@@ -138,6 +138,7 @@ public:
     using Map = ServerParameter::Map;
 
     void add(ServerParameter* sp);
+    void remove(const std::string& name);
 
     const Map& getMap() const {
         return _map;

@@ -54,6 +54,10 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
+#if __has_feature(address_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
+
 namespace mongo {
 
 namespace {
@@ -117,15 +121,14 @@ public:
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.
-        new WiredTigerServerStatusSection(kv);
-        new OplogStonesServerStatusSection();
-        auto* param = new WiredTigerEngineRuntimeConfigParameter("wiredTigerEngineRuntimeConfig",
-                                                                 ServerParameterType::kRuntimeOnly);
-        param->_data.second = kv;
+        MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection = new WiredTigerServerStatusSection(kv);
+        MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection2 = new OplogStonesServerStatusSection();
 
-        auto* maxCacheOverflowParam = new WiredTigerMaxCacheOverflowSizeGBParameter(
-            "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly);
-        maxCacheOverflowParam->_data = {wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB, kv};
+        // This allows unit tests to run this code without encountering memory leaks
+#if __has_feature(address_sanitizer)
+        __lsan_ignore_object(leakedSection);
+        __lsan_ignore_object(leakedSection2);
+#endif
 
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;

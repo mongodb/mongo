@@ -104,6 +104,9 @@ public:
 
 class SyncTailTest : public ServiceContextMongoDTest {
 public:
+    SyncTailTest(){};
+    SyncTailTest(std::string storageEngine) : ServiceContextMongoDTest(std::move(storageEngine)){};
+
     /**
      * Creates OplogApplier::Options for initial sync.
      */
