@@ -71,10 +71,21 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            if (oplogApplicationMode != repl::OplogApplication::Mode::kInitialSync &&
-                oplogApplicationMode != repl::OplogApplication::Mode::kRecovering)
-                throw;
+        } catch (const DBException& ex) {
+            // Ignore NamespaceNotFound errors if we are in initial sync or recovering mode.
+            const bool ignoreException = ex.code() == ErrorCodes::NamespaceNotFound &&
+                (oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync ||
+                 oplogApplicationMode == repl::OplogApplication::Mode::kRecovering);
+
+            if (!ignoreException) {
+                LOG(1) << "Error applying operation in transaction. " << redact(ex)
+                       << "- oplog entry: " << redact(op.toBSON());
+                return exceptionToStatus();
+            }
+            LOG(1) << "Encountered but ignoring error: " << redact(ex)
+                   << " while applying operations for transaction because we are either in initial "
+                      "sync or recovering mode - oplog entry: "
+                   << redact(op.toBSON());
         }
     }
     return Status::OK();
