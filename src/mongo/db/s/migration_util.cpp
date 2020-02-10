@@ -49,6 +49,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -602,14 +603,13 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22037, "Starting migration coordinator stepup recovery thread.");
 
     auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
-    ExecutorFuture<void>(executor).getAsync([serviceContext](const Status& status) {
-        try {
+    ExecutorFuture<void>(executor)
+        .then([serviceContext] {
             ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
                 tc->setSystemOperationKillable(lk);
             }
-
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
@@ -633,14 +633,17 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
             LOGV2(22038,
                   "Waiting for OpTime {lastOpTime} to become majority committed",
                   "lastOpTime"_attr = lastOpTime);
-            WriteConcernResult unusedWCResult;
-            uassertStatusOK(
-                waitForWriteConcern(opCtx,
-                                    lastOpTime,
-                                    WriteConcernOptions{WriteConcernOptions::kMajority,
-                                                        WriteConcernOptions::SyncMode::UNSET,
-                                                        WriteConcernOptions::kNoTimeout},
-                                    &unusedWCResult));
+            return WaitForMajorityService::get(serviceContext).waitUntilMajority(lastOpTime);
+        })
+        .thenRunOn(executor)
+        .then([serviceContext]() {
+            ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
+            }
+            auto uniqueOpCtx = tc->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
 
             PersistentTaskStore<MigrationCoordinatorDocument> store(
                 opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
@@ -718,12 +721,14 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
                 coordinator.completeMigration(opCtx);
                 return true;
             });
-        } catch (const DBException& ex) {
-            LOGV2(22041,
-                  "Failed to resume coordinating migrations on stepup {causedBy_ex_toStatus}",
-                  "causedBy_ex_toStatus"_attr = causedBy(ex.toStatus()));
-        }
-    });
+        })
+        .getAsync([](const Status& status) {
+            if (!status.isOK()) {
+                LOGV2(22041,
+                      "Failed to resume coordinating migrations on stepup {causedBy_status}",
+                      "causedBy_status"_attr = causedBy(status));
+            }
+        });
 }
 
 }  // namespace migrationutil
