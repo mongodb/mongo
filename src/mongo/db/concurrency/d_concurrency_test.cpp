@@ -468,6 +468,24 @@ TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
         MODE_NONE);
 }
 
+TEST_F(DConcurrencyTestFixture, PBWMmodeX_Timeout) {
+    auto clients = makeKClientsWithLockers(2);
+    Lock::ParallelBatchWriterMode pbwm(clients[0].second.get()->lockState());
+    ASSERT_EQ(clients[0].second.get()->lockState()->getLockMode(resourceIdParallelBatchWriterMode),
+              MODE_X);
+
+    ASSERT_THROWS_CODE(Lock::GlobalLock(clients[1].second.get(),
+                                        MODE_X,
+                                        Date_t::now() + Milliseconds(1),
+                                        Lock::InterruptBehavior::kThrow),
+                       AssertionException,
+                       ErrorCodes::LockTimeout);
+    ASSERT_EQ(clients[0].second.get()->lockState()->getLockMode(resourceIdParallelBatchWriterMode),
+              MODE_X);
+    ASSERT_EQ(clients[1].second.get()->lockState()->getLockMode(resourceIdParallelBatchWriterMode),
+              MODE_NONE);
+}
+
 TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();

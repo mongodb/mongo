@@ -172,7 +172,7 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.lock(_opCtx, MODE_IS);
+            _pbwm.lock(_opCtx, MODE_IS, deadline);
         }
         auto unlockPBWM = makeGuard([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
