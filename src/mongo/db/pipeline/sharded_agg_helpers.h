@@ -152,6 +152,20 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            bool hasChangeStream);
 
 /**
+ * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
+ * true. Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
+ */
+BSONObj targetShardsForExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               Pipeline* ownedPipeline);
+
+/**
+ * Appends the explain output of `dispatchResults` to `result`.
+ */
+Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
+                            const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
+                            BSONObjBuilder* result);
+
+/**
  * Returns the proper routing table to use for targeting shards: either a historical routing table
  * based on the global read timestamp if there is an active transaction with snapshot level read
  * concern or the latest routing table otherwise.
