@@ -683,7 +683,7 @@ class NinjaState:
             rule="CMD",
             pool="console",
             variables={
-                "cmd": "ninja -f {} -t compdb CC,CXX > compile_commands.json".format(
+                "cmd": "ninja -f {} -t compdb CC CXX > compile_commands.json".format(
                     ninja_file
                 )
             },
