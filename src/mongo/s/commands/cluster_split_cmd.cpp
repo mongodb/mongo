@@ -51,7 +51,7 @@ namespace {
 
 /**
  * Asks the mongod holding this chunk to find a key that approximately divides the specified chunk
- * in two. Throws on error or if the chunk is empty.
+ * in two. Throws on error or if the chunk is indivisible.
  */
 BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
@@ -81,7 +81,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
     }
 
     uasserted(ErrorCodes::CannotSplit,
-              "Unable to find median in chunk, possibly because chunk is empty.");
+              "Unable to find median in chunk because chunk is indivisible.");
 }
 
 class SplitCollectionCmd : public ErrmsgCommandDeprecated {
