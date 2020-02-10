@@ -150,7 +150,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.lock(opCtx, MODE_IS);
+            _pbwm.lock(opCtx, MODE_IS, deadline);
         }
         auto unlockPBWM = makeGuard([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
