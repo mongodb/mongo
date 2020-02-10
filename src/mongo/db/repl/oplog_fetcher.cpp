@@ -58,6 +58,7 @@ MONGO_FAIL_POINT_DEFINE(setSmallOplogGetMoreMaxTimeMS);
 MONGO_FAIL_POINT_DEFINE(logAfterOplogFetcherConnCreated);
 MONGO_FAIL_POINT_DEFINE(hangAfterOplogFetcherCallbackScheduled);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
+MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
 
 // TODO SERVER-45574: Define the failpoint in this file instead.
 extern FailPoint hangBeforeStartingOplogFetcher;
@@ -584,6 +585,63 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
                                     _batchSize);
 }
 
+StatusWith<NewOplogFetcher::DocumentsInfo> NewOplogFetcher::validateDocuments(
+    const Fetcher::Documents& documents,
+    bool first,
+    Timestamp lastTS,
+    StartingPoint startingPoint) {
+    if (first && documents.empty()) {
+        return Status(ErrorCodes::OplogStartMissing,
+                      str::stream() << "The first batch of oplog entries is empty, but expected at "
+                                       "least 1 document matching ts: "
+                                    << lastTS.toString());
+    }
+
+    DocumentsInfo info;
+    // The count of the bytes of the documents read off the network.
+    info.networkDocumentBytes = 0;
+    info.networkDocumentCount = 0;
+    for (auto&& doc : documents) {
+        info.networkDocumentBytes += doc.objsize();
+        ++info.networkDocumentCount;
+
+        // If this is the first response (to the $gte query) then we already applied the first doc.
+        if (first && info.networkDocumentCount == 1U) {
+            continue;
+        }
+
+        auto docOpTime = OpTime::parseFromOplogEntry(doc);
+        if (!docOpTime.isOK()) {
+            return docOpTime.getStatus();
+        }
+        info.lastDocument = docOpTime.getValue();
+
+        // Check to see if the oplog entry goes back in time for this document.
+        const auto docTS = info.lastDocument.getTimestamp();
+        if (lastTS >= docTS) {
+            return Status(ErrorCodes::OplogOutOfOrder,
+                          str::stream() << "Out of order entries in oplog. lastTS: "
+                                        << lastTS.toString() << " outOfOrderTS:" << docTS.toString()
+                                        << " in batch with " << info.networkDocumentCount
+                                        << "docs; first-batch:" << first << ", doc:" << doc);
+        }
+        lastTS = docTS;
+    }
+
+    // These numbers are for the documents we will apply.
+    info.toApplyDocumentCount = documents.size();
+    info.toApplyDocumentBytes = info.networkDocumentBytes;
+    if (first && startingPoint == StartingPoint::kSkipFirstDoc) {
+        // The count is one less since the first document found was already applied ($gte $ts query)
+        // and we will not apply it again.
+        --info.toApplyDocumentCount;
+        auto alreadyAppliedDocument = documents.cbegin();
+        info.toApplyDocumentBytes -= alreadyAppliedDocument->objsize();
+    }
+
+    return info;
+}
+
 NewOplogFetcher::NewOplogFetcher(
     executor::TaskExecutor* executor,
     OpTime lastFetched,
@@ -782,6 +840,7 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
             }
         }
 
+        // This will advance our view of _lastFetched.
         auto status = _onSuccessfulBatch(batchResult.getValue());
         if (!status.isOK()) {
             // The stopReplProducer fail point expects this to return successfully. If another fail
@@ -790,6 +849,7 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
                 _finishCallback(Status::OK());
                 return;
             }
+
             _finishCallback(status);
             return;
         }
@@ -921,9 +981,130 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
 }
 
 Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
+    hangBeforeProcessingSuccessfulBatch.pauseWhileSet();
+
+    if (_isShuttingDown()) {
+        return Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down");
+    }
+
     _oplogFetcherRestartDecision->fetchSuccessful(this);
 
-    // TODO SERVER-45469: handle each batch.
+    // Stop fetching and return on fail point.
+    // This fail point makes the oplog fetcher ignore the downloaded batch of operations and not
+    // error out. The FailPointEnabled error will be caught by the caller.
+    if (MONGO_unlikely(stopReplProducer.shouldFail())) {
+        return Status(ErrorCodes::FailPointEnabled, "stopReplProducer fail point is enabled");
+    }
+
+    // Stop fetching and return when we reach a particular document. This failpoint should be used
+    // with the setParameter bgSyncOplogFetcherBatchSize=1, so that documents are fetched one at a
+    // time.
+    {
+        Status status = Status::OK();
+        stopReplProducerOnDocument.executeIf(
+            [&](auto&&) {
+                status = {ErrorCodes::FailPointEnabled,
+                          "stopReplProducerOnDocument fail point is enabled."};
+                log() << status.reason();
+            },
+            [&](const BSONObj& data) {
+                auto opCtx = cc().makeOperationContext();
+                boost::intrusive_ptr<ExpressionContext> expCtx(
+                    new ExpressionContext(opCtx.get(), nullptr));
+                Matcher m(data["document"].Obj(), expCtx);
+                return !documents.empty() && m.matches(documents.front()["o"].Obj());
+            });
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    auto firstDocToApply = documents.cbegin();
+
+    if (!documents.empty()) {
+        LOG(2) << "oplog fetcher read " << documents.size()
+               << " operations from remote oplog starting at " << documents.front()["ts"]
+               << " and ending at " << documents.back()["ts"];
+    } else {
+        LOG(2) << "oplog fetcher read 0 operations from remote oplog";
+    }
+
+    // TODO SERVER-45470: parse metadata.
+
+    // This lastFetched value is the last OpTime from the previous batch.
+    auto lastFetched = _getLastOpTimeFetched();
+
+    if (_firstBatch) {
+        // TODO SERVER-45470: use metadata to populate remoteRBID and remoteLastApplied.
+        auto remoteRBID = boost::none;
+        auto remoteLastApplied = boost::none;
+        auto status = checkRemoteOplogStart(documents,
+                                            lastFetched,
+                                            remoteLastApplied,
+                                            _requiredRBID,
+                                            remoteRBID,
+                                            _requireFresherSyncSource);
+        if (!status.isOK()) {
+            // Stop oplog fetcher and execute rollback if necessary.
+            return status;
+        }
+
+        LOG(1) << "oplog fetcher successfully fetched from " << _source;
+
+        // We do not always enqueue the first document. We elect to skip it for the following
+        // reasons:
+        //    1. This is the first batch and no rollback is needed. Callers specify
+        //       StartingPoint::kSkipFirstDoc when they want this behavior.
+        //    2. We have already enqueued that document in a previous attempt. We can get into
+        //       this situation if we had a batch with StartingPoint::kEnqueueFirstDoc that failed
+        //       right after that first document was enqueued. In such a scenario, we would not
+        //       have advanced the lastFetched opTime, so we skip past that document to avoid
+        //       duplicating it.
+
+        if (_startingPoint == StartingPoint::kSkipFirstDoc) {
+            firstDocToApply++;
+        }
+    }
+
+    auto validateResult = NewOplogFetcher::validateDocuments(
+        documents, _firstBatch, lastFetched.getTimestamp(), _startingPoint);
+    if (!validateResult.isOK()) {
+        return validateResult.getStatus();
+    }
+    auto info = validateResult.getValue();
+
+    // TODO SERVER-45470: Process replset metadata.
+
+    // Increment stats. We read all of the docs in the query.
+    opsReadStats.increment(info.networkDocumentCount);
+    networkByteStats.increment(info.networkDocumentBytes);
+
+    // TODO SERVER-44705: Track time spent in each batch.
+
+    auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Start skipping the first doc after at least one doc has been enqueued in the lifetime
+    // of this fetcher.
+    _startingPoint = StartingPoint::kSkipFirstDoc;
+
+    // TODO SERVER-45470: check for invalid sync source.
+
+    // We have now processed the batch and should move forward our view of _lastFetched.
+    if (documents.size() > 0) {
+        auto lastDocOpTimeRes = OpTime::parseFromOplogEntry(documents.back());
+        if (!lastDocOpTimeRes.isOK()) {
+            return lastDocOpTimeRes.getStatus();
+        }
+
+        auto lastDocOpTime = lastDocOpTimeRes.getValue();
+        LOG(3) << "Oplog fetcher setting last fetched optime ahead after batch: " << lastDocOpTime;
+
+        stdx::lock_guard<Latch> lock(_mutex);
+        _lastFetched = lastDocOpTime;
+    }
 
     _firstBatch = false;
     return Status::OK();
