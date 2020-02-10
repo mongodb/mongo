@@ -59,13 +59,13 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
-                                    OpTime lastDurableOpTime,
+                                    OpTime lastAppliedOpTime,
                                     int primaryIndex)
     : _rsConfig(rsConfig),
       _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
-      _lastDurableOpTime(lastDurableOpTime) {
+      _lastAppliedOpTime(lastAppliedOpTime) {
     // populate targets with all voting members that aren't this node
     long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
@@ -89,14 +89,20 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("term", _term);
     requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
-    // Only append the config term field to the VoteRequester if we are in FCV 4.4
+
+    // TODO: Remove this check when we upgrade to 4.6 and can remove references to "lastCommittedOp"
+    // (SERVER-46090).
+    // Only append the config term field to the VoteRequester and use "lastAppliedOpTime" as the
+    // field name for _lastAppliedOpTime if we are in FCV 4.4.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
+        _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
+    } else {
+        // If we are not in FCV 4.4, use "lastCommittedOp" as the field name instead.
+        _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
     }
-
-    _lastDurableOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
@@ -219,10 +225,10 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     long long candidateIndex,
     long long term,
     bool dryRun,
-    OpTime lastDurableOpTime,
+    OpTime lastAppliedOpTime,
     int primaryIndex) {
     _algorithm = std::make_shared<Algorithm>(
-        rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex);
+        rsConfig, candidateIndex, term, dryRun, lastAppliedOpTime, primaryIndex);
     _runner = std::make_unique<ScatterGatherRunner>(_algorithm, executor, "vote request");
     return _runner->start();
 }

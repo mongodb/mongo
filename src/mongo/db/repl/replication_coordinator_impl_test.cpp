@@ -6895,7 +6895,7 @@ TEST_F(ReplCoordTest, NodeStoresElectionVotes) {
                                                          << "mySet"
                                                          << "term" << 7LL << "candidateIndex" << 2LL
                                                          << "configVersion" << 2LL << "dryRun"
-                                                         << false << "lastCommittedOp"
+                                                         << false << "lastAppliedOpTime"
                                                          << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
@@ -6938,7 +6938,7 @@ TEST_F(ReplCoordTest, NodeDoesNotStoreDryRunVotes) {
                                                          << "mySet"
                                                          << "term" << 7LL << "candidateIndex" << 2LL
                                                          << "configVersion" << 2LL << "dryRun"
-                                                         << true << "lastCommittedOp"
+                                                         << true << "lastAppliedOpTime"
                                                          << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
@@ -6985,7 +6985,7 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
                                    << "mySet"
                                    << "term" << initTerm + 1  // term of new candidate.
                                    << "candidateIndex" << 1LL << "configVersion" << 2LL << "dryRun"
-                                   << false << "lastCommittedOp" << time.asOpTime().toBSON())));
+                                   << false << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     // Simulate a failure to write the 'last vote' document. The specific error code isn't
@@ -7036,7 +7036,7 @@ TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
                                    << "mySet"
                                    << "term" << initTerm + 1  // term of new candidate.
                                    << "candidateIndex" << 1LL << "configVersion" << 2LL << "dryRun"
-                                   << false << "lastCommittedOp" << time.asOpTime().toBSON())));
+                                   << false << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     getReplCoord()->enterTerminalShutdown();

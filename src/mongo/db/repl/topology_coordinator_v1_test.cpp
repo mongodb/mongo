@@ -2563,7 +2563,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2578,7 +2578,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 1LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response2;
@@ -2642,7 +2642,7 @@ TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatT
                                                << "rs0"
                                                << "dryRun" << true << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2658,7 +2658,7 @@ TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatT
                                                << "rs0"
                                                << "dryRun" << true << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response2;
@@ -2674,7 +2674,7 @@ TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatT
                                                << "rs0"
                                                << "dryRun" << false << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response3;
@@ -2690,7 +2690,7 @@ TEST_F(TopoCoordTest, DryRunVoteRequestShouldNotPreventSubsequentDryRunsForThatT
                                                << "rs0"
                                                << "dryRun" << false << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response4;
@@ -2720,7 +2720,7 @@ TEST_F(TopoCoordTest, VoteRequestShouldNotPreventDryRunsForThatTerm) {
                                                << "rs0"
                                                << "dryRun" << false << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2736,7 +2736,7 @@ TEST_F(TopoCoordTest, VoteRequestShouldNotPreventDryRunsForThatTerm) {
                                                << "rs0"
                                                << "dryRun" << false << "term" << 1LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response2;
@@ -2766,7 +2766,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenReplSetNameDoesNotMatch) {
                                                << "wrongName"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2795,7 +2795,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigVersionIsLower) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 1LL
                                                << "configVersion" << 0LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2827,7 +2827,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigTermIsLower) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 1LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2863,7 +2863,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 1LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2894,7 +2894,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenOpTimeIsStale) {
                                                << "rs0"
                                                << "term" << 3LL << "candidateIndex" << 1LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2931,7 +2931,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenReplSetNameDoesNotMatch) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse responseForRealVote;
@@ -2947,7 +2947,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenReplSetNameDoesNotMatch) {
                                                << "wrongName"
                                                << "dryRun" << true << "term" << 2LL
                                                << "candidateIndex" << 0LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -2980,7 +2980,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse responseForRealVote;
@@ -2996,7 +2996,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
                                                << "rs0"
                                                << "dryRun" << true << "term" << 2LL
                                                << "candidateIndex" << 1LL << "configVersion" << 0LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -3032,7 +3032,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse responseForRealVote;
@@ -3047,7 +3047,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
                                                << "rs0"
                                                << "dryRun" << true << "term" << 0LL
                                                << "candidateIndex" << 1LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -3081,7 +3081,7 @@ TEST_F(TopoCoordTest, NodeGrantsVoteWhenTermIsHigherButConfigVersionIsLower) {
                                                << "rs0"
                                                << "term" << 2LL << "candidateIndex" << 1LL
                                                << "configVersion" << 1LL << "configTerm" << 2LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -3114,7 +3114,7 @@ TEST_F(TopoCoordTest, GrantDryRunVoteEvenWhenTermHasBeenSeen) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse responseForRealVote;
@@ -3130,7 +3130,7 @@ TEST_F(TopoCoordTest, GrantDryRunVoteEvenWhenTermHasBeenSeen) {
                                                << "rs0"
                                                << "dryRun" << true << "term" << 1LL
                                                << "candidateIndex" << 1LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -3163,7 +3163,7 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
                                                << "rs0"
                                                << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastCommittedOp"
+                                               << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse responseForRealVote;
@@ -3179,7 +3179,7 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
                                                << "rs0"
                                                << "dryRun" << true << "term" << 3LL
                                                << "candidateIndex" << 1LL << "configVersion" << 1LL
-                                               << "configTerm" << 1LL << "lastCommittedOp"
+                                               << "configTerm" << 1LL << "lastAppliedOpTime"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
@@ -3193,6 +3193,42 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
         response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
+}
+
+// TODO: Remove this test in 4.6 when we can remove references to "lastCommittedOp" (SERVER-46090).
+TEST_F(TopoCoordTest, ParseLastAppliedOpTimeWithCorrectFieldName) {
+    const OpTime lastOpTimeApplied = OpTime(Timestamp(4, 0), 0);
+
+    const auto reqVotesObjWithLastAppliedOpTimeField =
+        BSON("replSetRequestVotes" << 1 << "setName"
+                                   << "rs0"
+                                   << "dryRun" << true << "term" << 1LL << "candidateIndex" << 1LL
+                                   << "configVersion" << 1LL << "configTerm" << 1LL
+                                   << "lastAppliedOpTime" << lastOpTimeApplied);
+    ReplSetRequestVotesArgs reqVotesArgsWithLastAppliedOpTimeField;
+    ASSERT_OK(
+        reqVotesArgsWithLastAppliedOpTimeField.initialize(reqVotesObjWithLastAppliedOpTimeField));
+
+    // Verify we successfully parse the args with 'lastAppliedOpTime' as the field name.
+    ASSERT_EQUALS(lastOpTimeApplied, reqVotesArgsWithLastAppliedOpTimeField.getLastAppliedOpTime());
+    // Verify that the request serializes correctly.
+    ASSERT_EQUALS(reqVotesObjWithLastAppliedOpTimeField.toString(),
+                  reqVotesObjWithLastAppliedOpTimeField.toString());
+
+    const auto reqVotesObjWithLastCommittedOpField =
+        BSON("replSetRequestVotes" << 1 << "setName"
+                                   << "rs1"
+                                   << "dryRun" << true << "term" << 1LL << "candidateIndex" << 1LL
+                                   << "configVersion" << 1LL << "configTerm" << 1LL
+                                   << "lastCommittedOp" << lastOpTimeApplied);
+    ReplSetRequestVotesArgs reqVotesArgsWithLastCommittedOpField;
+    ASSERT_OK(reqVotesArgsWithLastCommittedOpField.initialize(reqVotesObjWithLastCommittedOpField));
+
+    // Verify we successfully parse the args with 'lastCommittedOp' as the field name.
+    ASSERT_EQUALS(lastOpTimeApplied, reqVotesArgsWithLastCommittedOpField.getLastAppliedOpTime());
+    // Verify that the request serializes correctly.
+    ASSERT_EQUALS(reqVotesObjWithLastCommittedOpField.toString(),
+                  reqVotesArgsWithLastCommittedOpField.toString());
 }
 
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {

@@ -2931,12 +2931,12 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         response->setReason(str::stream()
                             << "candidate's set name ({}) differs from mine ({})"_format(
                                    args.getSetName(), _rsConfig.getReplSetName()));
-    } else if (args.getLastDurableOpTime() < getMyLastAppliedOpTime()) {
+    } else if (args.getLastAppliedOpTime() < getMyLastAppliedOpTime()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
                             << "candidate's data is staler than mine. candidate's last applied "
                                "OpTime: {}, my last applied OpTime: {}"_format(
-                                   args.getLastDurableOpTime().toString(),
+                                   args.getLastAppliedOpTime().toString(),
                                    getMyLastAppliedOpTime().toString()));
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);

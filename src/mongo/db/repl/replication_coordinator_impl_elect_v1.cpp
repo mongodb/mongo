@@ -136,9 +136,9 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnu
 
 
     invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-    const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
+    const auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
 
-    if (lastOpTime == OpTime()) {
+    if (lastAppliedOpTime == OpTime()) {
         LOGV2(21436,
               "not trying to elect self, "
               "do not yet have a complete set of data from any point in time");
@@ -173,7 +173,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnu
                               _selfIndex,
                               term,
                               true,  // dry run
-                              lastOpTime,
+                              lastAppliedOpTime,
                               primaryIndex);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
@@ -328,11 +328,11 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
 
 void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm,
                                                             StartElectionReasonEnum reason) {
-    const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
+    const auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
 
     _voteRequester.reset(new VoteRequester);
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-        _replExecutor.get(), _rsConfig, _selfIndex, newTerm, false, lastOpTime, -1);
+        _replExecutor.get(), _rsConfig, _selfIndex, newTerm, false, lastAppliedOpTime, -1);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
