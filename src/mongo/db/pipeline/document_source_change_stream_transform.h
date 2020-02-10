@@ -216,6 +216,9 @@ private:
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
 
+    // Set to true if the pre-image optime should be included in output documents.
+    bool _includePreImageOptime = false;
+
     // '_fcv' is used to determine which version of the resume token to generate for each change.
     // This is a snapshot of what the feature compatibility version was at the time the stream was
     // opened or resumed.

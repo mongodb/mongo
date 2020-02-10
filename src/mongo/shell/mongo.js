@@ -633,6 +633,16 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.startAtOperationTime;
     }
 
+    if (options.hasOwnProperty("fullDocumentBeforeChange")) {
+        changeStreamOptions.fullDocumentBeforeChange = options.fullDocumentBeforeChange;
+        delete options.fullDocumentBeforeChange;
+    }
+
+    if (options.hasOwnProperty("allChangesForCluster")) {
+        changeStreamOptions.allChangesForCluster = options.allChangesForCluster;
+        delete options.allChangesForCluster;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

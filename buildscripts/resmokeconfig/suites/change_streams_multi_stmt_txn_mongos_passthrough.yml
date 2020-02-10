@@ -15,6 +15,8 @@ selector:
   # These tests make assumptions about change stream results that are no longer true once operations
   # get bundled into transactions.
   - change_stream_does_not_expect_txns
+  # Exclude any that assume sharding is disabled
+  - assumes_against_mongod_not_mongos
 
 executor:
   archive:

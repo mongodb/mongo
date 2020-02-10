@@ -87,6 +87,12 @@ public:
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
 
+    // Used by operations which need to obtain the oplog's UUID.
+    static const UUID& oplogUuid() {
+        static const UUID* oplog_uuid = new UUID(UUID::gen());
+        return *oplog_uuid;
+    }
+
     // This mock iterator simulates a traversal of transaction history in the oplog by returning
     // mock oplog entries from a list.
     struct MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
@@ -109,8 +115,11 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
     };
 
     MockMongoInterface(std::vector<FieldPath> fields,
-                       std::vector<repl::OplogEntry> transactionEntries = {})
-        : _fields(std::move(fields)), _transactionEntries(std::move(transactionEntries)) {}
+                       std::vector<repl::OplogEntry> transactionEntries = {},
+                       std::vector<Document> documentsForLookup = {})
+        : _fields(std::move(fields)),
+          _transactionEntries(std::move(transactionEntries)),
+          _documentsForLookup{std::move(documentsForLookup)} {}
 
     // For tests of transactions that involve multiple oplog entries.
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
@@ -128,6 +137,28 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
         }
 
         return iterator;
+    }
+
+    // Called by DocumentSourceLookupPreImage to obtain the UUID of the oplog. Since that's the only
+    // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+        return BSON("uuid" << oplogUuid());
+    }
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead) final {
+        Matcher matcher(documentKey.toBson(), expCtx);
+        auto it = std::find_if(_documentsForLookup.begin(),
+                               _documentsForLookup.end(),
+                               [&](const Document& lookedUpDoc) {
+                                   return matcher.matches(lookedUpDoc.toBson(), nullptr);
+                               });
+        return (it != _documentsForLookup.end() ? *it : boost::optional<Document>{});
     }
 
     // For "insert" tests.
@@ -148,6 +179,9 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
     // These entries are stored in the order they would be returned by the
     // TransactionHistoryIterator, which is the _reverse_ of the order they appear in the oplog.
     std::vector<repl::OplogEntry> _transactionEntries;
+
+    // These documents are used to feed the 'lookupSingleDocument' method.
+    std::vector<Document> _documentsForLookup;
 };
 
 class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
@@ -169,12 +203,13 @@ public:
                              std::vector<FieldPath> docKeyFields = {},
                              const BSONObj& spec = kDefaultSpec,
                              const boost::optional<Document> expectedInvalidate = {},
-                             const std::vector<repl::OplogEntry> transactionEntries = {}) {
+                             const std::vector<repl::OplogEntry> transactionEntries = {},
+                             std::vector<Document> documentsForLookup = {}) {
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.toBSON(), spec);
         auto closeCursor = stages.back();
 
-        getExpCtx()->mongoProcessInterface =
-            std::make_unique<MockMongoInterface>(docKeyFields, transactionEntries);
+        getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
+            docKeyFields, transactionEntries, std::move(documentsForLookup));
 
         auto next = closeCursor->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -321,19 +356,20 @@ public:
         return lsid;
     }
 
-
     /**
      * Creates an OplogEntry with given parameters and preset defaults for this test suite.
      */
-    static repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
-                                           NamespaceString nss,
-                                           BSONObj object,
-                                           boost::optional<UUID> uuid = testUuid(),
-                                           boost::optional<bool> fromMigrate = boost::none,
-                                           boost::optional<BSONObj> object2 = boost::none,
-                                           boost::optional<repl::OpTime> opTime = boost::none,
-                                           OperationSessionInfo sessionInfo = {},
-                                           boost::optional<repl::OpTime> prevOpTime = {}) {
+    static repl::OplogEntry makeOplogEntry(
+        repl::OpTypeEnum opType,
+        NamespaceString nss,
+        BSONObj object,
+        boost::optional<UUID> uuid = testUuid(),
+        boost::optional<bool> fromMigrate = boost::none,
+        boost::optional<BSONObj> object2 = boost::none,
+        boost::optional<repl::OpTime> opTime = boost::none,
+        OperationSessionInfo sessionInfo = {},
+        boost::optional<repl::OpTime> prevOpTime = {},
+        boost::optional<repl::OpTime> preImageOpTime = boost::none) {
         long long hash = 1LL;
         return repl::OplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
                                 hash,                               // hash
@@ -348,9 +384,9 @@ public:
                                 boost::none,                        // upsert
                                 Date_t(),                           // wall clock time
                                 boost::none,                        // statement id
-                                prevOpTime,    // optime of previous write within same transaction
-                                boost::none,   // pre-image optime
-                                boost::none);  // post-image optime
+                                prevOpTime,      // optime of previous write within same transaction
+                                preImageOpTime,  // pre-image optime
+                                boost::none);    // post-image optime
     }
 };
 
@@ -1964,6 +2000,282 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
     };
 
     checkTransformation(dropDB, expectedDropDatabase, {}, kDefaultSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
+    // Set the pre-image opTime to 1 second prior to the default event optime.
+    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
+    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
+
+    // The documentKey for the main change stream event.
+    const auto documentKey = BSON("_id" << 1);
+
+    // The mock oplog UUID used by MockMongoInterface.
+    auto oplogUUID = MockMongoInterface::oplogUuid();
+
+    // Create an oplog entry for the pre-image no-op event.
+    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
+                                        NamespaceString::kRsOplogNamespace,
+                                        preImageObj,    // o
+                                        oplogUUID,      // uuid
+                                        boost::none,    // fromMigrate
+                                        boost::none,    // o2
+                                        preImageOpTime  // opTime
+    );
+
+    // Create an oplog entry for the delete event that will look up the pre-image.
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,
+                                      nss,
+                                      documentKey,     // o
+                                      testUuid(),      // uuid
+                                      boost::none,     // fromMigrate
+                                      boost::none,     // o2
+                                      kDefaultOpTime,  // opTime
+                                      {},              // sessionInfo
+                                      {},              // prevOpTime
+                                      preImageOpTime   // preImageOpTime
+    );
+
+    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
+    // entry before it so that we know we are finding the pre-image based on the given timestamp.
+    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
+    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
+                                                Document{preImageEntry.toBSON()}};
+
+    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
+    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                             << "off"));
+    Document expectedDeleteNoPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+    };
+    checkTransformation(
+        deleteEntry, expectedDeleteNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    Document expectedDeleteWithPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+    };
+    checkTransformation(
+        deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    checkTransformation(
+        deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
+    // without the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    checkTransformation(deleteEntry, expectedDeleteNoPreImage, {}, spec);
+
+    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
+    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    ASSERT_THROWS_CODE(checkTransformation(deleteEntry, boost::none, {}, spec),
+                       AssertionException,
+                       ErrorCodes::ChangeStreamHistoryLost);
+}
+
+TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
+    // Set the pre-image opTime to 1 second prior to the default event optime.
+    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
+
+    // Define the pre-image object, the update operation spec, and the document key.
+    const auto updateSpec = BSON("$unset" << BSON("x" << 1));
+    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
+    const auto documentKey = BSON("_id" << 1);
+
+    // The mock oplog UUID used by MockMongoInterface.
+    auto oplogUUID = MockMongoInterface::oplogUuid();
+
+    // Create an oplog entry for the pre-image no-op event.
+    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
+                                        NamespaceString::kRsOplogNamespace,
+                                        preImageObj,    // o
+                                        oplogUUID,      // uuid
+                                        boost::none,    // fromMigrate
+                                        boost::none,    // o2
+                                        preImageOpTime  // opTime
+    );
+
+    // Create an oplog entry for the update event that will look up the pre-image.
+    auto updateEntry = makeOplogEntry(OpTypeEnum::kUpdate,
+                                      nss,
+                                      updateSpec,      // o
+                                      testUuid(),      // uuid
+                                      boost::none,     // fromMigrate
+                                      documentKey,     // o2
+                                      kDefaultOpTime,  // opTime
+                                      {},              // sessionInfo
+                                      {},              // prevOpTime
+                                      preImageOpTime   // preImageOpTime
+    );
+
+    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
+    // entry before it so that we know we are finding the pre-image based on the given timestamp.
+    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
+    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
+                                                Document{preImageEntry.toBSON()}};
+
+    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
+    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                             << "off"));
+    Document expectedUpdateNoPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+        {
+            "updateDescription",
+            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("x"_sd)}}},
+        },
+    };
+    checkTransformation(
+        updateEntry, expectedUpdateNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    Document expectedUpdateWithPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+        {
+            "updateDescription",
+            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("x"_sd)}}},
+        },
+    };
+    checkTransformation(
+        updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    checkTransformation(
+        updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
+    // without the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    checkTransformation(updateEntry, expectedUpdateNoPreImage, {}, spec);
+
+    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
+    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    ASSERT_THROWS_CODE(checkTransformation(updateEntry, boost::none, {}, spec),
+                       AssertionException,
+                       ErrorCodes::ChangeStreamHistoryLost);
+}
+
+TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
+    // Set the pre-image opTime to 1 second prior to the default event optime.
+    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
+
+    // Define the pre-image object, the replacement document, and the document key.
+    const auto replacementDoc = BSON("_id" << 1 << "y" << 3);
+    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
+    const auto documentKey = BSON("_id" << 1);
+
+    // The mock oplog UUID used by MockMongoInterface.
+    auto oplogUUID = MockMongoInterface::oplogUuid();
+
+    // Create an oplog entry for the pre-image no-op event.
+    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
+                                        NamespaceString::kRsOplogNamespace,
+                                        preImageObj,    // o
+                                        oplogUUID,      // uuid
+                                        boost::none,    // fromMigrate
+                                        boost::none,    // o2
+                                        preImageOpTime  // opTime
+    );
+
+    // Create an oplog entry for the replacement event that will look up the pre-image.
+    auto replaceEntry = makeOplogEntry(OpTypeEnum::kUpdate,
+                                       nss,
+                                       replacementDoc,  // o
+                                       testUuid(),      // uuid
+                                       boost::none,     // fromMigrate
+                                       documentKey,     // o2
+                                       kDefaultOpTime,  // opTime
+                                       {},              // sessionInfo
+                                       {},              // prevOpTime
+                                       preImageOpTime   // preImageOpTime
+    );
+
+    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
+    // entry before it so that we know we are finding the pre-image based on the given timestamp.
+    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
+    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
+                                                Document{preImageEntry.toBSON()}};
+
+    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
+    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                             << "off"));
+    Document expectedReplaceNoPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kFullDocumentField, replacementDoc},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+    };
+    checkTransformation(
+        replaceEntry, expectedReplaceNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    Document expectedReplaceWithPreImage{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kFullDocumentField, replacementDoc},
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, documentKey},
+    };
+    checkTransformation(
+        replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    checkTransformation(
+        replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
+
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
+    // without the pre-image.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "whenAvailable"));
+    checkTransformation(replaceEntry, expectedReplaceNoPreImage, {}, spec);
+
+    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
+    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
+                                        << "required"));
+    ASSERT_THROWS_CODE(checkTransformation(replaceEntry, boost::none, {}, spec),
+                       AssertionException,
+                       ErrorCodes::ChangeStreamHistoryLost);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {

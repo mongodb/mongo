@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -72,6 +73,7 @@ REGISTER_MULTI_STAGE_ALIAS(changeStream,
                            DocumentSourceChangeStream::createFromBson);
 
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
+constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
 constexpr StringData DocumentSourceChangeStream::kIdField;
 constexpr StringData DocumentSourceChangeStream::kNamespaceField;
@@ -470,18 +472,37 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
             str::stream() << "unrecognized value for the 'fullDocument' option to the "
-                             "$changeStream stage. Expected \"default\" or "
-                             "\"updateLookup\", got \""
-                          << fullDocOption << "\"",
+                             "$changeStream stage. Expected 'default' or 'updateLookup', got '"
+                          << fullDocOption << "'",
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
 
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
+    const bool shouldLookupPreImage =
+        (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
+
+    // TODO SERVER-36941: We do not currently support sharded pre-image lookup.
+    uassert(51771,
+            "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
+            !(shouldLookupPreImage && (expCtx->inMongos || expCtx->needsMerge)));
+
     auto stages = buildPipeline(expCtx, spec, elem);
+
     if (!expCtx->needsMerge) {
         // There should only be one close cursor stage. If we're on the shards and producing input
         // to be merged, do not add a close cursor stage, since the mongos will already have one.
         stages.push_back(DocumentSourceCloseCursor::create(expCtx));
+
+        // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
+        // so that any $match stages which follow the $changeStream pipeline prefix may be able to
+        // skip ahead of the DSLPreImage stage. This allows a whole-db or whole-cluster stream to
+        // run on an instance where only some collections have pre-images enabled, so long as the
+        // user filters for only those namespaces.
+        // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
+        if (shouldLookupPreImage) {
+            invariant(!expCtx->inMongos);
+            stages.push_back(DocumentSourceLookupChangePreImage::create(expCtx, spec));
+        }
 
         // There should be only one post-image lookup stage.  If we're on the shards and producing
         // input to be merged, the lookup is done on the mongos.

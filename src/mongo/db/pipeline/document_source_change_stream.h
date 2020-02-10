@@ -102,6 +102,9 @@ public:
     // after the transformation.
     static constexpr StringData kDocumentKeyField = "documentKey"_sd;
 
+    // The name of the field where the pre-image document will be found, if requested and available.
+    static constexpr StringData kFullDocumentBeforeChangeField = "fullDocumentBeforeChange"_sd;
+
     // The name of the field where the full document will be found after the transformation. The
     // full document is only present for certain types of operations, such as an insert.
     static constexpr StringData kFullDocumentField = "fullDocument"_sd;

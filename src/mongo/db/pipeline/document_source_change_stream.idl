@@ -51,6 +51,19 @@ types:
         serializer: ResumeToken::toBSON_do_not_use
         deserializer: ResumeToken::parse
 
+enums:
+    FullDocumentBeforeChangeMode:
+        description: Possible modes for the 'fullDocumentBeforeChange' parameter of the
+                     $changeStream stage.
+        type: string
+        values:
+            # Do not supply pre-images.
+            kOff: "off"
+            # Supply a pre-image if available. Otherwise, omit the output field.
+            kWhenAvailable: "whenAvailable"
+            # Pre-images are required. Throw an exception if not available.
+            kRequired: "required"
+
 structs:
     ResumeTokenClusterTime:
         description: The IDL type of cluster time
@@ -86,12 +99,28 @@ structs:
                 description: The operation time after which we should start reporting changes.
                              Only one of resumeAfter, _resumeAfterClusterTimeDeprecated, and
                              startAtOperationTime should be specified.
+
             fullDocument:
                 cpp_name: fullDocument
                 type: string
                 default: '"default"'
                 description: A string '"updateLookup"' or '"default"', indicating whether or not we
                              should return a full document or just changes for an update.
+
+            fullDocumentBeforeChange:
+                cpp_name: fullDocumentBeforeChange
+                type: FullDocumentBeforeChangeMode
+                default: kOff
+                description: Valid values are "off", "whenAvailable", or "required". If set to
+                             "off", the "fullDocumentBeforeChange" field of the output document
+                             is always omitted. If set to "whenAvailable", the
+                             "fullDocumentBeforeChange" field will be populated with the
+                             pre-image of the document modified by the current change event if
+                             such a pre-image is available, and will be omitted otherwise. If
+                             set to "required", then the "fullDocumentBeforeChange" field is
+                             always populated and an exception is thrown if the pre-image is not
+                             available.
+
             allChangesForCluster:
                 cpp_name: allChangesForCluster
                 type: bool
@@ -99,6 +128,7 @@ structs:
                 description: A flag indicating whether the stream should report all changes that
                              occur on the deployment, aside from those on internal databases or
                              collections.
+
             showMigrationEvents:
                 cpp_name: showMigrationEvents
                 type: bool
@@ -109,6 +139,7 @@ structs:
                              deletes may appear that do not reflect actual deletions or insertions
                              of data. Instead they reflect this data moving from one shard to
                              another.
+
             allowToRunOnConfigDB:
                 cpp_name: allowToRunOnConfigDB
                 type: bool

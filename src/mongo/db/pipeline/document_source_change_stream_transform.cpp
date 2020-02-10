@@ -92,6 +92,10 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       _changeStreamSpec);
 
+    // If the change stream spec requested a pre-image, make sure that we supply one.
+    _includePreImageOptime =
+        (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
+
     // If the change stream spec includes a resumeToken with a shard key, populate the document key
     // cache with the field paths.
     auto resumeAfter = spec.getResumeAfter();
@@ -188,6 +192,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value ns = input[repl::OplogEntry::kNssFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
+    Value preImageOpTime = input[repl::OplogEntry::kPreImageOpTimeFieldName];
     std::vector<FieldPath> documentKeyFields;
 
     // Deal with CRUD operations and commands.
@@ -338,7 +343,13 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         return doc.freeze();
     }
 
+    // Add the post-image, pre-image, namespace, documentKey and other fields as appropriate.
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, fullDocument);
+    if (_includePreImageOptime) {
+        // Set 'kFullDocumentBeforeChangeField' to the pre-image optime. The DSCSLookupPreImage
+        // stage will replace this optime with the actual pre-image taken from the oplog.
+        doc.addField(DocumentSourceChangeStream::kFullDocumentBeforeChangeField, preImageOpTime);
+    }
     doc.addField(DocumentSourceChangeStream::kNamespaceField,
                  operationType == DocumentSourceChangeStream::kDropDatabaseOpType
                      ? Value(Document{{"db", nss.db()}})
@@ -384,6 +395,9 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kSessionIdFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTermFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
+    if (_includePreImageOptime) {
+        deps->fields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());
+    }
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
