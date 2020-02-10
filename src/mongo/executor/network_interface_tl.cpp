@@ -228,7 +228,8 @@ NetworkInterfaceTL::CommandState::CommandState(NetworkInterfaceTL* interface_,
     : interface(interface_),
       requestOnAny(std::move(request_)),
       cbHandle(cbHandle_),
-      finishLine(maxRequestFailures()) {}
+      finishLine(maxRequestFailures()),
+      operationKey(request_.operationKey) {}
 
 
 auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
@@ -415,7 +416,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
      *     it then schedules onto the reactor to finish.
      * 2.  All nodes are bad but some needed new connections. The reaction to the new connection
      *     needs to be scheduled onto the reactor.
-     * 3.  The timer in onAcquireConn() fires and the operation times out. ASIO timers run on the
+     * 3.  The timer in sendRequest() fires and the operation times out. ASIO timers run on the
      *     reactor.
      * 4.  AsyncDBClient::runCommandRequest() concludes. This path is sadly indeterminate since
      *     early failure can still be inline. The future chain is thenRunOn() either the baton or
@@ -423,8 +424,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
      *
      * The important bits to remember here:
      * - onFinish() is out-of-line
-     * - Stay inline as long as feasible until onAcquireConn()---i.e. until network operations
-     * - Baton execution *cannot* be relied upon at least until onAcquireConn()
+     * - Stay inline as long as feasible until sendRequest()---i.e. until network operations
+     * - Baton execution *cannot* be relied upon at least until sendRequest()
      * - Connection failure and command failure are related but distinct
      */
 
@@ -433,6 +434,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                    StatusWith<RemoteCommandOnAnyResponse> swr) {
         invariant(swr.isOK());
         auto rs = std::move(swr.getValue());
+
         LOGV2_DEBUG(22597,
                     2,
                     "Request {cmdState_requestOnAny_id} finished with response: "
@@ -496,6 +498,11 @@ void NetworkInterfaceTL::CommandState::doMetadataHook(const RemoteCommandOnAnyRe
 
 void NetworkInterfaceTL::RequestState::trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn,
                                                size_t idx) noexcept {
+    trySend(std::move(swConn), {cmdState->requestOnAny, idx});
+}
+
+void NetworkInterfaceTL::RequestState::trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn,
+                                               RemoteCommandRequest remoteCommandRequest) noexcept {
     // Our connection wasn't any good
     if (!swConn.isOK()) {
         if (!connFinishLine.arriveWeakly()) {
@@ -524,8 +531,8 @@ void NetworkInterfaceTL::RequestState::trySend(StatusWith<ConnectionPool::Connec
     }
 
     // We have a connection and the command hasn't already been attempted
-    request.emplace(cmdState->requestOnAny, idx);
-    host = cmdState->requestOnAny.target[idx];
+    request.emplace(remoteCommandRequest);
+    host = request.get().target;
     conn = std::move(swConn.getValue());
 
     networkInterfaceDiscardCommandsAfterAcquireConn.pauseWhileSet();
@@ -602,27 +609,110 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
     if (it == _inProgress.end()) {
         return;
     }
-    auto state = it->second.lock();
-    if (!state) {
+    auto cmdStateToCancel = it->second.lock();
+    if (!cmdStateToCancel) {
         return;
     }
 
     _inProgress.erase(it);
     lk.unlock();
 
-    if (!state->finishLine.arriveStrongly()) {
+    if (!cmdStateToCancel->finishLine.arriveStrongly()) {
         // If we didn't cross the command finishLine first, the promise is already fulfilled
         return;
     }
 
-    // Satisfy the promise locally
-    LOGV2_DEBUG(22599,
+    auto requestStateToCancel = cmdStateToCancel->requestStatePtr.lock();
+
+    // If we didn't cross the connection finishLine first, the command must have acquired a
+    // connection.
+    auto hasAcquiredConn =
+        requestStateToCancel && !requestStateToCancel->connFinishLine.arriveStrongly();
+
+    // Only kill the command if it has an operation key and was attempted.
+    bool shouldKillOp =
+        cmdStateToCancel->operationKey && hasAcquiredConn && requestStateToCancel->request;
+
+    if (!shouldKillOp) {
+        // Satisfy the promise locally immediately.
+        LOGV2_DEBUG(22599,
+                    2,
+                    "Canceling operation; original request was: {cmdStateToCancel_requestOnAny}",
+                    "cmdStateToCancel_requestOnAny"_attr =
+                        redact(cmdStateToCancel->requestOnAny.toString()));
+        cmdStateToCancel->promise.setError(
+            {ErrorCodes::CallbackCanceled,
+             str::stream() << "Command canceled; original request was: "
+                           << redact(cmdStateToCancel->requestOnAny.toString())});
+        return;
+    }
+
+    _killOperation(requestStateToCancel);
+}
+
+void NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill) {
+    auto [target, sslMode] = [&] {
+        invariant(requestStateToKill->request);
+        auto request = requestStateToKill->request.get();
+        return std::make_pair(request.target, request.sslMode);
+    }();
+    auto cmdStateToKill = requestStateToKill->cmdState;
+    auto operationKey = cmdStateToKill->operationKey.get();
+
+    // Make a request state for _killOperations.
+    executor::RemoteCommandRequest killOpRequest(
+        target,
+        "admin",
+        BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(operationKey)),
+        nullptr,
+        kCancelCommandTimeout);
+
+    auto cbHandle = executor::TaskExecutor::CallbackHandle();
+    auto [killOpCmdState, future] = CommandState::make(this, killOpRequest, cbHandle);
+    killOpCmdState->deadline = killOpCmdState->stopwatch.start() + killOpRequest.timeout;
+
+    std::move(future).getAsync(
+        [this, operationKey, cmdStateToKill](StatusWith<RemoteCommandOnAnyResponse> swr) {
+            invariant(swr.isOK());
+            auto rs = std::move(swr.getValue());
+            LOGV2_DEBUG(
+                51813,
                 2,
-                "Canceling operation; original request was: {state_requestOnAny}",
-                "state_requestOnAny"_attr = redact(state->requestOnAny.toString()));
-    state->promise.setError({ErrorCodes::CallbackCanceled,
-                             str::stream() << "Command canceled; original request was: "
-                                           << redact(state->requestOnAny.toString())});
+                "Remote _killOperations request to cancel command with operationKey {operationKey}"
+                " finished with response: {rsdata_or_status}",
+                "operationKey"_attr = operationKey,
+                "rsdata_or_status"_attr =
+                    redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
+
+            // Satisfy the promise locally.
+            if (rs.isOK()) {
+                // _killOperations succeeded but the operation interrupted error is expected to be
+                // ignored in resolve() since cancelCommand() crossed the command finishLine first.
+                cmdStateToKill->promise.setError(
+                    {ErrorCodes::CallbackCanceled,
+                     str::stream() << "cancelCommand successfully issued remote interruption"});
+            } else {
+                // _killOperations timed out or failed due to other errors.
+                rs.status.addContext("operation's client canceled by cancelCommand");
+                cmdStateToKill->promise.setError(std::move(rs.status));
+            }
+        });
+
+    auto killOpRequestState = std::make_shared<RequestState>(killOpCmdState);
+    killOpCmdState->requestStatePtr = killOpRequestState;
+
+    // Send the _killOperations request.
+    auto connFuture = _pool->get(target, sslMode, killOpRequest.kNoTimeout);
+    if (connFuture.isReady()) {
+        killOpRequestState->trySend(std::move(connFuture).getNoThrow(), killOpRequest);
+        return;
+    }
+
+    std::move(connFuture)
+        .thenRunOn(_reactor)
+        .getAsync([this, killOpRequestState, killOpRequest](auto swConn) {
+            killOpRequestState->trySend(std::move(swConn), killOpRequest);
+        });
 }
 
 Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {

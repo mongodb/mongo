@@ -80,11 +80,17 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
         cmdObj = theCmdObj;
     }
 
+    if (hedgeOptions) {
+        operationKey.emplace(UUID::gen());
+        cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.get()).firstElement());
+    }
+
     timeout = opCtx ? std::min<Milliseconds>(opCtx->getRemainingMaxTimeMillis(), timeoutMillis)
                     : timeoutMillis;
 }
 
-RemoteCommandRequestBase::RemoteCommandRequestBase() : id(requestIdCounter.addAndFetch(1)) {}
+RemoteCommandRequestBase::RemoteCommandRequestBase()
+    : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
 
 template <typename T>
 RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl() = default;
@@ -150,7 +156,9 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
     }
 
     if (hedgeOptions) {
+        invariant(operationKey);
         out << " hedgeOptions.count: " << hedgeOptions->count;
+        out << " operationKey: " << operationKey.get();
     }
 
     out << " cmd:" << cmdObj.toString();

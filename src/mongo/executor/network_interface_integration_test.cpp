@@ -162,17 +162,20 @@ public:
         startNet(std::make_unique<WaitForIsMasterHook>(this));
     }
 
-    RemoteCommandRequest makeTestCommand(boost::optional<Milliseconds> timeout = boost::none,
-                                         BSONObj cmd = BSON("echo" << 1 << "foo"
-                                                                   << "bar"),
-                                         OperationContext* opCtx = nullptr) {
+    RemoteCommandRequest makeTestCommand(
+        boost::optional<Milliseconds> timeout = boost::none,
+        BSONObj cmd = BSON("echo" << 1 << "foo"
+                                  << "bar"),
+        OperationContext* opCtx = nullptr,
+        boost::optional<RemoteCommandRequest::HedgeOptions> hedgeOptions = boost::none) {
         auto cs = fixture();
         return RemoteCommandRequest(cs.getServers().front(),
                                     "admin",
                                     std::move(cmd),
                                     BSONObj(),
                                     opCtx,
-                                    timeout ? *timeout : RemoteCommandRequest::kNoTimeout);
+                                    timeout ? *timeout : RemoteCommandRequest::kNoTimeout,
+                                    hedgeOptions);
     }
 
     struct IsMasterData {
@@ -254,6 +257,107 @@ TEST_F(NetworkInterfaceTest, CancelOperation) {
     ASSERT(result.elapsedMillis);
 
     assertNumOps(1u, 0u, 0u, 0u);
+}
+
+TEST_F(NetworkInterfaceTest, CancelRemotely) {
+    auto runCommandAssertStatusOK = [this](BSONObj cmdObj) {
+        auto request = makeTestCommand(RemoteCommandRequest::kNoTimeout, cmdObj);
+        auto result = runCommandSync(request);
+        ASSERT_OK(result.status);
+    };
+
+    // Enable blockConnection for "echo".
+    runCommandAssertStatusOK(BSON("configureFailPoint"
+                                  << "failCommand"
+                                  << "mode"
+                                  << "alwaysOn"
+                                  << "data"
+                                  << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
+                                                            << "failCommands"
+                                                            << BSON_ARRAY("echo"))));
+
+    auto cbh = makeCallbackHandle();
+    auto deferred = [&] {
+        // Kick off an "echo" operation, which should block until cancelCommand causes
+        // the operation to be killed.
+        auto cmdObj = BSON("echo" << 1 << "foo"
+                                  << "bar");
+        auto deferred = runCommand(
+            cbh,
+            makeTestCommand(
+                boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+
+        // Run cancelCommand to kill the above operation.
+        net().cancelCommand(cbh);
+
+        return deferred;
+    }();
+
+    // Wait for the operation to complete, assert that it was canceled.
+    auto result = deferred.get();
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
+    ASSERT(result.elapsedMillis);
+
+    // We have one canceled operation (echo) and two succeeded operations (configureFailPoint
+    // and _killOperations).
+    assertNumOps(1u, 0u, 0u, 2u);
+
+    // Disable blockConnection.
+    runCommandAssertStatusOK(BSON("configureFailPoint"
+                                  << "failCommand"
+                                  << "mode"
+                                  << "off"));
+}
+
+TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
+    auto runCommandAssertStatusOK = [this](BSONObj cmdObj) {
+        auto request = makeTestCommand(RemoteCommandRequest::kNoTimeout, cmdObj);
+        auto result = runCommandSync(request);
+        ASSERT_OK(result.status);
+    };
+
+    // Enable blockConnection for "echo" and "_killOperations".
+    runCommandAssertStatusOK(BSON("configureFailPoint"
+                                  << "failCommand"
+                                  << "mode"
+                                  << "alwaysOn"
+                                  << "data"
+                                  << BSON("blockConnection" << true << "blockTimeMS" << 5000
+                                                            << "failCommands"
+                                                            << BSON_ARRAY("echo"
+                                                                          << "_killOperations"))));
+
+    auto cbh = makeCallbackHandle();
+    auto deferred = [&] {
+        // Kick off a blocking "echo" operation.
+        auto cmdObj = BSON("echo" << 1 << "foo"
+                                  << "bar");
+        auto deferred = runCommand(
+            cbh,
+            makeTestCommand(
+                boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+
+        // Run cancelCommand to kill the above operation. _killOperations is expected to block and
+        // time out, and the cancel timer is expected to cancel the operations.
+        net().cancelCommand(cbh);
+
+        return deferred;
+    }();
+
+    // Wait for op to complete, assert that it was canceled.
+    auto result = deferred.get();
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    ASSERT(result.elapsedMillis);
+
+    // We have two timedout operations (echo and _killOperations), and one succeeded operation
+    // (configureFailPoint).
+    assertNumOps(0u, 2u, 0u, 1u);
+
+    // Disable blockConnection.
+    runCommandAssertStatusOK(BSON("configureFailPoint"
+                                  << "failCommand"
+                                  << "mode"
+                                  << "off"));
 }
 
 TEST_F(NetworkInterfaceTest, ImmediateCancel) {
@@ -396,16 +500,8 @@ TEST_F(NetworkInterfaceTest, StartCommand) {
     auto commandRequest = BSON("echo" << 1 << "boop"
                                       << "bop");
 
-    // This opmsg request expect the following reply, which is generated below
-    // { echo: { echo: 1, boop: "bop", $db: "admin" }, ok: 1.0 }
-    auto expectedCommandReply = [&] {
-        BSONObjBuilder echoed;
-        echoed.appendElements(commandRequest);
-        echoed << "$db"
-               << "admin";
-        return echoed.obj();
-    }();
-    auto request = makeTestCommand(boost::none, commandRequest);
+    auto request = makeTestCommand(
+        boost::none, commandRequest, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions());
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
 
@@ -413,8 +509,15 @@ TEST_F(NetworkInterfaceTest, StartCommand) {
 
     ASSERT(res.elapsedMillis);
     uassertStatusOK(res.status);
-    ASSERT_BSONOBJ_EQ(res.data.getObjectField("echo"), expectedCommandReply);
-    ASSERT_EQ(res.data.getIntField("ok"), 1);
+
+    // This opmsg request expect the following reply, which is generated below
+    // { echo: { echo: 1, boop: "bop", clientOperationKey: uuid, $db: "admin" }, ok: 1.0 }
+    auto cmdObj = res.data.getObjectField("echo");
+    ASSERT_EQ(1, cmdObj.getIntField("echo"));
+    ASSERT_EQ("bop"_sd, cmdObj.getStringField("boop"));
+    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
+    ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
+    ASSERT_EQ(1, res.data.getIntField("ok"));
     assertNumOps(0u, 0u, 0u, 1u);
 }
 

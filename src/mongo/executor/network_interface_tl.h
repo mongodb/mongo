@@ -56,6 +56,8 @@ public:
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
 
+    constexpr static Milliseconds kCancelCommandTimeout{1000};
+
     std::string getDiagnosticString() override;
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
     std::string getHostName() override;
@@ -149,6 +151,8 @@ private:
 
         StrongWeakFinishLine finishLine;
         Promise<RemoteCommandOnAnyResponse> promise;
+
+        boost::optional<UUID> operationKey;
     };
 
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
@@ -182,6 +186,8 @@ private:
          * Attempt to send a request using the given connection
          */
         void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
+        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn,
+                     RemoteCommandRequest remoteCommandRequest) noexcept;
 
         /**
          * Resolve an eventual response
@@ -225,14 +231,7 @@ private:
 
     void _run();
 
-    /**
-     * Structure a future chain based upon a CommandState that has received a good connection
-     *
-     * This command starts on the reactor to launch the command and its future chain must end on the
-     * reactor to return the connection. The internal future chain essentially starts with sending
-     * the RemoteCommandRequest and ends with receiving the RemoteCommandResponse.
-     */
-    void _onAcquireConn(std::shared_ptr<CommandState> state) noexcept;
+    void _killOperation(std::shared_ptr<RequestState> requestStateToKill);
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;

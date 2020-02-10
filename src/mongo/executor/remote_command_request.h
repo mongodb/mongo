@@ -83,6 +83,8 @@ struct RemoteCommandRequestBase {
 
     boost::optional<HedgeOptions> hedgeOptions;
 
+    boost::optional<UUID> operationKey;
+
     Milliseconds timeout = kNoTimeout;
 
     // Deadline by when the request must be completed
