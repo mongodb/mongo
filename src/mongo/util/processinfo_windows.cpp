@@ -227,8 +227,14 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
             case 10:
                 if (osvi.wProductType == VER_NT_WORKSTATION)
                     osName += "Windows 10";
-                else
-                    osName += "Windows Server 2016";
+                else {
+                    // The only way to tell apart Windows Server versions is via build number
+                    if (osvi.dwBuildNumber >= 17763) {
+                        osName += "Windows Server 2019";
+                    } else {
+                        osName += "Windows Server 2016";
+                    }
+                }
                 break;
             case 6:
                 switch (osvi.dwMinorVersion) {
