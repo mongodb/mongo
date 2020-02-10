@@ -960,6 +960,12 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
             // the awaitData timeout with a network buffer.
             _setSocketTimeout(durationCount<Milliseconds>(_awaitDataTimeout));
         } else {
+            auto lastCommittedWithCurrentTerm =
+                _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
+            if (lastCommittedWithCurrentTerm.value != OpTime::kUninitializedTerm) {
+                _cursor->setCurrentTermAndLastCommittedOpTime(lastCommittedWithCurrentTerm.value,
+                                                              lastCommittedWithCurrentTerm.opTime);
+            }
             _cursor->more();
         }
 
