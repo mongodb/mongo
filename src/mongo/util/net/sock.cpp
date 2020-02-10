@@ -63,7 +63,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/private/socket_poll.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -173,6 +172,19 @@ SockAddr getLocalAddrForBoundSocketFd(int fd) {
     }
     return result;
 }
+
+#ifdef _WIN32
+
+int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout) {
+    return WSAPoll(fdarray, nfds, timeout);
+}
+
+#else
+
+int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout) {
+    return ::poll(fdarray, nfds, timeout);
+}
+#endif
 
 }  // namespace
 
@@ -606,8 +618,6 @@ bool Socket::isStillConnected() {
 
     if (errorPollIntervalSecs < 0)
         return true;
-    if (!isPollSupported())
-        return true;  // nothing we can do
 
     time_t now = time(nullptr);
     time_t idleTimeSecs = now - _lastValidityCheckAtSecs;

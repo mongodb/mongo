@@ -42,29 +42,6 @@
 
 namespace mongo {
 
-// dynamically link to psapi.dll (in case this version of Windows
-// does not support what we need)
-struct PsApiInit {
-    bool supported;
-    typedef BOOL(WINAPI* pQueryWorkingSetEx)(HANDLE hProcess, PVOID pv, DWORD cb);
-    pQueryWorkingSetEx QueryWSEx;
-
-    PsApiInit() {
-        HINSTANCE psapiLib = LoadLibrary(TEXT("psapi.dll"));
-        if (psapiLib) {
-            QueryWSEx =
-                reinterpret_cast<pQueryWorkingSetEx>(GetProcAddress(psapiLib, "QueryWorkingSetEx"));
-            if (QueryWSEx) {
-                supported = true;
-                return;
-            }
-        }
-        supported = false;
-    }
-};
-
-static PsApiInit* psapiGlobal = NULL;
-
 int _wconvertmtos(SIZE_T s) {
     return (int)(s / (1024 * 1024));
 }
@@ -308,9 +285,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osVersion = verstr.str();
     hasNuma = checkNumaEnabled();
     _extraStats = bExtra.obj();
-    if (psapiGlobal == NULL) {
-        psapiGlobal = new PsApiInit();
-    }
 }
 
 bool ProcessInfo::checkNumaEnabled() {
@@ -320,15 +294,9 @@ bool ProcessInfo::checkNumaEnabled() {
     DWORD numaNodeCount = 0;
     std::unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
 
-    LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(
-        GetProcAddress(GetModuleHandleW(L"kernel32"), "GetLogicalProcessorInformation")));
-    if (glpi == NULL) {
-        return false;
-    }
-
     DWORD returnCode = 0;
     do {
-        returnCode = glpi(buffer.get(), &returnLength);
+        returnCode = GetLogicalProcessorInformation(buffer.get(), &returnLength);
 
         if (returnCode == FALSE) {
             if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
@@ -361,9 +329,7 @@ bool ProcessInfo::checkNumaEnabled() {
 }
 
 bool ProcessInfo::blockCheckSupported() {
-    sysInfo();  // Initialize SystemInfo, which calls collectSystemInfo(), which creates
-                // psapiGlobal.
-    return psapiGlobal->supported;
+    return true;
 }
 
 bool ProcessInfo::blockInMemory(const void* start) {
@@ -385,7 +351,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
 #endif
     PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
     wsinfo.VirtualAddress = const_cast<void*>(start);
-    BOOL result = psapiGlobal->QueryWSEx(GetCurrentProcess(), &wsinfo, sizeof(wsinfo));
+    BOOL result = QueryWorkingSetEx(GetCurrentProcess(), &wsinfo, sizeof(wsinfo));
     if (result)
         if (wsinfo.VirtualAttributes.Valid)
             return true;
@@ -403,7 +369,7 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
             reinterpret_cast<unsigned long long>(startOfFirstPage) + i * getPageSize());
     }
 
-    BOOL result = psapiGlobal->QueryWSEx(
+    BOOL result = QueryWorkingSetEx(
         GetCurrentProcess(), wsinfo.get(), sizeof(PSAPI_WORKING_SET_EX_INFORMATION) * numPages);
 
     if (!result)

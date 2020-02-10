@@ -76,7 +76,6 @@ env.Library(
 env.Library(
     target='socket',
     source=[
-        "private/socket_poll.cpp",
         "sock.cpp",
     ],
     LIBDEPS=[

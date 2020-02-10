@@ -823,102 +823,11 @@ unsigned long long curTimeMillis64() {
         durationCount<Milliseconds>(system_clock::now() - system_clock::from_time_t(0)));
 }
 
-static unsigned long long getFiletime() {
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    return *reinterpret_cast<unsigned long long*>(&ft);
-}
-
-static unsigned long long getPerfCounter() {
-    LARGE_INTEGER li;
-    QueryPerformanceCounter(&li);
-    return li.QuadPart;
-}
-
-static unsigned long long baseFiletime = 0;
-static unsigned long long basePerfCounter = 0;
-static unsigned long long resyncInterval = 0;
-static SimpleMutex _curTimeMicros64ReadMutex;
-static SimpleMutex _curTimeMicros64ResyncMutex;
-
-typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(
-    _Out_ LPFILETIME lpSystemTimeAsFileTime);
-
-static pGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTimeFunc;
-
-MONGO_INITIALIZER(Init32TimeSupport)(InitializerContext*) {
-    HINSTANCE kernelLib = LoadLibraryA("kernel32.dll");
-    if (kernelLib) {
-        GetSystemTimePreciseAsFileTimeFunc = reinterpret_cast<pGetSystemTimePreciseAsFileTime>(
-            GetProcAddress(kernelLib, "GetSystemTimePreciseAsFileTime"));
-    }
-
-    return Status::OK();
-}
-
-static unsigned long long resyncTime() {
-    stdx::lock_guard<SimpleMutex> lkResync(_curTimeMicros64ResyncMutex);
-    unsigned long long ftOld;
-    unsigned long long ftNew;
-    ftOld = ftNew = getFiletime();
-    do {
-        ftNew = getFiletime();
-    } while (ftOld == ftNew);  // wait for filetime to change
-
-    unsigned long long newPerfCounter = getPerfCounter();
-
-    // Make sure that we use consistent values for baseFiletime and basePerfCounter.
-    //
-    stdx::lock_guard<SimpleMutex> lkRead(_curTimeMicros64ReadMutex);
-    baseFiletime = ftNew;
-    basePerfCounter = newPerfCounter;
-    resyncInterval = 60 * SystemTickSource::get()->getTicksPerSecond();
-    return newPerfCounter;
-}
-
 unsigned long long curTimeMicros64() {
     // Windows 8/2012 & later support a <1us time function
-    if (GetSystemTimePreciseAsFileTimeFunc != nullptr) {
-        FILETIME time;
-        GetSystemTimePreciseAsFileTimeFunc(&time);
-        return fileTimeToMicroseconds(time);
-    }
-
-    // Get a current value for QueryPerformanceCounter; if it is not time to resync we will
-    // use this value.
-    //
-    unsigned long long perfCounter = getPerfCounter();
-
-    // Periodically resync the timer so that we don't let timer drift accumulate.  Testing
-    // suggests that we drift by about one microsecond per minute, so resynching once per
-    // minute should keep drift to no more than one microsecond.
-    //
-    if ((perfCounter - basePerfCounter) > resyncInterval) {
-        perfCounter = resyncTime();
-    }
-
-    // Make sure that we use consistent values for baseFiletime and basePerfCounter.
-    //
-    stdx::lock_guard<SimpleMutex> lkRead(_curTimeMicros64ReadMutex);
-
-    // Compute the current time in FILETIME format by adding our base FILETIME and an offset
-    // from that time based on QueryPerformanceCounter.  The math is (logically) to compute the
-    // fraction of a second elapsed since 'baseFiletime' by taking the difference in ticks
-    // and dividing by the tick frequency, then scaling this fraction up to units of 100
-    // nanoseconds to match the FILETIME format.  We do the multiplication first to avoid
-    // truncation while using only integer instructions.
-    //
-    unsigned long long computedTime = baseFiletime +
-        ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) /
-            SystemTickSource::get()->getTicksPerSecond();
-
-    FILETIME fileTimeComputed;
-    fileTimeComputed.dwHighDateTime = computedTime >> 32;
-    fileTimeComputed.dwLowDateTime = computedTime;
-
-    // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
-    //
-    return fileTimeToMicroseconds(fileTimeComputed);
+    FILETIME time;
+    GetSystemTimePreciseAsFileTime(&time);
+    return fileTimeToMicroseconds(time);
 }
 
 #else
