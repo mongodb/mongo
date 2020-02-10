@@ -251,8 +251,10 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
 
     handle->cancel();
     handle->end();
-    auto callbackError = exhaustFuture.getNoThrow();
-    ASSERT_EQ(callbackError, ErrorCodes::CallbackCanceled);
+    auto error = exhaustFuture.getNoThrow();
+    // exhaustFuture will resolve with CallbackCanceled unless the socket is already closed, in
+    // which case it will resolve with HostUnreachable.
+    ASSERT((error == ErrorCodes::CallbackCanceled) || (error == ErrorCodes::HostUnreachable));
 }
 
 TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
