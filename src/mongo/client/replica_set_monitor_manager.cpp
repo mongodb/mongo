@@ -71,6 +71,41 @@ const auto getGlobalRSMMonitorManager =
     ServiceContext::declareDecoration<ReplicaSetMonitorManager>();
 }  // namespace
 
+Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
+    const HostAndPort& remoteHost,
+    const BSONObj& isMasterRequest,
+    const executor::RemoteCommandResponse& isMasterReply) {
+    if (gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning) {
+        auto monitor = ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost);
+        if (!monitor) {
+            return Status::OK();
+        }
+
+        if (std::shared_ptr<StreamableReplicaSetMonitor> streamableMonitor =
+                std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+                    ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost))) {
+
+            auto publisher = streamableMonitor->getEventsPublisher();
+            if (publisher) {
+                publisher->onServerHandshakeCompleteEvent(
+                    isMasterReply.elapsedMillis.get(), remoteHost.toString(), isMasterReply.data);
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
+StatusWith<boost::optional<executor::RemoteCommandRequest>>
+ReplicaSetMonitorManagerNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
+    return {boost::none};
+}
+
+Status ReplicaSetMonitorManagerNetworkConnectionHook::handleReply(
+    const HostAndPort& remoteHost, executor::RemoteCommandResponse&& response) {
+    MONGO_UNREACHABLE;
+}
+
 ReplicaSetMonitorManager::~ReplicaSetMonitorManager() {
     shutdown();
 }
@@ -97,8 +132,9 @@ void ReplicaSetMonitorManager::_setupTaskExecutorInLock() {
 
     // construct task executor
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    auto networkConnectionHook = std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>();
     auto net = executor::makeNetworkInterface(
-        "ReplicaSetMonitor-TaskExecutor", nullptr, std::move(hookList));
+        "ReplicaSetMonitor-TaskExecutor", std::move(networkConnectionHook), std::move(hookList));
     auto pool = std::make_unique<NetworkInterfaceThreadPool>(net.get());
     _taskExecutor = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
     _taskExecutor->startup();
@@ -141,6 +177,19 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
     }
     _monitors[setName] = newMonitor;
     return newMonitor;
+}
+
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const HostAndPort& host) {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    for (auto entry : _monitors) {
+        auto monitor = entry.second.lock();
+        if (monitor->contains(host)) {
+            return monitor;
+        }
+    }
+
+    return shared_ptr<ReplicaSetMonitor>();
 }
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() {

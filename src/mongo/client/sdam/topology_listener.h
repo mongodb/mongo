@@ -57,6 +57,14 @@ public:
                                                const ServerAddress& hostAndPort,
                                                const BSONObj reply){};
     /**
+     * Called when a ServerHandshakeCompleteEvent is published - The initial handshake to the server
+     * at hostAndPort was successful. durationMS is the measured RTT (Round Trip Time).
+     */
+    virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
+                                                const sdam::ServerAddress& address,
+                                                const BSONObj reply = BSONObj()){};
+
+    /**
      * Called when a ServerHeartBeatSucceededEvent is published - A heartbeat sent to the server at
      * hostAndPort succeeded. durationMS is the execution time of the event, including the time it
      * took to send the message and recieve the reply from the server.
@@ -85,8 +93,8 @@ public:
  * To publish an event to all registered listeners call the corresponding event function on the
  * TopologyEventsPublisher instance.
  */
-class TopologyEventsPublisher final : public TopologyListener,
-                                      public std::enable_shared_from_this<TopologyEventsPublisher> {
+class TopologyEventsPublisher : public TopologyListener,
+                                public std::enable_shared_from_this<TopologyEventsPublisher> {
 public:
     TopologyEventsPublisher(std::shared_ptr<executor::TaskExecutor> executor)
         : _executor(executor){};
@@ -97,6 +105,9 @@ public:
     void onTopologyDescriptionChangedEvent(UUID topologyId,
                                            TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
+    virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
+                                                const sdam::ServerAddress& address,
+                                                const BSONObj reply = BSONObj()) override;
     void onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
                                          const ServerAddress& hostAndPort,
                                          const BSONObj reply) override;
@@ -108,14 +119,14 @@ public:
     void onServerPingSucceededEvent(IsMasterRTT durationMS,
                                     const ServerAddress& hostAndPort) override;
 
-
 private:
     enum class EventType {
         HEARTBEAT_SUCCESS,
         HEARTBEAT_FAILURE,
         PING_SUCCESS,
         PING_FAILURE,
-        TOPOLOGY_DESCRIPTION_CHANGED
+        TOPOLOGY_DESCRIPTION_CHANGED,
+        HANDSHAKE_COMPLETE
     };
     struct Event {
         EventType type;

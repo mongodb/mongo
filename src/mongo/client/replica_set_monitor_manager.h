@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -44,6 +45,22 @@ class BSONObjBuilder;
 class ConnectionString;
 class ReplicaSetMonitor;
 class MongoURI;
+
+class ReplicaSetMonitorManagerNetworkConnectionHook final : public executor::NetworkConnectionHook {
+public:
+    ReplicaSetMonitorManagerNetworkConnectionHook() = default;
+    virtual ~ReplicaSetMonitorManagerNetworkConnectionHook() = default;
+
+    Status validateHost(const HostAndPort& remoteHost,
+                        const BSONObj& isMasterRequest,
+                        const executor::RemoteCommandResponse& isMasterReply) override;
+
+    StatusWith<boost::optional<executor::RemoteCommandRequest>> makeRequest(
+        const HostAndPort& remoteHost) override;
+
+    Status handleReply(const HostAndPort& remoteHost,
+                       executor::RemoteCommandResponse&& response) override;
+};
 
 /**
  * Manages the lifetime of a set of replica set monitors.
@@ -77,6 +94,8 @@ public:
      * will be destroyed and will no longer be tracked.
      */
     void removeMonitor(StringData setName);
+
+    std::shared_ptr<ReplicaSetMonitor> getMonitorForHost(const HostAndPort& host);
 
     /**
      * Removes and destroys all replica set monitors. Should be used for unit tests only.
