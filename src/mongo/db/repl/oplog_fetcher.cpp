@@ -940,6 +940,7 @@ void NewOplogFetcher::_createNewCursor(bool initialFind) {
 StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
     Documents batch;
     try {
+        Timer timer;
         // If it is the first batch, we should initialize the cursor, which will run the find query.
         // Otherwise we should call more() to get the next batch.
         if (_firstBatch) {
@@ -972,6 +973,10 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
         while (_cursor->moreInCurrentBatch()) {
             batch.emplace_back(_cursor->nextSafe());
         }
+
+        // This value is only used on a successful batch for metrics.repl.network.getmores. This
+        // metric intentionally tracks the time taken by the initial find as well.
+        _lastBatchElapsedMS = timer.millis();
     } catch (const DBException& ex) {
         if (_cursor->connectionHasPendingReplies()) {
             // Close the connection because the connection cannot be used anymore as more data is on
@@ -1084,7 +1089,7 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     opsReadStats.increment(info.networkDocumentCount);
     networkByteStats.increment(info.networkDocumentBytes);
 
-    // TODO SERVER-44705: Track time spent in each batch.
+    getmoreReplStats.recordMillis(_lastBatchElapsedMS);
 
     auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
     if (!status.isOK()) {
