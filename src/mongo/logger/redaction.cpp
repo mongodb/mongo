@@ -46,12 +46,12 @@ constexpr auto kRedactionDefaultMask = "###"_sd;
 
 }  // namespace
 
-std::string redact(const BSONObj& objectToRedact) {
+BSONObj redact(const BSONObj& objectToRedact) {
     if (!logger::globalLogDomain()->shouldRedactLogs()) {
-        return objectToRedact.toString(false);
+        return objectToRedact;
     }
 
-    return objectToRedact.toString(true);
+    return objectToRedact.redact();
 }
 
 StringData redact(StringData stringToRedact) {

@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/jsobj.h"
 
@@ -38,6 +39,7 @@
 #include "mongo/bson/generator_extended_relaxed_2_0_0.h"
 #include "mongo/bson/generator_legacy_strict.h"
 #include "mongo/db/json.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -111,14 +113,7 @@ BSONObj BSONObj::copy() const {
     // those assumptions, and preserving any currently observed behavior does not form an argument
     // against the later application of such optimizations.
     int size = objsize();
-    if (!isOwned() && (size < kMinBSONLength || size > BufferMaxSize)) {
-        // Only for unowned objects, the size is validated in the constructor, so it is an error for
-        // the size to ever be invalid. This means that the unowned memory we are reading has
-        // changed, and we must exit immediately to avoid further undefined behavior.
-        severe() << "BSONObj::copy() - size " << size
-                 << " of unowned BSONObj is invalid and differs from previously validated size.";
-        fassertFailed(31322);
-    }
+    _validateUnownedSize(size);
     auto storage = SharedBuffer::allocate(size);
 
     // If the call to objsize() changes between this call and the previous one, this indicates that
@@ -141,6 +136,42 @@ BSONObj BSONObj::getOwned() const {
 
 BSONObj BSONObj::getOwned(const BSONObj& obj) {
     return obj.getOwned();
+}
+
+BSONObj BSONObj::redact() const {
+    _validateUnownedSize(objsize());
+
+    // Helper to get an "internal function" to be able to do recursion
+    struct redactor {
+        void operator()(BSONObjBuilder& builder, const BSONObj& obj) {
+            for (BSONElement e : obj) {
+                if (e.type() == Object || e.type() == Array) {
+                    BSONObjBuilder subBuilder = builder.subobjStart(e.fieldNameStringData());
+                    operator()(subBuilder, e.Obj());
+                    subBuilder.done();
+                } else {
+                    builder.append(e.fieldNameStringData(), "###"_sd);
+                }
+            }
+        }
+    };
+
+    BSONObjBuilder builder;
+    redactor()(builder, *this);
+    return builder.obj();
+}
+
+void BSONObj::_validateUnownedSize(int size) const {
+    // Only for unowned objects, the size is validated in the constructor, so it is an error for
+    // the size to ever be invalid. This means that the unowned memory we are reading has
+    // changed, and we must exit immediately to avoid further undefined behavior.
+    if (!isOwned() && (size < kMinBSONLength || size > BufferMaxSize)) {
+        LOGV2_FATAL(51772,
+                    "BSONObj::_validateUnownedSize() - size {size} of unowned BSONObj is invalid "
+                    "and differs from previously validated size.",
+                    "size"_attr = size);
+        fassertFailed(31322);
+    }
 }
 
 template <typename Generator>

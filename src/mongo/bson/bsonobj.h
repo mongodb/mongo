@@ -249,6 +249,9 @@ public:
     /** @return a new full (and owned) copy of the object. */
     BSONObj copy() const;
 
+    /** @return a new full (and owned) redacted copy of the object. */
+    BSONObj redact() const;
+
     /** Readable representation of a BSON object in an extended JSON-style notation.
         This is an abbreviated representation which might be used for logging.
     */
@@ -623,6 +626,8 @@ private:
         if (!isValid<Traits>())
             _assertInvalid(Traits::MaxSize);
     }
+
+    void _validateUnownedSize(int size) const;
 
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;

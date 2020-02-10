@@ -95,12 +95,12 @@ TEST(RedactExceptionTest, BasicException) {
 TEST(RedactBSONTest, NoRedact) {
     logger::globalLogDomain()->setShouldRedactLogs(false);
     BSONObj obj = BSON("a" << 1);
-    ASSERT_EQ(redact(obj), obj.toString());
+    ASSERT_BSONOBJ_EQ(redact(obj), obj);
 }
 
 void testBSONCases(std::initializer_list<BSONStringPair> testCases) {
     for (auto m : testCases) {
-        ASSERT_EQ(redact(m.first), m.second);
+        ASSERT_EQ(redact(m.first).toString(), m.second);
     }
 }
 

@@ -56,7 +56,7 @@ class DBException;
  *  In 'redact' mode replace all values with '###' and keep keys intact.
  *  In normal mode return objectToRedact.toString().
  */
-std::string redact(const BSONObj& objectToRedact);
+BSONObj redact(const BSONObj& objectToRedact);
 
 /**
  *  In 'redact mode return '###'.

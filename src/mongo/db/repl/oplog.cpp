@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -89,6 +90,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/scripting/engine.h"
@@ -1452,9 +1454,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
 
-                LOG(1)
-                    << "Acceptable error during oplog application: background operation in progress for DB '{}' from oplog entry {}"_format(
-                           nss.db(), redact(entry.toBSON()));
+                LOGV2_DEBUG(51774,
+                            1,
+                            "Acceptable error during oplog application: background operation in "
+                            "progress for DB '{db}' from oplog entry {entry}",
+                            "db"_attr = nss.db(),
+                            "entry"_attr = redact(entry.toBSON()));
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -1478,9 +1483,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
 
-                LOG(1)
-                    << "Acceptable error during oplog application: background operation in progress for ns '{}' from oplog entry {}"_format(
-                           ns, redact(entry.toBSON()));
+                LOGV2_DEBUG(51775,
+                            1,
+                            "Acceptable error during oplog application: background operation in "
+                            "progress for ns '{ns}' from oplog entry {entry}",
+                            "ns"_attr = ns,
+                            "entry"_attr = redact(entry.toBSON()));
                 break;
             }
             default: {
@@ -1490,9 +1498,13 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     return status;
                 }
 
-                LOG(1)
-                    << "Acceptable error during oplog application on db '{}' with status '{}' from oplog entry {}"_format(
-                           nss.db(), status.toString(), redact(entry.toBSON()));
+                LOGV2_DEBUG(51776,
+                            1,
+                            "Acceptable error during oplog application on db '{db}' with status "
+                            "'{status}' from oplog entry {entry}",
+                            "db"_attr = nss.db(),
+                            "status"_attr = status,
+                            "entry"_attr = redact(entry.toBSON()));
             }
             // fallthrough
             case ErrorCodes::OK:

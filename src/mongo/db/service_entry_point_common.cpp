@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -82,6 +83,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
@@ -127,11 +129,20 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       Message* response) {
     curop->debug().errInfo = exception.toStatus();
 
-    log(LogComponent::kQuery) << "assertion " << exception.toString() << " ns:" << queryMessage.ns
-                              << " query:"
-                              << (queryMessage.query.valid(BSONVersion::kLatest)
-                                      ? redact(queryMessage.query)
-                                      : "query object is corrupt");
+    if (queryMessage.query.valid(BSONVersion::kLatest))
+        LOGV2_OPTIONS(51777,
+                      {logv2::LogComponent::kQuery},
+                      "assertion {exception} ns: {ns} query: {query}",
+                      "exception"_attr = exception,
+                      "ns"_attr = queryMessage.ns,
+                      "query"_attr = redact(queryMessage.query));
+    else
+        LOGV2_OPTIONS(51778,
+                      {logv2::LogComponent::kQuery},
+                      "assertion {exception} ns: {ns} query object is corrupt",
+                      "exception"_attr = exception,
+                      "ns"_attr = queryMessage.ns);
+
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         log(LogComponent::kQuery) << " ntoskip:" << queryMessage.ntoskip
                                   << " ntoreturn:" << queryMessage.ntoreturn;
