@@ -102,10 +102,12 @@ public:
          * Acquires lock on this specified resource in the specified mode.
          *
          * If 'opCtx' is provided, it will be used to interrupt a LOCK_WAITING state.
+         * If 'deadline' is provided, we will wait until 'deadline' for the lock to be granted.
+         * Otherwise, this parameter defaults to an infinite deadline.
          *
          * This function may throw an exception if it is interrupted.
          */
-        void lock(OperationContext* opCtx, LockMode mode);
+        void lock(OperationContext* opCtx, LockMode mode, Date_t deadline = Date_t::max());
 
         void unlock();
 

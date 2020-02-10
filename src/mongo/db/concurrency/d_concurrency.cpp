@@ -307,9 +307,9 @@ Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
     : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X),
       _shouldNotConflictBlock(lockState) {}
 
-void Lock::ResourceLock::lock(OperationContext* opCtx, LockMode mode) {
+void Lock::ResourceLock::lock(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     invariant(_result == LOCK_INVALID);
-    _locker->lock(opCtx, _rid, mode);
+    _locker->lock(opCtx, _rid, mode, deadline);
     _result = LOCK_OK;
 }
 
