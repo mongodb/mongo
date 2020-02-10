@@ -141,10 +141,6 @@ Value DocumentSourceOplogMatch::serialize(optional<ExplainOptions::Verbosity> ex
     return Value();
 }
 
-DocumentSourceOplogMatch::DocumentSourceOplogMatch(BSONObj filter,
-                                                   const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceMatch(std::move(filter), expCtx) {}
-
 void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 const StringData filedName,
                                                 BSONType expectedType) {
