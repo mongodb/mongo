@@ -107,6 +107,11 @@ commands:
                 description: "A document that expresses the write concern for the operation."
                 type: object
                 optional: true
+            recordPreImages:
+                description: "Sets whether updates/deletes should store the pre-image of the
+                              document in the oplog"
+                type: safeBool
+                optional: true
             temp:
                 description: "DEPRECATED"
                 type: safeBool

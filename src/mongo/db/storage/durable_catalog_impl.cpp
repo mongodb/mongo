@@ -919,6 +919,12 @@ void DurableCatalogImpl::setIsTemp(OperationContext* opCtx, RecordId catalogId, 
     putMetaData(opCtx, catalogId, md);
 }
 
+void DurableCatalogImpl::setRecordPreImages(OperationContext* opCtx, RecordId catalogId, bool val) {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    md.options.recordPreImages = val;
+    putMetaData(opCtx, catalogId, md);
+}
+
 void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
                                          RecordId catalogId,
                                          const BSONObj& validator,

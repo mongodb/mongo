@@ -168,6 +168,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             continue;
         } else if (fieldName == "temp") {
             collectionOptions.temp = e.trueValue();
+        } else if (fieldName == "recordPreImages") {
+            collectionOptions.recordPreImages = e.trueValue();
         } else if (fieldName == "storageEngine") {
             Status status = checkStorageEngineOptions(e);
             if (!status.isOK()) {
@@ -286,6 +288,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
     if (temp)
         builder->appendBool("temp", true);
 
+    if (recordPreImages) {
+        builder->appendBool("recordPreImages", true);
+    }
+
     if (!storageEngine.isEmpty()) {
         builder->append("storageEngine", storageEngine);
     }
@@ -338,6 +344,10 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (autoIndexId != other.autoIndexId) {
+        return false;
+    }
+
+    if (recordPreImages != other.recordPreImages) {
         return false;
     }
 

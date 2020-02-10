@@ -493,6 +493,13 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
     // Refresh list of database names to include newly-created admin, if it exists.
     dbNames = storageEngine->listDatabases();
+
+    // We want to recover the admin database first so we can load the FCV early since
+    // some collection validation may depend on the FCV being set.
+    if (auto it = std::find(dbNames.begin(), dbNames.end(), "admin"); it != dbNames.end()) {
+        std::swap(*it, dbNames.front());
+    }
+
     for (const auto& dbName : dbNames) {
         if (dbName != "local") {
             nonLocalDatabases = true;

@@ -266,6 +266,9 @@ public:
                            StringData newLevel,
                            StringData newAction) final;
 
+    bool getRecordPreImages() const final;
+    void setRecordPreImages(OperationContext* opCtx, bool val) final;
+
     bool isTemporary(OperationContext* opCtx) const final;
 
     //
@@ -402,6 +405,8 @@ private:
 
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
+
+    bool _recordPreImages = false;
 
     // Notifier object for awaitData. Threads polling a capped collection for new data can wait
     // on this object until notified of the arrival of new data.

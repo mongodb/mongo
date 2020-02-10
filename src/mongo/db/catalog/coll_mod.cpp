@@ -74,6 +74,7 @@ struct CollModRequest {
     BSONElement collValidator = {};
     std::string collValidationAction = {};
     std::string collValidationLevel = {};
+    bool recordPreImages = false;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -222,6 +223,13 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
             }
             cmr.viewOn = e.str();
+        } else if (fieldName == "recordPreImages") {
+            if (isView) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream() << "option not supported on a view: " << fieldName};
+            }
+
+            cmr.recordPreImages = e.trueValue();
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -395,6 +403,10 @@ Status _collModInternal(OperationContext* opCtx,
             invariant(coll->setValidationAction(opCtx, cmrNew.collValidationAction));
         if (!cmrNew.collValidationLevel.empty())
             invariant(coll->setValidationLevel(opCtx, cmrNew.collValidationLevel));
+
+        if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
+            coll->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        }
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.

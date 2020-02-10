@@ -208,6 +208,14 @@ public:
         std::abort();
     }
 
+    bool getRecordPreImages() const {
+        std::abort();
+    }
+
+    void setRecordPreImages(OperationContext* opCtx, bool val) {
+        std::abort();
+    }
+
     bool isCapped() const {
         std::abort();
     }

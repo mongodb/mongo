@@ -164,6 +164,11 @@ public:
     virtual void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) = 0;
 
     /**
+     * Updates whether updates/deletes should store their pre-images in the opLog.
+     */
+    virtual void setRecordPreImages(OperationContext* opCtx, RecordId catalogId, bool val) = 0;
+
+    /**
      * Updates the validator for this collection.
      *
      * An empty validator removes all validation.

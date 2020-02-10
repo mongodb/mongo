@@ -211,6 +211,35 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
     return Status::OK();
 }
 
+Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString& ns) {
+    if (ns.db() == NamespaceString::kAdminDb || ns.db() == NamespaceString::kLocalDb) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "recordPreImages collection option is not supported on the "
+                              << ns.db() << " database"};
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        return {ErrorCodes::InvalidOptions,
+                "recordPreImages collection option is only supported when the feature "
+                "compatibility version is set to 4.4 or above"};
+    }
+
+    if (serverGlobalParams.clusterRole != ClusterRole::None) {
+        return {ErrorCodes::InvalidOptions,
+                "recordPreImages collection option is not supported on shards or config servers"};
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled()) {
+        return {ErrorCodes::InvalidOptions,
+                "recordPreImages collection option depends on being in a replica set"};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
@@ -273,6 +302,11 @@ void CollectionImpl::init(OperationContext* opCtx) {
     }
     _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
     _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
+    if (collectionOptions.recordPreImages) {
+        uassertStatusOK(validatePreImageRecording(opCtx, _ns));
+        _recordPreImages = true;
+    }
+
     getIndexCatalog()->init(opCtx).transitional_ignore();
     _initialized = true;
 }
@@ -643,7 +677,8 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
-    if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
+    if ((storeDeletedDoc == Collection::StoreDeletedDoc::On && opCtx->getTxnNumber()) ||
+        getRecordPreImages()) {
         deletedDoc.emplace(doc.value().getOwned());
     }
 
@@ -716,7 +751,13 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                   str::stream() << "Cannot change the size of a document in a capped collection: "
                                 << oldSize << " != " << newDoc.objsize());
 
-    args->preImageDoc = oldDoc.value().getOwned();
+    // The preImageDoc may not be boost::none if this update was a retryable findAndModify or if
+    // the update may have changed the shard key. For non-in-place updates we always set the
+    // preImageDoc here to an owned copy of the pre-image.
+    if (!args->preImageDoc) {
+        args->preImageDoc = oldDoc.value().getOwned();
+    }
+    args->preImageRecordingEnabledForCollection = getRecordPreImages();
 
     uassertStatusOK(
         _recordStore->updateRecord(opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
@@ -725,7 +766,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         int64_t keysInserted, keysDeleted;
 
         uassertStatusOK(_indexCatalog->updateRecord(
-            opCtx, args->preImageDoc.get(), newDoc, oldLocation, &keysInserted, &keysDeleted));
+            opCtx, *args->preImageDoc, newDoc, oldLocation, &keysInserted, &keysDeleted));
 
         if (opDebug) {
             opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
@@ -760,12 +801,19 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     invariant(oldRec.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
 
+    // For in-place updates we need to grab an owned copy of the pre-image doc if pre-image
+    // recording is enabled and we haven't already set the pre-image due to this update being
+    // a retryable findAndModify or a possible update to the shard key.
+    if (!args->preImageDoc && getRecordPreImages()) {
+        args->preImageDoc = oldRec.value().toBson().getOwned();
+    }
+
     auto newRecStatus =
         _recordStore->updateWithDamages(opCtx, loc, oldRec.value(), damageSource, damages);
 
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
-
+        args->preImageRecordingEnabledForCollection = getRecordPreImages();
         OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
         getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
     }
@@ -774,6 +822,18 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
 
 bool CollectionImpl::isTemporary(OperationContext* opCtx) const {
     return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, getCatalogId()).temp;
+}
+
+bool CollectionImpl::getRecordPreImages() const {
+    return _recordPreImages;
+}
+
+void CollectionImpl::setRecordPreImages(OperationContext* opCtx, bool val) {
+    if (val) {
+        uassertStatusOK(validatePreImageRecording(opCtx, _ns));
+    }
+    DurableCatalog::get(opCtx)->setRecordPreImages(opCtx, getCatalogId(), val);
+    _recordPreImages = val;
 }
 
 bool CollectionImpl::isCapped() const {

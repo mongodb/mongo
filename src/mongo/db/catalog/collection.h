@@ -93,6 +93,7 @@ struct CollectionUpdateArgs {
     bool fromMigrate = false;
 
     StoreDocOption storeDocOption = StoreDocOption::None;
+    bool preImageRecordingEnabledForCollection = false;
 };
 
 /**
@@ -382,6 +383,9 @@ public:
                                    BSONObj newValidator,
                                    StringData newLevel,
                                    StringData newAction) = 0;
+
+    virtual bool getRecordPreImages() const = 0;
+    virtual void setRecordPreImages(OperationContext* opCtx, bool val) = 0;
 
     /**
      * Returns true if this is a temporary collection.

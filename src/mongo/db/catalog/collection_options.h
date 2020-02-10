@@ -119,6 +119,7 @@ struct CollectionOptions {
     } autoIndexId = DEFAULT;
 
     bool temp = false;
+    bool recordPreImages = false;
 
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;
