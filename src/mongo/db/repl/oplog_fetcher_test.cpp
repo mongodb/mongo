@@ -1236,6 +1236,10 @@ void NewOplogFetcherTest::setUp() {
 
     auto target = HostAndPort{"localhost:12346"};
     _mockServer = std::make_unique<MockRemoteDBServer>(target.toString());
+
+    // Always enable oplogFetcherUsesExhaust at the beginning of each unittest in case some
+    // unittests disable it in the test.
+    oplogFetcherUsesExhaust = true;
 }
 
 std::unique_ptr<NewOplogFetcher> NewOplogFetcherTest::makeOplogFetcher() {
@@ -2682,6 +2686,36 @@ TEST_F(NewOplogFetcherTest, DisconnectsOnErrorsDuringExhaustStream) {
 
     // Simulate closing the cursor and the OplogFetcher should exit with an OK status.
     processSingleRequestResponse(conn, makeFirstBatch(0LL, {firstEntry}, metadataObj));
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(NewOplogFetcherTest, GetMoreEmptyBatch) {
+    ShutdownState shutdownState;
+
+    // Create an oplog fetcher without any retries.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto metadataObj = makeOplogBatchMetadata(boost::none, staleOqMetadata);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+
+    // Creating the cursor will succeed.
+    auto m =
+        processSingleRequestResponse(conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj));
+
+    // Empty batch from first getMore.
+    processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, true /* moreToCome */));
+
+    // Terminating empty batch from exhaust stream with cursorId 0.
+    processSingleExhaustResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                 makeSubsequentBatch(0LL, {}, metadataObj, false /* moreToCome */),
+                                 false);
 
     oplogFetcher->join();
 

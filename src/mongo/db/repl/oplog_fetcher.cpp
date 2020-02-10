@@ -959,9 +959,8 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
             // The 'find' command has already been executed, so reset the socket timeout to reflect
             // the awaitData timeout with a network buffer.
             _setSocketTimeout(durationCount<Milliseconds>(_awaitDataTimeout));
-        } else if (!_cursor->more()) {
-            // The only reason more() should return false is if the cursor is dead.
-            invariant(_cursor->isDead());
+        } else {
+            _cursor->more();
         }
 
         while (_cursor->moreInCurrentBatch()) {
