@@ -283,7 +283,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                 << "Cannot select a sync source because chaining is not allowed and we are primary";
             _syncSource = HostAndPort();
             return _syncSource;
-        } else if (_memberData.at(_currentPrimaryIndex).getHeartbeatAppliedOpTime() <
+        } else if (_memberData.at(_currentPrimaryIndex).getLastAppliedOpTime() <
                    lastOpTimeFetched) {
             LOG(1) << "Cannot select a sync source because chaining is not allowed and the primary "
                       "is behind me. Last oplog optime of primary {}: {}, my last fetched oplog "
