@@ -1378,6 +1378,10 @@ constexpr int OCSP_CLIENT_RESPONSE_ERROR = -1;
 constexpr int OCSP_CLIENT_RESPONSE_ACCEPTABLE = 1;
 
 int ocspClientCallback(SSL* ssl, void* arg) {
+    if (getSSLGlobalParams().sslAllowInvalidCertificates) {
+        return OCSP_CLIENT_RESPONSE_ACCEPTABLE;
+    }
+
     const unsigned char* response_ptr = NULL;
     long length = SSL_get_tlsext_status_ocsp_resp(ssl, &response_ptr);
 
@@ -2145,7 +2149,10 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     }
 
     Future<void> ocspFuture;
-    if (sslOCSPEnabled) {
+
+    // The check to ensure that remoteHost is empty is to ensure that we only run OCSP
+    // verification when we are a client, never as a server.
+    if (sslOCSPEnabled && !remoteHost.empty() && !_allowInvalidCertificates) {
         ocspFuture = ocspClientVerification(conn);
     }
 
