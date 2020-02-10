@@ -82,7 +82,7 @@ public:
 
         ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {
-            lock(mode);
+            lock(nullptr, mode);
         }
 
         ResourceLock(ResourceLock&& otherLock)
@@ -98,8 +98,15 @@ public:
             }
         }
 
-        void lock(LockMode mode);                           // Uninterruptible
-        void lock(OperationContext* opCtx, LockMode mode);  // Interruptible
+        /**
+         * Acquires lock on this specified resource in the specified mode.
+         *
+         * If 'opCtx' is provided, it will be used to interrupt a LOCK_WAITING state.
+         *
+         * This function may throw an exception if it is interrupted.
+         */
+        void lock(OperationContext* opCtx, LockMode mode);
+
         void unlock();
 
         bool isLocked() const {

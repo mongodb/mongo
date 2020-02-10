@@ -235,7 +235,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
         state.finish(3);
 
         // Step 4: Try to regain the shared lock // transfers control to t1
-        lk.lock(MODE_IS);
+        lk.lock(nullptr, MODE_IS);
 
         // Step 6: CHeck we actually got back the shared lock
         ASSERT(lk.isLocked());
@@ -2364,7 +2364,7 @@ TEST_F(DConcurrencyTestFixture, PBWMRespectsMaxTimeMS) {
     auto opCtx2 = clientOpCtxPairs[1].second.get();
 
     Lock::ResourceLock pbwm1(opCtx1->lockState(), resourceIdParallelBatchWriterMode);
-    pbwm1.lock(MODE_X);
+    pbwm1.lock(nullptr, MODE_X);
 
     opCtx2->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
 
