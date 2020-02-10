@@ -1735,6 +1735,13 @@ TEST(ReplSetConfig, ConfigVersionAndTermComparison) {
     ASSERT_GT(ConfigVersionAndTerm(2, -1), ConfigVersionAndTerm(1, 1));
     ASSERT_GT(ConfigVersionAndTerm(2, -1), ConfigVersionAndTerm(1, -1));
 }
+TEST(ReplSetConfig, ConfigVersionAndTermToString) {
+    ASSERT_EQ(ConfigVersionAndTerm(0, 1).toString(), "{version: 0, term: 1}");
+    ASSERT_EQ(ConfigVersionAndTerm(0, 2).toString(), "{version: 0, term: 2}");
+    ASSERT_EQ(ConfigVersionAndTerm(1, 1).toString(), "{version: 1, term: 1}");
+    ASSERT_EQ(ConfigVersionAndTerm(1, 2).toString(), "{version: 1, term: 2}");
+    ASSERT_EQ(ConfigVersionAndTerm(1, -1).toString(), "{version: 1, term: -1}");
+}
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

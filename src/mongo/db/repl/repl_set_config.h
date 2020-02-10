@@ -94,9 +94,8 @@ public:
         return !(*this < rhs);
     }
 
-    // TODO (SERVER-45082): Implement string conversion.
     std::string toString() const {
-        return "";
+        return str::stream() << "{version: " << _version << ", term: " << _term << "}";
     };
 
     friend std::ostream& operator<<(std::ostream& out, const ConfigVersionAndTerm& cvt) {

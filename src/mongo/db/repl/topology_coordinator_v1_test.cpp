@@ -2798,8 +2798,8 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigVersionIsLower) {
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
     ASSERT_EQUALS(
-        "ignoring term of -1 for comparison, candidate's version in config(term, version): (1, 0) "
-        "is lower than mine (1, 1)",
+        "candidate's config with {version: 0, term: 1} is older than mine with {version: 1, term: "
+        "1}",
         response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
@@ -2829,8 +2829,10 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigTermIsLower) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's term in config(term, version): (1, 1) is lower than mine (2, 1)",
-                  response.getReason());
+    ASSERT_EQUALS(
+        "candidate's config with {version: 1, term: 1} is older than mine with {version: 1, term: "
+        "2}",
+        response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
 
@@ -2997,8 +2999,8 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
     ASSERT_EQUALS(
-        "ignoring term of -1 for comparison, candidate's version in config(term, version): (1, 0) "
-        "is lower than mine (1, 1)",
+        "candidate's config with {version: 0, term: 1} is older than mine with {version: 1, term: "
+        "1}",
         response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());

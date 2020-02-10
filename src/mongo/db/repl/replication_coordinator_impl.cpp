@@ -2825,8 +2825,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     // we have already set our ReplicationCoordinatorImpl::_rsConfigState state to
     // "kConfigReconfiguring" which prevents new elections from happening.
     if (electionFinishedEvent) {
-        LOG(2) << "Waiting for election to complete before finishing reconfig to config with term "
-               << newConfig.getConfigTerm() << ", version " << newConfig.getConfigVersion();
+        LOG(2) << "Waiting for election to complete before finishing reconfig to config with "
+               << newConfig.getConfigVersionAndTerm();
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor->waitForEvent(electionFinishedEvent);
     }

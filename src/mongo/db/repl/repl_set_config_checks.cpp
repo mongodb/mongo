@@ -63,10 +63,10 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     }
     if (meConfigs.empty()) {
         return StatusWith<int>(ErrorCodes::NodeNotFound,
-                               str::stream() << "No host described in new configuration with term "
-                                             << newConfig.getConfigTerm() << " and version "
-                                             << newConfig.getConfigVersion() << " for replica set "
-                                             << newConfig.getReplSetName() << " maps to this node");
+                               str::stream() << "No host described in new configuration with "
+                                             << newConfig.getConfigVersionAndTerm().toString()
+                                             << " for replica set " << newConfig.getReplSetName()
+                                             << " maps to this node");
     }
     if (meConfigs.size() > 1) {
         str::stream message;
@@ -75,9 +75,9 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
             message << ", " << meConfigs[i]->getHostAndPort().toString();
         }
         message << " and " << meConfigs.back()->getHostAndPort().toString()
-                << " all map to this node in new configuration with term "
-                << newConfig.getConfigTerm() << " and version " << newConfig.getConfigVersion()
-                << " for replica set " << newConfig.getReplSetName();
+                << " all map to this node in new configuration with "
+                << newConfig.getConfigVersionAndTerm().toString() << " for replica set "
+                << newConfig.getReplSetName();
         return StatusWith<int>(ErrorCodes::InvalidReplicaSetConfig, message);
     }
 
@@ -96,10 +96,9 @@ Status checkElectable(const ReplSetConfig& newConfig, int configIndex) {
         return Status(ErrorCodes::NodeNotElectable,
                       str::stream() << "This node, " << myConfig.getHostAndPort().toString()
                                     << ", with _id " << myConfig.getId()
-                                    << " is not electable under the new configuration with term "
-                                    << newConfig.getConfigTerm() << " and version "
-                                    << newConfig.getConfigVersion() << " for replica set "
-                                    << newConfig.getReplSetName());
+                                    << " is not electable under the new configuration with "
+                                    << newConfig.getConfigVersionAndTerm().toString()
+                                    << " for replica set " << newConfig.getReplSetName());
     }
     return Status::OK();
 }

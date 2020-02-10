@@ -129,6 +129,10 @@ long long ReplSetRequestVotesArgs::getConfigTerm() const {
     return _cfgTerm;
 }
 
+ConfigVersionAndTerm ReplSetRequestVotesArgs::getConfigVersionAndTerm() const {
+    return ConfigVersionAndTerm(_cfgVer, _cfgTerm);
+}
+
 OpTime ReplSetRequestVotesArgs::getLastDurableOpTime() const {
     return _lastDurableOpTime;
 }

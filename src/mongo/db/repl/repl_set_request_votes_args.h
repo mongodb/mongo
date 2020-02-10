@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 
 namespace mongo {
 
@@ -48,6 +49,7 @@ public:
     long long getCandidateIndex() const;
     long long getConfigVersion() const;
     long long getConfigTerm() const;
+    ConfigVersionAndTerm getConfigVersionAndTerm() const;
     OpTime getLastDurableOpTime() const;
     bool isADryRun() const;
 

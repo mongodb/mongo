@@ -2773,33 +2773,16 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         return;
     }
 
-    // If either config term is -1, ignore the config term entirely and compare config versions.
-    bool compareConfigTerms = args.getConfigTerm() != -1 && _rsConfig.getConfigTerm() != -1;
-
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);
         response->setReason(str::stream() << "candidate's term ({}) is lower than mine ({})"_format(
                                 args.getTerm(), _term));
-    } else if (compareConfigTerms && args.getConfigTerm() < _rsConfig.getConfigTerm()) {
+    } else if (args.getConfigVersionAndTerm() < _rsConfig.getConfigVersionAndTerm()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
-                            << "candidate's term in config(term, version): ({}, {}) is lower "
-                               "than mine ({}, {})"_format(args.getConfigTerm(),
-                                                           args.getConfigVersion(),
-                                                           _rsConfig.getConfigTerm(),
-                                                           _rsConfig.getConfigVersion()));
-    } else if ((!compareConfigTerms || args.getConfigTerm() == _rsConfig.getConfigTerm()) &&
-               args.getConfigVersion() < _rsConfig.getConfigVersion()) {
-        // If the terms should not be compared or if the terms are equal, fall back to version
-        // comparison.
-        response->setVoteGranted(false);
-        response->setReason(str::stream()
-                            << "ignoring term of -1 for comparison, candidate's version in "
-                               "config(term, version): ({}, {}) is lower than mine ({}, {})"_format(
-                                   args.getConfigTerm(),
-                                   args.getConfigVersion(),
-                                   _rsConfig.getConfigTerm(),
-                                   _rsConfig.getConfigVersion()));
+                            << "candidate's config with {} is older "
+                               "than mine with {}"_format(args.getConfigVersionAndTerm(),
+                                                          _rsConfig.getConfigVersionAndTerm()));
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
