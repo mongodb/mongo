@@ -86,34 +86,6 @@ static const int kPerDocumentOverheadBytesUpperBound = 10;
 const char kFindCmdName[] = "find";
 
 /**
- * Transforms the raw sort spec into one suitable for use as the ordering specification in
- * BSONObj::woCompare().
- *
- * In particular, eliminates text score meta-sort from 'sortSpec'.
- *
- * The input must be validated (each BSON element must be either a number or text score meta-sort
- * specification).
- */
-BSONObj transformSortSpec(const BSONObj& sortSpec) {
-    BSONObjBuilder comparatorBob;
-
-    for (BSONElement elt : sortSpec) {
-        if (elt.isNumber()) {
-            comparatorBob.append(elt);
-        } else if (QueryRequest::isTextScoreMeta(elt)) {
-            // Sort text score decreasing by default. Field name doesn't matter but we choose
-            // something that a user shouldn't ever have.
-            comparatorBob.append("$metaTextScore", -1);
-        } else {
-            // Sort spec should have been validated before here.
-            fassertFailed(28784);
-        }
-    }
-
-    return comparatorBob.obj();
-}
-
-/**
  * Given the QueryRequest 'qr' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
  */
@@ -302,9 +274,17 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // $natural sort is actually a hint to use a collection scan, and shouldn't be treated like a
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
-    BSONObj sortComparatorBob;
-    if (!query.getQueryRequest().getSort().hasField("$natural")) {
-        sortComparatorBob = transformSortSpec(query.getQueryRequest().getSort());
+    BSONObj sortComparatorObj;
+    if (query.getSortPattern() && !query.getQueryRequest().getSort().hasField("$natural")) {
+        // We have already validated the input sort object. Serialize the raw sort spec into one
+        // suitable for use as the ordering specification in BSONObj::woCompare(). In particular, we
+        // want to eliminate sorts using expressions (like $meta) and replace them with a
+        // placeholder. When mongos performs a merge-sort, any $meta expressions have already been
+        // performed on the shards. Mongos just needs to know the length of the sort pattern and
+        // whether each part of the sort pattern is ascending or descending.
+        sortComparatorObj = query.getSortPattern()
+                                ->serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
+                                .toBson();
     }
 
     bool appendGeoNearDistanceProjection = false;
@@ -315,13 +295,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
         // shards. Indicate to the AsyncResultsMerger that it should extract the sort key
         // {"$sortKey": <geoNearDistance>} and sort by the order {"$sortKey": 1}.
-        sortComparatorBob = AsyncResultsMerger::kWholeSortKeySortPattern;
+        sortComparatorObj = AsyncResultsMerger::kWholeSortKeySortPattern;
         compareWholeSortKeyOnRouter = true;
         appendGeoNearDistanceProjection = true;
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
-    invariant(sortComparatorBob.isEmpty() || !query.getQueryRequest().isTailable());
+    invariant(sortComparatorObj.isEmpty() || !query.getQueryRequest().isTailable());
 
     // Construct the requests that we will use to establish cursors on the targeted shards,
     // attaching the shardVersion and txnNumber, if necessary.
@@ -349,7 +329,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         const auto qr = query.getQueryRequest();
         params.skipToApplyOnRouter = qr.getSkip();
         params.limit = qr.getLimit();
-        params.sortToApplyOnRouter = sortComparatorBob;
+        params.sortToApplyOnRouter = sortComparatorObj;
         params.compareWholeSortKeyOnRouter = compareWholeSortKeyOnRouter;
     }
 

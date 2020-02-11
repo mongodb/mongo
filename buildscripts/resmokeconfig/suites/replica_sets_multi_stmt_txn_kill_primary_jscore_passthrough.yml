@@ -60,6 +60,7 @@ selector:
   - jstests/core/sortf.js
   - jstests/core/sortg.js
   - jstests/core/sortj.js
+  - jstests/core/sort_with_meta_operator.js
   - jstests/core/tailable_skip_limit.js
   - jstests/core/type_array.js
   - jstests/core/uniqueness.js

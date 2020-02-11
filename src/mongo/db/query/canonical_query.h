@@ -149,6 +149,10 @@ public:
         return _proj.get_ptr();
     }
 
+    const boost::optional<SortPattern>& getSortPattern() const {
+        return _sortPattern;
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator.get();
     }
