@@ -60,6 +60,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
+#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
@@ -888,8 +889,9 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
     };
-    // TODO SERVER-45966 Add necessary hooks.
-    auto hookList = nullptr;
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
         executor::makeNetworkInterface("ReplNodeDbWorkerNetwork", nullptr, std::move(hookList)));
@@ -947,7 +949,7 @@ void setUpReplication(ServiceContext* serviceContext) {
         SecureRandom().nextInt64());
     // Only create a ReplicaSetNodeExecutor if sharding is disabled and replication is enabled.
     // Note that sharding sets up its own executors for scheduling work to remote nodes.
-    if (!ShardingState::get(serviceContext)->enabled() && replCoord->isReplEnabled())
+    if (serverGlobalParams.clusterRole == ClusterRole::None && replCoord->isReplEnabled())
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 

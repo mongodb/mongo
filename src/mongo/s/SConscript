@@ -327,6 +327,7 @@ env.Library(
         'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'grid',
     ],

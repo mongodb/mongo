@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_metadata_hook.h"
@@ -81,6 +82,7 @@ const auto getInstance = ServiceContext::declareDecoration<ShardingInitializatio
 auto makeEgressHooksList(ServiceContext* service) {
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     unshardedHookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
 
     return unshardedHookList;

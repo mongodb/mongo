@@ -49,6 +49,7 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
+#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -424,6 +425,7 @@ Status initializeSharding(OperationContext* opCtx) {
                 std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(
                 std::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
+            hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
             hookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(
                 opCtx->getServiceContext()));
             return hookList;
@@ -559,6 +561,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     unshardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
     // TODO SERVER-33053: readReplyMetadata is not called on hooks added through
@@ -571,6 +574,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     auto shardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     shardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    shardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     shardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
     shardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));

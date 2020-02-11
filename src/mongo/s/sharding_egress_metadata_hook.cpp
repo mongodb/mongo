@@ -56,8 +56,6 @@ ShardingEgressMetadataHook::ShardingEgressMetadataHook(ServiceContext* serviceCo
 Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                         BSONObjBuilder* metadataBob) {
     try {
-        writeAuthDataToImpersonatedUserMetadata(opCtx, metadataBob);
-        ClientMetadataIsMasterState::writeToMetadata(opCtx, metadataBob);
         rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();
     } catch (...) {

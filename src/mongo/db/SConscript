@@ -1590,6 +1590,17 @@ env.Library(
 )
 
 env.Library(
+    target='client_metadata_propagation_egress_hook',
+    source=[
+        'client_metadata_propagation_egress_hook.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
+    ],
+)
+
+env.Library(
     target= 'logical_clock_test_fixture',
     source= [
         'logical_clock_test_fixture.cpp',

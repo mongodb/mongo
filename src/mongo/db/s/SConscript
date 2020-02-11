@@ -80,6 +80,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
+        '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',

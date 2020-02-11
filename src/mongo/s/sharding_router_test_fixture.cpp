@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
@@ -112,6 +113,7 @@ ShardingTestFixture::ShardingTestFixture() {
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
         hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
         hookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(service));
+        hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
         hookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
         return hookList;
     };
