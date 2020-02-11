@@ -72,16 +72,6 @@ CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
 
 class DeleteStateTest : public ShardServerTestFixture {};
 
-class CollectionShardingRuntimeTest : public ShardServerTestFixture {
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-    }
-
-    void tearDown() override {
-        ShardServerTestFixture::tearDown();
-    }
-};
-
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
     setCollectionFilteringMetadata(operationContext(), CollectionMetadata());
 
@@ -164,12 +154,6 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
-
-TEST_F(CollectionShardingRuntimeTest,
-       GetCurrentMetadataReturnsNoneBeforeSetFilteringMetadataIsCalled) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-}
 
 }  // namespace
 }  // namespace mongo

@@ -155,6 +155,10 @@ public:
         _metadataManager->toBSONPending(bb);
     }
 
+    std::uint64_t getNumMetadataManagerChanges_forTest() {
+        return _numMetadataManagerChanges;
+    }
+
 private:
     friend CSRLock;
 
@@ -204,6 +208,9 @@ private:
     // If the collection is unsharded, the metadata has not been set yet, or the metadata has been
     // specifically reset by calling clearFilteringMetadata(), this will be nullptr;
     std::shared_ptr<MetadataManager> _metadataManager;
+
+    // Used for testing to check the number of times a new MetadataManager has been installed.
+    std::uint64_t _numMetadataManagerChanges{0};
 };
 
 /**

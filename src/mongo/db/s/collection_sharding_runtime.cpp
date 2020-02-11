@@ -208,11 +208,13 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
         LOG(0) << "Marking collection " << _nss.ns() << " as " << newMetadata.toStringBasic();
         _metadataType = MetadataType::kUnsharded;
         _metadataManager.reset();
+        ++_numMetadataManagerChanges;
     } else if (!_metadataManager ||
                !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
         _metadataType = MetadataType::kSharded;
         _metadataManager = std::make_shared<MetadataManager>(
             opCtx->getServiceContext(), _nss, _rangeDeleterExecutor, newMetadata);
+        ++_numMetadataManagerChanges;
     } else {
         _metadataManager->setFilteringMetadata(std::move(newMetadata));
     }
