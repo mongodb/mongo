@@ -36,10 +36,10 @@ namespace logv2 {
 
 BSONArray LogTag::toBSONArray() {
     BSONArrayBuilder builder;
-    if (_value | kStartupWarnings) {
+    if (_value & kStartupWarnings) {
         builder.append("startupWarnings"_sd);
     }
-    if (_value | kPlainShell) {
+    if (_value & kPlainShell) {
         builder.append("plainShellOutput"_sd);
     }
 
