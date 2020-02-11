@@ -362,8 +362,9 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     const auto projectedFields =
         projection_executor_utils::applyProjectionToFields(wildcardProjection->exec(), fields);
 
-    std::set<FieldRef> includedPaths =
-        wildcardProjection->exhaustivePaths().value_or(std::set<FieldRef>{});
+    const static auto kEmptySet = std::set<FieldRef>{};
+    const auto& includedPaths =
+        wildcardProjection->exhaustivePaths() ? *wildcardProjection->exhaustivePaths() : kEmptySet;
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
         // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.
