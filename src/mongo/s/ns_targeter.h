@@ -120,13 +120,6 @@ public:
         OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const = 0;
 
     /**
-     * Returns a vector of ShardEndpoints for the entire collection.
-     *
-     * Returns !OK with message if the full collection could not be targeted.
-     */
-    virtual StatusWith<std::vector<ShardEndpoint>> targetCollection() const = 0;
-
-    /**
      * Returns a vector of ShardEndpoints for all shards.
      *
      * Returns !OK with message if all shards could not be targeted.
@@ -175,6 +168,13 @@ public:
      * Returns !OK with message if could not refresh
      */
     virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
+
+    /**
+     * Returns whether this write targets the config server. Invariants if the write targets the
+     * config server AND there is more than one endpoint, since there should be no namespaces that
+     * target both config servers and shards.
+     */
+    virtual bool endpointIsConfigServer() const = 0;
 
     /**
      * Returns the number of shards that own one or more chunks for the targeted collection.

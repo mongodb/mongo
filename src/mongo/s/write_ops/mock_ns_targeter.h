@@ -100,11 +100,6 @@ public:
         return _targetQuery(deleteDoc.getQ());
     }
 
-    StatusWith<std::vector<ShardEndpoint>> targetCollection() const override {
-        // No-op
-        return std::vector<ShardEndpoint>{};
-    }
-
     StatusWith<std::vector<ShardEndpoint>> targetAllShards(OperationContext* opCtx) const override {
         std::vector<ShardEndpoint> endpoints;
         for (const auto& range : _mockRanges) {
@@ -133,6 +128,11 @@ public:
         if (wasChanged)
             *wasChanged = false;
         return Status::OK();
+    }
+
+    bool endpointIsConfigServer() const override {
+        // No-op
+        return false;
     }
 
     int getNShardsOwningChunks() const override {

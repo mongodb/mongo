@@ -627,30 +627,6 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& s
     MONGO_UNREACHABLE;
 }
 
-StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() const {
-    if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "could not target full range of " << getNS().ns()
-                              << "; metadata not found"};
-    }
-
-    if (!_routingInfo->cm()) {
-        return std::vector<ShardEndpoint>{{_routingInfo->db().primaryId(),
-                                           ChunkVersion::UNSHARDED(),
-                                           _routingInfo->db().databaseVersion()}};
-    }
-
-    std::set<ShardId> shardIds;
-    _routingInfo->cm()->getAllShardIds(&shardIds);
-
-    std::vector<ShardEndpoint> endpoints;
-    for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _routingInfo->cm()->getVersion(shardId));
-    }
-
-    return endpoints;
-}
-
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetAllShards(
     OperationContext* opCtx) const {
     if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
@@ -844,6 +820,30 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
     }
 
     MONGO_UNREACHABLE;
+}
+
+bool ChunkManagerTargeter::endpointIsConfigServer() const {
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "could not verify full range of " << getNS().ns()
+                          << "; metadata not found",
+            _routingInfo->db().primary() || _routingInfo->cm());
+
+    if (!_routingInfo->cm()) {
+        return _routingInfo->db().primaryId() == ShardRegistry::kConfigServerShardId;
+    }
+
+    std::set<ShardId> shardIds;
+    _routingInfo->cm()->getAllShardIds(&shardIds);
+
+    if (std::any_of(shardIds.begin(), shardIds.end(), [](const auto& shardId) {
+            return shardId == ShardRegistry::kConfigServerShardId;
+        })) {
+        // There should be no namespaces that target both config servers and shards.
+        invariant(shardIds.size() == 1);
+        return true;
+    }
+
+    return false;
 }
 
 int ChunkManagerTargeter::getNShardsOwningChunks() const {

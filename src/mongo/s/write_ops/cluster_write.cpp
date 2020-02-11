@@ -75,47 +75,37 @@ void ClusterWriter::write(OperationContext* opCtx,
     // Config writes and shard writes are done differently
     if (nss.db() == NamespaceString::kAdminDb) {
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
-    } else {
-        {
-            ChunkManagerTargeter targeter(request.getNS(), targetEpoch);
-
-            Status targetInitStatus = targeter.init(opCtx);
-            if (!targetInitStatus.isOK()) {
-                toBatchError(targetInitStatus.withContext(
-                                 str::stream()
-                                 << "unable to initialize targeter for write op for collection "
-                                 << request.getNS().ns()),
-                             response);
-                return;
-            }
-
-            auto swEndpoints = targeter.targetCollection();
-            if (!swEndpoints.isOK()) {
-                toBatchError(swEndpoints.getStatus().withContext(
-                                 str::stream() << "unable to target write op for collection "
-                                               << request.getNS().ns()),
-                             response);
-                return;
-            }
-
-            const auto& endpoints = swEndpoints.getValue();
-
-            // Handle sharded config server writes differently.
-            if (std::any_of(endpoints.begin(), endpoints.end(), [](const auto& it) {
-                    return it.shardName == ShardRegistry::kConfigServerShardId;
-                })) {
-                // There should be no namespaces that partially target config servers.
-                invariant(endpoints.size() == 1);
-
-                // For config servers, we do direct writes.
-                Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(
-                    opCtx, request, response);
-                return;
-            }
-
-            BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
-        }
+        return;
     }
+
+    ChunkManagerTargeter targeter(request.getNS(), targetEpoch);
+
+    Status targetInitStatus = targeter.init(opCtx);
+    if (!targetInitStatus.isOK()) {
+        toBatchError(targetInitStatus.withContext(
+                         str::stream()
+                         << "unable to initialize targeter for write op for collection "
+                         << request.getNS().ns()),
+                     response);
+        return;
+    }
+
+    bool endpointIsConfigServer;
+    try {
+        endpointIsConfigServer = targeter.endpointIsConfigServer();
+    } catch (DBException& ex) {
+        toBatchError(ex.toStatus(str::stream()
+                                 << "unable to target write op for collection " << request.getNS()),
+                     response);
+        return;
+    }
+
+    if (endpointIsConfigServer) {
+        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
+        return;
+    }
+
+    BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
 }
 
 }  // namespace mongo
