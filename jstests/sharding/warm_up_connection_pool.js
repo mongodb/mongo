@@ -6,6 +6,7 @@
 // test is shutdown.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckOrphans = true;
 
 (function() {
 'use strict';
