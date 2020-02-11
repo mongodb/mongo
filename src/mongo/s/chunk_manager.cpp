@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/s/chunk_writes_tracker.h"
+#include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -409,7 +410,7 @@ ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
         return ChunkVersion(0, 0, _collectionVersion.epoch());
     }
 
-    uassert(StaleConfigInfo(_nss, {}, {}, shardName),
+    uassert(ShardInvalidatedForTargetingInfo(_nss),
             "shard has been marked stale",
             !it->second.isStale.load());
 

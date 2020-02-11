@@ -337,6 +337,10 @@ error_codes:
     - {code: 301,name: DataCorruptionDetected}
     - {code: 302,name: OCSPCertificateStatusUnknown}
     - {code: 303,name: SplitHorizonChange}
+    # This code should only be used upon finding that a shard has been marked stale in the sharding
+    # catalog cache, and as such does not belong in the StaleShardVersionError or
+    # NeedRetargettingError categories.
+    - {code: 304,name: ShardInvalidatedForTargeting,extra: ShardInvalidatedForTargetingInfo}
 
     # Error codes 4000-8999 are reserved.
 

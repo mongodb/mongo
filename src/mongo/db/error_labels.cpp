@@ -176,7 +176,7 @@ bool isTransientTransactionError(ErrorCodes::Error code,
     }
 
     isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code) ||
-        code == ErrorCodes::StaleDbVersion;
+        code == ErrorCodes::ShardInvalidatedForTargeting || code == ErrorCodes::StaleDbVersion;
 
     if (isCommitOrAbort) {
         // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be

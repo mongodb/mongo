@@ -214,6 +214,8 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                 catalogCache->onEpochChange(nss);
             }
             continue;  // Try again if allowed.
+        } catch (const ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>&) {
+            continue;
         }
         break;  // Success!
     }

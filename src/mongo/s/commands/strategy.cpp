@@ -77,6 +77,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
@@ -172,6 +173,7 @@ void invokeInTransactionRouter(OperationContext* opCtx,
     } catch (const DBException& e) {
         if (ErrorCodes::isSnapshotError(e.code()) ||
             ErrorCodes::isNeedRetargettingError(e.code()) ||
+            e.code() == ErrorCodes::ShardInvalidatedForTargeting ||
             e.code() == ErrorCodes::StaleDbVersion) {
             // Don't abort on possibly retryable errors.
             throw;
@@ -549,6 +551,48 @@ void runCommand(OperationContext* opCtx,
                 }
 
                 return;
+            } catch (ShardInvalidatedForTargetingException& ex) {
+                auto catalogCache = Grid::get(opCtx)->catalogCache();
+                catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
+
+                // Retry logic specific to transactions. Throws and aborts the transaction if the
+                // error cannot be retried on.
+                if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    auto abortGuard = makeGuard(
+                        [&] { txnRouter.implicitlyAbortTransaction(opCtx, ex.toStatus()); });
+
+                    if (!canRetry) {
+                        addContextForTransactionAbortingError(txnRouter.txnIdToString(),
+                                                              txnRouter.getLatestStmtId(),
+                                                              ex,
+                                                              "exhausted retries");
+                        throw;
+                    }
+
+                    // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
+                    // or shard invalidated for targeting errors.
+                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
+                        (void)catalogCache->getCollectionRoutingInfoWithRefresh(
+                            opCtx, ex.extraInfo<ShardInvalidatedForTargetingInfo>()->getNss());
+                        addContextForTransactionAbortingError(
+                            txnRouter.txnIdToString(),
+                            txnRouter.getLatestStmtId(),
+                            ex,
+                            "an error from cluster data placement change");
+                        throw;
+                    }
+
+                    // The error is retryable, so update transaction state before retrying.
+                    txnRouter.onStaleShardOrDbError(opCtx, commandName, ex.toStatus());
+
+                    abortGuard.dismiss();
+                    continue;
+                }
+
+                if (canRetry) {
+                    continue;
+                }
+                throw;
             } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
                 const auto staleNs = [&] {
                     if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
@@ -569,24 +613,24 @@ void runCommand(OperationContext* opCtx,
                     ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
                 }
 
+                auto catalogCache = Grid::get(opCtx)->catalogCache();
+
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                    Grid::get(opCtx)
-                        ->catalogCache()
-                        ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                            opCtx,
-                            staleNs,
-                            staleInfo->getVersionWanted(),
-                            staleInfo->getVersionReceived(),
-                            staleInfo->getShardId());
+                    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                        opCtx,
+                        staleNs,
+                        staleInfo->getVersionWanted(),
+                        staleInfo->getVersionReceived(),
+                        staleInfo->getShardId());
                 } else {
                     // If we don't have the stale config info and therefore don't know the shard's
                     // id, we have to force all further targetting requests for the namespace to
                     // block on a refresh.
-                    Grid::get(opCtx)->catalogCache()->onEpochChange(staleNs);
+                    catalogCache->onEpochChange(staleNs);
                 }
 
-                Grid::get(opCtx)->catalogCache()->setOperationShouldBlockBehindCatalogCacheRefresh(
-                    opCtx, true);
+
+                catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 
                 // Retry logic specific to transactions. Throws and aborts the transaction if the
                 // error cannot be retried on.
@@ -602,6 +646,8 @@ void runCommand(OperationContext* opCtx,
                         throw;
                     }
 
+                    // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
+                    // or shard invalidated for targeting errors.
                     if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
                         addContextForTransactionAbortingError(
                             txnRouter.txnIdToString(),
@@ -641,6 +687,8 @@ void runCommand(OperationContext* opCtx,
                         throw;
                     }
 
+                    // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
+                    // or shard invalidated for targeting errors.
                     if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
                         addContextForTransactionAbortingError(
                             txnRouter.txnIdToString(),
@@ -678,6 +726,8 @@ void runCommand(OperationContext* opCtx,
                         throw;
                     }
 
+                    // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
+                    // or shard invalidated for targeting errors.
                     if (!txnRouter.canContinueOnSnapshotError()) {
                         addContextForTransactionAbortingError(txnRouter.txnIdToString(),
                                                               txnRouter.getLatestStmtId(),
@@ -1079,6 +1129,14 @@ void Strategy::explainFind(OperationContext* opCtx,
                                                            qr.getCollation());
             millisElapsed = timer.millis();
             break;
+        } catch (ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>&) {
+            Grid::get(opCtx)->catalogCache()->setOperationShouldBlockBehindCatalogCacheRefresh(
+                opCtx, true);
+
+            if (canRetry) {
+                continue;
+            }
+            throw;
         } catch (const ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
             const auto staleNs = [&] {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
