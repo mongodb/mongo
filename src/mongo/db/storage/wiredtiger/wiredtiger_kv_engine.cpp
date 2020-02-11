@@ -677,6 +677,7 @@ StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCurso
     WT_SESSION* session,
     WT_CURSOR* cursor,
     bool incrementalBackup,
+    bool fullBackup,
     std::string dbPath,
     const char* statusPrefix) {
     int wtRet;
@@ -690,14 +691,11 @@ StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCurso
         std::string name(filename);
 
         boost::filesystem::path filePath = directoryPath;
-        boost::filesystem::path relativePath;
         if (name.find(wiredTigerLogFilePrefix) == 0) {
             // TODO SERVER-13455:replace `journal/` with the configurable journal path.
             filePath /= boost::filesystem::path("journal");
-            relativePath /= boost::filesystem::path("journal");
         }
         filePath /= name;
-        relativePath /= name;
 
         boost::system::error_code errorCode;
         const std::uint64_t fileSize = boost::filesystem::file_size(filePath, errorCode);
@@ -709,13 +707,15 @@ StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCurso
         StorageEngine::BackupFile backupFile(fileSize);
         backupInformation.insert({filePath.string(), backupFile});
 
-        if (!incrementalBackup) {
+        // Full backups cannot open an incremental cursor, even if they are the first full backup
+        // for incremental.
+        if (!incrementalBackup || fullBackup) {
             continue;
         }
 
         // For each file listed, open a duplicate backup cursor and get the blocks to copy.
         std::stringstream ss;
-        ss << "incremental=(file=\"" << str::escape(relativePath.string()) << "\")";
+        ss << "incremental=(file=" << filename << ")";
         const std::string config = ss.str();
         WT_CURSOR* dupCursor;
         wtRet = session->open_cursor(session, nullptr, cursor, config.c_str(), &dupCursor);
@@ -1322,8 +1322,13 @@ StatusWith<StorageEngine::BackupInformation> WiredTigerKVEngine::beginNonBlockin
         return wtRCToStatus(wtRet);
     }
 
-    auto swBackupInfo = getBackupInformationFromBackupCursor(
-        session, cursor, options.incrementalBackup, _path, "Error opening backup cursor.");
+    const bool fullBackup = !options.srcBackupName;
+    auto swBackupInfo = getBackupInformationFromBackupCursor(session,
+                                                             cursor,
+                                                             options.incrementalBackup,
+                                                             fullBackup,
+                                                             _path,
+                                                             "Error opening backup cursor.");
 
     if (!swBackupInfo.isOK()) {
         return swBackupInfo;
@@ -1359,8 +1364,12 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     }
 
     StatusWith<StorageEngine::BackupInformation> swBackupInfo =
-        getBackupInformationFromBackupCursor(
-            session, cursor, /*incrementalBackup=*/false, _path, "Error extending backup cursor.");
+        getBackupInformationFromBackupCursor(session,
+                                             cursor,
+                                             /*incrementalBackup=*/false,
+                                             /*fullBackup=*/true,
+                                             _path,
+                                             "Error extending backup cursor.");
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
