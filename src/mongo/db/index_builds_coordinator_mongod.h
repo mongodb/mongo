@@ -55,7 +55,6 @@ public:
      * Sets up the thread pool.
      */
     IndexBuildsCoordinatorMongod();
-    IndexBuildsCoordinatorMongod(ThreadPool::Options options);
 
     /**
      * Shuts down the thread pool, signals interrupt to all index builds, then waits for all of the

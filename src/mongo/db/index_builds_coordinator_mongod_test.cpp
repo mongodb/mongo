@@ -73,15 +73,7 @@ void IndexBuildsCoordinatorMongodTest::setUp() {
     createCollection(_testFooNss, _testFooUUID);
     createCollection(_testBarNss, _testBarUUID);
     createCollection(_othertestFooNss, _othertestFooUUID);
-
-    ThreadPool::Options options;
-    options.poolName = "IndexBuildsCoordinatorMongod";
-    options.minThreads = 0;
-    options.maxThreads = 5;
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-    _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>(options);
+    _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
 }
 
 void IndexBuildsCoordinatorMongodTest::tearDown() {
