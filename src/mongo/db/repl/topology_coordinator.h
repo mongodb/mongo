@@ -718,6 +718,11 @@ public:
     bool checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum,
                                            const std::vector<MemberConfig>& members) const;
 
+    /**
+     * Returns nullptr if there is no primary, or the MemberConfig* for the current primary.
+     */
+    const MemberConfig* getCurrentPrimaryMember() const;
+
     ////////////////////////////////////////////////////////////
     //
     // Test support methods
@@ -850,9 +855,6 @@ private:
      * nullptr if memberId is not found in the configuration.
      */
     MemberData* _findMemberDataByMemberId(const int memberId);
-
-    // Returns NULL if there is no primary, or the MemberConfig* for the current primary
-    const MemberConfig* _currentPrimaryMember() const;
 
     /**
      * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an

@@ -510,5 +510,9 @@ OpTime ReplicationCoordinatorEmbedded::getLatestWriteOpTime(OperationContext* op
     return getMyLastAppliedOpTime();
 }
 
+HostAndPort ReplicationCoordinatorEmbedded::getCurrentPrimaryHostAndPort() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

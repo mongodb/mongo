@@ -2066,6 +2066,12 @@ OpTime ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx)
     return OpTime(latestOplogTimestamp, getTerm());
 }
 
+HostAndPort ReplicationCoordinatorImpl::getCurrentPrimaryHostAndPort() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    auto primary = _topCoord->getCurrentPrimaryMember();
+    return primary ? primary->getHostAndPort() : HostAndPort();
+}
+
 void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
     AutoGetRstlForStepUpStepDown* arsc, ErrorCodes::Error reason) {
     const OperationContext* rstlOpCtx = arsc->getOpCtx();

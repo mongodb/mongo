@@ -331,6 +331,8 @@ public:
 
     virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
+    virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
+
 private:
     ServiceContext* const _service;
     ReplSettings _settings;

@@ -39,6 +39,8 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -176,6 +178,53 @@ ReplicaSetNodeProcessInterface::attachCursorSourceToPipeline(
     Pipeline* ownedPipeline,
     bool allowTargetingShards) {
     return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+}
+
+StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
+    OperationContext* opCtx, const NamespaceString& ns, const BSONObj& cmdObj) const {
+    executor::RemoteCommandRequest request(
+        repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort(),
+        ns.db().toString(),
+        cmdObj,
+        opCtx);
+    auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
+    auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
+        std::move(promise));
+    auto scheduleResult = _executor->scheduleRemoteCommand(
+        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
+    if (!scheduleResult.getStatus().isOK()) {
+        // Since the command failed to be scheduled, the callback above did not and will not run.
+        // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
+        // with the executor's thread.
+        promisePtr->setError(scheduleResult.getStatus());
+    }
+
+    auto response = future.getNoThrow(opCtx);
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+
+    auto rcr = std::move(response.getValue());
+    if (!rcr.response.status.isOK()) {
+        return rcr.response.status;
+    }
+
+    auto commandStatus = getStatusFromCommandResult(rcr.response.data);
+    if (!commandStatus.isOK()) {
+        return commandStatus;
+    }
+
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(rcr.response.data);
+    if (!writeConcernStatus.isOK()) {
+        return writeConcernStatus;
+    }
+
+    auto writeStatus = getFirstWriteErrorStatusFromCommandResult(rcr.response.data);
+    if (!writeStatus.isOK()) {
+        return writeStatus;
+    }
+
+    return rcr.response.data;
 }
 
 }  // namespace mongo

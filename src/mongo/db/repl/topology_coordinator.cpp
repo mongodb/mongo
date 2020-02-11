@@ -287,13 +287,13 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                         " not allowed and primary is unknown/down");
             _syncSource = HostAndPort();
             return _syncSource;
-        } else if (_memberIsBlacklisted(*_currentPrimaryMember(), now)) {
+        } else if (_memberIsBlacklisted(*getCurrentPrimaryMember(), now)) {
             LOGV2_DEBUG(21785,
                         1,
                         "Cannot select a sync source because chaining is not allowed and primary "
                         "member is blacklisted: {currentPrimaryMember_getHostAndPort}",
                         "currentPrimaryMember_getHostAndPort"_attr =
-                            _currentPrimaryMember()->getHostAndPort());
+                            getCurrentPrimaryMember()->getHostAndPort());
             _syncSource = HostAndPort();
             return _syncSource;
         } else if (_currentPrimaryIndex == _selfIndex) {
@@ -308,13 +308,13 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
             LOG(1) << "Cannot select a sync source because chaining is not allowed and the primary "
                       "is behind me. Last oplog optime of primary {}: {}, my last fetched oplog "
                       "optime: {}"_format(
-                          _currentPrimaryMember()->getHostAndPort(),
+                          getCurrentPrimaryMember()->getHostAndPort(),
                           _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime().toBSON(),
                           lastOpTimeFetched.toBSON());
             _syncSource = HostAndPort();
             return _syncSource;
         } else {
-            _syncSource = _currentPrimaryMember()->getHostAndPort();
+            _syncSource = getCurrentPrimaryMember()->getHostAndPort();
             LOGV2(21787,
                   "chaining not allowed, choosing primary as sync source candidate: {syncSource}",
                   "syncSource"_attr = _syncSource);
@@ -1542,7 +1542,7 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
     }
 }
 
-const MemberConfig* TopologyCoordinator::_currentPrimaryMember() const {
+const MemberConfig* TopologyCoordinator::getCurrentPrimaryMember() const {
     if (_currentPrimaryIndex == -1)
         return nullptr;
 
@@ -1886,7 +1886,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterRespons
     response->setIsMaster(myState.primary() && !isSteppingDown());
     response->setIsSecondary(myState.secondary());
 
-    const MemberConfig* curPrimary = _currentPrimaryMember();
+    const MemberConfig* curPrimary = getCurrentPrimaryMember();
     if (curPrimary) {
         response->setPrimary(curPrimary->getHostAndPort(horizonString));
     }

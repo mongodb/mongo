@@ -268,6 +268,8 @@ public:
 
     OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
+    HostAndPort getCurrentPrimaryHostAndPort() const override;
+
 private:
     ServiceContext* const _service;
 };

@@ -484,5 +484,9 @@ OpTime ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx)
     return getMyLastAppliedOpTime();
 }
 
+HostAndPort ReplicationCoordinatorNoOp::getCurrentPrimaryHostAndPort() const {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

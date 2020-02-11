@@ -582,5 +582,9 @@ OpTime ReplicationCoordinatorMock::getLatestWriteOpTime(OperationContext* opCtx)
     return getMyLastAppliedOpTime();
 }
 
+HostAndPort ReplicationCoordinatorMock::getCurrentPrimaryHostAndPort() const {
+    return HostAndPort();
+}
+
 }  // namespace repl
 }  // namespace mongo

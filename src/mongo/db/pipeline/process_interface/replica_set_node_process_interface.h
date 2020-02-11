@@ -89,6 +89,15 @@ public:
         bool allowTargetingShards) override;
 
 private:
+    /**
+     * Attemps to execute the specified command on the primary. Returns the command response upon
+     * success or a non-OK status upon a failed command response, a writeConcernError, or any
+     * writeErrors.
+     */
+    StatusWith<BSONObj> _executeCommandOnPrimary(OperationContext* opCtx,
+                                                 const NamespaceString& ns,
+                                                 const BSONObj& cmdObj) const;
+
     executor::TaskExecutor* _executor;
 };
 

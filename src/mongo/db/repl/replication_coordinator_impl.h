@@ -349,6 +349,8 @@ public:
 
     virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
+    virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
+
     // ================== Test support API ===================
 
     /**

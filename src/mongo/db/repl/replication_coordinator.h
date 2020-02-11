@@ -977,6 +977,13 @@ public:
      */
     virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const = 0;
 
+    /**
+     * Returns the HostAndPort of the current primary, or an empty HostAndPort if there is no
+     * primary. Note that the primary can change at any time and thus the result may be immediately
+     * stale unless run from the primary with the RSTL held.
+     */
+    virtual HostAndPort getCurrentPrimaryHostAndPort() const = 0;
+
 protected:
     ReplicationCoordinator();
 };
