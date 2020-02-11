@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/latch_analyzer.h"
 
+#include <boost/iterator/transform_iterator.hpp>
 #include <deque>
 
 #include <fmt/format.h>
@@ -47,7 +48,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/latch_analyzer.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -150,11 +150,13 @@ void dumpLevels(const LatchSetState& state) {
         return;
     }
 
-    LOGV2(23162, "Dumping Latch Identities:");
-    auto& identities = *state.identities;
-    for (auto& identity : identities) {
-        LOGV2(23163, "- {identity_name}", "identity_name"_attr = identity->name());
-    }
+    auto identityName = [](const auto& identity) { return identity->name(); };
+    auto begin = boost::make_transform_iterator(state.identities->begin(), identityName);
+    auto end = boost::make_transform_iterator(state.identities->end(), identityName);
+    LOGV2_OPTIONS(23162,
+                  {logv2::LogTruncation::Disabled},
+                  "Dumping Latch Identities",
+                  "names"_attr = logv2::seqLog(begin, end));
 }
 
 }  // namespace
@@ -228,8 +230,12 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
 
             fassert(31360, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
-            LOGV2_WARNING(23164, "{errorMessage}", "errorMessage"_attr = errorMessage);
-
+            LOGV2_WARNING(23164,
+                          "Theoretical deadlock alert at latch acquisition",
+                          "result"_attr = result,
+                          "file"_attr = identity.sourceLocation()->file_name(),
+                          "line"_attr = identity.sourceLocation()->line(),
+                          "latch"_attr = identity.name());
             {
                 stdx::lock_guard lk(_mutex);
 
@@ -287,7 +293,12 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
 
             fassert(31361, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
-            LOGV2_WARNING(23165, "{errorMessage}", "errorMessage"_attr = errorMessage);
+            LOGV2_WARNING(23165,
+                          "Theoretical deadlock alert at latch release",
+                          "result"_attr = result,
+                          "file"_attr = identity.sourceLocation()->file_name(),
+                          "line"_attr = identity.sourceLocation()->line(),
+                          "latch"_attr = identity.name());
 
             {
                 stdx::lock_guard lk(_mutex);
@@ -381,15 +392,12 @@ void LatchAnalyzer::dump() {
     }
 
     BSONObjBuilder bob(1024 * 1024);
-    {
-        BSONObjBuilder analysis = bob.subobjStart("latchAnalysis");
-        appendToBSON(analysis);
-    }
+    appendToBSON(bob);
 
-    auto obj = bob.done();
-    log().setIsTruncatable(false) << "=====LATCHES=====\n"
-                                  << obj.jsonString(JsonStringFormat::LegacyStrict)
-                                  << "\n===END LATCHES===";
+    LOGV2_OPTIONS(25003,
+                  {logv2::LogTruncation::Disabled},
+                  "LatchAnalyzer dump",
+                  "latchAnalysis"_attr = bob.done());
 }
 
 LatchAnalyzerDisabledBlock::LatchAnalyzerDisabledBlock() {

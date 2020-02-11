@@ -67,6 +67,16 @@ struct IndexKeyEntry {
 
     IndexKeyEntry(BSONObj key, RecordId loc) : key(std::move(key)), loc(std::move(loc)) {}
 
+    // TODO SERVER-45138: toString() can be removed when we log to JSON only
+    std::string toString() const {
+        return str::stream() << key << ' ' << loc;
+    }
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("key"_sd, key);
+        loc.serialize(builder);
+    }
+
     BSONObj key;
     RecordId loc;
 };

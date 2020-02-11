@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 #undef MONGO_PCH_WHITELISTED  // needed for log.h
@@ -35,7 +35,6 @@
 #include "mongo/util/progress_meter.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -69,17 +68,18 @@ bool ProgressMeter::hit(int n) {
 
     if (_total > 0) {
         int per = (int)(((double)_done * 100.0) / (double)_total);
-        LogstreamBuilder out = log();
-        out << "  " << _name << ": " << _done;
 
+        logv2::DynamicAttributes attrs;
+        attrs.add("name", _name);
+        attrs.add("done", _done);
         if (_showTotal) {
-            out << '/' << _total << ' ' << per << '%';
+            attrs.add("total", _total);
+            attrs.add("percent", per);
         }
-
         if (!_units.empty()) {
-            out << " (" << _units << ")";
+            attrs.add("units", _units);
         }
-        out << std::endl;
+        LOGV2(51773, "progress meter", attrs);
     }
     _lastTime = t;
     return true;

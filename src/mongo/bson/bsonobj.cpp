@@ -579,18 +579,6 @@ Status BSONObj::storageValidEmbedded() const {
     return Status::OK();
 }
 
-void BSONObj::dump() const {
-    LogstreamBuilder builder = log();
-    builder << std::hex;
-    const char* p = objdata();
-    for (int i = 0; i < objsize(); i++) {
-        builder << i << '\t' << (0xff & ((unsigned)*p));
-        if (*p >= 'A' && *p <= 'z')
-            builder << '\t' << *p;
-        p++;
-    }
-}
-
 void BSONObj::getFields(unsigned n, const char** fieldNames, BSONElement* fields) const {
     BSONObjIterator i(*this);
     while (i.more()) {
