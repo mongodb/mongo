@@ -550,6 +550,9 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
         }
     }
 
+    uassert(17320,
+            str::stream() << "cannot do createCollection on namespace with a $ in it: " << nss,
+            nss.ns().find('$') == std::string::npos);
     uassert(14037,
             "can't create user databases on a --configsvr instance",
             serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOnInternalDb());

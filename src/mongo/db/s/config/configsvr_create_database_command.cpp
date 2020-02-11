@@ -82,8 +82,7 @@ public:
 
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "invalid db name specified: " << dbname,
-                    NamespaceString::validDBName(dbname,
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+                    NamespaceString::validDBName(dbname));
 
             // Make sure to force update of any stale metadata
             ON_BLOCK_EXIT(

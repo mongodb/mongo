@@ -131,8 +131,9 @@ makeView("a",
          ErrorCodes.FailedToParse);
 
 const invalidDb = db.getSiblingDB("$gt");
-assert.commandFailedWithCode(invalidDb.createView('testView', 'testColl', []),
-                             ErrorCodes.InvalidViewDefinition);
+assert.commandFailedWithCode(
+    invalidDb.createView('testView', 'testColl', []),
+    [17320, ErrorCodes.InvalidNamespace, ErrorCodes.InvalidViewDefinition]);
 // Delete the invalid view (by dropping the database) so that the validate hook succeeds.
 assert.commandWorked(invalidDb.dropDatabase());
 }());
