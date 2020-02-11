@@ -309,7 +309,7 @@ assert.commandWorked(readOnlyDB.runCommand({count: "foo"}));
 
 print("make sure currentOp/killOp fail");
 assert.commandFailed(readOnlyDB.currentOp());
-assert.commandFailed(readOnlyDB.killOp(123));
+assert.commandFailed(readOnlyDB.killOp(2000000000));
 
 // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 /*
@@ -328,7 +328,7 @@ assert.commandWorked(readOnlyDB.runCommand({logout: 1}));
 
 print("make sure currentOp/killOp fail again");
 assert.commandFailed(readOnlyDB.currentOp());
-assert.commandFailed(readOnlyDB.killOp(123));
+assert.commandFailed(readOnlyDB.killOp(2000000000));
 
 s.stop();
 d1.stopSet();
