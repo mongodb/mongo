@@ -582,7 +582,8 @@ def create_generate_tasks_config(
         for index, test in enumerate(test_list):
             if task in evg_project_config.get_task_names_by_tag(RANDOM_MULTIVERSION_REPLSETS_TAG):
                 # Exclude files that should be blacklisted from multiversion testing.
-                files_to_exclude = gen_multiversion.get_exclude_files(task, TASK_PATH_SUFFIX)
+                task_name = gen_resmoke.remove_gen_suffix(task)
+                files_to_exclude = gen_multiversion.get_exclude_files(task_name, TASK_PATH_SUFFIX)
                 if test in files_to_exclude:
                     LOGGER.debug("Files to exclude", files_to_exclude=files_to_exclude, test=test,
                                  suite=task)
