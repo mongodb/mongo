@@ -77,7 +77,16 @@ public:
      */
     void setChunkRefreshReturnValue(StatusWith<std::vector<ChunkType>> statusWithChunks);
 
+    /**
+     * Sets the mocked database entry result that getDatabase will use to construct its return
+     * value.
+     */
+    void setDatabaseRefreshReturnValue(StatusWith<DatabaseType> swDatabase);
+
 private:
+    StatusWith<DatabaseType> _swDatabaseReturnValue{
+        Status(ErrorCodes::InternalError, "config loader database response is uninitialized")};
+
     // These variables hold the mocked chunks and collection entry results used to construct the
     // return value of getChunksSince above.
     StatusWith<CollectionType> _swCollectionReturnValue{Status(

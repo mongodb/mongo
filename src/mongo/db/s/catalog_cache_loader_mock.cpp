@@ -133,7 +133,26 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
 void CatalogCacheLoaderMock::getDatabase(
     StringData dbName,
     std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    // Not implemented
+    _threadPool.schedule([ this, callbackFn ](auto status) noexcept {
+        invariant(status);
+
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        auto swDatabase = [&]() -> StatusWith<DatabaseType> {
+            try {
+                uassertStatusOK(_swDatabaseReturnValue);
+
+                return DatabaseType(_swDatabaseReturnValue.getValue().getName(),
+                                    _swDatabaseReturnValue.getValue().getPrimary(),
+                                    _swDatabaseReturnValue.getValue().getSharded(),
+                                    _swDatabaseReturnValue.getValue().getVersion());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }();
+
+        callbackFn(opCtx.get(), std::move(swDatabase));
+    });
 }
 
 void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(
@@ -144,6 +163,10 @@ void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(
 void CatalogCacheLoaderMock::setChunkRefreshReturnValue(
     StatusWith<std::vector<ChunkType>> statusWithChunks) {
     _swChunksReturnValue = std::move(statusWithChunks);
+}
+
+void CatalogCacheLoaderMock::setDatabaseRefreshReturnValue(StatusWith<DatabaseType> swDatabase) {
+    _swDatabaseReturnValue = std::move(swDatabase);
 }
 
 }  // namespace mongo

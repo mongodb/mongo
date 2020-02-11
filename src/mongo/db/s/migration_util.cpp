@@ -130,11 +130,7 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
 ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                                              const RangeDeletionTask& deletionTask) {
     const auto serviceContext = opCtx->getServiceContext();
-    // TODO (SERVER-45577): Use the Grid's fixed executor once the refresh is done asynchronously.
-    // An arbitrary executor is being used temporarily because unit tests have only one thread in
-    // the fixed executor, and that thread is needed to respond to the refresh.
-    return ExecutorFuture<void>(
-               Grid::get(serviceContext)->getExecutorPool()->getArbitraryExecutor())
+    return ExecutorFuture<void>(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
         .then([=] {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
             {
@@ -160,7 +156,7 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                                : " is not known")
                        << ", forcing a refresh of " << deletionTask.getNss();
 
-                // TODO (SERVER-45577): Add an asynchronous version of
+                // TODO (SERVER-46075): Add an asynchronous version of
                 // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
                 // thread pool.
                 autoColl.reset();

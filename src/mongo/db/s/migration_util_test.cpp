@@ -30,12 +30,16 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/catalog_cache_loader_mock.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/wait_for_majority_service.h"
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/shard_server_test_fixture.h"
@@ -376,22 +380,151 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
     ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range, wrongUuid));
 }
 
-using SubmitRangeDeletionTaskTest = MigrationUtilsTest;
+// Fixture that uses a mocked CatalogCacheLoader and CatalogClient to allow metadata refreshes
+// without using the mock network.
+class SubmitRangeDeletionTaskTest : public ShardServerTestFixture {
+public:
+    const HostAndPort kConfigHostAndPort{"dummy", 123};
+    const NamespaceString kNss{"test.foo"};
+    const ShardKeyPattern kShardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
+    const UUID kDefaultUUID = UUID::gen();
+    const OID kEpoch = OID::gen();
+    const DatabaseType kDefaultDatabaseType =
+        DatabaseType(kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID, 1));
+    const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
+                                               ShardType("1", "Host1:12345")};
+
+    void setUp() override {
+        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache loader.
+        ShardingMongodTestFixture::setUp();
+
+        replicationCoordinator()->alwaysAllowWrites(true);
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        _clusterId = OID::gen();
+        ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
+
+        std::unique_ptr<CatalogCacheLoaderMock> mockLoader =
+            std::make_unique<CatalogCacheLoaderMock>();
+        _mockCatalogCacheLoader = mockLoader.get();
+        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
+
+        uassertStatusOK(
+            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
+
+        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
+
+        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+
+        // Set up 2 default shards.
+        for (const auto& shard : kShardList) {
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            HostAndPort host(shard.getHost());
+            targeter->setConnectionStringReturnValue(ConnectionString(host));
+            targeter->setFindHostReturnValue(host);
+            targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
+        }
+    }
+
+    void tearDown() override {
+        WaitForMajorityService::get(getServiceContext()).shutDown();
+        CatalogCacheLoader::clearForTests(getServiceContext());
+        ShardingMongodTestFixture::tearDown();
+        CollectionShardingStateFactory::clear(getServiceContext());
+    }
+
+    // Mock for the ShardingCatalogClient used to satisfy loading all shards for the ShardRegistry
+    // and loading all collections when a database is loaded for the first time by the CatalogCache.
+    class StaticCatalogClient final : public ShardingCatalogClientMock {
+    public:
+        StaticCatalogClient(std::vector<ShardType> shards)
+            : ShardingCatalogClientMock(nullptr), _shards(std::move(shards)) {}
+
+        StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+            OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
+            return repl::OpTimeWith<std::vector<ShardType>>(_shards);
+        }
+
+        StatusWith<std::vector<CollectionType>> getCollections(
+            OperationContext* opCtx,
+            const std::string* dbName,
+            repl::OpTime* optime,
+            repl::ReadConcernLevel readConcernLevel) override {
+            return _colls;
+        }
+
+        void setCollections(std::vector<CollectionType> colls) {
+            _colls = std::move(colls);
+        }
+
+    private:
+        const std::vector<ShardType> _shards;
+        std::vector<CollectionType> _colls;
+    };
+
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
+        std::unique_ptr<DistLockManager> distLockManager) override {
+        auto mockCatalogClient = std::make_unique<StaticCatalogClient>(kShardList);
+        // Stash a pointer to the mock so its return values can be set.
+        _mockCatalogClient = mockCatalogClient.get();
+        return mockCatalogClient;
+    }
+
+    CollectionType makeCollectionType(UUID uuid, OID epoch) {
+        CollectionType coll;
+        coll.setNs(kNss);
+        coll.setEpoch(epoch);
+        coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
+        coll.setUnique(true);
+        coll.setUUID(uuid);
+        return coll;
+    }
+
+    std::vector<ChunkType> makeChangedChunks(ChunkVersion startingVersion) {
+        ChunkType chunk1(kNss,
+                         {kShardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
+                         startingVersion,
+                         {"0"});
+        chunk1.setName(OID::gen());
+        startingVersion.incMinor();
+
+        ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, startingVersion, {"1"});
+        chunk2.setName(OID::gen());
+        startingVersion.incMinor();
+
+        ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, startingVersion, {"0"});
+        chunk3.setName(OID::gen());
+        startingVersion.incMinor();
+
+        ChunkType chunk4(kNss,
+                         {BSON("_id" << 100), kShardKeyPattern.getKeyPattern().globalMax()},
+                         startingVersion,
+                         {"1"});
+        chunk4.setName(OID::gen());
+        startingVersion.incMinor();
+
+        return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
+    }
+
+    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
+    StaticCatalogClient* _mockCatalogClient;
+};
 
 TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataIsUnknownEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    const auto uuid = UUID::gen();
-    auto deletionTask = createDeletionTask(kNss, uuid, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
 
-    // Make the refresh triggered by submitting the task return an empty result.
-    auto result = stdx::async(stdx::launch::async,
-                              [this, uuid] { respondToMetadataRefreshRequestsWithError(); });
+    // Make the refresh triggered by submitting the task return an empty result when loading the
+    // database.
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
+        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
 
     auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
 
@@ -404,12 +537,15 @@ TEST_F(SubmitRangeDeletionTaskTest,
 TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUUID) {
     auto opCtx = operationContext();
 
-    const auto uuid = UUID::gen();
-    auto deletionTask = createDeletionTask(kNss, uuid, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
 
     // Force a metadata refresh with the task's UUID before the task is submitted.
-    auto result =
-        stdx::async(stdx::launch::async, [this, uuid] { respondToMetadataRefreshRequests(uuid); });
+    auto coll = makeCollectionType(kDefaultUUID, kEpoch);
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch)));
+    _mockCatalogClient->setCollections({coll});
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
     // The task should have been submitted successfully.
@@ -422,12 +558,15 @@ TEST_F(
     SucceedsIfFilteringMetadataInitiallyUnknownButFilteringMetadataUUIDMatchesTaskUUIDAfterRefresh) {
     auto opCtx = operationContext();
 
-    const auto uuid = UUID::gen();
-    auto deletionTask = createDeletionTask(kNss, uuid, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto result =
-        stdx::async(stdx::launch::async, [this, uuid] { respondToMetadataRefreshRequests(uuid); });
+    auto coll = makeCollectionType(kDefaultUUID, kEpoch);
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch)));
+    _mockCatalogClient->setCollections({coll});
 
     // The task should have been submitted successfully.
     auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -440,16 +579,24 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     // Force a metadata refresh with an arbitrary UUID so that the node's filtering metadata is
     // stale when the task is submitted.
-    auto result1 = stdx::async(stdx::launch::async, [this] { respondToMetadataRefreshRequests(); });
+    const auto staleUUID = UUID::gen();
+    const auto staleEpoch = OID::gen();
+    auto staleColl = makeCollectionType(staleUUID, staleEpoch);
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(staleColl);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(1, 0, staleEpoch)));
+    _mockCatalogClient->setCollections({staleColl});
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
-    const auto uuid = UUID::gen();
-    auto deletionTask = createDeletionTask(kNss, uuid, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto result2 = stdx::async(stdx::launch::async, [this, uuid] {
-        respondToMetadataRefreshRequests(uuid, true /* incrementalRefresh */);
-    });
+    auto matchingColl = makeCollectionType(kDefaultUUID, kEpoch);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch)));
+    _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
     auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -460,16 +607,20 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    const auto uuid = UUID::gen();
-    auto deletionTask = createDeletionTask(kNss, uuid, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
 
     // Make the refresh triggered by submitting the task return an arbitrary UUID.
-    auto result2 =
-        stdx::async(stdx::launch::async, [this, uuid] { respondToMetadataRefreshRequests(); });
+    const auto otherEpoch = OID::gen();
+    auto otherColl = makeCollectionType(UUID::gen(), otherEpoch);
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(otherColl);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(1, 0, otherEpoch)));
+    _mockCatalogClient->setCollections({otherColl});
 
     // The task should not have been submitted, and the task's entry should have been removed from
     // the persistent store.
