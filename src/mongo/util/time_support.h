@@ -30,6 +30,7 @@
 #pragma once
 
 #include <ctime>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <string>
@@ -305,14 +306,16 @@ std::string dateToCtimeString(Date_t date);
 StatusWith<Date_t> dateFromISOString(StringData dateString);
 
 /**
- * Like dateToISOStringUTC, except outputs to a std::ostream.
+ * Like dateToISOStringUTC, except outputs to a std::ostream or fmt::memory_buffer.
  */
 void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
+void outputDateAsISOStringUTC(fmt::memory_buffer& buffer, Date_t date);
 
 /**
- * Like dateToISOStringLocal, except outputs to a std::ostream.
+ * Like dateToISOStringLocal, except outputs to a std::ostream or fmt::memory_buffer.
  */
 void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
+void outputDateAsISOStringLocal(fmt::memory_buffer& buffer, Date_t date);
 
 /**
  * Like dateToCtimeString, except outputs to a std::ostream.

@@ -33,6 +33,7 @@
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_format.h"
 
 namespace mongo::logv2 {
 

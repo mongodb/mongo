@@ -99,6 +99,8 @@ struct ServerGlobalParams {
 
     std::string logpath;  // Path to log file, if logging to a file; otherwise, empty.
     logv2::LogFormat logFormat = logv2::LogFormat::kDefault;  // Log format to output to
+    logv2::LogTimestampFormat logTimestampFormat = logv2::LogTimestampFormat::kISO8601Local;
+
     bool logAppend = false;         // True if logging to a file in append mode.
     bool logRenameOnRotate = true;  // True if logging should rename log files on rotate
     bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.

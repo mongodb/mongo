@@ -46,10 +46,18 @@ void TextFormatter::operator()(boost::log::record_view const& rec,
                                boost::log::formatting_ostream& strm) const {
     using namespace boost::log;
 
+    Date_t timeStamp = extract<Date_t>(attributes::timeStamp(), rec).get();
     fmt::memory_buffer buffer;
+    switch (_timestampFormat) {
+        case LogTimestampFormat::kISO8601UTC:
+            outputDateAsISOStringUTC(buffer, timeStamp);
+            break;
+        case LogTimestampFormat::kISO8601Local:
+            outputDateAsISOStringLocal(buffer, timeStamp);
+            break;
+    };
     fmt::format_to(buffer,
-                   "{} {:<2} {:<8} [{}] ",
-                   extract<Date_t>(attributes::timeStamp(), rec).get().toString(),
+                   " {:<2} {:<8} [{}] ",
                    extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact(),
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog(),
                    extract<StringData>(attributes::threadName(), rec).get());

@@ -35,10 +35,14 @@ namespace mongo::logv2 {
 
 class TextFormatter : protected PlainFormatter {
 public:
-    TextFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
-        : PlainFormatter(maxAttributeSizeKB) {}
+    TextFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
+                  LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)
+        : PlainFormatter(maxAttributeSizeKB), _timestampFormat(timestampFormat) {}
 
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
+
+private:
+    const LogTimestampFormat _timestampFormat;
 };
 
 }  // namespace mongo::logv2

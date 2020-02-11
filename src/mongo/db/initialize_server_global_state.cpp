@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -226,6 +227,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
     MessageEventDetailsEncoder::setMaxLogSizeKBSource(gMaxLogAttributeSizeKB);
     lv2Config.maxAttributeSizeKB = &gMaxLogAttributeSizeKB;
+    bool writeServerRestartedAfterLogConfig = false;
 
     if (serverGlobalParams.logWithSyslog) {
 #ifdef _WIN32
@@ -324,11 +326,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                 : logv2::LogDomainGlobal::ConfigurationOptions::OpenMode::kTruncate;
 
             if (serverGlobalParams.logAppend && exists) {
-                LOGV2(20698, "***** SERVER RESTARTED *****");
-                // FIXME rewrite for logv2
-                // Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
-                // if (!status.isOK())
-                //    return status;
+                writeServerRestartedAfterLogConfig = true;
             }
 
         } else {
@@ -377,7 +375,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
     if (logV2Enabled()) {
         lv2Config.format = serverGlobalParams.logFormat;
-        return lv2Manager.getGlobalDomainInternal().configure(lv2Config);
+        lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
+        Status result = lv2Manager.getGlobalDomainInternal().configure(lv2Config);
+        if (result.isOK() && writeServerRestartedAfterLogConfig)
+            LOGV2(20698, "***** SERVER RESTARTED *****");
+        return result;
     }
 
     return Status::OK();

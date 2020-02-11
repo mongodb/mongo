@@ -176,10 +176,12 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     switch (options.format) {
         case LogFormat::kDefault:
         case LogFormat::kText:
-            setFormatters([&] { return TextFormatter(options.maxAttributeSizeKB); });
+            setFormatters(
+                [&] { return TextFormatter(options.maxAttributeSizeKB, options.timestampFormat); });
             break;
         case LogFormat::kJson:
-            setFormatters([&] { return JSONFormatter(options.maxAttributeSizeKB); });
+            setFormatters(
+                [&] { return JSONFormatter(options.maxAttributeSizeKB, options.timestampFormat); });
             break;
     }
 

@@ -140,7 +140,7 @@ configs:
         short_name: logRotate
         arg_vartype: String
     'systemLog.timeStampFormat':
-        description: Desired format for timestamps in log messages. One of ctime, iso8601-utc or iso8601-local
+        description: Desired format for timestamps in log messages. One of iso8601-utc or iso8601-local
         short_name: timeStampFormat
         arg_vartype: String
 

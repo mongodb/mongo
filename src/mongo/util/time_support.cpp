@@ -283,10 +283,22 @@ void outputDateAsISOStringUTC(std::ostream& os, Date_t date) {
     os << StringData(buf.data, buf.size);
 }
 
+void outputDateAsISOStringUTC(fmt::memory_buffer& buffer, Date_t date) {
+    DateStringBuffer buf;
+    _dateToISOString(date, false, &buf);
+    buffer.append(buf.data, buf.data + buf.size);
+}
+
 void outputDateAsISOStringLocal(std::ostream& os, Date_t date) {
     DateStringBuffer buf;
     _dateToISOString(date, true, &buf);
     os << StringData(buf.data, buf.size);
+}
+
+void outputDateAsISOStringLocal(fmt::memory_buffer& buffer, Date_t date) {
+    DateStringBuffer buf;
+    _dateToISOString(date, true, &buf);
+    buffer.append(buf.data, buf.data + buf.size);
 }
 
 void outputDateAsCtime(std::ostream& os, Date_t date) {

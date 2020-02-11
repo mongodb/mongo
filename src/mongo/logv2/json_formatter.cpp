@@ -213,15 +213,24 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
     // Put all fields up until the message value
     fmt::format_to(buffer,
                    R"({{)"
-                   R"("{}":{{"$date":"{}"}},)"  // timestamp
-                   R"("{}":"{}"{: <{}})"        // severity with padding for the comma
-                   R"("{}":"{}"{: <{}})"        // component with padding for the comma
-                   R"("{}":{},)"                // id
-                   R"("{}":"{}",)"              // context
-                   R"("{}":"{}")",              // message
-                                                // timestamp
-                   constants::kTimestampFieldName,
-                   dateToISOStringUTC(extract<Date_t>(attributes::timeStamp(), rec).get()),
+                   R"("{}":{{"$date":")",
+                   constants::kTimestampFieldName);
+    Date_t date = extract<Date_t>(attributes::timeStamp(), rec).get();
+    switch (_timestampFormat) {
+        case LogTimestampFormat::kISO8601UTC:
+            outputDateAsISOStringUTC(buffer, date);
+            break;
+        case LogTimestampFormat::kISO8601Local:
+            outputDateAsISOStringLocal(buffer, date);
+            break;
+    };
+    fmt::format_to(buffer,
+                   R"("}},)"              // close timestamp
+                   R"("{}":"{}"{: <{}})"  // severity with padding for the comma
+                   R"("{}":"{}"{: <{}})"  // component with padding for the comma
+                   R"("{}":{},)"          // id
+                   R"("{}":"{}",)"        // context
+                   R"("{}":"{}")",        // message
                    // severity, left align the comma and add padding to create fixed column width
                    constants::kSeverityFieldName,
                    severity,

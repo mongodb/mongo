@@ -312,15 +312,15 @@ Status storeBaseOptions(const moe::Environment& params) {
     if (params.count("systemLog.timeStampFormat")) {
         using logger::MessageEventDetailsEncoder;
         std::string formatterName = params["systemLog.timeStampFormat"].as<string>();
-        if (formatterName == "ctime") {
-            MessageEventDetailsEncoder::setDateFormatter(outputDateAsCtime);
-        } else if (formatterName == "iso8601-utc") {
+        if (formatterName == "iso8601-utc") {
             MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringUTC);
+            serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601UTC;
         } else if (formatterName == "iso8601-local") {
             MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringLocal);
+            serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601Local;
         } else {
             StringBuilder sb;
-            sb << "Value of logTimestampFormat must be one of ctime, iso8601-utc "
+            sb << "Value of logTimestampFormat must be one of iso8601-utc "
                << "or iso8601-local; not \"" << formatterName << "\".";
             return Status(ErrorCodes::BadValue, sb.str());
         }
