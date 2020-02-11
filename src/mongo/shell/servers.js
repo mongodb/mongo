@@ -128,6 +128,11 @@ function runHangAnalyzer(pids) {
         return;
     }
 
+    if (TestData.isAsanBuild) {
+        print('Skipping runHangAnalyzer: ASAN build');
+        return;
+    }
+
     if (typeof pids === 'undefined') {
         pids = getPids();
     }

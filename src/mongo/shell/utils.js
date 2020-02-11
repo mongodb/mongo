@@ -354,6 +354,7 @@ jsTestOptions = function() {
             // is shut down.
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
+            isAsanBuild: TestData.isAsanBuild,
         });
     }
     return _jsTestOptions;

@@ -26,11 +26,16 @@ try {
 
     MongoRunner.runHangAnalyzer([child.pid]);
 
-    assert.soon(() => {
-        const lines = rawMongoProgramOutput().split('\n');
-        return anyLineMatches(lines, /Dumping core/);
-    });
+    const lines = rawMongoProgramOutput().split('\n');
 
+    if (TestData.isAsanBuild) {
+        // Nothing should be executed, so there's no output.
+        assert.eq(lines, ['']);
+    } else {
+        assert.soon(() => {
+            return anyLineMatches(lines, /Dumping core/);
+        });
+    }
 } finally {
     MongoRunner.stopMongod(child);
 }
