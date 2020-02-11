@@ -52,7 +52,7 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.prepare_transaction(
             'prepare_timestamp=' + timestamp_str(1)),
             "/older than the oldest timestamp/")
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.rollback_transaction()
 
         # Check setting the prepare timestamp same as oldest timestamp is valid.
         self.session.begin_transaction()
@@ -72,7 +72,7 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.prepare_transaction(
             'prepare_timestamp=' + timestamp_str(2)),
             "/should not have been set before/")
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.rollback_transaction()
 
         # It is illegal to set a prepare timestamp same as or earlier than an
         # active read timestamp.
@@ -97,16 +97,18 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
             s_reader.rollback_transaction()
             self.session.rollback_transaction()
 
-        # It is illegal to set a commit timestamp older than prepare
-        # timestamp of a transaction.
+        '''
+        Commented out for now: the system panics if we fail after preparing a transaction.
+
+        # It is illegal to set a commit timestamp older than prepare timestamp of a transaction.
         self.session.begin_transaction()
         c[1] = 1
-        self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(5))
+        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(5))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(4)),
             "/less than the prepare timestamp/")
+        '''
 
         # It is legal to set a commit timestamp as same as prepare
         # timestamp.

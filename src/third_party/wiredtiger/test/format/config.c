@@ -52,6 +52,12 @@ static void config_reset(void);
 static void config_transaction(void);
 
 /*
+ * We currently disable random LSM testing, that is, it can be specified explicitly but we won't
+ * randomly choose LSM as a data_source configuration.
+ */
+#define DISABLE_RANDOM_LSM_TESTING 1
+
+/*
  * config_setup --
  *     Initialize configuration for a run.
  */
@@ -106,14 +112,15 @@ config_setup(void)
             config_single("data_source=file", false);
             break;
         case 2: /* 20% */
-                /*
-                 * LSM requires a row-store and backing disk.
-                 *
-                 * Configuring truncation or timestamps results in LSM cache problems, don't
-                 * configure LSM if those set.
-                 *
-                 * XXX Remove the timestamp test when WT-4162 resolved.
-                 */
+#if !defined(DISABLE_RANDOM_LSM_TESTING)
+            /*
+             * LSM requires a row-store and backing disk.
+             *
+             * Configuring truncation or timestamps results in LSM cache problems, don't configure
+             * LSM if those set.
+             *
+             * XXX Remove the timestamp test when WT-4162 resolved.
+             */
             if (g.type != ROW || g.c_in_memory)
                 break;
             if (config_is_perm("transaction_timestamps") && g.c_txn_timestamps)
@@ -121,6 +128,7 @@ config_setup(void)
             if (config_is_perm("truncate") && g.c_truncate)
                 break;
             config_single("data_source=lsm", false);
+#endif
             break;
         case 3:
         case 4:

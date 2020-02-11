@@ -278,8 +278,12 @@ thread_insert(void *arg)
             else if (ret == WT_ROLLBACK)
                 threadargs->rollbacks++;
         }
-        if (sharedopts->remove)
-            testutil_check(session->commit_transaction(session, NULL));
+        if (sharedopts->remove) {
+            if (ret == WT_ROLLBACK)
+                testutil_check(session->rollback_transaction(session, NULL));
+            else
+                testutil_check(session->commit_transaction(session, NULL));
+        }
         if (i % 1000 == 0 && i != 0) {
             if (i % 10000 == 0)
                 fprintf(stderr, "*");

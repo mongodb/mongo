@@ -9,53 +9,74 @@
 #include "wt_internal.h"
 
 /*
- * __alloc_merge --
- *     Merge two allocation lists.
+ * __wt_backup_load_incr --
+ *     Load the incremental.
  */
-static void
-__alloc_merge(
-  uint64_t *a, uint64_t a_cnt, uint64_t *b, uint64_t b_cnt, uint64_t *res, uint64_t *res_cnt)
+int
+__wt_backup_load_incr(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *blkcfg, WT_ITEM *bitstring, uint64_t nbits)
 {
-    uint64_t total;
+    if (blkcfg->len != 0)
+        WT_RET(__wt_nhex_to_raw(session, blkcfg->str, blkcfg->len, bitstring));
+    if (bitstring->size != (nbits >> 3))
+        WT_RET_MSG(session, WT_ERROR, "corrupted modified block list");
+    return (0);
+}
 
-    for (total = 0; a_cnt > 0 || b_cnt > 0; ++total, res += 2) {
-        if (a_cnt > 0 && b_cnt > 0) {
-            if (a[0] <= b[0]) {
-                res[0] = a[0];
-                if (a[0] + a[1] < b[0])
-                    res[1] = a[1];
-                else {
-                    res[1] = (b[0] + b[1]) - a[0];
-                    b += 2;
-                    --b_cnt;
-                }
-                a += 2;
-                --a_cnt;
-            } else if (b[0] <= a[0]) {
-                res[0] = b[0];
-                if (b[0] + b[1] < a[0])
-                    res[1] = b[1];
-                else {
-                    res[1] = (a[0] + a[1]) - b[0];
-                    a += 2;
-                    --a_cnt;
-                }
-                b += 2;
-                --b_cnt;
-            }
-        } else if (a_cnt > 0) {
-            res[0] = a[0];
-            res[1] = a[1];
-            a += 2;
-            --a_cnt;
-        } else if (b_cnt > 0) {
-            res[0] = b[0];
-            res[1] = b[1];
-            b += 2;
-            --b_cnt;
+/*
+ * __curbackup_incr_blkmod --
+ *     Get the block modifications for a tree from its metadata and fill in the backup cursor's
+ *     information with it.
+ */
+static int
+__curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BACKUP *cb)
+{
+    WT_CONFIG blkconf;
+    WT_CONFIG_ITEM b, k, v;
+    WT_DECL_RET;
+    char *config;
+
+    WT_ASSERT(session, btree != NULL);
+    WT_ASSERT(session, btree->dhandle != NULL);
+    WT_ASSERT(session, cb->incr_src != NULL);
+
+    WT_RET(__wt_metadata_search(session, btree->dhandle->name, &config));
+    WT_ERR(__wt_config_getones(session, config, "checkpoint_backup_info", &v));
+    __wt_config_subinit(session, &blkconf, &v);
+    while ((ret = __wt_config_next(&blkconf, &k, &v)) == 0) {
+        /*
+         * First see if we have information for this source identifier.
+         */
+        if (WT_STRING_MATCH(cb->incr_src->id_str, k.str, k.len) == 0)
+            continue;
+
+        /*
+         * We found a match. If we have a name, then there should be granularity and nbits. The
+         * granularity should be set to something. But nbits may be 0 if there are no blocks
+         * currently modified.
+         */
+        WT_ERR(__wt_config_subgets(session, &v, "granularity", &b));
+        cb->granularity = (uint64_t)b.val;
+        WT_ERR(__wt_config_subgets(session, &v, "nbits", &b));
+        cb->nbits = (uint64_t)b.val;
+        WT_ERR(__wt_config_subgets(session, &v, "offset", &b));
+        cb->offset = (uint64_t)b.val;
+
+        /*
+         * We found a match. Load the block information into the cursor.
+         */
+        ret = __wt_config_subgets(session, &v, "blocks", &b);
+        if (ret != WT_NOTFOUND) {
+            WT_ERR(__wt_backup_load_incr(session, &b, &cb->bitstring, cb->nbits));
+            cb->bit_offset = 0;
+            cb->incr_init = true;
         }
     }
-    *res_cnt = total;
+    WT_ERR_NOTFOUND_OK(ret);
+
+err:
+    __wt_free(session, config);
+    return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
@@ -66,18 +87,11 @@ static int
 __curbackup_incr_next(WT_CURSOR *cursor)
 {
     WT_BTREE *btree;
-    WT_CKPT *ckpt, *ckptbase;
     WT_CURSOR_BACKUP *cb;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_off_t size;
-    uint64_t *a, *b, *current, *next;
-    uint64_t entries, total;
     uint32_t raw;
-    bool start, stop;
-
-    ckptbase = NULL;
-    a = b = NULL;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->btree;
@@ -86,104 +100,46 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     F_CLR(cursor, WT_CURSTD_RAW);
 
     if (cb->incr_init) {
-        /* We have this object's incremental information, Check if we're done. */
-        if (cb->incr_list_offset >= cb->incr_list_count - WT_BACKUP_INCR_COMPONENTS)
-            return (WT_NOTFOUND);
+        /* Look for the next chunk that had modifications.  */
+        while (cb->bit_offset < cb->nbits)
+            if (__bit_test(cb->bitstring.mem, cb->bit_offset))
+                break;
+            else
+                ++cb->bit_offset;
 
-        /*
-         * If we returned all of the data, step to the next block, otherwise return the next chunk
-         * of the current block.
-         */
-        if (cb->incr_list[cb->incr_list_offset + 1] <= cb->incr_granularity)
-            cb->incr_list_offset += WT_BACKUP_INCR_COMPONENTS;
-        else {
-            cb->incr_list[cb->incr_list_offset] += cb->incr_granularity;
-            cb->incr_list[cb->incr_list_offset + 1] -= cb->incr_granularity;
-            cb->incr_list[cb->incr_list_offset + 2] = WT_BACKUP_RANGE;
-        }
-    } else if (btree == NULL) {
+        /* We either have this object's incremental information or we're done. */
+        if (cb->bit_offset >= cb->nbits)
+            WT_ERR(WT_NOTFOUND);
+        __wt_cursor_set_key(cursor, cb->offset + cb->granularity * cb->bit_offset++,
+          cb->granularity, WT_BACKUP_RANGE);
+    } else if (btree == NULL || F_ISSET(cb, WT_CURBACKUP_FORCE_FULL)) {
         /* We don't have this object's incremental information, and it's a full file copy. */
         WT_ERR(__wt_fs_size(session, cb->incr_file, &size));
 
-        cb->incr_list_count = WT_BACKUP_INCR_COMPONENTS;
+        cb->nbits = 0;
+        cb->offset = 0;
+        cb->bit_offset = 0;
         cb->incr_init = true;
-        cb->incr_list_offset = 0;
         __wt_cursor_set_key(cursor, 0, size, WT_BACKUP_FILE);
     } else {
         /*
          * We don't have this object's incremental information, and it's not a full file copy. Get a
-         * list of the checkpoints available for the file and flag the starting/stopping ones. It
-         * shouldn't be possible to specify checkpoints that no longer exist, but check anyway.
+         * list of the block modifications for the file. The block modifications are from the
+         * incremental identifier starting point. Walk the list looking for one with a source of our
+         * id.
          */
-        ret = __wt_meta_ckptlist_get(session, cb->incr_file, false, &ckptbase);
-        WT_ERR(ret == WT_NOTFOUND ? ENOENT : ret);
-
+        WT_ERR(__curbackup_incr_blkmod(session, btree, cb));
         /*
-         * Count up the maximum number of block entries we might have to merge, and allocate a pair
-         * of temporary arrays in which to do the merge.
+         * If there is no block modification information for this file, there is no information to
+         * return to the user.
          */
-        entries = 0;
-        WT_CKPT_FOREACH (ckptbase, ckpt)
-            entries += ckpt->alloc_list_entries;
-        WT_ERR(__wt_calloc_def(session, entries * WT_BACKUP_INCR_COMPONENTS, &a));
-        WT_ERR(__wt_calloc_def(session, entries * WT_BACKUP_INCR_COMPONENTS, &b));
-
-        /* Merge the block lists into a final list of blocks to copy. */
-        start = stop = false;
-        total = 0;
-        current = NULL;
-        next = a;
-        WT_CKPT_FOREACH (ckptbase, ckpt) {
-            if (strcmp(ckpt->name, cb->incr_checkpoint_start) == 0) {
-                start = true;
-                WT_ERR_ASSERT(session, ckpt->alloc_list_entries == 0, __wt_panic(session),
-                  "incremental backup start checkpoint has allocation list blocks");
-                continue;
-            }
-            if (start == true) {
-                if (strcmp(ckpt->name, cb->incr_checkpoint_stop) == 0)
-                    stop = true;
-
-                __alloc_merge(
-                  current, total, ckpt->alloc_list, ckpt->alloc_list_entries, next, &total);
-                current = next;
-                next = next == a ? b : a;
-            }
-
-            if (stop == true)
-                break;
-        }
-
-        if (!start)
-            WT_ERR_MSG(session, ENOENT, "incremental backup start checkpoint %s not found",
-              cb->incr_checkpoint_start);
-        if (!stop)
-            WT_ERR_MSG(session, ENOENT, "incremental backup stop checkpoint %s not found",
-              cb->incr_checkpoint_stop);
-
-        /* There may be nothing that needs copying. */
-        if (total == 0)
+        if (cb->bitstring.mem == NULL)
             WT_ERR(WT_NOTFOUND);
-
-        if (next == a) {
-            cb->incr_list = b;
-            b = NULL;
-        } else {
-            cb->incr_list = a;
-            a = NULL;
-        }
-        cb->incr_list_count = total;
-        cb->incr_list_offset = 0;
-        WT_ERR(__wt_scr_alloc(session, 0, &cb->incr_block));
-        cb->incr_init = true;
-
-        F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+        __wt_cursor_set_key(cursor, cb->offset + cb->granularity * cb->bit_offset++,
+          cb->granularity, WT_BACKUP_RANGE);
     }
 
 err:
-    __wt_free(session, a);
-    __wt_free(session, b);
-    __wt_meta_ckptlist_free(session, &ckptbase);
     F_SET(cursor, raw);
     API_END_RET(session, ret);
 }
@@ -198,10 +154,7 @@ __wt_curbackup_free_incr(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     __wt_free(session, cb->incr_file);
     if (cb->incr_cursor != NULL)
         __wt_cursor_close(cb->incr_cursor);
-    __wt_free(session, cb->incr_checkpoint_start);
-    __wt_free(session, cb->incr_checkpoint_stop);
-    __wt_free(session, cb->incr_list);
-    __wt_scr_free(session, &cb->incr_block);
+    __wt_buf_free(session, &cb->bitstring);
 }
 
 /*
@@ -213,12 +166,15 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
   WT_CURSOR *cursor, const char *cfg[], WT_CURSOR **cursorp)
 {
     WT_CURSOR_BACKUP *cb, *other_cb;
+    WT_DECL_ITEM(open_uri);
+    WT_DECL_RET;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     other_cb = (WT_CURSOR_BACKUP *)other;
-    WT_UNUSED(session);
     cursor->key_format = WT_UNCHECKED_STRING(qqq);
     cursor->value_format = "";
+
+    WT_ASSERT(session, other_cb->incr_src != NULL);
 
     /*
      * Inherit from the backup cursor but reset specific functions for incremental.
@@ -226,8 +182,32 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
     cursor->next = __curbackup_incr_next;
     cursor->get_key = __wt_cursor_get_key;
     cursor->get_value = __wt_cursor_get_value_notsup;
-    cb->incr_granularity = other_cb->incr_granularity;
+    cb->incr_src = other_cb->incr_src;
 
-    /* XXX Return full file info for all files for now. */
-    return (__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+    /* All WiredTiger owned files are full file copies. */
+    if (F_ISSET(other_cb->incr_src, WT_BLKINCR_FULL) ||
+      WT_PREFIX_MATCH(cb->incr_file, "WiredTiger")) {
+        __wt_verbose(session, WT_VERB_BACKUP, "Forcing full file copies for id %s",
+          other_cb->incr_src->id_str);
+        F_SET(cb, WT_CURBACKUP_FORCE_FULL);
+    }
+    /*
+     * Set up the incremental backup information, if we are not forcing a full file copy. We need an
+     * open cursor on the file. Open the backup checkpoint, confirming it exists.
+     */
+    if (!F_ISSET(cb, WT_CURBACKUP_FORCE_FULL)) {
+        WT_ERR(__wt_scr_alloc(session, 0, &open_uri));
+        WT_ERR(__wt_buf_fmt(session, open_uri, "file:%s", cb->incr_file));
+        __wt_free(session, cb->incr_file);
+        WT_ERR(__wt_strdup(session, open_uri->data, &cb->incr_file));
+
+        WT_ERR(__wt_curfile_open(session, cb->incr_file, NULL, cfg, &cb->incr_cursor));
+        WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+        WT_ERR(__wt_strdup(session, cb->incr_cursor->internal_uri, &cb->incr_cursor->internal_uri));
+    } else
+        WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+
+err:
+    __wt_scr_free(session, &open_uri);
+    return (ret);
 }

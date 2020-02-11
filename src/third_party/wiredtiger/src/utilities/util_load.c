@@ -449,7 +449,7 @@ config_update(WT_SESSION *session, char **list)
 
         if ((ret = __wt_config_merge((WT_SESSION_IMPL *)session, cfg,
                "filename=,id=,"
-               "checkpoint=,checkpoint_lsn=,version=,source=,",
+               "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=,version=,source=,",
                &p)) != 0)
             break;
 

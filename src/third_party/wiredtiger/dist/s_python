@@ -7,9 +7,10 @@ trap 'rm -f $t' 0 1 2 3 13 15
 cd ..
 
 # Check Python coding standards: check for tab characters.
+# Ignore generated files.
 egrep '	' `find . -name '*.py'` |
     sed -e 's/:.*//' \
-	-e '/__init__.py/d' \
+	-e '/swig_wiredtiger.py/d' \
 	-e '/\/wiredtiger.py/d' \
 	-e '/src\/docs\/tools\/doxypy.py/d' |
     sort -u |

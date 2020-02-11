@@ -33,7 +33,7 @@ import wiredtiger, wttest
 class test_stat08(wttest.WiredTigerTestCase):
 
     nentries = 350000
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    conn_config = 'cache_size=10MB,statistics=(all)'
     entry_value = "abcde" * 40
     BYTES_READ = 4000
     READ_TIME = 4003

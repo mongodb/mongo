@@ -9,8 +9,7 @@
 #include "wt_internal.h"
 
 static int __ckpt_process(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
-static int __ckpt_update(
-  WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, WT_CKPT *, WT_BLOCK_CKPT *, bool);
+static int __ckpt_update(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, WT_CKPT *, WT_BLOCK_CKPT *);
 
 /*
  * __wt_block_ckpt_init --
@@ -331,6 +330,7 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
         case WT_CKPT_DELETE | WT_CKPT_FAKE:
         case WT_CKPT_FAKE:
             break;
+        case WT_CKPT_ADD | WT_CKPT_BLOCK_MODS:
         case WT_CKPT_ADD:
             if (ckpt[1].name == NULL)
                 break;
@@ -570,7 +570,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     /* Update checkpoints marked for update. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (F_ISSET(ckpt, WT_CKPT_UPDATE))
-            WT_ERR(__ckpt_update(session, block, ckptbase, ckpt, ckpt->bpriv, false));
+            WT_ERR(__ckpt_update(session, block, ckptbase, ckpt, ckpt->bpriv));
 
 live_update:
     /* Truncate the file if that's possible. */
@@ -607,7 +607,7 @@ live_update:
              */
             ci->ckpt_size = WT_MIN(ckpt_size, (uint64_t)block->size);
 
-            WT_ERR(__ckpt_update(session, block, ckptbase, ckpt, ci, true));
+            WT_ERR(__ckpt_update(session, block, ckptbase, ckpt, ci));
         }
 
     /*
@@ -654,16 +654,80 @@ err:
 }
 
 /*
+ * __ckpt_add_blkmod_entry --
+ *     Add an offset/length entry to the bitstring based on granularity.
+ */
+static int
+__ckpt_add_blkmod_entry(
+  WT_SESSION_IMPL *session, WT_BLOCK_MODS *blk_mod, wt_off_t offset, wt_off_t len)
+{
+    uint64_t end, start;
+    uint32_t end_rdup;
+
+    WT_ASSERT(session, blk_mod->granularity != 0);
+    start = (uint64_t)offset / blk_mod->granularity;
+    end = (uint64_t)(offset + len) / blk_mod->granularity;
+    WT_ASSERT(session, end < UINT32_MAX);
+    end_rdup = WT_MAX(__wt_rduppo2((uint32_t)end, 8), WT_BLOCK_MODS_LIST_MIN);
+    if ((end_rdup << 3) > blk_mod->nbits) {
+        /* If we don't have enough, extend the buffer. */
+        if (blk_mod->nbits == 0) {
+            WT_RET(__wt_buf_initsize(session, &blk_mod->bitstring, end_rdup));
+            memset(blk_mod->bitstring.mem, 0, end_rdup);
+        } else
+            WT_RET(__wt_buf_extend(session, &blk_mod->bitstring, end_rdup));
+        blk_mod->nbits = end_rdup << 3;
+    }
+
+    /* Set all the bits needed to record this offset/length pair. */
+    __bit_nset(blk_mod->bitstring.mem, start, end);
+    return (0);
+}
+
+/*
+ * __ckpt_add_blk_mods --
+ *     Add the blocks to all valid incremental backup source identifiers.
+ */
+static int
+__ckpt_add_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci)
+{
+    WT_BLOCK_MODS *blk_mod;
+    WT_EXT *ext;
+    u_int i;
+
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blk_mod = &ckpt->backup_blocks[i];
+        /* If there is no information at this entry, we're done. */
+        if (!F_ISSET(blk_mod, WT_BLOCK_MODS_VALID))
+            continue;
+
+        WT_EXT_FOREACH (ext, ci->alloc.off)
+            WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, ext->off, ext->size));
+
+        if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
+            WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, ci->alloc.offset, ci->alloc.size));
+        if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
+            WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, ci->discard.offset, ci->discard.size));
+        if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
+            WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, ci->avail.offset, ci->avail.size));
+    }
+    return (0);
+}
+
+/*
  * __ckpt_update --
  *     Update a checkpoint.
  */
 static int
-__ckpt_update(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, WT_CKPT *ckpt,
-  WT_BLOCK_CKPT *ci, bool is_live)
+__ckpt_update(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci)
 {
     WT_DECL_ITEM(a);
     WT_DECL_RET;
     uint8_t *endp;
+    bool is_live;
+
+    is_live = F_ISSET(ckpt, WT_CKPT_ADD);
 
 #ifdef HAVE_DIAGNOSTIC
     /* Check the extent list combinations for overlaps. */
@@ -721,6 +785,13 @@ __ckpt_update(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, WT_C
         block->final_ckpt = NULL;
         WT_RET(ret);
     }
+
+    /*
+     * If this is the live system, we need to record the list of blocks written for this checkpoint
+     * (including the blocks we allocated to write the extent lists).
+     */
+    if (F_ISSET(ckpt, WT_CKPT_BLOCK_MODS))
+        WT_RET(__ckpt_add_blk_mods(session, ckpt, ci));
 
     /*
      * Set the file size for the live system.

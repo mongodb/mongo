@@ -91,12 +91,14 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
      * Build and flatten the metadata and the checkpoint list, then insert it into the metadata for
      * this file.
      *
-     * Strip out the checkpoint-LSN, an imported file isn't associated with any log files. Assign a
+     * Strip out any incremental backup information, an imported file has not been part of a backup.
+     * Strip out the checkpoint LSN, an imported file isn't associated with any log files. Assign a
      * unique file ID.
      */
     filecfg[1] = a->data;
     filecfg[2] = checkpoint_list;
-    filecfg[3] = "checkpoint_lsn=";
+    filecfg[3] = "checkpoint_backup_info=";
+    filecfg[4] = "checkpoint_lsn=";
     WT_WITH_SCHEMA_LOCK(session,
       ret = __wt_snprintf(fileid, sizeof(fileid), "id=%" PRIu32, ++S2C(session)->next_file_id));
     WT_ERR(ret);

@@ -188,8 +188,10 @@ def get_library_dirs():
     return dirs
 
 # source_filter
-#   Make any needed changes to the sources list.  Any entry that
-# needs to be moved is returned in a dictionary.
+#   Make any needed changes to the original sources list and return a manifest,
+# a list of source file names relative to the new staging root.  Any entry
+# that needs to be renamed returned in a dictionary where the entry's key
+# is the new name and the value is the old source name.
 def source_filter(sources):
     result = []
     movers = dict()
@@ -205,15 +207,16 @@ def source_filter(sources):
         # move all lang/python files to the top level.
         if dest.startswith(pywt_prefix):
             dest = os.path.basename(dest)
-            if dest == 'pip_init.py':
+            if dest == 'init.py':
                 dest = '__init__.py'
         if dest != src:
             movers[dest] = src
         result.append(dest)
     # Add SWIG generated files
-    result.append('wiredtiger.py')
-    movers['wiredtiger.py'] = os.path.join(pywt_build_dir, '__init__.py')
     result.append(os.path.join(py_dir, 'wiredtiger_wrap.c'))
+    wiredtiger_py = 'swig_wiredtiger.py'
+    result.append('swig_wiredtiger.py')
+    movers['swig_wiredtiger.py'] = os.path.join(py_dir, 'wiredtiger.py')
     return result, movers
 
 ################################################################

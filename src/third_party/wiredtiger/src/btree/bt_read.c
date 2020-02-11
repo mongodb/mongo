@@ -639,9 +639,7 @@ read:
                   session, true, !F_ISSET(&session->txn, WT_TXN_HAS_ID), NULL));
             WT_RET(__page_read(session, ref, flags));
 
-            /*
-             * We just read a page, don't evict it before we have a chance to use it.
-             */
+            /* We just read a page, don't evict it before we have a chance to use it. */
             evict_skip = true;
 
             /*
@@ -713,10 +711,13 @@ read:
                 __wt_tree_modify_set(session);
 
             /*
-             * Check if the page requires forced eviction.
+             * If a page has grown too large, we'll try and forcibly evict it before making it
+             * available to the caller. There are a variety of cases where that's not possible.
+             * Don't involve a thread resolving a transaction in forced eviction, they're usually
+             * making the problem better.
              */
-            if (evict_skip || LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0 ||
-              btree->lsm_primary)
+            if (evict_skip || F_ISSET(session, WT_SESSION_RESOLVING_TXN) ||
+              LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0 || btree->lsm_primary)
                 goto skip_evict;
 
             /*

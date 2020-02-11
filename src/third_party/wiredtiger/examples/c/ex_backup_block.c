@@ -136,11 +136,11 @@ setup_directories(void)
 }
 
 static void
-add_work(WT_SESSION *session, int iter)
+add_work(WT_SESSION *session, int iter, int iterj)
 {
     WT_CURSOR *cursor, *cursor2;
     int i;
-    char k[32], v[32];
+    char k[64], v[64];
 
     error_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
     /*
@@ -154,8 +154,8 @@ add_work(WT_SESSION *session, int iter)
      * Perform some operations with individual auto-commit transactions.
      */
     for (i = 0; i < MAX_KEYS; i++) {
-        (void)snprintf(k, sizeof(k), "key.%d.%d", iter, i);
-        (void)snprintf(v, sizeof(v), "value.%d.%d", iter, i);
+        (void)snprintf(k, sizeof(k), "key.%d.%d.%d", iter, iterj, i);
+        (void)snprintf(v, sizeof(v), "value.%d.%d.%d", iter, iterj, i);
         cursor->set_key(cursor, k);
         cursor->set_value(cursor, v);
         error_check(cursor->insert(cursor));
@@ -260,7 +260,8 @@ take_full_backup(WT_SESSION *session, int i)
     } else
         hdir = home_incr;
     if (i == 0) {
-        (void)snprintf(buf, sizeof(buf), "incremental=(enabled=true,this_id=ID%d)", i);
+        (void)snprintf(
+          buf, sizeof(buf), "incremental=(granularity=1M,enabled=true,this_id=ID%d)", i);
         error_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
     } else
         error_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
@@ -279,13 +280,17 @@ take_full_backup(WT_SESSION *session, int i)
             for (j = 0; j < MAX_ITERATIONS; j++) {
                 (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
                 (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+#if 0
                 printf("FULL: Copy: %s\n", buf);
+#endif
                 error_check(system(buf));
             }
         else {
             (void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
             (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, hdir, filename);
+#if 0
             printf("FULL %d: Copy: %s\n", i, buf);
+#endif
             error_check(system(buf));
         }
     }
@@ -300,13 +305,16 @@ take_incr_backup(WT_SESSION *session, int i)
     FILELIST *flist;
     WT_CURSOR *backup_cur, *incr_cur;
     uint64_t offset, size, type;
-    size_t alloc, count;
+    size_t alloc, count, rdsize, tmp_sz;
     int j, ret, rfd, wfd;
-    char buf[1024], h[256];
+    char buf[1024], h[256], *tmp;
     const char *filename;
+    bool first;
 
     /*! [incremental backup using block transfer]*/
 
+    tmp = NULL;
+    tmp_sz = 0;
     /* Open the backup data source for incremental backup. */
     (void)snprintf(buf, sizeof(buf), "incremental=(src_id=ID%d,this_id=ID%d)", i - 1, i);
     error_check(session->open_cursor(session, "backup:", NULL, buf, &backup_cur));
@@ -321,51 +329,61 @@ take_incr_backup(WT_SESSION *session, int i)
         error_check(process_file(&flist, &count, &alloc, filename));
         (void)snprintf(h, sizeof(h), "%s.0", home_incr);
         (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
-        printf("Copying backup: %s\n", buf);
-        error_check(system(buf));
 #if 0
-        (void)snprintf(buf, sizeof(buf), "%s/%s", home, filename);
-        printf("Open source %s for reading\n", buf);
-        error_check(rfd = open(buf, O_RDONLY, 0));
-        (void)snprintf(h, sizeof(h), "%s.%d", home_incr, i);
-        (void)snprintf(buf, sizeof(buf), "%s/%s", h, filename);
-        printf("Open dest %s for writing\n", buf);
-        error_check(wfd = open(buf, O_WRONLY, 0));
+        printf("Copying backup: %s\n", buf);
 #endif
+        error_check(system(buf));
+        first = true;
 
         (void)snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
         error_check(session->open_cursor(session, NULL, backup_cur, buf, &incr_cur));
+#if 0
         printf("Taking incremental %d: File %s\n", i, filename);
+#endif
         while ((ret = incr_cur->next(incr_cur)) == 0) {
             error_check(incr_cur->get_key(incr_cur, &offset, &size, &type));
-            printf("Incremental %s: KEY: Off %" PRIu64 " Size: %" PRIu64 " Type: %" PRIu64 "\n",
-              filename, offset, size, type);
             scan_end_check(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
+#if 0
+            printf("Incremental %s: KEY: Off %" PRIu64 " Size: %" PRIu64 " %s\n", filename, offset,
+              size, type == WT_BACKUP_FILE ? "WT_BACKUP_FILE" : "WT_BACKUP_RANGE");
+#endif
             if (type == WT_BACKUP_RANGE) {
                 /*
                  * We should never get a range key after a whole file so the read file descriptor
-                 * should be valid. If the read descriptor is valid, so it the write one.
+                 * should be valid. If the read descriptor is valid, so is the write one.
                  */
-                scan_end_check(rfd != -1);
-                printf("Incremental %s: Range Offset: %" PRIu64 " Size: %" PRIu64 "\n", filename,
-                  offset, size);
+                if (tmp_sz < size) {
+                    tmp = realloc(tmp, size);
+                    testutil_assert(tmp != NULL);
+                    tmp_sz = size;
+                }
+                if (first) {
+                    (void)snprintf(buf, sizeof(buf), "%s/%s", home, filename);
+                    error_sys_check(rfd = open(buf, O_RDONLY, 0));
+                    (void)snprintf(h, sizeof(h), "%s.%d", home_incr, i);
+                    (void)snprintf(buf, sizeof(buf), "%s/%s", h, filename);
+                    error_sys_check(wfd = open(buf, O_WRONLY, 0));
+                    first = false;
+                }
+
                 error_sys_check(lseek(rfd, (wt_off_t)offset, SEEK_SET));
-                error_sys_check(read(rfd, buf, (size_t)size));
+                error_sys_check(rdsize = (size_t)read(rfd, tmp, (size_t)size));
                 error_sys_check(lseek(wfd, (wt_off_t)offset, SEEK_SET));
-                error_sys_check(write(wfd, buf, (size_t)size));
+                /* Use the read size since we may have read less than the granularity. */
+                error_sys_check(write(wfd, tmp, rdsize));
             } else {
-/* Whole file, so close both files and just copy the whole thing. */
-#if 0
-                error_check(close(rfd));
-                error_check(close(wfd));
-#endif
+                /* Whole file, so close both files and just copy the whole thing. */
+                testutil_assert(first == true);
                 rfd = wfd = -1;
                 (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+#if 0
                 printf("Incremental: Whole file copy: %s\n", buf);
+#endif
                 error_check(system(buf));
             }
         }
         scan_end_check(ret == WT_NOTFOUND);
+        /* Done processing this file. Close incremental cursor. */
         error_check(incr_cur->close(incr_cur));
 
         /* Close file descriptors if they're open. */
@@ -386,18 +404,21 @@ take_incr_backup(WT_SESSION *session, int i)
     }
     scan_end_check(ret == WT_NOTFOUND);
 
+    /* Done processing all files. Close backup cursor. */
     error_check(backup_cur->close(backup_cur));
     error_check(finalize_files(flist, count));
+    free(tmp);
     /*! [incremental backup using block transfer]*/
 }
 
 int
 main(int argc, char *argv[])
 {
+    struct stat sb;
     WT_CONNECTION *wt_conn;
     WT_CURSOR *backup_cur;
     WT_SESSION *session;
-    int i;
+    int i, j, ret;
     char cmd_buf[256];
 
     (void)argc; /* Unused variable */
@@ -412,7 +433,7 @@ main(int argc, char *argv[])
     error_check(session->create(session, uri, "key_format=S,value_format=S"));
     error_check(session->create(session, uri2, "key_format=S,value_format=S"));
     printf("Adding initial data\n");
-    add_work(session, 0);
+    add_work(session, 0, 0);
 
     printf("Taking initial backup\n");
     take_full_backup(session, 0);
@@ -421,8 +442,12 @@ main(int argc, char *argv[])
 
     for (i = 1; i < MAX_ITERATIONS; i++) {
         printf("Iteration %d: adding data\n", i);
-        add_work(session, i);
-        error_check(session->checkpoint(session, NULL));
+        /* For each iteration we may add work and checkpoint multiple times. */
+        for (j = 0; j < i; j++) {
+            add_work(session, i, j);
+            error_check(session->checkpoint(session, NULL));
+        }
+
         /*
          * The full backup here is only needed for testing and comparison purposes. A normal
          * incremental backup procedure would not include this.
@@ -440,6 +465,20 @@ main(int argc, char *argv[])
         error_check(compare_backups(i));
     }
 
+    printf("Close and reopen the connection\n");
+    /*
+     * Close and reopen the connection to illustrate the durability of id information.
+     */
+    error_check(wt_conn->close(wt_conn, NULL));
+    error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
+    error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+    /*
+     * We should have an entry for i-1 and i-2. Use the older one.
+     */
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "incremental=(src_id=ID%d,this_id=ID%d)", i - 2, i);
+    error_check(session->open_cursor(session, "backup:", NULL, cmd_buf, &backup_cur));
+    error_check(backup_cur->close(backup_cur));
+
     /*
      * After we're done, release resources. Test the force stop setting.
      */
@@ -455,6 +494,28 @@ main(int argc, char *argv[])
 
     printf("Final comparison: dumping and comparing data\n");
     error_check(compare_backups(0));
+    for (i = 0; i < (int)filelist_count; ++i) {
+        if (last_flist[i].name == NULL)
+            break;
+        free((void *)last_flist[i].name);
+    }
+    free(last_flist);
+
+    /*
+     * Reopen the connection to verify that the forced stop should remove incremental information.
+     */
+    error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
+    error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+    /*
+     * We should not have any information.
+     */
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "incremental=(src_id=ID%d,this_id=ID%d)", i - 2, i);
+    testutil_assert(session->open_cursor(session, "backup:", NULL, cmd_buf, &backup_cur) == ENOENT);
+    error_check(wt_conn->close(wt_conn, NULL));
+
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "%s/WiredTiger.backup.block", home);
+    ret = stat(cmd_buf, &sb);
+    testutil_assert(ret == -1 && errno == ENOENT);
 
     return (EXIT_SUCCESS);
 }

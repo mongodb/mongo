@@ -2,7 +2,7 @@ PYSRC = $(top_srcdir)/lang/python
 PYDIRS = -t $(abs_builddir) -I $(abs_top_srcdir):$(abs_top_builddir) -L $(abs_top_builddir)/.libs
 PYDST = $(abs_builddir)/wiredtiger
 PYFILES = $(PYDST)/fpacking.py $(PYDST)/intpacking.py $(PYDST)/packing.py \
-	$(PYDST)/packutil.py $(PYDST)/__init__.py
+	$(PYDST)/packutil.py $(PYDST)/swig_wiredtiger.py $(PYDST)/__init__.py
 PY_MAJOR_VERSION := $$($(PYTHON) -c \
 	'import sys; print(int(sys.version_info.major))')
 
@@ -25,7 +25,12 @@ pyfiles: $(PYFILES)
 $(PYDST)/%: $(PYSRC)/wiredtiger/%
 	mkdir -p $(PYDST) && cp -f $< $@
 
-$(PYDST)/__init__.py: $(PYSRC)/wiredtiger.py
+$(PYDST)/__init__.py: $(PYSRC)/wiredtiger/init.py
+	mkdir -p $(PYDST) && cp -f $< $@
+
+# Note: this cannot be named wiredtiger.py in the target directory,
+# we won't be able to import it.
+$(PYDST)/swig_wiredtiger.py: $(PYSRC)/wiredtiger.py
 	mkdir -p $(PYDST) && cp -f $< $@
 
 install-exec-local:

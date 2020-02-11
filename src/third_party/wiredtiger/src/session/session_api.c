@@ -365,22 +365,17 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    /*
-     * Indicated as allowed in prepared state, even though not allowed, so that running transaction
-     * check below take precedence.
-     */
-    SESSION_API_CALL_PREPARE_ALLOWED(session, reconfigure, config, cfg);
-
-    /*
-     * Note that this method only checks keys that are passed in by the application: we don't want
-     * to reset other session settings to their default values.
-     */
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, reconfigure, config, cfg);
     WT_UNUSED(cfg);
 
     WT_ERR(__wt_txn_context_check(session, false));
 
     WT_ERR(__wt_session_reset_cursors(session, false));
 
+    /*
+     * Note that this method only checks keys that are passed in by the application: we don't want
+     * to reset other session settings to their default values.
+     */
     WT_ERR(__wt_txn_reconfigure(session, config));
 
     ret = __wt_config_getones(session, config, "ignore_cache_size", &cval);
@@ -820,7 +815,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
     va_list ap;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_NOCONF_PREPARE_NOT_ALLOWED(session, log_printf);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, log_printf);
 
     va_start(ap, fmt);
     ret = __wt_log_vprintf(session, fmt, ap);
@@ -967,8 +962,7 @@ __session_reset(WT_SESSION *wt_session)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-
-    SESSION_API_CALL_NOCONF(session, reset);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, reset);
 
     WT_ERR(__wt_txn_context_check(session, false));
 
@@ -1084,7 +1078,7 @@ __session_import(WT_SESSION *wt_session, const char *uri, const char *config)
     value = NULL;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_NOCONF(session, import);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, import);
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
@@ -1605,11 +1599,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    /*
-     * Indicated as allowed in prepared state, even though not allowed, so that running transaction
-     * check below take precedence.
-     */
-    SESSION_API_CALL_PREPARE_ALLOWED(session, begin_transaction, config, cfg);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, begin_transaction, config, cfg);
     WT_STAT_CONN_INCR(session, txn_begin);
 
     WT_ERR(__wt_txn_context_check(session, false));
@@ -1632,10 +1622,10 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
     WT_TXN *txn;
 
     session = (WT_SESSION_IMPL *)wt_session;
+    txn = &session->txn;
     SESSION_API_CALL_PREPARE_ALLOWED(session, commit_transaction, config, cfg);
     WT_STAT_CONN_INCR(session, txn_commit);
 
-    txn = &session->txn;
     if (F_ISSET(txn, WT_TXN_PREPARE)) {
         WT_STAT_CONN_INCR(session, txn_prepare_commit);
         WT_STAT_CONN_DECR(session, txn_prepare_active);
@@ -1645,20 +1635,34 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 
     /* Permit the commit if the transaction failed, but was read-only. */
     if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0) {
-        __wt_err(session, EINVAL, "failed transaction requires rollback%s%s",
-          txn->rollback_reason == NULL ? "" : ": ",
+        __wt_err(session, EINVAL,
+          "failed %s"
+          "transaction requires rollback%s%s",
+          F_ISSET(txn, WT_TXN_PREPARE) ? "prepared " : "", txn->rollback_reason == NULL ? "" : ": ",
           txn->rollback_reason == NULL ? "" : txn->rollback_reason);
         ret = EINVAL;
     }
 
-    if (ret == 0)
+err:
+    /*
+     * We might have failed because an illegal configuration was specified or because there wasn't a
+     * transaction running, and we check the former as part of the api macros before we check the
+     * latter. Deal with it here: if there's an error and a transaction is running, roll it back.
+     */
+    if (ret == 0) {
+        F_SET(session, WT_SESSION_RESOLVING_TXN);
         ret = __wt_txn_commit(session, cfg);
-    else {
+        F_CLR(session, WT_SESSION_RESOLVING_TXN);
+    } else if (F_ISSET(txn, WT_TXN_RUNNING)) {
+        if (F_ISSET(txn, WT_TXN_PREPARE))
+            WT_PANIC_RET(session, ret, "failed to commit prepared transaction, failing the system");
+
         WT_TRET(__wt_session_reset_cursors(session, false));
+        F_SET(session, WT_SESSION_RESOLVING_TXN);
         WT_TRET(__wt_txn_rollback(session, cfg));
+        F_CLR(session, WT_SESSION_RESOLVING_TXN);
     }
 
-err:
     API_END_RET(session, ret);
 }
 
@@ -1679,7 +1683,9 @@ __session_prepare_transaction(WT_SESSION *wt_session, const char *config)
 
     WT_ERR(__wt_txn_context_check(session, true));
 
+    F_SET(session, WT_SESSION_RESOLVING_TXN);
     WT_ERR(__wt_txn_prepare(session, cfg));
+    F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:
     API_END_RET(session, ret);
@@ -1730,7 +1736,9 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 
     WT_TRET(__wt_session_reset_cursors(session, false));
 
+    F_SET(session, WT_SESSION_RESOLVING_TXN);
     WT_TRET(__wt_txn_rollback(session, cfg));
+    F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:
     API_END_RET(session, ret);
@@ -1753,7 +1761,8 @@ __session_timestamp_transaction(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_PREPARE_ALLOWED(session, timestamp_transaction, NULL, cfg);
     cfg[1] = config;
 #endif
-    WT_TRET(__wt_txn_set_timestamp(session, cfg));
+
+    ret = __wt_txn_set_timestamp(session, cfg);
 err:
     API_END_RET(session, ret);
 }
@@ -1770,7 +1779,8 @@ __session_query_timestamp(WT_SESSION *wt_session, char *hex_timestamp, const cha
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL_PREPARE_ALLOWED(session, query_timestamp, config, cfg);
-    WT_TRET(__wt_txn_query_timestamp(session, hex_timestamp, cfg, false));
+
+    ret = __wt_txn_query_timestamp(session, hex_timestamp, cfg, false);
 err:
     API_END_RET(session, ret);
 }
@@ -1788,7 +1798,7 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
     uint64_t pinned;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_NOCONF_PREPARE_NOT_ALLOWED(session, pinned_range);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, transaction_pinned_range);
 
     txn_state = WT_SESSION_TXN_STATE(session);
 
@@ -1837,11 +1847,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
     uint64_t time_start, time_stop;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    /*
-     * Indicated as allowed in prepared state, even though not allowed, so that running transaction
-     * check below take precedence.
-     */
-    SESSION_API_CALL_PREPARE_ALLOWED(session, transaction_sync, config, cfg);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, transaction_sync, config, cfg);
     WT_STAT_CONN_INCR(session, txn_sync);
 
     conn = S2C(session);
@@ -1930,13 +1936,8 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-
     WT_STAT_CONN_INCR(session, txn_checkpoint);
-    /*
-     * Indicated as allowed in prepared state, even though not allowed, so that running transaction
-     * check below take precedence.
-     */
-    SESSION_API_CALL_PREPARE_ALLOWED(session, checkpoint, config, cfg);
+    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, checkpoint, config, cfg);
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 

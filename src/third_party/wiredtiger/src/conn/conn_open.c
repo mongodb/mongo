@@ -141,6 +141,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     /* Close operation tracking */
     WT_TRET(__wt_conn_optrack_teardown(session, false));
 
+    __wt_backup_destroy(session);
+
     /* Close any file handles left open. */
     WT_TRET(__wt_close_connection_close(session));
 

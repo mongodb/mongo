@@ -185,7 +185,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     char *metaconf, *unused_value;
-    bool exist_backup, exist_bincr, exist_incr, exist_isrc, exist_turtle;
+    bool exist_backup, exist_incr, exist_isrc, exist_turtle;
     bool load, loadTurtle;
 
     load = loadTurtle = false;
@@ -212,17 +212,6 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
     WT_RET(__wt_fs_exist(session, WT_LOGINCR_SRC, &exist_isrc));
     WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
     WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
-    /*
-     * Block incremental is different. If it exists, then we have block incremental information we
-     * need to keep. Mark the connection as having block-based incremental backup turned on. XXX -
-     * Need to call something to read it in and set this up. Maybe here, maybe not.
-     */
-    WT_RET(__wt_fs_exist(session, WT_BLKINCR_BACKUP, &exist_bincr));
-    if (exist_bincr) {
-        F_SET(S2C(session), WT_CONN_INCR_BACKUP);
-        /* Load content into some structure. Not sure this is the right place. It may be too early.
-         */
-    }
 
     if (exist_turtle) {
         /*

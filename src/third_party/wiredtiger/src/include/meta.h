@@ -17,11 +17,10 @@
 /*
  * Backup related WiredTiger files.
  */
-#define WT_BACKUP_TMP "WiredTiger.backup.tmp"       /* Backup tmp file */
-#define WT_BLKINCR_BACKUP "WiredTiger.backup.block" /* Block incremental durable file */
-#define WT_METADATA_BACKUP "WiredTiger.backup"      /* Hot backup file */
-#define WT_LOGINCR_BACKUP "WiredTiger.ibackup"      /* Log incremental backup */
-#define WT_LOGINCR_SRC "WiredTiger.isrc"            /* Log incremental source */
+#define WT_BACKUP_TMP "WiredTiger.backup.tmp"  /* Backup tmp file */
+#define WT_METADATA_BACKUP "WiredTiger.backup" /* Hot backup file */
+#define WT_LOGINCR_BACKUP "WiredTiger.ibackup" /* Log incremental backup */
+#define WT_LOGINCR_SRC "WiredTiger.isrc"       /* Log incremental source */
 
 #define WT_METADATA_TURTLE "WiredTiger.turtle"         /* Metadata metadata */
 #define WT_METADATA_TURTLE_SET "WiredTiger.turtle.set" /* Turtle temp file */
@@ -58,6 +57,42 @@
     } while (0)
 
 /*
+ * Block based incremental backup structure. These live in the connection.
+ */
+#define WT_BLKINCR_MAX 2
+struct __wt_blkincr {
+    const char *id_str;   /* User's name for this backup. */
+    uint64_t granularity; /* Granularity of this backup. */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_BLKINCR_FULL 0x1u  /* There is no checkpoint, always do full file */
+#define WT_BLKINCR_INUSE 0x2u /* This entry is active */
+#define WT_BLKINCR_VALID 0x4u /* This entry is valid */
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint64_t flags;
+};
+
+/*
+ * Block modifications from an incremental identifier going forward.
+ */
+/*
+ * At the default granularity, this is enough for blocks in a 2G file.
+ */
+#define WT_BLOCK_MODS_LIST_MIN 16 /* Initial bytes for bitmap. */
+struct __wt_block_mods {
+    const char *id_str;
+
+    WT_ITEM bitstring;
+    uint64_t nbits; /* Number of bits in bitstring */
+
+    uint64_t offset; /* Zero bit offset for bitstring */
+    uint64_t granularity;
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_BLOCK_MODS_VALID 0x1u /* Entry is valid */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
+};
+
+/*
  * WT_CKPT --
  *	Encapsulation of checkpoint information, shared by the metadata, the
  * btree engine, and the block manager.
@@ -88,15 +123,14 @@ struct __wt_ckpt {
     char *block_metadata;   /* Block-stored metadata */
     char *block_checkpoint; /* Block-stored checkpoint */
 
+    WT_BLOCK_MODS backup_blocks[WT_BLKINCR_MAX];
+
     /* Validity window */
     wt_timestamp_t newest_durable_ts;
     wt_timestamp_t oldest_start_ts;
     uint64_t oldest_start_txn;
     wt_timestamp_t newest_stop_ts;
     uint64_t newest_stop_txn;
-
-    uint64_t *alloc_list; /* Checkpoint allocation list */
-    uint64_t alloc_list_entries;
 
     WT_ITEM addr; /* Checkpoint cookie string */
     WT_ITEM raw;  /* Checkpoint cookie raw */

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-# pip_init.py
+# init.py
 #      This is installed as __init__.py, and imports the file created by SWIG.
 # This is needed because SWIG's import helper code created by certain SWIG
 # versions may be broken, see: https://github.com/swig/swig/issues/769 .
@@ -42,11 +42,11 @@ if fname != '__init__.py' and fname != '__init__.pyc':
 # to this module so they will appear in the wiredtiger namespace.
 me = sys.modules[__name__]
 sys.path.append(os.path.dirname(__file__))
-try:
-    import wiredtiger.wiredtiger as swig_wiredtiger
-except ImportError:
-    # for Python2
-    import wiredtiger as swig_wiredtiger
+
+# explicitly importing _wiredtiger in advance of SWIG allows us to not
+# use relative importing, as SWIG does.  It doesn't work for us with Python2.
+import _wiredtiger
+import swig_wiredtiger
 for name in dir(swig_wiredtiger):
     value = getattr(swig_wiredtiger, name)
     setattr(me, name, value)

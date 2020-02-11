@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # runner/__init__.py
-#	Used as a first import by runners, does any common initialization.
+#   Used as a first import by runners, does any common initialization.
 from __future__ import print_function
 
 import os, shutil, sys
