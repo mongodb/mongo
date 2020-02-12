@@ -146,14 +146,29 @@ template <class T, class = void>
 struct HasToString : std::false_type {};
 
 template <class T>
-struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>> : std::true_type {};
+struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>>
+    : std::is_same<decltype(std::declval<T>().toString()), std::string> {};
+
+template <class T, class = void>
+struct HasToStringReturnStringData : std::false_type {};
+
+template <class T>
+struct HasToStringReturnStringData<T, std::void_t<decltype(std::declval<T>().toString())>>
+    : std::is_convertible<decltype(std::declval<T>().toString()), StringData> {};
 
 template <class T, class = void>
 struct HasNonMemberToString : std::false_type {};
 
 template <class T>
 struct HasNonMemberToString<T, std::void_t<decltype(toString(std::declval<T>()))>>
-    : std::true_type {};
+    : std::is_same<decltype(toString(std::declval<T>())), std::string> {};
+
+template <class T, class = void>
+struct HasNonMemberToStringReturnStringData : std::false_type {};
+
+template <class T>
+struct HasNonMemberToStringReturnStringData<T, std::void_t<decltype(toString(std::declval<T>()))>>
+    : std::is_convertible<decltype(toString(std::declval<T>())), StringData> {};
 
 template <class T, class = void>
 struct HasNonMemberToBSON : std::false_type {};
@@ -236,6 +251,13 @@ auto mapValue(T val) {
         CustomAttributeValue custom;
         custom.toString = [val]() { return toString(val); };
         return custom;
+    } else if constexpr (HasNonMemberToStringReturnStringData<T>::value) {
+        CustomAttributeValue custom;
+        custom.stringSerialize = [val](fmt::memory_buffer& buffer) {
+            StringData sd = toString(val);
+            buffer.append(sd.begin(), sd.end());
+        };
+        return custom;
     } else {
         return mapValue(static_cast<std::underlying_type_t<T>>(val));
     }
@@ -263,8 +285,9 @@ template <
                          !IsDuration<T>::value && !IsContainer<T>::value,
                      int> = 0>
 CustomAttributeValue mapValue(const T& val) {
-    static_assert(HasToString<T>::value || HasStringSerialize<T>::value ||
-                      HasNonMemberToString<T>::value,
+    static_assert(HasToString<T>::value || HasToStringReturnStringData<T>::value ||
+                      HasStringSerialize<T>::value || HasNonMemberToString<T>::value ||
+                      HasNonMemberToStringReturnStringData<T>::value,
                   "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
 
     CustomAttributeValue custom;
@@ -290,8 +313,18 @@ CustomAttributeValue mapValue(const T& val) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
     } else if constexpr (HasToString<T>::value) {
         custom.toString = [&val]() { return val.toString(); };
+    } else if constexpr (HasToStringReturnStringData<T>::value) {
+        custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+            StringData sd = val.toString();
+            buffer.append(sd.begin(), sd.end());
+        };
     } else if constexpr (HasNonMemberToString<T>::value) {
         custom.toString = [&val]() { return toString(val); };
+    } else if constexpr (HasNonMemberToStringReturnStringData<T>::value) {
+        custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+            StringData sd = toString(val);
+            buffer.append(sd.begin(), sd.end());
+        };
     }
 
     return custom;
