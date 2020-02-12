@@ -143,17 +143,6 @@ private:
     StringData sep = ","_sd;
 };
 
-class LogJson : public LogAdapter {
-public:
-    explicit LogJson(const BSONObj& obj) : obj(obj) {}
-
-private:
-    void doPrint(std::ostream& os) const override {
-        os << tojson(obj, ExtendedRelaxedV2_0_0, /*pretty=*/true);
-    }
-    const BSONObj& obj;
-};
-
 auto tlog() {
     auto r = unittest::log();
     r.setIsTruncatable(false);
@@ -162,74 +151,6 @@ auto tlog() {
 
 uintptr_t fromHex(const std::string& s) {
     return static_cast<uintptr_t>(std::stoull(s, nullptr, 16));
-}
-
-std::string getBaseName(std::string path) {
-    size_t lastSlash = path.rfind('/');
-    if (lastSlash == std::string::npos)
-        return path;
-    return path.substr(lastSlash + 1);
-}
-
-struct HumanFrame {
-    uintptr_t addr;
-    std::string soFileName;
-    uintptr_t soFileOffset;
-    std::string symbolName;
-    uintptr_t symbolOffset;
-};
-
-std::vector<HumanFrame> parseTraceBody(const std::string& traceBody) {
-    std::vector<HumanFrame> r;
-    // Three choices:
-    //   just raw:      " ???[0x7F0A71AD4238]"
-    //   just soFile:   " libfoo.so(+0xABC408)[0x7F0A71AD4238]"
-    //   soFile + symb: " libfoo.so(someSym+0x408)[0x7F0A71AD4238]"
-    const std::regex re(R"re( ()re"                              // line pattern open
-                        R"re((?:)re"                             // choice open non-capturing
-                        R"re((\?\?\?))re"                        // capture just raw case "???"
-                        R"re(|)re"                               // next choice
-                        R"re(([^(]*)\((.*)\+(0x[0-9A-F]+)\))re"  // so "(" sym offset ")"
-                        R"re())re"                               // choice close
-                        R"re( \[(0x[0-9A-F]+)\])re"              // raw addr suffix
-                        R"re()\n)re");                           // line pattern close, newline
-    for (auto i = std::sregex_iterator(traceBody.begin(), traceBody.end(), re);
-         i != std::sregex_iterator();
-         ++i) {
-        if (kSuperVerbose) {
-            tlog() << "{";
-            for (size_t ei = 1; ei < i->size(); ++ei) {
-                tlog() << "  {:2d}: `{}`"_format(ei, (*i)[ei]);
-            }
-            tlog() << "}";
-        }
-        size_t patternIdx = 1;
-        std::string line = (*i)[patternIdx++];
-        std::string rawOnly = (*i)[patternIdx++];  // "???" or empty
-        std::string soFile = (*i)[patternIdx++];
-        std::string symbol = (*i)[patternIdx++];
-        std::string offset = (*i)[patternIdx++];
-        std::string addr = (*i)[patternIdx++];
-        if (kSuperVerbose) {
-            tlog() << "    rawOnly:`{}`, soFile:`{}`, symbol:`{}`, offset: `{}`, addr:`{}`"
-                      ""_format(rawOnly, soFile, symbol, offset, addr);
-        }
-        HumanFrame hf{};
-        hf.addr = fromHex(addr);
-        if (rawOnly.empty()) {
-            // known soFile
-            hf.soFileName = soFile;
-            if (symbol.empty()) {
-                hf.soFileOffset = fromHex(offset);
-            } else {
-                // known symbol
-                hf.symbolName = symbol;
-                hf.symbolOffset = fromHex(offset);
-            }
-        }
-        r.push_back(hf);
-    }
-    return r;
 }
 
 // Break down a printStackTrace output for a contrived call tree and sanity-check it.
@@ -249,48 +170,22 @@ TEST(StackTrace, PosixFormat) {
     }
 
     std::smatch m;
-    ASSERT_TRUE(
-        std::regex_match(trace,
-                         m,
-                         std::regex(R"re(((?: [0-9A-F]+)+)\n)re"  // raw void* list `addrLine`
-                                    R"re(----- BEGIN BACKTRACE -----\n)re"  // header line
-                                    R"re((.*)\n)re"                         // huge `jsonLine`
-                                    R"re(((?:.*\n)+))re"  // multi-line human-readable `traceBody`
-                                    R"re(-----  END BACKTRACE  -----\n)re")))  // footer line
+    ASSERT_TRUE(std::regex_match(trace,
+                                 m,
+                                 std::regex(R"re(BACKTRACE: (\{.*\})\n)re"
+                                            R"re(((?:.|\n)*))re")))
         << "trace: {}"_format(trace);
-    std::string addrLine = m[1].str();
-    std::string jsonLine = m[2].str();
-    std::string traceBody = m[3].str();
+    std::string jsonLine = m[1].str();
+    std::string traceBody = m[2].str();
 
     if (kSuperVerbose) {
-        tlog() << "addrLine:{" << addrLine << "}";
         tlog() << "jsonLine:{" << jsonLine << "}";
         tlog() << "traceBody:{" << traceBody << "}";
-    }
-
-    std::vector<uintptr_t> addrs;
-    {
-        const std::regex re(R"re( ([0-9A-F]+))re");
-        for (auto i = std::sregex_iterator(addrLine.begin(), addrLine.end(), re);
-             i != std::sregex_iterator();
-             ++i) {
-            addrs.push_back(fromHex((*i)[1]));
-        }
-    }
-    if (kSuperVerbose) {
-        tlog() << "addrs[] = " << LogVec(addrs);
     }
 
     BSONObj jsonObj = fromjson(jsonLine);  // throwy
     ASSERT_TRUE(jsonObj.hasField("backtrace"));
     ASSERT_TRUE(jsonObj.hasField("processInfo"));
-
-    if (kSuperVerbose) {
-        for (auto& elem : jsonObj["backtrace"].Array()) {
-            tlog() << "  btelem=\n" << LogJson(elem.Obj());
-        }
-        tlog() << "  processInfo=\n" << LogJson(jsonObj["processInfo"].Obj());
-    }
 
     ASSERT_TRUE(jsonObj["processInfo"].Obj().hasField("somap"));
     struct SoMapEntry {
@@ -309,47 +204,28 @@ TEST(StackTrace, PosixFormat) {
         soMap[ent.base] = ent;
     }
 
-    std::vector<HumanFrame> humanFrames = parseTraceBody(traceBody);
-
-    {
-        // Extract all the humanFrames .addr into a vector and match against the addr line.
-        std::vector<uintptr_t> humanAddrs;
-        std::transform(humanFrames.begin(),
-                       humanFrames.end(),
-                       std::back_inserter(humanAddrs),
-                       [](auto&& h) { return h.addr; });
-        ASSERT_TRUE(addrs == humanAddrs) << LogVec(addrs) << " vs " << LogVec(humanAddrs);
-    }
-
-    {
-        // Match humanFrames against the "backtrace" json array
-        auto btArray = jsonObj["backtrace"].Array();
-        for (size_t i = 0; i < humanFrames.size(); ++i) {
-            const auto& hf = humanFrames[i];
-            const BSONObj& bt = btArray[i].Obj();
-            ASSERT_TRUE(bt.hasField("b"));
-            ASSERT_TRUE(bt.hasField("o"));
-            ASSERT_EQUALS(!hf.symbolName.empty(), bt.hasField("s"));
-
-            if (!hf.soFileName.empty()) {
-                uintptr_t btBase = fromHex(bt["b"].String());
-                auto soEntryIter = soMap.find(btBase);
-                // ASSERT_TRUE(soEntryIter != soMap.end()) << "not in soMap: 0x{:X}"_format(btBase);
-                if (soEntryIter == soMap.end())
-                    continue;
-                std::string soPath = getBaseName(soEntryIter->second.path);
-                if (soPath.empty()) {
-                    // As a special case, the "main" shared object has an empty soPath.
-                } else {
-                    ASSERT_EQUALS(hf.soFileName, soPath)
-                        << "hf.soFileName:`{}`,soPath:`{}`"_format(hf.soFileName, soPath);
-                }
+    // Sanity check: make sure all BACKTRACE addrs are represented in the Frame section.
+    std::vector<uintptr_t> humanAddrs;
+    static const std::regex re(R"re(  Frame: (?:\{"a":"(.*?)",.*\})\n?)re");
+    for (auto rei = std::sregex_iterator(traceBody.begin(), traceBody.end(), re);
+         rei != std::sregex_iterator();
+         ++rei) {
+        if (kSuperVerbose) {
+            tlog() << "sregex_iterator fields {";
+            for (size_t ei = 1; ei < rei->size(); ++ei) {
+                tlog() << "  {:2d}: `{}`"_format(ei, (*rei)[ei]);
             }
-            if (!hf.symbolName.empty()) {
-                ASSERT_EQUALS(hf.symbolName, bt["s"].String());
-            }
+            tlog() << "}";
         }
+        ASSERT_EQ(rei->size(), 2);
+        humanAddrs.push_back(fromHex((*rei)[1]));
     }
+
+    std::vector<uintptr_t> btAddrs;
+    for (const auto& btElem : jsonObj["backtrace"].embeddedObject()) {
+        btAddrs.push_back(fromHex(btElem.embeddedObject()["a"].String()));
+    }
+    ASSERT_TRUE(btAddrs == humanAddrs) << LogVec(btAddrs) << " vs " << LogVec(humanAddrs);
 }
 
 TEST(StackTrace, WindowsFormat) {
@@ -584,23 +460,14 @@ TEST_F(StackTraceSigAltStackTest, Backtrace) {
 }
 #endif  // HAVE_SIGALTSTACK
 
-class CheapJsonTest : public unittest::Test {
+class JsonTest : public unittest::Test {
 public:
     using unittest::Test::Test;
-    using CheapJson = stack_trace_detail::CheapJson;
     using Hex = stack_trace_detail::Hex;
     using Dec = stack_trace_detail::Dec;
 };
 
-TEST_F(CheapJsonTest, Appender) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    sink << "Hello"
-         << ":" << Dec(0) << ":" << Hex(255) << ":" << Dec(1234567890);
-    ASSERT_EQ(s, "Hello:0:FF:1234567890");
-}
-
-TEST_F(CheapJsonTest, Hex) {
+TEST_F(JsonTest, Hex) {
     ASSERT_EQ(StringData(Hex(static_cast<void*>(0))), "0");
     ASSERT_EQ(StringData(Hex(0xffff)), "FFFF");
     ASSERT_EQ(Hex(0xfff0), "FFF0");
@@ -615,106 +482,6 @@ TEST_F(CheapJsonTest, Hex) {
     ASSERT_EQ(s, R"(FFFF)");
 }
 
-TEST_F(CheapJsonTest, DocumentObject) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    ASSERT_EQ(s, "");
-    {
-        auto obj = doc.appendObj();
-        ASSERT_EQ(s, "{");
-    }
-    ASSERT_EQ(s, "{}");
-}
-
-TEST_F(CheapJsonTest, ScalarStringData) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    doc.append(123);
-    ASSERT_EQ(s, R"(123)");
-}
-
-TEST_F(CheapJsonTest, ScalarInt) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    doc.append("hello");
-    ASSERT_EQ(s, R"("hello")");
-}
-
-TEST_F(CheapJsonTest, ObjectNesting) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    {
-        auto obj = doc.appendObj();
-        obj.appendKey("k").append(255);
-        {
-            auto inner = obj.appendKey("obj").appendObj();
-            inner.appendKey("innerKey").append("hi");
-        }
-    }
-    ASSERT_EQ(s, R"({"k":255,"obj":{"innerKey":"hi"}})");
-}
-
-TEST_F(CheapJsonTest, Arrays) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    {
-        auto obj = doc.appendObj();
-        obj.appendKey("k").append(0xFF);
-        { obj.appendKey("empty").appendArr(); }
-        {
-            auto arr = obj.appendKey("arr").appendArr();
-            arr.append(240);
-            arr.append(241);
-            arr.append(242);
-        }
-    }
-    ASSERT_EQ(s, R"({"k":255,"empty":[],"arr":[240,241,242]})");
-}
-
-TEST_F(CheapJsonTest, AppendBSONElement) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    {
-        auto obj = env.doc().appendObj();
-        for (auto& e : fromjson(R"({"a":1,"arr":[2,123],"emptyO":{},"emptyA":[]})"))
-            obj.append(e);
-    }
-    ASSERT_EQ(s, R"({"a":1,"arr":[2,123],"emptyO":{},"emptyA":[]})");
-}
-
-TEST_F(CheapJsonTest, Pretty) {
-    std::string s;
-    StringStackTraceSink sink{s};
-    CheapJson env{sink};
-    auto doc = env.doc();
-    doc.setPretty(true);
-    {
-        auto obj = doc.appendObj();
-        obj.appendKey("headerKey").append(255);
-        {
-            auto inner = obj.appendKey("inner").appendObj();
-            inner.appendKey("innerKey").append("hi");
-        }
-        obj.appendKey("footerKey").append(123);
-    }
-
-    ASSERT_EQ(s, R"({
-  "headerKey":255,
-  "inner":{
-    "innerKey":"hi"},
-  "footerKey":123})"_sd);
-}
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 class PrintAllThreadStacksTest : public unittest::Test {

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <cstdio>
@@ -41,6 +43,7 @@
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_libunwind_test_functions.h"
@@ -155,15 +158,11 @@ TEST(Unwind, Linkage) {
 
     std::string_view view = stacktrace;
 
-    if (1) {
-        unittest::log().setIsTruncatable(false) << "trace:\n{{{\n" << stacktrace << "\n}}}\n";
-    }
+    LOGV2_OPTIONS(31429, {logv2::LogTruncation::Disabled}, "trace: {trace}", "trace"_attr = view);
 
     // Remove the backtrace JSON object, which is all one line.
-    assertAndRemovePrefix(view, "----- BEGIN BACKTRACE -----");
-    assertAndRemovePrefix(view, R"({"backtrace":)");
+    assertAndRemovePrefix(view, R"(BACKTRACE: {"backtrace":)");
     assertAndRemovePrefix(view, "}\n");
-    assertAndRemoveSuffix(view, "-----  END BACKTRACE  -----");
 
     std::string_view remainder = stacktrace;
 
@@ -186,14 +185,11 @@ TEST(Unwind, Linkage) {
     for (const auto& name : frames) {
         auto pos = remainder.find(name);
         if (pos == remainder.npos) {
-            unittest::log().setIsTruncatable(false)    //
-                << "\n"                                //
-                << "--- BEGIN ACTUAL BACKTRACE ---\n"  //
-                << stacktrace                          //
-                << "--- END ACTUAL BACKTRACE ---";
+            LOGV2_OPTIONS(
+                31378, {logv2::LogTruncation::Disabled}, "BACKTRACE: {trace}", "trace"_attr = view);
             FAIL("name '{}' is missing or out of order in sample backtrace"_format(name));
         }
-        unittest::log() << "removing prefix `" << std::string(remainder.substr(0, pos)) << "`";
+        LOGV2(31379, "Removing prefix: {prefix}", "prefix"_attr = remainder.substr(0, pos));
         remainder.remove_prefix(pos);
     }
 }

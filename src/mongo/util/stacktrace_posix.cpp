@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/stacktrace_somap.h"
 
 #include <array>
 #include <boost/optional.hpp>
@@ -44,11 +43,13 @@
 #include <string>
 
 #include "mongo/base/init.h"
+#include "mongo/bson/json.h"
 #include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler_gcc.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace_json.h"
+#include "mongo/util/stacktrace_somap.h"
 #include "mongo/util/version.h"
 
 #define MONGO_STACKTRACE_BACKEND_NONE 0
@@ -83,9 +84,17 @@ ptrdiff_t offsetFromBase(uintptr_t base, uintptr_t addr) {
 }
 
 struct Options {
+    // Add the processInfo block
     bool withProcessInfo = true;
+
+    // Add "human readable" breakdown when dumping stack. 1 line per frame.
     bool withHumanReadable = true;
-    bool trimSoMap = true;  // only include the somap entries relevant to the backtrace
+
+    // only include the somap entries relevant to the backtrace
+    bool trimSoMap = true;
+
+    // include "a" field with raw addr (use for fatal traces only)
+    bool rawAddress = false;
 };
 
 
@@ -115,41 +124,38 @@ public:
  * Iterates through the stacktrace to extract the base for each address in the
  * stacktrace. Returns a sorted, unique sequence of these bases.
  */
-size_t uniqueBases(IterationIface& iter, uintptr_t* bases, size_t capacity) {
-    auto basesEndMax = bases + capacity;
-    auto basesEnd = bases;
-    for (iter.start(iter.kSymbolic); basesEnd < basesEndMax && !iter.done(); iter.advance()) {
+std::vector<uintptr_t> uniqueBases(IterationIface& iter, size_t capacity) {
+    std::vector<uintptr_t> bases;
+    for (iter.start(iter.kSymbolic); bases.size() < capacity && !iter.done(); iter.advance()) {
         const auto& f = iter.deref();
-        if (f.file()) {
-            // Add the soFile base into bases, keeping it sorted and unique.
-            auto base = f.file().base();
-            auto position = std::lower_bound(bases, basesEnd, base);
-            if (position != basesEnd && *position == base)
-                continue;  // skip duplicate base
-            *basesEnd++ = base;
-            std::rotate(position, basesEnd - 1, basesEnd);
-        }
-    }
-    return basesEnd - bases;
-}
-
-void printRawAddrsLine(IterationIface& iter, StackTraceSink& sink, const Options& options) {
-    for (iter.start(iter.kRaw); !iter.done(); iter.advance()) {
-        sink << " " << Hex(iter.deref().address());
-    }
-}
-
-void appendJsonBacktrace(IterationIface& iter, CheapJson::Value& jsonRoot) {
-    CheapJson::Value frames = jsonRoot.appendKey("backtrace").appendArr();
-    for (iter.start(iter.kSymbolic); !iter.done(); iter.advance()) {
-        const auto& f = iter.deref();
+        if (!f.file())
+            continue;
+        // Add the soFile base into bases, keeping it sorted and unique.
         auto base = f.file().base();
-        CheapJson::Value frameObj = frames.appendObj();
-        frameObj.appendKey("b").append(Hex(base));
-        frameObj.appendKey("o").append(Hex(offsetFromBase(base, f.address())));
-        if (f.symbol()) {
-            frameObj.appendKey("s").append(f.symbol().name());
-            // We don't write the symbol offset for some reason.
+        auto position = std::lower_bound(bases.begin(), bases.end(), base);
+        if (position != bases.end() && *position == base)
+            continue;  // skip duplicate base
+        bases.insert(position, base);
+    }
+    return bases;
+}
+
+void appendBacktrace(BSONObjBuilder* obj, IterationIface& iter, const Options& options) {
+    BSONArrayBuilder frames(obj->subarrayStart("backtrace"));
+    for (iter.start(iter.kSymbolic); !iter.done(); iter.advance()) {
+        const auto& meta = iter.deref();
+        const uintptr_t addr = reinterpret_cast<uintptr_t>(meta.address());
+        BSONObjBuilder frame(frames.subobjStart());
+        if (options.rawAddress) {
+            frame.append("a", Hex(addr));
+        }
+        if (const auto& mf = meta.file(); mf) {
+            frame.append("b", Hex(mf.base()));
+            frame.append("o", Hex(offsetFromBase(mf.base(), addr)));
+        }
+        if (const auto& sym = meta.symbol(); sym) {
+            frame.append("s", sym.name());
+            frame.append("s+", Hex(offsetFromBase(sym.base(), addr)));
         }
     }
 }
@@ -157,48 +163,39 @@ void appendJsonBacktrace(IterationIface& iter, CheapJson::Value& jsonRoot) {
 /**
  * Most elements of `bsonProcInfo` are copied verbatim into the `jsonProcInfo` Json
  * object. But the "somap" BSON Array is filtered to only include elements corresponding
- * to the addresses contained by the range `[bases, basesEnd)`.
+ * to the addresses contained by `bases`.
  */
-void printJsonProcessInfoTrimmed(const BSONObj& bsonProcInfo,
-                                 CheapJson::Value& jsonProcInfo,
-                                 const uintptr_t* bases,
-                                 const uintptr_t* basesEnd) {
+void appendProcessInfoTrimmed(const BSONObj& bsonProcInfo,
+                              const std::vector<uintptr_t>& bases,
+                              BSONObjBuilder* bob) {
     for (const BSONElement& be : bsonProcInfo) {
         StringData key = be.fieldNameStringData();
         if (be.type() != BSONType::Array || key != "somap"_sd) {
-            jsonProcInfo.append(be);
+            bob->append(be);
             continue;
         }
-        CheapJson::Value jsonSoMap = jsonProcInfo.appendKey(key).appendArr();
+        BSONArrayBuilder so(bob->subarrayStart(key));
         for (const BSONElement& ae : be.Array()) {
             BSONObj bRec = ae.embeddedObject();
             uintptr_t soBase = Hex::fromHex(bRec.getStringField("b"));
-            if (std::binary_search(bases, basesEnd, soBase))
-                jsonSoMap.append(ae);
+            if (std::binary_search(bases.begin(), bases.end(), soBase))
+                so.append(ae);
         }
     }
 }
 
-template <bool isTrimmed>
-void appendJsonProcessInfoImpl(IterationIface& iter, CheapJson::Value& jsonRoot) {
-    const BSONObj& bsonProcInfo = globalSharedObjectMapInfo().obj();
-    CheapJson::Value jsonProcInfo = jsonRoot.appendKey("processInfo").appendObj();
-    if constexpr (isTrimmed) {
-        uintptr_t bases[kStackTraceFrameMax];
-        size_t basesSize = uniqueBases(iter, bases, kStackTraceFrameMax);
-        printJsonProcessInfoTrimmed(bsonProcInfo, jsonProcInfo, bases, bases + basesSize);
-    } else {
-        for (const BSONElement& be : bsonProcInfo) {
-            jsonProcInfo.append(be);
+void appendStackTraceObject(BSONObjBuilder* obj, IterationIface& iter, const Options& options) {
+    appendBacktrace(obj, iter, options);
+    if (options.withProcessInfo) {
+        const BSONObj& bsonProcInfo = globalSharedObjectMapInfo().obj();
+        BSONObjBuilder bob(obj->subobjStart("processInfo"));
+        if (options.trimSoMap) {
+            appendProcessInfoTrimmed(bsonProcInfo, uniqueBases(iter, kStackTraceFrameMax), &bob);
+        } else {
+            for (const BSONElement& be : bsonProcInfo) {
+                bob.append(be);
+            }
         }
-    }
-}
-
-void appendJsonProcessInfo(IterationIface& iter, CheapJson::Value& jsonRoot, bool trimmed) {
-    if (trimmed) {
-        appendJsonProcessInfoImpl<true>(iter, jsonRoot);
-    } else {
-        appendJsonProcessInfoImpl<false>(iter, jsonRoot);
     }
 }
 
@@ -229,47 +226,6 @@ void printMetadata(StackTraceSink& sink, const StackTraceAddressMetadata& meta) 
         sink << kUnknownFileName;
     }
     sink << " [0x" << Hex(meta.address()) << "]\n";
-}
-
-/**
- * Prints a stack backtrace for the current thread to the specified sink.
- *
- * The format of the backtrace is:
- *
- *     hexAddresses ...                    // space-separated
- *     ----- BEGIN BACKTRACE -----
- *     {backtrace:..., processInfo:...}    // json
- *     Human-readable backtrace
- *     -----  END BACKTRACE  -----
- *
- * The JSON backtrace will be a JSON object with a "backtrace" field, and optionally others.
- * The "backtrace" field is an array, whose elements are frame objects.  A frame object has a
- * "b" field, which is the base-address of the library or executable containing the symbol, and
- * an "o" field, which is the offset into said library or executable of the symbol.
- *
- * The JSON backtrace may optionally contain additional information useful to a backtrace
- * analysis tool.  For example, on Linux it contains a subobject named "somap", describing
- * the objects referenced in the "b" fields of the "backtrace" list.
- */
-void printStackTraceGeneric(StackTraceSink& sink, IterationIface& iter, const Options& options) {
-    printRawAddrsLine(iter, sink, options);
-    sink << "\n----- BEGIN BACKTRACE -----\n";
-    {
-        CheapJson json{sink};
-        CheapJson::Value doc = json.doc();
-        CheapJson::Value jsonRootObj = doc.appendObj();
-        appendJsonBacktrace(iter, jsonRootObj);
-        if (options.withProcessInfo) {
-            appendJsonProcessInfo(iter, jsonRootObj, options.trimSoMap);
-        }
-    }
-    sink << "\n";
-    if (options.withHumanReadable) {
-        for (iter.start(iter.kSymbolic); !iter.done(); iter.advance()) {
-            printMetadata(sink, iter.deref());
-        }
-    }
-    sink << "-----  END BACKTRACE  -----\n";
 }
 
 void mergeDlInfo(StackTraceAddressMetadata& f) {
@@ -433,6 +389,78 @@ private:
     size_t _i = 0;
 };
 
+/**
+ * Prints a stack backtrace for the current thread to the specified sink.
+ * @param sink sink to print to, or print to LOGV2 if sink is nullptr.
+ *
+ * The format of the backtrace is:
+ *
+ *     {
+ *      backtrace: [...],
+ *      processInfo: {...}
+ *     }
+ *
+ * The backtrace will be a JSON object with a "backtrace" field, and optionally others.
+ * The "backtrace" field is an array of frame objects. A frame object has a
+ * "b" field, which is the base-address of the library or executable containing the symbol, and
+ * an "o" field, which is the offset into said library or executable of the symbol.
+ *
+ * The backtrace may optionally contain additional information useful to a backtrace
+ * analysis tool. For example, on Linux it contains a subobject named "somap", describing
+ * the objects referenced in the "b" fields of the "backtrace" list.
+ */
+void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr) {
+    using namespace fmt::literals;
+    std::string err;
+    BSONObjBuilder bob;
+#if (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_NONE)
+    err = "This platform does not support printing stacktraces";
+#else
+#if (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND)
+    using IterationType = LibunwindStepIteration;
+#else
+    using IterationType = RawBacktraceIteration;
+#endif
+    StringStackTraceSink errSink{err};
+    IterationType iteration(errSink);
+    appendStackTraceObject(&bob, iteration, options);
+#endif
+
+    BSONObj obj = bob.done();
+    if (!err.empty()) {
+        static constexpr char fmtErr[] = "Error collecting stack trace: {err}";
+        if (sink) {
+            *sink << fmt::format(fmtErr, "err"_a = err);
+        } else {
+            LOGV2(31430, fmtErr, "err"_attr = err);
+        }
+        return;
+    }
+    static constexpr char fmtBt[] = "BACKTRACE: {bt}";
+    if (sink) {
+        *sink << fmt::format(fmtBt, "bt"_a = tojson(obj, ExtendedRelaxedV2_0_0));
+    } else {
+        LOGV2_OPTIONS(31431, {logv2::LogTruncation::Disabled}, fmtBt, "bt"_attr = obj);
+    }
+
+    if (options.withHumanReadable) {
+        if (auto elem = obj.getField("backtrace"); !elem.eoo()) {
+            for (const auto& fe : elem.embeddedObject()) {
+                BSONObj frame = fe.embeddedObject();
+                static constexpr char fmtFrame[] = "  Frame: {frame}";
+                if (sink) {
+                    *sink << "\n"
+                          << fmt::format(fmtFrame,
+                                         "frame"_a = tojson(frame, ExtendedRelaxedV2_0_0));
+                } else {
+                    LOGV2(31427, fmtFrame, "frame"_attr = frame);
+                }
+            }
+        }
+    }
+}
+
+
 }  // namespace
 }  // namespace stack_trace_detail
 
@@ -441,11 +469,11 @@ void StackTraceAddressMetadata::printTo(StackTraceSink& sink) const {
 }
 
 size_t rawBacktrace(void** addrs, size_t capacity) {
-#if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
+#if (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND)
     return ::unw_backtrace(addrs, capacity);
-#elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
+#elif (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO)
     return ::backtrace(addrs, capacity);
-#elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_NONE
+#else
     return 0;
 #endif
 }
@@ -457,23 +485,9 @@ const StackTraceAddressMetadata& StackTraceAddressMetadataGenerator::load(void* 
 }
 
 void printStackTrace(StackTraceSink& sink) {
-#if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
     stack_trace_detail::Options options{};
-    static constexpr bool kUseUnwindSteps = true;
-    if (kUseUnwindSteps) {
-        stack_trace_detail::LibunwindStepIteration iteration(sink);
-        printStackTraceGeneric(sink, iteration, options);
-    } else {
-        stack_trace_detail::RawBacktraceIteration iteration(sink);
-        printStackTraceGeneric(sink, iteration, options);
-    }
-#elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
-    stack_trace_detail::Options options{};
-    stack_trace_detail::RawBacktraceIteration iteration(sink);
-    printStackTraceGeneric(sink, iteration, options);
-#elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_NONE
-    sink << "This platform does not support printing stacktraces\n";
-#endif
+    options.rawAddress = true;
+    stack_trace_detail::printStackTraceImpl(options, &sink);
 }
 
 void printStackTrace(std::ostream& os) {
@@ -482,9 +496,9 @@ void printStackTrace(std::ostream& os) {
 }
 
 void printStackTrace() {
-    // NOTE: We disable long-line truncation for the stack trace, because the JSON
-    // representation of the stack trace can sometimes exceed the long line limit.
-    printStackTrace(log().setIsTruncatable(false).stream());
+    stack_trace_detail::Options options{};
+    options.rawAddress = true;
+    stack_trace_detail::printStackTraceImpl(options, nullptr);
 }
 
 }  // namespace mongo
