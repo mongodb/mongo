@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
@@ -52,6 +53,12 @@ void logProcessDetails() {
     auto&& vii = VersionInfoInterface::instance();
     log() << mongodVersion(vii);
     vii.logBuildInfo();
+
+    ProcessInfo p;
+    LOGV2(51765,
+          "operating system: {name}, version: {version}",
+          "name"_attr = p.getOsName(),
+          "version"_attr = p.getOsVersion());
 
     if (ProcessInfo::getMemSizeMB() < ProcessInfo::getSystemMemSizeMB()) {
         log() << ProcessInfo::getMemSizeMB() << " MB of memory available to the process out of "
