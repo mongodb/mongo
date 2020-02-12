@@ -41,6 +41,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -190,10 +191,21 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
 }
 
 /**
- * Aborts any ongoing migration for the given namespace. Should only be called when observing index
- * operations.
+ * Aborts any ongoing migration for the given namespace if the observed operation was sent with a
+ * shard version. Should only be called when observing index operations.
+ *
+ * TODO SERVER-45017: Update this comment once the check for a shard version is removed.
  */
-void abortOngoingMigration(OperationContext* opCtx, const NamespaceString nss) {
+void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceString nss) {
+    // Only abort migrations if the request is versioned, meaning it came from a mongos using the
+    // 4.4 index operation protocol.
+    //
+    // TODO SERVER-45017: Remove this check once 4.4. is last-stable, since all index operations
+    // sent from a mongos will have shard versions.
+    if (!OperationShardingState::isOperationVersioned(opCtx)) {
+        return;
+    }
+
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
@@ -453,12 +465,12 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const UUID& indexBuildUUID,
                                               const std::vector<BSONObj>& indexes,
                                               bool fromMigrate) {
-    abortOngoingMigration(opCtx, nss);
+    abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
 void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    abortOngoingMigration(opCtx, nss);
+    abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
 void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
@@ -466,7 +478,7 @@ void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         OptionalCollectionUUID uuid,
                                         const std::string& indexName,
                                         const BSONObj& indexInfo) {
-    abortOngoingMigration(opCtx, nss);
+    abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
 void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
@@ -475,7 +487,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<TTLCollModInfo> ttlInfo) {
-    abortOngoingMigration(opCtx, nss);
+    abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
 

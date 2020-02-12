@@ -622,6 +622,9 @@ void MigrationSourceManager::cleanupOnError() {
 }
 
 void MigrationSourceManager::abortDueToConflictingIndexOperation() {
+    // Index operations sent in the 4.4 protocol are versioned and block behind both phases of the
+    // critical section, so there should never be an active critical section.
+    dassert(!_critSec);
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     _opCtx->markKilled();
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
