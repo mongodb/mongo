@@ -63,7 +63,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
                                const MatchExpression* filter)
     : RequiresCollectionStage(kStageType, opCtx, collection),
       _workingSet(workingSet),
-      _filter(filter),
+      _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;

@@ -67,7 +67,7 @@ IndexScan::IndexScan(OperationContext* opCtx,
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
       _bounds(std::move(params.bounds)),
-      _filter(filter),
+      _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _direction(params.direction),
       _forward(params.direction == 1),
       _shouldDedup(params.shouldDedup),
@@ -219,10 +219,8 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         }
     }
 
-    if (_filter) {
-        if (!Filter::passes(kv->key, _keyPattern, _filter)) {
-            return PlanStage::NEED_TIME;
-        }
+    if (!Filter::passes(kv->key, _keyPattern, _filter)) {
+        return PlanStage::NEED_TIME;
     }
 
     if (!kv->key.isOwned())

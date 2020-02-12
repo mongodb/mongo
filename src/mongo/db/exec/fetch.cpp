@@ -56,7 +56,7 @@ FetchStage::FetchStage(OperationContext* opCtx,
                        const Collection* collection)
     : RequiresCollectionStage(kStageType, opCtx, collection),
       _ws(ws),
-      _filter(filter),
+      _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _idRetrying(WorkingSet::INVALID_ID) {
     _children.emplace_back(std::move(child));
 }
