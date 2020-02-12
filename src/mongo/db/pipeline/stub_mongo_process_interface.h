@@ -81,8 +81,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
-                                          const NamespaceString& ns) override {
+    std::vector<Document> getIndexStats(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        StringData host,
+                                        bool addShardName) override {
         MONGO_UNREACHABLE;
     }
 

@@ -253,17 +253,51 @@ StatusWith<MongoProcessInterface::UpdateResult> MongoInterfaceStandalone::update
     return updateResult;
 }
 
-CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
-                                                                const NamespaceString& ns) {
+std::vector<Document> MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
+                                                              const NamespaceString& ns,
+                                                              StringData host,
+                                                              bool addShardName) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
     Collection* collection = autoColl.getCollection();
+    std::vector<Document> indexStats;
     if (!collection) {
         LOG(2) << "Collection not found on index stats retrieval: " << ns.ns();
-        return CollectionIndexUsageMap();
+        return indexStats;
     }
 
-    return collection->infoCache()->getIndexUsageStats();
+    auto indexStatsMap = collection->infoCache()->getIndexUsageStats();
+    for (auto&& indexStatsMapIter : indexStatsMap) {
+        auto indexName = indexStatsMapIter.first;
+        auto stats = indexStatsMapIter.second;
+        MutableDocument doc;
+        doc["name"] = Value(indexName);
+        doc["key"] = Value(stats.indexKey);
+        doc["host"] = Value(host);
+        doc["accesses"]["ops"] = Value(stats.accesses.loadRelaxed());
+        doc["accesses"]["since"] = Value(stats.trackerStartTime);
+
+        if (addShardName)
+            doc["shard"] = Value(getShardName(opCtx));
+
+        // Retrieve the relevant index entry.
+        auto idxCatalog = collection->getIndexCatalog();
+        auto idx = idxCatalog->findIndexByName(opCtx,
+                                               indexName,
+                                               /* includeUnfinishedIndexes */ true);
+        uassert(ErrorCodes::IndexNotFound,
+                "Could not find entry in IndexCatalog for index " + indexName,
+                idx);
+        auto entry = idxCatalog->getEntry(idx);
+        doc["spec"] = Value(idx->infoObj());
+
+        if (!entry->isReady(opCtx)) {
+            doc["building"] = Value(true);
+        }
+
+        indexStats.push_back(doc.freeze());
+    }
+    return indexStats;
 }
 
 void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,

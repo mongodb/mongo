@@ -17,21 +17,29 @@ class IndexBuildTest {
      * 'indexName', or any index build if either is undefined. Returns -1 if there is no current
      * index build.
      */
-    static getIndexBuildOpId(database, collectionName, indexName) {
-        const result = database.currentOp();
-        assert.commandWorked(result);
+
+    static getIndexBuildOpId(database, collectionName, indexName, filter) {
+        let pipeline = [{$currentOp: {allUsers: true}}];
+        if (filter) {
+            pipeline.push({$match: filter});
+        }
+        const result = database.getSiblingDB("admin")
+                           .aggregate(pipeline, {readConcern: {level: "local"}})
+                           .toArray();
         let indexBuildOpId = -1;
 
-        result.inprog.forEach(function(op) {
+        result.forEach(function(op) {
             if (op.op != 'command') {
                 return;
             }
-            if (op.command.createIndexes === undefined) {
+            const cmdBody = op.command;
+
+            if (cmdBody.createIndexes === undefined) {
                 return;
             }
             // If no collection is provided, return any index build.
-            if (!collectionName || op.command.createIndexes === collectionName) {
-                op.command.indexes.forEach((index) => {
+            if (!collectionName || cmdBody.createIndexes === collectionName) {
+                cmdBody.indexes.forEach((index) => {
                     if (!indexName || index.name === indexName) {
                         indexBuildOpId = op.opid;
                     }

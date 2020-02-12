@@ -50,21 +50,16 @@ const char* DocumentSourceIndexStats::getSourceName() const {
 DocumentSource::GetNextResult DocumentSourceIndexStats::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (_indexStatsMap.empty()) {
-        _indexStatsMap = pExpCtx->mongoProcessInterface->getIndexStats(pExpCtx->opCtx, pExpCtx->ns);
-        _indexStatsIter = _indexStatsMap.begin();
+    if (_indexStats.empty()) {
+        _indexStats = pExpCtx->mongoProcessInterface->getIndexStats(
+            pExpCtx->opCtx, pExpCtx->ns, _processName, pExpCtx->fromMongos);
+        _indexStatsIter = _indexStats.begin();
     }
 
-    if (_indexStatsIter != _indexStatsMap.end()) {
-        const auto& stats = _indexStatsIter->second;
-        MutableDocument doc;
-        doc["name"] = Value(_indexStatsIter->first);
-        doc["key"] = Value(stats.indexKey);
-        doc["host"] = Value(_processName);
-        doc["accesses"]["ops"] = Value(stats.accesses.loadRelaxed());
-        doc["accesses"]["since"] = Value(stats.trackerStartTime);
+    if (_indexStatsIter != _indexStats.cend()) {
+        Document doc{std::move(*_indexStatsIter)};
         ++_indexStatsIter;
-        return doc.freeze();
+        return doc;
     }
 
     return GetNextResult::makeEOF();

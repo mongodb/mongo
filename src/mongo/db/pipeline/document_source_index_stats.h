@@ -93,8 +93,8 @@ public:
 private:
     DocumentSourceIndexStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    CollectionIndexUsageMap _indexStatsMap;
-    CollectionIndexUsageMap::const_iterator _indexStatsIter;
+    std::vector<Document> _indexStats;
+    std::vector<Document>::const_iterator _indexStatsIter;
     std::string _processName;
 };
 
