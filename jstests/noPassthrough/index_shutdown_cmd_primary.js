@@ -32,7 +32,7 @@ assert.commandWorked(coll.insert({a: 1}));
 IndexBuildTest.pauseIndexBuilds(primary);
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
-IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
 // Stop the primary using the shutdown command without {force: true}.
 try {
