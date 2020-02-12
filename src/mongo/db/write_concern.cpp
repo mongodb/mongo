@@ -247,6 +247,15 @@ Status waitForWriteConcern(OperationContext* opCtx,
             break;
         }
         case WriteConcernOptions::SyncMode::JOURNAL:
+            if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::Mode::modeNone) {
+                // Wait for ops to become durable then update replication system's knowledge of
+                // this.
+                // This is only needed for inMemory storage engines, which may not update the
+                // Durable time.
+                auto appliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
+                getGlobalServiceContext()->getStorageEngine()->waitForJournalFlush(opCtx);
+                replCoord->setMyLastDurableOpTimeAndWallTimeForward(appliedOpTimeAndWallTime);
+            }
             getGlobalServiceContext()->getStorageEngine()->waitForJournalFlush(opCtx);
             break;
     }
