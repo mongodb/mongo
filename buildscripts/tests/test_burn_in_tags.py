@@ -106,7 +106,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         evergreen_api = MagicMock()
         repo = MagicMock()
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, repo, evg_conf_mock)
+                                       buildvariant_map, [repo], evg_conf_mock)
 
         self.assertEqual(shrub_config.to_map(), {})
 
@@ -135,7 +135,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
             MagicMock(test_file="dir/test2.js", avg_duration_pass=10)
         ]
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, repo, evg_conf_mock)
+                                       buildvariant_map, [repo], evg_conf_mock)
 
         generated_config = shrub_config.to_map()
         self.assertEqual(len(generated_config["buildvariants"]), 2)
