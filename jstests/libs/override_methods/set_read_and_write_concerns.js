@@ -116,7 +116,9 @@ function runCommandWithReadAndWriteConcerns(
 
             if (typeof readConcern !== "object" || readConcern === null ||
                 (readConcern.hasOwnProperty("level") &&
-                 bsonWoCompare({_: readConcern.level}, {_: kDefaultReadConcern.level}) !== 0)) {
+                 bsonWoCompare({_: readConcern.level}, {_: kDefaultReadConcern.level}) !== 0 &&
+                 bsonWoCompare({_: readConcern.level}, {_: "local"}) !== 0 &&
+                 bsonWoCompare({_: readConcern.level}, {_: "available"}) !== 0)) {
                 throw new Error("Cowardly refusing to override read concern of command: " +
                                 tojson(commandObj));
             }
@@ -145,7 +147,8 @@ function runCommandWithReadAndWriteConcerns(
 
             if (typeof writeConcern !== "object" || writeConcern === null ||
                 (writeConcern.hasOwnProperty("w") &&
-                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0)) {
+                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0 &&
+                 bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)) {
                 throw new Error("Cowardly refusing to override write concern of command: " +
                                 tojson(commandObj));
             }

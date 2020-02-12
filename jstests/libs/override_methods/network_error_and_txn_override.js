@@ -446,7 +446,8 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
             let writeConcern = cmdObj.writeConcern;
             if (typeof writeConcern !== "object" || writeConcern === null ||
                 (writeConcern.hasOwnProperty("w") &&
-                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcernW}) !== 0)) {
+                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcernW}) !== 0 &&
+                 bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)) {
                 throw new Error("Cowardly refusing to override write concern of command: " +
                                 tojson(cmdObj));
             }
