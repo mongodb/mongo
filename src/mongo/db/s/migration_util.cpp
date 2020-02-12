@@ -144,15 +144,18 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
 
             auto css = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-            if (!css->getCurrentMetadataIfKnown() ||
+            if (!css->getCurrentMetadataIfKnown() || !css->getCurrentMetadata()->isSharded() ||
                 !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
-                // If the collection's filtering metadata is not known or its UUID does not match
-                // the UUID of the deletion task, force a filtering metadata refresh once, because
-                // this node may have just stepped up and therefore may have a stale cache.
+                // If the collection's filtering metadata is not known, is unsharded, or its UUID
+                // does not match the UUID of the deletion task, force a filtering metadata refresh
+                // once, because this node may have just stepped up and therefore may have a stale
+                // cache.
                 LOG(0) << "Filtering metadata for namespace in deletion task "
                        << deletionTask.toBSON()
                        << (css->getCurrentMetadataIfKnown()
-                               ? " has UUID that does not match UUID of the deletion task"
+                               ? (css->getCurrentMetadata()->isSharded()
+                                      ? " has UUID that does not match UUID of the deletion task"
+                                      : " is unsharded")
                                : " is not known")
                        << ", forcing a refresh of " << deletionTask.getNss();
 
@@ -173,14 +176,16 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
             }
 
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
-            if (!css->getCurrentMetadataIfKnown() ||
+            if (!css->getCurrentMetadataIfKnown() || !css->getCurrentMetadata()->isSharded() ||
                 !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
                 LOG(0) << "Even after forced refresh, filtering metadata for namespace in deletion "
                           "task "
                        << deletionTask.toBSON()
                        << (css->getCurrentMetadataIfKnown()
-                               ? "has UUID that does not match UUID of the deletion task"
-                               : "is not known")
+                               ? (css->getCurrentMetadata()->isSharded()
+                                      ? " has UUID that does not match UUID of the deletion task"
+                                      : " is unsharded")
+                               : " is not known")
                        << ", deleting the task.";
 
                 autoColl.reset();

@@ -534,6 +534,54 @@ TEST_F(SubmitRangeDeletionTaskTest,
     ASSERT_EQ(store.count(opCtx), 0);
 }
 
+TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEvenAfterRefresh) {
+    auto opCtx = operationContext();
+
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+
+    // Make the refresh triggered by submitting the task return an empty result when loading the
+    // collection so it is considered unsharded.
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
+        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
+
+    auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+
+    // The task should not have been submitted, and the task's entry should have been removed from
+    // the persistent store.
+    ASSERT_FALSE(submitTaskFuture.get(opCtx));
+    ASSERT_EQ(store.count(opCtx), 0);
+}
+
+TEST_F(SubmitRangeDeletionTaskTest,
+       FailsAndDeletesTaskIfNamespaceIsUnshardedBeforeAndAfterRefresh) {
+    auto opCtx = operationContext();
+
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+
+    // Mock an empty result for the task's collection and force a refresh so the node believes the
+    // collection is unsharded.
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
+        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
+    forceShardFilteringMetadataRefresh(opCtx, kNss, true);
+
+    auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+
+    // The task should not have been submitted, and the task's entry should have been removed from
+    // the persistent store.
+    ASSERT_FALSE(submitTaskFuture.get(opCtx));
+    ASSERT_EQ(store.count(opCtx), 0);
+}
+
 TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUUID) {
     auto opCtx = operationContext();
 
@@ -567,6 +615,31 @@ TEST_F(
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion(1, 0, kEpoch)));
     _mockCatalogClient->setCollections({coll});
+
+    // The task should have been submitted successfully.
+    auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+    ASSERT(submitTaskFuture.get(opCtx));
+}
+
+TEST_F(SubmitRangeDeletionTaskTest,
+       SucceedsIfTaskNamespaceInitiallyUnshardedButUUIDMatchesAfterRefresh) {
+    auto opCtx = operationContext();
+
+    // Force a metadata refresh with no collection entry so the node believes the namespace is
+    // unsharded when the task is submitted.
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
+        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
+    forceShardFilteringMetadataRefresh(opCtx, kNss, true);
+
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+
+    // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
+    auto matchingColl = makeCollectionType(kDefaultUUID, kEpoch);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch)));
+    _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
     auto submitTaskFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
