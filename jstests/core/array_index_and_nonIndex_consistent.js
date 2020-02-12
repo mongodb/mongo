@@ -11,11 +11,11 @@
     indexColl.drop();
     nonIndexedColl.drop();
 
-    db.indexColl.createIndex({val: 1});
+    assert.commandWorked(indexColl.createIndex({val: 1}));
+    assert.commandWorked(db.runCommand({create: nonIndexedColl.getName()}));
     const collList = [indexColl, nonIndexedColl];
-
     collList.forEach(function(collObj) {
-        assert.commandWorked(collObj.insert([
+        const writeResult = assert.writeOK(collObj.insert([
             {val: [1, 2]},
             {val: [3, 4]},
             {val: [3, 1]},
@@ -51,9 +51,6 @@
         null,         [null],   [],          [MinKey],    [MinKey, 2], [MinKey, 4],
         MinKey,       [MaxKey], [MaxKey, 2], [MaxKey, 4], MaxKey,      [],
     ];
-
-    let failedLT = [];
-    let failedGT = [];
 
     queryList.forEach(function(q) {
         const queryLT = {val: {"$lt": q}};
