@@ -11628,7 +11628,7 @@ buildvariants:
     - rhel62-large
   - name: .aggfuzzer .common
   - name: aggregation
-  - name: .auth !.multiversion !.audit
+  - name: .auth !.multiversion !.audit !.sharding
   - name: .misc_js
   - name: concurrency
     distros:
