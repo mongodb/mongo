@@ -590,7 +590,9 @@ void NetworkInterfaceMock::signalWorkAvailable() {
 
 void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     while (!_alarms.empty() && _now_inlock() >= _alarms.top().when) {
-        auto& alarm = _alarms.top();
+        // It's safe to remove the const qualifier here as we immediately remove the top.
+        AlarmInfo alarm = std::move(const_cast<AlarmInfo&>(_alarms.top()));
+        _alarms.pop();
 
         // If the handle isn't cancelled, then run it
         auto iter = _canceledAlarms.find(alarm.handle);
@@ -601,8 +603,6 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
         } else {
             _canceledAlarms.erase(iter);
         }
-
-        _alarms.pop();
     }
     while (!_scheduled.empty() && _scheduled.front().getResponseDate() <= _now_inlock()) {
         invariant(_currentlyRunning == kNetworkThread);
