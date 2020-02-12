@@ -159,25 +159,27 @@ void ReplSetHeartbeatArgsV1::setCheckEmpty() {
     _checkEmpty = true;
 }
 
-BSONObj ReplSetHeartbeatArgsV1::toBSON(bool omitConfigTerm) const {
+BSONObj ReplSetHeartbeatArgsV1::toBSON() const {
     invariant(isInitialized());
     BSONObjBuilder builder;
-    addToBSON(&builder, omitConfigTerm);
+    addToBSON(&builder);
     return builder.obj();
 }
 
-void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder, bool omitConfigTerm) const {
+void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kSetNameFieldName, _setName);
     if (_checkEmpty) {
         builder->append(kCheckEmptyFieldName, _checkEmpty);
     }
     builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
-    // Only attach the term field if we are fully upgraded to 4.4, since 4.2 nodes won't be able to
-    // parse it.
+    // The configTerm field is new in 4.4 and cannot be parsed by MongoDB 4.2. Therefore omit it if
+    // we have a 4.2-style replica set config with no "term". This permits us to downgrade by first
+    // removing the replica set config's term, then downgrading to 4.2.
+    // TODO (SERVER-46288): Don't check FCV.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !omitConfigTerm) {
+        _configTerm != OpTime::kUninitializedTerm) {
         builder->appendIntOrLL(kConfigTermFieldName, _configTerm);
     }
     if (_hasHeartbeatVersion) {

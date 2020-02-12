@@ -754,7 +754,10 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     if (_rsConfig.isInitialized()) {
         hbArgs.setSetName(_rsConfig.getReplSetName());
         hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
-        hbArgs.setConfigTerm(_rsConfig.getConfigTerm());
+        if (_rsConfig.getConfigTerm() != OpTime::kUninitializedTerm) {
+            hbArgs.setConfigTerm(_rsConfig.getConfigTerm());
+        }
+
         if (_selfIndex >= 0) {
             const MemberConfig& me = _selfConfig();
             hbArgs.setSenderId(me.getId().getData());

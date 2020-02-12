@@ -105,10 +105,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     Milliseconds timeout(0);
     const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
         _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
-    // Omit config term from all heartbeat requests sent by arbiter, since it cannot be parsed by
-    // 4.2 nodes and arbiters do not respect FCV setting.
-    bool omitConfigTerm = _getMemberState_inlock().arbiter();
-    heartbeatObj = hbRequest.first.toBSON(omitConfigTerm);
+    heartbeatObj = hbRequest.first.toBSON();
     timeout = hbRequest.second;
 
     const RemoteCommandRequest request(

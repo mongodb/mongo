@@ -152,9 +152,9 @@ public:
      * Should only be called if the mandatory fields have been set.
      * Optional fields are only included if they have been set.
      */
-    BSONObj toBSON(bool omitConfigTerm = false) const;
+    BSONObj toBSON() const;
 
-    void addToBSON(BSONObjBuilder* builder, bool omitConfigTerm) const;
+    void addToBSON(BSONObjBuilder* builder) const;
 
 private:
     // look at the body of the isInitialized() function to see which fields are mandatory

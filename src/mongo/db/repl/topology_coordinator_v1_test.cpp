@@ -2246,6 +2246,35 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_EQUALS(HostAndPort("h2"), response.getSyncingTo());
 }
 
+TEST_F(TopoCoordTest, OmitUninitializedConfigTermFromHeartbeat) {
+    // A MongoDB 4.2 replica set config with no term.
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2"))),
+                 0);
+
+    // A member with this config omits configTerm from heartbeat requests.
+    auto [request, timeout] =
+        getTopoCoord().prepareHeartbeatRequestV1(Date_t(), "rs0", HostAndPort("h2", 27017));
+    (void)timeout;  // Unused.
+
+    ASSERT_EQUALS(request.getConfigTerm(), -1);
+    ASSERT_EQUALS(request.getConfigVersion(), 1);
+    ASSERT_FALSE(request.toBSON().hasField("configTerm"_sd));
+
+    // A member with this config omits configTerm from heartbeat responses.
+    ReplSetHeartbeatArgsV1 args;
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    ASSERT_OK(getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", &response));
+    ASSERT_FALSE(response.toBSON().hasField("configTerm"_sd));
+}
+
 TEST_F(TopoCoordTest, BecomeCandidateWhenBecomingSecondaryInSingleNodeSet) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
