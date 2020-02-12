@@ -1,5 +1,5 @@
 // SERVER-6591: Localhost authentication exception doesn't work right on sharded cluster
-//
+// @tags: [requires_os_access]
 // This test is to ensure that localhost authentication works correctly against a replica set
 // whether they are hosted with "localhost" or a hostname.
 

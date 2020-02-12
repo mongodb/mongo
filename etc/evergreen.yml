@@ -978,6 +978,9 @@ functions:
         set -o errexit
         set -o verbose
 
+        if [ "${disable_shared_scons_cache}" = true ]; then
+            exit
+        fi
         if [ "${scons_cache_scope}" = "shared" ]; then
             if [ "Windows_NT" = "$OS" ]; then
                 net use X: /delete || true
@@ -10381,6 +10384,26 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_auth_gen
   - name: .stitch
+
+- name: ubuntu1604-container
+  display_name: "Ubuntu 16.04 Container"
+  run_on:
+  - ubuntu1604-container-server
+  expansions:
+    resmoke_jobs_factor: 1
+    disable_shared_scons_cache: true
+    compile_flags: MONGO_DISTMOD=ubuntu1604 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    tooltags: ""
+    build_mongoreplay: true
+    test_flags: >-
+      --excludeWithAnyTags=requires_os_access
+  tasks:
+  - name: compile_TG
+    distros:
+    - ubuntu1604-build
+  - name: jsCore
+  - name: sharding_gen
+  - name: replica_sets
 
 - name: rhel62
   display_name: RHEL 6.2
