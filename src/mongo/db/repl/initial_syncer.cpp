@@ -206,34 +206,32 @@ InitialSyncer::InitialSyncer(
       _onCompletion(onCompletion),
       _createClientFn(
           [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
-      _createOplogFetcherFn(
-          [](executor::TaskExecutor* executor,
-             OpTime lastFetched,
-             HostAndPort source,
-             NamespaceString nss,
-             ReplSetConfig config,
-             std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-             int requiredRBID,
-             bool requireFresherSyncSource,
-             DataReplicatorExternalState* dataReplicatorExternalState,
-             OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-             OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
-             const int batchSize,
-             OplogFetcher::StartingPoint startingPoint) {
-              return std::make_unique<OplogFetcher>(executor,
-                                                    lastFetched,
-                                                    source,
-                                                    nss,
-                                                    config,
-                                                    std::move(oplogFetcherRestartDecision),
-                                                    requiredRBID,
-                                                    requireFresherSyncSource,
-                                                    dataReplicatorExternalState,
-                                                    std::move(enqueueDocumentsFn),
-                                                    std::move(onShutdownCallbackFn),
-                                                    batchSize,
-                                                    startingPoint);
-          }) {
+      _createOplogFetcherFn([](executor::TaskExecutor* executor,
+                               OpTime lastFetched,
+                               HostAndPort source,
+                               ReplSetConfig config,
+                               std::unique_ptr<NewOplogFetcher::OplogFetcherRestartDecision>
+                                   oplogFetcherRestartDecision,
+                               int requiredRBID,
+                               bool requireFresherSyncSource,
+                               DataReplicatorExternalState* dataReplicatorExternalState,
+                               NewOplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+                               NewOplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+                               const int batchSize,
+                               NewOplogFetcher::StartingPoint startingPoint) {
+          return std::make_unique<NewOplogFetcher>(executor,
+                                                   lastFetched,
+                                                   source,
+                                                   config,
+                                                   std::move(oplogFetcherRestartDecision),
+                                                   requiredRBID,
+                                                   requireFresherSyncSource,
+                                                   dataReplicatorExternalState,
+                                                   std::move(enqueueDocumentsFn),
+                                                   std::move(onShutdownCallbackFn),
+                                                   batchSize,
+                                                   startingPoint);
+      }) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -465,7 +463,7 @@ void InitialSyncer::setCreateOplogFetcherFn_forTest(
     _createOplogFetcherFn = createOplogFetcherFn;
 }
 
-OplogFetcher* InitialSyncer::getOplogFetcher_forTest() const {
+NewOplogFetcher* InitialSyncer::getOplogFetcher_forTest() const {
     // Wait up to 10 seconds.
     for (auto i = 0; i < 100; i++) {
         {
@@ -1119,21 +1117,20 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         _createOplogFetcherFn(_exec,
                               beginFetchingOpTime,
                               _syncSource,
-                              _opts.remoteOplogNS,
                               config,
                               std::make_unique<OplogFetcherRestartDecisionInitialSyncer>(
                                   _sharedData.get(), _opts.oplogFetcherMaxFetcherRestarts),
                               _rollbackChecker->getBaseRBID(),
                               false /* requireFresherSyncSource */,
                               _dataReplicatorExternalState.get(),
-                              [=](Fetcher::Documents::const_iterator first,
-                                  Fetcher::Documents::const_iterator last,
-                                  const OplogFetcher::DocumentsInfo& info) {
+                              [=](NewOplogFetcher::Documents::const_iterator first,
+                                  NewOplogFetcher::Documents::const_iterator last,
+                                  const NewOplogFetcher::DocumentsInfo& info) {
                                   return _enqueueDocuments(first, last, info);
                               },
                               [=](const Status& s) { _oplogFetcherCallback(s, onCompletionGuard); },
                               initialSyncOplogFetcherBatchSize,
-                              OplogFetcher::StartingPoint::kEnqueueFirstDoc);
+                              NewOplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
     LOGV2_DEBUG(21178,
                 2,
@@ -1973,9 +1970,9 @@ StatusWith<HostAndPort> InitialSyncer::_chooseSyncSource_inlock() {
     return syncSource;
 }
 
-Status InitialSyncer::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                                        Fetcher::Documents::const_iterator end,
-                                        const OplogFetcher::DocumentsInfo& info) {
+Status InitialSyncer::_enqueueDocuments(NewOplogFetcher::Documents::const_iterator begin,
+                                        NewOplogFetcher::Documents::const_iterator end,
+                                        const NewOplogFetcher::DocumentsInfo& info) {
     if (info.toApplyDocumentCount == 0) {
         return Status::OK();
     }
@@ -2051,7 +2048,7 @@ void InitialSyncer::InitialSyncAttemptInfo::append(BSONObjBuilder* builder) cons
 }
 
 bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(
-    AbstractOplogFetcher* fetcher, Status status) {
+    NewOplogFetcher* fetcher, Status status) {
     if (ErrorCodes::isRetriableError(status)) {
         stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
         return _sharedData->shouldRetryOperation(lk, &_retryingOperation);
@@ -2063,7 +2060,7 @@ bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(
 }
 
 void InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::fetchSuccessful(
-    AbstractOplogFetcher* fetcher) {
+    NewOplogFetcher* fetcher) {
     _retryingOperation = boost::none;
     _defaultDecision.fetchSuccessful(fetcher);
 }

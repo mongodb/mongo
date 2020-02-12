@@ -155,20 +155,19 @@ public:
     /**
      * Type of function to create an OplogFetcher.
      */
-    using CreateOplogFetcherFn = std::function<std::unique_ptr<OplogFetcher>(
+    using CreateOplogFetcherFn = std::function<std::unique_ptr<NewOplogFetcher>(
         executor::TaskExecutor* executor,
         OpTime lastFetched,
         HostAndPort source,
-        NamespaceString nss,
         ReplSetConfig config,
-        std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+        std::unique_ptr<NewOplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
         int requiredRBID,
         bool requireFresherSyncSource,
         DataReplicatorExternalState* dataReplicatorExternalState,
-        OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-        OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+        NewOplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+        NewOplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
         const int batchSize,
-        OplogFetcher::StartingPoint startingPoint)>;
+        NewOplogFetcher::StartingPoint startingPoint)>;
 
     struct InitialSyncAttemptInfo {
         int durationMillis;
@@ -184,22 +183,22 @@ public:
     };
 
     class OplogFetcherRestartDecisionInitialSyncer
-        : public AbstractOplogFetcher::OplogFetcherRestartDecision {
+        : public NewOplogFetcher::OplogFetcherRestartDecision {
 
     public:
         OplogFetcherRestartDecisionInitialSyncer(InitialSyncSharedData* sharedData,
                                                  std::size_t maxFetcherRestarts)
             : _sharedData(sharedData), _defaultDecision(maxFetcherRestarts){};
 
-        bool shouldContinue(AbstractOplogFetcher* fetcher, Status status) final;
+        bool shouldContinue(NewOplogFetcher* fetcher, Status status) final;
 
-        void fetchSuccessful(AbstractOplogFetcher* fetcher) final;
+        void fetchSuccessful(NewOplogFetcher* fetcher) final;
 
     private:
         InitialSyncSharedData* _sharedData;
 
         // We delegate to the default strategy when it's a non-network error.
-        AbstractOplogFetcher::OplogFetcherRestartDecisionDefault _defaultDecision;
+        NewOplogFetcher::OplogFetcherRestartDecisionDefault _defaultDecision;
 
         // The operation, if any, currently being retried because of a network error.
         InitialSyncSharedData::RetryableOperation _retryingOperation;
@@ -281,7 +280,7 @@ public:
      *
      * For testing only.
      */
-    OplogFetcher* getOplogFetcher_forTest() const;
+    NewOplogFetcher* getOplogFetcher_forTest() const;
 
     /**
      *
@@ -592,9 +591,9 @@ private:
      * Returns a status even though it always returns OK, to conform the interface OplogFetcher
      * expects for the EnqueueDocumentsFn.
      */
-    Status _enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                             Fetcher::Documents::const_iterator end,
-                             const OplogFetcher::DocumentsInfo& info);
+    Status _enqueueDocuments(NewOplogFetcher::Documents::const_iterator begin,
+                             NewOplogFetcher::Documents::const_iterator end,
+                             const NewOplogFetcher::DocumentsInfo& info);
 
     void _appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob) const;
     BSONObj _getInitialSyncProgress_inlock() const;
@@ -744,7 +743,7 @@ private:
     InitialSyncSharedData::RetryableOperation _retryingOperation;  // (M)
 
     std::unique_ptr<InitialSyncState> _initialSyncState;   // (M)
-    std::unique_ptr<OplogFetcher> _oplogFetcher;           // (S)
+    std::unique_ptr<NewOplogFetcher> _oplogFetcher;        // (S)
     std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;  // (S)
     std::unique_ptr<Fetcher> _lastOplogEntryFetcher;       // (S)
     std::unique_ptr<Fetcher> _fCVFetcher;                  // (S)

@@ -33,13 +33,12 @@
 
 namespace mongo {
 namespace repl {
-class OplogFetcherMock : public OplogFetcher {
+class OplogFetcherMock : public NewOplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,
         OpTime lastFetched,
         HostAndPort source,
-        NamespaceString nss,
         ReplSetConfig config,
         std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
         int requiredRBID,

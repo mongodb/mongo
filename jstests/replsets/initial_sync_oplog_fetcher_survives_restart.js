@@ -51,7 +51,7 @@ assert.commandWorked(secondary.getDB("test").adminCommand(
     {configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
 
 // Wait for retries to happen while the sync source is down.
-checkLog.containsWithAtLeastCount(secondary, "Scheduled new oplog query", nRetries);
+checkLog.containsWithAtLeastCount(secondary, "OplogFetcher reconnecting", nRetries);
 
 const options = {
     waitForConnect: true

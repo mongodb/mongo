@@ -77,6 +77,10 @@ ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadSt
 Counter64 networkByteStats;
 ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
 
+Counter64 readersCreatedStats;
+ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
+                                                         &readersCreatedStats);
+
 const Milliseconds maximumAwaitDataTimeoutMS(30 * 1000);
 
 /**
@@ -1020,6 +1024,8 @@ void NewOplogFetcher::_createNewCursor(bool initialFind) {
         _batchSize);
 
     _firstBatch = true;
+
+    readersCreatedStats.increment();
 }
 
 StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
@@ -1045,6 +1051,14 @@ StatusWith<NewOplogFetcher::Documents> NewOplogFetcher::_getNextBatch() {
             // The 'find' command has already been executed, so reset the socket timeout to reflect
             // the awaitData timeout with a network buffer.
             _setSocketTimeout(durationCount<Milliseconds>(_awaitDataTimeout));
+
+            // TODO SERVER-46240: Handle batchSize 1 in DBClientCursor.
+            // Due to a bug in DBClientCursor, it actually uses batchSize 2 if the given batchSize
+            // is 1 for the find command. So if the given batchSize is 1, we need to set it
+            // explicitly for getMores.
+            if (_batchSize == 1) {
+                _cursor->setBatchSize(_batchSize);
+            }
         } else {
             auto lastCommittedWithCurrentTerm =
                 _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
@@ -1107,7 +1121,12 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                 boost::intrusive_ptr<ExpressionContext> expCtx(
                     new ExpressionContext(opCtx.get(), nullptr, _nss));
                 Matcher m(data["document"].Obj(), expCtx);
-                return !documents.empty() && m.matches(documents.front()["o"].Obj());
+                // TODO SERVER-46240: Handle batchSize 1 in DBClientCursor.
+                // Due to a bug in DBClientCursor, it actually uses batchSize 2 if the given
+                // batchSize is 1 for the find command. So we need to check up to two documents.
+                return !documents.empty() &&
+                    (m.matches(documents.front()["o"].Obj()) ||
+                     m.matches(documents.back()["o"].Obj()));
             });
         if (!status.isOK()) {
             return status;

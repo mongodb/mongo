@@ -90,8 +90,19 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
-// Hang oplog getMore before awaitData to avoid races on the oplog metrics between primary and
-// secondary.
+// Even though initial sync has finished, the oplog exhaust cursor used by the oplog fetcher during
+// initial sync could be still alive because it has not yet reached an interrupt point. Do a dummy
+// write to unblock any oplog getMore that is currently waiting for inserts. After this, the oplog
+// exhaust cursor used by initial sync should terminate itself because the connection was closed.
+// Wait until there is only 1 oplog exhaust cursor in progress to avoid races on the oplog metrics.
+assert.commandWorked(testDB.dummy.insert({a: "dummy"}));
+assert.soon(() => testDB.currentOp({"appName": "OplogFetcher", "command.collection": "oplog.rs"})
+                      .inprog.length === 1,
+            `Timed out waiting for initial sync exhaust oplog stream to terminate: ${
+                tojson(testDB.currentOp())}`);
+
+// Hang steady state replication oplog getMore before awaitData to avoid races on the oplog metrics
+// between primary and secondary.
 var hangOplogGetMore = configureFailPoint(
     primary, 'planExecutorHangBeforeShouldWaitForInserts', {namespace: "local.oplog.rs"});
 // Do a dummy write to unblock the oplog getMore that is currently waiting for inserts (if any)
@@ -138,8 +149,8 @@ const oplogCursorId =
 assert.commandWorked(
     localDB.runCommand({"getMore": oplogCursorId, collection: "oplog.rs", batchSize: 1}));
 
-// Hang oplog getMore before awaitData to avoid races on the oplog metrics between primary and
-// secondary.
+// Hang steady state replication oplog getMore before awaitData to avoid races on the oplog metrics
+// between primary and secondary.
 var hangOplogGetMore = configureFailPoint(
     primary, 'planExecutorHangBeforeShouldWaitForInserts', {namespace: "local.oplog.rs"});
 // Do a dummy write to unblock the oplog getMore that is currently waiting for inserts (if any)

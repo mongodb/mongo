@@ -487,20 +487,21 @@ void BackgroundSync::_produce() {
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
         _replCoord, _replicationCoordinatorExternalState, this);
-    OplogFetcher* oplogFetcher;
+    NewOplogFetcher* oplogFetcher;
     try {
         auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
             fetcherReturnStatus = status;
         };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
-        auto oplogFetcherPtr = std::make_unique<OplogFetcher>(
+        auto numRestarts =
+            _replicationCoordinatorExternalState->getOplogFetcherSteadyStateMaxFetcherRestarts();
+        auto oplogFetcherPtr = std::make_unique<NewOplogFetcher>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             lastOpTimeFetched,
             source,
-            NamespaceString::kRsOplogNamespace,
             _replCoord->getConfig(),
-            _replicationCoordinatorExternalState->getOplogFetcherSteadyStateMaxFetcherRestarts(),
+            std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
             syncSourceResp.rbid,
             true /* requireFresherSyncSource */,
             &dataReplicatorExternalState,
@@ -523,10 +524,10 @@ void BackgroundSync::_produce() {
     LOGV2_DEBUG(21092,
                 logSeverityV1toV2(logLevel).toInt(),
                 "scheduling fetcher to read remote oplog on {source} starting at "
-                "{oplogFetcher_getFindQuery_forTest_filter}",
+                "{oplogFetcher_getLastOpTimeFetched_forTest}",
                 "source"_attr = source,
-                "oplogFetcher_getFindQuery_forTest_filter"_attr =
-                    oplogFetcher->getFindQuery_forTest()["filter"]);
+                "oplogFetcher_getLastOpTimeFetched_forTest"_attr =
+                    oplogFetcher->getLastOpTimeFetched_forTest());
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         LOGV2_WARNING(
@@ -588,9 +589,9 @@ void BackgroundSync::_produce() {
     }
 }
 
-Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                                         Fetcher::Documents::const_iterator end,
-                                         const OplogFetcher::DocumentsInfo& info) {
+Status BackgroundSync::_enqueueDocuments(NewOplogFetcher::Documents::const_iterator begin,
+                                         NewOplogFetcher::Documents::const_iterator end,
+                                         const NewOplogFetcher::DocumentsInfo& info) {
     // If this is the first batch of operations returned from the query, "toApplyDocumentCount" will
     // be one fewer than "networkDocumentCount" because the first document (which was applied
     // previously) is skipped.
@@ -623,7 +624,8 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     }
 
     // Check some things periodically (whenever we run out of items in the current cursor batch).
-    if (info.networkDocumentBytes > 0 && info.networkDocumentBytes < kSmallBatchLimitBytes) {
+    if (!oplogFetcherUsesExhaust && info.networkDocumentBytes > 0 &&
+        info.networkDocumentBytes < kSmallBatchLimitBytes) {
         // On a very low latency network, if we don't wait a little, we'll be
         // getting ops to write almost one at a time.  This will both be expensive
         // for the upstream server as well as potentially defeating our parallel

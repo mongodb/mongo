@@ -41,32 +41,30 @@ OplogFetcherMock::OplogFetcherMock(
     executor::TaskExecutor* executor,
     OpTime lastFetched,
     HostAndPort source,
-    NamespaceString nss,
     ReplSetConfig config,
     std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
     int requiredRBID,
     bool requireFresherSyncSource,
     DataReplicatorExternalState* dataReplicatorExternalState,
-    OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-    AbstractOplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+    EnqueueDocumentsFn enqueueDocumentsFn,
+    OnShutdownCallbackFn onShutdownCallbackFn,
     const int batchSize,
-    OplogFetcher::StartingPoint startingPoint)
-    : OplogFetcher(executor,
-                   lastFetched,
-                   std::move(source),
-                   std::move(nss),
-                   std::move(config),
-                   // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
-                   std::make_unique<OplogFetcherRestartDecisionDefault>(0),
-                   requiredRBID,
-                   requireFresherSyncSource,
-                   dataReplicatorExternalState,
-                   // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
-                   [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
-                   // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
-                   [](const auto& a) {},
-                   batchSize,
-                   startingPoint),
+    StartingPoint startingPoint)
+    : NewOplogFetcher(executor,
+                      lastFetched,
+                      std::move(source),
+                      std::move(config),
+                      // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
+                      std::make_unique<OplogFetcherRestartDecisionDefault>(0),
+                      requiredRBID,
+                      requireFresherSyncSource,
+                      dataReplicatorExternalState,
+                      // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
+                      [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
+                      // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
+                      [](const auto& a) {},
+                      batchSize,
+                      startingPoint),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(std::move(onShutdownCallbackFn)),
       _enqueueDocumentsFn(std::move(enqueueDocumentsFn)),
@@ -90,7 +88,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId, Fetcher::Documents docume
         _oplogFetcherRestartDecision->fetchSuccessful(this);
     }
 
-    auto validateResult = OplogFetcher::validateDocuments(
+    auto validateResult = NewOplogFetcher::validateDocuments(
         documents, _first, _getLastOpTimeFetched().getTimestamp(), _startingPoint);
 
     // Set _first to false after receiving the first batch.

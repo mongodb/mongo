@@ -52,10 +52,6 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher)
 
 namespace {
-Counter64 readersCreatedStats;
-ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
-                                                         &readersCreatedStats);
-
 // Default `maxTimeMS` timeout for `getMore`s.
 const Milliseconds kDefaultOplogGetMoreMaxMS{5000};
 
@@ -177,7 +173,6 @@ Mutex* AbstractOplogFetcher::_getMutex() noexcept {
 }
 
 Status AbstractOplogFetcher::_scheduleFetcher_inlock() {
-    readersCreatedStats.increment();
     return _fetcher->schedule();
 }
 
