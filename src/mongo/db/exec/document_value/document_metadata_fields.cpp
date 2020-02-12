@@ -263,9 +263,9 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
         case DocumentMetadataFields::kRecordId:
             return "record ID";
         case DocumentMetadataFields::kSearchHighlights:
-            return "$searchBeta highlights";
+            return "$search highlights";
         case DocumentMetadataFields::kSearchScore:
-            return "$searchBeta score";
+            return "$search score";
         case DocumentMetadataFields::kSortKey:
             return "sort key";
         case DocumentMetadataFields::kTextScore:

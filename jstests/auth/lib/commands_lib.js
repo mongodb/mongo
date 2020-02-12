@@ -5654,12 +5654,12 @@ var authCommandsLib = {
           }
         },
         {
-          testname: "aggregate_$searchBeta",
+          testname: "aggregate_$search",
           command: {
               aggregate: "foo",
               cursor: {},
               pipeline: [{
-                  $searchBeta: {
+                  $search: {
                       // empty query
                   }
               }]
@@ -5683,13 +5683,13 @@ var authCommandsLib = {
               }
           ],
           setup: function(db) {
-              // Configure the $searchBeta stage to always return EOF so we can avoid the hassle
+              // Configure the $search stage to always return EOF so we can avoid the hassle
               // of giving mongod a host and port for mongot.
-              const cmd = {configureFailPoint: "searchBetaReturnEofImmediately", mode: "alwaysOn"};
+              const cmd = {configureFailPoint: "searchReturnEofImmediately", mode: "alwaysOn"};
               FixtureHelpers.runCommandOnEachPrimary({db: db.getSiblingDB("admin"), cmdObj: cmd});
           },
           teardown: function(db) {
-              const cmd = {configureFailPoint: "searchBetaReturnEofImmediately", mode: "off"};
+              const cmd = {configureFailPoint: "searchReturnEofImmediately", mode: "off"};
               FixtureHelpers.runCommandOnEachPrimary({db: db.getSiblingDB("admin"), cmdObj: cmd});
           }
         },

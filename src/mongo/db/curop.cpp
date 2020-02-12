@@ -728,7 +728,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
     OPDEBUG_TOSTRING_HELP(nShards);
     OPDEBUG_TOSTRING_HELP(cursorid);
     if (mongotCursorId) {
-        s << " mongot: " << makeSearchBetaObject().toString();
+        s << " mongot: " << makeMongotDebugStatsObject().toString();
     }
     OPDEBUG_TOSTRING_HELP(ntoreturn);
     OPDEBUG_TOSTRING_HELP(ntoskip);
@@ -849,7 +849,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_NUMBER(nShards);
     OPDEBUG_APPEND_NUMBER(cursorid);
     if (mongotCursorId) {
-        b.append("mongot", makeSearchBetaObject());
+        b.append("mongot", makeMongotDebugStatsObject());
     }
     OPDEBUG_APPEND_BOOL(exhaust);
 
@@ -963,7 +963,7 @@ BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) con
     return builder.obj();
 }
 
-BSONObj OpDebug::makeSearchBetaObject() const {
+BSONObj OpDebug::makeMongotDebugStatsObject() const {
     BSONObjBuilder cursorBuilder;
     invariant(mongotCursorId);
     cursorBuilder.append("cursorid", mongotCursorId.get());

@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/search_beta/*.js
+  - src/mongo/db/modules/*/jstests/search/*.js
 
 executor:
   config:
