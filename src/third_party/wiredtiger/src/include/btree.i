@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2020 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1085,7 +1085,7 @@ __wt_ref_info(
         *sizep = unpack->size;
 
         if (is_leafp != NULL)
-            *is_leafp = unpack->type != WT_ADDR_INT;
+            *is_leafp = unpack->type != WT_CELL_ADDR_INT;
     }
 }
 

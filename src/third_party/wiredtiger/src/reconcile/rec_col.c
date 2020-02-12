@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2020 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -774,7 +774,7 @@ record_loop:
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
                     cbt->slot = WT_COL_SLOT(page, cip);
-                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;
@@ -1031,7 +1031,7 @@ compare:
                      * Impossible slot, there's no backing on-page item.
                      */
                     cbt->slot = UINT32_MAX;
-                    WT_ERR(__wt_value_return_upd(cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
+                    WT_ERR(__wt_value_return_upd(cbt, upd));
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;

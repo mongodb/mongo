@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2020 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -88,10 +88,12 @@ __curbackup_incr_next(WT_CURSOR *cursor)
 {
     WT_BTREE *btree;
     WT_CURSOR_BACKUP *cb;
+    WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_off_t size;
     uint32_t raw;
+    const char *file;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->btree;
@@ -114,7 +116,14 @@ __curbackup_incr_next(WT_CURSOR *cursor)
           cb->granularity, WT_BACKUP_RANGE);
     } else if (btree == NULL || F_ISSET(cb, WT_CURBACKUP_FORCE_FULL)) {
         /* We don't have this object's incremental information, and it's a full file copy. */
-        WT_ERR(__wt_fs_size(session, cb->incr_file, &size));
+        /* If this is a log file, use the full pathname that may include the log path. */
+        file = cb->incr_file;
+        if (WT_PREFIX_MATCH(file, WT_LOG_FILENAME)) {
+            WT_ERR(__wt_scr_alloc(session, 0, &buf));
+            WT_ERR(__wt_log_filename(session, UINT32_MAX, file, buf));
+            file = buf->data;
+        }
+        WT_ERR(__wt_fs_size(session, file, &size));
 
         cb->nbits = 0;
         cb->offset = 0;
@@ -141,6 +150,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
 
 err:
     F_SET(cursor, raw);
+    __wt_scr_free(session, &buf);
     API_END_RET(session, ret);
 }
 

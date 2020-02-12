@@ -940,6 +940,7 @@ logf
 logmgr
 lognum
 logop
+logpath
 logread
 logrec
 logsize

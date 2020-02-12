@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2020 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -528,11 +528,11 @@ err:
 }
 
 /*
- * __log_filename --
+ * __wt_log_filename --
  *     Given a log number, return a WT_ITEM of a generated log file name of the given prefix type.
  */
-static int
-__log_filename(WT_SESSION_IMPL *session, uint32_t id, const char *file_prefix, WT_ITEM *buf)
+int
+__wt_log_filename(WT_SESSION_IMPL *session, uint32_t id, const char *file_prefix, WT_ITEM *buf)
 {
     return (
       __wt_filename_construct(session, S2C(session)->log_path, file_prefix, UINTMAX_MAX, id, buf));
@@ -843,10 +843,10 @@ __log_openfile(WT_SESSION_IMPL *session, uint32_t id, uint32_t flags, WT_FH **fh
      */
     if (LF_ISSET(WT_LOG_OPEN_CREATE_OK)) {
         wtopen_flags = WT_FS_OPEN_CREATE;
-        WT_ERR(__log_filename(session, id, WT_LOG_TMPNAME, buf));
+        WT_ERR(__wt_log_filename(session, id, WT_LOG_TMPNAME, buf));
     } else {
         wtopen_flags = 0;
-        WT_ERR(__log_filename(session, id, WT_LOG_FILENAME, buf));
+        WT_ERR(__wt_log_filename(session, id, WT_LOG_FILENAME, buf));
     }
     __wt_verbose(session, WT_VERB_LOG, "opening log %s", (const char *)buf->data);
     if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
@@ -1086,8 +1086,8 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 
     WT_ERR(__wt_scr_alloc(session, 0, &from_path));
     WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-    WT_ERR(__log_filename(session, from_num, WT_LOG_PREPNAME, from_path));
-    WT_ERR(__log_filename(session, to_num, WT_LOG_FILENAME, to_path));
+    WT_ERR(__wt_log_filename(session, from_num, WT_LOG_PREPNAME, from_path));
+    WT_ERR(__wt_log_filename(session, to_num, WT_LOG_FILENAME, to_path));
     __wt_spin_lock(session, &log->log_fs_lock);
     locked = true;
     __wt_verbose(session, WT_VERB_LOG, "log_alloc_prealloc: rename log %s to %s",
@@ -1528,8 +1528,8 @@ __wt_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
     WT_RET(__wt_scr_alloc(session, 0, &from_path));
     WT_ERR(__wt_scr_alloc(session, 0, &to_path));
     tmp_id = __wt_atomic_add32(&log->tmp_fileid, 1);
-    WT_ERR(__log_filename(session, tmp_id, WT_LOG_TMPNAME, from_path));
-    WT_ERR(__log_filename(session, lognum, dest, to_path));
+    WT_ERR(__wt_log_filename(session, tmp_id, WT_LOG_TMPNAME, from_path));
+    WT_ERR(__wt_log_filename(session, lognum, dest, to_path));
     __wt_spin_lock(session, &log->log_fs_lock);
     /*
      * Set up the temporary file.
@@ -1565,7 +1565,7 @@ __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, uint32_t logn
     WT_DECL_RET;
 
     WT_RET(__wt_scr_alloc(session, 0, &path));
-    WT_ERR(__log_filename(session, lognum, file_prefix, path));
+    WT_ERR(__wt_log_filename(session, lognum, file_prefix, path));
     __wt_verbose(session, WT_VERB_LOG, "log_remove: remove log %s", (const char *)path->data);
     WT_ERR(__wt_fs_remove(session, path->data, false));
 err:

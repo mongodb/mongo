@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
+# Public Domain 2014-2020 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -274,7 +274,10 @@ builtins = [
       'or via: apt-get install libsnappy-dev' ],
     [ 'zlib', 'z',
       'Need to install zlib\n' + \
-      'It can be installed via: apt-get install zlib1g' ]
+      'It can be installed via: apt-get install zlib1g' ],
+    [ 'zstd', 'zstd',
+      'Need to install zstd\n' + \
+      'It can be installed via: apt-get install zstd' ]
 ]
 builtin_names = [b[0] for b in builtins]
 builtin_libraries = [b[1] for b in builtins]
