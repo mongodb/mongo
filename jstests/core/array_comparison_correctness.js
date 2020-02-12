@@ -115,4 +115,14 @@ assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected)
 resultSet = coll.find({val: {$gt: [3, 3]}}).toArray();
 expected = generateExpectedResults([1, 4, 5, 11, 13, 19, 21, 22]);
 assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected));
+
+// $gt the empty array should return all arrays.
+resultSet = coll.find({val: {$gt: []}}).toArray();
+expected = generateExpectedResults([0, 1, 2, 4, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 21, 22, 23]);
+assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected));
+
+// $lt the empty array should return no arrays.
+resultSet = coll.find({val: {$lt: []}}).toArray();
+expected = generateExpectedResults([3, 6, 7, 8, 16]);
+assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected));
 })();
