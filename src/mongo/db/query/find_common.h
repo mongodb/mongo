@@ -75,6 +75,10 @@ extern FailPoint waitWithPinnedCursorDuringGetMoreBatch;
 // has completed building the current batch.
 extern FailPoint waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch;
 
+// Enabling this failpoint will cause a getMore to fail with a specified exception after it has
+// checked out its cursor and the originating command has been made available to CurOp.
+extern FailPoint failGetMoreAfterCursorCheckout;
+
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.
  */

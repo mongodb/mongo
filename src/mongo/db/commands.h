@@ -272,6 +272,14 @@ struct CommandHelpers {
                                                    Client* client);
 
     /**
+     * Checks if the command passed in is in the list of failCommands defined in the fail point.
+     */
+    static bool shouldActivateFailCommandFailPoint(const BSONObj& data,
+                                                   const NamespaceString& nss,
+                                                   const Command* cmd,
+                                                   Client* client);
+
+    /**
      * Possibly uasserts according to the "failCommand" fail point.
      */
     static void evaluateFailCommandFailPoint(OperationContext* opCtx,

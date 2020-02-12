@@ -716,6 +716,22 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         CurOp::get(opCtx)->setGenericCursor_inlock(pinnedCursor.getValue().toGenericCursor());
     }
 
+    // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with the
+    // specified 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.
+    failGetMoreAfterCursorCheckout.executeIf(
+        [](const BSONObj& data) {
+            auto errorCode = (data["errorCode"] ? data["errorCode"].safeNumberLong()
+                                                : ErrorCodes::InternalError);
+            uasserted(errorCode, "Hit the 'failGetMoreAfterCursorCheckout' failpoint");
+        },
+        [&opCtx, &request](const BSONObj& data) {
+            auto dataForFailCommand =
+                data.addField(BSON("failCommands" << BSON_ARRAY("getMore")).firstElement());
+            auto* getMoreCommand = CommandHelpers::findCommand("getMore");
+            return CommandHelpers::shouldActivateFailCommandFailPoint(
+                dataForFailCommand, request.nss, getMoreCommand, opCtx->getClient());
+        });
+
     // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
     if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {

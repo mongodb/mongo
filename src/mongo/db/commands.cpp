@@ -534,7 +534,13 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     } catch (const ExceptionFor<ErrorCodes::InvalidNamespace>&) {
         return false;
     }
+    return shouldActivateFailCommandFailPoint(data, nss, cmd, client);
+}
 
+bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
+                                                        const NamespaceString& nss,
+                                                        const Command* cmd,
+                                                        Client* client) {
     if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 

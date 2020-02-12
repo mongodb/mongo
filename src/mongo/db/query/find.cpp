@@ -458,6 +458,22 @@ Message getMore(OperationContext* opCtx,
         curOp.setGenericCursor_inlock(cursorPin->toGenericCursor());
     }
 
+    // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with the
+    // specified 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.
+    failGetMoreAfterCursorCheckout.executeIf(
+        [](const BSONObj& data) {
+            auto errorCode = (data["errorCode"] ? data["errorCode"].safeNumberLong()
+                                                : ErrorCodes::InternalError);
+            uasserted(errorCode, "Hit the 'failGetMoreAfterCursorCheckout' failpoint");
+        },
+        [&opCtx, &nss](const BSONObj& data) {
+            auto dataForFailCommand =
+                data.addField(BSON("failCommands" << BSON_ARRAY("getMore")).firstElement());
+            auto* getMoreCommand = CommandHelpers::findCommand("getMore");
+            return CommandHelpers::shouldActivateFailCommandFailPoint(
+                dataForFailCommand, nss, getMoreCommand, opCtx->getClient());
+        });
+
     PlanExecutor::ExecState state;
 
     // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To obtain

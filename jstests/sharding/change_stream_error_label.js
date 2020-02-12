@@ -35,7 +35,42 @@ const expectedStopShardErrors = [
     ErrorCodes.NotMasterOrSecondary
 ];
 
-// Shard the collection, split at {_id: 0}, and move the upper chunk to the other shard.
+// First, verify that the 'failGetMoreAfterCursorCheckout' failpoint can effectively exercise the
+// error label generation logic for change stream getMores.
+function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel}) {
+    // Activate the failpoint and set the exception that it will throw.
+    assert.commandWorked(testDB.adminCommand({
+        configureFailPoint: "failGetMoreAfterCursorCheckout",
+        mode: "alwaysOn",
+        data: {"errorCode": errorCode}
+    }));
+
+    // Now open a valid $changeStream cursor...
+    const aggCmdRes = assert.commandWorked(
+        coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
+
+    // ... run a getMore using the cursorID from the original command response, and confirm that the
+    // expected error was thrown...
+    const getMoreRes = assert.commandFailedWithCode(
+        testDB.runCommand({getMore: aggCmdRes.cursor.id, collection: coll.getName()}), errorCode);
+
+    /// ... and confirm that the label is present or absent depending on the "expectedLabel" value.
+    const errorLabels = (getMoreRes.errorLabels || []);
+    assert.eq("errorLabels" in getMoreRes, expectedLabel, getMoreRes);
+    assert.eq(errorLabels.includes("ResumableChangeStreamError"), expectedLabel, getMoreRes);
+
+    // Finally, disable the failpoint.
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+}
+// Test the expected output for both resumable and non-resumable error codes.
+testFailGetMoreAfterCursorCheckoutFailpoint(
+    {errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
+testFailGetMoreAfterCursorCheckoutFailpoint(
+    {errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
+
+// Now test both aggregate and getMore under conditions of an actual cluster outage. Shard the
+// collection, split at {_id: 0}, and move the upper chunk to the other shard.
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
 
 // Open a change stream on the collection...
