@@ -5074,12 +5074,10 @@ tasks:
       num_tasks: 10
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
-      # TODO(SERVER-44896): Remove enableTwoPhaseIndexBuild from server parameters when two phase
-      # index builds work with this flow control setting.
       resmoke_args: >-
           --flowControlTicketOverride=3
           --storageEngine=wiredTiger
-          --mongodSetParameters="{logComponentVerbosity: {command: 2}, enableTwoPhaseIndexBuild: false}"
+          --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
       name: jstestfuzz_sharded_continuous_stepdown_flow_control
 
 ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
@@ -5094,13 +5092,10 @@ tasks:
       num_tasks: 2
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
-      # TODO(SERVER-44896): Remove enableTwoPhaseIndexBuild from server parameters when two phase
-      # index builds work with this flow control setting.
       resmoke_args: >-
           --flowControlTicketOverride=30
           --storageEngine=wiredTiger
           --numClientsPerFixture=10
-          --mongodSetParameters="{enableTwoPhaseIndexBuild: false}"
       name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control
 
 # jstestfuzz replication continuous stepdown with flow control engaged #
@@ -5115,12 +5110,10 @@ tasks:
       num_tasks: 30
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_continuous_stepdown
-      # TODO(SERVER-44896): Remove enableTwoPhaseIndexBuild from server parameters when two phase
-      # index builds work with this flow control setting.
       resmoke_args: >-
           --flowControlTicketOverride=1
           --storageEngine=wiredTiger
-          --mongodSetParameters="{logComponentVerbosity: {command: 2}, enableTwoPhaseIndexBuild: false}"
+          --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
       name: jstestfuzz_replication_continuous_stepdown_flow_control
 
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
@@ -5135,13 +5128,10 @@ tasks:
       num_tasks: 15
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_continuous_stepdown
-      # TODO(SERVER-44896): Remove enableTwoPhaseIndexBuild from server parameters when two phase
-      # index builds work with this flow control setting.
       resmoke_args: >-
           --flowControlTicketOverride=10
           --storageEngine=wiredTiger
           --numClientsPerFixture=10
-          --mongodSetParameters="{enableTwoPhaseIndexBuild: false}"
       name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
 
 ## jstestfuzz replica set ##
