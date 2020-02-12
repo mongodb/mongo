@@ -391,7 +391,7 @@ public:
     /**
      * Prints out the status and settings of the oplog fetcher.
      */
-    std::string toString() const;
+    std::string toString();
 
     // ================== Test support API ===================
 
@@ -479,6 +479,11 @@ private:
      * attempts.
      */
     Status _connect();
+
+    /**
+     * Sets the RequestMetadataWriter and ReplyMetadataReader on the connection.
+     */
+    void _setMetadataWriterAndReader();
 
     /**
      * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,

@@ -248,6 +248,31 @@ StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
     }
     return oqMetadata;
 }
+
+/**
+ * Parses the cursor's metadata response for the OplogQueryMetadata. If there is an error it returns
+ * it. If no OplogQueryMetadata is provided then it returns boost::none.
+ *
+ * OplogQueryMetadata is made optional for backwards compatibility.
+ * TODO SERVER-27668: Make this non-optional. When this stops being optional we can remove the
+ * duplicated fields in both metadata types and begin to always use OplogQueryMetadata's data.
+ */
+StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
+    const BSONObj& metadata) {
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata = boost::none;
+
+    bool receivedOplogQueryMetadata = metadata.hasElement(rpc::kOplogQueryMetadataFieldName);
+    if (receivedOplogQueryMetadata) {
+        auto metadataResult = rpc::OplogQueryMetadata::readFromMetadata(metadata);
+        if (!metadataResult.isOK()) {
+            return metadataResult.getStatus();
+        }
+
+        oqMetadata = boost::make_optional(metadataResult.getValue());
+    }
+
+    return oqMetadata;
+}
 }  // namespace
 
 StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
@@ -708,6 +733,22 @@ Mutex* NewOplogFetcher::_getMutex() noexcept {
     return &_mutex;
 }
 
+std::string NewOplogFetcher::toString() {
+    stdx::lock_guard lock(_mutex);
+    str::stream output;
+    output << "OplogFetcher -";
+    output << " last optime fetched: " << _lastFetched.toString();
+    output << " source: " << _source.toString();
+    output << " namespace: " << _nss.toString();
+    output << " active: " << _isActive_inlock();
+    output << " shutting down?:" << _isShuttingDown_inlock();
+    output << " first batch: " << _firstBatch;
+    output << " initial find timeout: " << _getInitialFindMaxTime();
+    output << " retried find timeout: " << _getRetriedFindMaxTime();
+    output << " awaitData timeout: " << _awaitDataTimeout;
+    return output;
+}
+
 OpTime NewOplogFetcher::getLastOpTimeFetched_forTest() const {
     return _getLastOpTimeFetched();
 }
@@ -809,6 +850,7 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
         return;
     }
 
+    _setMetadataWriterAndReader();
     _createNewCursor(true /* initialFind */);
 
     while (true) {
@@ -874,7 +916,7 @@ Status NewOplogFetcher::_connect() {
                 uassertStatusOK(_conn->connect(_source, "OplogFetcher"));
                 uassertStatusOK(replAuthenticate(_conn.get())
                                     .withContext(str::stream()
-                                                 << "OplogFecther failed to authenticate to "
+                                                 << "OplogFetcher failed to authenticate to "
                                                  << _source));
                 // Reset any state needed to track restarts on successful connection.
                 _oplogFetcherRestartDecision->fetchSuccessful(this);
@@ -888,6 +930,23 @@ Status NewOplogFetcher::_connect() {
              _oplogFetcherRestartDecision->shouldContinue(this, connectStatus));
 
     return connectStatus;
+}
+
+void NewOplogFetcher::_setMetadataWriterAndReader() {
+    invariant(_conn);
+
+    _conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
+        *metadataBob << rpc::kReplSetMetadataFieldName << 1;
+        *metadataBob << rpc::kOplogQueryMetadataFieldName << 1;
+        metadataBob->appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
+        return Status::OK();
+    });
+
+    _conn->setReplyMetadataReader(
+        [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) {
+            _metadataObj = metadataObj.getOwned();
+            return Status::OK();
+        });
 }
 
 BSONObj NewOplogFetcher::_makeFindQuery(long long findTimeout) const {
@@ -1039,15 +1098,21 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         LOG(2) << "oplog fetcher read 0 operations from remote oplog";
     }
 
-    // TODO SERVER-45470: parse metadata.
+    auto oqMetadataResult = parseOplogQueryMetadata(_metadataObj);
+    if (!oqMetadataResult.isOK()) {
+        error() << "invalid oplog query metadata from sync source " << _source << ": "
+                << oqMetadataResult.getStatus() << ": " << _metadataObj;
+        return oqMetadataResult.getStatus();
+    }
+    auto oqMetadata = oqMetadataResult.getValue();
 
     // This lastFetched value is the last OpTime from the previous batch.
     auto lastFetched = _getLastOpTimeFetched();
 
     if (_firstBatch) {
-        // TODO SERVER-45470: use metadata to populate remoteRBID and remoteLastApplied.
-        auto remoteRBID = boost::none;
-        auto remoteLastApplied = boost::none;
+        auto remoteRBID = oqMetadata ? boost::make_optional(oqMetadata->getRBID()) : boost::none;
+        auto remoteLastApplied =
+            oqMetadata ? boost::make_optional(oqMetadata->getLastOpApplied()) : boost::none;
         auto status = checkRemoteOplogStart(documents,
                                             lastFetched,
                                             remoteLastApplied,
@@ -1083,7 +1148,25 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     }
     auto info = validateResult.getValue();
 
-    // TODO SERVER-45470: Process replset metadata.
+    // Process replset metadata.  It is important that this happen after we've validated the
+    // first batch, so we don't progress our knowledge of the commit point from a
+    // response that triggers a rollback.
+    rpc::ReplSetMetadata replSetMetadata;
+    bool receivedReplMetadata = _metadataObj.hasElement(rpc::kReplSetMetadataFieldName);
+    if (receivedReplMetadata) {
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(_metadataObj);
+        if (!metadataResult.isOK()) {
+            error() << "invalid replication metadata from sync source " << _source << ": "
+                    << metadataResult.getStatus() << ": " << _metadataObj;
+            return metadataResult.getStatus();
+        }
+        replSetMetadata = metadataResult.getValue();
+
+        // We will only ever have OplogQueryMetadata if we have ReplSetMetadata, so it is safe
+        // to call processMetadata() in this if block.
+        invariant(oqMetadata);
+        _dataReplicatorExternalState->processMetadata(replSetMetadata, *oqMetadata);
+    }
 
     // Increment stats. We read all of the docs in the query.
     opsReadStats.increment(info.networkDocumentCount);
@@ -1100,7 +1183,24 @@ Status NewOplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     // of this fetcher.
     _startingPoint = StartingPoint::kSkipFirstDoc;
 
-    // TODO SERVER-45470: check for invalid sync source.
+    if (_dataReplicatorExternalState->shouldStopFetching(_source, replSetMetadata, oqMetadata)) {
+        str::stream errMsg;
+        errMsg << "sync source " << _source.toString();
+        errMsg << " (config version: " << replSetMetadata.getConfigVersion();
+        // If OplogQueryMetadata was provided, its values were used to determine if we should
+        // stop fetching from this sync source.
+        if (oqMetadata) {
+            errMsg << "; last applied optime: " << oqMetadata->getLastOpApplied().toString();
+            errMsg << "; sync source index: " << oqMetadata->getSyncSourceIndex();
+            errMsg << "; primary index: " << oqMetadata->getPrimaryIndex();
+        } else {
+            errMsg << "; last visible optime: " << replSetMetadata.getLastOpVisible().toString();
+            errMsg << "; sync source index: " << replSetMetadata.getSyncSourceIndex();
+            errMsg << "; primary index: " << replSetMetadata.getPrimaryIndex();
+        }
+        errMsg << ") is no longer valid";
+        return Status(ErrorCodes::InvalidSyncSource, errMsg);
+    }
 
     // We have now processed the batch and should move forward our view of _lastFetched.
     if (documents.size() > 0) {
