@@ -115,6 +115,13 @@ public:
     }
 
     /**
+     * Gets the id of the node the sender believes to be primary or -1 if it is not known.
+     */
+    long long getPrimaryId() const {
+        return _primaryId;
+    }
+
+    /**
      * Returns whether or not the sender is checking for emptiness.
      */
     bool hasCheckEmpty() const {
@@ -145,6 +152,7 @@ public:
     void setSenderHost(const HostAndPort& newVal);
     void setSetName(const std::string& newVal);
     void setTerm(long long newVal);
+    void setPrimaryId(long long primaryId);
     void setCheckEmpty();
 
     /**
@@ -163,6 +171,7 @@ private:
     long long _heartbeatVersion = -1;
     long long _senderId = -1;
     long long _term = -1;
+    long long _primaryId = -1;
     bool _checkEmpty = false;
     bool _hasSender = false;
     bool _hasHeartbeatVersion = false;
