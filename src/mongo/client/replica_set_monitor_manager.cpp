@@ -38,7 +38,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_params_gen.h"
+#include "mongo/client/scanning_replica_set_monitor.h"
+#include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -130,10 +132,14 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
 
     LOGV2(20186, "Starting new replica set monitor for {uri}", "uri"_attr = uri.toString());
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri);
-    _monitors[setName] = newMonitor;
-    newMonitor->init();
-    return newMonitor;
+    if (disableStreamableReplicaSetMonitor.load()) {
+        auto newMonitor = std::make_shared<ScanningReplicaSetMonitor>(uri);
+        _monitors[setName] = newMonitor;
+        newMonitor->init();
+        return newMonitor;
+    } else {
+        uasserted(31451, "StreamableReplicaSetMonitor is not yet implemented");
+    }
 }
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() {

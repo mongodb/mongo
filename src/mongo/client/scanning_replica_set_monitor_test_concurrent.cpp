@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
@@ -51,7 +51,7 @@ using executor::RemoteCommandResponse;
 using executor::ThreadPoolExecutorTest;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 using NetworkOperationIterator = NetworkInterfaceMock::NetworkOperationIterator;
-using StepKind = ReplicaSetMonitor::Refresher::NextStep::StepKind;
+using StepKind = ScanningReplicaSetMonitor::Refresher::NextStep::StepKind;
 
 class ReplicaSetMonitorConcurrentTest : public ThreadPoolExecutorTest {
 protected:
@@ -178,9 +178,9 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
     MockReplicaSet replSet("test", 2, false /* hasPrimary */, false /* dollarPrefixHosts */);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+    auto state = std::make_shared<ScanningReplicaSetMonitor::SetState>(
         replSet.getURI(), &getNotifier(), &getExecutor());
-    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+    auto monitor = std::make_shared<ScanningReplicaSetMonitor>(state);
 
     // Node 1 is unresponsive.
     replSet.kill(replSet.getSecondaries()[1]);
@@ -245,9 +245,9 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
     const auto node2 = HostAndPort(replSet.getSecondaries()[2]);
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+    auto state = std::make_shared<ScanningReplicaSetMonitor::SetState>(
         replSet.getURI(), &getNotifier(), &getExecutor());
-    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+    auto monitor = std::make_shared<ScanningReplicaSetMonitor>(state);
 
     // Node 2 is unresponsive.
     replSet.kill(replSet.getSecondaries()[2]);
@@ -328,9 +328,9 @@ TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
 
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+    auto state = std::make_shared<ScanningReplicaSetMonitor::SetState>(
         replSet.getURI(), &getNotifier(), &getExecutor());
-    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+    auto monitor = std::make_shared<ScanningReplicaSetMonitor>(state);
 
     // Node 1 is unresponsive.
     replSet.kill(replSet.getSecondaries()[1]);
@@ -389,9 +389,9 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RecheckUntilTimeout) {
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
 
-    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+    auto state = std::make_shared<ScanningReplicaSetMonitor::SetState>(
         replSet.getURI(), &getNotifier(), &getExecutor());
-    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+    auto monitor = std::make_shared<ScanningReplicaSetMonitor>(state);
 
     // Node 1 is unresponsive.
     replSet.kill(replSet.getSecondaries()[1]);
@@ -414,11 +414,12 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RecheckUntilTimeout) {
 
     // Every 500ms, the monitor rechecks node 0 after the previous successful isMaster.
     // Every 5s, the monitor rechecks node 1 after the previous isMaster experiences timeout.
-    constexpr auto kTimeoutPeriodMS = Milliseconds(ReplicaSetMonitor::kCheckTimeout).count() +
-        ReplicaSetMonitor::kExpeditedRefreshPeriod.count();
+    constexpr auto kTimeoutPeriodMS =
+        Milliseconds(ScanningReplicaSetMonitor::kCheckTimeout).count() +
+        ScanningReplicaSetMonitor::kExpeditedRefreshPeriod.count();
     checkUntil(Milliseconds(14500), [&]() {
         ASSERT_EQ(getNumChecks(node0),
-                  elapsedMS() / ReplicaSetMonitor::kExpeditedRefreshPeriod.count() + 1);
+                  elapsedMS() / ScanningReplicaSetMonitor::kExpeditedRefreshPeriod.count() + 1);
         ASSERT_EQ(getNumChecks(node1), elapsedMS() / kTimeoutPeriodMS + 1);
         ASSERT(!hostFuture.isReady());
     });

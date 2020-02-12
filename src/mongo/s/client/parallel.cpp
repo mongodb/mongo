@@ -362,7 +362,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     if (allowShardVersionFailure) {
         const DBClientReplicaSet* replConn = dynamic_cast<const DBClientReplicaSet*>(rawConn);
         invariant(replConn);
-        ReplicaSetMonitorPtr rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
+        auto rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
         uassert(16388,
                 str::stream() << "cannot access unknown replica set: " << replConn->getSetName(),
                 rsMonitor != nullptr);

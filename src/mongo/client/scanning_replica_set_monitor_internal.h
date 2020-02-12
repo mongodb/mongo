@@ -42,7 +42,7 @@
 #include <vector>
 
 #include "mongo/client/read_preference.h"
-#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-struct ReplicaSetMonitor::IsMasterReply {
+struct ScanningReplicaSetMonitor::IsMasterReply {
     IsMasterReply() : ok(false) {}
     IsMasterReply(const HostAndPort& host, int64_t latencyMicros, const BSONObj& reply)
         : ok(false), host(host), latencyMicros(latencyMicros) {
@@ -86,14 +86,15 @@ struct ReplicaSetMonitor::IsMasterReply {
 };
 
 /**
- * The SetState is the underlying data object behind both the ReplicaSetMonitor and the Refresher
+ * The SetState is the underlying data object behind both the ScanningReplicaSetMonitor and the
+ * Refresher
  *
  * Note that the SetState only holds its own lock in init() and drop(). Even those uses can probably
  * be offloaded to the RSM eventually. In all other cases, the RSM and RSM::Refresher use the
  * SetState lock to synchronize.
  */
-struct ReplicaSetMonitor::SetState
-    : public std::enable_shared_from_this<ReplicaSetMonitor::SetState> {
+struct ScanningReplicaSetMonitor::SetState
+    : public std::enable_shared_from_this<ScanningReplicaSetMonitor::SetState> {
     SetState(const SetState&) = delete;
     SetState& operator=(const SetState&) = delete;
 
@@ -271,7 +272,7 @@ public:
     ConnectionString workingConnStr;  // The connection string from our last scan
 
     // For tracking replies
-    OID maxElectionId;      // largest election id observed by this ReplicaSetMonitor
+    OID maxElectionId;      // largest election id observed by this ScanningReplicaSetMonitor
     int configVersion = 0;  // version number of the replica set config.
 
     // For matching hosts
@@ -288,7 +289,7 @@ public:
     Date_t nextScanTime;        // The time at which the next scan is scheduled to start
 };
 
-struct ReplicaSetMonitor::ScanState {
+struct ScanningReplicaSetMonitor::ScanState {
     ScanState(const ScanState&) = delete;
     ScanState& operator=(const ScanState&) = delete;
 

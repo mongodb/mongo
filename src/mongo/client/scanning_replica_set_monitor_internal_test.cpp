@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor_test_fixture.h"
+#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
 
 #include "mongo/client/mongo_uri.h"
 
@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 
 // -- SetState Construction --
-using InitialStateTest = ReplicaSetMonitorTest;
+using InitialStateTest = ScanningReplicaSetMonitorTest;
 
 TEST_F(InitialStateTest, InitialStateMongoURI) {
     auto uri = MongoURI::parse("mongodb://a,b,c/?replicaSet=name");
@@ -58,7 +58,7 @@ TEST_F(InitialStateTest, InitialStateMongoURI) {
 }
 
 // -- Node operations --
-class NodeTest : public ReplicaSetMonitorTest {
+class NodeTest : public ScanningReplicaSetMonitorTest {
 public:
     bool isCompatible(const Node& node, ReadPreference pref, const TagSet& tagSet) {
         auto connStr = ConnectionString::forReplicaSet(kSetName, {node.host});
@@ -356,7 +356,7 @@ TEST_F(NodeTest, SecNodeNotCompatibleMultiTag) {
 }
 
 // -- IsMasterReply operations --
-using IsMasterReplyTest = ReplicaSetMonitorTest;
+using IsMasterReplyTest = ScanningReplicaSetMonitorTest;
 TEST_F(IsMasterReplyTest, IsMasterBadParse) {
     BSONObj ismaster = BSON("hosts" << BSON_ARRAY("mongo.example:badport"));
     IsMasterReply imr(HostAndPort("mongo.example:27017"), -1, ismaster);

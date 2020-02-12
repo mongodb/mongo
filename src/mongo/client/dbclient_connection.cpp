@@ -801,7 +801,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
         return;
     }
 
-    ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_parentReplSetName);
+    auto monitor = ReplicaSetMonitor::get(_parentReplSetName);
     if (monitor) {
         monitor->failedHost(_serverAddress,
                             {ErrorCodes::NotMaster,

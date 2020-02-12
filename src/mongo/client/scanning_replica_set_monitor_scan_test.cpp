@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor_test_fixture.h"
+#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
 
 #include "mongo/client/mongo_uri.h"
 #include "mongo/logv2/log.h"
@@ -39,7 +39,7 @@
 namespace mongo {
 namespace {
 
-using CoreScanTest = ReplicaSetMonitorTest;
+using CoreScanTest = ScanningReplicaSetMonitorTest;
 
 TEST_F(CoreScanTest, CheckAllSeedsSerial) {
     auto state = makeState(basicUri);
@@ -568,7 +568,7 @@ TEST_F(CoreScanTest, GetMatchingDuringScan) {
 // Ensure nothing breaks when out-of-band failedHost is called during scan
 TEST_F(CoreScanTest, OutOfBandFailedHost) {
     auto state = makeState(basicUri);
-    ReplicaSetMonitorPtr rsm = std::make_shared<ReplicaSetMonitor>(state);
+    auto rsm = std::make_shared<ScanningReplicaSetMonitor>(state);
     Refresher refresher(state);
 
     for (size_t i = 0; i != basicSeeds.size(); ++i) {
@@ -802,14 +802,14 @@ TEST_F(CoreScanTest, StalePrimaryWithObsoleteElectionId) {
 
 TEST_F(CoreScanTest, NoPrimaryUpCheck) {
     auto state = makeState(basicUri);
-    ReplicaSetMonitor rsm(state);
+    ScanningReplicaSetMonitor rsm(state);
     ASSERT_FALSE(rsm.isKnownToHaveGoodPrimary());
 }
 
 TEST_F(CoreScanTest, PrimaryIsUpCheck) {
     auto state = makeState(basicUri);
     state->nodes.front().isMaster = true;
-    ReplicaSetMonitor rsm(state);
+    ScanningReplicaSetMonitor rsm(state);
     ASSERT_TRUE(rsm.isKnownToHaveGoodPrimary());
 }
 
@@ -901,7 +901,7 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasOlderConfigVersion) {
     ASSERT_EQUALS(state->configVersion, 2);
 }
 
-using MaxStalenessMSTest = ReplicaSetMonitorTest;
+using MaxStalenessMSTest = ScanningReplicaSetMonitorTest;
 
 /**
  * Success finding node matching maxStalenessMS parameter
@@ -1289,7 +1289,7 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSZeroNoLastWrite) {
     ASSERT(!state->getMatchingHost(secondary).empty());
 }
 
-using MinOpTimeTest = ReplicaSetMonitorTest;
+using MinOpTimeTest = ScanningReplicaSetMonitorTest;
 /**
  * Success matching minOpTime
  */
@@ -1454,7 +1454,7 @@ public:
     State lastState;
 };
 
-class ChangeNotifierTest : public ReplicaSetMonitorTest {
+class ChangeNotifierTest : public ScanningReplicaSetMonitorTest {
 public:
     ChangeNotifierTest() = default;
     virtual ~ChangeNotifierTest() = default;

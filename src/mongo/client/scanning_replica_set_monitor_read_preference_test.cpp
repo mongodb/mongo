@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor_test_fixture.h"
+#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
 
 #include <memory>
 
@@ -39,7 +39,7 @@
 namespace mongo {
 namespace {
 
-class ReadPrefTest : public ReplicaSetMonitorTest {
+class ReadPrefTest : public ScanningReplicaSetMonitorTest {
 public:
     ReadPrefTest() = default;
     virtual ~ReadPrefTest() = default;

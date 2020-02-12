@@ -34,8 +34,8 @@
 #include <vector>
 
 #include "mongo/client/replica_set_change_notifier.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/client/scanning_replica_set_monitor.h"
+#include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -44,21 +44,21 @@ namespace mongo {
 // current (only) thread, so they do not lock SetState::mutex before examining state. This is
 // NOT something that non-test code should do.
 
-class ReplicaSetMonitorTest : public unittest::Test {
+class ScanningReplicaSetMonitorTest : public unittest::Test {
 public:
     // Pull in nested types
-    using SetState = ReplicaSetMonitor::SetState;
+    using SetState = ScanningReplicaSetMonitor::SetState;
     using Node = SetState::Node;
 
-    using IsMasterReply = ReplicaSetMonitor::IsMasterReply;
+    using IsMasterReply = ScanningReplicaSetMonitor::IsMasterReply;
 
-    using Refresher = ReplicaSetMonitor::Refresher;
+    using Refresher = ScanningReplicaSetMonitor::Refresher;
     using NextStep = Refresher::NextStep;
 
     static constexpr StringData kSetName = "name"_sd;
 
-    ReplicaSetMonitorTest() = default;
-    virtual ~ReplicaSetMonitorTest() = default;
+    ScanningReplicaSetMonitorTest() = default;
+    virtual ~ScanningReplicaSetMonitorTest() = default;
 
     template <typename... Args>
     using StateIsConstructible =
@@ -69,7 +69,7 @@ public:
 
     template <typename... Args, typename = StateIsConstructible<Args...>>
     auto makeState(Args&&... args) {
-        return std::make_shared<ReplicaSetMonitor::SetState>(
+        return std::make_shared<ScanningReplicaSetMonitor::SetState>(
             std::forward<Args>(args)..., &_notifier, nullptr);
     }
 

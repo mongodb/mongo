@@ -29,13 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor_test_fixture.h"
+#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
 
 namespace mongo {
-const std::vector<HostAndPort> ReplicaSetMonitorTest::basicSeeds = {
+const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {
     HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
-                                                                    std::end(basicSeeds)};
-const MongoURI ReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
-                                                                               basicSeeds));
+const std::set<HostAndPort> ScanningReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
+                                                                            std::end(basicSeeds)};
+const MongoURI ScanningReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
+                                                                                       basicSeeds));
 }  // namespace mongo
