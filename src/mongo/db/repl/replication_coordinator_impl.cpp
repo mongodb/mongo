@@ -1962,12 +1962,11 @@ std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterRespo
     return response;
 }
 
-std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMasterResponse(
-    OperationContext* opCtx,
+SharedSemiFuture<ReplicationCoordinatorImpl::SharedIsMasterResponse>
+ReplicationCoordinatorImpl::_getIsMasterResponseFuture(
+    WithLock lk,
     const SplitHorizon::Parameters& horizonParams,
-    boost::optional<TopologyVersion> clientTopologyVersion,
-    boost::optional<Date_t> deadline) const {
-    stdx::unique_lock lk(_mutex);
+    boost::optional<TopologyVersion> clientTopologyVersion) const {
 
     const MemberState myState = _topCoord->getMemberState();
     if (!_rsConfig.isInitialized() || myState.removed()) {
@@ -1977,7 +1976,8 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
         auto response = std::make_shared<IsMasterResponse>();
         response->setTopologyVersion(_topCoord->getTopologyVersion());
         response->markAsNoConfig();
-        return response;
+        return SharedSemiFuture<SharedIsMasterResponse>(
+            SharedIsMasterResponse(std::move(response)));
     }
 
     const auto& self = _rsConfig.getMemberAt(_selfIndex);
@@ -1986,11 +1986,9 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     const StringData horizonString = self.determineHorizon(horizonParams);
     if (!clientTopologyVersion) {
         // The client is not using awaitable isMaster so we respond immediately.
-        return _makeIsMasterResponse(horizonString, lk);
+        return SharedSemiFuture<SharedIsMasterResponse>(
+            SharedIsMasterResponse(_makeIsMasterResponse(horizonString, lk)));
     }
-
-    // If clientTopologyVersion is not none, deadline must also be not none.
-    invariant(deadline);
 
     // Each awaitable isMaster will wait on their specific horizon. We always expect horizonString
     // to exist in _horizonToPromiseMap.
@@ -2003,7 +2001,8 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     if (clientTopologyVersion->getProcessId() != topologyVersion.getProcessId()) {
         // Getting a different process id indicates that the server has restarted so we return
         // immediately with the updated process id.
-        return _makeIsMasterResponse(horizonString, lk);
+        return SharedSemiFuture<SharedIsMasterResponse>(
+            SharedIsMasterResponse(_makeIsMasterResponse(horizonString, lk)));
     }
 
     auto prevCounter = clientTopologyVersion->getCounter();
@@ -2017,9 +2016,40 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     if (prevCounter < topologyVersionCounter) {
         // The received isMaster command contains a stale topology version so we respond
         // immediately with a more current topology version.
-        return _makeIsMasterResponse(horizonString, lk);
+        return SharedSemiFuture<SharedIsMasterResponse>(
+            SharedIsMasterResponse(_makeIsMasterResponse(horizonString, lk)));
     }
 
+    return future;
+}
+
+SharedSemiFuture<ReplicationCoordinatorImpl::SharedIsMasterResponse>
+ReplicationCoordinatorImpl::getIsMasterResponseFuture(
+    const SplitHorizon::Parameters& horizonParams,
+    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    stdx::lock_guard lk(_mutex);
+    return _getIsMasterResponseFuture(lk, horizonParams, clientTopologyVersion);
+}
+
+std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMasterResponse(
+    OperationContext* opCtx,
+    const SplitHorizon::Parameters& horizonParams,
+    boost::optional<TopologyVersion> clientTopologyVersion,
+    boost::optional<Date_t> deadline) const {
+    stdx::unique_lock lk(_mutex);
+
+    auto future = _getIsMasterResponseFuture(lk, horizonParams, clientTopologyVersion);
+    if (future.isReady()) {
+        return future.get();
+    }
+
+    // If clientTopologyVersion is not none, deadline must also be not none.
+    invariant(deadline);
+    const auto myState = _topCoord->getMemberState();
+    invariant(_rsConfig.isInitialized() && !myState.removed());
+    const auto& self = _rsConfig.getMemberAt(_selfIndex);
+    const StringData horizonString = self.determineHorizon(horizonParams);
+    const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
     lk.unlock();
 
     if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
@@ -2034,7 +2064,7 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
                 "Waiting for an isMaster response from a topology change or until deadline: "
                 "{deadline_get}. Current TopologyVersion counter is {topologyVersionCounter}",
                 "deadline_get"_attr = deadline.get(),
-                "topologyVersionCounter"_attr = topologyVersionCounter);
+                "topologyVersionCounter"_attr = topologyVersion.getCounter());
     auto statusWithIsMaster =
         futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
     auto status = statusWithIsMaster.getStatus();

@@ -1352,6 +1352,19 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='topology_version_observer_test',
+    source=[
+        'topology_version_observer_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        'repl_coordinator_impl',
+        'repl_coordinator_test_fixture',
+        'topology_version_observer',
+    ]
+)
+
+env.CppUnitTest(
     target='db_repl_cloners_test',
     source=[
         'all_database_cloner_test.cpp',
@@ -1408,5 +1421,18 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'election_reason_counter',
+    ],
+)
+
+env.Library(
+    target='topology_version_observer',
+    source=[
+        'topology_version_observer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'repl_coordinator_interface',
+        'replica_set_messages',
     ],
 )

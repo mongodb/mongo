@@ -480,6 +480,14 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMaste
     MONGO_UNREACHABLE;
 }
 
+
+SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
+ReplicationCoordinatorNoOp::getIsMasterResponseFuture(
+    const SplitHorizon::Parameters& horizonParams,
+    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    MONGO_UNREACHABLE;
+}
+
 OpTime ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const {
     return getMyLastAppliedOpTime();
 }

@@ -506,6 +506,13 @@ std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::aw
     UASSERT_NOT_IMPLEMENTED;
 };
 
+SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
+ReplicationCoordinatorEmbedded::getIsMasterResponseFuture(
+    const SplitHorizon::Parameters& horizonParams,
+    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 OpTime ReplicationCoordinatorEmbedded::getLatestWriteOpTime(OperationContext* opCtx) const {
     return getMyLastAppliedOpTime();
 }

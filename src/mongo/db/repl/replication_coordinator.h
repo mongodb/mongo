@@ -966,6 +966,15 @@ public:
         boost::optional<Date_t> deadline) const = 0;
 
     /**
+     * The futurized version of `awaitIsMasterResponse()`:
+     * * The future is ready for all cases that `awaitIsMasterResponse()` returns immediately.
+     * * For cases that `awaitIsMasterResponse()` blocks, calling `get()` on the future is blocking.
+     */
+    virtual SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> getIsMasterResponseFuture(
+        const SplitHorizon::Parameters& horizonParams,
+        boost::optional<TopologyVersion> clientTopologyVersion) const = 0;
+
+    /**
      * Returns the OpTime that consists of the timestamp of the latest oplog entry and the current
      * term.
      * This function throws if:

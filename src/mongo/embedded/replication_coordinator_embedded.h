@@ -273,6 +273,10 @@ public:
         boost::optional<TopologyVersion> previous,
         boost::optional<Date_t> deadline) const override;
 
+    virtual SharedSemiFuture<std::shared_ptr<const repl::IsMasterResponse>>
+    getIsMasterResponseFuture(const repl::SplitHorizon::Parameters& horizonParams,
+                              boost::optional<TopologyVersion> clientTopologyVersion) const;
+
     repl::OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;

@@ -563,6 +563,16 @@ void ReplicationCoordinatorMock::incrementTopologyVersion(OperationContext* opCt
     return;
 }
 
+SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
+ReplicationCoordinatorMock::getIsMasterResponseFuture(
+    const SplitHorizon::Parameters& horizonParams,
+    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    auto response =
+        awaitIsMasterResponse(nullptr, horizonParams, clientTopologyVersion, Date_t::now());
+    return SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>(
+        std::shared_ptr<const IsMasterResponse>(response));
+}
+
 std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMasterResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,

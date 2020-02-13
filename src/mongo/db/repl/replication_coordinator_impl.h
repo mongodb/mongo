@@ -341,6 +341,12 @@ public:
 
     virtual void incrementTopologyVersion(OperationContext* opCtx) override;
 
+    using SharedIsMasterResponse = std::shared_ptr<const IsMasterResponse>;
+
+    virtual SharedSemiFuture<SharedIsMasterResponse> getIsMasterResponseFuture(
+        const SplitHorizon::Parameters& horizonParams,
+        boost::optional<TopologyVersion> clientTopologyVersion) const override;
+
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
@@ -1131,6 +1137,13 @@ private:
      */
     std::shared_ptr<IsMasterResponse> _makeIsMasterResponse(const StringData horizonString,
                                                             WithLock) const;
+    /**
+     * Creates a semi-future for isMasterResponse.
+     */
+    virtual SharedSemiFuture<SharedIsMasterResponse> _getIsMasterResponseFuture(
+        WithLock,
+        const SplitHorizon::Parameters& horizonParams,
+        boost::optional<TopologyVersion> clientTopologyVersion) const;
 
     /**
      * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
