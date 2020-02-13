@@ -128,7 +128,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
     }
 
-    cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
+    cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (explainVerbosity) {
@@ -955,6 +955,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     }();
 
     AggregationRequest aggRequest(expCtx->ns, rawStages);
+
+    // The default value for 'allowDiskUse' in the AggregationRequest may not match what was set
+    // on the originating command, so copy it from the ExpressionContext.
+    aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
+
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto shardDispatchResults = dispatchShardPipeline(

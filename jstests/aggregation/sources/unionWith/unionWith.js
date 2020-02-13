@@ -5,6 +5,7 @@
 (function() {
 "use strict";
 load("jstests/aggregation/extras/utils.js");  // arrayEq
+load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -24,6 +25,7 @@ for (let i = 0; i < docsPerCollection; i++) {
 }
 
 function checkResults(resObj, expectedResult) {
+    assert.commandWorked(resObj);
     assert(arrayEq(resObj.cursor.firstBatch, expectedResult),
            "Expected:\n" + tojson(expectedResult) + "Got:\n" + tojson(resObj.cursor.firstBatch));
 }
@@ -124,7 +126,13 @@ checkResults(testDB.runCommand({
 }),
              resSet);
 // Test with $group. Set MaxMemory low to force spillToDisk.
-testDB.adminCommand({setParameter: 1, "internalDocumentSourceGroupMaxMemoryBytes": 1});
+FixtureHelpers.runCommandOnEachPrimary({
+    db: testDB.getSiblingDB("admin"),
+    cmdObj: {
+        setParameter: 1,
+        "internalDocumentSourceGroupMaxMemoryBytes": 1,
+    }
+});
 resSet =
     [{_id: 0, sum: 0}, {_id: 1, sum: 3}, {_id: 2, sum: 6}, {_id: 3, sum: 9}, {_id: 4, sum: 12}];
 checkResults(testDB.runCommand({
@@ -176,9 +184,35 @@ checkResults(testDB.runCommand({
     cursor: {}
 }),
              resSet);
+
+// Test that a $group within a $unionWith sub-pipeline correctly fails if it needs to spill but
+// 'allowDiskUse' is false.
+assert.commandFailedWithCode(testDB.runCommand({
+    aggregate: collA.getName(),
+    pipeline: [
+        {
+            $unionWith: {
+                coll: collB.getName(),
+                pipeline: [
+                    {"$group": {_id: "$groupKey", val: {$sum: "$val"}}},
+                    {"$addFields": {groupKey: 1}}
+                ]
+            }
+        },
+    ],
+    allowDiskUse: false,
+    cursor: {}
+}),
+                             16945);
+
 // Reset to default value.
-testDB.adminCommand(
-    {setParameter: 1, "internalDocumentSourceGroupMaxMemoryBytes": 100 * 1024 * 1024});
+FixtureHelpers.runCommandOnEachPrimary({
+    db: testDB.getSiblingDB("admin"),
+    cmdObj: {
+        setParameter: 1,
+        "internalDocumentSourceGroupMaxMemoryBytes": 100 * 1024 * 1024,
+    }
+});
 
 // Test with $limit and sort in a sub-pipeline.
 const setBResult = collB.find().sort({b: 1}).limit(2).toArray();
