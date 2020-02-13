@@ -1488,6 +1488,27 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+- name: linux-replSet-auth-delay
+  display_name: Linux 3-Node ReplSet (Auth Delay)
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: replica-auth-cluster-delay
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks:
+    - name: genny_auto_tasks
+
 #######################################
 #  Atlas Like Buildvariants           #
 #######################################
