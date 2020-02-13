@@ -362,8 +362,6 @@ variables:
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-suse12-s390x
-  - enterprise-ubuntu-dynamic-1604-64-bit
-  - enterprise-ubuntu-dynamic-1604-clang
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1804-64
@@ -391,9 +389,11 @@ variables:
   - enterprise-debian92-64
   - enterprise-macos
   - enterprise-rhel-62-64-bit
+  - enterprise-rhel-62-64-bit-dynamic-required
   - enterprise-rhel-70-64-bit
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
+  - enterprise-windows
   - enterprise-windows-required
 
 # List of all variants that use the packages.tgz
@@ -431,10 +431,7 @@ variables:
   - ubuntu1604-debug
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
-  - enterprise-ubuntu-dynamic-1604-64-bit
-  - enterprise-ubuntu-dynamic-1604-clang
   - enterprise-ubuntu-dynamic-1604-clang-tidy
-  - ubuntu-dynamic-1604-clang
   - ubuntu1804
   - ubuntu1804-arm64
   - ubuntu2004-arm64
@@ -8778,17 +8775,19 @@ buildvariants:
 
 - &linux-64-debug-template
   name: linux-64-debug
-  display_name: "! Linux DEBUG"
+  display_name: "! Shared Library Linux DEBUG"
   batchtime: 240 # 4 hours
   run_on:
   - rhel62-large
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off --link-model=dynamic
     scons_cache_scope: shared
+    scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
     target_resmoke_time: 15
     max_sub_suites: 100
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.encrypt
@@ -9797,8 +9796,7 @@ buildvariants:
   - windows-64-vs2019-small
   expansions:
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
-    mh_target: archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
@@ -9838,8 +9836,7 @@ buildvariants:
     - windows-64-vs2019-small
   expansions:
     exe: ".exe"
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
-    mh_target: archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
@@ -10102,14 +10099,15 @@ buildvariants:
     - rhel70-small
 
 - name: macos-debug
-  display_name: "* macOS DEBUG"
+  display_name: "* Shared Library macOS DEBUG"
   batchtime: 60 # 1 hour
   run_on:
   - macos-1014
   expansions:
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -10124,6 +10122,7 @@ buildvariants:
   - name: replica_sets_large_txns_format_gen
   - name: .ssl
   - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -10215,8 +10214,8 @@ buildvariants:
 ###########################################
 
 - name: enterprise-rhel-62-64-bit
-  display_name: "! Enterprise RHEL 6.2"
-  batchtime: 60 # 1 hour
+  display_name: "Enterprise RHEL 6.2"
+  batchtime: 1440 # 1 day
   modules:
   - enterprise
   run_on:
@@ -10241,7 +10240,105 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 100
     large_distro_name: rhel62-large
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: .aggfuzzer
+  - name: .aggregation
+  - name: audit
+  - name: .auth
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel62-large
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel62-large
+  - name: .jscore .common
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsCore_txns_large_txns_format
+  - name: jsonSchema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: mqlrun
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_write_concern .large
+    distros:
+    - rhel62-large
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel62-large
+  - name: replica_sets_reconfig_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough
+    distros:
+    - rhel62-large
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: snmp
+  - name: .stitch
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+
+- name: enterprise-rhel-62-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 6.2"
+  batchtime: 60 # 1 hour
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 100
+    large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10325,12 +10422,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
-  - name: test_packages
-    distros:
-    - ubuntu1604-packer
-  - name: .publish
-    distros:
-        - rhel62-small
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
@@ -10905,6 +10996,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
     - ubuntu1604-packer
@@ -11061,14 +11153,16 @@ buildvariants:
   - name: .stitch
 
 - name: ubuntu1604-debug
-  display_name: "* Ubuntu 16.04 DEBUG"
+  display_name: "* Shared Library Ubuntu 16.04 DEBUG"
   batchtime: 240 # 4 hours
   run_on:
   - ubuntu1604-test
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_TG
     distros:
@@ -11081,6 +11175,7 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_auth_gen
   - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: ubuntu1604-container
   display_name: "Ubuntu 16.04 Container"
@@ -11631,35 +11726,6 @@ buildvariants:
     distros:
     - ubuntu1604-small
 
-
-- name: enterprise-ubuntu-dynamic-1604-clang
-  display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
-  batchtime: 240 # 4 hours
-  modules:
-  - enterprise
-  run_on:
-   - ubuntu1604-test
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    lang_environment: LANG=C
-    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
-    # Unlike static builds, dynamic builds have no need to
-    # constrain the number of link jobs. Unfortunately, --jlink=1
-    # means one link job, not 100%. So this is a bit gross but set
-    # it to .99.
-    num_scons_link_jobs_available: 0.99
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    multiversion_platform: ubuntu1604
-    multiversion_edition: enterprise
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - ubuntu1604-build
-  - name: buildscripts_test
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
-
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
   batchtime: 240 # 4 hours
@@ -11680,29 +11746,6 @@ buildvariants:
     scons_cache_mode: all
   tasks:
   - name: clang_tidy_TG
-
-- name: ubuntu-dynamic-1604-clang
-  display_name: "* Shared Library Ubuntu 16.04 (Clang)"
-  batchtime: 240 # 4 hours
-  run_on:
-   - ubuntu1604-test
-  expansions:
-    lang_environment: LANG=C
-    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
-    # Unlike static builds, dynamic builds have no need to
-    # constrain the number of link jobs. Unfortunately, --jlink=1
-    # means one link job, not 100%. So this is a bit gross but set
-    # it to .99.
-    num_scons_link_jobs_available: 0.99
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    multiversion_platform: ubuntu1604
-    multiversion_edition: enterprise
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - ubuntu1604-build
-  - name: buildscripts_test
 
 ###########################################
 #          SUSE buildvariants             #
@@ -12604,6 +12647,7 @@ buildvariants:
   # Jepsen uses Java and Leiningen which is available on this distro
   # and requires a static build, so this is the only suitable build variant for it.
   - name: jepsen-smoke
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
@@ -12649,27 +12693,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
     - name: compile_all_run_unittests_TG
-
-- name: enterprise-ubuntu-dynamic-1604-64-bit
-  display_name: "* Shared Library Enterprise Ubuntu 16.04"
-  batchtime: 240 # 4 hours
-  modules:
-  - enterprise
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    lang_environment: LANG=C
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    # Unlike static builds, dynamic builds have no need to
-    # constrain the number of link jobs. Unfortunately, --jlink=1
-    # means one link job, not 100%. So this is a bit gross but set
-    # it to .99.
-    num_scons_link_jobs_available: 0.99
-    scons_cache_scope: shared
-    scons_cache_mode: all
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - ubuntu1604-build
 
 - name: enterprise-ubuntu-no-latch-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
@@ -12793,7 +12816,6 @@ buildvariants:
   stepback: false
   tasks:
   - name: shared_scons_cache_pruning
-
 
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
