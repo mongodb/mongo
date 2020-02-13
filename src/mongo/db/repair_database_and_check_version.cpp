@@ -279,15 +279,6 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     auto reconcileResult = fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
 
-    if (!reconcileResult.indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
-        LOGV2(21002, "note: restart the server with --noIndexBuildRetry to skip index rebuilds");
-    }
-
-    if (!serverGlobalParams.indexBuildRetry) {
-        LOGV2(21003, "  not rebuilding interrupted indexes");
-        return;
-    }
-
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;

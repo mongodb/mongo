@@ -502,17 +502,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // table is not found, or the index build did not successfully complete, this code
             // will return the index to be rebuilt.
             if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
-                if (!serverGlobalParams.indexBuildRetry) {
-                    LOGV2(22254,
-                          "Dropping an unfinished index because --noIndexBuildRetry is set. "
-                          "Collection: {coll} Index: {indexName}",
-                          "coll"_attr = coll,
-                          "indexName"_attr = indexName);
-                    fassert(51197, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
-                    indexesToDrop.push_back(indexName);
-                    continue;
-                }
-
                 LOGV2(22255,
                       "Expected background index build did not complete, rebuilding. "
                       "Collection: {coll} Index: {indexName}",

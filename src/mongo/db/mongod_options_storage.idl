@@ -101,19 +101,6 @@ configs:
             gte: 1
             lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
 
-    'storage.indexBuildRetry':
-        description: "Do not retry any index builds that were interrupted by shutdown"
-        arg_vartype: Switch
-        conflicts: ['replication.replSet', 'replication.replSetName']
-        source: yaml
-
-    noIndexBuildRetry:
-        description: "Do not retry any index builds that were interrupted by shutdown"
-        short_name: noIndexBuildRetry
-        arg_vartype: Switch
-        conflicts: ['replication.replSet', 'replication.replSetName']
-        source: [ cli, ini ]
-
     upgrade:
         description: 'Upgrade db if needed'
         arg_vartype: Switch

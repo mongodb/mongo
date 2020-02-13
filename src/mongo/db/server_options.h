@@ -63,8 +63,6 @@ struct ServerGlobalParams {
 
     int listenBacklog = 0;  // --listenBacklog, real default is SOMAXCONN
 
-    bool indexBuildRetry = true;  // --noIndexBuildRetry
-
     AtomicWord<bool> quiet{false};  // --quiet
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
