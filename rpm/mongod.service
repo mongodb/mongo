@@ -30,6 +30,13 @@ LimitMEMLOCK=infinity
 # total threads (user+kernel)
 TasksMax=infinity
 TasksAccounting=false
+# read-only /usr, /boot, /etc
+ProtectSystem=full
+# inaccessible /home, /root and /run/user
+ProtectHome=true
+# remove CAP_SYS_PTRACE kernel capability
+CapabilityBoundingSet=~CAP_SYS_PTRACE
+
 # Recommended limits for mongod as specified in
 # https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
 
