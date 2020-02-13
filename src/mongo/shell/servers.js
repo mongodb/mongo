@@ -123,6 +123,11 @@ function runHangAnalyzer(pids) {
         return;
     }
 
+    if (!TestData.inEvergreen) {
+        print('Skipping runHangAnalyzer: not running in Evergreen');
+        return;
+    }
+
     if (!_hangAnalyzerEnabled) {
         print('Skipping runHangAnalyzer: manually disabled');
         return;

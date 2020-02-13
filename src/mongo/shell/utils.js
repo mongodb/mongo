@@ -359,6 +359,7 @@ jsTestOptions = function() {
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             isAsanBuild: TestData.isAsanBuild,
+            inEvergreen: TestData.inEvergreen || false,
         });
     }
     return _jsTestOptions;

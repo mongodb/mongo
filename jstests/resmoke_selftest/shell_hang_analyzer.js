@@ -66,4 +66,25 @@ const lines = rawMongoProgramOutput().split('\n');
 // Nothing should be executed, so there's no output.
 assert.eq(lines, ['']);
 })();
+
+(function() {
+/*
+ * Test that hang analyzer doesn't run when running resmoke locally
+ */
+clearRawMongoProgramOutput();
+
+const origInEvg = TestData.inEvergreen;
+
+try {
+    TestData.inEvergreen = false;
+    MongoRunner.runHangAnalyzer.enable();
+    MongoRunner.runHangAnalyzer(TestData.peerPids);
+} finally {
+    TestData.inEvergreen = origInEvg;
+}
+
+const lines = rawMongoProgramOutput().split('\n');
+// Nothing should be executed, so there's no output.
+assert.eq(lines, ['']);
+})();
 })();

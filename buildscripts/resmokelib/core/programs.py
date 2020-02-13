@@ -282,6 +282,9 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
 
     global_vars["TestData"] = test_data
 
+    if config.EVERGREEN_TASK_ID is not None:
+        test_data["inEvergreen"] = True
+
     # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
     # by the _format_shell_vars() function.
