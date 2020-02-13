@@ -72,7 +72,8 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     FieldPath distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
-    : DocumentSourceCursor(collection, std::move(exec), expCtx),
+    : DocumentSourceCursor(
+          collection, std::move(exec), expCtx, DocumentSourceCursor::CursorType::kRegular),
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {

@@ -46,7 +46,28 @@ namespace mongo {
 class DocumentSourceCursor : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$cursor"_sd;
-    // virtuals from DocumentSource
+
+    /**
+     * Indicates whether or not this is a count-like operation. If the operation is count-like, then
+     * the cursor can produce empty documents since the subsequent stages need only the count of
+     * these documents (not the actual data).
+     */
+    enum class CursorType { kRegular, kEmptyDocuments };
+
+    /**
+     * Create a document source based on a passed-in PlanExecutor. 'exec' must be a yielding
+     * PlanExecutor, and must be registered with the associated collection's CursorManager.
+     *
+     * If 'cursorType' is 'kEmptyDocuments', then we inform the $cursor stage that this is a count
+     * scenario -- the dependency set is fully known and is empty. In this case, the newly created
+     * $cursor stage can return a sequence of empty documents for the caller to count.
+     */
+    static boost::intrusive_ptr<DocumentSourceCursor> create(
+        Collection* collection,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        CursorType cursorType,
+        bool trackOplogTimestamp = false);
 
     const char* getSourceName() const override;
 
@@ -74,24 +95,6 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) final;
 
-    /**
-     * Create a document source based on a passed-in PlanExecutor. 'exec' must be a yielding
-     * PlanExecutor, and must be registered with the associated collection's CursorManager.
-     */
-    static boost::intrusive_ptr<DocumentSourceCursor> create(
-        Collection* collection,
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        bool trackOplogTimestamp = false);
-
-    /**
-     * If subsequent sources need no information from the cursor, the cursor can simply output empty
-     * documents, avoiding the overhead of converting BSONObjs to Documents.
-     */
-    void shouldProduceEmptyDocs() {
-        _shouldProduceEmptyDocs = true;
-    }
-
     Timestamp getLatestOplogTimestamp() const {
         return _latestOplogTimestamp;
     }
@@ -112,6 +115,7 @@ protected:
     DocumentSourceCursor(Collection* collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         CursorType cursorType,
                          bool trackOplogTimestamp = false);
 
     GetNextResult doGetNext() final;
@@ -136,6 +140,63 @@ protected:
 
 private:
     /**
+     * A $cursor stage loads documents from the underlying PlanExecutor in batches. An object of
+     * this class represents one such batch. Acts like a queue into which documents can be queued
+     * and dequeued in FIFO order.
+     */
+    class Batch {
+    public:
+        Batch(CursorType type) : _type(type) {}
+
+        /**
+         * Adds a new document to the batch.
+         */
+        void enqueue(Document&& doc);
+
+        /**
+         * Removes the first document from the batch.
+         */
+        Document dequeue();
+
+        void clear();
+
+        bool isEmpty() const;
+
+        /**
+         * Returns the approximate memory footprint of this batch, measured in bytes. Even after
+         * documents are dequeued from the batch, continues to indicate the batch's peak memory
+         * footprint. Resets to zero once the final document in the batch is dequeued.
+         */
+        size_t memUsageBytes() const {
+            return _memUsageBytes;
+        }
+
+        /**
+         * Illegal to call unless the CursorType is 'kRegular'.
+         */
+        const Document& peekFront() const {
+            invariant(_type == CursorType::kRegular);
+            return _batchOfDocs.front();
+        }
+
+    private:
+        // If 'kEmptyDocuments', then dependency analysis has indicated that all we need to execute
+        // the query is a count of the incoming documents.
+        const CursorType _type;
+
+        // Used only if '_type' is 'kRegular'. A deque of the documents comprising the batch.
+        std::deque<Document> _batchOfDocs;
+
+        // Used only if '_type' is 'kEmptyDocuments'. In this case, we don't need to keep the
+        // documents themselves, only a count of the number of documents in the batch.
+        size_t _count = 0;
+
+        // The approximate memory footprint of the batch in bytes. Always kept at zero when '_type'
+        // is 'kEmptyDocuments'.
+        size_t _memUsageBytes = 0;
+    };
+
+    /**
      * Acquires the appropriate locks, then destroys and de-registers '_exec'. '_exec' must be
      * non-null.
      */
@@ -156,9 +217,7 @@ private:
     void _updateOplogTimestamp();
 
     // Batches results returned from the underlying PlanExecutor.
-    std::deque<Document> _currentBatch;
-
-    bool _shouldProduceEmptyDocs = false;
+    Batch _currentBatch;
 
     // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
     // collection lock.

@@ -101,7 +101,8 @@ protected:
             getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD, 0));
 
         exec->saveState();
-        _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
+        _source = DocumentSourceCursor::create(
+            ctx.getCollection(), std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -318,8 +319,10 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor =
-        DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
+    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+                                               std::move(planExecutor),
+                                               ctx(),
+                                               DocumentSourceCursor::CursorType::kRegular);
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
     ASSERT_THROWS_CODE(
@@ -354,8 +357,10 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor =
-        DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
+    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+                                               std::move(planExecutor),
+                                               ctx(),
+                                               DocumentSourceCursor::CursorType::kRegular);
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
     ASSERT_THROWS_CODE(
@@ -399,8 +404,10 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor =
-        DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
+    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+                                               std::move(planExecutor),
+                                               ctx(),
+                                               DocumentSourceCursor::CursorType::kRegular);
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
     ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
@@ -434,8 +441,10 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
-    auto cursor =
-        DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
+    auto cursor = DocumentSourceCursor::create(readLock.getCollection(),
+                                               std::move(planExecutor),
+                                               ctx(),
+                                               DocumentSourceCursor::CursorType::kRegular);
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
     ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);

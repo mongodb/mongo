@@ -214,7 +214,8 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
     // in the pipeline.
     innerExec->saveState();
-    auto cursorSource = DocumentSourceCursor::create(collection, std::move(innerExec), expCtx);
+    auto cursorSource = DocumentSourceCursor::create(
+        collection, std::move(innerExec), expCtx, DocumentSourceCursor::CursorType::kRegular);
     auto pipeline = Pipeline::create({cursorSource}, expCtx);
 
     // Create the output PlanExecutor that pulls results from the pipeline.

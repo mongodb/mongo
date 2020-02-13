@@ -190,15 +190,6 @@ private:
         const AggregationRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         bool* hasNoRequirements);
-
-    /**
-     * Adds 'cursor' to the front of 'pipeline'. If 'shouldProduceEmptyDocs' is true, then we inform
-     * 'cursor' that this is a count scenario -- the dependency set is fully known and is empty. In
-     * this case, 'cursor' can return a sequence of empty documents for the caller to count.
-     */
-    static void addCursorSource(Pipeline* pipeline,
-                                boost::intrusive_ptr<DocumentSourceCursor> cursor,
-                                bool shouldProduceEmptyDocs);
 };
 
 }  // namespace mongo

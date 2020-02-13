@@ -343,15 +343,16 @@ PipelineD::buildInnerQueryExecutor(Collection* collection,
                 // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
 
                 auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata);
-                const bool shouldProduceEmptyDocs = deps.hasNoRequirements();
+                const auto cursorType = deps.hasNoRequirements()
+                    ? DocumentSourceCursor::CursorType::kEmptyDocuments
+                    : DocumentSourceCursor::CursorType::kRegular;
                 auto attachExecutorCallback =
-                    [shouldProduceEmptyDocs](
-                        Collection* collection,
-                        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                        Pipeline* pipeline) {
+                    [cursorType](Collection* collection,
+                                 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                 Pipeline* pipeline) {
                         auto cursor = DocumentSourceCursor::create(
-                            collection, std::move(exec), pipeline->getContext());
-                        addCursorSource(pipeline, std::move(cursor), shouldProduceEmptyDocs);
+                            collection, std::move(exec), pipeline->getContext(), cursorType);
+                        pipeline->addInitialSource(std::move(cursor));
                     };
                 return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
             }
@@ -546,19 +547,22 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs));
 
+    const auto cursorType = shouldProduceEmptyDocs
+        ? DocumentSourceCursor::CursorType::kEmptyDocuments
+        : DocumentSourceCursor::CursorType::kRegular;
 
     // If this is a change stream pipeline, make sure that we tell DSCursor to track the oplog time.
     const bool trackOplogTS =
         (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
 
-    auto attachExecutorCallback = [shouldProduceEmptyDocs, trackOplogTS](
-                                      Collection* collection,
-                                      std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                                      Pipeline* pipeline) {
-        auto cursor = DocumentSourceCursor::create(
-            collection, std::move(exec), pipeline->getContext(), trackOplogTS);
-        addCursorSource(pipeline, std::move(cursor), shouldProduceEmptyDocs);
-    };
+    auto attachExecutorCallback =
+        [cursorType, trackOplogTS](Collection* collection,
+                                   std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                   Pipeline* pipeline) {
+            auto cursor = DocumentSourceCursor::create(
+                collection, std::move(exec), pipeline->getContext(), cursorType, trackOplogTS);
+            pipeline->addInitialSource(std::move(cursor));
+        };
     return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
 }
 
@@ -603,8 +607,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
                         Pipeline::kGeoNearMatcherFeatures,
                         &shouldProduceEmptyDocs));
 
-    auto attachExecutorCallback = [shouldProduceEmptyDocs,
-                                   distanceField = geoNearStage->getDistanceField(),
+    auto attachExecutorCallback = [distanceField = geoNearStage->getDistanceField(),
                                    locationField = geoNearStage->getLocationField(),
                                    distanceMultiplier =
                                        geoNearStage->getDistanceMultiplier().value_or(1.0)](
@@ -617,7 +620,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
                                                           distanceField,
                                                           locationField,
                                                           distanceMultiplier);
-        addCursorSource(pipeline, std::move(cursor), shouldProduceEmptyDocs);
+        pipeline->addInitialSource(std::move(cursor));
     };
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
     sources.pop_front();
@@ -737,18 +740,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 aggRequest,
                                 plannerOpts,
                                 matcherFeatures);
-}
-
-void PipelineD::addCursorSource(Pipeline* pipeline,
-                                boost::intrusive_ptr<DocumentSourceCursor> cursor,
-                                bool shouldProduceEmptyDocs) {
-    // Add the cursor to the pipeline first so that it's correctly disposed of as part of the
-    // pipeline if an exception is thrown during this method.
-    pipeline->addInitialSource(cursor);
-
-    if (shouldProduceEmptyDocs) {
-        cursor->shouldProduceEmptyDocs();
-    }
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
