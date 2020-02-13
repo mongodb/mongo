@@ -89,9 +89,9 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     awaitResult();
 }
 
-testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanThenThrow",
+testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
                          "ensureChunkVersionIsGreaterThan");
-testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessThenThrow",
+testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible",
                          "refreshFilteringMetadataUntilSuccess");
 
 st.stop();

@@ -71,6 +71,6 @@ function testShutDownAfterFailPoint(failPointName) {
     st.stop();
 }
 
-testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanThenThrow");
-testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessThenThrow");
+testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");
+testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible");
 })();

@@ -66,8 +66,10 @@ namespace migrationutil {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
-MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenThrow);
-MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenThrow);
+MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible);
 
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
@@ -495,6 +497,8 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
 
+            hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(newOpCtx);
+
             const auto ensureChunkVersionIsGreaterThanResponse =
                 Grid::get(newOpCtx)
                     ->shardRegistry()
@@ -510,12 +514,10 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
 
             uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
 
-            // 'newOpCtx' won't get interrupted if a stepdown occurs while the thread is hanging in
-            // the failpoint, because 'newOpCtx' hasn't been used to take a MODE_S, MODE_IX, or
-            // MODE_X lock. To ensure the catch block is entered if the failpoint was set, throw an
-            // arbitrary error.
-            if (hangInEnsureChunkVersionIsGreaterThanThenThrow.shouldFail()) {
-                hangInEnsureChunkVersionIsGreaterThanThenThrow.pauseWhileSet(newOpCtx);
+            if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible
+                    .shouldFail()) {
+                hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible
+                    .pauseWhileSet();
                 uasserted(
                     ErrorCodes::InternalError,
                     "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
@@ -560,14 +562,14 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
 
+            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
+
             forceShardFilteringMetadataRefresh(newOpCtx, nss, true);
 
-            // 'newOpCtx' won't get interrupted if a stepdown occurs while the thread is hanging in
-            // the failpoint, because 'newOpCtx' hasn't been used to take a MODE_S, MODE_IX, or
-            // MODE_X lock. To ensure the catch block is entered if the failpoint was set, throw an
-            // arbitrary error.
-            if (hangInRefreshFilteringMetadataUntilSuccessThenThrow.shouldFail()) {
-                hangInRefreshFilteringMetadataUntilSuccessThenThrow.pauseWhileSet(newOpCtx);
+            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .shouldFail()) {
+                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .pauseWhileSet();
                 uasserted(ErrorCodes::InternalError,
                           "simulate an error response for forceShardFilteringMetadataRefresh");
             }

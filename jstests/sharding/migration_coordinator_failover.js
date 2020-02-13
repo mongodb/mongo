@@ -145,13 +145,15 @@ runMoveChunkMakeDonorStepDownAfterFailpoint("moveChunkHangAtStep5",
                                             false /* shouldMakeMigrationFailToCommitOnConfig */,
                                             ErrorCodes.OperationFailed);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangInEnsureChunkVersionIsGreaterThanThenThrow",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.OperationFailed);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    ErrorCodes.OperationFailed);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangInRefreshFilteringMetadataUntilSuccessThenThrow",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.OperationFailed);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    ErrorCodes.OperationFailed);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeMakingAbortDecisionDurable",
                                             true /* shouldMakeMigrationFailToCommitOnConfig */,
