@@ -225,9 +225,18 @@ var Explainable = (function() {
             return throwOrReturn(explainResult);
         };
 
-        this.mapReduce = function(mr) {
-            var explainCmd = {"explain": mr, "verbosity": this._verbosity};
-            var explainResult = this._collection.runCommand(explainCmd);
+        this.mapReduce = function(map, reduce, optionsObjOrOutString) {
+            assert(optionsObjOrOutString, "Must supply the 'optionsObjOrOutString ' argument");
+
+            const mapReduceCmd = {mapreduce: this._collection.getName(), map: map, reduce: reduce};
+
+            if (typeof (optionsObjOrOutString) == "string")
+                mapReduceCmd["out"] = optionsObjOrOutString;
+            else
+                Object.extend(mapReduceCmd, optionsObjOrOutString);
+
+            const explainCmd = {"explain": mapReduceCmd, "verbosity": this._verbosity};
+            const explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
     }
