@@ -291,6 +291,16 @@ functions:
 
   "analyze":
     - command: shell.exec
+      type: test
+      params:
+        working_dir: work
+        script: |
+          set -o verbose
+          source ./dsienv.sh
+          ../src/dsi/dsi/run-dsi analysis.py
+          # detect outliers needs to run, so defer the post_run_check exit status to later
+          echo $? > post_run_check.status
+    - command: shell.exec
       params:
         working_dir: work
         script: |
@@ -304,18 +314,6 @@ functions:
           evergreen_api_user=${evergreen_api_user}
           source ../src/buildscripts/signal_processing_setup.sh
           detect-changes --evergreen-api-config .evergreen.yml
-    - command: shell.exec
-      type : test
-      params:
-        working_dir: work
-        script: |
-          set -o errexit
-          set -o verbose
-          TAG="3.4.14-Baseline"
-          OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
-          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
-          # detect outliers needs to run, so defer the post_run_check exit status to later
-          echo $? > post_run_check.status
     - command: shell.exec
       params:
         working_dir: work
