@@ -138,36 +138,6 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
-        script: |
-          cat > bootstrap.yml <<EOF
-          infrastructure_provisioning: ${cluster}
-          platform: ${platform}
-          mongodb_setup: ${setup}
-          storageEngine: ${storageEngine}
-          test_control: ${test}
-          production: true
-          EOF
-
-          cat > runtime.yml <<EOF
-          # evergreen default expansions
-          is_patch: ${is_patch}
-          task_id: ${task_id}
-          EOF
-
-          cp ./dsi/configurations/analysis/analysis.common.yml  analysis.yml
-    - command: shell.exec
-      params:
-        working_dir: src
-        silent: true
-        script: |
-          cat > runtime_secret.yml <<EOF
-          dsi_analysis_atlas_user: "${dsi_analysis_atlas_user}"
-          dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
-          EOF
-          chmod 400 runtime_secret.yml
-    - command: shell.exec
-      params:
-        working_dir: src
         silent: true
         script: |
           is_patch=${is_patch}
@@ -192,6 +162,34 @@ functions:
         file: "src/tags.json"
         name: "perf"
     - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          cat > overrides.yml <<EOF
+          bootstrap:
+            production: true
+          test_control:
+            reports_dir_basename: ..
+          runtime:
+            # evergreen default expansions
+            is_patch: ${is_patch}
+            task_id: ${task_id}
+          EOF
+
+          cp ./dsi/configurations/analysis/analysis.microbenchmarks.yml  analysis.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        silent: true
+        script: |
+          cat > runtime_secret.yml <<EOF
+          dsi_analysis_atlas_user: "${dsi_analysis_atlas_user}"
+          dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
+    - command: shell.exec
       type: test
       params:
         working_dir: src
@@ -200,15 +198,7 @@ functions:
           set -o verbose
           ./dsi/run-dsi setup
           source ./dsi/dsi_venv/bin/activate
-
-          # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
-          # `reports_analysis: true` as a var to this function. The following line will select the
-          # appropriate flags if it's `true`.
-          reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
-          cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
-          REFTAG="3.6.5-Baseline"
-          OVERRIDE="./dsi/analysis/${branch_name}/perf_override.json"
-          python ./dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
+          ./dsi/bin/analysis.py
 
   # Params:
   #   workload: the path relative to genny/src/workloads to run e.g.
