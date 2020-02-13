@@ -1549,7 +1549,7 @@ functions:
           else
 
             ${activate_virtualenv}
-            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --verbose --build-variant=enterprise-rhel-62-64-bit --selected-tests-config .selected_tests.yml
+            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --verbose --selected-tests-config .selected_tests.yml
 
           fi
     - command: archive.targz_pack
@@ -12063,6 +12063,8 @@ buildvariants:
     - rhel62-small
   batchtime: 10080 # 7 days
   stepback: false
+  expansions:
+    selected_tests_buildvariants: enterprise-rhel-62-64-bit enterprise-windows-required linux-64-debug enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite
   tasks:
   - name: selected_tests_gen
 
