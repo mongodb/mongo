@@ -360,18 +360,26 @@ public:
                 uassertStatusOK(foundParameter->second->set(parameter));
             } catch (const DBException& ex) {
                 LOGV2(20496,
-                      "error setting parameter {parameterName} to {parameter_false} errMsg: {ex}",
+                      "error setting parameter {parameterName} to {newValue} errMsg: {ex}",
                       "parameterName"_attr = parameterName,
-                      "parameter_false"_attr = redact(parameter.toString(false)),
+                      "newValue"_attr = redact(parameter.toString(false)),
                       "ex"_attr = redact(ex));
                 throw;
             }
 
-            log() << "successfully set parameter " << parameterName << " to "
-                  << redact(parameter.toString(false))
-                  << (oldValue ? std::string(str::stream()
-                                             << " (was " << redact(oldValue.toString(false)) << ")")
-                               : "");
+            if (oldValue) {
+                LOGV2(23435,
+                      "successfully set parameter {parameterName} to {newValue} (was "
+                      "{oldValue})",
+                      "parameterName"_attr = parameterName,
+                      "newValue"_attr = redact(parameter.toString(false)),
+                      "oldValue"_attr = redact(oldValue.toString(false)));
+            } else {
+                LOGV2(23436,
+                      "successfully set parameter {parameterName} to {newValue}",
+                      "parameterName"_attr = parameterName,
+                      "newValue"_attr = redact(parameter.toString(false)));
+            }
 
             numSet++;
         }
