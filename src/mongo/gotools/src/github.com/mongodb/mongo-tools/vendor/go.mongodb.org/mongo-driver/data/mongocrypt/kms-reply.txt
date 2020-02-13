@@ -1,6 +1,0 @@
-HTTP/1.1 200 OK
-x-amzn-RequestId: deeb35e5-4ecb-4bf1-9af5-84a54ff0af0e
-Content-Type: application/x-amz-json-1.1
-Content-Length: 233
-
-{"KeyId": "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0", "Plaintext": "TqhXy3tKckECjy4/ZNykMWG8amBF46isVPzeOgeusKrwheBmYaU8TMG5AHR/NeUDKukqo8hBGgogiQOVpLPkqBQHD8YkLsNbDmHoGOill5QAHnniF/Lz405bGucB5TfR"}

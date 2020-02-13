@@ -38,14 +38,6 @@
   revision = "3550fdcf1f43b89aaeabaa4559eaae6dc4407e42"
 
 [[projects]]
-  digest = "1:7c1116c6cd1c74152d61c02d64e4a3269d6f7744efb3fd5571f29169797c9a73"
-  name = "github.com/DataDog/zstd"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "8fdb579680349497546a04291cedfff98a7829a0"
-  version = "v1.4.4"
-
-[[projects]]
   digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
   name = "github.com/go-stack/stack"
   packages = ["."]
@@ -125,7 +117,7 @@
   version = "v0.0.4"
 
 [[projects]]
-  digest = "1:8dfffe923e9a4fe7a78d192bf4484467c9245f8f7d653c9dbe180e6fcb0ba341"
+  digest = "1:93572b763532e2de9dc4f68270d13d23a6ae043f5aaeb3cdec92d48178725df1"
   name = "github.com/mongodb/mongo-tools-common"
   packages = [
     "archive",
@@ -147,8 +139,8 @@
     "util",
   ]
   pruneopts = "T"
-  revision = "02867aff958f06c6d477863e41b426cf99312fdb"
-  version = "v2.0.1"
+  revision = "0b00b4fe7c54276f166f795c7d66b30a523f08dc"
+  version = "v2.0.3"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"
@@ -163,14 +155,6 @@
   packages = ["."]
   pruneopts = "T"
   revision = "1881a9bccb818787f68c52bfba648c6cf34c34fa"
-
-[[projects]]
-  digest = "1:9e1d37b58d17113ec3cb5608ac0382313c5b59470b94ed97d0976e69c7022314"
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "614d223910a179a466c1767a985424175c39b465"
-  version = "v0.9.1"
 
 [[projects]]
   digest = "1:c6ee5f0b23f2bc65fa69e006e0afd8e516d4c601573701cc700e3f492654b55c"
@@ -218,12 +202,11 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:5a1baa10a745ff242b6cea86da6e47663235ff26483fc241ac50052d0d1b3eed"
+  digest = "1:0a52cfa03e3941ae528e91266bf3e2c25ea39363d5c71adb85efadbfe80d1e42"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
     "bson/bsoncodec",
-    "bson/bsonoptions",
     "bson/bsonrw",
     "bson/bsontype",
     "bson/primitive",
@@ -246,8 +229,6 @@
     "x/mongo/driver/connstring",
     "x/mongo/driver/description",
     "x/mongo/driver/dns",
-    "x/mongo/driver/mongocrypt",
-    "x/mongo/driver/mongocrypt/options",
     "x/mongo/driver/operation",
     "x/mongo/driver/session",
     "x/mongo/driver/topology",
@@ -255,8 +236,8 @@
     "x/mongo/driver/wiremessage",
   ]
   pruneopts = "T"
-  revision = "55b507b3e45a2ef5dc1d5a4cba3333c45dce443c"
-  version = "v1.2.1"
+  revision = "1261197350f3ad46a907489aee7ecc49b39efb82"
+  version = "v1.1.2"
 
 [[projects]]
   digest = "1:0f2b2cb9f84318c0f71fed3087ff9ac370370f842469b71b00348c3d72a19b44"

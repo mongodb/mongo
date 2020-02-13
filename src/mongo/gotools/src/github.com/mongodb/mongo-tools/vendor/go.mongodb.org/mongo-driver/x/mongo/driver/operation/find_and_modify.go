@@ -44,7 +44,6 @@ type FindAndModify struct {
 	selector                 description.ServerSelector
 	writeConcern             *writeconcern.WriteConcern
 	retry                    *driver.RetryMode
-	crypt                    *driver.Crypt
 
 	result FindAndModifyResult
 }
@@ -132,7 +131,6 @@ func (fam *FindAndModify) Execute(ctx context.Context) error {
 		Deployment:     fam.deployment,
 		Selector:       fam.selector,
 		WriteConcern:   fam.writeConcern,
-		Crypt:          fam.crypt,
 	}.Execute(ctx, nil)
 
 }
@@ -392,15 +390,5 @@ func (fam *FindAndModify) Retry(retry driver.RetryMode) *FindAndModify {
 	}
 
 	fam.retry = &retry
-	return fam
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (fam *FindAndModify) Crypt(crypt *driver.Crypt) *FindAndModify {
-	if fam == nil {
-		fam = new(FindAndModify)
-	}
-
-	fam.crypt = crypt
 	return fam
 }

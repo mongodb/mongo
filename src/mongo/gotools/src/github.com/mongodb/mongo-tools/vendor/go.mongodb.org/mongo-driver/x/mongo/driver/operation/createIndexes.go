@@ -14,7 +14,6 @@ import (
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/event"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 	"go.mongodb.org/mongo-driver/x/mongo/driver"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
@@ -23,18 +22,16 @@ import (
 
 // CreateIndexes performs a createIndexes operation.
 type CreateIndexes struct {
-	indexes      bsoncore.Document
-	maxTimeMS    *int64
-	session      *session.Client
-	clock        *session.ClusterClock
-	collection   string
-	monitor      *event.CommandMonitor
-	crypt        *driver.Crypt
-	database     string
-	deployment   driver.Deployment
-	selector     description.ServerSelector
-	writeConcern *writeconcern.WriteConcern
-	result       CreateIndexesResult
+	indexes    bsoncore.Document
+	maxTimeMS  *int64
+	session    *session.Client
+	clock      *session.ClusterClock
+	collection string
+	monitor    *event.CommandMonitor
+	database   string
+	deployment driver.Deployment
+	selector   description.ServerSelector
+	result     CreateIndexesResult
 }
 
 type CreateIndexesResult struct {
@@ -105,11 +102,9 @@ func (ci *CreateIndexes) Execute(ctx context.Context) error {
 		Client:            ci.session,
 		Clock:             ci.clock,
 		CommandMonitor:    ci.monitor,
-		Crypt:             ci.crypt,
 		Database:          ci.database,
 		Deployment:        ci.deployment,
 		Selector:          ci.selector,
-		WriteConcern:      ci.writeConcern,
 	}.Execute(ctx, nil)
 
 }
@@ -185,16 +180,6 @@ func (ci *CreateIndexes) CommandMonitor(monitor *event.CommandMonitor) *CreateIn
 	return ci
 }
 
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (ci *CreateIndexes) Crypt(crypt *driver.Crypt) *CreateIndexes {
-	if ci == nil {
-		ci = new(CreateIndexes)
-	}
-
-	ci.crypt = crypt
-	return ci
-}
-
 // Database sets the database to run this operation against.
 func (ci *CreateIndexes) Database(database string) *CreateIndexes {
 	if ci == nil {
@@ -222,15 +207,5 @@ func (ci *CreateIndexes) ServerSelector(selector description.ServerSelector) *Cr
 	}
 
 	ci.selector = selector
-	return ci
-}
-
-// WriteConcern sets the write concern for this operation.
-func (ci *CreateIndexes) WriteConcern(writeConcern *writeconcern.WriteConcern) *CreateIndexes {
-	if ci == nil {
-		ci = new(CreateIndexes)
-	}
-
-	ci.writeConcern = writeConcern
 	return ci
 }

@@ -25,7 +25,7 @@ tests:
         arguments:
           options:
             readConcern:
-              level: majority
+              level: snapshot
       - &countDocuments
         name: countDocuments
         object: collection
@@ -51,7 +51,7 @@ tests:
             cursor: {}
             lsid: session0
             readConcern:
-              level: majority
+              level: snapshot
             txnNumber:
               $numberLong: "1"
             startTransaction: true
@@ -116,7 +116,7 @@ tests:
             batchSize: 3
             lsid: session0
             readConcern:
-              level: majority
+              level: snapshot
             txnNumber:
               $numberLong: "1"
             startTransaction: true
@@ -202,7 +202,7 @@ tests:
               batchSize: 3
             lsid: session0
             readConcern:
-              level: majority
+              level: snapshot
             txnNumber:
               $numberLong: "1"
             startTransaction: true
@@ -282,7 +282,7 @@ tests:
             key: _id
             lsid: session0
             readConcern:
-              level: majority
+              level: snapshot
             txnNumber:
               $numberLong: "1"
             startTransaction: true
@@ -328,7 +328,7 @@ tests:
             find: *collection_name
             lsid: session0
             readConcern:
-              level: majority
+              level: snapshot
             txnNumber:
               $numberLong: "1"
             startTransaction: true

@@ -64,8 +64,6 @@ type ConnString struct {
 	ReadPreferenceTagSets              []map[string]string
 	RetryWrites                        bool
 	RetryWritesSet                     bool
-	RetryReads                         bool
-	RetryReadsSet                      bool
 	MaxStaleness                       time.Duration
 	MaxStalenessSet                    bool
 	ReplicaSet                         string
@@ -90,8 +88,6 @@ type ConnString struct {
 	Username                           string
 	ZlibLevel                          int
 	ZlibLevelSet                       bool
-	ZstdLevel                          int
-	ZstdLevelSet                       bool
 
 	WTimeout              time.Duration
 	WTimeoutSet           bool
@@ -555,17 +551,6 @@ func (p *parser) addOption(pair string) error {
 		}
 
 		p.RetryWritesSet = true
-	case "retryreads":
-		switch value {
-		case "true":
-			p.RetryReads = true
-		case "false":
-			p.RetryReads = false
-		default:
-			return fmt.Errorf("invalid value for %s: %s", key, value)
-		}
-
-		p.RetryReadsSet = true
 	case "serverselectiontimeoutms":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
@@ -664,18 +649,6 @@ func (p *parser) addOption(pair string) error {
 		}
 		p.ZlibLevel = level
 		p.ZlibLevelSet = true
-	case "zstdcompressionlevel":
-		const maxZstdLevel = 22 // https://github.com/facebook/zstd/blob/a880ca239b447968493dd2fed3850e766d6305cc/contrib/linux-kernel/lib/zstd/compress.c#L3291
-		level, err := strconv.Atoi(value)
-		if err != nil || (level < -1 || level > maxZstdLevel) {
-			return fmt.Errorf("invalid value for %s: %s", key, value)
-		}
-
-		if level == -1 {
-			level = wiremessage.DefaultZstdLevel
-		}
-		p.ZstdLevel = level
-		p.ZstdLevelSet = true
 	default:
 		if p.UnknownOptions == nil {
 			p.UnknownOptions = make(map[string][]string)

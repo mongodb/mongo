@@ -14,30 +14,6 @@ type Deployment interface {
 	Kind() description.TopologyKind
 }
 
-// Connector represents a type that can connect to a server.
-type Connector interface {
-	Connect() error
-}
-
-// Disconnector represents a type that can disconnect from a server.
-type Disconnector interface {
-	Disconnect(context.Context) error
-}
-
-// Subscription represents a subscription to topology updates. A subscriber can receive updates through the
-// Updates field.
-type Subscription struct {
-	Updates <-chan description.Topology
-	ID      uint64
-}
-
-// Subscriber represents a type to which another type can subscribe. A subscription contains a channel that
-// is updated with topology descriptions.
-type Subscriber interface {
-	Subscribe() (*Subscription, error)
-	Unsubscribe(*Subscription) error
-}
-
 // Server represents a MongoDB server. Implementations should pool connections and handle the
 // retrieving and returning of connections.
 type Server interface {

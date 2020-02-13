@@ -52,7 +52,3 @@
 [prune]
   go-tests = true
   unused-packages = true
-
-[[constraint]]
-  name = "github.com/DataDog/zstd"
-  version = "~1.4.0"

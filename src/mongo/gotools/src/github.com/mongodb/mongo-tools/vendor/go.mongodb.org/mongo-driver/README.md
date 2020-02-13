@@ -31,7 +31,7 @@ The MongoDB supported driver for Go.
 The recommended way to get started using the MongoDB Go driver is by using `dep` to install the dependency in your project.
 
 ```bash
-dep ensure -add "go.mongodb.org/mongo-driver/mongo"
+dep ensure -add "go.mongodb.org/mongo-driver/mongo@~1.1.2"
 ```
 
 -------------------------
@@ -127,15 +127,26 @@ New Features and bugs can be reported on jira: https://jira.mongodb.org/browse/G
 -------------------------
 ## Testing / Development
 
-The driver tests can be run against several database configurations. The most simple configuration is a standalone mongod with no auth, no ssl, and no compression. To run these basic driver tests, make sure a standalone MongoDB server instance is running at localhost:27017. To run the tests, you can run `make` (on Windows, run `nmake`). This will run coverage, run go-lint, run go-vet, and build the examples.
+The driver tests can be run against several database configurations. The most simple configuration is a standalone mongod with no auth, no ssl, and no compression. To run these basic driver tests, make sure a standalone MongoDB server instance is running at localhost:27017. To run the tests, you can run `make` (on Windows, run `nmake`) with the following:
+
+```
+TOPOLOGY=server make
+```
+
+The `TOPOLOGY`variable must be set to run tests. This will run coverage, run go-lint, run go-vet, and build the examples.
 
 ### Testing Different Topologies
 
-To test a **replica set** or **sharded cluster**, set `MONGODB_URI="<connection-string>"` for the `make` command.
-For example, for a local replica set named `rs1` comprised of three nodes on ports 27017, 27018, and 27019:
+To test a **replica set**, set `MONGODB_URI="<connection-string>"` and `TOPOLOGY=replica_set` for the `make` command. For example, for a local replica set named `rs1` comprised of three nodes on ports 27017, 27018, and 27019:
 
 ```
-MONGODB_URI="mongodb://localhost:27017,localhost:27018,localhost:27018/?replicaSet=rs1" make
+MONGODB_URI="mongodb://localhost:27017,localhost:27018,localhost:27018/?replicaSet=rs1" TOPOLOGY=replica_set make
+```
+
+To test a **sharded cluster**, set `MONGODB_URI="<connection-string>"` and `TOPOLOGY=sharded_cluster` variables for the `make` command. For example, for a sharded cluster with a single mongos on port 27017:
+
+```
+MONGODB_URI="mongodb://localhost:27017/" TOPOLOGY=sharder_cluster make
 ```
 
 ### Testing Auth and SSL
@@ -163,7 +174,7 @@ Notes:
 
 ### Testing Compression
 
-The MongoDB Go Driver supports wire protocol compression using Snappy, zLib, or zstd. To run tests with wire protocol compression, set `MONGO_GO_DRIVER_COMPRESSOR` to `snappy`, `zlib`, or `zstd`.  For example:
+The MongoDB Go Driver supports wire protocol compression using Snappy or zLib. To run tests with wire protocol compression, set `MONGO_GO_DRIVER_COMPRESSOR` to `snappy` or `zlib`.  For example:
 
 ```
 MONGO_GO_DRIVER_COMPRESSOR=snappy make

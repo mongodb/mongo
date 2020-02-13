@@ -171,9 +171,8 @@ func VerifyConnStringOptions(t *testing.T, cs connstring.ConnString, options map
 			require.Equal(t, value, float64(cs.WTimeout/time.Millisecond))
 		case "waitqueuetimeoutms":
 		case "zlibcompressionlevel":
+			require.True(t, cs.ZlibLevelSet)
 			require.Equal(t, value, float64(cs.ZlibLevel))
-		case "zstdcompressionlevel":
-			require.Equal(t, value, float64(cs.ZstdLevel))
 		default:
 			opt, ok := cs.UnknownOptions[key]
 			require.True(t, ok)

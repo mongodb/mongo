@@ -9,7 +9,6 @@ package mongo
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -35,19 +34,11 @@ import (
 const defaultLocalThreshold = 15 * time.Millisecond
 const batchSize = 10000
 
-// keyVaultCollOpts specifies options used to communicate with the key vault collection
-var keyVaultCollOpts = options.Collection().SetReadConcern(readconcern.Majority()).
-	SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
-
-// Client is a handle representing a pool of connections to a MongoDB deployment. It is safe for concurrent use by
-// multiple goroutines.
-//
-// The Client type opens and closes connections automatically and maintains a pool of idle connections. For
-// connection pool configuration options, see documentation for the ClientOptions type in the mongo/options package.
+// Client performs operations on a given topology.
 type Client struct {
 	id              uuid.UUID
 	topologyOptions []topology.Option
-	deployment      driver.Deployment
+	topology        *topology.Topology
 	connString      connstring.ConnString
 	localThreshold  time.Duration
 	retryWrites     bool
@@ -59,37 +50,9 @@ type Client struct {
 	registry        *bsoncodec.Registry
 	marshaller      BSONAppender
 	monitor         *event.CommandMonitor
-	sessionPool     *session.Pool
-
-	// client-side encryption fields
-	keyVaultClient *Client
-	keyVaultColl   *Collection
-	mongocryptd    *mcryptClient
-	crypt          *driver.Crypt
 }
 
-// Connect creates a new Client and then initializes it using the Connect method. This is equivalent to calling
-// NewClient followed by Client.Connect.
-//
-// When creating an options.ClientOptions, the order the methods are called matters. Later Set*
-// methods will overwrite the values from previous Set* method invocations. This includes the
-// ApplyURI method. This allows callers to determine the order of precedence for option
-// application. For instance, if ApplyURI is called before SetAuth, the Credential from
-// SetAuth will overwrite the values from the connection string. If ApplyURI is called
-// after SetAuth, then its values will overwrite those from SetAuth.
-//
-// The opts parameter is processed using options.MergeClientOptions, which will overwrite entire
-// option fields of previous options, there is no partial overwriting. For example, if Username is
-// set in the Auth field for the first option, and Password is set for the second but with no
-// Username, after the merge the Username field will be empty.
-//
-// The NewClient function does not do any I/O and returns an error if the given options are invalid.
-// The Client.Connect method starts background goroutines to monitor the state of the deployment and does not do
-// any I/O in the main goroutine to prevent the main goroutine from blocking. Therefore, it will not error if the
-// deployment is down.
-//
-// The Client.Ping method can be used to verify that the deployment is successfully connected and the
-// Client was correctly configured.
+// Connect creates a new Client and then initializes it using the Connect method.
 func Connect(ctx context.Context, opts ...*options.ClientOptions) (*Client, error) {
 	c, err := NewClient(opts...)
 	if err != nil {
@@ -102,7 +65,7 @@ func Connect(ctx context.Context, opts ...*options.ClientOptions) (*Client, erro
 	return c, nil
 }
 
-// NewClient creates a new client to connect to a deployment specified by the uri.
+// NewClient creates a new client to connect to a cluster specified by the uri.
 //
 // When creating an options.ClientOptions, the order the methods are called matters. Later Set*
 // methods will overwrite the values from previous Set* method invocations. This includes the
@@ -129,49 +92,24 @@ func NewClient(opts ...*options.ClientOptions) (*Client, error) {
 		return nil, err
 	}
 
-	if client.deployment == nil {
-		client.deployment, err = topology.New(client.topologyOptions...)
-		if err != nil {
-			return nil, replaceErrors(err)
-		}
+	client.topology, err = topology.New(client.topologyOptions...)
+	if err != nil {
+		return nil, replaceErrors(err)
 	}
+
 	return client, nil
 }
 
 // Connect initializes the Client by starting background monitoring goroutines.
-// If the Client was created using the NewClient function, this method must be called before a Client can be used.
-//
-// Connect starts background goroutines to monitor the state of the deployment and does not do any I/O in the main
-// goroutine. The Client.Ping method can be used to verify that the connection was created successfully.
+// This method must be called before a Client can be used.
 func (c *Client) Connect(ctx context.Context) error {
-	if connector, ok := c.deployment.(driver.Connector); ok {
-		err := connector.Connect()
-		if err != nil {
-			return replaceErrors(err)
-		}
+	err := c.topology.Connect()
+	if err != nil {
+		return replaceErrors(err)
 	}
 
-	if c.mongocryptd != nil {
-		if err := c.mongocryptd.connect(ctx); err != nil {
-			return err
-		}
-	}
-	if c.keyVaultClient != nil {
-		if err := c.keyVaultClient.Connect(ctx); err != nil {
-			return err
-		}
-	}
-
-	var updateChan <-chan description.Topology
-	if subscriber, ok := c.deployment.(driver.Subscriber); ok {
-		sub, err := subscriber.Subscribe()
-		if err != nil {
-			return replaceErrors(err)
-		}
-		updateChan = sub.Updates
-	}
-	c.sessionPool = session.NewPool(updateChan)
 	return nil
+
 }
 
 // Disconnect closes sockets to the topology referenced by this Client. It will
@@ -188,37 +126,12 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	}
 
 	c.endSessions(ctx)
-	if c.mongocryptd != nil {
-		if err := c.mongocryptd.disconnect(ctx); err != nil {
-			return err
-		}
-	}
-	if c.keyVaultClient != nil {
-		if err := c.keyVaultClient.Disconnect(ctx); err != nil {
-			return err
-		}
-	}
-	if c.crypt != nil {
-		c.crypt.Close()
-	}
-
-	if disconnector, ok := c.deployment.(driver.Disconnector); ok {
-		return replaceErrors(disconnector.Disconnect(ctx))
-	}
-	return nil
+	return replaceErrors(c.topology.Disconnect(ctx))
 }
 
-// Ping sends a ping command to verify that the client can connect to the deployment.
-//
-// The rp paramter is used to determine which server is selected for the operation.
-// If it is nil, the client's read preference is used.
-//
-// If the server is down, Ping will try to select a server until the client's server selection timeout expires.
-// This can be configured through the ClientOptions.SetServerSelectionTimeout option when creating a new Client.
-// After the timeout expires, a server selection error is returned.
-//
-// Using Ping reduces application resilience because applications starting up will error if the server is temporarily
-// unavailable or is failing over (e.g. during autoscaling due to a load spike).
+// Ping verifies that the client can connect to the topology.
+// If readPreference is nil then will use the client's default read
+// preference.
 func (c *Client) Ping(ctx context.Context, rp *readpref.ReadPref) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -236,12 +149,9 @@ func (c *Client) Ping(ctx context.Context, rp *readpref.ReadPref) error {
 	return replaceErrors(res.Err())
 }
 
-// StartSession starts a new session configured with the given options.
-//
-// If the DefaultReadConcern, DefaultWriteConcern, or DefaultReadPreference options are not set, the client's read
-// concern, write concern, or read preference will be used, respectively.
+// StartSession starts a new session.
 func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) {
-	if c.sessionPool == nil {
+	if c.topology.SessionPool == nil {
 		return nil, ErrClientDisconnected
 	}
 
@@ -267,7 +177,7 @@ func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) 
 		coreOpts.DefaultMaxCommitTime = sopts.DefaultMaxCommitTime
 	}
 
-	sess, err := session.NewClientSession(c.sessionPool, c.id, session.Explicit, coreOpts)
+	sess, err := session.NewClientSession(c.topology.SessionPool, c.id, session.Explicit, coreOpts)
 	if err != nil {
 		return nil, replaceErrors(err)
 	}
@@ -278,16 +188,16 @@ func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) 
 	return &sessionImpl{
 		clientSession: sess,
 		client:        c,
-		deployment:    c.deployment,
+		topo:          c.topology,
 	}, nil
 }
 
 func (c *Client) endSessions(ctx context.Context) {
-	if c.sessionPool == nil {
+	if c.topology.SessionPool == nil {
 		return
 	}
 
-	ids := c.sessionPool.IDSlice()
+	ids := c.topology.SessionPool.IDSlice()
 	idx, idArray := bsoncore.AppendArrayStart(nil)
 	for i, id := range ids {
 		idDoc, _ := id.MarshalBSON()
@@ -295,9 +205,8 @@ func (c *Client) endSessions(ctx context.Context) {
 	}
 	idArray, _ = bsoncore.AppendArrayEnd(idArray, idx)
 
-	op := operation.NewEndSessions(idArray).ClusterClock(c.clock).Deployment(c.deployment).
-		ServerSelector(description.ReadPrefSelector(readpref.PrimaryPreferred())).CommandMonitor(c.monitor).
-		Database("admin").Crypt(c.crypt)
+	op := operation.NewEndSessions(idArray).ClusterClock(c.clock).Deployment(c.topology).
+		ServerSelector(description.ReadPrefSelector(readpref.PrimaryPreferred())).CommandMonitor(c.monitor).Database("admin")
 
 	idx, idArray = bsoncore.AppendArrayStart(nil)
 	totalNumIDs := len(ids)
@@ -342,14 +251,9 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		))
 
 		for _, comp := range comps {
-			switch comp {
-			case "zlib":
+			if comp == "zlib" {
 				connOpts = append(connOpts, topology.WithZlibLevel(func(level *int) *int {
 					return opts.ZlibLevel
-				}))
-			case "zstd":
-				connOpts = append(connOpts, topology.WithZstdLevel(func(level *int) *int {
-					return opts.ZstdLevel
 				}))
 			}
 		}
@@ -538,12 +442,6 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	if opts.WriteConcern != nil {
 		c.writeConcern = opts.WriteConcern
 	}
-	// AutoEncryptionOptions
-	if opts.AutoEncryptionOptions != nil {
-		if err := c.configureAutoEncryption(opts.AutoEncryptionOptions); err != nil {
-			return err
-		}
-	}
 
 	// ClusterClock
 	c.clock = new(session.ClusterClock)
@@ -557,82 +455,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		func(...topology.ServerOption) []topology.ServerOption { return serverOpts },
 	))
 
-	// Deployment
-	if opts.Deployment != nil {
-		if len(serverOpts) > 2 || len(topologyOpts) > 1 {
-			return errors.New("cannot specify topology or server options with a deployment")
-		}
-		c.deployment = opts.Deployment
-	}
-
 	return nil
-}
-
-func (c *Client) configureAutoEncryption(opts *options.AutoEncryptionOptions) error {
-	if err := c.configureKeyVault(opts); err != nil {
-		return err
-	}
-	if err := c.configureMongocryptd(opts); err != nil {
-		return err
-	}
-	return c.configureCrypt(opts)
-}
-
-func (c *Client) configureKeyVault(opts *options.AutoEncryptionOptions) error {
-	// parse key vault options and create new client if necessary
-	if opts.KeyVaultClientOptions != nil {
-		var err error
-		c.keyVaultClient, err = NewClient(opts.KeyVaultClientOptions)
-		if err != nil {
-			return err
-		}
-	}
-
-	dbName, collName := splitNamespace(opts.KeyVaultNamespace)
-	client := c.keyVaultClient
-	if client == nil {
-		client = c
-	}
-	c.keyVaultColl = client.Database(dbName).Collection(collName, keyVaultCollOpts)
-	return nil
-}
-
-func (c *Client) configureMongocryptd(opts *options.AutoEncryptionOptions) error {
-	var err error
-	c.mongocryptd, err = newMcryptClient(opts.ExtraOptions)
-	return err
-}
-
-func (c *Client) configureCrypt(opts *options.AutoEncryptionOptions) error {
-	// convert schemas in SchemaMap to bsoncore documents
-	cryptSchemaMap := make(map[string]bsoncore.Document)
-	for k, v := range opts.SchemaMap {
-		schema, err := transformBsoncoreDocument(c.registry, v)
-		if err != nil {
-			return err
-		}
-		cryptSchemaMap[k] = schema
-	}
-
-	// configure options
-	var bypass bool
-	if opts.BypassAutoEncryption != nil {
-		bypass = *opts.BypassAutoEncryption
-	}
-	kr := keyRetriever{coll: c.keyVaultColl}
-	cir := collInfoRetriever{client: c}
-	cryptOpts := &driver.CryptOptions{
-		CollInfoFn:           cir.cryptCollInfo,
-		KeyFn:                kr.cryptKeys,
-		MarkFn:               c.mongocryptd.markCommand,
-		KmsProviders:         opts.KmsProviders,
-		BypassAutoEncryption: bypass,
-		SchemaMap:            cryptSchemaMap,
-	}
-
-	var err error
-	c.crypt, err = driver.NewCrypt(cryptOpts)
-	return err
 }
 
 // validSession returns an error if the session doesn't belong to the client
@@ -643,20 +466,12 @@ func (c *Client) validSession(sess *session.Client) error {
 	return nil
 }
 
-// Database returns a handle for a database with the given name configured with the given DatabaseOptions.
+// Database returns a handle for a given database.
 func (c *Client) Database(name string, opts ...*options.DatabaseOptions) *Database {
 	return newDatabase(c, name, opts...)
 }
 
-// ListDatabases executes a listDatabases command and returns the result.
-//
-// The filter parameter must be a document containing query operators and can be used to select which
-// databases are included in the result. It cannot be nil. An empty document (e.g. bson.D{}) should be used to include
-// all databases.
-//
-// The opts paramter can be used to specify options for this operation (see the options.ListDatabasesOptions documentation).
-//
-// For more information about the command, see https://docs.mongodb.com/manual/reference/command/listDatabases/.
+// ListDatabases returns a ListDatabasesResult.
 func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...*options.ListDatabasesOptions) (ListDatabasesResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -665,8 +480,8 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	sess := sessionFromContext(ctx)
 
 	err := c.validSession(sess)
-	if sess == nil && c.sessionPool != nil {
-		sess, err = session.NewClientSession(c.sessionPool, c.id, session.Implicit)
+	if sess == nil && c.topology.SessionPool != nil {
+		sess, err = session.NewClientSession(c.topology.SessionPool, c.id, session.Implicit)
 		if err != nil {
 			return ListDatabasesResult{}, err
 		}
@@ -692,7 +507,7 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	ldo := options.MergeListDatabasesOptions(opts...)
 	op := operation.NewListDatabases(filterDoc).
 		Session(sess).ReadPreference(c.readPreference).CommandMonitor(c.monitor).
-		ServerSelector(selector).ClusterClock(c.clock).Database("admin").Deployment(c.deployment).Crypt(c.crypt)
+		ServerSelector(selector).ClusterClock(c.clock).Database("admin").Deployment(c.topology)
 	if ldo.NameOnly != nil {
 		op = op.NameOnly(*ldo.NameOnly)
 	}
@@ -710,17 +525,7 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	return newListDatabasesResultFromOperation(op.Result()), nil
 }
 
-// ListDatabaseNames executes a listDatabases command and returns a slice containing the names of all of the databases
-// on the server.
-//
-// The filter parameter must be a document containing query operators and can be used to select which databases
-// are included in the result. It cannot be nil. An empty document (e.g. bson.D{}) should be used to include all
-// databases.
-//
-// The opts parameter can be used to specify options for this operation (see the options.ListDatabasesOptions
-// documentation.)
-//
-// For more information about the command, see https://docs.mongodb.com/manual/reference/command/listDatabases/.
+// ListDatabaseNames returns a slice containing the names of all of the databases on the server.
 func (c *Client) ListDatabaseNames(ctx context.Context, filter interface{}, opts ...*options.ListDatabasesOptions) ([]string, error) {
 	opts = append(opts, options.ListDatabases().SetNameOnly(true))
 
@@ -737,30 +542,38 @@ func (c *Client) ListDatabaseNames(ctx context.Context, filter interface{}, opts
 	return names, nil
 }
 
-// WithSession creates a new SessionContext from the ctx and sess parameters and uses it to call the fn callback. The
-// SessionContext must be used as the Context parameter for any operations in the fn callback that should be executed
-// under the session.
+// WithSession allows a user to start a session themselves and manage
+// its lifetime. The only way to provide a session to a CRUD method is
+// to invoke that CRUD method with the mongo.SessionContext within the
+// closure. The mongo.SessionContext can be used as a regular context,
+// so methods like context.WithDeadline and context.WithTimeout are
+// supported.
 //
-// If the ctx parameter already contains a Session, that Session will be replaced with the one provided.
+// If the context.Context already has a mongo.Session attached, that
+// mongo.Session will be replaced with the one provided.
 //
-// Any error returned by the fn callback will be returned without any modifications.
+// Errors returned from the closure are transparently returned from
+// this function.
 func WithSession(ctx context.Context, sess Session, fn func(SessionContext) error) error {
 	return fn(contextWithSession(ctx, sess))
 }
 
-// UseSession creates a new Session and uses it to create a new SessionContext, which is used to call the fn callback.
-// The SessionContext parameter must be used as the Context parameter for any operations in the fn callback that should
-// be executed under a session. After the callback returns, the created Session is ended, meaning that any in-progress
-// transactions started by fn will be aborted even if fn returns an error.
+// UseSession creates a default session, that is only valid for the
+// lifetime of the closure. No cleanup outside of closing the session
+// is done upon exiting the closure. This means that an outstanding
+// transaction will be aborted, even if the closure returns an error.
 //
-// If the ctx parameter already contains a Session, that Session will be replaced with the newly created one.
+// If ctx already contains a mongo.Session, that mongo.Session will be
+// replaced with the newly created mongo.Session.
 //
-// Any error returned by the fn callback will be returned without any modifications.
+// Errors returned from the closure are transparently returned from
+// this method.
 func (c *Client) UseSession(ctx context.Context, fn func(SessionContext) error) error {
 	return c.UseSessionWithOptions(ctx, options.Session(), fn)
 }
 
-// UseSessionWithOptions operates like UseSession but uses the given SessionOptions to create the Session.
+// UseSessionWithOptions works like UseSession but allows the caller
+// to specify the options used to create the session.
 func (c *Client) UseSessionWithOptions(ctx context.Context, opts *options.SessionOptions, fn func(SessionContext) error) error {
 	defaultSess, err := c.StartSession(opts)
 	if err != nil {
@@ -777,22 +590,12 @@ func (c *Client) UseSessionWithOptions(ctx context.Context, opts *options.Sessio
 	return fn(sessCtx)
 }
 
-// Watch returns a change stream for all changes on the deployment. See
-// https://docs.mongodb.com/manual/changeStreams/ for more information about change streams.
-//
-// The client must be configured with read concern majority or no read concern for a change stream to be created
-// successfully.
-//
-// The pipeline parameter must be an array of documents, each representing a pipeline stage. The pipeline cannot be
-// nil or empty. The stage documents must all be non-nil. See https://docs.mongodb.com/manual/changeStreams/ for a list
-// of pipeline stages that can be used with change streams. For a pipeline of bson.D documents, the mongo.Pipeline{}
-// type can be used.
-//
-// The opts parameter can be used to specify options for change stream creation (see the options.ChangeStreamOptions
-// documentation).
+// Watch returns a change stream cursor used to receive information of changes to the client. This method is preferred
+// to running a raw aggregation with a $changeStream stage because it supports resumability in the case of some errors.
+// The client must have read concern majority or no read concern for a change stream to be created successfully.
 func (c *Client) Watch(ctx context.Context, pipeline interface{},
 	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
-	if c.sessionPool == nil {
+	if c.topology.SessionPool == nil {
 		return nil, ErrClientDisconnected
 	}
 
@@ -805,10 +608,4 @@ func (c *Client) Watch(ctx context.Context, pipeline interface{},
 	}
 
 	return newChangeStream(ctx, csConfig, pipeline, opts...)
-}
-
-// NumberSessionsInProgress returns the number of sessions that have been started for this client but have not been
-// closed (i.e. EndSession has not been called).
-func (c *Client) NumberSessionsInProgress() int {
-	return c.sessionPool.CheckedOut()
 }

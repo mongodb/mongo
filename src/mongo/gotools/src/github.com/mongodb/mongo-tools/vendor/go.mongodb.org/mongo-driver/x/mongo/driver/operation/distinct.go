@@ -31,7 +31,6 @@ type Distinct struct {
 	clock          *session.ClusterClock
 	collection     string
 	monitor        *event.CommandMonitor
-	crypt          *driver.Crypt
 	database       string
 	deployment     driver.Deployment
 	readConcern    *readconcern.ReadConcern
@@ -92,7 +91,6 @@ func (d *Distinct) Execute(ctx context.Context) error {
 		Client:            d.session,
 		Clock:             d.clock,
 		CommandMonitor:    d.monitor,
-		Crypt:             d.crypt,
 		Database:          d.database,
 		Deployment:        d.deployment,
 		ReadConcern:       d.readConcern,
@@ -199,16 +197,6 @@ func (d *Distinct) CommandMonitor(monitor *event.CommandMonitor) *Distinct {
 	}
 
 	d.monitor = monitor
-	return d
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (d *Distinct) Crypt(crypt *driver.Crypt) *Distinct {
-	if d == nil {
-		d = new(Distinct)
-	}
-
-	d.crypt = crypt
 	return d
 }
 

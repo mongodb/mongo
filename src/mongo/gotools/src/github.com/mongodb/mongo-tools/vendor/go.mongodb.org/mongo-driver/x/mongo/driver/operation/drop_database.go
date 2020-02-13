@@ -26,7 +26,6 @@ type DropDatabase struct {
 	session      *session.Client
 	clock        *session.ClusterClock
 	monitor      *event.CommandMonitor
-	crypt        *driver.Crypt
 	database     string
 	deployment   driver.Deployment
 	selector     description.ServerSelector
@@ -84,7 +83,6 @@ func (dd *DropDatabase) Execute(ctx context.Context) error {
 		Client:            dd.session,
 		Clock:             dd.clock,
 		CommandMonitor:    dd.monitor,
-		Crypt:             dd.crypt,
 		Database:          dd.database,
 		Deployment:        dd.deployment,
 		Selector:          dd.selector,
@@ -126,16 +124,6 @@ func (dd *DropDatabase) CommandMonitor(monitor *event.CommandMonitor) *DropDatab
 	}
 
 	dd.monitor = monitor
-	return dd
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (dd *DropDatabase) Crypt(crypt *driver.Crypt) *DropDatabase {
-	if dd == nil {
-		dd = new(DropDatabase)
-	}
-
-	dd.crypt = crypt
 	return dd
 }
 

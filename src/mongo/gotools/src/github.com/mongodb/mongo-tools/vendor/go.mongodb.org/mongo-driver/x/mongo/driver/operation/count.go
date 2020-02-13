@@ -30,7 +30,6 @@ type Count struct {
 	clock          *session.ClusterClock
 	collection     string
 	monitor        *event.CommandMonitor
-	crypt          *driver.Crypt
 	database       string
 	deployment     driver.Deployment
 	readConcern    *readconcern.ReadConcern
@@ -92,7 +91,6 @@ func (c *Count) Execute(ctx context.Context) error {
 		Client:            c.session,
 		Clock:             c.clock,
 		CommandMonitor:    c.monitor,
-		Crypt:             c.crypt,
 		Database:          c.database,
 		Deployment:        c.deployment,
 		ReadConcern:       c.readConcern,
@@ -170,16 +168,6 @@ func (c *Count) CommandMonitor(monitor *event.CommandMonitor) *Count {
 	}
 
 	c.monitor = monitor
-	return c
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (c *Count) Crypt(crypt *driver.Crypt) *Count {
-	if c == nil {
-		c = new(Count)
-	}
-
-	c.crypt = crypt
 	return c
 }
 

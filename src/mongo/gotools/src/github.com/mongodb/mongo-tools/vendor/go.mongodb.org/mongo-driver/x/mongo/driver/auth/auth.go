@@ -83,8 +83,10 @@ func (ah *authHandshaker) FinishHandshake(ctx context.Context, conn driver.Conne
 	performAuth := ah.options.PerformAuthentication
 	if performAuth == nil {
 		performAuth = func(serv description.Server) bool {
-			// Authentication is possible against all server types except arbiters
-			return serv.Kind != description.RSArbiter
+			return serv.Kind == description.RSPrimary ||
+				serv.Kind == description.RSSecondary ||
+				serv.Kind == description.Mongos ||
+				serv.Kind == description.Standalone
 		}
 	}
 	desc := conn.Description()

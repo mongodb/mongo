@@ -44,7 +44,6 @@ type Aggregate struct {
 	retry                    *driver.RetryMode
 	selector                 description.ServerSelector
 	writeConcern             *writeconcern.WriteConcern
-	crypt                    *driver.Crypt
 
 	result driver.CursorResponse
 }
@@ -98,7 +97,6 @@ func (a *Aggregate) Execute(ctx context.Context) error {
 		RetryMode:                      a.retry,
 		Selector:                       a.selector,
 		WriteConcern:                   a.writeConcern,
-		Crypt:                          a.crypt,
 		MinimumWriteConcernWireVersion: 5,
 	}.Execute(ctx, nil)
 
@@ -341,15 +339,5 @@ func (a *Aggregate) Retry(retry driver.RetryMode) *Aggregate {
 	}
 
 	a.retry = &retry
-	return a
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (a *Aggregate) Crypt(crypt *driver.Crypt) *Aggregate {
-	if a == nil {
-		a = new(Aggregate)
-	}
-
-	a.crypt = crypt
 	return a
 }

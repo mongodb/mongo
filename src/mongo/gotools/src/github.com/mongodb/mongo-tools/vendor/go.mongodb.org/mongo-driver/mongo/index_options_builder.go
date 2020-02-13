@@ -10,125 +10,125 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// IndexOptionsBuilder is deprecated and unused.  Use mongo/options.IndexOptions instead.
+// IndexOptionsBuilder constructs a BSON document for index options
 type IndexOptionsBuilder struct {
 	document bson.D
 }
 
-// NewIndexOptionsBuilder is deprecated.
+// NewIndexOptionsBuilder creates a new instance of IndexOptionsBuilder
 func NewIndexOptionsBuilder() *IndexOptionsBuilder {
 	return &IndexOptionsBuilder{}
 }
 
-// Background is deprecated.
+// Background sets the background option
 func (iob *IndexOptionsBuilder) Background(background bool) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"background", background})
 	return iob
 }
 
-// ExpireAfterSeconds is deprecated.
+// ExpireAfterSeconds sets the expireAfterSeconds option
 func (iob *IndexOptionsBuilder) ExpireAfterSeconds(expireAfterSeconds int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"expireAfterSeconds", expireAfterSeconds})
 	return iob
 }
 
-// Name is deprecated.
+// Name sets the name option
 func (iob *IndexOptionsBuilder) Name(name string) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"name", name})
 	return iob
 }
 
-// Sparse is deprecated.
+// Sparse sets the sparse option
 func (iob *IndexOptionsBuilder) Sparse(sparse bool) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"sparse", sparse})
 	return iob
 }
 
-// StorageEngine is deprecated.
+// StorageEngine sets the storageEngine option
 func (iob *IndexOptionsBuilder) StorageEngine(storageEngine interface{}) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"storageEngine", storageEngine})
 	return iob
 }
 
-// Unique is deprecated.
+// Unique sets the unique option
 func (iob *IndexOptionsBuilder) Unique(unique bool) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"unique", unique})
 	return iob
 }
 
-// Version is deprecated.
+// Version sets the version option
 func (iob *IndexOptionsBuilder) Version(version int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"v", version})
 	return iob
 }
 
-// DefaultLanguage is deprecated.
+// DefaultLanguage sets the defaultLanguage option
 func (iob *IndexOptionsBuilder) DefaultLanguage(defaultLanguage string) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"default_language", defaultLanguage})
 	return iob
 }
 
-// LanguageOverride is deprecated.
+// LanguageOverride sets the languageOverride option
 func (iob *IndexOptionsBuilder) LanguageOverride(languageOverride string) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"language_override", languageOverride})
 	return iob
 }
 
-// TextVersion is deprecated.
+// TextVersion sets the textVersion option
 func (iob *IndexOptionsBuilder) TextVersion(textVersion int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"textIndexVersion", textVersion})
 	return iob
 }
 
-// Weights is deprecated.
+// Weights sets the weights option
 func (iob *IndexOptionsBuilder) Weights(weights interface{}) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"weights", weights})
 	return iob
 }
 
-// SphereVersion is deprecated.
+// SphereVersion sets the sphereVersion option
 func (iob *IndexOptionsBuilder) SphereVersion(sphereVersion int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"2dsphereIndexVersion", sphereVersion})
 	return iob
 }
 
-// Bits is deprecated.
+// Bits sets the bits option
 func (iob *IndexOptionsBuilder) Bits(bits int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"bits", bits})
 	return iob
 }
 
-// Max is deprecated.
+// Max sets the max option
 func (iob *IndexOptionsBuilder) Max(max float64) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"max", max})
 	return iob
 }
 
-// Min is deprecated.
+// Min sets the min option
 func (iob *IndexOptionsBuilder) Min(min float64) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"min", min})
 	return iob
 }
 
-// BucketSize is deprecated.
+// BucketSize sets the bucketSize option
 func (iob *IndexOptionsBuilder) BucketSize(bucketSize int32) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"bucketSize", bucketSize})
 	return iob
 }
 
-// PartialFilterExpression is deprecated.
+// PartialFilterExpression sets the partialFilterExpression option
 func (iob *IndexOptionsBuilder) PartialFilterExpression(partialFilterExpression interface{}) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"partialFilterExpression", partialFilterExpression})
 	return iob
 }
 
-// Collation is deprecated.
+// Collation sets the collation option
 func (iob *IndexOptionsBuilder) Collation(collation interface{}) *IndexOptionsBuilder {
 	iob.document = append(iob.document, bson.E{"collation", collation})
 	return iob
 }
 
-// Build is deprecated.
+// Build returns the BSON document from the builder
 func (iob *IndexOptionsBuilder) Build() bson.D {
 	return iob.document
 }

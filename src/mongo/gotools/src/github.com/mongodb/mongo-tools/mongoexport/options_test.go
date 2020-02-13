@@ -78,8 +78,8 @@ func TestParseOptions(t *testing.T) {
 			expectSuccess  bool
 			expectedFormat jsonFormat
 		}{
-			{"JSON format defaults to Relaxed", "", true, Relaxed},
-			{"JSON format can be set", Canonical, true, Canonical},
+			{"JSON format defaults to relaxed", "", true, relaxed},
+			{"JSON format can be set", canonical, true, canonical},
 		}
 
 		baseOpts := []string{"--host", "localhost:27017", "--db", "db", "--collection", "coll"}

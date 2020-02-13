@@ -26,7 +26,7 @@ func TestWriteJSON(t *testing.T) {
 		Convey("Special types should serialize as extended JSON", func() {
 
 			Convey("ObjectId should have an extended JSON format", func() {
-				jsonExporter := NewJSONExportOutput(false, false, out, Relaxed)
+				jsonExporter := NewJSONExportOutput(false, false, out, relaxed)
 				objId := primitive.NewObjectID()
 				err := jsonExporter.WriteHeader()
 				So(err, ShouldBeNil)
@@ -37,8 +37,8 @@ func TestWriteJSON(t *testing.T) {
 				So(out.String(), ShouldEqual, `{"_id":{"$oid":"`+objId.Hex()+`"}}`+"\n")
 			})
 
-			Convey("Canoncial format should be outputted if Canonical is specified", func() {
-				exporter := NewJSONExportOutput(false, false, out, Canonical)
+			Convey("Canoncial format should be outputted if canonical is specified", func() {
+				exporter := NewJSONExportOutput(false, false, out, canonical)
 
 				err := exporter.WriteHeader()
 				So(err, ShouldBeNil)
@@ -66,7 +66,7 @@ func TestJSONArray(t *testing.T) {
 	Convey("With a JSON export output in array mode", t, func() {
 		out := &bytes.Buffer{}
 		Convey("exporting a bunch of documents should produce valid json", func() {
-			jsonExporter := NewJSONExportOutput(true, false, out, Relaxed)
+			jsonExporter := NewJSONExportOutput(true, false, out, relaxed)
 			err := jsonExporter.WriteHeader()
 			So(err, ShouldBeNil)
 

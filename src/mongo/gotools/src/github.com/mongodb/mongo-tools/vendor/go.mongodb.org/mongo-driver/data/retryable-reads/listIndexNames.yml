@@ -22,7 +22,7 @@ tests:
             -  &retryable_command_started_event
                 command_started_event:
                     command:
-                        listIndexes: *collection_name
+                        listIndexNames: *collection_name
                     database_name: *database_name
     -
         description: "ListIndexNames succeeds on second attempt"

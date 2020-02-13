@@ -10,16 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// WriteModel is an interface implemented by models that can be used in a BulkWrite operation. Each WriteModel
-// represents a write.
-//
-// This interface is implemented by InsertOneModel, DeleteOneModel, DeleteManyModel, ReplaceOneModel, UpdateOneModel,
-// and UpdateManyModel. Custom implementations of this interface must not be used.
+// WriteModel is the interface satisfied by all models for bulk writes.
 type WriteModel interface {
 	writeModel()
 }
 
-// InsertOneModel is used to insert a single document in a BulkWrite operation.
+// InsertOneModel is the write model for insert operations.
 type InsertOneModel struct {
 	Document interface{}
 }
@@ -29,9 +25,7 @@ func NewInsertOneModel() *InsertOneModel {
 	return &InsertOneModel{}
 }
 
-// SetDocument specifies the document to be inserted. The document cannot be nil. If it does not have an _id field when
-// transformed into BSON, one will be added automatically to the marshalled document. The original document will not be
-// modified.
+// SetDocument sets the BSON document for the InsertOneModel.
 func (iom *InsertOneModel) SetDocument(doc interface{}) *InsertOneModel {
 	iom.Document = doc
 	return iom
@@ -39,7 +33,7 @@ func (iom *InsertOneModel) SetDocument(doc interface{}) *InsertOneModel {
 
 func (*InsertOneModel) writeModel() {}
 
-// DeleteOneModel is used to delete at most one document in a BulkWriteOperation.
+// DeleteOneModel is the write model for delete operations.
 type DeleteOneModel struct {
 	Filter    interface{}
 	Collation *options.Collation
@@ -50,16 +44,13 @@ func NewDeleteOneModel() *DeleteOneModel {
 	return &DeleteOneModel{}
 }
 
-// SetFilter specifies a filter to use to select the document to delete. The filter must be a document containing query
-// operators. It cannot be nil. If the filter matches multiple documents, one will be selected from the matching
-// documents.
+// SetFilter sets the filter for the DeleteOneModel.
 func (dom *DeleteOneModel) SetFilter(filter interface{}) *DeleteOneModel {
 	dom.Filter = filter
 	return dom
 }
 
-// SetCollation specifies a collation to use for string comparisons. The default is nil, meaning no collation will be
-// used.
+// SetCollation sets the collation for the DeleteOneModel.
 func (dom *DeleteOneModel) SetCollation(collation *options.Collation) *DeleteOneModel {
 	dom.Collation = collation
 	return dom
@@ -67,7 +58,7 @@ func (dom *DeleteOneModel) SetCollation(collation *options.Collation) *DeleteOne
 
 func (*DeleteOneModel) writeModel() {}
 
-// DeleteManyModel is used to delete multiple documents in a BulkWrite operation.
+// DeleteManyModel is the write model for deleteMany operations.
 type DeleteManyModel struct {
 	Filter    interface{}
 	Collation *options.Collation
@@ -78,15 +69,13 @@ func NewDeleteManyModel() *DeleteManyModel {
 	return &DeleteManyModel{}
 }
 
-// SetFilter specifies a filter to use to select documents to delete. The filter must be a document containing query
-// operators. It cannot be nil.
+// SetFilter sets the filter for the DeleteManyModel.
 func (dmm *DeleteManyModel) SetFilter(filter interface{}) *DeleteManyModel {
 	dmm.Filter = filter
 	return dmm
 }
 
-// SetCollation specifies a collation to use for string comparisons. The default is nil, meaning no collation will be
-// used.
+// SetCollation sets the collation for the DeleteManyModel.
 func (dmm *DeleteManyModel) SetCollation(collation *options.Collation) *DeleteManyModel {
 	dmm.Collation = collation
 	return dmm
@@ -94,7 +83,7 @@ func (dmm *DeleteManyModel) SetCollation(collation *options.Collation) *DeleteMa
 
 func (*DeleteManyModel) writeModel() {}
 
-// ReplaceOneModel is used to replace at most one document in a BulkWrite operation.
+// ReplaceOneModel is the write model for replace operations.
 type ReplaceOneModel struct {
 	Collation   *options.Collation
 	Upsert      *bool
@@ -107,31 +96,25 @@ func NewReplaceOneModel() *ReplaceOneModel {
 	return &ReplaceOneModel{}
 }
 
-// SetFilter specifies a filter to use to select the document to replace. The filter must be a document containing query
-// operators. It cannot be nil. If the filter matches multiple documents, one will be selected from the matching
-// documents.
+// SetFilter sets the filter for the ReplaceOneModel.
 func (rom *ReplaceOneModel) SetFilter(filter interface{}) *ReplaceOneModel {
 	rom.Filter = filter
 	return rom
 }
 
-// SetReplacement specifies a document that will be used to replace the selected document. It cannot be nil and cannot
-// contain any update operators (https://docs.mongodb.com/manual/reference/operator/update/).
+// SetReplacement sets the replacement document for the ReplaceOneModel.
 func (rom *ReplaceOneModel) SetReplacement(rep interface{}) *ReplaceOneModel {
 	rom.Replacement = rep
 	return rom
 }
 
-// SetCollation specifies a collation to use for string comparisons. The default is nil, meaning no collation will be
-// used.
+// SetCollation sets the collation for the ReplaceOneModel.
 func (rom *ReplaceOneModel) SetCollation(collation *options.Collation) *ReplaceOneModel {
 	rom.Collation = collation
 	return rom
 }
 
-// SetUpsert specifies whether or not the replacement document should be inserted if no document matching the filter is
-// found. If an upsert is performed, the _id of the upserted document can be retrieved from the UpsertedIDs field of the
-// BulkWriteResult.
+// SetUpsert specifies if a new document should be created if no document matches the query.
 func (rom *ReplaceOneModel) SetUpsert(upsert bool) *ReplaceOneModel {
 	rom.Upsert = &upsert
 	return rom
@@ -139,7 +122,7 @@ func (rom *ReplaceOneModel) SetUpsert(upsert bool) *ReplaceOneModel {
 
 func (*ReplaceOneModel) writeModel() {}
 
-// UpdateOneModel is used to update at most one document in a BulkWrite operation.
+// UpdateOneModel is the write model for update operations.
 type UpdateOneModel struct {
 	Collation    *options.Collation
 	Upsert       *bool
@@ -153,38 +136,31 @@ func NewUpdateOneModel() *UpdateOneModel {
 	return &UpdateOneModel{}
 }
 
-// SetFilter specifies a filter to use to select the document to update. The filter must be a document containing query
-// operators. It cannot be nil. If the filter matches multiple documents, one will be selected from the matching
-// documents.
+// SetFilter sets the filter for the UpdateOneModel.
 func (uom *UpdateOneModel) SetFilter(filter interface{}) *UpdateOneModel {
 	uom.Filter = filter
 	return uom
 }
 
-// SetUpdate specifies the modifications to be made to the selected document. The value must be a document containing
-// update operators (https://docs.mongodb.com/manual/reference/operator/update/). It cannot be nil or empty.
+// SetUpdate sets the update document for the UpdateOneModel.
 func (uom *UpdateOneModel) SetUpdate(update interface{}) *UpdateOneModel {
 	uom.Update = update
 	return uom
 }
 
-// SetArrayFilters specifies a set of filters to determine which elements should be modified when updating an array
-// field.
+// SetArrayFilters specifies a set of filters specifying to which array elements an update should apply.
 func (uom *UpdateOneModel) SetArrayFilters(filters options.ArrayFilters) *UpdateOneModel {
 	uom.ArrayFilters = &filters
 	return uom
 }
 
-// SetCollation specifies a collation to use for string comparisons. The default is nil, meaning no collation will be
-// used.
+// SetCollation sets the collation for the UpdateOneModel.
 func (uom *UpdateOneModel) SetCollation(collation *options.Collation) *UpdateOneModel {
 	uom.Collation = collation
 	return uom
 }
 
-// SetUpsert specifies whether or not a new document should be inserted if no document matching the filter is found. If
-// an upsert is performed, the _id of the upserted document can be retrieved from the UpsertedIDs field of the
-// BulkWriteResult.
+// SetUpsert specifies if a new document should be created if no document matches the query.
 func (uom *UpdateOneModel) SetUpsert(upsert bool) *UpdateOneModel {
 	uom.Upsert = &upsert
 	return uom
@@ -192,7 +168,7 @@ func (uom *UpdateOneModel) SetUpsert(upsert bool) *UpdateOneModel {
 
 func (*UpdateOneModel) writeModel() {}
 
-// UpdateManyModel is used to update multiple documents in a BulkWrite operation.
+// UpdateManyModel is the write model for updateMany operations.
 type UpdateManyModel struct {
 	Collation    *options.Collation
 	Upsert       *bool
@@ -206,37 +182,31 @@ func NewUpdateManyModel() *UpdateManyModel {
 	return &UpdateManyModel{}
 }
 
-// SetFilter specifies a filter to use to select documents to update. The filter must be a document containing query
-// operators. It cannot be nil.
+// SetFilter sets the filter for the UpdateManyModel.
 func (umm *UpdateManyModel) SetFilter(filter interface{}) *UpdateManyModel {
 	umm.Filter = filter
 	return umm
 }
 
-// SetUpdate specifies the modifications to be made to the selected documents. The value must be a document containing
-// update operators (https://docs.mongodb.com/manual/reference/operator/update/). It cannot be nil or empty.
+// SetUpdate sets the update document for the UpdateManyModel.
 func (umm *UpdateManyModel) SetUpdate(update interface{}) *UpdateManyModel {
 	umm.Update = update
 	return umm
 }
 
-// SetArrayFilters specifies a set of filters to determine which elements should be modified when updating an array
-// field.
+// SetArrayFilters specifies a set of filters specifying to which array elements an update should apply.
 func (umm *UpdateManyModel) SetArrayFilters(filters options.ArrayFilters) *UpdateManyModel {
 	umm.ArrayFilters = &filters
 	return umm
 }
 
-// SetCollation specifies a collation to use for string comparisons. The default is nil, meaning no collation will be
-// used.
+// SetCollation sets the collation for the UpdateManyModel.
 func (umm *UpdateManyModel) SetCollation(collation *options.Collation) *UpdateManyModel {
 	umm.Collation = collation
 	return umm
 }
 
-// SetUpsert specifies whether or not a new document should be inserted if no document matching the filter is found. If
-// an upsert is performed, the _id of the upserted document can be retrieved from the UpsertedIDs field of the
-// BulkWriteResult.
+// SetUpsert specifies if a new document should be created if no document matches the query.
 func (umm *UpdateManyModel) SetUpsert(upsert bool) *UpdateManyModel {
 	umm.Upsert = &upsert
 	return umm

@@ -2,9 +2,6 @@ version = 0
 name = "CreateIndexes"
 documentation = "CreateIndexes performs a createIndexes operation."
 
-[properties]
-enabled = ["write concern"]
-
 [command]
 name = "createIndexes"
 parameter = "collection"

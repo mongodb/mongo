@@ -37,7 +37,6 @@ type Update struct {
 	writeConcern             *writeconcern.WriteConcern
 	retry                    *driver.RetryMode
 	result                   UpdateResult
-	crypt                    *driver.Crypt
 }
 
 // Upsert contains the information for an upsert in an Update operation.
@@ -151,7 +150,6 @@ func (u *Update) Execute(ctx context.Context) error {
 		Deployment:        u.deployment,
 		Selector:          u.selector,
 		WriteConcern:      u.writeConcern,
-		Crypt:             u.crypt,
 	}.Execute(ctx, nil)
 
 }
@@ -293,15 +291,5 @@ func (u *Update) Retry(retry driver.RetryMode) *Update {
 	}
 
 	u.retry = &retry
-	return u
-}
-
-// Crypt sets the Crypt object to use for automatic encryption and decryption.
-func (u *Update) Crypt(crypt *driver.Crypt) *Update {
-	if u == nil {
-		u = new(Update)
-	}
-
-	u.crypt = crypt
 	return u
 }

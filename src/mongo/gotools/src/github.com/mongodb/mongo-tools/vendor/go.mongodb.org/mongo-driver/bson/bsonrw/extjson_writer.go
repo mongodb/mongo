@@ -536,10 +536,7 @@ func (ejvw *extJSONValueWriter) WriteUndefined() error {
 func (ejvw *extJSONValueWriter) WriteDocumentElement(key string) (ValueWriter, error) {
 	switch ejvw.stack[ejvw.frame].mode {
 	case mDocument, mTopLevel, mCodeWithScope:
-		var buf bytes.Buffer
-		writeStringWithEscapes(key, &buf, ejvw.escapeHTML)
-
-		ejvw.buf = append(ejvw.buf, []byte(fmt.Sprintf(`%s:`, buf.String()))...)
+		ejvw.buf = append(ejvw.buf, []byte(fmt.Sprintf(`"%s":`, key))...)
 		ejvw.push(mElement)
 	default:
 		return nil, ejvw.invalidTransitionErr(mElement, "WriteDocumentElement", []mode{mDocument, mTopLevel, mCodeWithScope})

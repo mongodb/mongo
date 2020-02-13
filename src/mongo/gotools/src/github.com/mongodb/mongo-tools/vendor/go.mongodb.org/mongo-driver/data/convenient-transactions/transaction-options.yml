@@ -108,7 +108,7 @@ tests:
     sessionOptions:
       session0:
         defaultTransactionOptions:
-          readConcern: { level: majority }
+          readConcern: { level: snapshot }
           writeConcern: { w: 1 }
     operations: *operations
     expectations:
@@ -123,7 +123,7 @@ tests:
             txnNumber: { $numberLong: "1" }
             startTransaction: true
             autocommit: false
-            readConcern: { level: majority }
+            readConcern: { level: snapshot }
             # omitted fields
             writeConcern: ~
           command_name: insert
@@ -161,7 +161,7 @@ tests:
                 result:
                   insertedId: 1
           options:
-            readConcern: { level: majority }
+            readConcern: { level: snapshot }
             writeConcern: { w: 1 }
     expectations:
       -
@@ -175,7 +175,7 @@ tests:
             txnNumber: { $numberLong: "1" }
             startTransaction: true
             autocommit: false
-            readConcern: { level: majority }
+            readConcern: { level: snapshot }
             # omitted fields
             writeConcern: ~
           command_name: insert
@@ -200,7 +200,7 @@ tests:
     sessionOptions:
       session0:
         defaultTransactionOptions:
-          readConcern: { level: snapshot }
+          readConcern: { level: majority }
           writeConcern: { w: majority }
     operations: *operations_explicit_transactionOptions
     expectations:
@@ -215,7 +215,7 @@ tests:
             txnNumber: { $numberLong: "1" }
             startTransaction: true
             autocommit: false
-            readConcern: { level: majority }
+            readConcern: { level: snapshot }
             # omitted fields
             writeConcern: ~
           command_name: insert
@@ -238,7 +238,7 @@ tests:
     description: withTransaction explicit transaction options override client options
     useMultipleMongoses: true
     clientOptions:
-      readConcernLevel: local
+      readConcernLevel: majority
       w: majority
     operations: *operations_explicit_transactionOptions
     expectations:
@@ -253,7 +253,7 @@ tests:
             txnNumber: { $numberLong: "1" }
             startTransaction: true
             autocommit: false
-            readConcern: { level: majority }
+            readConcern: { level: snapshot }
             # omitted fields
             writeConcern: ~
           command_name: insert
