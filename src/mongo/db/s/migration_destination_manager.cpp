@@ -442,27 +442,31 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
                   "causedBy_exceptionToStatus"_attr = causedBy(redact(exceptionToStatus())));
         }
     }};
-    auto inserterThreadJoinGuard = makeGuard([&] {
-        batches.closeProducerEnd();
-        inserterThread.join();
-    });
 
-    while (true) {
-        opCtx->checkForInterrupt();
 
-        auto res = fetchBatchFn(opCtx);
-
-        opCtx->checkForInterrupt();
-        batches.push(res.getOwned(), opCtx);
-        auto arr = res["objects"].Obj();
-        if (arr.isEmpty()) {
-            inserterThreadJoinGuard.dismiss();
+    {
+        auto inserterThreadJoinGuard = makeGuard([&] {
+            batches.closeProducerEnd();
             inserterThread.join();
-            opCtx->checkForInterrupt();
-            break;
-        }
-    }
+        });
 
+        while (true) {
+            auto res = fetchBatchFn(opCtx);
+            try {
+                batches.push(res.getOwned(), opCtx);
+                auto arr = res["objects"].Obj();
+                if (arr.isEmpty()) {
+                    break;
+                }
+            } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
+                break;
+            }
+        }
+    }  // This scope ensures that the guard is destroyed
+
+    // This check is necessary because the consumer thread uses killOp to propagate errors to the
+    // producer thread (this thread)
+    opCtx->checkForInterrupt();
     return lastOpApplied;
 }
 
