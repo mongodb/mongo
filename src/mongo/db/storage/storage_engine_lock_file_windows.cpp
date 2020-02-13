@@ -38,6 +38,7 @@
 #include <ostream>
 #include <sstream>
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -184,13 +185,13 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     if (!_lockFileHandle->isValid()) {
         return;
     }
-    log() << "shutdown: removing fs lock...";
+    LOGV2(22281, "shutdown: removing fs lock...");
     // This ought to be an unlink(), but Eliot says the last
     // time that was attempted, there was a race condition
     // with StorageEngineLockFile::open().
     Status status = _truncateFile(_lockFileHandle->_handle);
     if (!status.isOK()) {
-        log() << "couldn't remove fs lock " << status.toString();
+        LOGV2(22282, "couldn't remove fs lock {status}", "status"_attr = status.toString());
     }
     CloseHandle(_lockFileHandle->_handle);
     _lockFileHandle->clear();

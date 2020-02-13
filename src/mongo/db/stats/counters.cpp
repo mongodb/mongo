@@ -35,6 +35,7 @@
 
 #include "mongo/client/authenticate.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -63,7 +64,7 @@ void OpCounters::gotOp(int op, bool isCommand) {
         case opReply:
             break;
         default:
-            log() << "OpCounters::gotOp unknown op: " << op << std::endl;
+            LOGV2(22205, "OpCounters::gotOp unknown op: {op}", "op"_attr = op);
     }
 }
 

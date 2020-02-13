@@ -38,6 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -203,7 +204,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     }
 
     if (!status.isOK()) {
-        log() << "Split chunk " << redact(cmdObj) << " failed" << causedBy(redact(status));
+        LOGV2(22878,
+              "Split chunk {cmdObj} failed{causedBy_status}",
+              "cmdObj"_attr = redact(cmdObj),
+              "causedBy_status"_attr = causedBy(redact(status)));
         return status.withContext("split failed");
     }
 
@@ -217,10 +221,13 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
 
         return boost::optional<ChunkRange>(std::move(chunkRangeStatus.getValue()));
     } else if (status != ErrorCodes::NoSuchKey) {
-        warning()
-            << "Chunk migration will be skipped because splitChunk returned invalid response: "
-            << redact(cmdResponse) << ". Extracting " << kShouldMigrate << " field failed"
-            << causedBy(redact(status));
+        LOGV2_WARNING(
+            22879,
+            "Chunk migration will be skipped because splitChunk returned invalid response: "
+            "{cmdResponse}. Extracting {kShouldMigrate} field failed{causedBy_status}",
+            "cmdResponse"_attr = redact(cmdResponse),
+            "kShouldMigrate"_attr = kShouldMigrate,
+            "causedBy_status"_attr = causedBy(redact(status)));
     }
 
     return boost::optional<ChunkRange>();

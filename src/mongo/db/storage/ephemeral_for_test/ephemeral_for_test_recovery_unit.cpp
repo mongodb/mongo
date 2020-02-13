@@ -34,6 +34,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -78,7 +79,10 @@ void EphemeralForTestRecoveryUnit::doAbortUnitOfWork() {
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
              ++it) {
             auto change = *it;
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
+            LOGV2_DEBUG(22217,
+                        2,
+                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
+                        "demangleName_typeid_change"_attr = demangleName(typeid(*change)));
             change->rollback();
         }
         _changes.clear();

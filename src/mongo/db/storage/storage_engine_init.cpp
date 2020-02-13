@@ -45,6 +45,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -78,10 +79,11 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
         if (storageGlobalParams.repair) {
             repairObserver->onRepairStarted();
         } else if (repairObserver->isIncomplete()) {
-            severe()
-                << "An incomplete repair has been detected! This is likely because a repair "
-                   "operation unexpectedly failed before completing. MongoDB will not start up "
-                   "again without --repair.";
+            LOGV2_FATAL(
+                22272,
+                "An incomplete repair has been detected! This is likely because a repair "
+                "operation unexpectedly failed before completing. MongoDB will not start up "
+                "again without --repair.");
             fassertFailedNoTrace(50922);
         }
     }
@@ -104,9 +106,13 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
             }
         } else {
             // Otherwise set the active storage engine as the contents of the metadata file.
-            log() << "Detected data files in " << dbpath << " created by the '"
-                  << *existingStorageEngine << "' storage engine, so setting the active"
-                  << " storage engine to '" << *existingStorageEngine << "'.";
+            LOGV2(
+                22270,
+                "Detected data files in {dbpath} created by the '{existingStorageEngine}' storage "
+                "engine, so setting the active storage engine to '{existingStorageEngine2}'.",
+                "dbpath"_attr = dbpath,
+                "existingStorageEngine"_attr = *existingStorageEngine,
+                "existingStorageEngine2"_attr = *existingStorageEngine);
             storageGlobalParams.engine = *existingStorageEngine;
         }
     }
@@ -205,11 +211,14 @@ void createLockFile(ServiceContext* service) {
 
     if (wasUnclean) {
         if (storageGlobalParams.readOnly) {
-            severe() << "Attempted to open dbpath in readOnly mode, but the server was "
-                        "previously not shut down cleanly.";
+            LOGV2_FATAL(22273,
+                        "Attempted to open dbpath in readOnly mode, but the server was "
+                        "previously not shut down cleanly.");
             fassertFailedNoTrace(34416);
         }
-        warning() << "Detected unclean shutdown - " << lockFile->getFilespec() << " is not empty.";
+        LOGV2_WARNING(22271,
+                      "Detected unclean shutdown - {lockFile_getFilespec} is not empty.",
+                      "lockFile_getFilespec"_attr = lockFile->getFilespec());
         startingAfterUncleanShutdown(service) = true;
     }
 }

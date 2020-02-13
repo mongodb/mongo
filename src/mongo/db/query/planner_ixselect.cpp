@@ -47,6 +47,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -287,15 +288,20 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
         auto hintName = firstHintElt.valueStringData();
         for (auto&& entry : allIndices) {
             if (entry.identifier.catalogName == hintName) {
-                LOG(5) << "Hint by name specified, restricting indices to "
-                       << entry.keyPattern.toString();
+                LOGV2_DEBUG(20952,
+                            5,
+                            "Hint by name specified, restricting indices to {entry_keyPattern}",
+                            "entry_keyPattern"_attr = entry.keyPattern.toString());
                 out.push_back(entry);
             }
         }
     } else {
         for (auto&& entry : allIndices) {
             if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == hintedIndex)) {
-                LOG(5) << "Hint specified, restricting indices to " << hintedIndex.toString();
+                LOGV2_DEBUG(20953,
+                            5,
+                            "Hint specified, restricting indices to {hintedIndex}",
+                            "hintedIndex"_attr = hintedIndex.toString());
                 out.push_back(entry);
             }
         }
@@ -579,8 +585,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     } else if (IndexNames::GEO_HAYSTACK == indexedFieldType) {
         return false;
     } else {
-        warning() << "Unknown indexing for node " << node->debugString() << " and field "
-                  << keyPatternElt.toString();
+        LOGV2_WARNING(20954,
+                      "Unknown indexing for node {node_debugString} and field {keyPatternElt}",
+                      "node_debugString"_attr = node->debugString(),
+                      "keyPatternElt"_attr = keyPatternElt.toString());
         verify(0);
     }
 }

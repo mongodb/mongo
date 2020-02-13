@@ -36,6 +36,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
@@ -53,9 +54,10 @@ int main(int argc, char** argv, char** envp) {
         return 1;
 
 #ifndef MONGO_CONFIG_OPTIMIZED_BUILD
-    ::mongo::log() << "***WARNING*** MongoDB was built with --opt=off. Function timings may be "
-                      "affected. Always verify any code change against the production environment "
-                      "(e.g. --opt=on).";
+    LOGV2(23049,
+          "***WARNING*** MongoDB was built with --opt=off. Function timings may be "
+          "affected. Always verify any code change against the production environment "
+          "(e.g. --opt=on).");
 #endif
 
     ::benchmark::RunSpecifiedBenchmarks();

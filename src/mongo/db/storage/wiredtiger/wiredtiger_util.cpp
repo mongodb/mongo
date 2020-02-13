@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -144,7 +145,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCt
         cursor = session->getCachedCursor(
             "metadata:create", WiredTigerSession::kMetadataCreateTableId, NULL);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        error() << ex;
+        LOGV2_ERROR(22433, "{ex}", "ex"_attr = ex);
         fassertFailedNoTrace(51257);
     }
     invariant(cursor);
@@ -171,7 +172,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
     try {
         cursor = session->getCachedCursor("metadata:", WiredTigerSession::kMetadataTableId, NULL);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        error() << ex;
+        LOGV2_ERROR(22434, "{ex}", "ex"_attr = ex);
         fassertFailedNoTrace(31293);
     }
     invariant(cursor);
@@ -291,9 +292,14 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(Operat
                                     << " has unsupported format version: " << version << ".");
     }
 
-    LOG(2) << "WiredTigerUtil::checkApplicationMetadataFormatVersion "
-           << " uri: " << uri << " ok range " << minimumVersion << " -> " << maximumVersion
-           << " current: " << version;
+    LOGV2_DEBUG(22428,
+                2,
+                "WiredTigerUtil::checkApplicationMetadataFormatVersion  uri: {uri} ok range "
+                "{minimumVersion} -> {maximumVersion} current: {version}",
+                "uri"_attr = uri,
+                "minimumVersion"_attr = minimumVersion,
+                "maximumVersion"_attr = maximumVersion,
+                "version"_attr = version);
 
     return version;
 }
@@ -394,8 +400,10 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
         cacheSizeMB = 1024 * requestedCacheSizeGB;
     }
     if (cacheSizeMB > kMaxSizeCacheMB) {
-        log() << "Requested cache size: " << cacheSizeMB << "MB exceeds max; setting to "
-              << kMaxSizeCacheMB << "MB";
+        LOGV2(22429,
+              "Requested cache size: {cacheSizeMB}MB exceeds max; setting to {kMaxSizeCacheMB}MB",
+              "cacheSizeMB"_attr = cacheSizeMB,
+              "kMaxSizeCacheMB"_attr = kMaxSizeCacheMB);
         cacheSizeMB = kMaxSizeCacheMB;
     }
     return static_cast<size_t>(cacheSizeMB);
@@ -418,8 +426,11 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
                 return 0;
             }
         }
-        error() << "WiredTiger error (" << errorCode << ") " << redact(message)
-                << " Raw: " << message;
+        LOGV2_ERROR(22435,
+                    "WiredTiger error ({errorCode}) {message} Raw: {message2}",
+                    "errorCode"_attr = errorCode,
+                    "message"_attr = redact(message),
+                    "message2"_attr = message);
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
         if (storageGlobalParams.repair) {
@@ -437,7 +448,10 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      int errorCode,
                      const char* message) {
     try {
-        error() << "WiredTiger error (" << errorCode << ") " << redact(message);
+        LOGV2_ERROR(22436,
+                    "WiredTiger error ({errorCode}) {message}",
+                    "errorCode"_attr = errorCode,
+                    "message"_attr = redact(message));
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
         if (storageGlobalParams.repair) {
@@ -452,7 +466,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
     try {
-        log() << "WiredTiger message " << redact(message);
+        LOGV2(22430, "WiredTiger message {message}", "message"_attr = redact(message));
     } catch (...) {
         std::terminate();
     }
@@ -464,7 +478,10 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
                         const char* operation,
                         uint64_t progress) {
     try {
-        log() << "WiredTiger progress " << redact(operation) << " " << progress;
+        LOGV2(22431,
+              "WiredTiger progress {operation} {progress}",
+              "operation"_attr = redact(operation),
+              "progress"_attr = progress);
     } catch (...) {
         std::terminate();
     }
@@ -603,12 +620,21 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
         return Status::OK();
     }
 
-    LOG(1) << "Changing table logging settings. Uri: " << uri << " Enable? " << on;
+    LOGV2_DEBUG(22432,
+                1,
+                "Changing table logging settings. Uri: {uri} Enable? {on}",
+                "uri"_attr = uri,
+                "on"_attr = on);
     int ret = session->alter(session, uri.c_str(), setting.c_str());
     if (ret) {
-        severe() << "Failed to update log setting. Uri: " << uri << " Enable? " << on
-                 << " Ret: " << ret << " MD: " << redact(existingMetadata)
-                 << " Msg: " << session->strerror(session, ret);
+        LOGV2_FATAL(22437,
+                    "Failed to update log setting. Uri: {uri} Enable? {on} Ret: {ret} MD: "
+                    "{existingMetadata} Msg: {session_strerror_session_ret}",
+                    "uri"_attr = uri,
+                    "on"_attr = on,
+                    "ret"_attr = ret,
+                    "existingMetadata"_attr = redact(existingMetadata),
+                    "session_strerror_session_ret"_attr = session->strerror(session, ret));
         fassertFailed(50756);
     }
 

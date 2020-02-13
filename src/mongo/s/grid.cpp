@@ -37,6 +37,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
@@ -130,10 +131,13 @@ boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
         if (opCtx && opCtx->getClient()) {
             clientAddr = opCtx->getClient()->clientAddress(true);
         }
-        log() << "Received " << what << " " << clientAddr
-              << " indicating config server optime "
-                 "term has increased, previous optime "
-              << prevOpTime << ", now " << opTime;
+        LOGV2(22792,
+              "Received {what} {clientAddr} indicating config server optime "
+              "term has increased, previous optime {prevOpTime}, now {opTime}",
+              "what"_attr = what,
+              "clientAddr"_attr = clientAddr,
+              "prevOpTime"_attr = prevOpTime,
+              "opTime"_attr = opTime);
     }
     return prevOpTime;
 }

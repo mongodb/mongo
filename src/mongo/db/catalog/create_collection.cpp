@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logger/redaction.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -253,9 +254,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     return Result(Status::OK());
 
                 if (currentName && currentName->isDropPendingNamespace()) {
-                    log() << "CMD: create " << newCollName
-                          << " - existing collection with conflicting UUID " << uuid
-                          << " is in a drop-pending state: " << *currentName;
+                    LOGV2(20308,
+                          "CMD: create {newCollName} - existing collection with conflicting UUID "
+                          "{uuid} is in a drop-pending state: {currentName}",
+                          "newCollName"_attr = newCollName,
+                          "uuid"_attr = uuid,
+                          "currentName"_attr = *currentName);
                     return Result(Status(ErrorCodes::NamespaceExists,
                                          str::stream()
                                              << "existing collection " << currentName->toString()
@@ -297,9 +301,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     }
 
                     // It is ok to log this because this doesn't happen very frequently.
-                    log() << "CMD: create " << newCollName
-                          << " - renaming existing collection with conflicting UUID " << uuid
-                          << " to temporary collection " << tmpName;
+                    LOGV2(20309,
+                          "CMD: create {newCollName} - renaming existing collection with "
+                          "conflicting UUID {uuid} to temporary collection {tmpName}",
+                          "newCollName"_attr = newCollName,
+                          "uuid"_attr = uuid,
+                          "tmpName"_attr = tmpName);
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
                         return Result(status);

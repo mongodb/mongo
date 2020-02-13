@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -50,7 +51,9 @@ Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBPara
 
     const auto valueMB = static_cast<size_t>(1024 * value);
 
-    log() << "Reconfiguring WiredTiger max cache overflow size with value: \"" << valueMB << "MB\'";
+    LOGV2(22375,
+          "Reconfiguring WiredTiger max cache overflow size with value: \"{valueMB}MB\'",
+          "valueMB"_attr = valueMB);
 
     invariant(param._data.second);
     int ret = param._data.second->reconfigure(
@@ -58,7 +61,7 @@ Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBPara
     if (ret != 0) {
         string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
                                        << ret << "): " << wiredtiger_strerror(ret));
-        error() << result;
+        LOGV2_ERROR(22377, "{result}", "result"_attr = result);
 
         return Status(ErrorCodes::BadValue, result);
     }
@@ -85,14 +88,16 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
                        << pos));
     }
 
-    log() << "Reconfiguring WiredTiger storage engine with config string: \"" << str << "\"";
+    LOGV2(22376,
+          "Reconfiguring WiredTiger storage engine with config string: \"{str}\"",
+          "str"_attr = str);
 
     invariant(_data.second);
     int ret = _data.second->reconfigure(str.c_str());
     if (ret != 0) {
         string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
                                        << ret << "): " << wiredtiger_strerror(ret));
-        error() << result;
+        LOGV2_ERROR(22378, "{result}", "result"_attr = result);
 
         return Status(ErrorCodes::BadValue, result);
     }

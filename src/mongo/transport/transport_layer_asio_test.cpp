@@ -33,6 +33,7 @@
 #include "mongo/transport/transport_layer_asio.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/unittest.h"
@@ -50,12 +51,12 @@ public:
     void startSession(transport::SessionHandle session) override {
         stdx::unique_lock<Latch> lk(_mutex);
         _sessions.push_back(std::move(session));
-        log() << "started session";
+        LOGV2(23032, "started session");
         _cv.notify_one();
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {
-        log() << "end all sessions";
+        LOGV2(23033, "end all sessions");
         std::vector<transport::SessionHandle> old_sessions;
         {
             stdx::unique_lock<Latch> lock(_mutex);
@@ -106,10 +107,10 @@ public:
             Socket s;
             SockAddr sa{"localhost", _port, AF_INET};
             s.connect(sa);
-            log() << "connection: port " << _port;
+            LOGV2(23034, "connection: port {port}", "port"_attr = _port);
             stdx::unique_lock<Latch> lk(_mutex);
             _cv.wait(lk, [&] { return _stop; });
-            log() << "connection: Rx stop request";
+            LOGV2(23035, "connection: Rx stop request");
         }};
     }
 
@@ -118,10 +119,10 @@ public:
             stdx::unique_lock<Latch> lk(_mutex);
             _stop = true;
         }
-        log() << "connection: Tx stop request";
+        LOGV2(23036, "connection: Tx stop request");
         _cv.notify_one();
         _thr.join();
-        log() << "connection: stopped";
+        LOGV2(23037, "connection: stopped");
     }
 
 private:
@@ -153,7 +154,7 @@ TEST(TransportLayerASIO, PortZeroConnect) {
     ASSERT_OK(tla.start());
     int port = tla.listenerPort();
     ASSERT_GT(port, 0);
-    log() << "TransportLayerASIO.listenerPort() is " << port;
+    LOGV2(23038, "TransportLayerASIO.listenerPort() is {port}", "port"_attr = port);
 
     SimpleConnectionThread connect_thread(port);
     sepu.waitForConnect();
@@ -174,7 +175,7 @@ public:
     }
 
     bool shutdown(Milliseconds timeout) override {
-        log() << "Joining all worker threads";
+        LOGV2(23039, "Joining all worker threads");
         for (auto& thread : _workerThreads) {
             thread.join();
         }
@@ -235,17 +236,19 @@ public:
     TimeoutSyncSEP(Mode mode) : _mode(mode) {}
 
     void startSession(transport::SessionHandle session) override {
-        log() << "Accepted connection from " << session->remote();
+        LOGV2(23040,
+              "Accepted connection from {session_remote}",
+              "session_remote"_attr = session->remote());
         startWorkerThread([this, session = std::move(session)]() mutable {
-            log() << "waiting for message";
+            LOGV2(23041, "waiting for message");
             session->setTimeout(Milliseconds{500});
             auto status = session->sourceMessage().getStatus();
             if (_mode == kShouldTimeout) {
                 ASSERT_EQ(status, ErrorCodes::NetworkTimeout);
-                log() << "message timed out";
+                LOGV2(23042, "message timed out");
             } else {
                 ASSERT_OK(status);
-                log() << "message received okay";
+                LOGV2(23043, "message received okay");
             }
 
             session.reset();
@@ -331,9 +334,11 @@ TEST(TransportLayerASIO, SourceSyncTimeoutSucceeds) {
 class TimeoutSwitchModesSEP : public TimeoutSEP {
 public:
     void startSession(transport::SessionHandle session) override {
-        log() << "Accepted connection from " << session->remote();
+        LOGV2(23044,
+              "Accepted connection from {session_remote}",
+              "session_remote"_attr = session->remote());
         startWorkerThread([this, session = std::move(session)]() mutable {
-            log() << "waiting for message";
+            LOGV2(23045, "waiting for message");
             auto sourceMessage = [&] { return session->sourceMessage().getStatus(); };
 
             // the first message we source should time out.
@@ -341,13 +346,13 @@ public:
             ASSERT_EQ(sourceMessage(), ErrorCodes::NetworkTimeout);
             notifyComplete();
 
-            log() << "timed out successfully";
+            LOGV2(23046, "timed out successfully");
 
             // get the session back in a known state with the timeout still in place
             ASSERT_OK(sourceMessage());
             notifyComplete();
 
-            log() << "waiting for message without a timeout";
+            LOGV2(23047, "waiting for message without a timeout");
 
             // this should block and timeout the waitForComplete mutex, and the session should wait
             // for a while to make sure this isn't timing out and then send a message to unblock
@@ -357,7 +362,7 @@ public:
 
             session.reset();
             notifyComplete();
-            log() << "ending test";
+            LOGV2(23048, "ending test");
         });
     }
 };

@@ -53,6 +53,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 
@@ -126,7 +127,7 @@ public:
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
 
-        LOG(0) << "CMD: reIndex " << toReIndexNss;
+        LOGV2(20457, "CMD: reIndex {toReIndexNss}", "toReIndexNss"_attr = toReIndexNss);
 
         AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
         Collection* collection = autoColl.getCollection();
@@ -219,7 +220,7 @@ public:
         }
 
         if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
-            log() << "exiting because 'reIndexCrashAfterDrop' fail point was set";
+            LOGV2(20458, "exiting because 'reIndexCrashAfterDrop' fail point was set");
             quickExit(EXIT_ABRUPT);
         }
 

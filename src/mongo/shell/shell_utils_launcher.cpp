@@ -63,6 +63,7 @@
 #include "mongo/base/environment_buffer.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
@@ -129,7 +130,7 @@ void safeClose(int fd) {
 #endif
     if (close(fd) != 0) {
         const auto ewd = errnoWithDescription();
-        error() << "failed to close fd " << fd << ": " << ewd;
+        LOGV2_ERROR(22829, "failed to close fd {fd}: {ewd}", "fd"_attr = fd, "ewd"_attr = ewd);
         fassertFailed(40318);
     }
 }
@@ -415,7 +416,7 @@ void ProgramRunner::start() {
         int status = pipe(pipeEnds);
         if (status != 0) {
             const auto ewd = errnoWithDescription();
-            error() << "failed to create pipe: " << ewd;
+            LOGV2_ERROR(22830, "failed to create pipe: {ewd}", "ewd"_attr = ewd);
             fassertFailed(16701);
         }
 #ifndef _WIN32
@@ -426,13 +427,13 @@ void ProgramRunner::start() {
         status = fcntl(pipeEnds[0], F_SETFD, FD_CLOEXEC);
         if (status != 0) {
             const auto ewd = errnoWithDescription();
-            error() << "failed to set FD_CLOEXEC on pipe end 0: " << ewd;
+            LOGV2_ERROR(22831, "failed to set FD_CLOEXEC on pipe end 0: {ewd}", "ewd"_attr = ewd);
             fassertFailed(40308);
         }
         status = fcntl(pipeEnds[1], F_SETFD, FD_CLOEXEC);
         if (status != 0) {
             const auto ewd = errnoWithDescription();
-            error() << "failed to set FD_CLOEXEC on pipe end 1: " << ewd;
+            LOGV2_ERROR(22832, "failed to set FD_CLOEXEC on pipe end 1: {ewd}", "ewd"_attr = ewd);
             fassertFailed(40317);
         }
 #endif
@@ -459,7 +460,7 @@ void ProgramRunner::start() {
         for (unsigned i = 0; i < _argv.size(); i++) {
             ss << " " << _argv[i];
         }
-        log() << ss.str();
+        LOGV2(22810, "{ss_str}", "ss_str"_attr = ss.str());
     }
 }
 
@@ -715,7 +716,7 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
         return false;
     } else if (ret != WAIT_OBJECT_0) {
         const auto ewd = errnoWithDescription();
-        log() << "wait_for_pid: WaitForSingleObject failed: " << ewd;
+        LOGV2(22811, "wait_for_pid: WaitForSingleObject failed: {ewd}", "ewd"_attr = ewd);
     }
 
     DWORD tmp;
@@ -734,7 +735,7 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
         return true;
     } else {
         const auto ewd = errnoWithDescription();
-        log() << "GetExitCodeProcess failed: " << ewd;
+        LOGV2(22812, "GetExitCodeProcess failed: {ewd}", "ewd"_attr = ewd);
         return false;
     }
 #else
@@ -796,7 +797,7 @@ BSONObj WaitMongoProgram(const BSONObj& a, void* data) {
     int exit_code = -123456;  // sentinel value
     invariant(port >= 0);
     if (!registry.isPortRegistered(port)) {
-        log() << "No db started on port: " << port;
+        LOGV2(22813, "No db started on port: {port}", "port"_attr = port);
         return BSON(string("") << 0);
     }
     pid = registry.pidForPort(port);
@@ -862,7 +863,7 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
     verify(a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
     if (path.empty()) {
-        warning() << "ResetDbpath(): nothing to do, path was empty";
+        LOGV2_WARNING(22824, "ResetDbpath(): nothing to do, path was empty");
         return undefinedReturn;
     }
     if (boost::filesystem::exists(path))
@@ -875,7 +876,7 @@ BSONObj PathExists(const BSONObj& a, void* data) {
     verify(a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
     if (path.empty()) {
-        warning() << "PathExists(): path was empty";
+        LOGV2_WARNING(22825, "PathExists(): path was empty");
         return BSON(string("") << false);
     };
     bool exists = boost::filesystem::exists(path);
@@ -892,8 +893,12 @@ void copyDir(const boost::filesystem::path& from, const boost::filesystem::path&
             boost::system::error_code ec;
             boost::filesystem::copy_file(p, to / p.leaf(), ec);
             if (ec) {
-                log() << "Skipping copying of file from '" << p.generic_string() << "' to '"
-                      << (to / p.leaf()).generic_string() << "' due to: " << ec.message();
+                LOGV2(22814,
+                      "Skipping copying of file from '{p_generic_string}' to "
+                      "'{to_p_leaf_generic_string}' due to: {ec_message}",
+                      "p_generic_string"_attr = p.generic_string(),
+                      "to_p_leaf_generic_string"_attr = (to / p.leaf()).generic_string(),
+                      "ec_message"_attr = ec.message());
             }
         } else if (p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock") {
             if (boost::filesystem::is_directory(p)) {
@@ -915,7 +920,8 @@ BSONObj CopyDbpath(const BSONObj& a, void* data) {
     string from = i.next().str();
     string to = i.next().str();
     if (from.empty() || to.empty()) {
-        warning() << "CopyDbpath(): nothing to do, source or destination path(s) were empty";
+        LOGV2_WARNING(22826,
+                      "CopyDbpath(): nothing to do, source or destination path(s) were empty");
         return undefinedReturn;
     }
     if (boost::filesystem::exists(to))
@@ -941,11 +947,13 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
         int gle = GetLastError();
         if (gle != ERROR_FILE_NOT_FOUND) {
             const auto ewd = errnoWithDescription();
-            warning() << "kill_wrapper OpenEvent failed: " << ewd;
+            LOGV2_WARNING(22827, "kill_wrapper OpenEvent failed: {ewd}", "ewd"_attr = ewd);
         } else {
-            log() << "kill_wrapper OpenEvent failed to open event to the process " << pid.asUInt32()
-                  << ". It has likely died already or server is running an older version."
-                  << " Attempting to shutdown through admin command.";
+            LOGV2(22815,
+                  "kill_wrapper OpenEvent failed to open event to the process {pid_asUInt32}. It "
+                  "has likely died already or server is running an older version. Attempting to "
+                  "shutdown through admin command.",
+                  "pid_asUInt32"_attr = pid.asUInt32());
 
             // Back-off to the old way of shutting down the server on Windows, in case we
             // are managing a pre-2.6.0rc0 service, which did not have the event.
@@ -984,7 +992,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
     bool result = SetEvent(event);
     if (!result) {
         const auto ewd = errnoWithDescription();
-        error() << "kill_wrapper SetEvent failed: " << ewd;
+        LOGV2_ERROR(22833, "kill_wrapper SetEvent failed: {ewd}", "ewd"_attr = ewd);
         return;
     }
 #else
@@ -993,7 +1001,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
         if (errno == ESRCH) {
         } else {
             const auto ewd = errnoWithDescription();
-            log() << "killFailed: " << ewd;
+            LOGV2(22816, "killFailed: {ewd}", "ewd"_attr = ewd);
             verify(x == 0);
         }
     }
@@ -1005,7 +1013,7 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPi
     ProcessId pid;
     if (port > 0) {
         if (!registry.isPortRegistered(port)) {
-            log() << "No db started on port: " << port;
+            LOGV2(22817, "No db started on port: {port}", "port"_attr = port);
             return 0;
         }
         pid = registry.pidForPort(port);
@@ -1017,16 +1025,16 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPi
 
     // If we are not waiting for the process to end, then return immediately.
     if (!waitPid) {
-        log() << "skip waiting for pid " << pid << " to terminate";
+        LOGV2(22818, "skip waiting for pid {pid} to terminate", "pid"_attr = pid);
         return 0;
     }
 
     int exitCode = EXIT_FAILURE;
     try {
-        log() << "waiting for process " << pid << " to terminate.";
+        LOGV2(22819, "waiting for process {pid} to terminate.", "pid"_attr = pid);
         wait_for_pid(pid, true, &exitCode);
     } catch (...) {
-        warning() << "process " << pid << " failed to terminate.";
+        LOGV2_WARNING(22828, "process {pid} failed to terminate.", "pid"_attr = pid);
         return EXIT_FAILURE;
     }
 
@@ -1090,10 +1098,12 @@ BSONObj StopMongoProgram(const BSONObj& a, void* data) {
     uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 4);
     uassert(ErrorCodes::BadValue, "stopMongoProgram needs a number", a.firstElement().isNumber());
     int port = int(a.firstElement().number());
-    log() << "shell: stopping mongo program, waitpid=" << getWaitPid(a);
+    LOGV2(22820,
+          "shell: stopping mongo program, waitpid={getWaitPid_a}",
+          "getWaitPid_a"_attr = getWaitPid(a));
     int code =
         killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMongodOpts(a), getWaitPid(a));
-    log() << "shell: stopped mongo program on port " << port;
+    LOGV2(22821, "shell: stopped mongo program on port {port}", "port"_attr = port);
     return BSON("" << (double)code);
 }
 
@@ -1104,7 +1114,7 @@ BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
         ErrorCodes::BadValue, "stopMongoProgramByPid needs a number", a.firstElement().isNumber());
     ProcessId pid = ProcessId::fromNative(int(a.firstElement().number()));
     int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a));
-    log() << "shell: stopped mongo program with pid " << pid;
+    LOGV2(22822, "shell: stopped mongo program with pid {pid}", "pid"_attr = pid);
     return BSON("" << (double)code);
 }
 
@@ -1124,7 +1134,10 @@ int KillMongoProgramInstances() {
         int port = registry.portForPid(pid);
         int code = killDb(port != -1 ? port : 0, pid, SIGTERM);
         if (code != EXIT_SUCCESS) {
-            log() << "Process with pid " << pid << " exited with error code " << code;
+            LOGV2(22823,
+                  "Process with pid {pid} exited with error code {code}",
+                  "pid"_attr = pid,
+                  "code"_attr = code);
             returnCode = code;
         }
     }

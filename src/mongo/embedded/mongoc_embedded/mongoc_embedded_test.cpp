@@ -43,6 +43,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/embedded/mongo_embedded/mongo_embedded.h"
 #include "mongo/embedded/mongoc_embedded/mongoc_embedded_test_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -87,7 +88,7 @@ bool insert_data(mongoc_collection_t* collection) {
     bool ret = mongoc_bulk_operation_execute(bulk, NULL, &error);
 
     if (!ret) {
-        ::mongo::log() << "Error inserting data: " << error.message;
+        LOGV2(22556, "Error inserting data: {error_message}", "error_message"_attr = error.message);
     }
 
     mongoc_bulk_operation_destroy(bulk);
@@ -118,7 +119,7 @@ bool explain(mongoc_collection_t* collection) {
                        "}");
     res = mongoc_collection_command_simple(collection, command, NULL, &reply, &error);
     if (!res) {
-        ::mongo::log() << "Error with explain: " << error.message;
+        LOGV2(22557, "Error with explain: {error_message}", "error_message"_attr = error.message);
         goto explain_cleanup;
     }
 

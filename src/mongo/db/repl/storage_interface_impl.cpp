@@ -76,6 +76,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
@@ -190,7 +191,10 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     const BSONObj idIndexSpec,
     const std::vector<BSONObj>& secondaryIndexSpecs) {
 
-    LOG(2) << "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: " << nss.ns();
+    LOGV2_DEBUG(21753,
+                2,
+                "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {nss_ns}",
+                "nss_ns"_attr = nss.ns());
 
     class StashClient {
     public:
@@ -384,7 +388,9 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     std::vector<std::string> dbNames =
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
     invariant(!dbNames.empty());
-    log() << "dropReplicatedDatabases - dropping " << dbNames.size() << " databases";
+    LOGV2(21754,
+          "dropReplicatedDatabases - dropping {dbNames_size} databases",
+          "dbNames_size"_attr = dbNames.size());
 
     ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
 
@@ -401,14 +407,17 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
             } else {
                 // This is needed since dropDatabase can't be rolled back.
                 // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed.
-                log() << "dropReplicatedDatabases - database disappeared after retrieving list of "
-                         "database names but before drop: "
-                      << dbName;
+                LOGV2(21755,
+                      "dropReplicatedDatabases - database disappeared after retrieving list of "
+                      "database names but before drop: {dbName}",
+                      "dbName"_attr = dbName);
             }
         });
     }
     invariant(hasLocalDatabase, "local database missing");
-    log() << "dropReplicatedDatabases - dropped " << dbNames.size() << " databases";
+    LOGV2(21756,
+          "dropReplicatedDatabases - dropped {dbNames_size} databases",
+          "dbNames_size"_attr = dbNames.size());
 
     return Status::OK();
 }

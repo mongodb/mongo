@@ -40,6 +40,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -487,8 +488,9 @@ void DocumentSourceMerge::waitWhileFailPointEnabled() {
         pExpCtx->opCtx,
         "hangWhileBuildingDocumentSourceMergeBatch",
         []() {
-            log() << "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' "
-                  << "failpoint";
+            LOGV2(
+                20900,
+                "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' failpoint");
         });
 }
 

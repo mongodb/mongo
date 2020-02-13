@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -70,7 +71,11 @@ public:
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        LOG(1) << "createIndexes: " << nss << " cmd:" << redact(cmdObj);
+        LOGV2_DEBUG(22750,
+                    1,
+                    "createIndexes: {nss} cmd:{cmdObj}",
+                    "nss"_attr = nss,
+                    "cmdObj"_attr = redact(cmdObj));
 
         createShardDatabase(opCtx, dbName);
 

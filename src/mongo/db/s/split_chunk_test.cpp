@@ -42,6 +42,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -169,8 +170,8 @@ void SplitChunkTest::expectLock() {
     dynamic_cast<DistLockManagerMock*>(distLock())
         ->expectLock(
             [this](StringData name, StringData whyMessage, Milliseconds) {
-                LOG(0) << name;
-                LOG(0) << whyMessage;
+                LOGV2(22105, "{name}", "name"_attr = name);
+                LOGV2(22106, "{whyMessage}", "whyMessage"_attr = whyMessage);
             },
             Status::OK());
 }

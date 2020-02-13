@@ -38,6 +38,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -142,8 +143,11 @@ public:
         }
 
         if (!serverGlobalParams.quiet.load()) {
-            LOG(0) << "CMD: validate " << nss.ns() << (background ? ", background:true" : "")
-                   << (fullValidate ? ", full:true" : "");
+            LOGV2(20514,
+                  "CMD: validate {nss_ns}{background_background_true}{fullValidate_full_true}",
+                  "nss_ns"_attr = nss.ns(),
+                  "background_background_true"_attr = (background ? ", background:true" : ""),
+                  "fullValidate_full_true"_attr = (fullValidate ? ", full:true" : ""));
         }
 
         // Only one validation per collection can be in progress, the rest wait.

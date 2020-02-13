@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include <math.h>
 
 #include "mongo/platform/basic.h"
@@ -41,6 +43,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/log.h"
 
 namespace DocumentTests {
 
@@ -236,7 +240,7 @@ public:
 
         // Remove the second field.
         md.setField("b", Value());
-        log() << md.peek().toString();
+        LOGV2(20585, "{md_peek}", "md_peek"_attr = md.peek().toString());
         ASSERT_EQUALS(2U, md.peek().size());
         ASSERT(md.peek()["b"].missing());
         ASSERT_EQUALS("a", getNthField(md.peek(), 0).first.toString());
@@ -1915,7 +1919,7 @@ private:
         assertComparison(expectedResult, fromBson(a), fromBson(b));
     }
     void assertComparison(int expectedResult, const Value& a, const Value& b) {
-        mongo::unittest::log() << "testing " << a.toString() << " and " << b.toString();
+        LOGV2(20586, "testing {a} and {b}", "a"_attr = a.toString(), "b"_attr = b.toString());
 
         // reflexivity
         ASSERT_EQUALS(0, cmp(a, a));

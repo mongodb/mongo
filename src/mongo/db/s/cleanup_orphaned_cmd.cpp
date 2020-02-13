@@ -48,6 +48,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
@@ -80,8 +81,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         auto* const css = CollectionShardingRuntime::get(opCtx, ns);
         const auto metadata = css->getCurrentMetadata();
         if (!metadata->isSharded()) {
-            LOG(0) << "skipping orphaned data cleanup for " << ns.ns()
-                   << ", collection is not sharded";
+            LOGV2(21911,
+                  "skipping orphaned data cleanup for {ns_ns}, collection is not sharded",
+                  "ns_ns"_attr = ns.ns());
             return CleanupResult::kDone;
         }
 
@@ -92,7 +94,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                     << "could not cleanup orphaned data, start key " << startingFromKey
                     << " does not match shard key pattern " << keyPattern;
 
-                log() << *errMsg;
+                LOGV2(21912, "{errMsg}", "errMsg"_attr = *errMsg);
                 return CleanupResult::kError;
             }
         } else {
@@ -101,8 +103,12 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         targetRange = css->getNextOrphanRange(startingFromKey);
         if (!targetRange) {
-            LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-                   << redact(startingFromKey) << ", no orphan ranges remain";
+            LOGV2_DEBUG(21913,
+                        1,
+                        "cleanupOrphaned requested for {ns} starting from {startingFromKey}, no "
+                        "orphan ranges remain",
+                        "ns"_attr = ns.toString(),
+                        "startingFromKey"_attr = redact(startingFromKey));
 
             return CleanupResult::kDone;
         }
@@ -115,16 +121,21 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     // Sleep waiting for our own deletion. We don't actually care about any others, so there is no
     // need to call css::waitForClean() here.
 
-    LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-           << redact(startingFromKey) << ", removing next orphan range "
-           << redact(targetRange->toString()) << "; waiting...";
+    LOGV2_DEBUG(21914,
+                1,
+                "cleanupOrphaned requested for {ns} starting from {startingFromKey}, removing next "
+                "orphan range {targetRange}; waiting...",
+                "ns"_attr = ns.toString(),
+                "startingFromKey"_attr = redact(startingFromKey),
+                "targetRange"_attr = redact(targetRange->toString()));
 
     Status result = cleanupCompleteFuture.getNoThrow(opCtx);
 
-    LOG(1) << "Finished waiting for last " << ns.toString() << " orphan range cleanup";
+    LOGV2_DEBUG(
+        21915, 1, "Finished waiting for last {ns} orphan range cleanup", "ns"_attr = ns.toString());
 
     if (!result.isOK()) {
-        log() << redact(result.reason());
+        LOGV2(21916, "{result_reason}", "result_reason"_attr = redact(result.reason()));
         *errMsg = result.reason();
         return CleanupResult::kError;
     }

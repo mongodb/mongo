@@ -39,6 +39,7 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/processinfo.h"
@@ -56,46 +57,61 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     {
         auto&& vii = VersionInfoInterface::instance();
         if ((vii.minorVersion() % 2) != 0) {
-            log() << startupWarningsLog;
-            log() << "** NOTE: This is a development version (" << vii.version() << ") of MongoDB."
-                  << startupWarningsLog;
-            log() << "**       Not recommended for production." << startupWarningsLog;
+            LOGV2_OPTIONS(22116, {logv2::LogTag::kStartupWarnings}, "");
+            LOGV2_OPTIONS(22117,
+                          {logv2::LogTag::kStartupWarnings},
+                          "** NOTE: This is a development version ({vii_version}) of MongoDB.",
+                          "vii_version"_attr = vii.version());
+            LOGV2_OPTIONS(22118,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**       Not recommended for production.");
             warned = true;
         }
     }
 
     if (serverParams.authState == ServerGlobalParams::AuthState::kUndefined) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: Access control is not enabled for the database."
-              << startupWarningsLog;
-        log() << "**          Read and write access to data and configuration is "
-                 "unrestricted."
-              << startupWarningsLog;
+        LOGV2_OPTIONS(22119, {logv2::LogTag::kStartupWarnings}, "");
+        LOGV2_OPTIONS(22120,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: Access control is not enabled for the database.");
+        LOGV2_OPTIONS(22121,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          Read and write access to data and configuration is "
+                      "unrestricted.");
         warned = true;
     }
 
     const bool is32bit = sizeof(int*) == 4;
     if (is32bit) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This 32-bit MongoDB binary is deprecated" << startupWarningsLog;
+        LOGV2_OPTIONS(22122, {logv2::LogTag::kStartupWarnings}, "");
+        LOGV2_OPTIONS(22123,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: This 32-bit MongoDB binary is deprecated");
         warned = true;
     }
 
 #ifdef MONGO_CONFIG_SSL
     if (sslGlobalParams.sslAllowInvalidCertificates) {
-        log() << "** WARNING: While invalid X509 certificates may be used to" << startupWarningsLog;
-        log() << "**          connect to this server, they will not be considered"
-              << startupWarningsLog;
-        log() << "**          permissible for authentication." << startupWarningsLog;
-        log() << startupWarningsLog;
+        LOGV2_OPTIONS(22124,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: While invalid X509 certificates may be used to");
+        LOGV2_OPTIONS(22125,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          connect to this server, they will not be considered");
+        LOGV2_OPTIONS(22126,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          permissible for authentication.");
+        LOGV2_OPTIONS(22127, {logv2::LogTag::kStartupWarnings}, "");
     }
 
     if (sslGlobalParams.sslAllowInvalidHostnames) {
-        log() << "** WARNING: This server will not perform X.509 hostname validation"
-              << startupWarningsLog;
-        log() << "** This may allow your server to make or accept connections to"
-              << startupWarningsLog;
-        log() << "** untrusted parties" << startupWarningsLog;
+        LOGV2_OPTIONS(22128,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: This server will not perform X.509 hostname validation");
+        LOGV2_OPTIONS(22129,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** This may allow your server to make or accept connections to");
+        LOGV2_OPTIONS(22130, {logv2::LogTag::kStartupWarnings}, "** untrusted parties");
     }
 #endif
 
@@ -108,13 +124,14 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         sslGlobalParams.sslCertificateSelector.empty() &&
 #endif
         sslGlobalParams.sslCAFile.empty()) {
-        log() << "";
-        log() << "** WARNING: No client certificate validation can be performed since"
-                 " no CA file has been provided";
+        LOGV2(22131, "");
+        LOGV2(22132,
+              "** WARNING: No client certificate validation can be performed since"
+              " no CA file has been provided");
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-        log() << "**          and no sslCertificateSelector has been specified.";
+        LOGV2(22133, "**          and no sslCertificateSelector has been specified.");
 #endif
-        log() << "**          Please specify an sslCAFile parameter.";
+        LOGV2(22134, "**          Please specify an sslCAFile parameter.");
     }
 
 #if defined(_WIN32) && !defined(_WIN64)
@@ -122,50 +139,68 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     BOOL wow64Process;
     BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
     if (retWow64 && wow64Process) {
-        log() << "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating"
-              << startupWarningsLog;
-        log() << "**      system. Switch to a 64-bit build of MongoDB to" << startupWarningsLog;
-        log() << "**      support larger databases." << startupWarningsLog;
+        LOGV2_OPTIONS(22135,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating");
+        LOGV2_OPTIONS(22136,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**      system. Switch to a 64-bit build of MongoDB to");
+        LOGV2_OPTIONS(
+            22137, {logv2::LogTag::kStartupWarnings}, "**      support larger databases.");
         warned = true;
     }
 #endif
 
 #if !defined(_WIN32)
     if (getuid() == 0) {
-        log() << "** WARNING: You are running this process as the root user, "
-              << "which is not recommended." << startupWarningsLog;
+        LOGV2_OPTIONS(
+            22138,
+            {logv2::LogTag::kStartupWarnings},
+            "** WARNING: You are running this process as the root user, which is not recommended.");
         warned = true;
     }
 #endif
 
     if (serverParams.bind_ips.empty()) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This server is bound to localhost." << startupWarningsLog;
-        log() << "**          Remote systems will be unable to connect to this server. "
-              << startupWarningsLog;
-        log() << "**          Start the server with --bind_ip <address> to specify which IP "
-              << startupWarningsLog;
-        log() << "**          addresses it should serve responses from, or with --bind_ip_all to"
-              << startupWarningsLog;
-        log() << "**          bind to all interfaces. If this behavior is desired, start the"
-              << startupWarningsLog;
-        log() << "**          server with --bind_ip 127.0.0.1 to disable this warning."
-              << startupWarningsLog;
+        LOGV2_OPTIONS(22139, {logv2::LogTag::kStartupWarnings}, "");
+        LOGV2_OPTIONS(22140,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: This server is bound to localhost.");
+        LOGV2_OPTIONS(22141,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          Remote systems will be unable to connect to this server. ");
+        LOGV2_OPTIONS(22142,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          Start the server with --bind_ip <address> to specify which IP ");
+        LOGV2_OPTIONS(
+            22143,
+            {logv2::LogTag::kStartupWarnings},
+            "**          addresses it should serve responses from, or with --bind_ip_all to");
+        LOGV2_OPTIONS(22144,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          bind to all interfaces. If this behavior is desired, start the");
+        LOGV2_OPTIONS(22145,
+                      {logv2::LogTag::kStartupWarnings},
+                      "**          server with --bind_ip 127.0.0.1 to disable this warning.");
         warned = true;
     }
 
     if (auth::hasMultipleInternalAuthKeys()) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: Multiple keys specified in security key file. If cluster key file"
-              << startupWarningsLog;
-        log() << "            rollover is not in progress, only one key should be specified in"
-              << startupWarningsLog;
-        log() << "            the key file" << startupWarningsLog;
+        LOGV2_OPTIONS(22146, {logv2::LogTag::kStartupWarnings}, "");
+        LOGV2_OPTIONS(
+            22147,
+            {logv2::LogTag::kStartupWarnings},
+            "** WARNING: Multiple keys specified in security key file. If cluster key file");
+        LOGV2_OPTIONS(
+            22148,
+            {logv2::LogTag::kStartupWarnings},
+            "            rollover is not in progress, only one key should be specified in");
+        LOGV2_OPTIONS(22149, {logv2::LogTag::kStartupWarnings}, "            the key file");
         warned = true;
     }
 
     if (warned) {
-        log() << startupWarningsLog;
+        LOGV2_OPTIONS(22150, {logv2::LogTag::kStartupWarnings}, "");
     }
 }
 }  // namespace mongo

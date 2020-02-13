@@ -41,6 +41,7 @@
 #include <sys/types.h>
 #endif
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/scopeguard.h"
@@ -90,8 +91,12 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     int err;
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
-        LOG(3) << "Failed to obtain address information for hostname " << hostName << ": "
-               << getAddrInfoStrError(err);
+        LOGV2_DEBUG(23170,
+                    3,
+                    "Failed to obtain address information for hostname {hostName}: "
+                    "{getAddrInfoStrError_err}",
+                    "hostName"_attr = hostName,
+                    "getAddrInfoStrError_err"_attr = getAddrInfoStrError(err));
         return results;
     }
     const auto guard = makeGuard(shim_freeaddrinfo);
@@ -141,7 +146,10 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     }
 
     if (encounteredErrors) {
-        LOG(3) << getNameInfoErrors.str() << " ]";
+        LOGV2_DEBUG(23171,
+                    3,
+                    "{getNameInfoErrors_str} ]",
+                    "getNameInfoErrors_str"_attr = getNameInfoErrors.str());
     }
 
     // Deduplicate the results list

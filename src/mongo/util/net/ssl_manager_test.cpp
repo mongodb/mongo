@@ -34,6 +34,7 @@
 #include "mongo/util/net/ssl_manager.h"
 
 #include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -78,10 +79,17 @@ TEST(SSLManager, matchHostname) {
     for (const auto& test : tests) {
         if (bool(test.expected) != hostNameMatchForX509Certificates(test.hostname, test.certName)) {
             failure = true;
-            LOG(1) << "Failure for Hostname: " << test.hostname
-                   << " Certificate: " << test.certName;
+            LOGV2_DEBUG(23266,
+                        1,
+                        "Failure for Hostname: {test_hostname} Certificate: {test_certName}",
+                        "test_hostname"_attr = test.hostname,
+                        "test_certName"_attr = test.certName);
         } else {
-            LOG(1) << "Passed for Hostname: " << test.hostname << " Certificate: " << test.certName;
+            LOGV2_DEBUG(23267,
+                        1,
+                        "Passed for Hostname: {test_hostname} Certificate: {test_certName}",
+                        "test_hostname"_attr = test.hostname,
+                        "test_certName"_attr = test.certName);
         }
     }
     ASSERT_FALSE(failure);
@@ -358,7 +366,7 @@ TEST(SSLManager, DNParsingAndNormalization) {
           {"2.5.4.7", "大田区, 東京都"}}}};
 
     for (const auto& test : tests) {
-        log() << "Testing DN \"" << test.first << "\"";
+        LOGV2(23268, "Testing DN \"{test_first}\"", "test_first"_attr = test.first);
         auto swDN = parseDN(test.first);
         ASSERT_OK(swDN.getStatus());
         ASSERT_OK(swDN.getValue().normalizeStrings());
@@ -370,7 +378,7 @@ TEST(SSLManager, DNParsingAndNormalization) {
 TEST(SSLManager, BadDNParsing) {
     std::vector<std::string> tests = {"CN=#12345", R"(CN=\B)", R"(CN=<", "\)"};
     for (const auto& test : tests) {
-        log() << "Testing bad DN: \"" << test << "\"";
+        LOGV2(23269, "Testing bad DN: \"{test}\"", "test"_attr = test);
         auto swDN = parseDN(test);
         ASSERT_NOT_OK(swDN.getStatus());
     }

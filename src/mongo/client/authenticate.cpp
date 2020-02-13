@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -150,8 +151,9 @@ Future<void> authenticateClient(const BSONObj& params,
     auto errorHandler = [](Status status) {
         if (serverGlobalParams.transitionToAuth && !ErrorCodes::isNetworkError(status)) {
             // If auth failed in transitionToAuth, just pretend it succeeded.
-            log() << "Failed to authenticate in transitionToAuth, falling back to no "
-                     "authentication.";
+            LOGV2(20108,
+                  "Failed to authenticate in transitionToAuth, falling back to no "
+                  "authentication.");
 
             return Status::OK();
         }

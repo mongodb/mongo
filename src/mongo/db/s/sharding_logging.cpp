@@ -37,6 +37,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -80,7 +81,9 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
         if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
         } else {
-            log() << "couldn't create config.actionlog collection:" << causedBy(result);
+            LOGV2(22078,
+                  "couldn't create config.actionlog collection:{causedBy_result}",
+                  "causedBy_result"_attr = causedBy(result));
             return result;
         }
     }
@@ -106,7 +109,9 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
         if (result.isOK()) {
             _changeLogCollectionCreated.store(1);
         } else {
-            log() << "couldn't create config.changelog collection:" << causedBy(result);
+            LOGV2(22079,
+                  "couldn't create config.changelog collection:{causedBy_result}",
+                  "causedBy_result"_attr = causedBy(result));
             return result;
         }
     }
@@ -144,15 +149,22 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     changeLog.setDetails(detail);
 
     BSONObj changeLogBSON = changeLog.toBSON();
-    log() << "about to log metadata event into " << logCollName << ": " << redact(changeLogBSON);
+    LOGV2(22080,
+          "about to log metadata event into {logCollName}: {changeLogBSON}",
+          "logCollName"_attr = logCollName,
+          "changeLogBSON"_attr = redact(changeLogBSON));
 
     const NamespaceString nss("config", logCollName);
     Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx, nss, changeLogBSON, writeConcern);
 
     if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID [" << changeId
-                  << "] into collection " << logCollName << ": " << redact(result);
+        LOGV2_WARNING(22081,
+                      "Error encountered while logging config change with ID [{changeId}] into "
+                      "collection {logCollName}: {result}",
+                      "changeId"_attr = changeId,
+                      "logCollName"_attr = logCollName,
+                      "result"_attr = redact(result));
     }
 
     return result;

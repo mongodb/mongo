@@ -48,6 +48,7 @@
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -380,7 +381,10 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
 
 void CurOp::setMessage_inlock(StringData message) {
     if (_progressMeter.isActive()) {
-        error() << "old _message: " << redact(_message) << " new message:" << redact(message);
+        LOGV2_ERROR(20527,
+                    "old _message: {message} new message:{message2}",
+                    "message"_attr = redact(_message),
+                    "message2"_attr = redact(message));
         verify(!_progressMeter.isActive());
     }
     _message = message.toString();  // copy
@@ -467,12 +471,16 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                 if (lk.isLocked()) {
                     _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
                 } else {
-                    warning(component) << "Unable to gather storage statistics for a slow "
-                                          "operation due to lock aquire timeout";
+                    LOGV2_WARNING_OPTIONS(20525,
+                                          {logComponentV1toV2(component)},
+                                          "Unable to gather storage statistics for a slow "
+                                          "operation due to lock aquire timeout");
                 }
             } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                warning(component) << "Unable to gather storage statistics for a slow "
-                                      "operation due to interrupt";
+                LOGV2_WARNING_OPTIONS(20526,
+                                      {logComponentV1toV2(component)},
+                                      "Unable to gather storage statistics for a slow "
+                                      "operation due to interrupt");
             }
         }
 

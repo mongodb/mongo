@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -69,7 +70,11 @@ public:
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        LOG(1) << "dropIndexes: " << nss << " cmd:" << redact(cmdObj);
+        LOGV2_DEBUG(22751,
+                    1,
+                    "dropIndexes: {nss} cmd:{cmdObj}",
+                    "nss"_attr = nss,
+                    "cmdObj"_attr = redact(cmdObj));
 
         // If the collection is sharded, we target only the primary shard and the shards that own
         // chunks for the collection. We ignore IndexNotFound errors, because the index may have

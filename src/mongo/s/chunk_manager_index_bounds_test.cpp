@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_router_test_fixture.h"
@@ -88,7 +89,10 @@ protected:
             for (size_t i = 0; i < oil.intervals.size(); i++) {
                 if (Interval::INTERVAL_EQUALS !=
                     oil.intervals[i].compare(expectedOil.intervals[i])) {
-                    log() << oil.intervals[i] << " != " << expectedOil.intervals[i];
+                    LOGV2(22676,
+                          "{oil_intervals_i} != {expectedOil_intervals_i}",
+                          "oil_intervals_i"_attr = oil.intervals[i],
+                          "expectedOil_intervals_i"_attr = expectedOil.intervals[i]);
                 }
                 ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                               oil.intervals[i].compare(expectedOil.intervals[i]));
@@ -109,7 +113,7 @@ protected:
 
         if (oil.intervals.size() != expectedOil.intervals.size()) {
             for (size_t i = 0; i < oil.intervals.size(); i++) {
-                log() << oil.intervals[i];
+                LOGV2(22677, "{oil_intervals_i}", "oil_intervals_i"_attr = oil.intervals[i]);
             }
         }
 

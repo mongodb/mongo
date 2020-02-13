@@ -67,6 +67,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -579,7 +580,7 @@ public:
         }
 
         if (_authzManager->getCacheGeneration() == _cacheGeneration) {
-            LOG(1) << "User management command did not invalidate the user cache.";
+            LOGV2_DEBUG(20509, 1, "User management command did not invalidate the user cache.");
             _authzManager->invalidateUserCache(_opCtx);
         }
     }
@@ -2494,16 +2495,22 @@ public:
             Status status = updatePrivilegeDocument(opCtx, userName, userObj);
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
-                warning() << "Could not update user " << userName
-                          << " in _mergeAuthzCollections command: " << redact(status);
+                LOGV2_WARNING(
+                    20510,
+                    "Could not update user {userName} in _mergeAuthzCollections command: {status}",
+                    "userName"_attr = userName,
+                    "status"_attr = redact(status));
             }
         } else {
             auditCreateOrUpdateUser(userObj, true);
             Status status = insertPrivilegeDocument(opCtx, userObj);
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
-                warning() << "Could not insert user " << userName
-                          << " in _mergeAuthzCollections command: " << redact(status);
+                LOGV2_WARNING(
+                    20511,
+                    "Could not insert user {userName} in _mergeAuthzCollections command: {status}",
+                    "userName"_attr = userName,
+                    "status"_attr = redact(status));
             }
         }
         usersToDrop->erase(userName);
@@ -2532,16 +2539,22 @@ public:
             Status status = updateRoleDocument(opCtx, roleName, roleObj);
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
-                warning() << "Could not update role " << roleName
-                          << " in _mergeAuthzCollections command: " << redact(status);
+                LOGV2_WARNING(
+                    20512,
+                    "Could not update role {roleName} in _mergeAuthzCollections command: {status}",
+                    "roleName"_attr = roleName,
+                    "status"_attr = redact(status));
             }
         } else {
             auditCreateOrUpdateRole(roleObj, true);
             Status status = insertRoleDocument(opCtx, roleObj);
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
-                warning() << "Could not insert role " << roleName
-                          << " in _mergeAuthzCollections command: " << redact(status);
+                LOGV2_WARNING(
+                    20513,
+                    "Could not insert role {roleName} in _mergeAuthzCollections command: {status}",
+                    "roleName"_attr = roleName,
+                    "status"_attr = redact(status));
             }
         }
         rolesToDrop->erase(roleName);

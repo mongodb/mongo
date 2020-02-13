@@ -48,6 +48,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -154,7 +155,7 @@ void ShardingCatalogClientImpl::startup() {
 }
 
 void ShardingCatalogClientImpl::shutDown(OperationContext* opCtx) {
-    LOG(1) << "ShardingCatalogClientImpl::shutDown() called.";
+    LOGV2_DEBUG(22673, 1, "ShardingCatalogClientImpl::shutDown() called.");
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _inShutdown = true;
@@ -722,8 +723,10 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         // document in the list of updates should be returned from a query to the chunks
         // collection. The last chunk can be identified by namespace and version number.
 
-        warning() << "chunk operation commit failed and metadata will be revalidated"
-                  << causedBy(redact(status));
+        LOGV2_WARNING(
+            22675,
+            "chunk operation commit failed and metadata will be revalidated{causedBy_status}",
+            "causedBy_status"_attr = causedBy(redact(status)));
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that
         // mod made it to the config server, then transaction was successful.
@@ -810,7 +813,8 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
         // or it is because we failed to wait for write concern on the first attempt. In order to
         // differentiate, fetch the entry and check.
         if (retry > 1 && status == ErrorCodes::DuplicateKey) {
-            LOG(1) << "Insert retry failed because of duplicate key error, rechecking.";
+            LOGV2_DEBUG(
+                22674, 1, "Insert retry failed because of duplicate key error, rechecking.");
 
             auto fetchDuplicate =
                 _exhaustiveFindOnConfig(opCtx,

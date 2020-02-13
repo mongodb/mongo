@@ -38,6 +38,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -105,8 +106,10 @@ StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
 
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {
-        log() << "Scheduling remote command request for " << _logMessage << ": "
-              << requests[i].toString();
+        LOGV2(21752,
+              "Scheduling remote command request for {logMessage}: {requests_i}",
+              "logMessage"_attr = _logMessage,
+              "requests_i"_attr = requests[i].toString());
         const StatusWith<CallbackHandle> cbh =
             _executor->scheduleRemoteCommand(requests[i], processResponseCB);
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {

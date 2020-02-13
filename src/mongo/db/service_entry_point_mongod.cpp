@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/logger/redaction.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
@@ -84,11 +85,18 @@ public:
             if (ErrorCodes::isExceededTimeLimitError(rcStatus.code())) {
                 const int debugLevel =
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
-                LOG(debugLevel) << "Command on database " << request.getDatabase()
-                                << " timed out waiting for read concern to be satisfied. Command: "
-                                << redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
-                                       invocation->definition(), request.body))
-                                << ". Info: " << redact(rcStatus);
+                LOGV2_DEBUG(
+                    21975,
+                    logSeverityV1toV2(debugLevel).toInt(),
+                    "Command on database {request_getDatabase} timed out waiting for read concern "
+                    "to be satisfied. Command: "
+                    "{ServiceEntryPointCommon_getRedactedCopyForLogging_invocation_definition_"
+                    "request_body}. Info: {rcStatus}",
+                    "request_getDatabase"_attr = request.getDatabase(),
+                    "ServiceEntryPointCommon_getRedactedCopyForLogging_invocation_definition_request_body"_attr =
+                        redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
+                            invocation->definition(), request.body)),
+                    "rcStatus"_attr = redact(rcStatus));
             }
 
             uassertStatusOK(rcStatus);

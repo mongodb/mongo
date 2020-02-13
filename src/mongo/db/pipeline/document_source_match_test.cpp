@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -40,8 +42,10 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -59,7 +63,7 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
             auto match = DocumentSourceMatch::create(fromjson(input), expCtx);
             ASSERT_BSONOBJ_EQ(match->redactSafePortion(), fromjson(safePortion));
         } catch (...) {
-            unittest::log() << "Problem with redactSafePortion() of: " << input;
+            LOGV2(20899, "Problem with redactSafePortion() of: {input}", "input"_attr = input);
             throw;
         }
     };

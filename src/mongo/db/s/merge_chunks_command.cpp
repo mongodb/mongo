@@ -42,6 +42,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -227,8 +228,11 @@ void mergeChunks(OperationContext* opCtx,
 
     if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
         checkMetadataForSuccess(opCtx, nss, epoch, ChunkRange(minKey, maxKey))) {
-        LOG(1) << "mergeChunk [" << redact(minKey) << "," << redact(maxKey)
-               << ") has already been committed.";
+        LOGV2_DEBUG(21983,
+                    1,
+                    "mergeChunk [{minKey},{maxKey}) has already been committed.",
+                    "minKey"_attr = redact(minKey),
+                    "maxKey"_attr = redact(maxKey));
         return;
     }
 

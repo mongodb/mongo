@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/hasher.h"
@@ -36,11 +38,13 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/log.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -117,7 +121,7 @@ protected:
 
     static auto getNewSeed() {
         auto seed = Date_t::now().asInt64();
-        unittest::log() << "Generated new seed is " << seed;
+        LOGV2(20898, "Generated new seed is {seed}", "seed"_attr = seed);
 
         return seed;
     }

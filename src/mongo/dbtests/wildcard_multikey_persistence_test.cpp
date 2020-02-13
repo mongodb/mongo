@@ -36,6 +36,7 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -116,9 +117,12 @@ protected:
             // Confirm that there are no further keys in the index.
             ASSERT(!indexKey);
         } catch (const TestAssertionFailureException& ex) {
-            log() << "Writing remaining index keys to debug log:";
+            LOGV2(22518, "Writing remaining index keys to debug log:");
             while (indexKey) {
-                log() << "{ key: " << indexKey->key << ", loc: " << indexKey->loc << " }";
+                LOGV2(22519,
+                      "{{ key: {indexKey_key}, loc: {indexKey_loc} }}",
+                      "indexKey_key"_attr = indexKey->key,
+                      "indexKey_loc"_attr = indexKey->loc);
                 indexKey = indexCursor->next();
             }
             throw ex;

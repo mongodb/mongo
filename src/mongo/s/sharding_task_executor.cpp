@@ -38,6 +38,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/client/shard_registry.h"
@@ -180,16 +181,21 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
 
             if (!shard) {
-                LOG(1) << "Could not find shard containing host: " << target;
+                LOGV2_DEBUG(22870,
+                            1,
+                            "Could not find shard containing host: {target}",
+                            "target"_attr = target);
             }
 
             if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
-                severe() << "This mongos server must be upgraded. It is attempting to communicate "
+                LOGV2_FATAL(22873,
+                            "This mongos server must be upgraded. It is attempting to communicate "
                             "with "
-                            "an upgraded cluster with which it is incompatible. Error: '"
-                         << args.response.status.toString()
-                         << "' Crashing in order to bring attention to the incompatibility, rather "
-                            "than erroring endlessly.";
+                            "an upgraded cluster with which it is incompatible. Error: "
+                            "'{args_response_status}' Crashing in order to bring attention to the "
+                            "incompatibility, rather "
+                            "than erroring endlessly.",
+                            "args_response_status"_attr = args.response.status.toString());
                 fassertNoTrace(50710, false);
             }
 
@@ -197,7 +203,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
                 shard->updateReplSetMonitor(target, args.response.status);
             }
 
-            LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
+            LOGV2_DEBUG(
+                22871, 1, "Error processing the remote request, not updating operationTime or gLE");
 
             return;
         }
@@ -228,16 +235,21 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
                 auto shardConn = ConnectionString::parse(target.toString());
                 if (!shardConn.isOK()) {
-                    severe() << "got bad host string in saveGLEStats: " << target;
+                    LOGV2_FATAL(22874,
+                                "got bad host string in saveGLEStats: {target}",
+                                "target"_attr = target);
                 }
 
                 clusterGLE->addHostOpTime(shardConn.getValue(),
                                           HostOpTime(shardingMetadata.getLastOpTime(),
                                                      shardingMetadata.getLastElectionId()));
             } else if (swShardingMetadata.getStatus() != ErrorCodes::NoSuchKey) {
-                warning() << "Got invalid sharding metadata "
-                          << redact(swShardingMetadata.getStatus()) << " metadata object was '"
-                          << redact(args.response.data) << "'";
+                LOGV2_WARNING(22872,
+                              "Got invalid sharding metadata {swShardingMetadata_getStatus} "
+                              "metadata object was '{args_response_data}'",
+                              "swShardingMetadata_getStatus"_attr =
+                                  redact(swShardingMetadata.getStatus()),
+                              "args_response_data"_attr = redact(args.response.data));
             }
         }
     };

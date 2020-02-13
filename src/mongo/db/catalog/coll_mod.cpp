@@ -56,6 +56,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
@@ -384,7 +385,7 @@ Status _collModInternal(OperationContext* opCtx,
                     std::make_unique<CollModResultChange>(oldExpireSecs, newExpireSecs, result));
 
                 if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
-                    log() << "collMod - assertAfterIndexUpdate fail point enabled.";
+                    LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled.");
                     uasserted(50970, "trigger rollback after the index update");
                 }
             }

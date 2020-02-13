@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -254,10 +255,14 @@ public:
                               cm->getShardKeyPattern(),
                               ChunkRange(chunk->getMin(), chunk->getMax()));
 
-        log() << "Splitting chunk "
-              << redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString())
-              << " in collection " << nss.ns() << " on shard " << chunk->getShardId() << " at key "
-              << redact(splitPoint);
+        LOGV2(22758,
+              "Splitting chunk {ChunkRange_chunk_getMin_chunk_getMax} in collection {nss_ns} on "
+              "shard {chunk_getShardId} at key {splitPoint}",
+              "ChunkRange_chunk_getMin_chunk_getMax"_attr =
+                  redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
+              "nss_ns"_attr = nss.ns(),
+              "chunk_getShardId"_attr = chunk->getShardId(),
+              "splitPoint"_attr = redact(splitPoint));
 
         uassertStatusOK(
             shardutil::splitChunkAtMultiplePoints(opCtx,

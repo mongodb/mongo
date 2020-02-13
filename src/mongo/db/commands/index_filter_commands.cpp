@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/log.h"
 
@@ -264,7 +265,9 @@ Status ClearFilters::clear(OperationContext* opCtx,
         // Remove entry from plan cache
         planCache->remove(*cq).transitional_ignore();
 
-        LOG(0) << "Removed index filter on " << redact(cq->toStringShort());
+        LOGV2(20479,
+              "Removed index filter on {cq_Short}",
+              "cq_Short"_attr = redact(cq->toStringShort()));
 
         return Status::OK();
     }
@@ -320,7 +323,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         planCache->remove(*cq).transitional_ignore();
     }
 
-    LOG(0) << "Removed all index filters for collection: " << ns;
+    LOGV2(20480, "Removed all index filters for collection: {ns}", "ns"_attr = ns);
 
     return Status::OK();
 }
@@ -397,7 +400,10 @@ Status SetFilter::set(OperationContext* opCtx,
     // Remove entry from plan cache.
     planCache->remove(*cq).transitional_ignore();
 
-    LOG(0) << "Index filter set on " << redact(cq->toStringShort()) << " " << indexesElt;
+    LOGV2(20481,
+          "Index filter set on {cq_Short} {indexesElt}",
+          "cq_Short"_attr = redact(cq->toStringShort()),
+          "indexesElt"_attr = indexesElt);
 
     return Status::OK();
 }

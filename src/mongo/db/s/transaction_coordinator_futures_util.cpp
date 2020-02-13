@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
@@ -96,7 +97,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                 ->grantInternalAuthorization(opCtx->getClient());
 
             if (MONGO_unlikely(hangWhileTargetingLocalHost.shouldFail())) {
-                LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
+                LOGV2(22449, "Hit hangWhileTargetingLocalHost failpoint");
                 hangWhileTargetingLocalHost.pauseWhileSet(opCtx);
             }
 
@@ -232,7 +233,9 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
         if (MONGO_unlikely(hangWhileTargetingRemoteHost.shouldFail())) {
-            LOG(0) << "Hit hangWhileTargetingRemoteHost failpoint for shard " << shardId;
+            LOGV2(22450,
+                  "Hit hangWhileTargetingRemoteHost failpoint for shard {shardId}",
+                  "shardId"_attr = shardId);
             hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 

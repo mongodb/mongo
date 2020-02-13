@@ -52,6 +52,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -90,7 +91,7 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](CursorManager& mgr, CursorId id) {
         uassertStatusOK(mgr.killCursor(opCtx, id, true));
-        log() << "killing cursor: " << id << " as part of killing session(s)";
+        LOGV2(20528, "killing cursor: {id} as part of killing session(s)", "id"_attr = id);
     };
 
     auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));
@@ -141,8 +142,10 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
 
     // Be careful not to dispose of cursors while holding the partition lock.
     for (auto&& cursor : toDisposeWithoutMutex) {
-        log() << "Cursor id " << cursor->cursorid() << " timed out, idle since "
-              << cursor->getLastUseDate();
+        LOGV2(20529,
+              "Cursor id {cursor_cursorid} timed out, idle since {cursor_getLastUseDate}",
+              "cursor_cursorid"_attr = cursor->cursorid(),
+              "cursor_getLastUseDate"_attr = cursor->getLastUseDate());
         cursor->dispose(opCtx);
     }
     return toDisposeWithoutMutex.size();
@@ -212,8 +215,10 @@ void CursorManager::unpin(OperationContext* opCtx,
     // proactively delete the cursor. In other cases we preserve the error code so that the client
     // will see the reason the cursor was killed when asking for the next batch.
     if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled) {
-        LOG(0) << "removing cursor " << cursor->cursorid()
-               << " after completing batch: " << interruptStatus;
+        LOGV2(20530,
+              "removing cursor {cursor_cursorid} after completing batch: {interruptStatus}",
+              "cursor_cursorid"_attr = cursor->cursorid(),
+              "interruptStatus"_attr = interruptStatus);
         return deregisterAndDestroyCursor(std::move(partition), opCtx, std::move(cursor));
     } else if (!interruptStatus.isOK()) {
         cursor->markAsKilled(interruptStatus);

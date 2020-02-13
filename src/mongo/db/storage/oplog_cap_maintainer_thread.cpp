@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -56,7 +57,7 @@ namespace mongo {
 
 bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     if (!getGlobalServiceContext()->getStorageEngine()) {
-        LOG(2) << "OplogCapMaintainerThread: no global storage engine yet";
+        LOGV2_DEBUG(22240, 2, "OplogCapMaintainerThread: no global storage engine yet");
         return false;
     }
 
@@ -81,7 +82,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
             auto databaseHolder = DatabaseHolder::get(opCtx.get());
             auto db = databaseHolder->getDb(opCtx.get(), oplogNss.db());
             if (!db) {
-                LOG(2) << "no local database yet";
+                LOGV2_DEBUG(22241, 2, "no local database yet");
                 return false;
             }
             // We need to hold the database lock while getting the collection. Otherwise a
@@ -90,7 +91,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
             Collection* collection = CollectionCatalog::get(opCtx.get())
                                          .lookupCollectionByNamespace(opCtx.get(), oplogNss);
             if (!collection) {
-                LOG(2) << "no collection " << oplogNss;
+                LOGV2_DEBUG(22242, 2, "no collection {oplogNss}", "oplogNss"_attr = oplogNss);
                 return false;
             }
             rs = collection->getRecordStore();
@@ -102,7 +103,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         return false;
     } catch (const std::exception& e) {
-        severe() << "error in OplogCapMaintainerThread: " << e.what();
+        LOGV2_FATAL(22243, "error in OplogCapMaintainerThread: {e_what}", "e_what"_attr = e.what());
         fassertFailedNoTrace(!"error in OplogCapMaintainerThread");
     } catch (...) {
         fassertFailedNoTrace(!"unknown error in OplogCapMaintainerThread");

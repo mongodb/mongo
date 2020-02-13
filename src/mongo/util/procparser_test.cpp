@@ -38,6 +38,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -222,7 +223,7 @@ TEST(FTDCProcStat, TestLocalStat) {
 
     BSONObj obj = builder.obj();
     auto stringMap = toStringMap(obj);
-    log() << "OBJ:" << obj;
+    LOGV2(23364, "OBJ:{obj}", "obj"_attr = obj);
     ASSERT_KEY("user_ms");
     ASSERT_KEY("nice_ms");
     ASSERT_KEY("idle_ms");
@@ -335,7 +336,7 @@ TEST(FTDCProcMemInfo, TestLocalMemInfo) {
 
     BSONObj obj = builder.obj();
     auto stringMap = toStringMap(obj);
-    log() << "OBJ:" << obj;
+    LOGV2(23365, "OBJ:{obj}", "obj"_attr = obj);
     ASSERT_KEY("MemTotal_kb");
     ASSERT_KEY("MemFree_kb");
     // Needs in 3.15+ - ASSERT_KEY("MemAvailable_kb");
@@ -474,7 +475,7 @@ TEST(FTDCProcNetstat, TestLocalNetstat) {
 
     BSONObj obj = builder.obj();
     auto stringMap = toStringMap(obj);
-    log() << "OBJ:" << obj;
+    LOGV2(23366, "OBJ:{obj}", "obj"_attr = obj);
     ASSERT_KEY("TcpExt:TCPTimeouts");
     ASSERT_KEY("TcpExt:TCPPureAcks");
     ASSERT_KEY("TcpExt:TCPAbortOnTimeout");
@@ -498,7 +499,7 @@ TEST(FTDCProcNetstat, TestLocalNetSnmp) {
 
     BSONObj obj = builder.obj();
     auto stringMap = toStringMap(obj);
-    log() << "OBJ:" << obj;
+    LOGV2(23367, "OBJ:{obj}", "obj"_attr = obj);
     ASSERT_KEY("Ip:InReceives");
     ASSERT_KEY("Ip:OutRequests");
     ASSERT_KEY("Tcp:InSegs");
@@ -612,7 +613,7 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
 
     std::vector<StringData> disks2;
     for (const auto& disk : disks) {
-        log() << "DISK:" << disk;
+        LOGV2(23368, "DISK:{disk}", "disk"_attr = disk);
         disks2.emplace_back(disk);
     }
 
@@ -624,7 +625,7 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
 
     BSONObj obj = builder.obj();
     auto stringMap = toNestedStringMap(obj);
-    log() << "OBJ:" << obj;
+    LOGV2(23369, "OBJ:{obj}", "obj"_attr = obj);
 
     bool foundDisk = false;
 

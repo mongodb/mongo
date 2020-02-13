@@ -144,7 +144,10 @@ public:
     CachedMetaGenerator() = default;
 
     ~CachedMetaGenerator() {
-        log() << "CachedMetaGenerator: " << _hits << "/" << (_hits + _misses);
+        LOGV2(23393,
+              "CachedMetaGenerator: {hits}/{hits_misses}",
+              "hits"_attr = _hits,
+              "hits_misses"_attr = (_hits + _misses));
     }
 
     const RedactedMeta& load(void* addr) {
@@ -406,7 +409,9 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
                           std::vector<int>& missedTids) {
     std::set<int> pendingTids;
     iterateTids([&](int tid) { pendingTids.insert(tid); });
-    log() << "Preparing to dump up to " << pendingTids.size() << " thread stacks";
+    LOGV2(23394,
+          "Preparing to dump up to {pendingTids_size} thread stacks",
+          "pendingTids_size"_attr = pendingTids.size());
 
     messageStorage.resize(pendingTids.size());
     received.reserve(pendingTids.size());
@@ -422,14 +427,19 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
         errno = 0;
         if (int r = tgkill(getpid(), *iter, _signal); r < 0) {
             int errsv = errno;
-            log() << "failed to signal thread (" << *iter << "):" << strerror(errsv);
+            LOGV2(23395,
+                  "failed to signal thread ({iter}):{strerror_errsv}",
+                  "iter"_attr = *iter,
+                  "strerror_errsv"_attr = strerror(errsv));
             missedTids.push_back(*iter);
             iter = pendingTids.erase(iter);
         } else {
             ++iter;
         }
     }
-    log() << "signalled " << pendingTids.size() << " threads";
+    LOGV2(23396,
+          "signalled {pendingTids_size} threads",
+          "pendingTids_size"_attr = pendingTids.size());
 
     size_t napMicros = 0;
     while (!pendingTids.empty()) {
@@ -634,9 +644,13 @@ void initialize(int signal) {
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;
-        severe() << format(FMT_STRING("Failed to install sigaction for signal {} ({})"),
-                           signal,
-                           strerror(savedErr));
+        LOGV2_FATAL(
+            23397,
+            "{format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr}",
+            "format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr"_attr =
+                format(FMT_STRING("Failed to install sigaction for signal {} ({})"),
+                       signal,
+                       strerror(savedErr)));
         fassertFailed(31376);
     }
 }

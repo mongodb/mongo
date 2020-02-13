@@ -54,6 +54,7 @@
 #endif
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/log.h"
 
@@ -157,8 +158,10 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
         // we were unsuccessful
         if (_hostOrIp != "0.0.0.0") {  // don't log if this as it is a
                                        // CRT construction and log() may not work yet.
-            log() << "getaddrinfo(\"" << _hostOrIp
-                  << "\") failed: " << getAddrInfoStrError(addrErr.err);
+            LOGV2(23175,
+                  "getaddrinfo(\"{hostOrIp}\") failed: {getAddrInfoStrError_addrErr_err}",
+                  "hostOrIp"_attr = _hostOrIp,
+                  "getAddrInfoStrError_addrErr_err"_attr = getAddrInfoStrError(addrErr.err));
             _isValid = false;
             return;
         }
@@ -187,7 +190,10 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
 
     auto addrErr = resolveAddrInfo(hostOrIp, port, familyHint);
     if (addrErr.err) {
-        log() << "getaddrinfo(\"" << hostOrIp << "\") failed: " << getAddrInfoStrError(addrErr.err);
+        LOGV2(23176,
+              "getaddrinfo(\"{hostOrIp}\") failed: {getAddrInfoStrError_addrErr_err}",
+              "hostOrIp"_attr = hostOrIp,
+              "getAddrInfoStrError_addrErr_err"_attr = getAddrInfoStrError(addrErr.err));
         return {};
     }
 

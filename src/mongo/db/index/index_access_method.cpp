@@ -52,6 +52,7 @@
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
@@ -113,7 +114,10 @@ bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx,
     // A document might be indexed multiple times during a background index build if it moves ahead
     // of the cursor (e.g. via an update). We test this scenario and swallow the error accordingly.
     if (status == ErrorCodes::DuplicateKeyValue && !_indexCatalogEntry->isReady(opCtx)) {
-        LOG(3) << "KeyString " << key << " already in index during background indexing (ok)";
+        LOGV2_DEBUG(20681,
+                    3,
+                    "KeyString {key} already in index during background indexing (ok)",
+                    "key"_attr = key);
         return false;
     }
     return true;
@@ -200,10 +204,16 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
     } catch (AssertionException& e) {
-        log() << "Assertion failure: _unindex failed on: " << _descriptor->parentNS()
-              << " for index: " << _descriptor->indexName();
-        log() << "Assertion failure: _unindex failed: " << redact(e) << "  KeyString:" << keyString
-              << "  dl:" << loc;
+        LOGV2(20682,
+              "Assertion failure: _unindex failed on: {descriptor_parentNS} for index: "
+              "{descriptor_indexName}",
+              "descriptor_parentNS"_attr = _descriptor->parentNS(),
+              "descriptor_indexName"_attr = _descriptor->indexName());
+        LOGV2(20683,
+              "Assertion failure: _unindex failed: {e}  KeyString:{keyString}  dl:{loc}",
+              "e"_attr = redact(e),
+              "keyString"_attr = keyString,
+              "loc"_attr = loc);
         logContext();
     }
 }
@@ -523,8 +533,13 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
                 // index builder can retry at a point when data is consistent.
                 auto interceptor = _indexCatalogEntry->indexBuildInterceptor();
                 if (interceptor && interceptor->getSkippedRecordTracker()) {
-                    LOG(1) << "Recording suppressed key generation error to retry later: " << status
-                           << " on " << loc << ": " << redact(obj);
+                    LOGV2_DEBUG(20684,
+                                1,
+                                "Recording suppressed key generation error to retry later: "
+                                "{status} on {loc}: {obj}",
+                                "status"_attr = status,
+                                "loc"_attr = loc,
+                                "obj"_attr = redact(obj));
                     interceptor->getSkippedRecordTracker()->record(opCtx, loc);
                 }
             });
@@ -618,9 +633,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         if (kDebugBuild || _descriptor->unique()) {
             cmpData = data.first.compareWithoutRecordId(previousKey);
             if (cmpData < 0) {
-                severe() << "expected the next key" << data.first.toString()
-                         << " to be greater than or equal to the previous key"
-                         << previousKey.toString();
+                LOGV2_FATAL(20687,
+                            "expected the next key{data_first} to be greater than or equal to the "
+                            "previous key{previousKey}",
+                            "data_first"_attr = data.first.toString(),
+                            "previousKey"_attr = previousKey.toString());
                 fassertFailedNoTrace(31171);
             }
         }
@@ -667,8 +684,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     pm.finished();
 
-    log() << "index build: inserted " << bulk->getKeysInserted()
-          << " keys from external sorter into index in " << timer.seconds() << " seconds";
+    LOGV2(20685,
+          "index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
+          "{timer_seconds} seconds",
+          "bulk_getKeysInserted"_attr = bulk->getKeysInserted(),
+          "timer_seconds"_attr = timer.seconds());
 
     WriteUnitOfWork wunit(opCtx);
     builder->commit(true);
@@ -682,8 +702,13 @@ void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, Mult
 
 IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedErrorFn =
     [](Status status, const BSONObj& obj, boost::optional<RecordId> loc) {
-        LOG(1) << "Suppressed key generation error: " << redact(status)
-               << " when getting index keys for " << loc << ": " << redact(obj);
+        LOGV2_DEBUG(
+            20686,
+            1,
+            "Suppressed key generation error: {status} when getting index keys for {loc}: {obj}",
+            "status"_attr = redact(status),
+            "loc"_attr = loc,
+            "obj"_attr = redact(obj));
     };
 
 void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,

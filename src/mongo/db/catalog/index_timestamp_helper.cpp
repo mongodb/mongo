@@ -35,6 +35,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -94,10 +95,15 @@ void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opC
 
     auto status = opCtx->recoveryUnit()->setTimestamp(commitTimestamp);
     if (status.code() == ErrorCodes::BadValue) {
-        log() << "Temporarily could not apply ghost commit timestamp. " << status.reason();
+        LOGV2(20379,
+              "Temporarily could not apply ghost commit timestamp. {status_reason}",
+              "status_reason"_attr = status.reason());
         throw WriteConflictException();
     }
-    LOG(1) << "assigning ghost commit timestamp: " << commitTimestamp.toString();
+    LOGV2_DEBUG(20380,
+                1,
+                "assigning ghost commit timestamp: {commitTimestamp}",
+                "commitTimestamp"_attr = commitTimestamp.toString());
 
     fassert(51053, status);
 }
@@ -153,8 +159,9 @@ bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationConte
     auto status = opCtx->recoveryUnit()->setTimestamp(
         LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
     if (status.code() == ErrorCodes::BadValue) {
-        log() << "Temporarily could not timestamp the index build commit, retrying. "
-              << status.reason();
+        LOGV2(20381,
+              "Temporarily could not timestamp the index build commit, retrying. {status_reason}",
+              "status_reason"_attr = status.reason());
         throw WriteConflictException();
     }
     fassert(50701, status);

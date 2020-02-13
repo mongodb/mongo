@@ -62,6 +62,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -99,10 +100,11 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
 
     auto obj2 = oplogEntry.getObject2();
     if (!obj2) {
-        warning() << "Unable to get collection count from " << desc
-                  << " without the o2 "
-                     "field. oplog op: "
-                  << redact(oplogEntry.toBSON());
+        LOGV2_WARNING(21634,
+                      "Unable to get collection count from {desc} without the o2 "
+                      "field. oplog op: {oplogEntry}",
+                      "desc"_attr = desc,
+                      "oplogEntry"_attr = redact(oplogEntry.toBSON()));
         return boost::none;
     }
 
@@ -110,19 +112,30 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
     // TODO: Use IDL to parse o2 object. See txn_cmds.idl for example.
     auto status = bsonExtractIntegerField(*obj2, kNumRecordsFieldName, &count);
     if (!status.isOK()) {
-        warning() << "Failed to parse " << desc << " for collection count: " << status
-                  << ". oplog op: " << redact(oplogEntry.toBSON());
+        LOGV2_WARNING(
+            21635,
+            "Failed to parse {desc} for collection count: {status}. oplog op: {oplogEntry}",
+            "desc"_attr = desc,
+            "status"_attr = status,
+            "oplogEntry"_attr = redact(oplogEntry.toBSON()));
         return boost::none;
     }
 
     if (count < 0) {
-        warning() << "Invalid collection count found in " << desc << ": " << count
-                  << ". oplog op: " << redact(oplogEntry.toBSON());
+        LOGV2_WARNING(21636,
+                      "Invalid collection count found in {desc}: {count}. oplog op: {oplogEntry}",
+                      "desc"_attr = desc,
+                      "count"_attr = count,
+                      "oplogEntry"_attr = redact(oplogEntry.toBSON()));
         return boost::none;
     }
 
-    LOG(2) << "Parsed collection count of " << count << " from " << desc
-           << ". oplog op: " << redact(oplogEntry.toBSON());
+    LOGV2_DEBUG(21590,
+                2,
+                "Parsed collection count of {count} from {desc}. oplog op: {oplogEntry}",
+                "count"_attr = count,
+                "desc"_attr = desc,
+                "oplogEntry"_attr = redact(oplogEntry.toBSON()));
     return count;
 }
 
@@ -182,8 +195,9 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     _listener->onTransitionToRollback();
 
     if (MONGO_unlikely(rollbackHangAfterTransitionToRollback.shouldFail())) {
-        log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
-                 "point is disabled (rollback_impl).";
+        LOGV2(21591,
+              "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
+              "point is disabled (rollback_impl).");
         rollbackHangAfterTransitionToRollback.pauseWhileSet(opCtx);
     }
 
@@ -251,7 +265,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onRollbackOpObserver(_observerInfo);
 
-    log() << "Rollback complete";
+    LOGV2(21592, "Rollback complete");
 
     return Status::OK();
 }
@@ -308,7 +322,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
 
-    log() << "transition to ROLLBACK";
+    LOGV2(21593, "transition to ROLLBACK");
     {
         ReplicationStateTransitionLockGuard rstlLock(
             opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
@@ -327,7 +341,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
                               << "Cannot transition from "
                               << _replicationCoordinator->getMemberState().toString() << " to "
                               << MemberState(MemberState::RS_ROLLBACK).toString());
-            log() << status;
+            LOGV2(21594, "{status}", "status"_attr = status);
             return status;
         }
     }
@@ -350,14 +364,19 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
 
     // Wait for all background operations to complete by waiting on each database.
     std::vector<StringData> dbNames(dbs.begin(), dbs.end());
-    log() << "Waiting for all background operations to complete before starting rollback";
+    LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
     for (auto db : dbNames) {
         auto numInProg = BackgroundOperation::numInProgForDb(db);
         auto numInProgInCoordinator = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(db);
         if (numInProg > 0 || numInProgInCoordinator > 0) {
-            LOG(1) << "Waiting for "
-                   << (numInProg > numInProgInCoordinator ? numInProg : numInProgInCoordinator)
-                   << " background operations to complete on database '" << db << "'";
+            LOGV2_DEBUG(
+                21596,
+                1,
+                "Waiting for {numInProg_numInProgInCoordinator_numInProg_numInProgInCoordinator} "
+                "background operations to complete on database '{db}'",
+                "numInProg_numInProgInCoordinator_numInProg_numInProgInCoordinator"_attr =
+                    (numInProg > numInProgInCoordinator ? numInProg : numInProgInCoordinator),
+                "db"_attr = db);
             BackgroundOperation::awaitNoBgOpInProgForDb(db);
             IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(db);
         }
@@ -368,7 +387,7 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
         }
     }
 
-    log() << "Finished waiting for background operations to complete before rollback";
+    LOGV2(21597, "Finished waiting for background operations to complete before rollback");
     return Status::OK();
 }
 
@@ -478,7 +497,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
         status = _writeRollbackFiles(opCtx);
         fassert(31228, status);
     } else {
-        log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
+        LOGV2(21598, "Not writing rollback files. 'createRollbackDataFiles' set to false.");
     }
 
     // If there were rolled back operations on any session, invalidate all sessions.
@@ -497,16 +516,24 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 
     // Log the total number of insert and update operations that have been rolled back as a
     // result of recovering to the stable timestamp.
-    log() << "Rollback reverted " << _observerInfo.rollbackCommandCounts[kInsertCmdName]
-          << " insert operations, " << _observerInfo.rollbackCommandCounts[kUpdateCmdName]
-          << " update operations and " << _observerInfo.rollbackCommandCounts[kDeleteCmdName]
-          << " delete operations.";
+    LOGV2(21599,
+          "Rollback reverted {observerInfo_rollbackCommandCounts_kInsertCmdName} insert "
+          "operations, {observerInfo_rollbackCommandCounts_kUpdateCmdName} update operations and "
+          "{observerInfo_rollbackCommandCounts_kDeleteCmdName} delete operations.",
+          "observerInfo_rollbackCommandCounts_kInsertCmdName"_attr =
+              _observerInfo.rollbackCommandCounts[kInsertCmdName],
+          "observerInfo_rollbackCommandCounts_kUpdateCmdName"_attr =
+              _observerInfo.rollbackCommandCounts[kUpdateCmdName],
+          "observerInfo_rollbackCommandCounts_kDeleteCmdName"_attr =
+              _observerInfo.rollbackCommandCounts[kDeleteCmdName]);
 
     // During replication recovery, we truncate all oplog entries with timestamps greater than the
     // oplog truncate after point. If we entered rollback, we are guaranteed to have at least one
     // oplog entry after the common point.
-    log() << "Marking to truncate all oplog entries with timestamps greater than "
-          << commonPoint.getOpTime().getTimestamp();
+    LOGV2(21600,
+          "Marking to truncate all oplog entries with timestamps greater than "
+          "{commonPoint_getOpTime_getTimestamp}",
+          "commonPoint_getOpTime_getTimestamp"_attr = commonPoint.getOpTime().getTimestamp());
     Timestamp truncatePoint = commonPoint.getOpTime().getTimestamp();
 
     // Persist the truncate point to the 'oplogTruncateAfterPoint' document. We save this value so
@@ -568,9 +595,14 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
         // if we just set the collection count here.
         if (sizeRecoveryState(opCtx->getServiceContext())
                 .collectionAlwaysNeedsSizeAdjustment(ident)) {
-            LOG(2) << "Not setting collection count to " << newCount << " for " << nss.ns() << " ("
-                   << uuid.toString() << ") [" << ident
-                   << "] because it is marked for size adjustment.";
+            LOGV2_DEBUG(21601,
+                        2,
+                        "Not setting collection count to {newCount} for {nss_ns} ({uuid}) "
+                        "[{ident}] because it is marked for size adjustment.",
+                        "newCount"_attr = newCount,
+                        "nss_ns"_attr = nss.ns(),
+                        "uuid"_attr = uuid.toString(),
+                        "ident"_attr = ident);
             continue;
         }
 
@@ -578,8 +610,10 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
         // (most likely due to a 4.0 drop oplog entry without the count information), we will
         // determine the correct count here post-recovery using a collection scan.
         if (kCollectionScanRequired == newCount) {
-            log() << "Scanning collection " << nss.ns() << " (" << uuid.toString()
-                  << ") to fix collection count.";
+            LOGV2(21602,
+                  "Scanning collection {nss_ns} ({uuid}) to fix collection count.",
+                  "nss_ns"_attr = nss.ns(),
+                  "uuid"_attr = uuid.toString());
             AutoGetCollectionForRead autoCollToScan(opCtx, nss);
             auto collToScan = autoCollToScan.getCollection();
             invariant(coll == collToScan,
@@ -596,9 +630,13 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             if (PlanExecutor::IS_EOF != state) {
                 // We ignore errors here because crashing or leaving rollback would only leave
                 // collection counts more inaccurate.
-                warning() << "Failed to set count of " << nss.ns() << " (" << uuid.toString()
-                          << ") [" << ident
-                          << "] due to failed collection scan: " << exec->statestr(state);
+                LOGV2_WARNING(21637,
+                              "Failed to set count of {nss_ns} ({uuid}) [{ident}] due to failed "
+                              "collection scan: {exec_statestr_state}",
+                              "nss_ns"_attr = nss.ns(),
+                              "uuid"_attr = uuid.toString(),
+                              "ident"_attr = ident,
+                              "exec_statestr_state"_attr = exec->statestr(state));
                 continue;
             }
             newCount = countFromScan;
@@ -609,11 +647,22 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
         if (!status.isOK()) {
             // We ignore errors here because crashing or leaving rollback would only leave
             // collection counts more inaccurate.
-            warning() << "Failed to set count of " << nss.ns() << " (" << uuid.toString() << ") ["
-                      << ident << "] to " << newCount << ". Received: " << status;
+            LOGV2_WARNING(21638,
+                          "Failed to set count of {nss_ns} ({uuid}) [{ident}] to {newCount}. "
+                          "Received: {status}",
+                          "nss_ns"_attr = nss.ns(),
+                          "uuid"_attr = uuid.toString(),
+                          "ident"_attr = ident,
+                          "newCount"_attr = newCount,
+                          "status"_attr = status);
         } else {
-            LOG(2) << "Set collection count of " << nss.ns() << " (" << uuid.toString() << ") ["
-                   << ident << "] to " << newCount << ".";
+            LOGV2_DEBUG(21603,
+                        2,
+                        "Set collection count of {nss_ns} ({uuid}) [{ident}] to {newCount}.",
+                        "nss_ns"_attr = nss.ns(),
+                        "uuid"_attr = uuid.toString(),
+                        "ident"_attr = ident,
+                        "newCount"_attr = newCount);
         }
     }
 }
@@ -622,7 +671,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
     const auto& catalog = CollectionCatalog::get(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    log() << "finding record store counts";
+    LOGV2(21604, "finding record store counts");
     for (const auto& uiCount : _countDiffs) {
         auto uuid = uiCount.first;
         auto countDiff = uiCount.second;
@@ -662,10 +711,13 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         }
 
         if (oldCount > static_cast<uint64_t>(std::numeric_limits<long long>::max())) {
-            warning() << "Count for " << nss->ns() << " (" << uuid.toString() << ") was "
-                      << oldCount
-                      << " which is larger than the maximum int64_t value. Not attempting to fix "
-                         "count during rollback.";
+            LOGV2_WARNING(21639,
+                          "Count for {nss_ns} ({uuid}) was {oldCount} which is larger than the "
+                          "maximum int64_t value. Not attempting to fix "
+                          "count during rollback.",
+                          "nss_ns"_attr = nss->ns(),
+                          "uuid"_attr = uuid.toString(),
+                          "oldCount"_attr = oldCount);
             continue;
         }
 
@@ -673,17 +725,28 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         auto newCount = oldCountSigned + countDiff;
 
         if (newCount < 0) {
-            warning() << "Attempted to set count for " << nss->ns() << " (" << uuid.toString()
-                      << ") to " << newCount
-                      << " but set it to 0 instead. This is likely due to the count previously "
-                         "becoming inconsistent from an unclean shutdown or a rollback that could "
-                         "not fix the count correctly. Old count: "
-                      << oldCount << ". Count change: " << countDiff;
+            LOGV2_WARNING(
+                21640,
+                "Attempted to set count for {nss_ns} ({uuid}) to {newCount} but set it to 0 "
+                "instead. This is likely due to the count previously "
+                "becoming inconsistent from an unclean shutdown or a rollback that could "
+                "not fix the count correctly. Old count: {oldCount}. Count change: {countDiff}",
+                "nss_ns"_attr = nss->ns(),
+                "uuid"_attr = uuid.toString(),
+                "newCount"_attr = newCount,
+                "oldCount"_attr = oldCount,
+                "countDiff"_attr = countDiff);
             newCount = 0;
         }
-        LOG(2) << "Record count of " << nss->ns() << " (" << uuid.toString()
-               << ") before rollback is " << oldCount << ". Setting it to " << newCount
-               << ", due to change of " << countDiff;
+        LOGV2_DEBUG(21605,
+                    2,
+                    "Record count of {nss_ns} ({uuid}) before rollback is {oldCount}. Setting it "
+                    "to {newCount}, due to change of {countDiff}",
+                    "nss_ns"_attr = nss->ns(),
+                    "uuid"_attr = uuid.toString(),
+                    "oldCount"_attr = oldCount,
+                    "newCount"_attr = newCount,
+                    "countDiff"_attr = countDiff);
         _newCounts[uuid] = newCount;
     }
 
@@ -774,15 +837,17 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             idVal == ShardIdentityType::IdName) {
             // Check if the creation of the shard identity document is being rolled back.
             _observerInfo.shardIdentityRolledBack = true;
-            warning() << "Shard identity document rollback detected. oplog op: "
-                      << redact(oplogEntry.toBSON());
+            LOGV2_WARNING(21641,
+                          "Shard identity document rollback detected. oplog op: {oplogEntry}",
+                          "oplogEntry"_attr = redact(oplogEntry.toBSON()));
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
                    opNss == VersionType::ConfigNS) {
             // Check if the creation of the config server config version document is being rolled
             // back.
             _observerInfo.configServerConfigVersionRolledBack = true;
-            warning() << "Config version document rollback detected. oplog op: "
-                      << redact(oplogEntry.toBSON());
+            LOGV2_WARNING(21642,
+                          "Config version document rollback detected. oplog op: {oplogEntry}",
+                          "oplogEntry"_attr = redact(oplogEntry.toBSON()));
         }
 
         // Rolling back an insert must decrement the count by 1.
@@ -902,7 +967,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
 
-    log() << "finding common point";
+    LOGV2(21606, "finding common point");
 
     // We save some aggregate information about all operations that are rolled back, so that we can
     // pass this information to the rollback op observer. In most cases, other subsystems do not
@@ -934,7 +999,9 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     auto stableTimestamp =
         _storageInterface->getLastStableRecoveryTimestamp(opCtx->getServiceContext());
 
-    log() << "Rollback common point is " << commonPointOpTime;
+    LOGV2(21607,
+          "Rollback common point is {commonPointOpTime}",
+          "commonPointOpTime"_attr = commonPointOpTime);
 
     // Rollback common point should be >= the replication commit point.
     invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
@@ -949,8 +1016,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     if (commonPointOpTime.getTimestamp() < *stableTimestamp) {
         // This is an fassert rather than an invariant, since it can happen if the server was
         // recently upgraded to enableMajorityReadConcern=true.
-        severe() << "Common point must be at least stable timestamp, common point: "
-                 << commonPointOpTime.getTimestamp() << ", stable timestamp: " << *stableTimestamp;
+        LOGV2_FATAL(21644,
+                    "Common point must be at least stable timestamp, common point: "
+                    "{commonPointOpTime_getTimestamp}, stable timestamp: {stableTimestamp}",
+                    "commonPointOpTime_getTimestamp"_attr = commonPointOpTime.getTimestamp(),
+                    "stableTimestamp"_attr = *stableTimestamp);
         fassertFailedNoTrace(51121);
     }
 
@@ -996,11 +1066,13 @@ Status RollbackImpl::_checkAgainstTimeLimit(
         }
 
     } else {
-        warning()
-            << "Wall clock times on oplog entries not monotonically increasing. This "
-               "might indicate a backward clock skew. Time at first oplog after common point: "
-            << firstOpWallClockTimeAfterCommonPoint
-            << ". Time at top of oplog: " << topOfOplogWallTime;
+        LOGV2_WARNING(
+            21643,
+            "Wall clock times on oplog entries not monotonically increasing. This "
+            "might indicate a backward clock skew. Time at first oplog after common point: "
+            "{firstOpWallClockTimeAfterCommonPoint}. Time at top of oplog: {topOfOplogWallTime}",
+            "firstOpWallClockTimeAfterCommonPoint"_attr = firstOpWallClockTimeAfterCommonPoint,
+            "topOfOplogWallTime"_attr = topOfOplogWallTime);
     }
 
     return Status::OK();
@@ -1016,8 +1088,13 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
     } else if (document.getStatus().code() == ErrorCodes::NoSuchKey) {
         return boost::none;
     } else {
-        severe() << "Rollback failed to read document with " << redact(id) << " in namespace "
-                 << nss.ns() << " with uuid " << uuid.toString() << causedBy(document.getStatus());
+        LOGV2_FATAL(21645,
+                    "Rollback failed to read document with {id} in namespace {nss_ns} with uuid "
+                    "{uuid}{causedBy_document_getStatus}",
+                    "id"_attr = redact(id),
+                    "nss_ns"_attr = nss.ns(),
+                    "uuid"_attr = uuid.toString(),
+                    "causedBy_document_getStatus"_attr = causedBy(document.getStatus()));
         fassert(50751, document.getStatus());
     }
 
@@ -1034,10 +1111,12 @@ Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().
         if (!nss && storageEngine->supportsPendingDrops()) {
-            log() << "The collection with UUID " << uuid
-                  << " is missing in the CollectionCatalog. This could be due to a dropped "
-                     " collection. Not writing rollback file for uuid "
-                  << uuid;
+            LOGV2(21608,
+                  "The collection with UUID {uuid} is missing in the CollectionCatalog. This could "
+                  "be due to a dropped "
+                  " collection. Not writing rollback file for uuid {uuid2}",
+                  "uuid"_attr = uuid,
+                  "uuid2"_attr = uuid);
             continue;
         }
 
@@ -1056,8 +1135,12 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
                                                   NamespaceString nss,
                                                   const SimpleBSONObjUnorderedSet& idSet) {
     RemoveSaver removeSaver(kRollbackRemoveSaverType, uuid.toString(), kRollbackRemoveSaverWhy);
-    log() << "Preparing to write deleted documents to a rollback file for collection " << nss.ns()
-          << " with uuid " << uuid.toString() << " to " << removeSaver.file().generic_string();
+    LOGV2(21609,
+          "Preparing to write deleted documents to a rollback file for collection {nss_ns} with "
+          "uuid {uuid} to {removeSaver_file_generic_string}",
+          "nss_ns"_attr = nss.ns(),
+          "uuid"_attr = uuid.toString(),
+          "removeSaver_file_generic_string"_attr = removeSaver.file().generic_string());
 
     // The RemoveSaver will save the data files in a directory structure similar to the following:
     //
@@ -1106,7 +1189,7 @@ Status RollbackImpl::_triggerOpObserver(OperationContext* opCtx) {
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
-    log() << "Triggering the rollback op observer";
+    LOGV2(21610, "Triggering the rollback op observer");
     opCtx->getServiceContext()->getOpObserver()->onReplicationRollback(opCtx, _observerInfo);
     return Status::OK();
 }
@@ -1115,16 +1198,22 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
     invariant(opCtx);
     invariant(_replicationCoordinator->getMemberState() == MemberState(MemberState::RS_ROLLBACK));
 
-    log() << "transition to SECONDARY";
+    LOGV2(21611, "transition to SECONDARY");
 
     ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
     auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {
-        severe() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
-                 << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                 << "; found self in " << _replicationCoordinator->getMemberState()
-                 << causedBy(status);
+        LOGV2_FATAL(
+            21646,
+            "Failed to transition into {MemberState_MemberState_RS_SECONDARY}; expected to be in "
+            "state {MemberState_MemberState_RS_ROLLBACK}; found self in "
+            "{replicationCoordinator_getMemberState}{causedBy_status}",
+            "MemberState_MemberState_RS_SECONDARY"_attr = MemberState(MemberState::RS_SECONDARY),
+            "MemberState_MemberState_RS_ROLLBACK"_attr = MemberState(MemberState::RS_ROLLBACK),
+            "replicationCoordinator_getMemberState"_attr =
+                _replicationCoordinator->getMemberState(),
+            "causedBy_status"_attr = causedBy(status));
         fassertFailedNoTrace(40408);
     }
 }
@@ -1150,21 +1239,36 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
 }
 
 void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
-    log() << "Rollback summary:";
-    log() << "\tstart time: " << _rollbackStats.startTime;
-    log() << "\tend time: " << opCtx->getServiceContext()->getFastClockSource()->now();
-    log() << "\tsync source: " << _remoteOplog->hostAndPort().toString();
-    log() << "\trollback data file directory: "
-          << _rollbackStats.rollbackDataFileDirectory.value_or("none; no files written");
+    LOGV2(21612, "Rollback summary:");
+    LOGV2(21613,
+          "\tstart time: {rollbackStats_startTime}",
+          "rollbackStats_startTime"_attr = _rollbackStats.startTime);
+    LOGV2(21614,
+          "\tend time: {opCtx_getServiceContext_getFastClockSource_now}",
+          "opCtx_getServiceContext_getFastClockSource_now"_attr =
+              opCtx->getServiceContext()->getFastClockSource()->now());
+    LOGV2(21615,
+          "\tsync source: {remoteOplog_hostAndPort}",
+          "remoteOplog_hostAndPort"_attr = _remoteOplog->hostAndPort().toString());
+    LOGV2(21616,
+          "\trollback data file directory: "
+          "{rollbackStats_rollbackDataFileDirectory_value_or_none_no_files_written}",
+          "rollbackStats_rollbackDataFileDirectory_value_or_none_no_files_written"_attr =
+              _rollbackStats.rollbackDataFileDirectory.value_or("none; no files written"));
     if (_rollbackStats.rollbackId) {
-        log() << "\trollback id: " << *_rollbackStats.rollbackId;
+        LOGV2(21617,
+              "\trollback id: {rollbackStats_rollbackId}",
+              "rollbackStats_rollbackId"_attr = *_rollbackStats.rollbackId);
     }
     if (_rollbackStats.lastLocalOptime) {
-        log() << "\tlast optime on branch of history rolled back: "
-              << *_rollbackStats.lastLocalOptime;
+        LOGV2(21618,
+              "\tlast optime on branch of history rolled back: {rollbackStats_lastLocalOptime}",
+              "rollbackStats_lastLocalOptime"_attr = *_rollbackStats.lastLocalOptime);
     }
     if (_rollbackStats.commonPoint) {
-        log() << "\tcommon point optime: " << *_rollbackStats.commonPoint;
+        LOGV2(21619,
+              "\tcommon point optime: {rollbackStats_commonPoint}",
+              "rollbackStats_commonPoint"_attr = *_rollbackStats.commonPoint);
     }
     if (_rollbackStats.lastLocalWallClockTime &&
         _rollbackStats.firstOpWallClockTimeAfterCommonPoint) {
@@ -1175,36 +1279,62 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
         unsigned long long diff =
             durationCount<Seconds>(Milliseconds(lastWall - firstOpWallClockTimeAfterCommonPoint));
 
-        log() << "\tlast wall clock time on the branch of history rolled back: " << lastWall;
-        log() << "\twall clock time of the first operation after the common point: "
-              << firstOpWallClockTimeAfterCommonPoint;
-        log() << "\tdifference in wall clock times: " << diff << " second(s)";
+        LOGV2(21620,
+              "\tlast wall clock time on the branch of history rolled back: {lastWall}",
+              "lastWall"_attr = lastWall);
+        LOGV2(21621,
+              "\twall clock time of the first operation after the common point: "
+              "{firstOpWallClockTimeAfterCommonPoint}",
+              "firstOpWallClockTimeAfterCommonPoint"_attr = firstOpWallClockTimeAfterCommonPoint);
+        LOGV2(21622, "\tdifference in wall clock times: {diff} second(s)", "diff"_attr = diff);
     }
     if (_rollbackStats.truncateTimestamp) {
-        log() << "\ttruncate timestamp: " << *_rollbackStats.truncateTimestamp;
+        LOGV2(21623,
+              "\ttruncate timestamp: {rollbackStats_truncateTimestamp}",
+              "rollbackStats_truncateTimestamp"_attr = *_rollbackStats.truncateTimestamp);
     }
     if (_rollbackStats.stableTimestamp) {
-        log() << "\tstable timestamp: " << *_rollbackStats.stableTimestamp;
+        LOGV2(21624,
+              "\tstable timestamp: {rollbackStats_stableTimestamp}",
+              "rollbackStats_stableTimestamp"_attr = *_rollbackStats.stableTimestamp);
     }
-    log() << "\tshard identity document rolled back: " << std::boolalpha
-          << _observerInfo.shardIdentityRolledBack;
-    log() << "\tconfig server config version document rolled back: " << std::boolalpha
-          << _observerInfo.configServerConfigVersionRolledBack;
-    log() << "\taffected sessions: " << (_observerInfo.rollbackSessionIds.empty() ? "none" : "");
+    LOGV2(21625,
+          "\tshard identity document rolled back: {observerInfo_shardIdentityRolledBack}",
+          "observerInfo_shardIdentityRolledBack"_attr = _observerInfo.shardIdentityRolledBack);
+    LOGV2(21626,
+          "\tconfig server config version document rolled back: "
+          "{observerInfo_configServerConfigVersionRolledBack}",
+          "observerInfo_configServerConfigVersionRolledBack"_attr =
+              _observerInfo.configServerConfigVersionRolledBack);
+    LOGV2(21627,
+          "\taffected sessions: {observerInfo_rollbackSessionIds_empty_none}",
+          "observerInfo_rollbackSessionIds_empty_none"_attr =
+              (_observerInfo.rollbackSessionIds.empty() ? "none" : ""));
     for (const auto& sessionId : _observerInfo.rollbackSessionIds) {
-        log() << "\t\t" << sessionId;
+        LOGV2(21628, "\t\t{sessionId}", "sessionId"_attr = sessionId);
     }
-    log() << "\taffected namespaces: " << (_observerInfo.rollbackNamespaces.empty() ? "none" : "");
+    LOGV2(21629,
+          "\taffected namespaces: {observerInfo_rollbackNamespaces_empty_none}",
+          "observerInfo_rollbackNamespaces_empty_none"_attr =
+              (_observerInfo.rollbackNamespaces.empty() ? "none" : ""));
     for (const auto& nss : _observerInfo.rollbackNamespaces) {
-        log() << "\t\t" << nss.ns();
+        LOGV2(21630, "\t\t{nss_ns}", "nss_ns"_attr = nss.ns());
     }
-    log() << "\tcounts of interesting commands rolled back: "
-          << (_observerInfo.rollbackCommandCounts.empty() ? "none" : "");
+    LOGV2(21631,
+          "\tcounts of interesting commands rolled back: "
+          "{observerInfo_rollbackCommandCounts_empty_none}",
+          "observerInfo_rollbackCommandCounts_empty_none"_attr =
+              (_observerInfo.rollbackCommandCounts.empty() ? "none" : ""));
     for (const auto& entry : _observerInfo.rollbackCommandCounts) {
-        log() << "\t\t" << entry.first << ": " << entry.second;
+        LOGV2(21632,
+              "\t\t{entry_first}: {entry_second}",
+              "entry_first"_attr = entry.first,
+              "entry_second"_attr = entry.second);
     }
-    log() << "\ttotal number of entries rolled back (including no-ops): "
-          << _observerInfo.numberOfEntriesObserved;
+    LOGV2(21633,
+          "\ttotal number of entries rolled back (including no-ops): "
+          "{observerInfo_numberOfEntriesObserved}",
+          "observerInfo_numberOfEntriesObserved"_attr = _observerInfo.numberOfEntriesObserved);
 }
 
 }  // namespace repl

@@ -41,6 +41,7 @@
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -92,9 +93,14 @@ Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
     }
 
     if (kUninitializedRollbackId == _rbid) {
-        log() << "Rollback ID is " << rbidResult.getValue();
+        LOGV2(21529,
+              "Rollback ID is {rbidResult_getValue}",
+              "rbidResult_getValue"_attr = rbidResult.getValue());
     } else {
-        log() << "Rollback ID is " << rbidResult.getValue() << " (previously " << _rbid << ")";
+        LOGV2(21530,
+              "Rollback ID is {rbidResult_getValue} (previously {rbid})",
+              "rbidResult_getValue"_attr = rbidResult.getValue(),
+              "rbid"_attr = _rbid);
     }
     _rbid = rbidResult.getValue();
 
@@ -106,7 +112,7 @@ int ReplicationProcess::getRollbackID() const {
     if (kUninitializedRollbackId == _rbid) {
         // This may happen when serverStatus is called by an internal client before we have a chance
         // to read the rollback ID from storage.
-        warning() << "Rollback ID is not initialized yet.";
+        LOGV2_WARNING(21533, "Rollback ID is not initialized yet.");
     }
     return _rbid;
 }
@@ -122,11 +128,15 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
 
     auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
     if (initRbidSW.isOK()) {
-        log() << "Initialized the rollback ID to " << initRbidSW.getValue();
+        LOGV2(21531,
+              "Initialized the rollback ID to {initRbidSW_getValue}",
+              "initRbidSW_getValue"_attr = initRbidSW.getValue());
         _rbid = initRbidSW.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
-        warning() << "Failed to initialize the rollback ID: " << initRbidSW.getStatus().reason();
+        LOGV2_WARNING(21534,
+                      "Failed to initialize the rollback ID: {initRbidSW_getStatus_reason}",
+                      "initRbidSW_getStatus_reason"_attr = initRbidSW.getStatus().reason());
     }
     return initRbidSW.getStatus();
 }
@@ -139,11 +149,15 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     // If the rollback ID was incremented successfully, cache the new value in _rbid to be returned
     // the next time getRollbackID() is called.
     if (status.isOK()) {
-        log() << "Incremented the rollback ID to " << status.getValue();
+        LOGV2(21532,
+              "Incremented the rollback ID to {status_getValue}",
+              "status_getValue"_attr = status.getValue());
         _rbid = status.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
-        warning() << "Failed to increment the rollback ID: " << status.getStatus().reason();
+        LOGV2_WARNING(21535,
+                      "Failed to increment the rollback ID: {status_getStatus_reason}",
+                      "status_getStatus_reason"_attr = status.getStatus().reason());
     }
 
     return status.getStatus();

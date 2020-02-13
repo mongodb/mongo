@@ -39,6 +39,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 
@@ -205,7 +206,10 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     stdx::lock_guard lk(_metadataManagerLock);
 
     if (!newMetadata.isSharded()) {
-        LOG(0) << "Marking collection " << _nss.ns() << " as " << newMetadata.toStringBasic();
+        LOGV2(21917,
+              "Marking collection {nss_ns} as {newMetadata_Basic}",
+              "nss_ns"_attr = _nss.ns(),
+              "newMetadata_Basic"_attr = newMetadata.toStringBasic());
         _metadataType = MetadataType::kUnsharded;
         _metadataManager.reset();
         ++_numMetadataManagerChanges;
@@ -269,13 +273,18 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             stillScheduled = self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
             if (!stillScheduled) {
-                log() << "Finished deleting " << nss.ns() << " range "
-                      << redact(orphanRange.toString());
+                LOGV2(21918,
+                      "Finished deleting {nss_ns} range {orphanRange}",
+                      "nss_ns"_attr = nss.ns(),
+                      "orphanRange"_attr = redact(orphanRange.toString()));
                 return Status::OK();
             }
         }
 
-        log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
+        LOGV2(21919,
+              "Waiting for deletion of {nss_ns} range {orphanRange}",
+              "nss_ns"_attr = nss.ns(),
+              "orphanRange"_attr = orphanRange);
 
         Status result = stillScheduled->getNoThrow(opCtx);
 

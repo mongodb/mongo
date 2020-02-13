@@ -35,6 +35,7 @@
 
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -167,7 +168,7 @@ void FreeMonController::start(RegistrationType registrationType,
 
 void FreeMonController::stop() {
     // Stop the agent
-    log() << "Shutting down free monitoring";
+    LOGV2(20609, "Shutting down free monitoring");
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -198,7 +199,9 @@ void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
         invariant(_state == State::kStarted);
     }
 
-    log() << "Turning Crank: " << countMessagesToIgnore;
+    LOGV2(20610,
+          "Turning Crank: {countMessagesToIgnore}",
+          "countMessagesToIgnore"_attr = countMessagesToIgnore);
 
     _processor->turnCrankForTest(countMessagesToIgnore);
 }

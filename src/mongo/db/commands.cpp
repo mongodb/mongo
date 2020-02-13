@@ -54,6 +54,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -572,8 +573,10 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
 
             if (closeConnection) {
                 opCtx->getClient()->session()->end();
-                log() << "Failing command '" << cmd->getName()
-                      << "' via 'failCommand' failpoint. Action: closing connection.";
+                LOGV2(20431,
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "closing connection.",
+                      "cmd_getName"_attr = cmd->getName());
                 uasserted(50985, "Failing command due to 'failCommand' failpoint");
             }
 
@@ -587,24 +590,33 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                         "'blockTimeMS' must be non-negative",
                         blockTimeMS >= 0);
 
-                log() << "Blocking command '" << cmd->getName()
-                      << "' via 'failCommand' failpoint for " << blockTimeMS << " milliseconds";
+                LOGV2(20432,
+                      "Blocking command '{cmd_getName}' via 'failCommand' failpoint for "
+                      "{blockTimeMS} milliseconds",
+                      "cmd_getName"_attr = cmd->getName(),
+                      "blockTimeMS"_attr = blockTimeMS);
                 opCtx->sleepFor(Milliseconds{blockTimeMS});
-                log() << "Unblocking command '" << cmd->getName()
-                      << "' via 'failCommand' failpoint";
+                LOGV2(20433,
+                      "Unblocking command '{cmd_getName}' via 'failCommand' failpoint",
+                      "cmd_getName"_attr = cmd->getName());
             }
 
             if (hasExtraInfo) {
-                log() << "Failing command '" << cmd->getName()
-                      << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
-                      << " and " << errorExtraInfo << ".";
+                LOGV2(20434,
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "returning error code {errorCode} and {errorExtraInfo}.",
+                      "cmd_getName"_attr = cmd->getName(),
+                      "errorCode"_attr = errorCode,
+                      "errorExtraInfo"_attr = errorExtraInfo);
                 uassertStatusOK(Status(ErrorCodes::Error(errorCode),
                                        "Failing command due to 'failCommand' failpoint",
                                        errorExtraInfo.Obj()));
             } else if (hasErrorCode) {
-                log() << "Failing command '" << cmd->getName()
-                      << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
-                      << ".";
+                LOGV2(20435,
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "returning error code {errorCode}.",
+                      "cmd_getName"_attr = cmd->getName(),
+                      "errorCode"_attr = errorCode);
                 uasserted(ErrorCodes::Error(errorCode),
                           "Failing command due to 'failCommand' failpoint");
             }
@@ -672,7 +684,10 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             }
         }
     } catch (const DBException& e) {
-        log(LogComponent::kAccessControl) << e.toStatus();
+        LOGV2_OPTIONS(20436,
+                      {logComponentV1toV2(LogComponent::kAccessControl)},
+                      "{e_toStatus}",
+                      "e_toStatus"_attr = e.toStatus());
         CommandHelpers::auditLogAuthEvent(opCtx, this, request, e.code());
         throw;
     }

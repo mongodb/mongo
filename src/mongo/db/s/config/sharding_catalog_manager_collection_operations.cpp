@@ -56,6 +56,7 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -421,15 +422,16 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
         BSONObj(),
         ShardingCatalogClient::kMajorityWriteConcern));
 
-    LOG(1) << "dropCollection " << nss.ns() << " started";
+    LOGV2_DEBUG(21924, 1, "dropCollection {nss_ns} started", "nss_ns"_attr = nss.ns());
 
     sendDropCollectionToAllShards(opCtx, nss);
 
-    LOG(1) << "dropCollection " << nss.ns() << " shard data deleted";
+    LOGV2_DEBUG(21925, 1, "dropCollection {nss_ns} shard data deleted", "nss_ns"_attr = nss.ns());
 
     removeChunksAndTagsForDroppedCollection(opCtx, nss);
 
-    LOG(1) << "dropCollection " << nss.ns() << " chunk and tag data deleted";
+    LOGV2_DEBUG(
+        21926, 1, "dropCollection {nss_ns} chunk and tag data deleted", "nss_ns"_attr = nss.ns());
 
     // Mark the collection as dropped
     CollectionType coll;
@@ -442,11 +444,12 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
     uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
         opCtx, nss, coll, upsert));
 
-    LOG(1) << "dropCollection " << nss.ns() << " collection marked as dropped";
+    LOGV2_DEBUG(
+        21927, 1, "dropCollection {nss_ns} collection marked as dropped", "nss_ns"_attr = nss.ns());
 
     sendSSVToAllShards(opCtx, nss);
 
-    LOG(1) << "dropCollection " << nss.ns() << " completed";
+    LOGV2_DEBUG(21928, 1, "dropCollection {nss_ns} completed", "nss_ns"_attr = nss.ns());
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "dropCollection", nss.ns(), BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
@@ -455,8 +458,10 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
 void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
 
-    LOG(1) << "Ensuring config entries for " << nss.ns()
-           << " from previous dropCollection are cleared";
+    LOGV2_DEBUG(21929,
+                1,
+                "Ensuring config entries for {nss_ns} from previous dropCollection are cleared",
+                "nss_ns"_attr = nss.ns());
     sendDropCollectionToAllShards(opCtx, nss);
     removeChunksAndTagsForDroppedCollection(opCtx, nss);
     sendSSVToAllShards(opCtx, nss);
@@ -479,7 +484,7 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
             .docs;
 
     if (shardedColls.empty()) {
-        LOG(0) << "all sharded collections already have UUIDs";
+        LOGV2(21930, "all sharded collections already have UUIDs");
 
         // We did a local read of the collections collection above and found that all sharded
         // collections already have UUIDs. However, the data may not be majority committed (a
@@ -491,8 +496,10 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
     }
 
     // Generate and persist a new UUID for each collection that did not have a UUID.
-    LOG(0) << "generating UUIDs for " << shardedColls.size()
-           << " sharded collections that do not yet have a UUID";
+    LOGV2(
+        21931,
+        "generating UUIDs for {shardedColls_size} sharded collections that do not yet have a UUID",
+        "shardedColls_size"_attr = shardedColls.size());
     for (auto& coll : shardedColls) {
         auto collType = uassertStatusOK(CollectionType::fromBSON(coll));
         invariant(!collType.getUUID());
@@ -502,8 +509,12 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
 
         uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
             opCtx, collType.getNs(), collType, false /* upsert */));
-        LOG(2) << "updated entry in config.collections for sharded collection " << collType.getNs()
-               << " with generated UUID " << uuid;
+        LOGV2_DEBUG(21932,
+                    2,
+                    "updated entry in config.collections for sharded collection {collType_getNs} "
+                    "with generated UUID {uuid}",
+                    "collType_getNs"_attr = collType.getNs(),
+                    "uuid"_attr = uuid);
     }
 }
 
@@ -617,9 +628,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                                      true /* startTransaction */,
                                                                      txnNumber));
 
-        log() << "refineCollectionShardKey: updated collection entry for '" << nss.ns()
-              << "': took " << executionTimer.millis()
-              << " ms. Total time taken: " << totalTimer.millis() << " ms.";
+        LOGV2(21933,
+              "refineCollectionShardKey: updated collection entry for '{nss_ns}': took "
+              "{executionTimer_millis} ms. Total time taken: {totalTimer_millis} ms.",
+              "nss_ns"_attr = nss.ns(),
+              "executionTimer_millis"_attr = executionTimer.millis(),
+              "totalTimer_millis"_attr = totalTimer.millis());
         executionTimer.reset();
 
         // Update all config.chunks entries for the given namespace by setting (i) their epoch to
@@ -627,7 +641,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // MinKey (except for the global max chunk where the max bounds are set to MaxKey), and
         // unsetting (iii) their jumbo field.
         if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeUpdatingChunks.shouldFail())) {
-            log() << "Hit hangRefineCollectionShardKeyBeforeUpdatingChunks failpoint";
+            LOGV2(21934, "Hit hangRefineCollectionShardKeyBeforeUpdatingChunks failpoint");
             hangRefineCollectionShardKeyBeforeUpdatingChunks.pauseWhileSet(opCtx);
         }
 
@@ -653,9 +667,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             false,  // startTransaction
             txnNumber));
 
-        log() << "refineCollectionShardKey: updated chunk entries for '" << nss.ns() << "': took "
-              << executionTimer.millis() << " ms. Total time taken: " << totalTimer.millis()
-              << " ms.";
+        LOGV2(21935,
+              "refineCollectionShardKey: updated chunk entries for '{nss_ns}': took "
+              "{executionTimer_millis} ms. Total time taken: {totalTimer_millis} ms.",
+              "nss_ns"_attr = nss.ns(),
+              "executionTimer_millis"_attr = executionTimer.millis(),
+              "totalTimer_millis"_attr = totalTimer.millis());
         executionTimer.reset();
 
         // Update all config.tags entries for the given namespace by setting their bounds for each
@@ -680,12 +697,15 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                   false,  // startTransaction
                                                   txnNumber));
 
-        log() << "refineCollectionShardKey: updated zone entries for '" << nss.ns() << "': took "
-              << executionTimer.millis() << " ms. Total time taken: " << totalTimer.millis()
-              << " ms.";
+        LOGV2(21936,
+              "refineCollectionShardKey: updated zone entries for '{nss_ns}': took "
+              "{executionTimer_millis} ms. Total time taken: {totalTimer_millis} ms.",
+              "nss_ns"_attr = nss.ns(),
+              "executionTimer_millis"_attr = executionTimer.millis(),
+              "totalTimer_millis"_attr = totalTimer.millis());
 
         if (MONGO_unlikely(hangRefineCollectionShardKeyBeforeCommit.shouldFail())) {
-            log() << "Hit hangRefineCollectionShardKeyBeforeCommit failpoint";
+            LOGV2(21937, "Hit hangRefineCollectionShardKeyBeforeCommit failpoint");
             hangRefineCollectionShardKeyBeforeCommit.pauseWhileSet(opCtx);
         }
 

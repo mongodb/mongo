@@ -34,6 +34,7 @@
 #include "mongo/db/collection_index_builds_tracker.h"
 
 #include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -110,9 +111,11 @@ void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_loc
             return true;
         }
 
-        log() << "Waiting until the following index builds are finished:";
+        LOGV2(20425, "Waiting until the following index builds are finished:");
         for (const auto& indexBuild : _buildStateByBuildUUID) {
-            log() << "    Index build with UUID: " << indexBuild.first;
+            LOGV2(20426,
+                  "    Index build with UUID: {indexBuild_first}",
+                  "indexBuild_first"_attr = indexBuild.first);
         }
 
         return false;

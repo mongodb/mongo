@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/abstract_oplog_fetcher_test_fixture.h"
 
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -119,13 +123,13 @@ executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(
 
     auto net = getNet();
     executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-    unittest::log() << "scheduling response.";
+    LOGV2(21050, "scheduling response.");
     auto request = net->scheduleSuccessfulResponse(response);
-    unittest::log() << "running network ops.";
+    LOGV2(21051, "running network ops.");
     net->runReadyNetworkOperations();
-    unittest::log() << "checking for more requests";
+    LOGV2(21052, "checking for more requests");
     ASSERT_EQUALS(expectReadyRequestsAfterProcessing, net->hasReadyRequests());
-    unittest::log() << "returning consumed request";
+    LOGV2(21053, "returning consumed request");
     return request;
 }
 

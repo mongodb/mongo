@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/roll_back_local_operations.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -114,7 +115,10 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
 
     while (getTimestamp(_localOplogValue) > getTimestamp(operation)) {
         _scanned++;
-        LOG(2) << "Local oplog entry to roll back: " << redact(_localOplogValue.first);
+        LOGV2_DEBUG(21656,
+                    2,
+                    "Local oplog entry to roll back: {localOplogValue_first}",
+                    "localOplogValue_first"_attr = redact(_localOplogValue.first));
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
             invariant(ErrorCodes::NoSuchKey != status.code());

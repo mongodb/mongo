@@ -60,6 +60,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_pointer.h"
 #include "mongo/logger/log_component_settings.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
@@ -1610,12 +1611,19 @@ StatusWithMatchExpression JSONSchemaParser::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONObj schema,
     bool ignoreUnknownKeywords) {
-    LOG(5) << "Parsing JSON Schema: " << schema.jsonString(JsonStringFormat::LegacyStrict);
+    LOGV2_DEBUG(20728,
+                5,
+                "Parsing JSON Schema: {schema_jsonString_JsonStringFormat_LegacyStrict}",
+                "schema_jsonString_JsonStringFormat_LegacyStrict"_attr =
+                    schema.jsonString(JsonStringFormat::LegacyStrict));
     try {
         auto translation = _parse(expCtx, ""_sd, schema, ignoreUnknownKeywords);
         if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
-            LOG(5) << "Translated schema match expression: "
-                   << translation.getValue()->debugString();
+            LOGV2_DEBUG(20729,
+                        5,
+                        "Translated schema match expression: {translation_getValue_debugString}",
+                        "translation_getValue_debugString"_attr =
+                            translation.getValue()->debugString());
         }
         return translation;
     } catch (const DBException& ex) {

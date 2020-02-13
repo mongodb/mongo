@@ -47,6 +47,7 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
@@ -270,12 +271,12 @@ protected:
 
 public:
     void run() {
-        log() << "SCRAM-SHA-1 variant";
+        LOGV2(20252, "SCRAM-SHA-1 variant");
         saslServerSession = std::make_unique<SaslSCRAMSHA1ServerMechanism>("test");
         _digestPassword = true;
         Test::run();
 
-        log() << "SCRAM-SHA-256 variant";
+        LOGV2(20253, "SCRAM-SHA-256 variant");
         saslServerSession = std::make_unique<SaslSCRAMSHA256ServerMechanism>("test");
         _digestPassword = false;
         Test::run();

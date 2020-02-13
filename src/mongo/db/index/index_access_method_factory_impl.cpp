@@ -40,6 +40,7 @@
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -62,7 +63,9 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethodFactoryImpl::make(
         return std::make_unique<TwoDAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::WILDCARD == type)
         return std::make_unique<WildcardAccessMethod>(entry, std::move(sortedDataInterface));
-    log() << "Can't find index for keyPattern " << desc->keyPattern();
+    LOGV2(20688,
+          "Can't find index for keyPattern {desc_keyPattern}",
+          "desc_keyPattern"_attr = desc->keyPattern());
     fassertFailed(31021);
 }
 

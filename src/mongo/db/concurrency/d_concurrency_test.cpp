@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -2074,9 +2075,13 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
     for (auto& thread : threads)
         thread.join();
     for (int threadId = 0; threadId < numThreads; threadId++) {
-        log() << "thread " << threadId << " stats: " << acquisitionCount[threadId]
-              << " acquisitions, " << timeoutCount[threadId] << " timeouts, "
-              << busyWaitCount[threadId] / 1'000'000 << "M busy waits";
+        LOGV2(20515,
+              "thread {threadId} stats: {acquisitionCount_threadId} acquisitions, "
+              "{timeoutCount_threadId} timeouts, {busyWaitCount_threadId_1_000_000}M busy waits",
+              "threadId"_attr = threadId,
+              "acquisitionCount_threadId"_attr = acquisitionCount[threadId],
+              "timeoutCount_threadId"_attr = timeoutCount[threadId],
+              "busyWaitCount_threadId_1_000_000"_attr = busyWaitCount[threadId] / 1'000'000);
     }
 }
 

@@ -43,6 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/latch_analyzer.h"
@@ -149,10 +150,10 @@ void dumpLevels(const LatchSetState& state) {
         return;
     }
 
-    log() << "Dumping Latch Identities:";
+    LOGV2(23162, "Dumping Latch Identities:");
     auto& identities = *state.identities;
     for (auto& identity : identities) {
-        log() << "- " << identity->name();
+        LOGV2(23163, "- {identity_name}", "identity_name"_attr = identity->name());
     }
 }
 
@@ -227,7 +228,7 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
 
             fassert(31360, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
-            warning() << errorMessage;
+            LOGV2_WARNING(23164, "{errorMessage}", "errorMessage"_attr = errorMessage);
 
             {
                 stdx::lock_guard lk(_mutex);
@@ -286,7 +287,7 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
 
             fassert(31361, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
         } else {
-            warning() << errorMessage;
+            LOGV2_WARNING(23165, "{errorMessage}", "errorMessage"_attr = errorMessage);
 
             {
                 stdx::lock_guard lk(_mutex);

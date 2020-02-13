@@ -63,6 +63,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/log_with_sampling.h"
@@ -97,11 +98,16 @@ void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
                                 StmtId stmtId,
                                 const repl::OpTime& firstOpTime,
                                 const repl::OpTime& secondOpTime) {
-    severe() << "Statement id " << stmtId << " from transaction [ " << lsid.toBSON() << ":"
-             << txnNumber << " ] was committed once with opTime " << firstOpTime
-             << " and a second time with opTime " << secondOpTime
-             << ". This indicates possible data corruption or server bug and the process will be "
-                "terminated.";
+    LOGV2_FATAL(22524,
+                "Statement id {stmtId} from transaction [ {lsid}:{txnNumber} ] was committed once "
+                "with opTime {firstOpTime} and a second time with opTime {secondOpTime}. This "
+                "indicates possible data corruption or server bug and the process will be "
+                "terminated.",
+                "stmtId"_attr = stmtId,
+                "lsid"_attr = lsid.toBSON(),
+                "txnNumber"_attr = txnNumber,
+                "firstOpTime"_attr = firstOpTime,
+                "secondOpTime"_attr = secondOpTime);
     fassertFailed(40526);
 }
 
@@ -654,9 +660,9 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 
 TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
     if (MONGO_unlikely(hangBeforeReleasingTransactionOplogHole.shouldFail())) {
-        log()
-            << "transaction - hangBeforeReleasingTransactionOplogHole fail point enabled. Blocking "
-               "until fail point is disabled.";
+        LOGV2(22520,
+              "transaction - hangBeforeReleasingTransactionOplogHole fail point enabled. Blocking "
+              "until fail point is disabled.");
         hangBeforeReleasingTransactionOplogHole.pauseWhileSet();
     }
 
@@ -1071,9 +1077,12 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         } catch (...) {
             // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
             // instead.
-            severe() << "Caught exception during abort of prepared transaction "
-                     << opCtx->getTxnNumber() << " on " << _sessionId().toBSON() << ": "
-                     << exceptionToStatus();
+            LOGV2_FATAL(22525,
+                        "Caught exception during abort of prepared transaction "
+                        "{opCtx_getTxnNumber} on {sessionId}: {exceptionToStatus}",
+                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
+                        "sessionId"_attr = _sessionId().toBSON(),
+                        "exceptionToStatus"_attr = exceptionToStatus());
             std::terminate();
         }
     });
@@ -1135,9 +1144,11 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
 
         if (MONGO_unlikely(hangAfterReservingPrepareTimestamp.shouldFail())) {
             // This log output is used in js tests so please leave it.
-            log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
-                     "enabled. Blocking until fail point is disabled. Prepare OpTime: "
-                  << prepareOplogSlot;
+            LOGV2(22521,
+                  "transaction - hangAfterReservingPrepareTimestamp fail point "
+                  "enabled. Blocking until fail point is disabled. Prepare OpTime: "
+                  "{prepareOplogSlot}",
+                  "prepareOplogSlot"_attr = prepareOplogSlot);
             hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
@@ -1163,8 +1174,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     }
 
     if (MONGO_unlikely(hangAfterSettingPrepareStartTime.shouldFail())) {
-        log() << "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
-                 "until fail point is disabled.";
+        LOGV2(22522,
+              "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
+              "until fail point is disabled.");
         hangAfterSettingPrepareStartTime.pauseWhileSet();
     }
 
@@ -1390,9 +1402,12 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     } catch (...) {
         // It is illegal for committing a prepared transaction to fail for any reason, other than an
         // invalid command, so we crash instead.
-        severe() << "Caught exception during commit of prepared transaction "
-                 << opCtx->getTxnNumber() << " on " << _sessionId().toBSON() << ": "
-                 << exceptionToStatus();
+        LOGV2_FATAL(22526,
+                    "Caught exception during commit of prepared transaction {opCtx_getTxnNumber} "
+                    "on {sessionId}: {exceptionToStatus}",
+                    "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
+                    "sessionId"_attr = _sessionId().toBSON(),
+                    "exceptionToStatus"_attr = exceptionToStatus());
         std::terminate();
     }
 }
@@ -1518,10 +1533,12 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         } catch (...) {
             // It is illegal for aborting a transaction that must write an abort oplog entry to fail
             // after aborting the storage transaction, so we crash instead.
-            severe()
-                << "Caught exception during abort of transaction that must write abort oplog entry "
-                << opCtx->getTxnNumber() << " on " << _sessionId().toBSON() << ": "
-                << exceptionToStatus();
+            LOGV2_FATAL(22527,
+                        "Caught exception during abort of transaction that must write abort oplog "
+                        "entry {opCtx_getTxnNumber} on {sessionId}: {exceptionToStatus}",
+                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
+                        "sessionId"_attr = _sessionId().toBSON(),
+                        "exceptionToStatus"_attr = exceptionToStatus());
             std::terminate();
         }
     } else {
@@ -1901,9 +1918,13 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            log(logger::LogComponent::kTransaction)
-                << "transaction "
-                << _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs);
+            LOGV2_OPTIONS(
+                22523,
+                {logComponentV1toV2(logger::LogComponent::kTransaction)},
+                "transaction "
+                "{transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs}",
+                "transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs"_attr =
+                    _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs));
         }
     }
 }

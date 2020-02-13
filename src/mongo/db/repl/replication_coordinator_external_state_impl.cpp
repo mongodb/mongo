@@ -94,6 +94,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -238,13 +239,13 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _bgSync =
         std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogApplier.get());
 
-    log() << "Starting replication fetcher thread";
+    LOGV2(21299, "Starting replication fetcher thread");
     _bgSync->startup(opCtx);
 
-    log() << "Starting replication applier thread";
+    LOGV2(21300, "Starting replication applier thread");
     _oplogApplierShutdownFuture = _oplogApplier->startup();
 
-    log() << "Starting replication reporter thread";
+    LOGV2(21301, "Starting replication reporter thread");
     invariant(!_syncSourceFeedbackThread);
     // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
     // leave the unique pointer empty if the _syncSourceFeedbackThread's function starts
@@ -275,18 +276,18 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
     // a pointer of _bgSync.
     if (oldSSF) {
-        log() << "Stopping replication reporter thread";
+        LOGV2(21302, "Stopping replication reporter thread");
         _syncSourceFeedback.shutdown();
         oldSSF->join();
     }
 
     if (oldBgSync) {
-        log() << "Stopping replication fetcher thread";
+        LOGV2(21303, "Stopping replication fetcher thread");
         oldBgSync->shutdown(opCtx);
     }
 
     if (oldApplier) {
-        log() << "Stopping replication applier thread";
+        LOGV2(21304, "Stopping replication applier thread");
         oldApplier->shutdown();
     }
 
@@ -321,11 +322,12 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         return;
     }
     if (_inShutdown) {
-        log() << "Not starting replication storage threads because replication is shutting down.";
+        LOGV2(21305,
+              "Not starting replication storage threads because replication is shutting down.");
         return;
     }
 
-    log() << "Starting replication storage threads";
+    LOGV2(21306, "Starting replication storage threads");
     _service->getStorageEngine()->setJournalListener(this);
 
     _oplogApplierTaskExecutor =
@@ -383,7 +385,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     _stopDataReplication_inlock(opCtx, lk);
 
-    log() << "Stopping replication storage threads";
+    LOGV2(21307, "Stopping replication storage threads");
     _taskExecutor->shutdown();
     _oplogApplierTaskExecutor->shutdown();
 
@@ -396,7 +398,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // itself can block on the ReplicationCoordinator mutex. It is safe to access _noopWriter
     // outside of _threadMutex because _noopWriter is protected by its own mutex.
     invariant(_noopWriter);
-    LOG(1) << "Stopping noop writer";
+    LOGV2_DEBUG(21308, 1, "Stopping noop writer");
     _noopWriter->stopWritingPeriodicNoops();
 
     // We must wait for _taskExecutor outside of _threadMutex, since _taskExecutor is used to run
@@ -877,7 +879,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         // replica set members.
         if (*it == "local")
             continue;
-        LOG(2) << "Removing temporary collections from " << *it;
+        LOGV2_DEBUG(21309, 2, "Removing temporary collections from {it}", "it"_attr = *it);
         AutoGetDb autoDb(opCtx, *it, MODE_IX);
         invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
         autoDb.getDb()->clearTmpCollections(opCtx);
@@ -922,10 +924,11 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
                 _taskExecutor.get(),
                 [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
                     if (MONGO_unlikely(dropPendingCollectionReaperHang.shouldFail())) {
-                        log() << "fail point dropPendingCollectionReaperHang enabled. "
-                                 "Blocking until fail point is disabled. "
-                                 "committedOpTime: "
-                              << committedOpTime;
+                        LOGV2(21310,
+                              "fail point dropPendingCollectionReaperHang enabled. "
+                              "Blocking until fail point is disabled. "
+                              "committedOpTime: {committedOpTime}",
+                              "committedOpTime"_attr = committedOpTime);
                         dropPendingCollectionReaperHang.pauseWhileSet();
                     }
                     auto opCtx = cc().makeOperationContext();

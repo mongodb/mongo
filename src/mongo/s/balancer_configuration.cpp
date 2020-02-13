@@ -43,6 +43,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -242,8 +243,12 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx)
     }
 
     if (settings.getMaxChunkSizeBytes() != getMaxChunkSizeBytes()) {
-        log() << "MaxChunkSize changing from " << getMaxChunkSizeBytes() / (1024 * 1024) << "MB"
-              << " to " << settings.getMaxChunkSizeBytes() / (1024 * 1024) << "MB";
+        LOGV2(22640,
+              "MaxChunkSize changing from {getMaxChunkSizeBytes_1024_1024}MB to "
+              "{settings_getMaxChunkSizeBytes_1024_1024}MB",
+              "getMaxChunkSizeBytes_1024_1024"_attr = getMaxChunkSizeBytes() / (1024 * 1024),
+              "settings_getMaxChunkSizeBytes_1024_1024"_attr =
+                  settings.getMaxChunkSizeBytes() / (1024 * 1024));
 
         _maxChunkSizeBytes.store(settings.getMaxChunkSizeBytes());
     }
@@ -268,8 +273,10 @@ Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* opCtx)
     }
 
     if (settings.getShouldAutoSplit() != getShouldAutoSplit()) {
-        log() << "ShouldAutoSplit changing from " << getShouldAutoSplit() << " to "
-              << settings.getShouldAutoSplit();
+        LOGV2(22641,
+              "ShouldAutoSplit changing from {getShouldAutoSplit} to {settings_getShouldAutoSplit}",
+              "getShouldAutoSplit"_attr = getShouldAutoSplit(),
+              "settings_getShouldAutoSplit"_attr = settings.getShouldAutoSplit());
 
         _shouldAutoSplit.store(settings.getShouldAutoSplit());
     }

@@ -56,6 +56,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -469,7 +470,7 @@ Status DBClientBase::authenticateInternalUser() {
     ScopedMetadataWriterRemover remover{this};
     if (!auth::isInternalAuthSet()) {
         if (!serverGlobalParams.quiet.load()) {
-            log() << "ERROR: No authentication parameters set for internal user";
+            LOGV2(20116, "ERROR: No authentication parameters set for internal user");
         }
         return {ErrorCodes::AuthenticationFailed,
                 "No authentication parameters set for internal user"};
@@ -491,8 +492,10 @@ Status DBClientBase::authenticateInternalUser() {
     }
 
     if (serverGlobalParams.quiet.load()) {
-        log() << "can't authenticate to " << toString()
-              << " as internal user, error: " << status.reason();
+        LOGV2(20117,
+              "can't authenticate to {} as internal user, error: {status_reason}",
+              ""_attr = toString(),
+              "status_reason"_attr = status.reason());
     }
 
     return status;
@@ -892,7 +895,10 @@ void DBClientBase::dropIndex(const string& ns, const string& indexName) {
     if (!runCommand(nsToDatabase(ns),
                     BSON("dropIndexes" << nsToCollectionSubstring(ns) << "index" << indexName),
                     info)) {
-        LOG(_logLevel) << "dropIndex failed: " << info << endl;
+        LOGV2_DEBUG(20118,
+                    logSeverityV1toV2(_logLevel).toInt(),
+                    "dropIndex failed: {info}",
+                    "info"_attr = info);
         uassert(10007, "dropIndex failed", 0);
     }
 }

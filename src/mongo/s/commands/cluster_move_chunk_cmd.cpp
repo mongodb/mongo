@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -119,7 +120,7 @@ public:
             std::string msg(str::stream()
                             << "Could not move chunk in '" << nss.ns() << "' to shard '" << toString
                             << "' because that shard does not exist");
-            log() << msg;
+            LOGV2(22755, "{msg}", "msg"_attr = msg);
             uasserted(ErrorCodes::ShardNotFound, msg);
         }
 

@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -141,10 +142,15 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // existing cache entry nor cache the result of replanning.
             BSONObj statusObj = WorkingSetCommon::getStatusMemberDocument(*_ws, id)->toBson();
 
-            LOG(1) << "Execution of cached plan failed, falling back to replan."
-                   << " query: " << redact(_canonicalQuery->toStringShort())
-                   << " planSummary: " << Explain::getPlanSummary(child().get())
-                   << " status: " << redact(statusObj);
+            LOGV2_DEBUG(20579,
+                        1,
+                        "Execution of cached plan failed, falling back to replan. query: "
+                        "{canonicalQuery_Short} planSummary: {Explain_getPlanSummary_child_get} "
+                        "status: {statusObj}",
+                        "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
+                        "Explain_getPlanSummary_child_get"_attr =
+                            Explain::getPlanSummary(child().get()),
+                        "statusObj"_attr = redact(statusObj));
 
             const bool shouldCache = false;
             return replan(yieldPolicy,
@@ -158,11 +164,16 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // If we're here, the trial period took more than 'maxWorksBeforeReplan' work cycles. This
     // plan is taking too long, so we replan from scratch.
-    LOG(1) << "Execution of cached plan required " << maxWorksBeforeReplan
-           << " works, but was originally cached with only " << _decisionWorks
-           << " works. Evicting cache entry and replanning query: "
-           << redact(_canonicalQuery->toStringShort())
-           << " plan summary before replan: " << Explain::getPlanSummary(child().get());
+    LOGV2_DEBUG(
+        20580,
+        1,
+        "Execution of cached plan required {maxWorksBeforeReplan} works, but was originally cached "
+        "with only {decisionWorks} works. Evicting cache entry and replanning query: "
+        "{canonicalQuery_Short} plan summary before replan: {Explain_getPlanSummary_child_get}",
+        "maxWorksBeforeReplan"_attr = maxWorksBeforeReplan,
+        "decisionWorks"_attr = _decisionWorks,
+        "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
+        "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()));
 
     const bool shouldCache = true;
     return replan(
@@ -222,11 +233,15 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
 
-        LOG(1)
-            << "Replanning of query resulted in single query solution, which will not be cached. "
-            << redact(_canonicalQuery->toStringShort())
-            << " plan summary after replan: " << Explain::getPlanSummary(child().get())
-            << " previous cache entry evicted: " << (shouldCache ? "yes" : "no");
+        LOGV2_DEBUG(
+            20581,
+            1,
+            "Replanning of query resulted in single query solution, which will not be cached. "
+            "{canonicalQuery_Short} plan summary after replan: {Explain_getPlanSummary_child_get} "
+            "previous cache entry evicted: {shouldCache_yes_no}",
+            "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
+            "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()),
+            "shouldCache_yes_no"_attr = (shouldCache ? "yes" : "no"));
         return Status::OK();
     }
 
@@ -255,9 +270,14 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         return pickBestPlanStatus;
     }
 
-    LOG(1) << "Replanning " << redact(_canonicalQuery->toStringShort())
-           << " resulted in plan with summary: " << Explain::getPlanSummary(child().get())
-           << ", which " << (shouldCache ? "has" : "has not") << " been written to the cache";
+    LOGV2_DEBUG(20582,
+                1,
+                "Replanning {canonicalQuery_Short} resulted in plan with summary: "
+                "{Explain_getPlanSummary_child_get}, which {shouldCache_has_has_not} been written "
+                "to the cache",
+                "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
+                "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()),
+                "shouldCache_has_has_not"_attr = (shouldCache ? "has" : "has not"));
     return Status::OK();
 }
 
@@ -302,12 +322,19 @@ void CachedPlanStage::updatePlanCache() {
     PlanCache* cache = CollectionQueryInfo::get(collection()).getPlanCache();
     Status fbs = cache->feedback(*_canonicalQuery, score);
     if (!fbs.isOK()) {
-        LOG(5) << _canonicalQuery->ns() << ": Failed to update cache with feedback: " << redact(fbs)
-               << " - "
-               << "(query: " << redact(_canonicalQuery->getQueryObj())
-               << "; sort: " << _canonicalQuery->getQueryRequest().getSort()
-               << "; projection: " << _canonicalQuery->getQueryRequest().getProj()
-               << ") is no longer in plan cache.";
+        LOGV2_DEBUG(
+            20583,
+            5,
+            "{canonicalQuery_ns}: Failed to update cache with feedback: {fbs} - (query: "
+            "{canonicalQuery_getQueryObj}; sort: {canonicalQuery_getQueryRequest_getSort}; "
+            "projection: {canonicalQuery_getQueryRequest_getProj}) is no longer in plan cache.",
+            "canonicalQuery_ns"_attr = _canonicalQuery->ns(),
+            "fbs"_attr = redact(fbs),
+            "canonicalQuery_getQueryObj"_attr = redact(_canonicalQuery->getQueryObj()),
+            "canonicalQuery_getQueryRequest_getSort"_attr =
+                _canonicalQuery->getQueryRequest().getSort(),
+            "canonicalQuery_getQueryRequest_getProj"_attr =
+                _canonicalQuery->getQueryRequest().getProj());
     }
 }
 

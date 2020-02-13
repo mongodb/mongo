@@ -53,6 +53,7 @@
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
 #include "mongo/util/sequence_util.h"
@@ -187,10 +188,15 @@ Status doSaslStep(OperationContext* opCtx,
     StatusWith<std::string> swResponse = mechanism.step(opCtx, payload);
 
     if (!swResponse.isOK()) {
-        log() << "SASL " << mechanism.mechanismName() << " authentication failed for "
-              << mechanism.getPrincipalName() << " on " << mechanism.getAuthenticationDatabase()
-              << " from client " << opCtx->getClient()->getRemote().toString() << " ; "
-              << redact(swResponse.getStatus());
+        LOGV2(20249,
+              "SASL {mechanism_mechanismName} authentication failed for "
+              "{mechanism_getPrincipalName} on {mechanism_getAuthenticationDatabase} from client "
+              "{opCtx_getClient_getRemote} ; {swResponse_getStatus}",
+              "mechanism_mechanismName"_attr = mechanism.mechanismName(),
+              "mechanism_getPrincipalName"_attr = mechanism.getPrincipalName(),
+              "mechanism_getAuthenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
+              "opCtx_getClient_getRemote"_attr = opCtx->getClient()->getRemote().toString(),
+              "swResponse_getStatus"_attr = redact(swResponse.getStatus()));
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
@@ -211,9 +217,14 @@ Status doSaslStep(OperationContext* opCtx,
         }
 
         if (!serverGlobalParams.quiet.load()) {
-            log() << "Successfully authenticated as principal " << mechanism.getPrincipalName()
-                  << " on " << mechanism.getAuthenticationDatabase() << " from client "
-                  << opCtx->getClient()->session()->remote();
+            LOGV2(20250,
+                  "Successfully authenticated as principal {mechanism_getPrincipalName} on "
+                  "{mechanism_getAuthenticationDatabase} from client "
+                  "{opCtx_getClient_session_remote}",
+                  "mechanism_getPrincipalName"_attr = mechanism.getPrincipalName(),
+                  "mechanism_getAuthenticationDatabase"_attr =
+                      mechanism.getAuthenticationDatabase(),
+                  "opCtx_getClient_session_remote"_attr = opCtx->getClient()->session()->remote());
         }
         if (session->isSpeculative()) {
             authCounter.incSpeculativeAuthenticateSuccessful(mechanism.mechanismName().toString());

@@ -40,6 +40,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -80,7 +81,8 @@ void DocumentSourceCursor::loadBatch() {
     }
 
     while (MONGO_unlikely(hangBeforeDocumentSourceCursorLoadBatch.shouldFail())) {
-        log() << "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint";
+        LOGV2(20895,
+              "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint");
         sleepmillis(10);
     }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
@@ -345,7 +346,8 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
     } else if (!itDbEntry->second->dbt ||
                databaseVersion::equal(itDbEntry->second->dbt->getVersion(), databaseVersion)) {
         // If the versions match, the cached database info is stale, so mark it as needs refresh.
-        log() << "Marking cached database entry for '" << dbName << "' as stale";
+        LOGV2(
+            22642, "Marking cached database entry for '{dbName}' as stale", "dbName"_attr = dbName);
         itDbEntry->second->needsRefresh = true;
     }
 }
@@ -456,14 +458,23 @@ void CatalogCache::invalidateShardForShardedCollection(const NamespaceString& ns
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    log() << "Starting to invalidate databases and collections with data on shard: " << shardId;
+    LOGV2(22643,
+          "Starting to invalidate databases and collections with data on shard: {shardId}",
+          "shardId"_attr = shardId);
 
     // Invalidate databases with this shard as their primary.
     for (const auto& [dbNs, dbInfoEntry] : _databases) {
-        LOG(3) << "Checking if database " << dbNs << "has primary shard: " << shardId;
+        LOGV2_DEBUG(22644,
+                    3,
+                    "Checking if database {dbNs}has primary shard: {shardId}",
+                    "dbNs"_attr = dbNs,
+                    "shardId"_attr = shardId);
         if (!dbInfoEntry->needsRefresh && dbInfoEntry->dbt->getPrimary() == shardId) {
-            LOG(3) << "Database " << dbNs << "has primary shard " << shardId
-                   << ", invalidating cache entry";
+            LOGV2_DEBUG(22645,
+                        3,
+                        "Database {dbNs}has primary shard {shardId}, invalidating cache entry",
+                        "dbNs"_attr = dbNs,
+                        "shardId"_attr = shardId);
             dbInfoEntry->needsRefresh = true;
         }
     }
@@ -472,7 +483,11 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     for (const auto& [db, collInfoMap] : _collectionsByDb) {
         for (const auto& [collNs, collRoutingInfoEntry] : collInfoMap) {
 
-            LOG(3) << "Checking if " << collNs << "has data on shard: " << shardId;
+            LOGV2_DEBUG(22646,
+                        3,
+                        "Checking if {collNs}has data on shard: {shardId}",
+                        "collNs"_attr = collNs,
+                        "shardId"_attr = shardId);
             // The set of shards on which this collection contains chunks.
             std::set<ShardId> shardsOwningDataForCollection;
             if (collRoutingInfoEntry->routingInfo) {
@@ -480,8 +495,11 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 
                 if (shardsOwningDataForCollection.find(shardId) !=
                     shardsOwningDataForCollection.end()) {
-                    LOG(3) << collNs << "has data on shard " << shardId
-                           << ", invalidating cache entry";
+                    LOGV2_DEBUG(22647,
+                                3,
+                                "{collNs}has data on shard {shardId}, invalidating cache entry",
+                                "collNs"_attr = collNs,
+                                "shardId"_attr = shardId);
 
                     collRoutingInfoEntry->routingInfo->setShardStale(shardId);
                 }
@@ -489,7 +507,9 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
         }
     }
 
-    log() << "Finished invalidating databases and collections with data on shard: " << shardId;
+    LOGV2(22648,
+          "Finished invalidating databases and collections with data on shard: {shardId}",
+          "shardId"_attr = shardId);
 }
 
 void CatalogCache::purgeCollection(const NamespaceString& nss) {

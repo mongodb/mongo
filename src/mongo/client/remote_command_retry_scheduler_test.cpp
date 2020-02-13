@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -39,9 +41,11 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace {
@@ -555,7 +559,9 @@ TEST_F(RemoteCommandRetrySchedulerTest,
         request,
         [&result,
          sharedCallbackData](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba) {
-            unittest::log() << "setting result to " << rcba.response.status;
+            LOGV2(20156,
+                  "setting result to {rcba_response_status}",
+                  "rcba_response_status"_attr = rcba.response.status);
             result = rcba.response.status;
         },
         std::move(policy));

@@ -51,6 +51,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
@@ -538,8 +539,14 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 throw;
             }
 
-            LOG(1) << "Received error status for query " << redact(query.toStringShort())
-                   << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
+            LOGV2_DEBUG(22839,
+                        1,
+                        "Received error status for query {query_Short} on attempt {retries} of "
+                        "{kMaxRetries}: {ex}",
+                        "query_Short"_attr = redact(query.toStringShort()),
+                        "retries"_attr = retries,
+                        "kMaxRetries"_attr = kMaxRetries,
+                        "ex"_attr = redact(ex));
 
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                      ex->getVersionReceived());
@@ -573,8 +580,14 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 throw;
             }
 
-            LOG(1) << "Received error status for query " << redact(query.toStringShort())
-                   << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
+            LOGV2_DEBUG(22840,
+                        1,
+                        "Received error status for query {query_Short} on attempt {retries} of "
+                        "{kMaxRetries}: {ex}",
+                        "query_Short"_attr = redact(query.toStringShort()),
+                        "retries"_attr = retries,
+                        "kMaxRetries"_attr = kMaxRetries,
+                        "ex"_attr = redact(ex));
 
             if (ex.code() != ErrorCodes::ShardInvalidatedForTargeting) {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {

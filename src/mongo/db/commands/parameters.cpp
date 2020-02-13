@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -358,8 +359,11 @@ public:
             try {
                 uassertStatusOK(foundParameter->second->set(parameter));
             } catch (const DBException& ex) {
-                log() << "error setting parameter " << parameterName << " to "
-                      << redact(parameter.toString(false)) << " errMsg: " << redact(ex);
+                LOGV2(20496,
+                      "error setting parameter {parameterName} to {parameter_false} errMsg: {ex}",
+                      "parameterName"_attr = parameterName,
+                      "parameter_false"_attr = redact(parameter.toString(false)),
+                      "ex"_attr = redact(ex));
                 throw;
             }
 

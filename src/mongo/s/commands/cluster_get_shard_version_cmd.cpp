@@ -35,6 +35,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/database_version_gen.h"
@@ -114,7 +115,7 @@ public:
                 bool exceedsSizeLimit = false;
 
                 for (const auto& chunk : cm->chunks()) {
-                    log() << redact(chunk.toString());
+                    LOGV2(22753, "{chunk}", "chunk"_attr = redact(chunk.toString()));
                     if (!exceedsSizeLimit) {
                         BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
                         chunkBB.append(chunk.getMin());

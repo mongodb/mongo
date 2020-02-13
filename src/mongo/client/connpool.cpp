@@ -44,6 +44,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -267,8 +268,10 @@ public:
                 PoolForHost& p = _this->_pools[PoolKey(host, timeout)];
 
                 if (p.openConnections() >= _this->_maxInUse) {
-                    log() << "Too many in-use connections; waiting until there are fewer than "
-                          << _this->_maxInUse;
+                    LOGV2(20112,
+                          "Too many in-use connections; waiting until there are fewer than "
+                          "{this_maxInUse}",
+                          "this_maxInUse"_attr = _this->_maxInUse);
                     p.waitForFreeConnection(timeout, lk);
                 } else {
                     // Drop the lock here, so we can connect without holding it.
@@ -352,9 +355,13 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
         throw;
     }
 
-    log() << "Successfully connected to " << ident << " (" << openConnections(ident, socketTimeout)
-          << " connections now open to " << ident << " with a " << socketTimeout
-          << " second timeout)";
+    LOGV2(20113,
+          "Successfully connected to {ident} ({openConnections_ident_socketTimeout} connections "
+          "now open to {ident2} with a {socketTimeout} second timeout)",
+          "ident"_attr = ident,
+          "openConnections_ident_socketTimeout"_attr = openConnections(ident, socketTimeout),
+          "ident2"_attr = ident,
+          "socketTimeout"_attr = socketTimeout);
 
     return conn;
 }
@@ -472,7 +479,7 @@ void DBConnectionPool::flush() {
 
 void DBConnectionPool::clear() {
     stdx::lock_guard<Latch> L(_mutex);
-    LOG(2) << "Removing connections on all pools owned by " << _name << endl;
+    LOGV2_DEBUG(20114, 2, "Removing connections on all pools owned by {name}", "name"_attr = _name);
     for (PoolMap::iterator iter = _pools.begin(); iter != _pools.end(); ++iter) {
         iter->second.clear();
     }
@@ -480,7 +487,8 @@ void DBConnectionPool::clear() {
 
 void DBConnectionPool::removeHost(const string& host) {
     stdx::lock_guard<Latch> L(_mutex);
-    LOG(2) << "Removing connections from all pools for host: " << host << endl;
+    LOGV2_DEBUG(
+        20115, 2, "Removing connections from all pools for host: {host}", "host"_attr = host);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
         const string& poolHost = i->first.ident;
         if (!serverNameCompare()(host, poolHost) && !serverNameCompare()(poolHost, host)) {

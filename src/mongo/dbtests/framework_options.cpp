@@ -43,6 +43,7 @@
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -119,7 +120,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     }
 
     if (kDebugBuild)
-        log() << "DEBUG build" << endl;
+        LOGV2(22491, "DEBUG build");
 
     string dbpathString = p.string();
     storageGlobalParams.dbpath = dbpathString.c_str();
@@ -128,7 +129,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     gFlowControlEnabled.store(params["enableFlowControl"].as<bool>());
 
     if (gFlowControlEnabled.load()) {
-        log() << "Flow Control enabled" << endl;
+        LOGV2(22492, "Flow Control enabled");
     }
 
     if (storageGlobalParams.engine == "wiredTiger" &&

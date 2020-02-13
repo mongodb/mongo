@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -82,8 +83,11 @@ public:
                 base->run();
             }
         } catch (...) {
-            log() << "exception while testing with allowFastPath=" << _allowFastPath
-                  << " and allowFallBackToDefault=" << AllowFallBackToDefault;
+            LOGV2(20587,
+                  "exception while testing with allowFastPath={allowFastPath} and "
+                  "allowFallBackToDefault={AllowFallBackToDefault}",
+                  "allowFastPath"_attr = _allowFastPath,
+                  "AllowFallBackToDefault"_attr = AllowFallBackToDefault);
             throw;
         }
     }

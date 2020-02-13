@@ -58,6 +58,7 @@
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -90,7 +91,7 @@ Status repairCollections(OperationContext* opCtx,
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
 
-        log() << "Repairing collection " << nss;
+        LOGV2(21027, "Repairing collection {nss}", "nss"_attr = nss);
 
         auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
@@ -128,7 +129,9 @@ Status repairCollections(OperationContext* opCtx,
             return status;
         }
 
-        log() << "Collection validation results: " << output.done();
+        LOGV2(21028,
+              "Collection validation results: {output_done}",
+              "output_done"_attr = output.done());
 
         if (!validateResults.valid) {
             status = rebuildIndexesForNamespace(opCtx, nss, engine);
@@ -148,7 +151,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     invariant(opCtx->lockState()->isW());
     invariant(dbName.find('.') == std::string::npos);
 
-    log() << "repairDatabase " << dbName;
+    LOGV2(21029, "repairDatabase {dbName}", "dbName"_attr = dbName);
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
@@ -163,7 +166,10 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
-        severe() << "Failed to repair database " << dbName << ": " << status.reason();
+        LOGV2_FATAL(21030,
+                    "Failed to repair database {dbName}: {status_reason}",
+                    "dbName"_attr = dbName,
+                    "status_reason"_attr = status.reason());
     }
 
     try {
@@ -189,7 +195,8 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
         // have a UUID.
         throw;
     } catch (...) {
-        severe() << "Unexpected exception encountered while reopening database after repair.";
+        LOGV2_FATAL(21031,
+                    "Unexpected exception encountered while reopening database after repair.");
         std::terminate();  // Logs additional info about the specific error.
     }
 

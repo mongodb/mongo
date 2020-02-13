@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -141,8 +142,12 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
         } else {
             // Since the mongod version is only used for reporting, there is no need to fail the
             // entire round if it cannot be retrieved, so just leave it empty
-            log() << "Unable to obtain shard version for " << shard.getName()
-                  << causedBy(mongoDVersionStatus.getStatus());
+            LOGV2(21895,
+                  "Unable to obtain shard version for "
+                  "{shard_getName}{causedBy_mongoDVersionStatus_getStatus}",
+                  "shard_getName"_attr = shard.getName(),
+                  "causedBy_mongoDVersionStatus_getStatus"_attr =
+                      causedBy(mongoDVersionStatus.getStatus()));
         }
 
         std::set<std::string> shardTags;

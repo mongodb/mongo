@@ -36,6 +36,7 @@
 #include <functional>
 #include <memory>
 
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -84,10 +85,12 @@ Status launchServiceWorkerThread(std::function<void()> task) {
             int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
             if (failed) {
                 const auto ewd = errnoWithDescription(failed);
-                warning() << "pthread_attr_setstacksize failed: " << ewd;
+                LOGV2_WARNING(22949, "pthread_attr_setstacksize failed: {ewd}", "ewd"_attr = ewd);
             }
         } else if (limits.rlim_cur < 1024 * 1024) {
-            warning() << "Stack size set to " << (limits.rlim_cur / 1024) << "KB. We suggest 1MB";
+            LOGV2_WARNING(22950,
+                          "Stack size set to {limits_rlim_cur_1024}KB. We suggest 1MB",
+                          "limits_rlim_cur_1024"_attr = (limits.rlim_cur / 1024));
         }
 
         // Wrap the user-specified `task` so it runs with an installed `sigaltstack`.
@@ -104,7 +107,9 @@ Status launchServiceWorkerThread(std::function<void()> task) {
         pthread_attr_destroy(&attrs);
 
         if (failed) {
-            log() << "pthread_create failed: " << errnoWithDescription(failed);
+            LOGV2(22948,
+                  "pthread_create failed: {errnoWithDescription_failed}",
+                  "errnoWithDescription_failed"_attr = errnoWithDescription(failed));
             throw std::system_error(
                 std::make_error_code(std::errc::resource_unavailable_try_again));
         }

@@ -43,6 +43,7 @@
 #include "mongo/client/sdam/sdam_json_test_runner_cli_options_gen.h"
 #include "mongo/client/sdam/topology_manager.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
@@ -126,10 +127,14 @@ public:
     }
 
     void LogParams() const {
-        log() << "Verbosity: " << _verbose << std::endl;
-        log() << "Source Directory: " << _sourceDirectory << std::endl;
+        LOGV2(20199, "Verbosity: {verbose}", "verbose"_attr = _verbose);
+        LOGV2(20200,
+              "Source Directory: {sourceDirectory}",
+              "sourceDirectory"_attr = _sourceDirectory);
         if (_testFilters.size()) {
-            log() << "Filters: " << boost::join(_testFilters, ", ");
+            LOGV2(20201,
+                  "Filters: {boost_join_testFilters}",
+                  "boost_join_testFilters"_attr = boost::join(_testFilters, ", "));
         }
     }
 
@@ -212,13 +217,18 @@ public:
         for (auto response : _isMasterResponses) {
             auto descriptionStr =
                 (response.getResponse()) ? response.getResponse()->toString() : "[ Network Error ]";
-            log() << "Sending server description: " << response.getServer() << " : "
-                  << descriptionStr << std::endl;
+            LOGV2(20202,
+                  "Sending server description: {response_getServer} : {descriptionStr}",
+                  "response_getServer"_attr = response.getServer(),
+                  "descriptionStr"_attr = descriptionStr);
             topology.onServerDescription(response);
         }
 
-        log() << "TopologyDescription after Phase " << _phaseNum << ": "
-              << topology.getTopologyDescription()->toString() << std::endl;
+        LOGV2(20203,
+              "TopologyDescription after Phase {phaseNum}: {topology_getTopologyDescription}",
+              "phaseNum"_attr = _phaseNum,
+              "topology_getTopologyDescription"_attr =
+                  topology.getTopologyDescription()->toString());
 
         validateServers(
             &testResult, topology.getTopologyDescription(), _topologyOutcome["servers"].Obj());
@@ -553,11 +563,16 @@ public:
         TestCaseResult result{{}, _testFilePath, _testName};
 
         for (const auto& testPhase : _testPhases) {
-            log() << emphasize("Phase " + std::to_string(testPhase.getPhaseNum()));
+            LOGV2(20204,
+                  "{emphasize_Phase_std_to_string_testPhase_getPhaseNum}",
+                  "emphasize_Phase_std_to_string_testPhase_getPhaseNum"_attr =
+                      emphasize("Phase " + std::to_string(testPhase.getPhaseNum())));
             auto phaseResult = testPhase.execute(topology);
             result.phaseResults.push_back(phaseResult);
             if (!result.Success()) {
-                log() << "Phase " << phaseResult.phaseNumber << " failed.";
+                LOGV2(20205,
+                      "Phase {phaseResult_phaseNumber} failed.",
+                      "phaseResult_phaseNumber"_attr = phaseResult.phaseNumber);
                 break;
             }
         }
@@ -572,8 +587,11 @@ public:
 private:
     void parseTest(fs::path testFilePath) {
         _testFilePath = testFilePath.string();
-        log() << "";
-        log() << emphasize("Parsing " + testFilePath.string());
+        LOGV2(20206, "");
+        LOGV2(20207,
+              "{emphasize_Parsing_testFilePath_string}",
+              "emphasize_Parsing_testFilePath_string"_attr =
+                  emphasize("Parsing " + testFilePath.string()));
         {
             std::ifstream testFile(_testFilePath);
             std::ostringstream json;
@@ -636,7 +654,10 @@ public:
         for (auto jsonTest : testFiles) {
             auto testCase = JsonTestCase(jsonTest);
             try {
-                log() << emphasize("Executing " + testCase.Name());
+                LOGV2(20208,
+                      "{emphasize_Executing_testCase_Name}",
+                      "emphasize_Executing_testCase_Name"_attr =
+                          emphasize("Executing " + testCase.Name()));
                 results.push_back(testCase.execute());
             } catch (const DBException& ex) {
                 std::stringstream error;
@@ -661,7 +682,9 @@ public:
                 results.begin(), results.end(), [](const JsonTestCase::TestCaseResult& result) {
                     return !result.Success();
                 })) {
-            log() << emphasize("Failed Test Results");
+            LOGV2(20209,
+                  "{emphasize_Failed_Test_Results}",
+                  "emphasize_Failed_Test_Results"_attr = emphasize("Failed Test Results"));
         }
 
         for (const auto result : results) {
@@ -671,22 +694,31 @@ public:
             if (result.Success()) {
                 ++numSuccess;
             } else {
-                log() << emphasize(testName);
-                log() << "error in file: " << file;
+                LOGV2(
+                    20210, "{emphasize_testName}", "emphasize_testName"_attr = emphasize(testName));
+                LOGV2(20211, "error in file: {file}", "file"_attr = file);
                 ++numFailed;
                 for (auto phaseResult : phaseResults) {
-                    log() << "Phase " << phaseResult.phaseNumber << ": " << std::endl;
+                    LOGV2(20212,
+                          "Phase {phaseResult_phaseNumber}: ",
+                          "phaseResult_phaseNumber"_attr = phaseResult.phaseNumber);
                     if (!phaseResult.Success()) {
                         for (auto error : phaseResult.errorDescriptions) {
-                            log() << "\t" << error.first << ": " << error.second << std::endl;
+                            LOGV2(20213,
+                                  "\t{error_first}: {error_second}",
+                                  "error_first"_attr = error.first,
+                                  "error_second"_attr = error.second);
                         }
                     }
                 }
-                log() << std::endl;
+                LOGV2(20214, "");
             }
         }
-        log() << numTestCases << " test cases; " << numSuccess << " success; " << numFailed
-              << " failed.";
+        LOGV2(20215,
+              "{numTestCases} test cases; {numSuccess} success; {numFailed} failed.",
+              "numTestCases"_attr = numTestCases,
+              "numSuccess"_attr = numSuccess,
+              "numFailed"_attr = numFailed);
 
         return numFailed;
     }
@@ -721,7 +753,10 @@ private:
             if (filePath.string().find(filter) != std::string::npos) {
                 return true;
             } else {
-                LOG(2) << "'" << filePath.string() << "' skipped due to filter configuration.";
+                LOGV2_DEBUG(20216,
+                            2,
+                            "'{filePath_string}' skipped due to filter configuration.",
+                            "filePath_string"_attr = filePath.string());
             }
         }
 

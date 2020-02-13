@@ -40,6 +40,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -211,8 +212,12 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     Status responseStatus =
         _checkForShutdownAndConvertStatus(result.getStatus(), "error in fetcher batch callback");
     if (ErrorCodes::CallbackCanceled == responseStatus) {
-        LOG(1) << _getComponentName() << " oplog query cancelled to " << _getSource() << ": "
-               << redact(responseStatus);
+        LOGV2_DEBUG(21032,
+                    1,
+                    "{getComponentName} oplog query cancelled to {getSource}: {responseStatus}",
+                    "getComponentName"_attr = _getComponentName(),
+                    "getSource"_attr = _getSource(),
+                    "responseStatus"_attr = redact(responseStatus));
         _finishCallback(responseStatus);
         return;
     }
@@ -235,11 +240,16 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
 
                 auto scheduleStatus = _scheduleFetcher_inlock();
                 if (scheduleStatus.isOK()) {
-                    log() << "Scheduled new oplog query " << _fetcher->toString();
+                    LOGV2(21033,
+                          "Scheduled new oplog query {fetcher}",
+                          "fetcher"_attr = _fetcher->toString());
                     return;
                 }
-                error() << "Error scheduling new oplog query: " << redact(scheduleStatus)
-                        << ". Returning current oplog query error: " << redact(responseStatus);
+                LOGV2_ERROR(21037,
+                            "Error scheduling new oplog query: {scheduleStatus}. Returning current "
+                            "oplog query error: {responseStatus}",
+                            "scheduleStatus"_attr = redact(scheduleStatus),
+                            "responseStatus"_attr = redact(responseStatus));
             }
         }
         _finishCallback(responseStatus);
@@ -290,8 +300,11 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             return;
         }
         auto lastDoc = lastDocRes.getValue();
-        LOG(3) << _getComponentName()
-               << " setting last fetched optime ahead after batch: " << lastDoc;
+        LOGV2_DEBUG(21034,
+                    3,
+                    "{getComponentName} setting last fetched optime ahead after batch: {lastDoc}",
+                    "getComponentName"_attr = _getComponentName(),
+                    "lastDoc"_attr = lastDoc);
 
         stdx::lock_guard<Latch> lock(_mutex);
         _lastFetched = lastDoc;
@@ -348,13 +361,18 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
 bool AbstractOplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(
     AbstractOplogFetcher* fetcher, Status status) {
     if (_fetcherRestarts == _maxFetcherRestarts) {
-        log() << "Error returned from oplog query (no more query restarts left): "
-              << redact(status);
+        LOGV2(21035,
+              "Error returned from oplog query (no more query restarts left): {status}",
+              "status"_attr = redact(status));
         return false;
     }
-    log() << "Restarting oplog query due to error: " << redact(status)
-          << ". Last fetched optime: " << fetcher->_getLastOpTimeFetched()
-          << ". Restarts remaining: " << (_maxFetcherRestarts - _fetcherRestarts);
+    LOGV2(
+        21036,
+        "Restarting oplog query due to error: {status}. Last fetched optime: "
+        "{fetcher_getLastOpTimeFetched}. Restarts remaining: {maxFetcherRestarts_fetcherRestarts}",
+        "status"_attr = redact(status),
+        "fetcher_getLastOpTimeFetched"_attr = fetcher->_getLastOpTimeFetched(),
+        "maxFetcherRestarts_fetcherRestarts"_attr = (_maxFetcherRestarts - _fetcherRestarts));
     _fetcherRestarts++;
     return true;
 }

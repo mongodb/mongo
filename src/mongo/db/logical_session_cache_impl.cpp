@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
@@ -124,15 +125,17 @@ void LogicalSessionCacheImpl::_periodicRefresh(Client* client) {
     try {
         _refresh(client);
     } catch (...) {
-        log() << "Failed to refresh session cache: " << exceptionToStatus()
-              << ", will try again at the next refresh interval";
+        LOGV2(20710,
+              "Failed to refresh session cache: {exceptionToStatus}, will try again at the next "
+              "refresh interval",
+              "exceptionToStatus"_attr = exceptionToStatus());
     }
 }
 
 void LogicalSessionCacheImpl::_periodicReap(Client* client) {
     auto res = _reap(client);
     if (!res.isOK()) {
-        log() << "Failed to reap transaction table: " << res;
+        LOGV2(20711, "Failed to reap transaction table: {res}", "res"_attr = res);
     }
 
     return;
@@ -174,9 +177,12 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
                 "waiting until next sessions reap interval";
             if (ex.code() != ErrorCodes::NamespaceNotFound ||
                 ex.code() != ErrorCodes::NamespaceNotSharded) {
-                log() << notSetUpWarning << ": " << ex.reason();
+                LOGV2(20712,
+                      "{notSetUpWarning}: {ex_reason}",
+                      "notSetUpWarning"_attr = notSetUpWarning,
+                      "ex_reason"_attr = ex.reason());
             } else {
-                log() << notSetUpWarning;
+                LOGV2(20713, "{notSetUpWarning}", "notSetUpWarning"_attr = notSetUpWarning);
             }
             return Status::OK();
         }
@@ -243,8 +249,10 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     try {
         _sessionsColl->setupSessionsCollection(opCtx);
     } catch (const DBException& ex) {
-        log() << "Failed to refresh session cache, will try again at the next refresh interval"
-              << causedBy(redact(ex));
+        LOGV2(20714,
+              "Failed to refresh session cache, will try again at the next refresh "
+              "interval{causedBy_ex}",
+              "causedBy_ex"_attr = causedBy(redact(ex)));
         return;
     }
 
@@ -374,7 +382,10 @@ Status LogicalSessionCacheImpl::_addToCacheIfNotFull(WithLock, LogicalSessionRec
                                 "high"};
         auto severity =
             MONGO_GET_LIMITED_SEVERITY(ErrorCodes::TooManyLogicalSessions, Seconds{1}, 0, 2);
-        LOG(severity) << status.toString();
+        LOGV2_DEBUG(20715,
+                    logSeverityV1toV2(severity).toInt(),
+                    "{status}",
+                    "status"_attr = status.toString());
         return status;
     }
 

@@ -38,6 +38,7 @@
 #include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/integration_test.h"
@@ -117,9 +118,9 @@ RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
     auto deferred = runCommand(makeCallbackHandle(), request);
     auto& res = deferred.get();
     if (res.isOK()) {
-        log() << "got command result: " << res.toString();
+        LOGV2(22586, "got command result: {res}", "res"_attr = res.toString());
     } else {
-        log() << "command failed: " << res.status;
+        LOGV2(22587, "command failed: {res_status}", "res_status"_attr = res.status);
     }
     return res;
 }

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/alarm.h"
@@ -49,21 +50,21 @@ TEST(AlarmScheduler, BasicSingleThread) {
     auto alarm = scheduler->alarmAt(testStart + Milliseconds(10));
     bool firstTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        log() << "Timer expired: " << status;
+        LOGV2(23071, "Timer expired: {status}", "status"_attr = status);
         firstTimerExpired = true;
     });
 
     alarm = scheduler->alarmAt(testStart + Milliseconds(500));
     bool secondTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        log() << "Second timer expired: " << status;
+        LOGV2(23072, "Second timer expired: {status}", "status"_attr = status);
         secondTimerExpired = true;
     });
 
     alarm = scheduler->alarmAt(testStart + Milliseconds(515));
     bool thirdTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        log() << "third timer expired: " << status;
+        LOGV2(23073, "third timer expired: {status}", "status"_attr = status);
         thirdTimerExpired = true;
     });
     auto missingEvent = alarm.handle;

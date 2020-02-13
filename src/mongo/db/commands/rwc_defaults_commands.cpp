@@ -41,6 +41,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rw_concern_default_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
@@ -114,7 +115,9 @@ public:
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
 
             updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);
-            log() << "successfully set RWC defaults to " << newDefaults.toBSON();
+            LOGV2(20498,
+                  "successfully set RWC defaults to {newDefaults}",
+                  "newDefaults"_attr = newDefaults.toBSON());
 
             // Refresh to populate the cache with the latest defaults.
             rwcDefaults.refreshIfNecessary(opCtx);

@@ -120,8 +120,11 @@ BSONObj BSONObj::copy() const {
     // that the memory we are reading has changed, and we must exit immediately to avoid further
     // undefined behavior.
     if (int sizeAfter = objsize(); sizeAfter != size) {
-        severe() << "BSONObj::copy() - size " << sizeAfter
-                 << " differs from previously observed size " << size;
+        LOGV2_FATAL(
+            20103,
+            "BSONObj::copy() - size {sizeAfter} differs from previously observed size {size}",
+            "sizeAfter"_attr = sizeAfter,
+            "size"_attr = size);
         fassertFailed(31323);
     }
     memcpy(storage.get(), objdata(), size);

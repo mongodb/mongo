@@ -38,6 +38,7 @@
 
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -396,8 +397,10 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
             !entry.getOperationUsingCursor() && entry.getLastActive() <= cutoff;
 
         if (res) {
-            log() << "Cursor id " << cursorId << " timed out, idle since "
-                  << entry.getLastActive().toString();
+            LOGV2(22837,
+                  "Cursor id {cursorId} timed out, idle since {entry_getLastActive}",
+                  "cursorId"_attr = cursorId,
+                  "entry_getLastActive"_attr = entry.getLastActive().toString());
         }
 
         return res;
@@ -582,7 +585,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
             return;
         }
         uassertStatusOK(mgr.killCursor(opCtx, *cursorNss, id));
-        log() << "killing cursor: " << id << " as part of killing session(s)";
+        LOGV2(22838, "killing cursor: {id} as part of killing session(s)", "id"_attr = id);
     };
 
     auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));

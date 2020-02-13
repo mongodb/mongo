@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -74,7 +75,10 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
-            LOG(3) << "CUSTOM COMMIT " << redact(demangleName(typeid(*change)));
+            LOGV2_DEBUG(22244,
+                        3,
+                        "CUSTOM COMMIT {demangleName_typeid_change}",
+                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
             change->commit(commitTimestamp);
         } catch (...) {
             std::terminate();
@@ -90,7 +94,10 @@ void RecoveryUnit::abortRegisteredChanges() {
              it != end;
              ++it) {
             Change* change = it->get();
-            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
+            LOGV2_DEBUG(22245,
+                        2,
+                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
+                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
             change->rollback();
         }
         _changes.clear();

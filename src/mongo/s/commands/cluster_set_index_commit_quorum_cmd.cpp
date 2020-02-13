@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_index_commit_quorum_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/util/log.h"
 
@@ -85,8 +86,11 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             BSONObj cmdObj = request().toBSON(BSONObj());
-            LOG(1) << "setIndexCommitQuorum: " << request().getNamespace()
-                   << " cmd:" << redact(cmdObj);
+            LOGV2_DEBUG(22757,
+                        1,
+                        "setIndexCommitQuorum: {request_getNamespace} cmd:{cmdObj}",
+                        "request_getNamespace"_attr = request().getNamespace(),
+                        "cmdObj"_attr = redact(cmdObj));
 
             scatterGatherOnlyVersionIfUnsharded(
                 opCtx,

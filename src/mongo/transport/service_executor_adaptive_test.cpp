@@ -34,6 +34,7 @@
 #include "boost/optional.hpp"
 
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -122,7 +123,7 @@ protected:
         invariant(waitFor.load() != -1);
         waitFor.fetchAndSubtract(1);
         cond.notify_one();
-        log() << "Ran callback";
+        LOGV2(22960, "Ran callback");
     };
 
     void waitForCallback(int expected, boost::optional<Milliseconds> timeout = boost::none) {
@@ -146,7 +147,7 @@ protected:
             getGlobalServiceContext(), asioIoCtx, std::move(configOwned));
 
         ASSERT_OK(exec->start());
-        log() << "wait for executor to finish starting";
+        LOGV2(22961, "wait for executor to finish starting");
         waitFor.store(1);
         ASSERT_OK(exec->schedule(notifyCallback,
                                  ServiceExecutor::kEmptyFlags,
@@ -173,7 +174,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckTask) {
         ASSERT_OK(exec->shutdown(config->workerThreadRunTime() * 2));
     });
 
-    log() << "Scheduling blocked task";
+    LOGV2(22962, "Scheduling blocked task");
     waitFor.store(3);
     ASSERT_OK(exec->schedule(
         [this, &blockedMutex] {
@@ -184,20 +185,20 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckTask) {
         ServiceExecutor::kEmptyFlags,
         ServiceExecutorTaskName::kSSMProcessMessage));
 
-    log() << "Scheduling task stuck on blocked task";
+    LOGV2(22963, "Scheduling task stuck on blocked task");
     ASSERT_OK(exec->schedule(
         notifyCallback, ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMProcessMessage));
 
-    log() << "Waiting for second thread to start";
+    LOGV2(22964, "Waiting for second thread to start");
     waitForCallback(1);
     ASSERT_EQ(exec->threadsRunning(), 2);
 
-    log() << "Waiting for unstuck task to run";
+    LOGV2(22965, "Waiting for unstuck task to run");
     blockedLock.unlock();
     waitForCallback(0);
     ASSERT_EQ(exec->threadsRunning(), 2);
 
-    log() << "Waiting for second thread to idle out";
+    LOGV2(22966, "Waiting for second thread to idle out");
     stdx::this_thread::sleep_for(config->workerThreadRunTime().toSystemDuration() * 1.5);
     ASSERT_EQ(exec->threadsRunning(), config->reservedThreads());
 }
@@ -219,7 +220,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
     });
 
     auto blockedTask = [this, &blockedMutex] {
-        log() << "waiting on blocked mutex";
+        LOGV2(22967, "waiting on blocked mutex");
         notifyCallback();
         stdx::unique_lock<Latch> lk(blockedMutex);
         notifyCallback();
@@ -227,17 +228,17 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
 
     waitFor.store(6);
     auto tasks = waitFor.load() / 2;
-    log() << "Scheduling " << tasks << " blocked tasks";
+    LOGV2(22968, "Scheduling {tasks} blocked tasks", "tasks"_attr = tasks);
     for (auto i = 0; i < tasks; i++) {
         ASSERT_OK(exec->schedule(blockedTask,
                                  ServiceExecutor::kEmptyFlags,
                                  ServiceExecutorTaskName::kSSMProcessMessage));
     }
 
-    log() << "Waiting for executor to start new threads";
+    LOGV2(22969, "Waiting for executor to start new threads");
     waitForCallback(3);
 
-    log() << "All threads blocked, wait for executor to detect block and start a new thread.";
+    LOGV2(22970, "All threads blocked, wait for executor to detect block and start a new thread.");
 
     // The controller thread in the adaptive executor runs on a stuckThreadTimeout in normal
     // operation where no starvation is detected (shouldn't be in this test as all threads should be
@@ -247,7 +248,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
 
     ASSERT_EQ(exec->threadsRunning(), waitFor.load() + config->reservedThreads());
 
-    log() << "Waiting for unstuck task to run";
+    LOGV2(22971, "Waiting for unstuck task to run");
     blockedLock.unlock();
     waitForCallback(0);
 }
@@ -318,12 +319,12 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
 
     task = [this, &task, &exec, &mutex, &cv, &remainingTasks] {
         if (remainingTasks.subtractAndFetch(1) == 0) {
-            log() << "Signaling job done";
+            LOGV2(22972, "Signaling job done");
             cv.notify_one();
             return;
         }
 
-        log() << "Starting task recursively";
+        LOGV2(22973, "Starting task recursively");
 
         ASSERT_OK(exec->schedule(
             task, ServiceExecutor::kMayRecurse, ServiceExecutorTaskName::kSSMProcessMessage));
@@ -331,7 +332,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
         // Make sure we don't block too long because then the block detection logic would kick in.
         stdx::this_thread::sleep_for(config->stuckThreadTimeout().toSystemDuration() /
                                      (config->recursionLimit() * 2));
-        log() << "Completing task recursively";
+        LOGV2(22974, "Completing task recursively");
     };
 
     stdx::unique_lock<Latch> lock(mutex);
@@ -363,7 +364,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestDeferredTasks) {
     });
 
     waitFor.store(3);
-    log() << "Scheduling a blocking task";
+    LOGV2(22975, "Scheduling a blocking task");
     ASSERT_OK(exec->schedule(
         [this, &blockedMutex] {
             stdx::unique_lock<Latch> lk(blockedMutex);
@@ -372,7 +373,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestDeferredTasks) {
         ServiceExecutor::kEmptyFlags,
         ServiceExecutorTaskName::kSSMProcessMessage));
 
-    log() << "Scheduling deferred task";
+    LOGV2(22976, "Scheduling deferred task");
     ASSERT_OK(exec->schedule(notifyCallback,
                              ServiceExecutor::kDeferredTask,
                              ServiceExecutorTaskName::kSSMProcessMessage));
@@ -380,7 +381,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestDeferredTasks) {
     ASSERT_THROWS(waitForCallback(1, config->stuckThreadTimeout()),
                   unittest::TestAssertionFailureException);
 
-    log() << "Scheduling non-deferred task";
+    LOGV2(22977, "Scheduling non-deferred task");
     ASSERT_OK(exec->schedule(
         notifyCallback, ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMProcessMessage));
     waitForCallback(1, config->stuckThreadTimeout());

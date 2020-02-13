@@ -54,6 +54,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
@@ -96,26 +97,29 @@ public:
                 sleepsecs(ttlMonitorSleepSecs.load());
             }
 
-            LOG(3) << "thread awake";
+            LOGV2_DEBUG(22528, 3, "thread awake");
 
             if (!ttlMonitorEnabled.load()) {
-                LOG(1) << "disabled";
+                LOGV2_DEBUG(22529, 1, "disabled");
                 continue;
             }
 
             if (lockedForWriting()) {
                 // Note: this is not perfect as you can go into fsync+lock between this and actually
                 // doing the delete later.
-                LOG(3) << "locked for writing";
+                LOGV2_DEBUG(22530, 3, "locked for writing");
                 continue;
             }
 
             try {
                 doTTLPass();
             } catch (const WriteConflictException&) {
-                LOG(1) << "got WriteConflictException";
+                LOGV2_DEBUG(22531, 1, "got WriteConflictException");
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruption) {
-                LOG(1) << "TTLMonitor was interrupted: " << interruption;
+                LOGV2_DEBUG(22532,
+                            1,
+                            "TTLMonitor was interrupted: {interruption}",
+                            "interruption"_attr = interruption);
             }
         }
     }
@@ -181,11 +185,16 @@ private:
             try {
                 doTTLForIndex(&opCtx, it.first, it.second);
             } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                warning() << "TTLMonitor was interrupted, waiting " << ttlMonitorSleepSecs.load()
-                          << " seconds before doing another pass";
+                LOGV2_WARNING(22537,
+                              "TTLMonitor was interrupted, waiting {ttlMonitorSleepSecs_load} "
+                              "seconds before doing another pass",
+                              "ttlMonitorSleepSecs_load"_attr = ttlMonitorSleepSecs.load());
                 return;
             } catch (const DBException& dbex) {
-                error() << "Error processing ttl index: " << it.second << " -- " << dbex.toString();
+                LOGV2_ERROR(22538,
+                            "Error processing ttl index: {it_second} -- {dbex}",
+                            "it_second"_attr = it.second,
+                            "dbex"_attr = dbex.toString());
                 // Continue on to the next index.
                 continue;
             }
@@ -201,23 +210,33 @@ private:
             return;
         }
         if (!userAllowedWriteNS(collectionNSS).isOK()) {
-            error() << "namespace '" << collectionNSS
-                    << "' doesn't allow deletes, skipping ttl job for: " << idx;
+            LOGV2_ERROR(
+                22539,
+                "namespace '{collectionNSS}' doesn't allow deletes, skipping ttl job for: {idx}",
+                "collectionNSS"_attr = collectionNSS,
+                "idx"_attr = idx);
             return;
         }
 
         const BSONObj key = idx["key"].Obj();
         const StringData name = idx["name"].valueStringData();
         if (key.nFields() != 1) {
-            error() << "key for ttl index can only have 1 field, skipping ttl job for: " << idx;
+            LOGV2_ERROR(22540,
+                        "key for ttl index can only have 1 field, skipping ttl job for: {idx}",
+                        "idx"_attr = idx);
             return;
         }
 
-        LOG(1) << "ns: " << collectionNSS << " key: " << key << " name: " << name;
+        LOGV2_DEBUG(22533,
+                    1,
+                    "ns: {collectionNSS} key: {key} name: {name}",
+                    "collectionNSS"_attr = collectionNSS,
+                    "key"_attr = key,
+                    "name"_attr = name);
 
         AutoGetCollection autoGetCollection(opCtx, collectionNSS, MODE_IX);
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
-            log() << "Hanging due to hangTTLMonitorWithLock fail point";
+            LOGV2(22534, "Hanging due to hangTTLMonitorWithLock fail point");
             hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
 
@@ -234,8 +253,11 @@ private:
 
         const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
         if (!desc) {
-            LOG(1) << "index not found (index build in progress? index dropped?), skipping "
-                   << "ttl job for: " << idx;
+            LOGV2_DEBUG(22535,
+                        1,
+                        "index not found (index build in progress? index dropped?), skipping ttl "
+                        "job for: {idx}",
+                        "idx"_attr = idx);
             return;
         }
 
@@ -244,15 +266,21 @@ private:
         idx = desc->infoObj();
 
         if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
-            error() << "special index can't be used as a ttl index, skipping ttl job for: " << idx;
+            LOGV2_ERROR(22541,
+                        "special index can't be used as a ttl index, skipping ttl job for: {idx}",
+                        "idx"_attr = idx);
             return;
         }
 
         BSONElement secondsExpireElt = idx[secondsExpireField];
         if (!secondsExpireElt.isNumber()) {
-            error() << "ttl indexes require the " << secondsExpireField << " field to be "
-                    << "numeric but received a type of " << typeName(secondsExpireElt.type())
-                    << ", skipping ttl job for: " << idx;
+            LOGV2_ERROR(
+                22542,
+                "ttl indexes require the {secondsExpireField} field to be numeric but received a "
+                "type of {typeName_secondsExpireElt_type}, skipping ttl job for: {idx}",
+                "secondsExpireField"_attr = secondsExpireField,
+                "typeName_secondsExpireElt_type"_attr = typeName(secondsExpireElt.type()),
+                "idx"_attr = idx);
             return;
         }
 
@@ -295,14 +323,16 @@ private:
 
         Status result = exec->executePlan();
         if (!result.isOK()) {
-            error() << "ttl query execution for index " << idx
-                    << " failed with status: " << redact(result);
+            LOGV2_ERROR(22543,
+                        "ttl query execution for index {idx} failed with status: {result}",
+                        "idx"_attr = idx,
+                        "result"_attr = redact(result));
             return;
         }
 
         const long long numDeleted = DeleteStage::getNumDeleted(*exec);
         ttlDeletedDocuments.increment(numDeleted);
-        LOG(1) << "deleted: " << numDeleted;
+        LOGV2_DEBUG(22536, 1, "deleted: {numDeleted}", "numDeleted"_attr = numDeleted);
     }
 
     ServiceContext* _serviceContext;

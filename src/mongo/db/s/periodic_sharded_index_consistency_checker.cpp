@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/util/log.h"
@@ -77,7 +78,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 return;
             }
 
-            log() << "Checking consistency of sharded collection indexes across the cluster";
+            LOGV2(22049, "Checking consistency of sharded collection indexes across the cluster");
 
             const auto aggRequestBSON = fromjson(
                 "{pipeline: [{$indexStats: {}},"
@@ -141,8 +142,12 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                             }
                             break;
                         } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-                            log() << "Attempt " << tries << " to check index consistency for "
-                                  << nss << " received StaleShardVersion error" << causedBy(ex);
+                            LOGV2(22050,
+                                  "Attempt {tries} to check index consistency for {nss} received "
+                                  "StaleShardVersion error{causedBy_ex}",
+                                  "tries"_attr = tries,
+                                  "nss"_attr = nss,
+                                  "causedBy_ex"_attr = causedBy(ex));
                             if (canRetry) {
                                 continue;
                             }
@@ -151,14 +156,19 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     }
                 }
 
-                log() << "Found " << numShardedCollsWithInconsistentIndexes
-                      << " collections with inconsistent indexes";
+                LOGV2(22051,
+                      "Found {numShardedCollsWithInconsistentIndexes} collections with "
+                      "inconsistent indexes",
+                      "numShardedCollsWithInconsistentIndexes"_attr =
+                          numShardedCollsWithInconsistentIndexes);
 
                 // Update the count.
                 _numShardedCollsWithInconsistentIndexes.store(
                     numShardedCollsWithInconsistentIndexes);
             } catch (DBException& ex) {
-                log() << "Failed to check index consistency " << causedBy(ex.toStatus());
+                LOGV2(22052,
+                      "Failed to check index consistency {causedBy_ex_toStatus}",
+                      "causedBy_ex_toStatus"_attr = causedBy(ex.toStatus()));
             }
         },
         Milliseconds(shardedIndexConsistencyCheckIntervalMS));

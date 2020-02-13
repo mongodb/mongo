@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -79,8 +80,13 @@ Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vecto
         records.emplace_back(Record{RecordId(), RecordData(obj.objdata(), obj.objsize())});
     }
 
-    LOG(1) << "recording " << records.size() << " duplicate key conflicts on unique index: "
-           << _indexCatalogEntry->descriptor()->indexName();
+    LOGV2_DEBUG(20676,
+                1,
+                "recording {records_size} duplicate key conflicts on unique index: "
+                "{indexCatalogEntry_descriptor_indexName}",
+                "records_size"_attr = records.size(),
+                "indexCatalogEntry_descriptor_indexName"_attr =
+                    _indexCatalogEntry->descriptor()->indexName());
 
     WriteUnitOfWork wuow(opCtx);
     std::vector<Timestamp> timestamps(records.size());
@@ -138,9 +144,13 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
     invariant(resolved == _duplicateCounter.load());
 
     int logLevel = (resolved > 0) ? 0 : 1;
-    LOG(logLevel) << "index build: resolved " << resolved
-                  << " duplicate key conflicts for unique index: "
-                  << _indexCatalogEntry->descriptor()->indexName();
+    LOGV2_DEBUG(20677,
+                logSeverityV1toV2(logLevel).toInt(),
+                "index build: resolved {resolved} duplicate key conflicts for unique index: "
+                "{indexCatalogEntry_descriptor_indexName}",
+                "resolved"_attr = resolved,
+                "indexCatalogEntry_descriptor_indexName"_attr =
+                    _indexCatalogEntry->descriptor()->indexName());
     return Status::OK();
 }
 

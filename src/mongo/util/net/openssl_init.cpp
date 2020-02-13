@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -148,13 +149,16 @@ void setupFIPS() {
 #if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
     int status = FIPS_mode_set(1);
     if (!status) {
-        severe() << "can't activate FIPS mode: "
-                 << SSLManagerInterface::getSSLErrorMessage(ERR_get_error());
+        LOGV2_FATAL(
+            23173,
+            "can't activate FIPS mode: {SSLManagerInterface_getSSLErrorMessage_ERR_get_error}",
+            "SSLManagerInterface_getSSLErrorMessage_ERR_get_error"_attr =
+                SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
         fassertFailedNoTrace(16703);
     }
-    log() << "FIPS 140-2 mode activated";
+    LOGV2(23172, "FIPS 140-2 mode activated");
 #else
-    severe() << "this version of mongodb was not compiled with FIPS support";
+    LOGV2_FATAL(23174, "this version of mongodb was not compiled with FIPS support");
     fassertFailedNoTrace(17089);
 #endif
 }

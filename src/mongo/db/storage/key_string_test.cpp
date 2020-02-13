@@ -48,6 +48,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/config.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
@@ -97,8 +98,11 @@ public:
             version = KeyString::Version::V1;
             base->run();
         } catch (...) {
-            log() << "exception while testing KeyStringBuilder version "
-                  << mongo::KeyString::keyStringVersionToString(version);
+            LOGV2(22226,
+                  "exception while testing KeyStringBuilder version "
+                  "{mongo_KeyString_keyStringVersionToString_version}",
+                  "mongo_KeyString_keyStringVersionToString_version"_attr =
+                      mongo::KeyString::keyStringVersionToString(version));
             throw;
         }
     }
@@ -351,8 +355,12 @@ TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
 
     BSONObj a = BSON("" << 5.5);
     KeyString::Builder ks(version, a, ALL_ASCENDING);
-    log() << keyStringVersionToString(version) << " size: " << ks.getSize() << " hex ["
-          << toHex(ks.getBuffer(), ks.getSize()) << "]";
+    LOGV2(22227,
+          "{keyStringVersionToString_version} size: {ks_getSize} hex "
+          "[{toHex_ks_getBuffer_ks_getSize}]",
+          "keyStringVersionToString_version"_attr = keyStringVersionToString(version),
+          "ks_getSize"_attr = ks.getSize(),
+          "toHex_ks_getBuffer_ks_getSize"_attr = toHex(ks.getBuffer(), ks.getSize()));
 
     ASSERT_EQUALS(10U, ks.getSize());
 
@@ -484,7 +492,7 @@ TEST_F(KeyStringBuilderTest, NumbersNearInt32Max) {
 
 TEST_F(KeyStringBuilderTest, DecimalNumbers) {
     if (version == KeyString::Version::V0) {
-        log() << "not testing DecimalNumbers for KeyStringBuilder V0";
+        LOGV2(22228, "not testing DecimalNumbers for KeyStringBuilder V0");
         return;
     }
 
@@ -1172,7 +1180,7 @@ void testPermutation(KeyString::Version version,
                 BSONObj orderObj = orderings[k];
                 Ordering ordering = Ordering::make(orderObj);
                 if (debug)
-                    log() << "ordering: " << orderObj;
+                    LOGV2(22229, "ordering: {orderObj}", "orderObj"_attr = orderObj);
 
                 std::vector<BSONObj> elements = elementsOrig;
                 BSONObjComparator bsonCmp(orderObj,
@@ -1183,7 +1191,7 @@ void testPermutation(KeyString::Version version,
                 for (size_t i = 0; i < elements.size(); i++) {
                     const BSONObj& o1 = elements[i];
                     if (debug)
-                        log() << "\to1: " << o1;
+                        LOGV2(22230, "\to1: {o1}", "o1"_attr = o1);
                     ROUNDTRIP_ORDER(version, o1, ordering);
 
                     KeyString::Builder k1(version, o1, ordering);
@@ -1191,7 +1199,7 @@ void testPermutation(KeyString::Version version,
                     if (i + 1 < elements.size()) {
                         const BSONObj& o2 = elements[i + 1];
                         if (debug)
-                            log() << "\t\t o2: " << o2;
+                            LOGV2(22231, "\t\t o2: {o2}", "o2"_attr = o2);
                         KeyString::Builder k2(version, o2, ordering);
 
                         int bsonCmp = o1.woCompare(o2, ordering);
@@ -1225,7 +1233,7 @@ std::mt19937_64 seedGen(rd());
 // To be used by perf test for seeding, so that the entire test is repeatable in case of error.
 unsigned newSeed() {
     unsigned int seed = seedGen();  // Replace by the reported number to repeat test execution.
-    log() << "Initializing random number generator using seed " << seed;
+    LOGV2(22232, "Initializing random number generator using seed {seed}", "seed"_attr = seed);
     return seed;
 };
 
@@ -1237,8 +1245,10 @@ std::vector<BSONObj> thinElements(std::vector<BSONObj> elements,
     if (elements.size() <= maxElements)
         return elements;
 
-    log() << "only keeping " << maxElements << " of " << elements.size()
-          << " elements using random selection";
+    LOGV2(22233,
+          "only keeping {maxElements} of {elements_size} elements using random selection",
+          "maxElements"_attr = maxElements,
+          "elements_size"_attr = elements.size());
     std::shuffle(elements.begin(), elements.end(), gen);
     elements.resize(maxElements);
     return elements;
@@ -1284,7 +1294,10 @@ TEST_F(KeyStringBuilderTest, AllPerm2Compare) {
         }
     }
 
-    log() << "AllPerm2Compare " << keyStringVersionToString(version) << " size:" << elements.size();
+    LOGV2(22234,
+          "AllPerm2Compare {keyStringVersionToString_version} size:{elements_size}",
+          "keyStringVersionToString_version"_attr = keyStringVersionToString(version),
+          "elements_size"_attr = elements.size());
 
     for (size_t i = 0; i < elements.size(); i++) {
         const BSONObj& o = elements[i];
@@ -1443,7 +1456,10 @@ TEST_F(KeyStringBuilderTest, NumberOrderLots) {
 
             if (a.compare(b) !=
                 compareNumbers(numbers[i].firstElement(), numbers[j].firstElement())) {
-                log() << numbers[i] << " " << numbers[j];
+                LOGV2(22235,
+                      "{numbers_i} {numbers_j}",
+                      "numbers_i"_attr = numbers[i],
+                      "numbers_j"_attr = numbers[j]);
             }
 
             ASSERT_EQUALS(a.compare(b),
@@ -1755,10 +1771,17 @@ void perfTest(KeyString::Version version, const Numbers& numbers) {
     auto minmax = std::minmax_element(
         numbers.begin(), numbers.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
 
-    log() << 1E3 * micros / static_cast<double>(iters * numbers.size()) << " ns per "
-          << mongo::KeyString::keyStringVersionToString(version) << " roundtrip"
-          << (kDebugBuild ? " (DEBUG BUILD!)" : "") << " min " << (*minmax.first)[""] << ", max"
-          << (*minmax.second)[""];
+    LOGV2(22236,
+          "{_1E3_micros_static_cast_double_iters_numbers_size} ns per "
+          "{mongo_KeyString_keyStringVersionToString_version} roundtrip{kDebugBuild_DEBUG_BUILD} "
+          "min {minmax_first}, max{minmax_second}",
+          "_1E3_micros_static_cast_double_iters_numbers_size"_attr =
+              1E3 * micros / static_cast<double>(iters * numbers.size()),
+          "mongo_KeyString_keyStringVersionToString_version"_attr =
+              mongo::KeyString::keyStringVersionToString(version),
+          "kDebugBuild_DEBUG_BUILD"_attr = (kDebugBuild ? " (DEBUG BUILD!)" : ""),
+          "minmax_first"_attr = (*minmax.first)[""],
+          "minmax_second"_attr = (*minmax.second)[""]);
 }
 }  // namespace
 

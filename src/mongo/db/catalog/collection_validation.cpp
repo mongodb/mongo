@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
@@ -92,9 +93,12 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
         const IndexDescriptor* descriptor = entry->descriptor();
         const IndexAccessMethod* iam = entry->accessMethod();
 
-        log(LogComponent::kIndex) << "validating the internal structure of index "
-                                  << descriptor->indexName() << " on collection "
-                                  << descriptor->parentNS();
+        LOGV2_OPTIONS(20295,
+                      {logComponentV1toV2(LogComponent::kIndex)},
+                      "validating the internal structure of index {descriptor_indexName} on "
+                      "collection {descriptor_parentNS}",
+                      "descriptor_indexName"_attr = descriptor->indexName(),
+                      "descriptor_parentNS"_attr = descriptor->parentNS());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
@@ -129,8 +133,12 @@ void _validateIndexes(OperationContext* opCtx,
 
         const IndexDescriptor* descriptor = index->descriptor();
 
-        log(LogComponent::kIndex) << "validating index consistency " << descriptor->indexName()
-                                  << " on collection " << descriptor->parentNS();
+        LOGV2_OPTIONS(20296,
+                      {logComponentV1toV2(LogComponent::kIndex)},
+                      "validating index consistency {descriptor_indexName} on collection "
+                      "{descriptor_parentNS}",
+                      "descriptor_indexName"_attr = descriptor->indexName(),
+                      "descriptor_parentNS"_attr = descriptor->parentNS());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
@@ -188,7 +196,9 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateResults* result) {
     indexConsistency->setSecondPhase();
 
-    log(LogComponent::kIndex) << "Starting to traverse through all the document key sets.";
+    LOGV2_OPTIONS(20297,
+                  {logComponentV1toV2(LogComponent::kIndex)},
+                  "Starting to traverse through all the document key sets.");
 
     // During the second phase of validation, iterate through each documents key set and only record
     // the keys that were inconsistent during the first phase of validation.
@@ -198,8 +208,12 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         indexValidator->traverseRecordStore(opCtx, &tempValidateResults, &tempBuilder);
     }
 
-    log(LogComponent::kIndex) << "Finished traversing through all the document key sets.";
-    log(LogComponent::kIndex) << "Starting to traverse through all the indexes.";
+    LOGV2_OPTIONS(20298,
+                  {logComponentV1toV2(LogComponent::kIndex)},
+                  "Finished traversing through all the document key sets.");
+    LOGV2_OPTIONS(20299,
+                  {logComponentV1toV2(LogComponent::kIndex)},
+                  "Starting to traverse through all the indexes.");
 
     // Iterate through all the indexes in the collection and only record the index entry keys that
     // had inconsistencies during the first phase.
@@ -208,8 +222,10 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
 
         const IndexDescriptor* descriptor = index->descriptor();
 
-        log(LogComponent::kIndex) << "Traversing through the index entries for index "
-                                  << descriptor->indexName() << ".";
+        LOGV2_OPTIONS(20300,
+                      {logComponentV1toV2(LogComponent::kIndex)},
+                      "Traversing through the index entries for index {descriptor_indexName}.",
+                      "descriptor_indexName"_attr = descriptor->indexName());
 
         indexValidator->traverseIndex(opCtx,
                                       index.get(),
@@ -217,7 +233,9 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                                       /*ValidateResults=*/nullptr);
     }
 
-    log(LogComponent::kIndex) << "Finished traversing through all the indexes.";
+    LOGV2_OPTIONS(20301,
+                  {logComponentV1toV2(LogComponent::kIndex)},
+                  "Finished traversing through all the indexes.");
 
     indexConsistency->addIndexEntryErrors(indexNsResultsMap, result);
 }
@@ -296,8 +314,12 @@ void _reportInvalidResults(OperationContext* opCtx,
                            const string uuidString) {
     _reportValidationResults(
         opCtx, validateState, indexNsResultsMap, keysPerIndex, results, output);
-    log(LogComponent::kIndex) << "Validation complete for collection " << validateState->nss()
-                              << uuidString << ". Corruption found.";
+    LOGV2_OPTIONS(
+        20302,
+        {logComponentV1toV2(LogComponent::kIndex)},
+        "Validation complete for collection {validateState_nss}{uuidString}. Corruption found.",
+        "validateState_nss"_attr = validateState->nss(),
+        "uuidString"_attr = uuidString);
 }
 
 template <typename T>
@@ -469,7 +491,11 @@ Status validate(OperationContext* opCtx,
         validateState.initializeCursors(opCtx);
 
         // Validate the record store.
-        log(LogComponent::kIndex) << "validating collection " << validateState.nss() << uuidString;
+        LOGV2_OPTIONS(20303,
+                      {logComponentV1toV2(LogComponent::kIndex)},
+                      "validating collection {validateState_nss}{uuidString}",
+                      "validateState_nss"_attr = validateState.nss(),
+                      "uuidString"_attr = uuidString);
 
         IndexConsistency indexConsistency(opCtx, &validateState);
         ValidateAdaptor indexValidator(&indexConsistency, &validateState, &indexNsResultsMap);
@@ -492,7 +518,7 @@ Status validate(OperationContext* opCtx,
 
         if (MONGO_unlikely(pauseCollectionValidationWithLock.shouldFail())) {
             _validationIsPausedForTest.store(true);
-            log() << "Failpoint 'pauseCollectionValidationWithLock' activated.";
+            LOGV2(20304, "Failpoint 'pauseCollectionValidationWithLock' activated.");
             pauseCollectionValidationWithLock.pauseWhileSet();
             _validationIsPausedForTest.store(false);
         }
@@ -518,9 +544,11 @@ Status validate(OperationContext* opCtx,
                          results);
 
         if (indexConsistency.haveEntryMismatch()) {
-            log(LogComponent::kIndex)
-                << "Index inconsistencies were detected on collection " << validateState.nss()
-                << ". Starting the second phase of index validation to gather concise errors.";
+            LOGV2_OPTIONS(20305,
+                          {logComponentV1toV2(LogComponent::kIndex)},
+                          "Index inconsistencies were detected on collection {validateState_nss}. "
+                          "Starting the second phase of index validation to gather concise errors.",
+                          "validateState_nss"_attr = validateState.nss());
             _gatherIndexEntryErrors(opCtx,
                                     &validateState,
                                     &indexConsistency,
@@ -559,8 +587,12 @@ Status validate(OperationContext* opCtx,
         _reportValidationResults(
             opCtx, &validateState, &indexNsResultsMap, &keysPerIndex, results, output);
 
-        log(LogComponent::kIndex) << "Validation complete for collection " << validateState.nss()
-                                  << uuidString << ". No corruption found.";
+        LOGV2_OPTIONS(20306,
+                      {logComponentV1toV2(LogComponent::kIndex)},
+                      "Validation complete for collection {validateState_nss}{uuidString}. No "
+                      "corruption found.",
+                      "validateState_nss"_attr = validateState.nss(),
+                      "uuidString"_attr = uuidString);
 
         output->append("ns", validateState.nss().ns());
     } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {

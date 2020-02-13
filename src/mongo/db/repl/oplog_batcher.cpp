@@ -35,6 +35,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -173,7 +174,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
             std::string message = str::stream()
                 << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
                 << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
-            severe() << message;
+            LOGV2_FATAL(21240, "{message}", "message"_attr = message);
             return {ErrorCodes::BadValue, message};
         }
 
@@ -319,7 +320,9 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
             if (isDraining && _oplogBuffer->isEmpty()) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);
-                log() << "Oplog buffer has been drained in term " << termWhenBufferIsEmpty;
+                LOGV2(21239,
+                      "Oplog buffer has been drained in term {termWhenBufferIsEmpty}",
+                      "termWhenBufferIsEmpty"_attr = termWhenBufferIsEmpty);
             } else {
                 // Don't emit empty batches.
                 continue;

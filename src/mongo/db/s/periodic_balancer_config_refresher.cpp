@@ -35,6 +35,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -60,7 +61,9 @@ PeriodicJobAnchor launchBalancerConfigRefresher(ServiceContext* serviceContext) 
 
             Status status = balancerConfig->refreshAndCheck(opCtx.get());
             if (!status.isOK()) {
-                log() << "Failed to refresh balancer configuration" << causedBy(status);
+                LOGV2(22048,
+                      "Failed to refresh balancer configuration{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(status));
             }
         },
         Seconds(30));

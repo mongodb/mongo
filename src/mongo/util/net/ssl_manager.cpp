@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/hex.h"
@@ -553,11 +554,21 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLog
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         const auto& config = theSSLManager->getSSLConfiguration();
         if (!config.clientSubjectName.empty()) {
-            LOG(1) << "Client Certificate Name: " << config.clientSubjectName;
+            LOGV2_DEBUG(23214,
+                        1,
+                        "Client Certificate Name: {config_clientSubjectName}",
+                        "config_clientSubjectName"_attr = config.clientSubjectName);
         }
         if (!config.serverSubjectName().empty()) {
-            LOG(1) << "Server Certificate Name: " << config.serverSubjectName();
-            LOG(1) << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
+            LOGV2_DEBUG(23215,
+                        1,
+                        "Server Certificate Name: {config_serverSubjectName}",
+                        "config_serverSubjectName"_attr = config.serverSubjectName());
+            LOGV2_DEBUG(23216,
+                        1,
+                        "Server Certificate Expiration: {config_serverCertificateExpirationDate}",
+                        "config_serverCertificateExpirationDate"_attr =
+                            config.serverCertificateExpirationDate);
         }
     }
 
@@ -594,8 +605,12 @@ Status SSLX509Name::normalizeStrings() {
                     break;
                 }
                 default:
-                    LOG(1) << "Certificate subject name contains unknown string type: "
-                           << entry.type << " (string value is \"" << entry.value << "\")";
+                    LOGV2_DEBUG(23217,
+                                1,
+                                "Certificate subject name contains unknown string type: "
+                                "{entry_type} (string value is \"{entry_value}\")",
+                                "entry_type"_attr = entry.type,
+                                "entry_value"_attr = entry.value);
                     break;
             }
         }
@@ -677,13 +692,16 @@ bool SSLConfiguration::isClusterMember(SSLX509Name subject) const {
 bool SSLConfiguration::isClusterMember(StringData subjectName) const {
     auto swClient = parseDN(subjectName);
     if (!swClient.isOK()) {
-        warning() << "Unable to parse client subject name: " << swClient.getStatus();
+        LOGV2_WARNING(23219,
+                      "Unable to parse client subject name: {swClient_getStatus}",
+                      "swClient_getStatus"_attr = swClient.getStatus());
         return false;
     }
     auto& client = swClient.getValue();
     auto status = client.normalizeStrings();
     if (!status.isOK()) {
-        warning() << "Unable to normalize client subject name: " << status;
+        LOGV2_WARNING(
+            23220, "Unable to normalize client subject name: {status}", "status"_attr = status);
         return false;
     }
 
@@ -1110,8 +1128,11 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     }
 
     if (!versionString.empty()) {
-        log() << "Accepted connection with TLS Version " << versionString << " from connection "
-              << hostForLogging;
+        LOGV2(
+            23218,
+            "Accepted connection with TLS Version {versionString} from connection {hostForLogging}",
+            "versionString"_attr = versionString,
+            "hostForLogging"_attr = hostForLogging);
     }
 }
 
@@ -1139,11 +1160,14 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer) {
-    warning() << "Peer certificate '" << peer << "' expires soon";
+    LOGV2_WARNING(23221, "Peer certificate '{peer}' expires soon", "peer"_attr = peer);
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days) {
-    warning() << "Peer certificate '" << peer << "' expires in " << days;
+    LOGV2_WARNING(23222,
+                  "Peer certificate '{peer}' expires in {days}",
+                  "peer"_attr = peer,
+                  "days"_attr = days);
 }
 
 }  // namespace mongo

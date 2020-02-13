@@ -37,6 +37,7 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -57,9 +58,12 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
         info.ident = ident.toString();
         _dropPendingIdents.insert(std::make_pair(dropTimestamp, info));
     } else {
-        severe() << "Failed to add drop-pending ident " << ident << " (" << nss << ")"
-                 << " with drop timestamp " << dropTimestamp
-                 << ": duplicate timestamp and ident pair.";
+        LOGV2_FATAL(22238,
+                    "Failed to add drop-pending ident {ident} ({nss}) with drop timestamp "
+                    "{dropTimestamp}: duplicate timestamp and ident pair.",
+                    "ident"_attr = ident,
+                    "nss"_attr = nss,
+                    "dropTimestamp"_attr = dropTimestamp);
         fassertFailedNoTrace(51023);
     }
 }
@@ -109,13 +113,22 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             const auto& identInfo = timestampAndIdentInfo.second;
             const auto& nss = identInfo.nss;
             const auto& ident = identInfo.ident;
-            log() << "Completing drop for ident " << ident << " (ns: " << nss
-                  << ") with drop timestamp " << dropTimestamp;
+            LOGV2(
+                22237,
+                "Completing drop for ident {ident} (ns: {nss}) with drop timestamp {dropTimestamp}",
+                "ident"_attr = ident,
+                "nss"_attr = nss,
+                "dropTimestamp"_attr = dropTimestamp);
             WriteUnitOfWork wuow(opCtx);
             auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), ident);
             if (!status.isOK()) {
-                severe() << "Failed to remove drop-pending ident " << ident << "(ns: " << nss
-                         << ") with drop timestamp " << dropTimestamp << ": " << status;
+                LOGV2_FATAL(22239,
+                            "Failed to remove drop-pending ident {ident}(ns: {nss}) with drop "
+                            "timestamp {dropTimestamp}: {status}",
+                            "ident"_attr = ident,
+                            "nss"_attr = nss,
+                            "dropTimestamp"_attr = dropTimestamp,
+                            "status"_attr = status);
                 fassertFailedNoTrace(51022);
             }
             wuow.commit();

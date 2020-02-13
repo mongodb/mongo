@@ -47,6 +47,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -111,7 +112,7 @@ Status SubplanStage::planSubqueries() {
         const auto insertionRes = _indexMap.insert(std::make_pair(ie.identifier, i));
         // Be sure the key was not already in the map.
         invariant(insertionRes.second);
-        LOG(5) << "Subplanner: index " << i << " is " << ie;
+        LOGV2_DEBUG(20598, 5, "Subplanner: index {i} is {ie}", "i"_attr = i, "ie"_attr = ie);
     }
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
@@ -141,8 +142,12 @@ Status SubplanStage::planSubqueries() {
             auto planCacheKey = planCache->computeKey(*branchResult->canonicalQuery);
             if (auto cachedSol = planCache->getCacheEntryIfActive(planCacheKey)) {
                 // We have a CachedSolution. Store it for later.
-                LOG(5) << "Subplanner: cached plan found for child " << i << " of "
-                       << _orExpression->numChildren();
+                LOGV2_DEBUG(
+                    20599,
+                    5,
+                    "Subplanner: cached plan found for child {i} of {orExpression_numChildren}",
+                    "i"_attr = i,
+                    "orExpression_numChildren"_attr = _orExpression->numChildren());
 
                 branchResult->cachedSolution = std::move(cachedSol);
             }
@@ -150,7 +155,11 @@ Status SubplanStage::planSubqueries() {
 
         if (!branchResult->cachedSolution) {
             // No CachedSolution found. We'll have to plan from scratch.
-            LOG(5) << "Subplanner: planning child " << i << " of " << _orExpression->numChildren();
+            LOGV2_DEBUG(20600,
+                        5,
+                        "Subplanner: planning child {i} of {orExpression_numChildren}",
+                        "i"_attr = i,
+                        "orExpression_numChildren"_attr = _orExpression->numChildren());
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
@@ -164,7 +173,10 @@ Status SubplanStage::planSubqueries() {
             }
             branchResult->solutions = std::move(solutions.getValue());
 
-            LOG(5) << "Subplanner: got " << branchResult->solutions.size() << " solutions";
+            LOGV2_DEBUG(20601,
+                        5,
+                        "Subplanner: got {branchResult_solutions_size} solutions",
+                        "branchResult_solutions_size"_attr = branchResult->solutions.size());
         }
     }
 
@@ -329,7 +341,10 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
-    LOG(5) << "Subplanner: fully tagged tree is " << redact(solnRoot->toString());
+    LOGV2_DEBUG(20602,
+                5,
+                "Subplanner: fully tagged tree is {solnRoot}",
+                "solnRoot"_attr = redact(solnRoot->toString()));
 
     _compositeSolution =
         QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot));
@@ -340,7 +355,10 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
 
-    LOG(5) << "Subplanner: Composite solution is " << redact(_compositeSolution->toString());
+    LOGV2_DEBUG(20603,
+                5,
+                "Subplanner: Composite solution is {compositeSolution}",
+                "compositeSolution"_attr = redact(_compositeSolution->toString()));
 
     // Use the index tags from planning each branch to construct the composite solution,
     // and set that solution as our child stage.

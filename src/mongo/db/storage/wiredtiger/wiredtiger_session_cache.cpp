@@ -43,6 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -104,8 +105,10 @@ void _openCursor(WT_SESSION* session,
             uasserted(ErrorCodes::CursorNotFound, cursorErrMsg);
         }
 
-        error() << cursorErrMsg;
-        error() << "This may be due to data corruption. " << kWTRepairMsg;
+        LOGV2_ERROR(22421, "{cursorErrMsg}", "cursorErrMsg"_attr = cursorErrMsg);
+        LOGV2_ERROR(22422,
+                    "This may be due to data corruption. {kWTRepairMsg}",
+                    "kWTRepairMsg"_attr = kWTRepairMsg);
 
         fassertFailedNoTrace(50882);
     }
@@ -294,7 +297,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
                 _journalListener->onDurable(token.get());
             }
         }
-        LOG(4) << "created checkpoint (forced)";
+        LOGV2_DEBUG(22418, 4, "created checkpoint (forced)");
         return;
     }
 
@@ -330,12 +333,12 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // Use the journal when available, or a checkpoint otherwise.
     if (_engine && _engine->isDurable()) {
         invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"));
-        LOG(4) << "flushed journal";
+        LOGV2_DEBUG(22419, 4, "flushed journal");
     } else {
         auto checkpointLock = _engine->getCheckpointLock(opCtx);
         _engine->clearIndividuallyCheckpointedIndexesList();
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
-        LOG(4) << "created checkpoint";
+        LOGV2_DEBUG(22420, 4, "created checkpoint");
     }
 
     if (token) {

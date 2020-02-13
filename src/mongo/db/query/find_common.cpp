@@ -38,6 +38,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -79,8 +80,9 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int
 void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {
     auto whileWaitingFunc = [&, hasLogged = false]() mutable {
         if (!std::exchange(hasLogged, true)) {
-            log() << "Waiting in find before making batch for query - "
-                  << redact(cq.toStringShort());
+            LOGV2(20908,
+                  "Waiting in find before making batch for query - {cq_Short}",
+                  "cq_Short"_attr = redact(cq.toStringShort()));
         }
     };
 

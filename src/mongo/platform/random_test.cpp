@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include <set>
 #include <vector>
 
 #include "mongo/platform/random.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -233,11 +237,14 @@ TEST(RandomTest, NextInt32Uniformity) {
     if (kDebugBuild) {
         for (size_t i = 0; i < hist.size(); ++i) {
             double dev = std::pow(std::pow((hist[i] - mu) / mu, 2), .5);
-            unittest::log() << format(FMT_STRING("  [{:4}] count:{:4}, dev:{:6f}, {}"),
-                                      i,
-                                      hist[i],
-                                      dev,
-                                      std::string(hist[i] / 256, '*'));
+            LOGV2(22611,
+                  "{format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256}",
+                  "format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256"_attr =
+                      format(FMT_STRING("  [{:4}] count:{:4}, dev:{:6f}, {}"),
+                             i,
+                             hist[i],
+                             dev,
+                             std::string(hist[i] / 256, '*')));
         }
     }
     for (size_t i = 0; i < hist.size(); ++i) {

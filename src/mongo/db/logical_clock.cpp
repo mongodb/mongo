@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -122,8 +123,9 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
     // second.
     else if (clusterTime.asTimestamp().getInc() > (kMaxSignedInt - nTicks)) {
 
-        log() << "Exceeded maximum allowable increment value within one second. Moving clusterTime "
-                 "forward to the next second.";
+        LOGV2(20709,
+              "Exceeded maximum allowable increment value within one second. Moving clusterTime "
+              "forward to the next second.");
 
         // Move time forward to the next second
         clusterTime = LogicalTime(Timestamp(clusterTime.asTimestamp().getSecs() + 1, 0));

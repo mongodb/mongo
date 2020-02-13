@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
@@ -108,8 +109,11 @@ void ReplSetDistLockManager::shutDown(OperationContext* opCtx) {
 
     auto status = _catalog->stopPing(opCtx, _processID);
     if (!status.isOK()) {
-        warning() << "error encountered while cleaning up distributed ping entry for " << _processID
-                  << causedBy(redact(status));
+        LOGV2_WARNING(22667,
+                      "error encountered while cleaning up distributed ping entry for "
+                      "{processID}{causedBy_status}",
+                      "processID"_attr = _processID,
+                      "causedBy_status"_attr = causedBy(redact(status)));
     }
 }
 
@@ -123,8 +127,11 @@ bool ReplSetDistLockManager::isShutDown() {
 }
 
 void ReplSetDistLockManager::doTask() {
-    LOG(0) << "creating distributed lock ping thread for process " << _processID
-           << " (sleeping for " << _pingInterval << ")";
+    LOGV2(22649,
+          "creating distributed lock ping thread for process {processID} (sleeping for "
+          "{pingInterval})",
+          "processID"_attr = _processID,
+          "pingInterval"_attr = _pingInterval);
 
     Timer elapsedSincelastPing(_serviceContext->getTickSource());
     Client::initThread("replSetDistLockPinger");
@@ -135,13 +142,17 @@ void ReplSetDistLockManager::doTask() {
             auto pingStatus = _catalog->ping(opCtx.get(), _processID, Date_t::now());
 
             if (!pingStatus.isOK() && pingStatus != ErrorCodes::NotMaster) {
-                warning() << "pinging failed for distributed lock pinger" << causedBy(pingStatus);
+                LOGV2_WARNING(22668,
+                              "pinging failed for distributed lock pinger{causedBy_pingStatus}",
+                              "causedBy_pingStatus"_attr = causedBy(pingStatus));
             }
 
             const Milliseconds elapsed(elapsedSincelastPing.millis());
             if (elapsed > 10 * _pingInterval) {
-                warning() << "Lock pinger for proc: " << _processID << " was inactive for "
-                          << elapsed << " ms";
+                LOGV2_WARNING(22669,
+                              "Lock pinger for proc: {processID} was inactive for {elapsed} ms",
+                              "processID"_attr = _processID,
+                              "elapsed"_attr = elapsed);
             }
             elapsedSincelastPing.reset();
 
@@ -164,15 +175,24 @@ void ReplSetDistLockManager::doTask() {
                 }
 
                 if (!unlockStatus.isOK()) {
-                    warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
-                              << toUnlock.first << nameMessage << causedBy(unlockStatus);
+                    LOGV2_WARNING(22670,
+                                  "Failed to unlock lock with {LocksType_lockID}: "
+                                  "{toUnlock_first}{nameMessage}{causedBy_unlockStatus}",
+                                  "LocksType_lockID"_attr = LocksType::lockID(),
+                                  "toUnlock_first"_attr = toUnlock.first,
+                                  "nameMessage"_attr = nameMessage,
+                                  "causedBy_unlockStatus"_attr = causedBy(unlockStatus));
                     // Queue another attempt, unless the problem was no longer being primary.
                     if (unlockStatus != ErrorCodes::NotMaster) {
                         queueUnlock(toUnlock.first, toUnlock.second);
                     }
                 } else {
-                    LOG(0) << "distributed lock with " << LocksType::lockID() << ": "
-                           << toUnlock.first << nameMessage << " unlocked.";
+                    LOGV2(22650,
+                          "distributed lock with {LocksType_lockID}: {toUnlock_first}{nameMessage} "
+                          "unlocked.",
+                          "LocksType_lockID"_attr = LocksType::lockID(),
+                          "toUnlock_first"_attr = toUnlock.first,
+                          "nameMessage"_attr = nameMessage);
                 }
 
                 if (isShutDown()) {
@@ -246,8 +266,13 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* opCtx,
 
     auto* pingInfo = &pingIter->second;
 
-    LOG(1) << "checking last ping for lock '" << lockDoc.getName() << "' against last seen process "
-           << pingInfo->processId << " and ping " << pingInfo->lastPing;
+    LOGV2_DEBUG(22651,
+                1,
+                "checking last ping for lock '{lockDoc_getName}' against last seen process "
+                "{pingInfo_processId} and ping {pingInfo_lastPing}",
+                "lockDoc_getName"_attr = lockDoc.getName(),
+                "pingInfo_processId"_attr = pingInfo->processId,
+                "pingInfo_lastPing"_attr = pingInfo->lastPing);
 
     if (pingInfo->lastPing != pingValue ||  // ping is active
 
@@ -266,21 +291,35 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* opCtx,
     }
 
     if (configServerLocalTime < pingInfo->configLocalTime) {
-        warning() << "config server local time went backwards, from last seen: "
-                  << pingInfo->configLocalTime << " to " << configServerLocalTime;
+        LOGV2_WARNING(22671,
+                      "config server local time went backwards, from last seen: "
+                      "{pingInfo_configLocalTime} to {configServerLocalTime}",
+                      "pingInfo_configLocalTime"_attr = pingInfo->configLocalTime,
+                      "configServerLocalTime"_attr = configServerLocalTime);
         return false;
     }
 
     Milliseconds elapsedSinceLastPing(configServerLocalTime - pingInfo->configLocalTime);
     if (elapsedSinceLastPing >= lockExpiration) {
-        LOG(0) << "forcing lock '" << lockDoc.getName() << "' because elapsed time "
-               << elapsedSinceLastPing << " >= takeover time " << lockExpiration;
+        LOGV2(22652,
+              "forcing lock '{lockDoc_getName}' because elapsed time {elapsedSinceLastPing} >= "
+              "takeover time {lockExpiration}",
+              "lockDoc_getName"_attr = lockDoc.getName(),
+              "elapsedSinceLastPing"_attr = elapsedSinceLastPing,
+              "lockExpiration"_attr = lockExpiration);
         return true;
     }
 
-    LOG(1) << "could not force lock '" << lockDoc.getName() << "' because elapsed time "
-           << durationCount<Milliseconds>(elapsedSinceLastPing) << " < takeover time "
-           << durationCount<Milliseconds>(lockExpiration) << " ms";
+    LOGV2_DEBUG(22653,
+                1,
+                "could not force lock '{lockDoc_getName}' because elapsed time "
+                "{durationCount_Milliseconds_elapsedSinceLastPing} < takeover time "
+                "{durationCount_Milliseconds_lockExpiration} ms",
+                "lockDoc_getName"_attr = lockDoc.getName(),
+                "durationCount_Milliseconds_elapsedSinceLastPing"_attr =
+                    durationCount<Milliseconds>(elapsedSinceLastPing),
+                "durationCount_Milliseconds_lockExpiration"_attr =
+                    durationCount<Milliseconds>(lockExpiration));
     return false;
 }
 
@@ -311,11 +350,20 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
         });
 
-        LOG(1) << "trying to acquire new distributed lock for " << name
-               << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
-               << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
-               << " ms, process : " << _processID << " )"
-               << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage.toString();
+        LOGV2_DEBUG(22654,
+                    1,
+                    "trying to acquire new distributed lock for {name} ( lock timeout : "
+                    "{durationCount_Milliseconds_lockExpiration} ms, ping interval : "
+                    "{durationCount_Milliseconds_pingInterval} ms, process : {processID} ) with "
+                    "lockSessionID: {lockSessionID}, why: {whyMessage}",
+                    "name"_attr = name,
+                    "durationCount_Milliseconds_lockExpiration"_attr =
+                        durationCount<Milliseconds>(lockExpiration),
+                    "durationCount_Milliseconds_pingInterval"_attr =
+                        durationCount<Milliseconds>(_pingInterval),
+                    "processID"_attr = _processID,
+                    "lockSessionID"_attr = lockSessionID,
+                    "whyMessage"_attr = whyMessage.toString());
 
         auto lockResult = _catalog->grabLock(
             opCtx, name, lockSessionID, who, _processID, Date_t::now(), whyMessage.toString());
@@ -325,17 +373,23 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         if (status.isOK()) {
             // Lock is acquired since findAndModify was able to successfully modify
             // the lock document.
-            log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
-                  << "', ts : " << lockSessionID;
+            LOGV2(22655,
+                  "distributed lock '{name}' acquired for '{whyMessage}', ts : {lockSessionID}",
+                  "name"_attr = name,
+                  "whyMessage"_attr = whyMessage.toString(),
+                  "lockSessionID"_attr = lockSessionID);
             return lockSessionID;
         }
 
         // If a network error occurred, unlock the lock synchronously and try again
         if (configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
             networkErrorRetries < kMaxNumLockAcquireRetries) {
-            LOG(1) << "Failed to acquire distributed lock because of retriable error. Retrying "
-                      "acquisition by first unlocking the stale entry, which possibly exists now"
-                   << causedBy(redact(status));
+            LOGV2_DEBUG(22656,
+                        1,
+                        "Failed to acquire distributed lock because of retriable error. Retrying "
+                        "acquisition by first unlocking the stale entry, which possibly exists "
+                        "now{causedBy_status}",
+                        "causedBy_status"_attr = causedBy(redact(status)));
 
             networkErrorRetries++;
 
@@ -348,9 +402,11 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             // Fall-through to the error checking logic below
             invariant(status != ErrorCodes::LockStateChangeFailed);
 
-            LOG(1)
-                << "Failed to retry acquisition of distributed lock. No more attempts will be made"
-                << causedBy(redact(status));
+            LOGV2_DEBUG(22657,
+                        1,
+                        "Failed to retry acquisition of distributed lock. No more attempts will be "
+                        "made{causedBy_status}",
+                        "causedBy_status"_attr = causedBy(redact(status)));
         }
 
         if (status != ErrorCodes::LockStateChangeFailed) {
@@ -394,8 +450,11 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
                     // Lock is acquired since findAndModify was able to successfully modify
                     // the lock document.
 
-                    LOG(0) << "lock '" << name << "' successfully forced";
-                    LOG(0) << "distributed lock '" << name << "' acquired, ts : " << lockSessionID;
+                    LOGV2(22658, "lock '{name}' successfully forced", "name"_attr = name);
+                    LOGV2(22659,
+                          "distributed lock '{name}' acquired, ts : {lockSessionID}",
+                          "name"_attr = name,
+                          "lockSessionID"_attr = lockSessionID);
                     return lockSessionID;
                 }
 
@@ -408,7 +467,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             }
         }
 
-        LOG(1) << "distributed lock '" << name << "' was not acquired.";
+        LOGV2_DEBUG(22660, 1, "distributed lock '{name}' was not acquired.", "name"_attr = name);
 
         if (waitFor == Milliseconds::zero()) {
             break;
@@ -416,8 +475,11 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
 
         // Periodically message for debugging reasons
         if (msgTimer.seconds() > 10) {
-            LOG(0) << "waited " << timer.seconds() << "s for distributed lock " << name << " for "
-                   << whyMessage.toString();
+            LOGV2(22661,
+                  "waited {timer_seconds}s for distributed lock {name} for {whyMessage}",
+                  "timer_seconds"_attr = timer.seconds(),
+                  "name"_attr = name,
+                  "whyMessage"_attr = whyMessage.toString());
 
             msgTimer.reset();
         }
@@ -438,11 +500,20 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
     OperationContext* opCtx, StringData name, StringData whyMessage, const OID& lockSessionID) {
     const string who = str::stream() << _processID << ":" << getThreadName();
 
-    LOG(1) << "trying to acquire new distributed lock for " << name
-           << " ( lock timeout : " << durationCount<Milliseconds>(_lockExpiration)
-           << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
-           << " ms, process : " << _processID << " )"
-           << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage.toString();
+    LOGV2_DEBUG(22662,
+                1,
+                "trying to acquire new distributed lock for {name} ( lock timeout : "
+                "{durationCount_Milliseconds_lockExpiration} ms, ping interval : "
+                "{durationCount_Milliseconds_pingInterval} ms, process : {processID} ) with "
+                "lockSessionID: {lockSessionID}, why: {whyMessage}",
+                "name"_attr = name,
+                "durationCount_Milliseconds_lockExpiration"_attr =
+                    durationCount<Milliseconds>(_lockExpiration),
+                "durationCount_Milliseconds_pingInterval"_attr =
+                    durationCount<Milliseconds>(_pingInterval),
+                "processID"_attr = _processID,
+                "lockSessionID"_attr = lockSessionID,
+                "whyMessage"_attr = whyMessage.toString());
 
     auto lockStatus = _catalog->grabLock(opCtx,
                                          name,
@@ -454,12 +525,15 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
                                          DistLockCatalog::kLocalWriteConcern);
 
     if (lockStatus.isOK()) {
-        log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
-              << "', ts : " << lockSessionID;
+        LOGV2(22663,
+              "distributed lock '{name}' acquired for '{whyMessage}', ts : {lockSessionID}",
+              "name"_attr = name,
+              "whyMessage"_attr = whyMessage.toString(),
+              "lockSessionID"_attr = lockSessionID);
         return lockSessionID;
     }
 
-    LOG(1) << "distributed lock '" << name << "' was not acquired.";
+    LOGV2_DEBUG(22664, 1, "distributed lock '{name}' was not acquired.", "name"_attr = name);
 
     if (lockStatus == ErrorCodes::LockStateChangeFailed) {
         return {ErrorCodes::LockBusy, str::stream() << "Unable to acquire " << name};
@@ -474,8 +548,10 @@ void ReplSetDistLockManager::unlock(OperationContext* opCtx, const DistLockHandl
     if (!unlockStatus.isOK()) {
         queueUnlock(lockSessionID, boost::none);
     } else {
-        LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << lockSessionID
-               << "' unlocked.";
+        LOGV2(22665,
+              "distributed lock with {LocksType_lockID}: {lockSessionID}' unlocked.",
+              "LocksType_lockID"_attr = LocksType::lockID(),
+              "lockSessionID"_attr = lockSessionID);
     }
 }
 
@@ -487,16 +563,22 @@ void ReplSetDistLockManager::unlock(OperationContext* opCtx,
     if (!unlockStatus.isOK()) {
         queueUnlock(lockSessionID, name.toString());
     } else {
-        LOG(0) << "distributed lock with " << LocksType::lockID() << ": '" << lockSessionID
-               << "' and " << LocksType::name() << ": '" << name.toString() << "' unlocked.";
+        LOGV2(22666,
+              "distributed lock with {LocksType_lockID}: '{lockSessionID}' and {LocksType_name}: "
+              "'{name}' unlocked.",
+              "LocksType_lockID"_attr = LocksType::lockID(),
+              "lockSessionID"_attr = lockSessionID,
+              "LocksType_name"_attr = LocksType::name(),
+              "name"_attr = name.toString());
     }
 }
 
 void ReplSetDistLockManager::unlockAll(OperationContext* opCtx, const std::string& processID) {
     Status status = _catalog->unlockAll(opCtx, processID);
     if (!status.isOK()) {
-        warning() << "Error while trying to unlock existing distributed locks"
-                  << causedBy(redact(status));
+        LOGV2_WARNING(22672,
+                      "Error while trying to unlock existing distributed locks{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(redact(status)));
     }
 }
 

@@ -38,6 +38,7 @@
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/thread.h"
@@ -278,7 +279,7 @@ private:
             _hotel.checkOut();
 
             if ((i % (checkIns / 10)) == 0)
-                mongo::unittest::log() << "checked in " << i << " times..." << endl;
+                LOGV2(22517, "checked in {i} times...", "i"_attr = i);
         }
     }
 

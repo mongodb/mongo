@@ -45,6 +45,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -195,7 +196,7 @@ void abortInProgressTransactions(OperationContext* opCtx) {
                      << DurableTxnState_serializer(DurableTxnStateEnum::kInProgress)));
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
     if (cursor->more()) {
-        LOG(3) << "Aborting in-progress transactions on stepup.";
+        LOGV2_DEBUG(21977, 3, "Aborting in-progress transactions on stepup.");
     }
     while (cursor->more()) {
         auto txnRecord = SessionTxnRecord::parse(
@@ -205,8 +206,12 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         opCtx->setInMultiDocumentTransaction();
         MongoDOperationContextSessionWithoutRefresh ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        LOG(3) << "Aborting transaction sessionId: " << txnRecord.getSessionId().toBSON()
-               << " txnNumber " << txnRecord.getTxnNum();
+        LOGV2_DEBUG(21978,
+                    3,
+                    "Aborting transaction sessionId: {txnRecord_getSessionId} txnNumber "
+                    "{txnRecord_getTxnNum}",
+                    "txnRecord_getSessionId"_attr = txnRecord.getSessionId().toBSON(),
+                    "txnRecord_getTxnNum"_attr = txnRecord.getTxnNum());
         txnParticipant.abortTransaction(opCtx);
     }
 }
@@ -248,8 +253,13 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             newOpCtx->setLogicalSessionId(sessionId);
             MongoDOperationContextSession ocs(newOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
-            LOG(3) << "Restoring locks of prepared transaction. SessionId: " << sessionId.getId()
-                   << " TxnNumber: " << txnParticipant.getActiveTxnNumber();
+            LOGV2_DEBUG(21979,
+                        3,
+                        "Restoring locks of prepared transaction. SessionId: {sessionId_getId} "
+                        "TxnNumber: {txnParticipant_getActiveTxnNumber}",
+                        "sessionId_getId"_attr = sessionId.getId(),
+                        "txnParticipant_getActiveTxnNumber"_attr =
+                            txnParticipant.getActiveTxnNumber());
             txnParticipant.refreshLocksForPreparedTransaction(newOpCtx.get(), false);
         }
     }

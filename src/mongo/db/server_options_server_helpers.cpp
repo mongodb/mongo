@@ -48,6 +48,7 @@
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/fail_point.h"
@@ -114,7 +115,9 @@ Status setParsedOpts(const moe::Environment& params) {
 }  // namespace
 
 void printCommandLineOpts() {
-    log() << "options: " << serverGlobalParams.parsedOpts << endl;
+    LOGV2(21951,
+          "options: {serverGlobalParams_parsedOpts}",
+          "serverGlobalParams_parsedOpts"_attr = serverGlobalParams.parsedOpts);
 }
 
 Status validateServerOptions(const moe::Environment& params) {

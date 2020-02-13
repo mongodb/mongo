@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -61,11 +62,12 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
                 auto c = std::make_unique<DBClientConnection>(true, 0, newURI);
 
                 c->setSoTimeout(socketTimeout);
-                LOG(1) << "creating new connection to:" << server;
+                LOGV2_DEBUG(
+                    20109, 1, "creating new connection to:{server}", "server"_attr = server);
                 if (!c->connect(server, applicationName, errmsg)) {
                     continue;
                 }
-                LOG(1) << "connected connection!";
+                LOGV2_DEBUG(20110, 1, "connected connection!");
                 return std::move(c);
             }
             return nullptr;
@@ -96,8 +98,12 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
             // Double-checked lock, since this will never be active during normal operation
             auto replacementConn = _connectHook->connect(*this, errmsg, socketTimeout);
 
-            log() << "replacing connection to " << this->toString() << " with "
-                  << (replacementConn ? replacementConn->getServerAddress() : "(empty)");
+            LOGV2(20111,
+                  "replacing connection to {this} with "
+                  "{replacementConn_replacementConn_getServerAddress_empty}",
+                  "this"_attr = this->toString(),
+                  "replacementConn_replacementConn_getServerAddress_empty"_attr =
+                      (replacementConn ? replacementConn->getServerAddress() : "(empty)"));
 
             return replacementConn;
         }

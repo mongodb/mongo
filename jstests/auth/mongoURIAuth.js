@@ -59,8 +59,8 @@ const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism
 const SCRAM_SHA_256 = "SCRAM-SHA-256";
 const SCRAM_SHA_1 = "SCRAM-SHA-1";
 
-const SCRAM_SHA_256_regex = /saslStart.*mechanism:.*SCRAM-SHA-256/g;
-const SCRAM_SHA_1_regex = /saslStart.*mechanism:.*SCRAM-SHA-1/g;
+const SCRAM_SHA_256_regex = /saslStart.*mechanism.*SCRAM-SHA-256/g;
+const SCRAM_SHA_1_regex = /saslStart.*mechanism.*SCRAM-SHA-1/g;
 
 jsTestLog("Test that a mechanism specified in the URI is the chosen authentication method.");
 runURIAuthTest(false, true, SCRAM_SHA_256, SCRAM_SHA_256_regex);

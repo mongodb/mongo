@@ -44,6 +44,7 @@
 #include "mongo/db/s/balancer/scoped_migration_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -234,9 +235,12 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             boost::none);
 
     if (!statusWithMigrationsQueryResponse.isOK()) {
-        log() << "Unable to read config.migrations collection documents for balancer migration"
-              << " recovery. Abandoning balancer recovery."
-              << causedBy(redact(statusWithMigrationsQueryResponse.getStatus()));
+        LOGV2(21896,
+              "Unable to read config.migrations collection documents for balancer migration "
+              "recovery. Abandoning balancer "
+              "recovery.{causedBy_statusWithMigrationsQueryResponse_getStatus}",
+              "causedBy_statusWithMigrationsQueryResponse_getStatus"_attr =
+                  causedBy(redact(statusWithMigrationsQueryResponse.getStatus())));
         return;
     }
 
@@ -246,9 +250,13 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             // The format of this migration document is incorrect. The balancer holds a distlock for
             // this migration, but without parsing the migration document we cannot identify which
             // distlock must be released. So we must release all distlocks.
-            log() << "Unable to parse config.migrations document '" << redact(migration.toString())
-                  << "' for balancer migration recovery. Abandoning balancer recovery."
-                  << causedBy(redact(statusWithMigrationType.getStatus()));
+            LOGV2(21897,
+                  "Unable to parse config.migrations document '{migration}' for balancer migration "
+                  "recovery. Abandoning balancer "
+                  "recovery.{causedBy_statusWithMigrationType_getStatus}",
+                  "migration"_attr = redact(migration.toString()),
+                  "causedBy_statusWithMigrationType_getStatus"_attr =
+                      causedBy(redact(statusWithMigrationType.getStatus())));
             return;
         }
         MigrationType migrateType = std::move(statusWithMigrationType.getValue());
@@ -265,11 +273,13 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             auto statusWithDistLockHandle = distLockManager->tryLockWithLocalWriteConcern(
                 opCtx, migrateType.getNss().ns(), whyMessage, _lockSessionID);
             if (!statusWithDistLockHandle.isOK()) {
-                log() << "Failed to acquire distributed lock for collection '"
-                      << migrateType.getNss().ns()
-                      << "' during balancer recovery of an active migration. Abandoning"
-                      << " balancer recovery."
-                      << causedBy(redact(statusWithDistLockHandle.getStatus()));
+                LOGV2(21898,
+                      "Failed to acquire distributed lock for collection '{migrateType_getNss_ns}' "
+                      "during balancer recovery of an active migration. Abandoning balancer "
+                      "recovery.{causedBy_statusWithDistLockHandle_getStatus}",
+                      "migrateType_getNss_ns"_attr = migrateType.getNss().ns(),
+                      "causedBy_statusWithDistLockHandle_getStatus"_attr =
+                          causedBy(redact(statusWithDistLockHandle.getStatus())));
                 return;
             }
         }
@@ -320,9 +330,12 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
-            log() << "Unable to reload chunk metadata for collection '" << nss
-                  << "' during balancer recovery. Abandoning recovery."
-                  << causedBy(redact(routingInfoStatus.getStatus()));
+            LOGV2(21899,
+                  "Unable to reload chunk metadata for collection '{nss}' during balancer "
+                  "recovery. Abandoning recovery.{causedBy_routingInfoStatus_getStatus}",
+                  "nss"_attr = nss,
+                  "causedBy_routingInfoStatus_getStatus"_attr =
+                      causedBy(redact(routingInfoStatus.getStatus())));
             return;
         }
 

@@ -40,6 +40,7 @@
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -145,7 +146,10 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             // Either of these cause us to immediately end the trial phase and switch to the backup.
             auto statusDoc = WorkingSetCommon::getStatusMemberDocument(*_ws, *out);
             BSONObj statusObj = statusDoc ? statusDoc->toBson() : BSONObj();
-            LOG(1) << "Trial plan failed; switching to backup plan. Status: " << redact(statusObj);
+            LOGV2_DEBUG(20604,
+                        1,
+                        "Trial plan failed; switching to backup plan. Status: {statusObj}",
+                        "statusObj"_attr = redact(statusObj));
             _specificStats.trialCompleted = true;
             _replaceCurrentPlan(_backupPlan);
             *out = WorkingSet::INVALID_ID;

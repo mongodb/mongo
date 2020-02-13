@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -93,25 +94,42 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
         if (!candidates[i].failed) {
-            LOG(5) << "Scoring plan " << i << ":" << endl
-                   << redact(candidates[i].solution->toString()) << "Stats:\n"
-                   << redact(Explain::statsToBSON(*statTrees[i])
-                                 .jsonString(ExtendedRelaxedV2_0_0, true));
-            LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
-                   << " planHitEOF=" << statTrees[i]->common.isEOF;
+            LOGV2_DEBUG(
+                20956,
+                5,
+                "Scoring plan "
+                "{i}:\n{candidates_i_solution}Stats:\n{Explain_statsToBSON_statTrees_i_jsonString_"
+                "ExtendedRelaxedV2_0_0_true}",
+                "i"_attr = i,
+                "candidates_i_solution"_attr = redact(candidates[i].solution->toString()),
+                "Explain_statsToBSON_statTrees_i_jsonString_ExtendedRelaxedV2_0_0_true"_attr =
+                    redact(Explain::statsToBSON(*statTrees[i])
+                               .jsonString(ExtendedRelaxedV2_0_0, true)));
+            LOGV2_DEBUG(20957,
+                        2,
+                        "Scoring query plan: {Explain_getPlanSummary_candidates_i_root} "
+                        "planHitEOF={statTrees_i_common_isEOF}",
+                        "Explain_getPlanSummary_candidates_i_root"_attr =
+                            Explain::getPlanSummary(candidates[i].root),
+                        "statTrees_i_common_isEOF"_attr = statTrees[i]->common.isEOF);
 
             double score = scoreTree(statTrees[i].get());
-            LOG(5) << "score = " << score;
+            LOGV2_DEBUG(20958, 5, "score = {score}", "score"_attr = score);
             if (statTrees[i]->common.isEOF) {
-                LOG(5) << "Adding +" << eofBonus << " EOF bonus to score.";
+                LOGV2_DEBUG(
+                    20959, 5, "Adding +{eofBonus} EOF bonus to score.", "eofBonus"_attr = eofBonus);
                 score += 1;
             }
 
             scoresAndCandidateindices.push_back(std::make_pair(score, i));
         } else {
             failed.push_back(i);
-            LOG(2) << "Not scording plan: " << Explain::getPlanSummary(candidates[i].root)
-                   << " because the plan failed.";
+            LOGV2_DEBUG(20960,
+                        2,
+                        "Not scording plan: {Explain_getPlanSummary_candidates_i_root} because the "
+                        "plan failed.",
+                        "Explain_getPlanSummary_candidates_i_root"_attr =
+                            Explain::getPlanSummary(candidates[i].root));
         }
     }
 
@@ -265,14 +283,17 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
        << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
        << str::convertDoubleToString(noIxisectBonus)
        << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
-    LOG(2) << sb.str();
+    LOGV2_DEBUG(20961, 2, "{sb_str}", "sb_str"_attr = sb.str());
 
     if (internalQueryForceIntersectionPlans.load()) {
         if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
             // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
             // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
             score += 3;
-            LOG(5) << "Score boosted to " << score << " due to intersection forcing.";
+            LOGV2_DEBUG(20962,
+                        5,
+                        "Score boosted to {score} due to intersection forcing.",
+                        "score"_attr = score);
         }
     }
 

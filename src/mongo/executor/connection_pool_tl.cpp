@@ -35,6 +35,7 @@
 
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -58,7 +59,7 @@ void TLTypeFactory::shutdown() {
 
     stdx::lock_guard<Latch> lk(_mutex);
 
-    log() << "Killing all outstanding egress activity.";
+    LOGV2(22582, "Killing all outstanding egress activity.");
     for (auto collar : _collars) {
         collar->kill();
     }
@@ -94,7 +95,7 @@ void TLTimer::setTimeout(Milliseconds timeoutVal, TimeoutCallback cb) {
     // We will not wait on a timeout if we are in shutdown.
     // The clients will be canceled as an inevitable consequence of pools shutting down.
     if (inShutdown()) {
-        LOG(2) << "Skipping timeout due to impending shutdown.";
+        LOGV2_DEBUG(22583, 2, "Skipping timeout due to impending shutdown.");
         return;
     }
 
@@ -306,11 +307,15 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             if (status.isOK()) {
                 handler->promise.emplaceValue();
             } else {
-                LOG(2) << "Failed to connect to " << _peer << " - " << redact(status);
+                LOGV2_DEBUG(22584,
+                            2,
+                            "Failed to connect to {peer} - {status}",
+                            "peer"_attr = _peer,
+                            "status"_attr = redact(status));
                 handler->promise.setError(status);
             }
         });
-    LOG(2) << "Finished connection setup.";
+    LOGV2_DEBUG(22585, 2, "Finished connection setup.");
 }
 
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {

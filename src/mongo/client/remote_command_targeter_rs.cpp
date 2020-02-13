@@ -38,6 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
@@ -52,9 +53,15 @@ RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
     std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
     _rsMonitor = ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
 
-    LOG(1) << "Started targeter for "
-           << ConnectionString::forReplicaSet(
-                  rsName, std::vector<HostAndPort>(seedServers.begin(), seedServers.end()));
+    LOGV2_DEBUG(
+        20157,
+        1,
+        "Started targeter for "
+        "{ConnectionString_forReplicaSet_rsName_std_vector_HostAndPort_seedServers_begin_"
+        "seedServers_end}",
+        "ConnectionString_forReplicaSet_rsName_std_vector_HostAndPort_seedServers_begin_seedServers_end"_attr =
+            ConnectionString::forReplicaSet(
+                rsName, std::vector<HostAndPort>(seedServers.begin(), seedServers.end())));
 }
 
 ConnectionString RemoteCommandTargeterRS::connectionString() {

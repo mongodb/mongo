@@ -52,6 +52,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -182,7 +183,9 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
 
         auto idElement = documentKey["_id"];
         if (idElement.eoo()) {
-            warning() << "Received a document with no id, ignoring: " << redact(documentKey);
+            LOGV2_WARNING(21994,
+                          "Received a document with no id, ignoring: {documentKey}",
+                          "documentKey"_attr = redact(documentKey));
             continue;
         }
 
@@ -396,7 +399,9 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
                                                    kRecvChunkAbort, _args.getNss(), _sessionId))
                                     .getStatus();
             if (!status.isOK()) {
-                LOG(0) << "Failed to cancel migration " << causedBy(redact(status));
+                LOGV2(21991,
+                      "Failed to cancel migration {causedBy_status}",
+                      "causedBy_status"_attr = causedBy(redact(status)));
             }
         }
         // Intentional fall through
@@ -419,8 +424,10 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
 
     BSONElement idElement = insertedDoc["_id"];
     if (idElement.eoo()) {
-        warning() << "logInsertOp got a document with no _id field, ignoring inserted document: "
-                  << redact(insertedDoc);
+        LOGV2_WARNING(21995,
+                      "logInsertOp got a document with no _id field, ignoring inserted document: "
+                      "{insertedDoc}",
+                      "insertedDoc"_attr = redact(insertedDoc));
         return;
     }
 
@@ -450,8 +457,10 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
 
     BSONElement idElement = postImageDoc["_id"];
     if (idElement.eoo()) {
-        warning() << "logUpdateOp got a document with no _id field, ignoring updatedDoc: "
-                  << redact(postImageDoc);
+        LOGV2_WARNING(
+            21996,
+            "logUpdateOp got a document with no _id field, ignoring updatedDoc: {postImageDoc}",
+            "postImageDoc"_attr = redact(postImageDoc));
         return;
     }
 
@@ -488,8 +497,10 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
 
     BSONElement idElement = deletedDocId["_id"];
     if (idElement.eoo()) {
-        warning() << "logDeleteOp got a document with no _id field, ignoring deleted doc: "
-                  << redact(deletedDocId);
+        LOGV2_WARNING(
+            21997,
+            "logDeleteOp got a document with no _id field, ignoring deleted doc: {deletedDocId}",
+            "deletedDocId"_attr = redact(deletedDocId));
         return;
     }
 
@@ -994,13 +1005,19 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
         const std::size_t cloneLocsRemaining = _cloneLocs.size();
 
         if (_forceJumbo && _jumboChunkCloneState) {
-            log() << "moveChunk data transfer progress: " << redact(res)
-                  << " mem used: " << _memoryUsed
-                  << " documents cloned so far: " << _jumboChunkCloneState->docsCloned;
+            LOGV2(21992,
+                  "moveChunk data transfer progress: {res} mem used: {memoryUsed} documents cloned "
+                  "so far: {jumboChunkCloneState_docsCloned}",
+                  "res"_attr = redact(res),
+                  "memoryUsed"_attr = _memoryUsed,
+                  "jumboChunkCloneState_docsCloned"_attr = _jumboChunkCloneState->docsCloned);
         } else {
-            log() << "moveChunk data transfer progress: " << redact(res)
-                  << " mem used: " << _memoryUsed
-                  << " documents remaining to clone: " << cloneLocsRemaining;
+            LOGV2(21993,
+                  "moveChunk data transfer progress: {res} mem used: {memoryUsed} documents "
+                  "remaining to clone: {cloneLocsRemaining}",
+                  "res"_attr = redact(res),
+                  "memoryUsed"_attr = _memoryUsed,
+                  "cloneLocsRemaining"_attr = cloneLocsRemaining);
         }
 
         if (res["state"].String() == "steady") {

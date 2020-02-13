@@ -37,6 +37,7 @@
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/ramlog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
@@ -354,7 +355,7 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
         ::abort();
     });
 
-    log() << "terminating, shutdown command received " << cmdObj;
+    LOGV2(20475, "terminating, shutdown command received {cmdObj}", "cmdObj"_attr = cmdObj);
 
 #if defined(_WIN32)
     // Signal the ServiceMain thread to shutdown.

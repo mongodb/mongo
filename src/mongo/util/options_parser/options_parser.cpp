@@ -56,6 +56,7 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -594,9 +595,17 @@ StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
         prefix += '.';
     }
 
-    log() << "Processing " << expansion.getExpansionName() << " config expansion for: " << nodeName;
+    LOGV2(23318,
+          "Processing {expansion_getExpansionName} config expansion for: {nodeName}",
+          "expansion_getExpansionName"_attr = expansion.getExpansionName(),
+          "nodeName"_attr = nodeName);
     const auto action = expansion.getAction();
-    LOG(2) << prefix << expansion.getExpansionName() << ": " << action;
+    LOGV2_DEBUG(23319,
+                2,
+                "{prefix}{expansion_getExpansionName}: {action}",
+                "prefix"_attr = prefix,
+                "expansion_getExpansionName"_attr = expansion.getExpansionName(),
+                "action"_attr = action);
 
     if (expansion.isRestExpansion()) {
         return expansion.process(runYAMLRestExpansion(action, configExpand.timeout));
@@ -658,8 +667,11 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
             type = iterator->_type;
             *option = &*iterator;
             if (isDeprecated) {
-                warning() << "Option: " << key << " is deprecated. Please use "
-                          << iterator->_dottedName << " instead.";
+                LOGV2_WARNING(
+                    23320,
+                    "Option: {key} is deprecated. Please use {iterator_dottedName} instead.",
+                    "key"_attr = key,
+                    "iterator_dottedName"_attr = iterator->_dottedName);
             }
         }
     }
@@ -796,10 +808,13 @@ Status checkLongName(const po::variables_map& vm,
 
     if (vm.count(long_name)) {
         if (!vm[long_name].defaulted() && singleName != option._singleName) {
-            warning() << "Option: " << singleName << " is deprecated. Please use "
-                      << option._singleName << " instead.";
+            LOGV2_WARNING(
+                23321,
+                "Option: {singleName} is deprecated. Please use {option_singleName} instead.",
+                "singleName"_attr = singleName,
+                "option_singleName"_attr = option._singleName);
         } else if (long_name == "sslMode") {
-            warning() << "Option: sslMode is deprecated. Please use tlsMode instead.";
+            LOGV2_WARNING(23322, "Option: sslMode is deprecated. Please use tlsMode instead.");
         }
 
         Value optionValue;

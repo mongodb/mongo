@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace moe = mongo::optionenvironment;
@@ -49,15 +50,22 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params) {
     }
 
     if (!wiredTigerGlobalOptions.engineConfig.empty()) {
-        log() << "Engine custom option: " << wiredTigerGlobalOptions.engineConfig;
+        LOGV2(22293,
+              "Engine custom option: {wiredTigerGlobalOptions_engineConfig}",
+              "wiredTigerGlobalOptions_engineConfig"_attr = wiredTigerGlobalOptions.engineConfig);
     }
 
     if (!wiredTigerGlobalOptions.collectionConfig.empty()) {
-        log() << "Collection custom option: " << wiredTigerGlobalOptions.collectionConfig;
+        LOGV2(22294,
+              "Collection custom option: {wiredTigerGlobalOptions_collectionConfig}",
+              "wiredTigerGlobalOptions_collectionConfig"_attr =
+                  wiredTigerGlobalOptions.collectionConfig);
     }
 
     if (!wiredTigerGlobalOptions.indexConfig.empty()) {
-        log() << "Index custom option: " << wiredTigerGlobalOptions.indexConfig;
+        LOGV2(22295,
+              "Index custom option: {wiredTigerGlobalOptions_indexConfig}",
+              "wiredTigerGlobalOptions_indexConfig"_attr = wiredTigerGlobalOptions.indexConfig);
     }
 
     return Status::OK();

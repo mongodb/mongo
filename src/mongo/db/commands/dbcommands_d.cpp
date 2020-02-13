@@ -86,6 +86,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point.h"
@@ -280,7 +281,8 @@ public:
                     if (partialOk) {
                         break;  // skipped chunk is probably on another shard
                     }
-                    log() << "should have chunk: " << n << " have:" << myn;
+                    LOGV2(
+                        20452, "should have chunk: {n} have:{myn}", "n"_attr = n, "myn"_attr = myn);
                     dumpChunks(opCtx, nss.ns(), query, sort);
                     uassert(10040, "chunks out of order", n == myn);
                 }
@@ -315,7 +317,10 @@ public:
                     // RELOCKED
                     ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
                 } catch (const StaleConfigException&) {
-                    LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
+                    LOGV2_DEBUG(
+                        20453,
+                        1,
+                        "chunk metadata changed during filemd5, will retarget and continue");
                     break;
                 }
 
@@ -350,7 +355,7 @@ public:
         q.sort(sort);
         unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns), q);
         while (c->more()) {
-            log() << c->nextSafe();
+            LOGV2(20454, "{c_nextSafe}", "c_nextSafe"_attr = c->nextSafe());
         }
     }
 

@@ -43,6 +43,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
@@ -173,7 +174,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 boost::optional<RecordId> startLoc =
                     collection()->getRecordStore()->oplogStartHack(getOpCtx(), goal.getValue());
                 if (startLoc && !startLoc->isNull()) {
-                    LOG(3) << "Using direct oplog seek";
+                    LOGV2_DEBUG(20584, 3, "Using direct oplog seek");
                     record = _cursor->seekExact(*startLoc);
                 }
             }

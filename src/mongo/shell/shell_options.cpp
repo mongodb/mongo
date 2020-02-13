@@ -43,6 +43,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_options_client_gen.h"
@@ -89,9 +90,14 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
     auto&& vii = VersionInfoInterface::instance();
     if (params.count("version") || params.count("help")) {
         setPlainConsoleLogger();
-        log() << mongoShellVersion(vii);
+        LOGV2(22808,
+              "{mongoShellVersion_vii}",
+              "mongoShellVersion_vii"_attr = mongoShellVersion(vii));
         if (params.count("help")) {
-            log() << getMongoShellHelp(args[0], moe::startupOptions);
+            LOGV2(22809,
+                  "{getMongoShellHelp_args_0_moe_startupOptions}",
+                  "getMongoShellHelp_args_0_moe_startupOptions"_attr =
+                      getMongoShellHelp(args[0], moe::startupOptions));
         } else {
             vii.logBuildInfo();
         }

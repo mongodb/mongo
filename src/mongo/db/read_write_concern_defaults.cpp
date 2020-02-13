@@ -34,6 +34,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 
 #include "mongo/db/logical_clock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -180,7 +181,9 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
         (possibleNewDefaults->getEpoch() > currentDefaultsHandle->getEpoch())) {
         // Use the new defaults if they have a higher epoch, if there are no defaults in the cache,
         // or if the found defaults have no epoch, meaning there are no defaults in config.settings.
-        log() << "refreshed RWC defaults to " << possibleNewDefaults->toBSON();
+        LOGV2(20997,
+              "refreshed RWC defaults to {possibleNewDefaults}",
+              "possibleNewDefaults"_attr = possibleNewDefaults->toBSON());
         setDefault(std::move(*possibleNewDefaults));
     }
 }

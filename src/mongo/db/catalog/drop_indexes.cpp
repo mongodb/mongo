@@ -46,6 +46,7 @@
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -222,7 +223,10 @@ Status dropIndexes(OperationContext* opCtx,
         }
 
         if (!serverGlobalParams.quiet.load()) {
-            LOG(0) << "CMD: dropIndexes " << nss << ": " << cmdObj[kIndexFieldName].toString(false);
+            LOGV2(20344,
+                  "CMD: dropIndexes {nss}: {cmdObj_kIndexFieldName_false}",
+                  "nss"_attr = nss,
+                  "cmdObj_kIndexFieldName_false"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
         // If db/collection does not exist, short circuit and return.

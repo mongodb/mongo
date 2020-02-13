@@ -48,6 +48,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -117,7 +118,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     StageState state = bestPlan.root->work(out);
 
     if (PlanStage::FAILURE == state && hasBackupPlan()) {
-        LOG(5) << "Best plan errored out switching to backup";
+        LOGV2_DEBUG(20588, 5, "Best plan errored out switching to backup");
         // Uncache the bad solution if we fall back
         // on the backup solution.
         //
@@ -138,7 +139,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     }
 
     if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-        LOG(5) << "Best plan had a blocking stage, became unblocked";
+        LOGV2_DEBUG(20589, 5, "Best plan had a blocking stage, became unblocked");
         _backupPlanIdx = kNoSuchPlan;
     }
 
@@ -250,15 +251,22 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     const auto& alreadyProduced = bestCandidate.results;
     const auto& bestSolution = bestCandidate.solution;
 
-    LOG(5) << "Winning solution:\n" << redact(bestSolution->toString());
-    LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
+    LOGV2_DEBUG(20590,
+                5,
+                "Winning solution:\n{bestSolution}",
+                "bestSolution"_attr = redact(bestSolution->toString()));
+    LOGV2_DEBUG(20591,
+                2,
+                "Winning plan: {Explain_getPlanSummary_bestCandidate_root}",
+                "Explain_getPlanSummary_bestCandidate_root"_attr =
+                    Explain::getPlanSummary(bestCandidate.root));
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
-        LOG(5) << "Winner has blocking stage, looking for backup plan...";
+        LOGV2_DEBUG(20592, 5, "Winner has blocking stage, looking for backup plan...");
         for (auto&& ix : candidateOrder) {
             if (!_candidates[ix].solution->hasBlockingStage) {
-                LOG(5) << "Candidate " << ix << " is backup child";
+                LOGV2_DEBUG(20593, 5, "Candidate {ix} is backup child", "ix"_attr = ix);
                 _backupPlanIdx = ix;
                 break;
             }
@@ -286,12 +294,20 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             size_t winnerIdx = ranking->candidateOrder[0];
             size_t runnerUpIdx = ranking->candidateOrder[1];
 
-            LOG(1) << "Winning plan tied with runner-up. Not caching."
-                   << " query: " << redact(_query->toStringShort())
-                   << " winner score: " << ranking->scores[0]
-                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
-                   << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
-                   << Explain::getPlanSummary(_candidates[runnerUpIdx].root);
+            LOGV2_DEBUG(20594,
+                        1,
+                        "Winning plan tied with runner-up. Not caching. query: {query_Short} "
+                        "winner score: {ranking_scores_0} winner summary: "
+                        "{Explain_getPlanSummary_candidates_winnerIdx_root} runner-up score: "
+                        "{ranking_scores_1} runner-up summary: "
+                        "{Explain_getPlanSummary_candidates_runnerUpIdx_root}",
+                        "query_Short"_attr = redact(_query->toStringShort()),
+                        "ranking_scores_0"_attr = ranking->scores[0],
+                        "Explain_getPlanSummary_candidates_winnerIdx_root"_attr =
+                            Explain::getPlanSummary(_candidates[winnerIdx].root),
+                        "ranking_scores_1"_attr = ranking->scores[1],
+                        "Explain_getPlanSummary_candidates_runnerUpIdx_root"_attr =
+                            Explain::getPlanSummary(_candidates[runnerUpIdx].root));
         }
 
         if (alreadyProduced.empty()) {
@@ -300,10 +316,15 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             canCache = false;
 
             size_t winnerIdx = ranking->candidateOrder[0];
-            LOG(1) << "Winning plan had zero results. Not caching."
-                   << " query: " << redact(_query->toStringShort())
-                   << " winner score: " << ranking->scores[0]
-                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
+            LOGV2_DEBUG(20595,
+                        1,
+                        "Winning plan had zero results. Not caching. query: {query_Short} winner "
+                        "score: {ranking_scores_0} winner summary: "
+                        "{Explain_getPlanSummary_candidates_winnerIdx_root}",
+                        "query_Short"_attr = redact(_query->toStringShort()),
+                        "ranking_scores_0"_attr = ranking->scores[0],
+                        "Explain_getPlanSummary_candidates_winnerIdx_root"_attr =
+                            Explain::getPlanSummary(_candidates[winnerIdx].root));
         }
     }
 
@@ -329,8 +350,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         bool validSolutions = true;
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (nullptr == solutions[ix]->cacheData.get()) {
-                LOG(5) << "Not caching query because this solution has no cache data: "
-                       << redact(solutions[ix]->toString());
+                LOGV2_DEBUG(
+                    20596,
+                    5,
+                    "Not caching query because this solution has no cache data: {solutions_ix}",
+                    "solutions_ix"_attr = redact(solutions[ix]->toString()));
                 validSolutions = false;
                 break;
             }

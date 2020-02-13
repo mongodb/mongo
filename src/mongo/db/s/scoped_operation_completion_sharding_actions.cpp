@@ -38,6 +38,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -89,16 +90,18 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(
             _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
-            log() << "Failed to handle stale version exception"
-                  << causedBy(redact(handleMismatchStatus));
+            LOGV2(22053,
+                  "Failed to handle stale version exception{causedBy_handleMismatchStatus}",
+                  "causedBy_handleMismatchStatus"_attr = causedBy(redact(handleMismatchStatus)));
     } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
         auto handleMismatchStatus = onDbVersionMismatchNoExcept(_opCtx,
                                                                 staleInfo->getDb(),
                                                                 staleInfo->getVersionReceived(),
                                                                 staleInfo->getVersionWanted());
         if (!handleMismatchStatus.isOK())
-            log() << "Failed to handle database version exception"
-                  << causedBy(redact(handleMismatchStatus));
+            LOGV2(22054,
+                  "Failed to handle database version exception{causedBy_handleMismatchStatus}",
+                  "causedBy_handleMismatchStatus"_attr = causedBy(redact(handleMismatchStatus)));
     } else if (auto cannotImplicitCreateCollInfo =
                    status->extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
         if (ShardingState::get(_opCtx)->enabled() &&
@@ -107,8 +110,11 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             auto handleCannotImplicitCreateStatus =
                 onCannotImplicitlyCreateCollection(_opCtx, cannotImplicitCreateCollInfo->getNss());
             if (!handleCannotImplicitCreateStatus.isOK())
-                log() << "Failed to handle CannotImplicitlyCreateCollection exception"
-                      << causedBy(redact(handleCannotImplicitCreateStatus));
+                LOGV2(22055,
+                      "Failed to handle CannotImplicitlyCreateCollection "
+                      "exception{causedBy_handleCannotImplicitCreateStatus}",
+                      "causedBy_handleCannotImplicitCreateStatus"_attr =
+                          causedBy(redact(handleCannotImplicitCreateStatus)));
         }
     }
 }

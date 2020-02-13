@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -85,7 +86,7 @@ void _finishDropDatabase(OperationContext* opCtx,
     });
 
     if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
-        log() << "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.";
+        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.");
         dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet();
     }
 
@@ -93,8 +94,11 @@ void _finishDropDatabase(OperationContext* opCtx,
     databaseHolder->dropDb(opCtx, db);
     dropPendingGuard.dismiss();
 
-    log() << "dropDatabase " << dbName << " - dropped " << numCollections << " collection(s)";
-    log() << "dropDatabase " << dbName << " - finished";
+    LOGV2(20335,
+          "dropDatabase {dbName} - dropped {numCollections} collection(s)",
+          "dbName"_attr = dbName,
+          "numCollections"_attr = numCollections);
+    LOGV2(20336, "dropDatabase {dbName} - finished", "dbName"_attr = dbName);
 }
 
 }  // namespace
@@ -147,7 +151,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                               << "The database is currently being dropped. Database: " << dbName);
         }
 
-        log() << "dropDatabase " << dbName << " - starting";
+        LOGV2(20337, "dropDatabase {dbName} - starting", "dbName"_attr = dbName);
         db->setDropPending(opCtx, true);
 
         // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
@@ -164,11 +168,17 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             const auto& nss = collection->ns();
             numCollections++;
 
-            log() << "dropDatabase " << dbName << " - dropping collection: " << nss;
+            LOGV2(20338,
+                  "dropDatabase {dbName} - dropping collection: {nss}",
+                  "dbName"_attr = dbName,
+                  "nss"_attr = nss);
 
             if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
                 opCtx->writesAreReplicated()) {
-                log() << "dropDatabase " << dbName << " - found drop-pending collection: " << nss;
+                LOGV2(20339,
+                      "dropDatabase {dbName} - found drop-pending collection: {nss}",
+                      "dbName"_attr = dbName,
+                      "nss"_attr = nss);
                 latestDropPendingOpTime = std::max(
                     latestDropPendingOpTime, uassertStatusOK(nss.getDropPendingNamespaceOpTime()));
                 continue;
@@ -264,17 +274,26 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         const WriteConcernOptions dropDatabaseWriteConcern(
             WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wTimeout);
 
-        log() << "dropDatabase " << dbName << " waiting for " << awaitOpTime
-              << " to be replicated at " << dropDatabaseWriteConcern.toBSON() << ". Dropping "
-              << numCollectionsToDrop << " collection(s), with last collection drop at "
-              << latestDropPendingOpTime;
+        LOGV2(20340,
+              "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
+              "{dropDatabaseWriteConcern}. Dropping {numCollectionsToDrop} collection(s), with "
+              "last collection drop at {latestDropPendingOpTime}",
+              "dbName"_attr = dbName,
+              "awaitOpTime"_attr = awaitOpTime,
+              "dropDatabaseWriteConcern"_attr = dropDatabaseWriteConcern.toBSON(),
+              "numCollectionsToDrop"_attr = numCollectionsToDrop,
+              "latestDropPendingOpTime"_attr = latestDropPendingOpTime);
 
         auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
 
         // If the user-provided write concern is weaker than majority, this is effectively a no-op.
         if (result.status.isOK() && !userWriteConcern.usedDefault) {
-            log() << "dropDatabase " << dbName << " waiting for " << awaitOpTime
-                  << " to be replicated at " << userWriteConcern.toBSON();
+            LOGV2(20341,
+                  "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
+                  "{userWriteConcern}",
+                  "dbName"_attr = dbName,
+                  "awaitOpTime"_attr = awaitOpTime,
+                  "userWriteConcern"_attr = userWriteConcern.toBSON());
             result = replCoord->awaitReplication(opCtx, awaitOpTime, userWriteConcern);
         }
 
@@ -286,14 +305,19 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                                              << awaitOpTime.toString() << ") to replicate.");
         }
 
-        log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
-              << " collection(s) (most recent drop optime: " << awaitOpTime << ") after "
-              << result.duration << ". dropping database";
+        LOGV2(20342,
+              "dropDatabase {dbName} - successfully dropped {numCollectionsToDrop} collection(s) "
+              "(most recent drop optime: {awaitOpTime}) after {result_duration}. dropping database",
+              "dbName"_attr = dbName,
+              "numCollectionsToDrop"_attr = numCollectionsToDrop,
+              "awaitOpTime"_attr = awaitOpTime,
+              "result_duration"_attr = result.duration);
     }
 
     if (MONGO_unlikely(dropDatabaseHangAfterAllCollectionsDrop.shouldFail())) {
-        log() << "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. "
-                 "Blocking until fail point is disabled. ";
+        LOGV2(20343,
+              "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. "
+              "Blocking until fail point is disabled. ");
         dropDatabaseHangAfterAllCollectionsDrop.pauseWhileSet();
     }
 

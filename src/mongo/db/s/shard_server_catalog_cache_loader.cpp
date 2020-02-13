@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/client/shard_registry.h"
@@ -90,7 +91,7 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
         dropChunks(opCtx, nss);
 
         if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
-            log() << "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint";
+            LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
             hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
         }
     }
@@ -954,12 +955,15 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
         _updatePersistedCollAndChunksMetadata(context.opCtx(), nss);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
-        LOG(0) << "Failed to persist chunk metadata update for collection '" << nss
-               << "' due to shutdown.";
+        LOGV2(22094,
+              "Failed to persist chunk metadata update for collection '{nss}' due to shutdown.",
+              "nss"_attr = nss);
         inShutdown = true;
     } catch (const DBException& ex) {
-        LOG(0) << "Failed to persist chunk metadata update for collection '" << nss
-               << causedBy(redact(ex));
+        LOGV2(22095,
+              "Failed to persist chunk metadata update for collection '{nss}{causedBy_ex}",
+              "nss"_attr = nss,
+              "causedBy_ex"_attr = causedBy(redact(ex)));
     }
 
     {
@@ -988,10 +992,12 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
 
     _threadPool.schedule([this, nss](auto status) {
         if (ErrorCodes::isCancelationError(status.code())) {
-            LOG(0) << "Cache loader failed to schedule a persisted metadata update"
-                   << " task for namespace '" << nss << "' due to '" << redact(status)
-                   << "'. Clearing task list so that scheduling will be attempted by the next"
-                   << " caller to refresh this namespace.";
+            LOGV2(22096,
+                  "Cache loader failed to schedule a persisted metadata update task for namespace "
+                  "'{nss}' due to '{status}'. Clearing task list so that scheduling will be "
+                  "attempted by the next caller to refresh this namespace.",
+                  "nss"_attr = nss,
+                  "status"_attr = redact(status));
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);
@@ -1014,11 +1020,15 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
         _updatePersistedDbMetadata(context.opCtx(), dbName);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
-        LOG(0) << "Failed to persist metadata update for db '" << dbName << "' due to shutdown.";
+        LOGV2(22097,
+              "Failed to persist metadata update for db '{dbName}' due to shutdown.",
+              "dbName"_attr = dbName);
         inShutdown = true;
     } catch (const DBException& ex) {
-        LOG(0) << "Failed to persist chunk metadata update for database " << dbName
-               << causedBy(redact(ex));
+        LOGV2(22098,
+              "Failed to persist chunk metadata update for database {dbName}{causedBy_ex}",
+              "dbName"_attr = dbName,
+              "causedBy_ex"_attr = causedBy(redact(ex)));
     }
 
     {
@@ -1047,10 +1057,12 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
 
     _threadPool.schedule([this, name = dbName.toString()](auto status) {
         if (ErrorCodes::isCancelationError(status.code())) {
-            LOG(0) << "Cache loader failed to schedule a persisted metadata update"
-                   << " task for namespace '" << name << "' due to '" << redact(status)
-                   << "'. Clearing task list so that scheduling will be attempted by the next"
-                   << " caller to refresh this namespace.";
+            LOGV2(22099,
+                  "Cache loader failed to schedule a persisted metadata update task for namespace "
+                  "'{name}' due to '{status}'. Clearing task list so that scheduling will be "
+                  "attempted by the next caller to refresh this namespace.",
+                  "name"_attr = name,
+                  "status"_attr = redact(status));
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);

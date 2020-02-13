@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 #include "mongo/config.h"
@@ -84,12 +85,12 @@ Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
 
 bool rotateLogs(bool renameFiles) {
     // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
-    log() << "Log rotation initiated";
+    LOGV2(23166, "Log rotation initiated");
     std::string suffix = "." + terseCurrentTime(false);
     Status resultv2 =
         logv2::LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
     if (!resultv2.isOK())
-        warning() << "Log rotation failed: " << resultv2;
+        LOGV2_WARNING(23168, "Log rotation failed: {resultv2}", "resultv2"_attr = resultv2);
 
     using logger::RotatableFileManager;
     RotatableFileManager* manager = logger::globalRotatableFileManager();
@@ -97,14 +98,17 @@ bool rotateLogs(bool renameFiles) {
     for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
          it != result.end();
          it++) {
-        warning() << "Rotating log file " << it->first << " failed: " << it->second.toString();
+        LOGV2_WARNING(23169,
+                      "Rotating log file {it_first} failed: {it_second}",
+                      "it_first"_attr = it->first,
+                      "it_second"_attr = it->second.toString());
     }
     return resultv2.isOK() && result.empty();
 }
 
 void logContext(const char* errmsg) {
     if (errmsg) {
-        log() << errmsg << std::endl;
+        LOGV2(23167, "{errmsg}", "errmsg"_attr = errmsg);
     }
     // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
     // the stack trace can sometimes exceed the long line limit.

@@ -50,6 +50,7 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "third_party/s2/s2cell.h"
@@ -887,13 +888,15 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else {
-            warning() << "Planner error trying to build geo bounds for " << elt.toString()
-                      << " index element.";
+            LOGV2_WARNING(20934,
+                          "Planner error trying to build geo bounds for {elt} index element.",
+                          "elt"_attr = elt.toString());
             verify(0);
         }
     } else {
-        warning() << "Planner error, trying to build bounds for expression: "
-                  << redact(expr->debugString());
+        LOGV2_WARNING(20935,
+                      "Planner error, trying to build bounds for expression: {expr_debugString}",
+                      "expr_debugString"_attr = redact(expr->debugString()));
         verify(0);
     }
 }
@@ -1198,9 +1201,11 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
     }
 
     if (!bounds->isValidFor(kp, scanDir)) {
-        log() << "INVALID BOUNDS: " << redact(bounds->toString()) << endl
-              << "kp = " << redact(kp) << endl
-              << "scanDir = " << scanDir;
+        LOGV2(20933,
+              "INVALID BOUNDS: {bounds}\nkp = {kp}\nscanDir = {scanDir}",
+              "bounds"_attr = redact(bounds->toString()),
+              "kp"_attr = redact(kp),
+              "scanDir"_attr = scanDir);
         MONGO_UNREACHABLE;
     }
 }

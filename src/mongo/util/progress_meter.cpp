@@ -34,6 +34,7 @@
 
 #include "mongo/util/progress_meter.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -53,7 +54,7 @@ void ProgressMeter::reset(unsigned long long total, int secondsBetween, int chec
 
 bool ProgressMeter::hit(int n) {
     if (!_active) {
-        warning() << "hit an inactive ProgressMeter";
+        LOGV2_WARNING(23370, "hit an inactive ProgressMeter");
         return false;
     }
 

@@ -73,6 +73,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -229,30 +230,40 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                                          bool haveIdIndex) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
-    error() << "Internal Index Catalog state: "
-            << " numIndexesTotal(): " << numIndexesTotal(opCtx)
-            << " numSystemIndexesEntries: " << numIndexesInCollectionCatalogEntry
-            << " _readyIndexes.size(): " << _readyIndexes.size()
-            << " _buildingIndexes.size(): " << _buildingIndexes.size()
-            << " indexNamesToDrop: " << indexNamesToDrop.size() << " haveIdIndex: " << haveIdIndex;
+    LOGV2_ERROR(
+        20365,
+        "Internal Index Catalog state:  numIndexesTotal(): {numIndexesTotal_opCtx} "
+        "numSystemIndexesEntries: {numIndexesInCollectionCatalogEntry} _readyIndexes.size(): "
+        "{readyIndexes_size} _buildingIndexes.size(): {buildingIndexes_size} indexNamesToDrop: "
+        "{indexNamesToDrop_size} haveIdIndex: {haveIdIndex}",
+        "numIndexesTotal_opCtx"_attr = numIndexesTotal(opCtx),
+        "numIndexesInCollectionCatalogEntry"_attr = numIndexesInCollectionCatalogEntry,
+        "readyIndexes_size"_attr = _readyIndexes.size(),
+        "buildingIndexes_size"_attr = _buildingIndexes.size(),
+        "indexNamesToDrop_size"_attr = indexNamesToDrop.size(),
+        "haveIdIndex"_attr = haveIdIndex);
 
     // Report the ready indexes.
-    error() << "Ready indexes:";
+    LOGV2_ERROR(20366, "Ready indexes:");
     for (const auto& entry : _readyIndexes) {
         const IndexDescriptor* desc = entry->descriptor();
-        error() << "Index '" << desc->indexName()
-                << "' with specification: " << redact(desc->infoObj());
+        LOGV2_ERROR(20367,
+                    "Index '{desc_indexName}' with specification: {desc_infoObj}",
+                    "desc_indexName"_attr = desc->indexName(),
+                    "desc_infoObj"_attr = redact(desc->infoObj()));
     }
 
     // Report the in-progress indexes.
-    error() << "In-progress indexes:";
+    LOGV2_ERROR(20368, "In-progress indexes:");
     for (const auto& entry : _buildingIndexes) {
         const IndexDescriptor* desc = entry->descriptor();
-        error() << "Index '" << desc->indexName()
-                << "' with specification: " << redact(desc->infoObj());
+        LOGV2_ERROR(20369,
+                    "Index '{desc_indexName}' with specification: {desc_infoObj}",
+                    "desc_indexName"_attr = desc->indexName(),
+                    "desc_infoObj"_attr = redact(desc->infoObj()));
     }
 
-    error() << "Internal Collection Catalog Entry state:";
+    LOGV2_ERROR(20370, "Internal Collection Catalog Entry state:");
     std::vector<std::string> allIndexes;
     std::vector<std::string> readyIndexes;
 
@@ -260,23 +271,36 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
     durableCatalog->getAllIndexes(opCtx, _collection->getCatalogId(), &allIndexes);
     durableCatalog->getReadyIndexes(opCtx, _collection->getCatalogId(), &readyIndexes);
 
-    error() << "All indexes:";
+    LOGV2_ERROR(20371, "All indexes:");
     for (const auto& index : allIndexes) {
-        error() << "Index '" << index << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index));
+        LOGV2_ERROR(20372,
+                    "Index '{index}' with specification: "
+                    "{durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_index}",
+                    "index"_attr = index,
+                    "durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_index"_attr = redact(
+                        durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index)));
     }
 
-    error() << "Ready indexes:";
+    LOGV2_ERROR(20373, "Ready indexes:");
     for (const auto& index : readyIndexes) {
-        error() << "Index '" << index << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index));
+        LOGV2_ERROR(20374,
+                    "Index '{index}' with specification: "
+                    "{durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_index}",
+                    "index"_attr = index,
+                    "durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_index"_attr = redact(
+                        durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), index)));
     }
 
-    error() << "Index names to drop:";
+    LOGV2_ERROR(20375, "Index names to drop:");
     for (const auto& indexNameToDrop : indexNamesToDrop) {
-        error() << "Index '" << indexNameToDrop << "' with specification: "
-                << redact(durableCatalog->getIndexSpec(
-                       opCtx, _collection->getCatalogId(), indexNameToDrop));
+        LOGV2_ERROR(
+            20376,
+            "Index '{indexNameToDrop}' with specification: "
+            "{durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_indexNameToDrop}",
+            "indexNameToDrop"_attr = indexNameToDrop,
+            "durableCatalog_getIndexSpec_opCtx_collection_getCatalogId_indexNameToDrop"_attr =
+                redact(durableCatalog->getIndexSpec(
+                    opCtx, _collection->getCatalogId(), indexNameToDrop)));
     }
 }
 
@@ -364,8 +388,12 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       CreateIndexEntryFlags flags) {
     Status status = _isSpecOk(opCtx, descriptor->infoObj());
     if (!status.isOK()) {
-        severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
-                 << _collection->ns() << " collection: " << redact(status);
+        LOGV2_FATAL(20378,
+                    "Found an invalid index {descriptor_infoObj} on the {collection_ns} "
+                    "collection: {status}",
+                    "descriptor_infoObj"_attr = descriptor->infoObj(),
+                    "collection_ns"_attr = _collection->ns(),
+                    "status"_attr = redact(status));
         fassertFailedNoTrace(28782);
     }
 
@@ -788,8 +816,13 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         const IndexDescriptor* desc =
             findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, includeUnfinishedIndexes);
         if (desc) {
-            LOG(2) << "Index already exists with a different name: " << name << " pattern: " << key
-                   << " collation: " << collation;
+            LOGV2_DEBUG(20353,
+                        2,
+                        "Index already exists with a different name: {name} pattern: {key} "
+                        "collation: {collation}",
+                        "name"_attr = name,
+                        "key"_attr = key,
+                        "collation"_attr = collation);
 
             IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
@@ -807,7 +840,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     if (numIndexesTotal(opCtx) >= kMaxNumIndexesAllowed) {
         string s = str::stream() << "add index fails, too many indexes for " << _collection->ns()
                                  << " key:" << key;
-        log() << s;
+        LOGV2(20354, "{s}", "s"_attr = s);
         return Status(ErrorCodes::CannotCreateIndex, s);
     }
 
@@ -875,7 +908,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         string indexName = indexNamesToDrop[i];
         const IndexDescriptor* desc = findIndexByName(opCtx, indexName, true);
         invariant(desc);
-        LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
+        LOGV2_DEBUG(20355, 1, "\t dropAllIndexes dropping: {desc}", "desc"_attr = desc->toString());
         IndexCatalogEntry* entry = _readyIndexes.find(desc);
         invariant(entry);
 
@@ -1019,8 +1052,12 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string
          * This is ok, as we may be partially through index creation.
          */
     } else if (!status.isOK()) {
-        warning() << "couldn't drop index " << indexName << " on collection: " << _collection->ns()
-                  << " because of " << redact(status);
+        LOGV2_WARNING(
+            20364,
+            "couldn't drop index {indexName} on collection: {collection_ns} because of {status}",
+            "indexName"_attr = indexName,
+            "collection_ns"_attr = _collection->ns(),
+            "status"_attr = redact(status));
     }
 }
 
@@ -1076,7 +1113,7 @@ int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
             }
             // Ignore the write conflict for read transactions; we will eventually roll back this
             // transaction anyway.
-            log() << " Skipping dassert check due to: " << ex;
+            LOGV2(20356, " Skipping dassert check due to: {ex}", "ex"_attr = ex);
         }
     }
 
@@ -1097,17 +1134,19 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
         // There is a potential inconistency where the index information in the collection catalog
         // entry and the index catalog differ. Log as much information as possible here.
         if (itIndexes.size() != completedIndexes.size()) {
-            log() << "index catalog reports: ";
+            LOGV2(20357, "index catalog reports: ");
             for (const IndexDescriptor* i : itIndexes) {
-                log() << "  index: " << i->toString();
+                LOGV2(20358, "  index: {i}", "i"_attr = i->toString());
             }
 
-            log() << "collection catalog reports: ";
+            LOGV2(20359, "collection catalog reports: ");
             for (auto const& i : completedIndexes) {
-                log() << "  index: " << i;
+                LOGV2(20360, "  index: {i}", "i"_attr = i);
             }
 
-            log() << "collection uuid: " << _collection->uuid();
+            LOGV2(20361,
+                  "collection uuid: {collection_uuid}",
+                  "collection_uuid"_attr = _collection->uuid());
 
             invariant(itIndexes.size() == completedIndexes.size(),
                       "The number of ready indexes reported in the collection metadata catalog did "
@@ -1484,8 +1523,11 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
     Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
 
     if (!status.isOK()) {
-        log() << "Couldn't unindex record " << redact(obj) << " from collection "
-              << _collection->ns() << ". Status: " << redact(status);
+        LOGV2(20362,
+              "Couldn't unindex record {obj} from collection {collection_ns}. Status: {status}",
+              "obj"_attr = redact(obj),
+              "collection_ns"_attr = _collection->ns(),
+              "status"_attr = redact(status));
     }
 
     if (keysDeletedOut) {
@@ -1615,10 +1657,15 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
          ++it) {
         IndexCatalogEntry* entry = it->get();
 
-        LOG(1) << "compacting index: " << entry->descriptor()->toString();
+        LOGV2_DEBUG(20363,
+                    1,
+                    "compacting index: {entry_descriptor}",
+                    "entry_descriptor"_attr = entry->descriptor()->toString());
         Status status = entry->accessMethod()->compact(opCtx);
         if (!status.isOK()) {
-            error() << "failed to compact index: " << entry->descriptor()->toString();
+            LOGV2_ERROR(20377,
+                        "failed to compact index: {entry_descriptor}",
+                        "entry_descriptor"_attr = entry->descriptor()->toString());
             return status;
         }
     }

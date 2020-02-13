@@ -54,6 +54,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/database_version_helpers.h"
@@ -213,7 +214,7 @@ public:
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 const auto shardingState = ShardingState::get(opCtx);
                 if (shardingState->enabled()) {
-                    LOG(0) << "Upgrade: submitting orphaned ranges for cleanup";
+                    LOGV2(20500, "Upgrade: submitting orphaned ranges for cleanup");
                     migrationutil::submitOrphanRangesForCleanup(opCtx);
                 }
 
@@ -236,7 +237,7 @@ public:
                                      << requestedVersion)))));
 
                 if (MONGO_unlikely(pauseBeforeUpgradingConfigMetadata.shouldFail())) {
-                    log() << "Hit pauseBeforeUpgradingConfigMetadata";
+                    LOGV2(20501, "Hit pauseBeforeUpgradingConfigMetadata");
                     pauseBeforeUpgradingConfigMetadata.pauseWhileSet(opCtx);
                 }
                 ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(
@@ -308,7 +309,7 @@ public:
                 repl::ReplicationCoordinator::modeReplSet;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                LOG(0) << "Downgrade: dropping config.rangeDeletions collection";
+                LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");
                 migrationutil::dropRangeDeletionsCollection(opCtx);
 
                 // The primary shard sharding a collection will write the initial chunks for a
@@ -334,7 +335,7 @@ public:
                                      << requestedVersion)))));
 
                 if (MONGO_unlikely(pauseBeforeDowngradingConfigMetadata.shouldFail())) {
-                    log() << "Hit pauseBeforeDowngradingConfigMetadata";
+                    LOGV2(20503, "Hit pauseBeforeDowngradingConfigMetadata");
                     pauseBeforeDowngradingConfigMetadata.pauseWhileSet(opCtx);
                 }
                 ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(

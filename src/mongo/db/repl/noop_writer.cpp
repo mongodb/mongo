@@ -43,6 +43,7 @@
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 
@@ -150,14 +151,14 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
     Lock::GlobalLock lock(
         opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kLeaveUnlocked);
     if (!lock.isLocked()) {
-        LOG(1) << "Global lock is not available skipping noopWrite";
+        LOGV2_DEBUG(21219, 1, "Global lock is not available skipping noopWrite");
         return;
     }
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // Its a proxy for being a primary
     if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-        LOG(1) << "Not a primary, skipping the noop write";
+        LOGV2_DEBUG(21220, 1, "Not a primary, skipping the noop write");
         return;
     }
 
@@ -165,14 +166,20 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
 
     // _lastKnownOpTime is not protected by lock as its used only by one thread.
     if (lastAppliedOpTime != _lastKnownOpTime) {
-        LOG(1) << "Not scheduling a noop write. Last known OpTime: " << _lastKnownOpTime
-               << " != last primary OpTime: " << lastAppliedOpTime;
+        LOGV2_DEBUG(21221,
+                    1,
+                    "Not scheduling a noop write. Last known OpTime: {lastKnownOpTime} != last "
+                    "primary OpTime: {lastAppliedOpTime}",
+                    "lastKnownOpTime"_attr = _lastKnownOpTime,
+                    "lastAppliedOpTime"_attr = lastAppliedOpTime);
     } else {
         if (writePeriodicNoops.load()) {
             const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
-            LOG(logLevel)
-                << "Writing noop to oplog as there has been no writes to this replica set in over "
-                << _writeInterval;
+            LOGV2_DEBUG(21222,
+                        logSeverityV1toV2(logLevel).toInt(),
+                        "Writing noop to oplog as there has been no writes to this replica set in "
+                        "over {writeInterval}",
+                        "writeInterval"_attr = _writeInterval);
             writeConflictRetry(
                 opCtx, "writeNoop", NamespaceString::kRsOplogNamespace.ns(), [&opCtx] {
                     WriteUnitOfWork uow(opCtx);
@@ -184,7 +191,10 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
     }
 
     _lastKnownOpTime = replCoord->getMyLastAppliedOpTime();
-    LOG(1) << "Set last known op time to " << _lastKnownOpTime;
+    LOGV2_DEBUG(21223,
+                1,
+                "Set last known op time to {lastKnownOpTime}",
+                "lastKnownOpTime"_attr = _lastKnownOpTime);
 }
 
 }  // namespace repl

@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -82,9 +83,15 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
         entry->_dirty.store(false);
     entry = sizeInfo;
     entry->_dirty.store(true);
-    LOG(2) << "WiredTigerSizeStorer::store Marking " << uri
-           << " dirty, numRecords: " << sizeInfo->numRecords.load()
-           << ", dataSize: " << sizeInfo->dataSize.load() << ", use_count: " << entry.use_count();
+    LOGV2_DEBUG(
+        22423,
+        2,
+        "WiredTigerSizeStorer::store Marking {uri} dirty, numRecords: {sizeInfo_numRecords_load}, "
+        "dataSize: {sizeInfo_dataSize_load}, use_count: {entry_use_count}",
+        "uri"_attr = uri,
+        "sizeInfo_numRecords_load"_attr = sizeInfo->numRecords.load(),
+        "sizeInfo_dataSize_load"_attr = sizeInfo->dataSize.load(),
+        "entry_use_count"_attr = entry.use_count());
 }
 
 std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(StringData uri) const {
@@ -115,7 +122,11 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(Strin
     invariantWTOK(_cursor->get_value(_cursor, &value));
     BSONObj data(reinterpret_cast<const char*>(value.data));
 
-    LOG(2) << "WiredTigerSizeStorer::load " << uri << " -> " << redact(data);
+    LOGV2_DEBUG(22424,
+                2,
+                "WiredTigerSizeStorer::load {uri} -> {data}",
+                "uri"_attr = uri,
+                "data"_attr = redact(data));
     return std::make_shared<SizeInfo>(data["numRecords"].safeNumberLong(),
                                       data["dataSize"].safeNumberLong());
 }
@@ -157,7 +168,11 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
                                              << sizeInfo.dataSize.load());
 
             auto& uri = it->first;
-            LOG(2) << "WiredTigerSizeStorer::flush " << uri << " -> " << redact(data);
+            LOGV2_DEBUG(22425,
+                        2,
+                        "WiredTigerSizeStorer::flush {uri} -> {data}",
+                        "uri"_attr = uri,
+                        "data"_attr = redact(data));
             WiredTigerItem key(uri.c_str(), uri.size());
             WiredTigerItem value(data.objdata(), data.objsize());
             _cursor->set_key(_cursor, key.Get());
@@ -170,6 +185,6 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
     }
 
     auto micros = t.micros();
-    LOG(2) << "WiredTigerSizeStorer flush took " << micros << " µs";
+    LOGV2_DEBUG(22426, 2, "WiredTigerSizeStorer flush took {micros} µs", "micros"_attr = micros);
 }
 }  // namespace mongo

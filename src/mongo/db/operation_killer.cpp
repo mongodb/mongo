@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_key_manager.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -82,7 +83,7 @@ void OperationKiller::killOperation(OperationId opId) {
 
     serviceContext->killOperation(target, target->getOperationContext());
 
-    log() << "Killed operation: " << opId;
+    LOGV2(20884, "Killed operation: {opId}", "opId"_attr = opId);
 }
 
 void OperationKiller::killOperation(const OperationKey& opKey) {

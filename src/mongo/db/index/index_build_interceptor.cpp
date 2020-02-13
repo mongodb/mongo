@@ -46,6 +46,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
@@ -268,10 +269,17 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     progress->finished();
 
     int logLevel = (_numApplied - appliedAtStart > 0) ? 0 : 1;
-    LOG(logLevel) << "index build: drain applied " << (_numApplied - appliedAtStart)
-                  << " side writes (inserted: " << totalInserted << ", deleted: " << totalDeleted
-                  << ") for '" << _indexCatalogEntry->descriptor()->indexName() << "' in "
-                  << timer.millis() << " ms";
+    LOGV2_DEBUG(20689,
+                logSeverityV1toV2(logLevel).toInt(),
+                "index build: drain applied {numApplied_appliedAtStart} side writes (inserted: "
+                "{totalInserted}, deleted: {totalDeleted}) for "
+                "'{indexCatalogEntry_descriptor_indexName}' in {timer_millis} ms",
+                "numApplied_appliedAtStart"_attr = (_numApplied - appliedAtStart),
+                "totalInserted"_attr = totalInserted,
+                "totalDeleted"_attr = totalDeleted,
+                "indexCatalogEntry_descriptor_indexName"_attr =
+                    _indexCatalogEntry->descriptor()->indexName(),
+                "timer_millis"_attr = timer.millis());
 
     return Status::OK();
 }
@@ -355,7 +363,7 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
 
     hangDuringIndexBuildDrainYield.executeIf(
         [&](auto&&) {
-            log() << "Hanging index build during drain yield";
+            LOGV2(20690, "Hanging index build during drain yield");
             hangDuringIndexBuildDrainYield.pauseWhileSet();
         },
         [&](auto&& config) {
@@ -380,7 +388,7 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
                 << writesRecorded << ", applied: " << _numApplied;
 
             dassert(writesRecorded == _numApplied, message);
-            warning() << message;
+            LOGV2_WARNING(20692, "{message}", "message"_attr = message);
         }
         return true;
     }
@@ -482,8 +490,13 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                     RecordData(doc.objdata(), doc.objsize())});
     }
 
-    LOG(2) << "recording " << records.size() << " side write keys on index '"
-           << _indexCatalogEntry->descriptor()->indexName() << "'";
+    LOGV2_DEBUG(20691,
+                2,
+                "recording {records_size} side write keys on index "
+                "'{indexCatalogEntry_descriptor_indexName}'",
+                "records_size"_attr = records.size(),
+                "indexCatalogEntry_descriptor_indexName"_attr =
+                    _indexCatalogEntry->descriptor()->indexName());
 
     // By passing a vector of null timestamps, these inserts are not timestamped individually, but
     // rather with the timestamp of the owning operation.

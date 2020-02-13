@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -79,7 +80,7 @@ void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis
         func();
         FAIL("Should have gotten an exception due to timeout");
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
-        log() << ex;
+        LOGV2(20396, "{ex}", "ex"_attr = ex);
         Date_t t2 = Date_t::now();
         ASSERT_GTE(t2 - t1, timeoutMillis);
     }

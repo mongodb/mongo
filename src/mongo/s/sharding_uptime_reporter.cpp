@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
@@ -85,7 +86,7 @@ void reportStatus(OperationContext* opCtx,
                                    ShardingCatalogClient::kMajorityWriteConcern)
             .status_with_transitional_ignore();
     } catch (const std::exception& e) {
-        log() << "Caught exception while reporting uptime: " << e.what();
+        LOGV2(22875, "Caught exception while reporting uptime: {e_what}", "e_what"_attr = e.what());
     }
 }
 
@@ -117,15 +118,18 @@ void ShardingUptimeReporter::startPeriodicThread() {
                                   ->getBalancerConfiguration()
                                   ->refreshAndCheck(opCtx.get());
                 if (!status.isOK()) {
-                    warning() << "failed to refresh mongos settings" << causedBy(status);
+                    LOGV2_WARNING(22876,
+                                  "failed to refresh mongos settings{causedBy_status}",
+                                  "causedBy_status"_attr = causedBy(status));
                 }
 
                 try {
                     ReadWriteConcernDefaults::get(opCtx.get()->getServiceContext())
                         .refreshIfNecessary(opCtx.get());
                 } catch (const DBException& ex) {
-                    warning() << "failed to refresh RWC defaults"
-                              << causedBy(redact(ex.toStatus()));
+                    LOGV2_WARNING(22877,
+                                  "failed to refresh RWC defaults{causedBy_ex_toStatus}",
+                                  "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
                 }
             }
 

@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/transaction_coordinator_catalog.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -46,10 +47,12 @@ TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() {
 
 void TransactionCoordinatorCatalog::exitStepUp(Status status) {
     if (status.isOK()) {
-        LOG(0) << "Incoming coordinateCommit requests are now enabled";
+        LOGV2(22438, "Incoming coordinateCommit requests are now enabled");
     } else {
-        warning() << "Coordinator recovery failed and coordinateCommit requests will not be allowed"
-                  << causedBy(status);
+        LOGV2_WARNING(22444,
+                      "Coordinator recovery failed and coordinateCommit requests will not be "
+                      "allowed{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(status));
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
@@ -80,8 +83,11 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
                                            TxnNumber txnNumber,
                                            std::shared_ptr<TransactionCoordinator> coordinator,
                                            bool forStepUp) {
-    LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
-           << " into in-memory catalog";
+    LOGV2_DEBUG(22439,
+                3,
+                "Inserting coordinator {lsid_getId}:{txnNumber} into in-memory catalog",
+                "lsid_getId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     stdx::unique_lock<Latch> ul(_mutex);
     if (!forStepUp) {
@@ -153,8 +159,11 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
 }
 
 void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNumber txnNumber) {
-    LOG(3) << "Removing coordinator " << lsid.getId() << ':' << txnNumber
-           << " from in-memory catalog";
+    LOGV2_DEBUG(22440,
+                3,
+                "Removing coordinator {lsid_getId}:{txnNumber} from in-memory catalog",
+                "lsid_getId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     stdx::lock_guard<Latch> lk(_mutex);
 
@@ -175,7 +184,7 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
     }
 
     if (_coordinatorsBySession.empty()) {
-        LOG(3) << "Signaling last active coordinator removed";
+        LOGV2_DEBUG(22441, 3, "Signaling last active coordinator removed");
         _noActiveCoordinatorsCV.notify_all();
     }
 }
@@ -185,9 +194,11 @@ void TransactionCoordinatorCatalog::join() {
 
     while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
-        LOG(0) << "After 5 seconds of wait there are still " << _coordinatorsBySession.size()
-               << " sessions left with active coordinators which have not yet completed";
-        LOG(0) << _toString(ul);
+        LOGV2(22442,
+              "After 5 seconds of wait there are still {coordinatorsBySession_size} sessions left "
+              "with active coordinators which have not yet completed",
+              "coordinatorsBySession_size"_attr = _coordinatorsBySession.size());
+        LOGV2(22443, "{ul}", "ul"_attr = _toString(ul));
     }
 }
 

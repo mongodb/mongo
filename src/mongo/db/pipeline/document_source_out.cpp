@@ -39,6 +39,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
@@ -152,8 +153,8 @@ void DocumentSourceOut::initialize() {
         pExpCtx->opCtx,
         "outWaitAfterTempCollectionCreation",
         []() {
-            log() << "Hanging aggregation due to 'outWaitAfterTempCollectionCreation' "
-                  << "failpoint";
+            LOGV2(20901,
+                  "Hanging aggregation due to 'outWaitAfterTempCollectionCreation' failpoint");
         });
     if (_originalIndexes.empty()) {
         return;
@@ -245,8 +246,8 @@ void DocumentSourceOut::waitWhileFailPointEnabled() {
         pExpCtx->opCtx,
         "hangWhileBuildingDocumentSourceOutBatch",
         []() {
-            log() << "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' "
-                  << "failpoint";
+            LOGV2(20902,
+                  "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' failpoint");
         });
 }
 

@@ -37,6 +37,7 @@
 #include <functional>
 #include <stack>
 
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -68,7 +69,7 @@ void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArg
 // has its own 'quickExitMutex' to prohibit multiple threads from attempting to call _exit().
 MONGO_COMPILER_NORETURN void logAndQuickExit_inlock() {
     ExitCode code = shutdownExitCode.get();
-    log() << "shutting down with code:" << code;
+    LOGV2(23138, "shutting down with code:{code}", "code"_attr = code);
     quickExit(code);
 }
 
@@ -113,11 +114,13 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
 
             ExitCode originallyRequestedCode = shutdownExitCode.get();
             if (code != originallyRequestedCode) {
-                log() << "While running shutdown tasks with the intent to exit with code "
-                      << originallyRequestedCode
-                      << ", an additional shutdown request arrived with "
-                         "the intent to exit with a different exit code "
-                      << code << "; ignoring the conflicting exit code";
+                LOGV2(23139,
+                      "While running shutdown tasks with the intent to exit with code "
+                      "{originallyRequestedCode}, an additional shutdown request arrived with "
+                      "the intent to exit with a different exit code {code}; ignoring the "
+                      "conflicting exit code",
+                      "originallyRequestedCode"_attr = originallyRequestedCode,
+                      "code"_attr = code);
             }
 
             // Wait for the shutdown tasks to complete

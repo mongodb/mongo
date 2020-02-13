@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -694,14 +698,14 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     conn->dropCollection(nss.toString());
 
     const int nDocs = 5;
-    unittest::log() << "Inserting " << nDocs << " documents.";
+    LOGV2(22634, "Inserting {nDocs} documents.", "nDocs"_attr = nDocs);
     for (int i = 0; i < nDocs; i++) {
         auto doc = BSON("_id" << i);
         conn->insert(nss.toString(), doc);
     }
 
     ASSERT_EQ(conn->count(nss), size_t(nDocs));
-    unittest::log() << "Finished document insertion.";
+    LOGV2(22635, "Finished document insertion.");
 
     // Open an exhaust cursor.
     int batchSize = 2;

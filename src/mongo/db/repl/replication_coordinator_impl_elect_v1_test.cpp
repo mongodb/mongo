@@ -44,6 +44,7 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -129,7 +130,9 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+    LOGV2(21453,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -140,8 +143,10 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
         }
         auto noi = net->getNextReadyRequest();
         const auto& request = noi->getRequest();
-        error() << "Black holing irrelevant request to " << request.target << ": "
-                << request.cmdObj;
+        LOGV2_ERROR(21473,
+                    "Black holing irrelevant request to {request_target}: {request_cmdObj}",
+                    "request_target"_attr = request.target,
+                    "request_cmdObj"_attr = request.cmdObj);
         net->blackHole(noi);
     }
     net->exitNetwork();
@@ -354,7 +359,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+    LOGV2(21454,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
     int voteRequests = 0;
     NetworkInterfaceMock* net = getNet();
@@ -366,7 +373,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
         ASSERT_TRUE(net->hasReadyRequests());
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21455,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (consumeHeartbeatV1(noi)) {
             // The heartbeat has been consumed.
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
@@ -423,7 +433,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+    LOGV2(21456,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
     int voteRequests = 0;
     NetworkInterfaceMock* net = getNet();
@@ -435,7 +447,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
         ASSERT_TRUE(net->hasReadyRequests());
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21457,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (consumeHeartbeatV1(noi)) {
             // The heartbeat has been consumed.
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
@@ -529,7 +544,10 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     for (int i = 0; i < 2; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21458,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         ReplSetHeartbeatArgsV1 hbArgs;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
             ReplSetHeartbeatResponse hbResp;
@@ -543,8 +561,10 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
-            error() << "Black holing unexpected request to " << request.target << ": "
-                    << request.cmdObj;
+            LOGV2_ERROR(21474,
+                        "Black holing unexpected request to {request_target}: {request_cmdObj}",
+                        "request_target"_attr = request.target,
+                        "request_cmdObj"_attr = request.cmdObj);
             net->blackHole(noi);
         }
         net->runReadyNetworkOperations();
@@ -554,7 +574,9 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // Advance the simulator clock sufficiently to trigger an election.
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+    LOGV2(21459,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
     net->enterNetwork();
     while (net->now() < electionTimeoutWhen) {
@@ -607,7 +629,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
     while (net->hasReadyRequests()) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21460,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
             net->blackHole(noi);
         } else {
@@ -700,7 +725,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     while (net->hasReadyRequests()) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21461,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
             net->blackHole(noi);
         } else {
@@ -796,7 +824,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     while (net->hasReadyRequests()) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21462,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
             net->blackHole(noi);
         } else {
@@ -941,7 +972,11 @@ private:
             noi = net->getNextReadyRequest();
             auto&& request = noi->getRequest();
 
-            log() << request.target << " processing " << request.cmdObj << " at " << net->now();
+            LOGV2(21463,
+                  "{request_target} processing {request_cmdObj} at {net_now}",
+                  "request_target"_attr = request.target,
+                  "request_cmdObj"_attr = request.cmdObj,
+                  "net_now"_attr = net->now());
 
             // Make sure the heartbeat request is valid.
             ReplSetHeartbeatArgsV1 hbArgs;
@@ -1549,10 +1584,16 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     NetworkInterfaceMock::NetworkOperationIterator noi_primary;
     Date_t until = net->now() + Seconds(1);
     while (voteRequests < votesExpected) {
-        unittest::log() << "request: " << voteRequests << " expected: " << votesExpected;
+        LOGV2(21464,
+              "request: {voteRequests} expected: {votesExpected}",
+              "voteRequests"_attr = voteRequests,
+              "votesExpected"_attr = votesExpected);
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
+        LOGV2(21465,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
         if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
             net->blackHole(noi);
         } else {
@@ -2125,13 +2166,17 @@ protected:
 
         auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
         ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-        log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+        LOGV2(21466,
+              "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+              "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
         ASSERT(replCoord->getMemberState().secondary()) << replCoord->getMemberState().toString();
         // Process requests until we're primary but leave the heartbeats for the notification
         // of election win. Exit immediately on unexpected requests.
         while (!replCoord->getMemberState().primary()) {
-            log() << "Waiting on network in state " << replCoord->getMemberState();
+            LOGV2(21467,
+                  "Waiting on network in state {replCoord_getMemberState}",
+                  "replCoord_getMemberState"_attr = replCoord->getMemberState());
             net->enterNetwork();
             if (net->now() < electionTimeoutWhen) {
                 net->runUntil(electionTimeoutWhen);
@@ -2139,7 +2184,10 @@ protected:
             // Peek the next request, don't consume it yet.
             const NetworkOpIter noi = net->getFrontOfUnscheduledQueue();
             const RemoteCommandRequest& request = noi->getRequest();
-            log() << request.target.toString() << " processing " << request.cmdObj;
+            LOGV2(21468,
+                  "{request_target} processing {request_cmdObj}",
+                  "request_target"_attr = request.target.toString(),
+                  "request_cmdObj"_attr = request.cmdObj);
             if (ReplSetHeartbeatArgsV1().initialize(request.cmdObj).isOK()) {
                 OpTime opTime(Timestamp(), getReplCoord()->getTerm());
                 net->scheduleResponse(
@@ -2204,13 +2252,18 @@ protected:
         while (net->hasReadyRequests()) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
             const RemoteCommandRequest& request = noi->getRequest();
-            log() << request.target.toString() << " processing heartbeat " << request.cmdObj
-                  << " at " << net->now();
+            LOGV2(21469,
+                  "{request_target} processing heartbeat {request_cmdObj} at {net_now}",
+                  "request_target"_attr = request.target.toString(),
+                  "request_cmdObj"_attr = request.cmdObj,
+                  "net_now"_attr = net->now());
             if (ReplSetHeartbeatArgsV1().initialize(request.cmdObj).isOK()) {
                 onHeartbeatRequest(noi);
             } else {
-                log() << "Black holing unexpected request to " << request.target << ": "
-                      << request.cmdObj;
+                LOGV2(21470,
+                      "Black holing unexpected request to {request_target}: {request_cmdObj}",
+                      "request_target"_attr = request.target,
+                      "request_cmdObj"_attr = request.cmdObj);
                 net->blackHole(noi);
             }
             net->runReadyNetworkOperations();
@@ -2227,7 +2280,11 @@ protected:
                 // Peek the next request
                 auto noi = net->getFrontOfUnscheduledQueue();
                 auto& request = noi->getRequest();
-                log() << request.target << " at " << net->now() << " processing " << request.cmdObj;
+                LOGV2(21471,
+                      "{request_target} at {net_now} processing {request_cmdObj}",
+                      "request_target"_attr = request.target,
+                      "net_now"_attr = net->now(),
+                      "request_cmdObj"_attr = request.cmdObj);
                 if (ReplSetHeartbeatArgsV1().initialize(request.cmdObj).isOK()) {
                     // Consume the next request
                     onHeartbeatRequest(net->getNextReadyRequest());
@@ -2434,7 +2491,9 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
     replyHeartbeatsAndRunUntil(catchupTimeoutTime, [this, time1](const NetworkOpIter noi) {
         const RemoteCommandRequest& request = noi->getRequest();
         if (request.target.host() == "node2") {
-            log() << "Black holing heartbeat from " << request.target.host();
+            LOGV2(21472,
+                  "Black holing heartbeat from {request_target_host}",
+                  "request_target_host"_attr = request.target.host());
             getNet()->blackHole(noi);
         } else {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));

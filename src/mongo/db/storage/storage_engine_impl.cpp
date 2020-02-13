@@ -50,6 +50,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/unclean_shutdown.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -90,11 +91,13 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
         invariant(repairObserver->isIncomplete());
 
-        log() << "Repairing catalog metadata";
+        LOGV2(22246, "Repairing catalog metadata");
         Status status = _engine->repairIdent(opCtx, catalogInfo);
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
-            warning() << "Catalog data modified by repair: " << status.reason();
+            LOGV2_WARNING(22264,
+                          "Catalog data modified by repair: {status_reason}",
+                          "status_reason"_attr = status.reason());
             repairObserver->invalidatingModification(str::stream() << "DurableCatalog repaired: "
                                                                    << status.reason());
         } else {
@@ -159,12 +162,14 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
                     if (statusWithNs.isOK()) {
                         wuow.commit();
                         auto orphanCollNs = statusWithNs.getValue();
-                        log() << "Successfully created an entry in the catalog for the orphaned "
-                                 "collection: "
-                              << orphanCollNs;
-                        warning() << orphanCollNs
-                                  << " does not have the _id index. Please manually "
-                                     "build the index.";
+                        LOGV2(22247,
+                              "Successfully created an entry in the catalog for the orphaned "
+                              "collection: {orphanCollNs}",
+                              "orphanCollNs"_attr = orphanCollNs);
+                        LOGV2_WARNING(22265,
+                                      "{orphanCollNs} does not have the _id index. Please manually "
+                                      "build the index.",
+                                      "orphanCollNs"_attr = orphanCollNs);
 
                         StorageRepairObserver::get(getGlobalServiceContext())
                             ->benignModification(str::stream() << "Orphan collection created: "
@@ -173,10 +178,14 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
                     } else {
                         // Log an error message if we cannot create the entry.
                         // reconcileCatalogAndIdents() will later drop this ident.
-                        error() << "Cannot create an entry in the catalog for the orphaned "
-                                   "collection ident: "
-                                << ident << " due to " << statusWithNs.getStatus().reason();
-                        error() << "Restarting the server will remove this ident.";
+                        LOGV2_ERROR(
+                            22268,
+                            "Cannot create an entry in the catalog for the orphaned "
+                            "collection ident: {ident} due to {statusWithNs_getStatus_reason}",
+                            "ident"_attr = ident,
+                            "statusWithNs_getStatus_reason"_attr =
+                                statusWithNs.getStatus().reason());
+                        LOGV2_ERROR(22269, "Restarting the server will remove this ident.");
                     }
                 }
             }
@@ -201,8 +210,11 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
                 auto status =
                     _recoverOrphanedCollection(opCtx, entry.catalogId, entry.nss, collectionIdent);
                 if (!status.isOK()) {
-                    warning() << "Failed to recover orphaned data file for collection '"
-                              << entry.nss << "': " << status;
+                    LOGV2_WARNING(22266,
+                                  "Failed to recover orphaned data file for collection "
+                                  "'{entry_nss}': {status}",
+                                  "entry_nss"_attr = entry.nss,
+                                  "status"_attr = status);
                     WriteUnitOfWork wuow(opCtx);
                     fassert(50716, _catalog->_removeEntry(opCtx, entry.catalogId));
 
@@ -223,7 +235,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
         if (entry.nss.isOrphanCollection()) {
-            log() << "Orphaned collection found: " << entry.nss;
+            LOGV2(22248, "Orphaned collection found: {entry_nss}", "entry_nss"_attr = entry.nss);
         }
     }
 
@@ -284,9 +296,11 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     if (!_options.forRepair) {
         return {ErrorCodes::IllegalOperation, "Orphan recovery only supported in repair"};
     }
-    log() << "Storage engine is missing collection '" << collectionName
-          << "' from its metadata. Attempting to locate and recover the data for "
-          << collectionIdent;
+    LOGV2(22249,
+          "Storage engine is missing collection '{collectionName}' from its metadata. Attempting "
+          "to locate and recover the data for {collectionIdent}",
+          "collectionName"_attr = collectionName,
+          "collectionIdent"_attr = collectionIdent);
 
     WriteUnitOfWork wuow(opCtx);
     const auto metadata = _catalog->getMetaData(opCtx, catalogId);
@@ -376,12 +390,14 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         // These idents have to be retained as long as the corresponding drops are not part of a
         // checkpoint.
         if (dropPendingIdents.find(it) != dropPendingIdents.cend()) {
-            log() << "Not removing ident for uncheckpointed collection or index drop: " << it;
+            LOGV2(22250,
+                  "Not removing ident for uncheckpointed collection or index drop: {it}",
+                  "it"_attr = it);
             continue;
         }
 
         const auto& toRemove = it;
-        log() << "Dropping unknown ident: " << toRemove;
+        LOGV2(22251, "Dropping unknown ident: {toRemove}", "toRemove"_attr = toRemove);
         WriteUnitOfWork wuow(opCtx);
         fassert(40591, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), toRemove));
         wuow.commit();
@@ -427,11 +443,14 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                             indexMetaData.multikeyPaths.end(),
                             [](auto& pathSet) { return pathSet.size() > 0; });
             if (!indexMetaData.multikey && hasMultiKeyPaths) {
-                warning() << "The 'multikey' field for index " << indexName << " on collection "
-                          << coll << " was false with non-empty 'multikeyPaths'. This indicates "
-                          << "corruption of the catalog. Consider either dropping and recreating "
-                          << "the index, or rerunning with the --repair option. See "
-                          << "http://dochub.mongodb.org/core/repair for more information.";
+                LOGV2_WARNING(22267,
+                              "The 'multikey' field for index {indexName} on collection {coll} was "
+                              "false with non-empty 'multikeyPaths'. This indicates corruption of "
+                              "the catalog. Consider either dropping and recreating the index, or "
+                              "rerunning with the --repair option. See "
+                              "http://dochub.mongodb.org/core/repair for more information.",
+                              "indexName"_attr = indexName,
+                              "coll"_attr = coll);
             }
 
             const bool foundIdent = engineIdents.find(indexIdent) != engineIdents.end();
@@ -440,8 +459,11 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // majority of nodes. The code will rebuild the index, despite potentially
             // encountering another `dropIndex` command.
             if (indexMetaData.ready && !foundIdent) {
-                log() << "Expected index data is missing, rebuilding. Collection: " << coll
-                      << " Index: " << indexName;
+                LOGV2(22252,
+                      "Expected index data is missing, rebuilding. Collection: {coll} Index: "
+                      "{indexName}",
+                      "coll"_attr = coll,
+                      "indexName"_attr = indexName);
                 ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
@@ -456,8 +478,13 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 invariant(collUUID);
                 auto buildUUID = *indexMetaData.buildUUID;
 
-                log() << "Found index from unfinished build. Collection: " << coll << " ("
-                      << *collUUID << "), index: " << indexName << ", build UUID: " << buildUUID;
+                LOGV2(22253,
+                      "Found index from unfinished build. Collection: {coll} ({collUUID}), index: "
+                      "{indexName}, build UUID: {buildUUID}",
+                      "coll"_attr = coll,
+                      "collUUID"_attr = *collUUID,
+                      "indexName"_attr = indexName,
+                      "buildUUID"_attr = buildUUID);
 
                 // Insert in the map if a build has not already been registered.
                 auto existingIt = ret.indexBuildsToRestart.find(buildUUID);
@@ -476,17 +503,21 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // will return the index to be rebuilt.
             if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
                 if (!serverGlobalParams.indexBuildRetry) {
-                    log() << "Dropping an unfinished index because --noIndexBuildRetry is set. "
-                             "Collection: "
-                          << coll << " Index: " << indexName;
+                    LOGV2(22254,
+                          "Dropping an unfinished index because --noIndexBuildRetry is set. "
+                          "Collection: {coll} Index: {indexName}",
+                          "coll"_attr = coll,
+                          "indexName"_attr = indexName);
                     fassert(51197, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
                     indexesToDrop.push_back(indexName);
                     continue;
                 }
 
-                log() << "Expected background index build did not complete, rebuilding. "
-                         "Collection: "
-                      << coll << " Index: " << indexName;
+                LOGV2(22255,
+                      "Expected background index build did not complete, rebuilding. "
+                      "Collection: {coll} Index: {indexName}",
+                      "coll"_attr = coll,
+                      "indexName"_attr = indexName);
                 ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
@@ -498,8 +529,10 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // index when it replays the oplog. In these cases the index entry in the catalog
             // should be dropped.
             if (!indexMetaData.ready && !indexMetaData.isBackgroundSecondaryBuild) {
-                log() << "Dropping unfinished index. Collection: " << coll
-                      << " Index: " << indexName;
+                LOGV2(22256,
+                      "Dropping unfinished index. Collection: {coll} Index: {indexName}",
+                      "coll"_attr = coll,
+                      "indexName"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
                 fassert(50713, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
                 indexesToDrop.push_back(indexName);
@@ -520,7 +553,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     }
 
     for (auto&& temp : internalIdentsToDrop) {
-        log() << "Dropping internal ident: " << temp;
+        LOGV2(22257, "Dropping internal ident: {temp}", "temp"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
         fassert(51067, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), temp));
         wuow.commit();
@@ -730,7 +763,10 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
     OperationContext* opCtx) {
     std::unique_ptr<RecordStore> rs =
         _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent());
-    LOG(1) << "created temporary record store: " << rs->getIdent();
+    LOGV2_DEBUG(22258,
+                1,
+                "created temporary record store: {rs_getIdent}",
+                "rs_getIdent"_attr = rs->getIdent());
     return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
 }
 
@@ -799,7 +835,9 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
 
     catalog::openCatalog(opCtx, state);
 
-    log() << "recoverToStableTimestamp successful. Stable Timestamp: " << swTimestamp.getValue();
+    LOGV2(22259,
+          "recoverToStableTimestamp successful. Stable Timestamp: {swTimestamp_getValue}",
+          "swTimestamp_getValue"_attr = swTimestamp.getValue());
     return {swTimestamp.getValue()};
 }
 
@@ -907,8 +945,9 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timest
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
         if (timestamp > *earliestDropTimestamp) {
-            log() << "Removing drop-pending idents with drop timestamps before timestamp "
-                  << timestamp;
+            LOGV2(22260,
+                  "Removing drop-pending idents with drop timestamps before timestamp {timestamp}",
+                  "timestamp"_attr = timestamp);
             auto opCtx = cc().getOperationContext();
             invariant(opCtx);
 
@@ -930,7 +969,7 @@ StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, Periodic
 }
 
 StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
-    log() << "Timestamp monitor shutting down";
+    LOGV2(22261, "Timestamp monitor shutting down");
     stdx::lock_guard<Latch> lock(_monitorMutex);
     invariant(_listeners.empty());
 }
@@ -938,7 +977,7 @@ StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
 void StorageEngineImpl::TimestampMonitor::startup() {
     invariant(!_running);
 
-    log() << "Timestamp monitor starting";
+    LOGV2(22262, "Timestamp monitor starting");
     PeriodicRunner::PeriodicJob job(
         "TimestampMonitor",
         [&](Client* client) {
@@ -998,7 +1037,10 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 }
             } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
                 // If we're interrupted at shutdown, it's fine to give up on future notifications
-                log() << "Timestamp monitor is stopping due to: " + ex.reason();
+                LOGV2(22263,
+                      "{Timestamp_monitor_is_stopping_due_to_ex_reason}",
+                      "Timestamp_monitor_is_stopping_due_to_ex_reason"_attr =
+                          "Timestamp monitor is stopping due to: " + ex.reason());
                 return;
             }
         },

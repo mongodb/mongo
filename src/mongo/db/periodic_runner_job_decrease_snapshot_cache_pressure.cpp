@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/snapshot_window_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -82,9 +83,11 @@ void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext*
                 SnapshotWindowUtil::decreaseTargetSnapshotWindowSize(opCtx.get());
             } catch (const DBException& ex) {
                 if (!ErrorCodes::isShutdownError(ex.toStatus().code())) {
-                    warning() << "Periodic task to check for and decrease cache pressure caused by "
-                                 "maintaining too much snapshot history failed! Caused by: "
-                              << ex.toStatus();
+                    LOGV2_WARNING(
+                        20894,
+                        "Periodic task to check for and decrease cache pressure caused by "
+                        "maintaining too much snapshot history failed! Caused by: {ex_toStatus}",
+                        "ex_toStatus"_attr = ex.toStatus());
                 }
             }
         },
@@ -97,9 +100,10 @@ void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext*
         try {
             anchor->setPeriod(Seconds(secs));
         } catch (const DBException& ex) {
-            log() << "Failed to update the period of the thread which decreases data history cache "
-                     "target size if there is cache pressure."
-                  << ex.toStatus();
+            LOGV2(20893,
+                  "Failed to update the period of the thread which decreases data history cache "
+                  "target size if there is cache pressure.{ex_toStatus}",
+                  "ex_toStatus"_attr = ex.toStatus());
         }
     });
 }

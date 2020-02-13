@@ -34,6 +34,7 @@
 #include "mongo/client/replica_set_monitor_test_fixture.h"
 
 #include "mongo/client/mongo_uri.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -1416,11 +1417,15 @@ TEST_F(MinOpTimeTest, MinOpTimeIgnored) {
 class Listener : public ReplicaSetChangeNotifier::Listener {
 public:
     void logEvent(StringData name, const Key& key) {
-        log() << name << ": " << key;
+        LOGV2(20190, "{name}: {key}", "name"_attr = name, "key"_attr = key);
     }
     void logEvent(StringData name, const State& state) {
-        log() << name << ": "
-              << "(" << state.generation << ") " << state.connStr << " | " << state.primary;
+        LOGV2(20191,
+              "{name}: ({state_generation}) {state_connStr} | {state_primary}",
+              "name"_attr = name,
+              "state_generation"_attr = state.generation,
+              "state_connStr"_attr = state.connStr,
+              "state_primary"_attr = state.primary);
     }
 
     void onFoundSet(const Key& key) noexcept override {

@@ -42,6 +42,7 @@
 #include "mongo/db/auth/user_cache_invalidator_job_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -63,7 +64,11 @@ public:
     void setInterval(Seconds interval) {
         {
             stdx::lock_guard<Latch> twiddle(_mutex);
-            LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
+            LOGV2_DEBUG(20259,
+                        5,
+                        "setInterval: old={interval}, new={interval2}",
+                        "interval"_attr = _interval,
+                        "interval2"_attr = interval);
             _interval = interval;
         }
         _condition.notify_all();
@@ -94,15 +99,19 @@ public:
 
             Date_t now = Date_t::now();
             Date_t expiry = _last + _interval;
-            LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
+            LOGV2_DEBUG(20260,
+                        5,
+                        "wait: now={now}, expiry={expiry}",
+                        "now"_attr = now,
+                        "expiry"_attr = expiry);
 
             if (now >= expiry) {
                 _last = now;
-                LOG(5) << "wait: done";
+                LOGV2_DEBUG(20261, 5, "wait: done");
                 return true;
             }
 
-            LOG(5) << "wait: blocking";
+            LOGV2_DEBUG(20262, 5, "wait: blocking");
             MONGO_IDLE_THREAD_BLOCK;
             _condition.wait_until(lock, expiry.toSystemTimePoint());
         }
@@ -165,13 +174,15 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
     }
 
     if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
-        warning() << "_getUserCacheGeneration command not found while fetching initial user "
-                     "cache generation from the config server(s).  This most likely means you are "
-                     "running an outdated version of mongod on the config servers";
+        LOGV2_WARNING(20264,
+                      "_getUserCacheGeneration command not found while fetching initial user "
+                      "cache generation from the config server(s).  This most likely means you are "
+                      "running an outdated version of mongod on the config servers");
     } else {
-        warning() << "An error occurred while fetching initial user cache generation from "
-                     "config servers: "
-                  << currentGeneration.getStatus();
+        LOGV2_WARNING(20265,
+                      "An error occurred while fetching initial user cache generation from "
+                      "config servers: {currentGeneration_getStatus}",
+                      "currentGeneration_getStatus"_attr = currentGeneration.getStatus());
     }
     _previousCacheGeneration = OID();
 }
@@ -184,26 +195,35 @@ void UserCacheInvalidator::run() {
         auto opCtx = cc().makeOperationContext();
         StatusWith<OID> currentGeneration = getCurrentCacheGeneration(opCtx.get());
         if (!currentGeneration.isOK()) {
-            warning() << "An error occurred while fetching current user cache generation "
-                         "to check if user cache needs invalidation: "
-                      << currentGeneration.getStatus();
+            LOGV2_WARNING(
+                20266,
+                "An error occurred while fetching current user cache generation "
+                "to check if user cache needs invalidation: {currentGeneration_getStatus}",
+                "currentGeneration_getStatus"_attr = currentGeneration.getStatus());
 
             // When in doubt, invalidate the cache
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                warning() << "Error invalidating user cache: " << e.toStatus();
+                LOGV2_WARNING(20267,
+                              "Error invalidating user cache: {e_toStatus}",
+                              "e_toStatus"_attr = e.toStatus());
             }
             continue;
         }
 
         if (currentGeneration.getValue() != _previousCacheGeneration) {
-            log() << "User cache generation changed from " << _previousCacheGeneration << " to "
-                  << currentGeneration.getValue() << "; invalidating user cache";
+            LOGV2(20263,
+                  "User cache generation changed from {previousCacheGeneration} to "
+                  "{currentGeneration_getValue}; invalidating user cache",
+                  "previousCacheGeneration"_attr = _previousCacheGeneration,
+                  "currentGeneration_getValue"_attr = currentGeneration.getValue());
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                warning() << "Error invalidating user cache: " << e.toStatus();
+                LOGV2_WARNING(20268,
+                              "Error invalidating user cache: {e_toStatus}",
+                              "e_toStatus"_attr = e.toStatus());
             }
 
             _previousCacheGeneration = currentGeneration.getValue();

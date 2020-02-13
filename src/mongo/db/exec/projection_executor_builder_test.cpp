@@ -39,6 +39,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -64,8 +65,11 @@ public:
             _allowFastPath = false;
             base->run();
         } catch (...) {
-            log() << "exception while testing with allowFastPath=" << _allowFastPath
-                  << " and allowFallBackToDefault=" << AllowFallBackToDefault;
+            LOGV2(20597,
+                  "exception while testing with allowFastPath={allowFastPath} and "
+                  "allowFallBackToDefault={AllowFallBackToDefault}",
+                  "allowFastPath"_attr = _allowFastPath,
+                  "AllowFallBackToDefault"_attr = AllowFallBackToDefault);
             throw;
         }
     }

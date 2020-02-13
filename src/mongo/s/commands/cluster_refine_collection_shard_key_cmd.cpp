@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/util/fail_point.h"
@@ -59,7 +60,7 @@ public:
                                                                                              nss));
 
             if (MONGO_unlikely(hangRefineCollectionShardKeyAfterRefresh.shouldFail())) {
-                log() << "Hit hangRefineCollectionShardKeyAfterRefresh failpoint";
+                LOGV2(22756, "Hit hangRefineCollectionShardKeyAfterRefresh failpoint");
                 hangRefineCollectionShardKeyAfterRefresh.pauseWhileSet(opCtx);
             }
 

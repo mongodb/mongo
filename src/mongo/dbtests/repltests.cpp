@@ -48,6 +48,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/log.h"
 
@@ -193,8 +194,10 @@ protected:
     }
     void check(const BSONObj& expected, const BSONObj& got) const {
         if (expected.woCompare(got)) {
-            ::mongo::log() << "expected: " << expected.toString() << ", got: " << got.toString()
-                           << endl;
+            LOGV2(22500,
+                  "expected: {expected}, got: {got}",
+                  "expected"_attr = expected.toString(),
+                  "got"_attr = got.toString());
         }
         ASSERT_BSONOBJ_EQ(expected, got);
     }
@@ -243,7 +246,7 @@ protected:
             OldClientContext ctx(&_opCtx, ns());
             for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
                 if (0) {
-                    mongo::unittest::log() << "op: " << *i << endl;
+                    LOGV2(22501, "op: {i}", "i"_attr = *i);
                 }
                 repl::UnreplicatedWritesBlock uwb(&_opCtx);
                 auto entry = uassertStatusOK(OplogEntry::parse(*i));

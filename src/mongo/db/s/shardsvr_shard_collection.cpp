@@ -51,6 +51,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -92,7 +93,9 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
  */
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
-        warning() << "shardsvrShardCollection failed" << causedBy(redact(status));
+        LOGV2_WARNING(22103,
+                      "shardsvrShardCollection failed{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(redact(status)));
         uassertStatusOK(status);
     }
 }
@@ -467,7 +470,7 @@ void logStartShardCollection(OperationContext* opCtx,
                              const ShardsvrShardCollection& request,
                              const ShardCollectionTargetState& prerequisites,
                              const ShardId& dbPrimaryShardId) {
-    LOG(0) << "CMD: shardcollection: " << cmdObj;
+    LOGV2(22100, "CMD: shardcollection: {cmdObj}", "cmdObj"_attr = cmdObj);
 
     audit::logShardCollection(
         opCtx->getClient(), nss.ns(), prerequisites.shardKeyPattern.toBSON(), request.getUnique());
@@ -722,8 +725,12 @@ UUID shardCollection(OperationContext* opCtx,
         writeChunkDocumentsAndRefreshShards(*targetState, initialChunks);
     }
 
-    LOG(0) << "Created " << initialChunks.chunks.size() << " chunk(s) for: " << nss
-           << ", producing collection version " << initialChunks.collVersion();
+    LOGV2(22101,
+          "Created {initialChunks_chunks_size} chunk(s) for: {nss}, producing collection version "
+          "{initialChunks_collVersion}",
+          "initialChunks_chunks_size"_attr = initialChunks.chunks.size(),
+          "nss"_attr = nss,
+          "initialChunks_collVersion"_attr = initialChunks.collVersion());
 
 
     ShardingLogging::get(opCtx)->logChange(
@@ -813,7 +820,7 @@ public:
                     uuid);
 
             if (MONGO_unlikely(pauseShardCollectionBeforeReturning.shouldFail())) {
-                log() << "Hit pauseShardCollectionBeforeReturning";
+                LOGV2(22102, "Hit pauseShardCollectionBeforeReturning");
                 pauseShardCollectionBeforeReturning.pauseWhileSet(opCtx);
             }
 

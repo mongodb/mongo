@@ -35,6 +35,7 @@
 
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
@@ -340,7 +341,7 @@ PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
     stdx::unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
 
     if (_nodeToId.end() == it) {
-        error() << "Trying to look up memo entry for node, none found.";
+        LOGV2_ERROR(20945, "Trying to look up memo entry for node, none found.");
         MONGO_UNREACHABLE;
     }
 
@@ -359,7 +360,8 @@ unique_ptr<MatchExpression> PlanEnumerator::getNext() {
     tagForSort(tree.get());
 
     _root->resetTag();
-    LOG(5) << "Enumerator: memo just before moving:" << endl << dumpMemo();
+    LOGV2_DEBUG(
+        20943, 5, "Enumerator: memo just before moving:\n{dumpMemo}", "dumpMemo"_attr = dumpMemo());
     _done = nextMemo(memoIDForNode(_root));
     return tree;
 }
@@ -1568,7 +1570,7 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 //
 
 void PlanEnumerator::tagMemo(size_t id) {
-    LOG(5) << "Tagging memoID " << id;
+    LOGV2_DEBUG(20944, 5, "Tagging memoID {id}", "id"_attr = id);
     NodeAssignment* assign = _memo[id];
     verify(nullptr != assign);
 

@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -109,8 +110,13 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         return ex.toStatus();
     }
 
-    log() << "Index build initialized: " << buildUUID << ": " << nss << " (" << collection->uuid()
-          << " ): indexes: " << indexes.size();
+    LOGV2(
+        20346,
+        "Index build initialized: {buildUUID}: {nss} ({collection_uuid} ): indexes: {indexes_size}",
+        "buildUUID"_attr = buildUUID,
+        "nss"_attr = nss,
+        "collection_uuid"_attr = collection->uuid(),
+        "indexes_size"_attr = indexes.size());
 
     return Status::OK();
 }
@@ -155,12 +161,16 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 auto validStatus = validateBSON(data.data(), data.size(), BSONVersion::kLatest);
                 if (!validStatus.isOK()) {
                     if (repair == RepairData::kNo) {
-                        severe() << "Invalid BSON detected at " << id << ": "
-                                 << redact(validStatus);
+                        LOGV2_FATAL(20349,
+                                    "Invalid BSON detected at {id}: {validStatus}",
+                                    "id"_attr = id,
+                                    "validStatus"_attr = redact(validStatus));
                         fassertFailed(31396);
                     }
-                    warning() << "Invalid BSON detected at " << id << ": " << redact(validStatus)
-                              << ". Deleting.";
+                    LOGV2_WARNING(20348,
+                                  "Invalid BSON detected at {id}: {validStatus}. Deleting.",
+                                  "id"_attr = id,
+                                  "validStatus"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, id);
                 } else {
                     numRecords++;
@@ -277,7 +287,10 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
         return false;
     }
 
-    log() << "Index build aborted without cleanup: " << buildUUID << ": " << reason;
+    LOGV2(20347,
+          "Index build aborted without cleanup: {buildUUID}: {reason}",
+          "buildUUID"_attr = buildUUID,
+          "reason"_attr = reason);
     std::shared_ptr<MultiIndexBlock> builder = builderIt->second;
 
     lk.unlock();

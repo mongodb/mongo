@@ -45,6 +45,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/util/log.h"
@@ -121,7 +122,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
         return monitor;
     }
 
-    log() << "Starting new replica set monitor for " << uri.toString();
+    LOGV2(20186, "Starting new replica set monitor for {uri}", "uri"_attr = uri.toString());
 
     auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri);
     _monitors[setName] = newMonitor;
@@ -149,7 +150,8 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
             monitor->drop();
         }
         _monitors.erase(it);
-        log() << "Removed ReplicaSetMonitor for replica set " << setName;
+        LOGV2(
+            20187, "Removed ReplicaSetMonitor for replica set {setName}", "setName"_attr = setName);
     }
 }
 
@@ -172,12 +174,12 @@ void ReplicaSetMonitorManager::shutdown() {
     }
 
     if (taskExecutor) {
-        LOG(1) << "Shutting down task executor used for monitoring replica sets";
+        LOGV2_DEBUG(20188, 1, "Shutting down task executor used for monitoring replica sets");
         taskExecutor->shutdown();
     }
 
     if (monitors.size()) {
-        log() << "Dropping all ongoing scans against replica sets";
+        LOGV2(20189, "Dropping all ongoing scans against replica sets");
     }
     for (auto& [name, monitor] : monitors) {
         auto anchor = monitor.lock();

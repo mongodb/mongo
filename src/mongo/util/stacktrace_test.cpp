@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <array>
@@ -47,10 +49,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
 
@@ -501,10 +505,14 @@ public:
     }
 
     static void handlerPreamble(int sig) {
-        unittest::log() << "tid:" << ostr(stdx::this_thread::get_id()) << ", caught signal " << sig
-                        << "!\n";
+        LOGV2(23387,
+              "tid:{ostr_stdx_this_thread_get_id}, caught signal {sig}!\n",
+              "ostr_stdx_this_thread_get_id"_attr = ostr(stdx::this_thread::get_id()),
+              "sig"_attr = sig);
         char storage;
-        unittest::log() << "local var:" << reinterpret_cast<uint64_t>(&storage) << "\n";
+        LOGV2(23388,
+              "local var:{reinterpret_cast_uint64_t_storage}",
+              "reinterpret_cast_uint64_t_storage"_attr = reinterpret_cast<uint64_t>(&storage));
     }
 
     static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
@@ -516,7 +524,9 @@ public:
         unittest::log() << "sigaltstack buf: [" << std::hex << buf->size() << std::dec << "] @"
                         << std::hex << uintptr_t(buf->data()) << std::dec << "\n";
         stdx::thread thr([&] {
-            unittest::log() << "tid:" << ostr(stdx::this_thread::get_id()) << " running\n";
+            LOGV2(23389,
+                  "tid:{ostr_stdx_this_thread_get_id} running\n",
+                  "ostr_stdx_this_thread_get_id"_attr = ostr(stdx::this_thread::get_id()));
             {
                 stack_t ss;
                 ss.ss_sp = buf->data();
@@ -550,7 +560,7 @@ public:
         size_t used = std::distance(
             std::find_if(buf->begin(), buf->end(), [](unsigned char x) { return x != kSentinel; }),
             buf->end());
-        unittest::log() << "stack used: " << used << " bytes\n";
+        LOGV2(23390, "stack used: {used} bytes\n", "used"_attr = used);
     }
 };
 
@@ -872,9 +882,13 @@ TEST(StackTrace, BacktraceThroughLibc) {
         capture.notify();
         return static_cast<int>(static_cast<const int*>(a) < static_cast<const int*>(b));
     });
-    unittest::log() << "caught [" << capture.arrSize << "]:";
+    LOGV2(23391, "caught [{capture_arrSize}]:", "capture_arrSize"_attr = capture.arrSize);
     for (size_t i = 0; i < capture.arrSize; ++i) {
-        unittest::log() << "  [" << i << "] " << reinterpret_cast<uint64_t>(capture.arr[i]);
+        LOGV2(23392,
+              "  [{i}] {reinterpret_cast_uint64_t_capture_arr_i}",
+              "i"_attr = i,
+              "reinterpret_cast_uint64_t_capture_arr_i"_attr =
+                  reinterpret_cast<uint64_t>(capture.arr[i]));
     }
 }
 #endif  // mongo stacktrace backend

@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -108,15 +109,18 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    TransactionParticipant::observeTransactionLifetimeLimitSeconds.addObserver(
-        [anchor = _anchor](const Argument& secs) {
-            try {
-                anchor->setPeriod(getPeriod(secs));
-            } catch (const DBException& ex) {
-                log() << "Failed to update period of thread which aborts expired transactions "
-                      << ex.toStatus();
-            }
-        });
+    TransactionParticipant::observeTransactionLifetimeLimitSeconds.addObserver([anchor = _anchor](
+                                                                                   const Argument&
+                                                                                       secs) {
+        try {
+            anchor->setPeriod(getPeriod(secs));
+        } catch (const DBException& ex) {
+            LOGV2(
+                20892,
+                "Failed to update period of thread which aborts expired transactions {ex_toStatus}",
+                "ex_toStatus"_attr = ex.toStatus());
+        }
+    });
 }
 
 }  // namespace mongo

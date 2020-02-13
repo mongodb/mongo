@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/platform/source_location_test.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -64,9 +68,9 @@ TEST(SourceLocation, InlineVariable) {
     ASSERT_LT(inlineLocation1.line(), inlineLocation2.line());
     ASSERT_LT(inlineLocation2.line(), inlineLocation3.line());
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << inlineLocation2;
-    unittest::log() << inlineLocation3;
+    LOGV2(22616, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(22617, "{inlineLocation2}", "inlineLocation2"_attr = inlineLocation2);
+    LOGV2(22618, "{inlineLocation3}", "inlineLocation3"_attr = inlineLocation3);
 }
 
 TEST(SourceLocation, LocalFunction) {
@@ -81,9 +85,11 @@ TEST(SourceLocation, LocalFunction) {
     // The two local function locations should be identical
     ASSERT_EQ(localFunctionLocation1, localFunctionLocation2);
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << localFunctionLocation1;
-    unittest::log() << localFunctionLocation2;
+    LOGV2(22619, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(
+        22620, "{localFunctionLocation1}", "localFunctionLocation1"_attr = localFunctionLocation1);
+    LOGV2(
+        22621, "{localFunctionLocation2}", "localFunctionLocation2"_attr = localFunctionLocation2);
 }
 
 TEST(SourceLocation, HeaderFunction) {
@@ -97,9 +103,9 @@ TEST(SourceLocation, HeaderFunction) {
     // The two header locations should be identical
     ASSERT_EQ(headerLocation1, headerLocation2);
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << headerLocation1;
-    unittest::log() << headerLocation2;
+    LOGV2(22622, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(22623, "{headerLocation1}", "headerLocation1"_attr = headerLocation1);
+    LOGV2(22624, "{headerLocation2}", "headerLocation2"_attr = headerLocation2);
 }
 
 TEST(SourceLocation, GlobalVariable) {
@@ -109,8 +115,8 @@ TEST(SourceLocation, GlobalVariable) {
     ASSERT_EQ(inlineLocation1.file_name(), kLocation.file_name());
     ASSERT_GT(inlineLocation1.line(), kLocation.line());
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << kLocation;
+    LOGV2(22625, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(22626, "{kLocation}", "kLocation"_attr = kLocation);
 }
 
 TEST(SourceLocation, DefaultStructMember) {
@@ -125,9 +131,9 @@ TEST(SourceLocation, DefaultStructMember) {
     // The two default ctor'd struct member locations should be identical
     ASSERT_EQ(obj1.location, obj2.location);
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << obj1.location;
-    unittest::log() << obj2.location;
+    LOGV2(22627, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(22628, "{obj1_location}", "obj1_location"_attr = obj1.location);
+    LOGV2(22629, "{obj2_location}", "obj2_location"_attr = obj2.location);
 }
 
 TEST(SourceLocation, Macro) {
@@ -140,8 +146,8 @@ TEST(SourceLocation, Macro) {
     // The line numbers for each location should increase monotonically when inline
     ASSERT_LT(inlineLocation1.line(), inlineLocation2.line());
 
-    unittest::log() << inlineLocation1;
-    unittest::log() << inlineLocation2;
+    LOGV2(22630, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
+    LOGV2(22631, "{inlineLocation2}", "inlineLocation2"_attr = inlineLocation2);
 }
 
 TEST(SourceLocation, Constexpr) {

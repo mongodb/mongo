@@ -36,6 +36,7 @@
 #include <js/Initialization.h>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/scripting/mozjs/engine_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
@@ -86,11 +87,19 @@ void MozJSScriptEngine::interrupt(unsigned opId) {
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
     if (iScope == _opToScopeMap.end()) {
         // got interrupt request for a scope that no longer exists
-        LOG(1) << "received interrupt request for unknown op: " << opId << printKnownOps_inlock();
+        LOGV2_DEBUG(22783,
+                    1,
+                    "received interrupt request for unknown op: {opId}{printKnownOps_inlock}",
+                    "opId"_attr = opId,
+                    "printKnownOps_inlock"_attr = printKnownOps_inlock());
         return;
     }
 
-    LOG(1) << "interrupting op: " << opId << printKnownOps_inlock();
+    LOGV2_DEBUG(22784,
+                1,
+                "interrupting op: {opId}{printKnownOps_inlock}",
+                "opId"_attr = opId,
+                "printKnownOps_inlock"_attr = printKnownOps_inlock());
     iScope->second->kill();
 }
 
@@ -147,7 +156,11 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 
     _opToScopeMap[opId] = scope;
 
-    LOG(2) << "SMScope " << reinterpret_cast<uint64_t>(scope) << " registered for op " << opId;
+    LOGV2_DEBUG(22785,
+                2,
+                "SMScope {reinterpret_cast_uint64_t_scope} registered for op {opId}",
+                "reinterpret_cast_uint64_t_scope"_attr = reinterpret_cast<uint64_t>(scope),
+                "opId"_attr = opId);
     Status status = opCtx->checkForInterruptNoAssert();
     if (!status.isOK()) {
         scope->kill();
@@ -157,7 +170,11 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
     stdx::lock_guard<Latch> giLock(_globalInterruptLock);
 
-    LOG(2) << "ImplScope " << reinterpret_cast<uint64_t>(this) << " unregistered for op " << opId;
+    LOGV2_DEBUG(22786,
+                2,
+                "ImplScope {reinterpret_cast_uint64_t_this} unregistered for op {opId}",
+                "reinterpret_cast_uint64_t_this"_attr = reinterpret_cast<uint64_t>(this),
+                "opId"_attr = opId);
 
     if (opId != 0) {
         // scope is currently associated with an operation id

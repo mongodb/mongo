@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
@@ -171,7 +172,10 @@ std::vector<RemoteCursor> establishShardCursors(
     const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref) {
-    LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
+    LOGV2_DEBUG(20904,
+                1,
+                "Dispatching command {cmdObj} to establish cursors on shards",
+                "cmdObj"_attr = redact(cmdObj));
 
     const bool mustRunOnAll = mustRunOnAllShards(nss, hasChangeStream);
     std::vector<std::pair<ShardId, BSONObj>> requests;
@@ -204,8 +208,9 @@ std::vector<RemoteCursor> establishShardCursors(
     }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
-        log() << "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
-                 "until fail point is disabled.";
+        LOGV2(20905,
+              "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
+              "until fail point is disabled.");
         while (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
             sleepsecs(1);
         }
@@ -754,10 +759,13 @@ DispatchShardPipelineResults dispatchShardPipeline(
     boost::optional<SplitPipeline> splitPipelines;
 
     if (needsSplit) {
-        LOG(5) << "Splitting pipeline: "
-               << "targeting = " << shardIds.size()
-               << " shards, needsMongosMerge = " << needsMongosMerge
-               << ", needsPrimaryShardMerge = " << needsPrimaryShardMerge;
+        LOGV2_DEBUG(20906,
+                    5,
+                    "Splitting pipeline: targeting = {shardIds_size} shards, needsMongosMerge = "
+                    "{needsMongosMerge}, needsPrimaryShardMerge = {needsPrimaryShardMerge}",
+                    "shardIds_size"_attr = shardIds.size(),
+                    "needsMongosMerge"_attr = needsMongosMerge,
+                    "needsPrimaryShardMerge"_attr = needsPrimaryShardMerge);
         splitPipelines = splitPipeline(std::move(pipeline));
 
         exchangeSpec = checkIfEligibleForExchange(opCtx, splitPipelines->mergePipeline.get());

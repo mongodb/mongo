@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/flow_control.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
 #include "mongo/util/background.h"
@@ -203,7 +204,7 @@ void LockerImpl::dump() const {
     }
     _lock.unlock();
 
-    log() << ss.str();
+    LOGV2(20523, "{ss_str}", "ss_str"_attr = ss.str());
 }
 
 
@@ -1062,7 +1063,7 @@ public:
     }
 
     void taskDoWork() {
-        LOG(2) << "cleaning up unused lock buckets of the global lock manager";
+        LOGV2_DEBUG(20524, 2, "cleaning up unused lock buckets of the global lock manager");
         getGlobalLockManager()->cleanupUnusedLocks();
     }
 } unusedLockCleaner;

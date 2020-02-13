@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/embedded_builder.h"
@@ -163,7 +164,10 @@ FieldCompareResult compareDottedFieldNames(const string& l,
             return LEFT_SUBFIELD;
     }
 
-    log() << "compareDottedFieldNames ERROR  l: " << l << " r: " << r << "  TOO MANY LOOPS" << endl;
+    LOGV2(22493,
+          "compareDottedFieldNames ERROR  l: {l} r: {r}  TOO MANY LOOPS",
+          "l"_attr = l,
+          "r"_attr = r);
     verify(0);
     return SAME;  // will never get here
 }

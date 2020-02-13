@@ -44,6 +44,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
@@ -132,7 +133,8 @@ public:
             oss.waitForMigrationCriticalSectionSignal(opCtx);
 
             if (request().getSyncFromConfig()) {
-                LOG(1) << "Forcing remote routing table refresh for " << ns();
+                LOGV2_DEBUG(
+                    21982, 1, "Forcing remote routing table refresh for {ns}", "ns"_attr = ns());
                 forceShardFilteringMetadataRefresh(opCtx, ns());
             }
 

@@ -57,6 +57,7 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -164,8 +165,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             "Destination shard cannot be the same as source",
             _args.getFromShardId() != _args.getToShardId());
 
-    log() << "Starting chunk migration " << redact(_args.toString())
-          << " with expected collection version epoch " << _args.getVersionEpoch();
+    LOGV2(22016,
+          "Starting chunk migration {args} with expected collection version epoch "
+          "{args_getVersionEpoch}",
+          "args"_attr = redact(_args.toString()),
+          "args_getVersionEpoch"_attr = _args.getVersionEpoch());
 
     // Force refresh of the metadata to ensure we have the latest
     forceShardFilteringMetadataRefresh(_opCtx, getNss());
@@ -391,7 +395,7 @@ Status MigrationSourceManager::enterCriticalSection() {
                           << signalStatus.toString()};
     }
 
-    log() << "Migration successfully entered critical section";
+    LOGV2(22017, "Migration successfully entered critical section");
 
     scopedGuard.dismiss();
     return Status::OK();
@@ -502,8 +506,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     }
 
     // Migration succeeded
-    LOG(0) << "Migration succeeded and updated collection version to "
-           << refreshedMetadata->getCollVersion();
+    LOGV2(
+        22018,
+        "Migration succeeded and updated collection version to {refreshedMetadata_getCollVersion}",
+        "refreshedMetadata_getCollVersion"_attr = refreshedMetadata->getCollVersion());
 
     if (_enableResumableRangeDeleter) {
         _coordinator->setMigrationDecision(
@@ -547,8 +553,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     if (_enableResumableRangeDeleter) {
         if (_args.getWaitForDelete()) {
-            log() << "Waiting for cleanup of " << getNss().ns() << " range "
-                  << redact(range.toString());
+            LOGV2(22019,
+                  "Waiting for cleanup of {getNss_ns} range {range}",
+                  "getNss_ns"_attr = getNss().ns(),
+                  "range"_attr = redact(range.toString()));
 
             invariant(_scheduledRangeDeletionOnSuccess);
             auto scheduleSW = _scheduledRangeDeletionOnSuccess->getNoThrow(_opCtx);
@@ -575,8 +583,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         }();
 
         if (_args.getWaitForDelete()) {
-            log() << "Waiting for cleanup of " << getNss().ns() << " range "
-                  << redact(range.toString());
+            LOGV2(22020,
+                  "Waiting for cleanup of {getNss_ns} range {range}",
+                  "getNss_ns"_attr = getNss().ns(),
+                  "range"_attr = redact(range.toString()));
 
             auto deleteStatus = cleanupCompleteFuture.getNoThrow(_opCtx);
 
@@ -592,8 +602,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             return {ErrorCodes::OrphanedRangeCleanUpFailed,
                     orphanedRangeCleanUpErrMsg + redact(cleanupCompleteFuture.getNoThrow(_opCtx))};
         } else {
-            log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
-                  << " to complete in background";
+            LOGV2(22021,
+                  "Leaving cleanup of {getNss_ns} range {range} to complete in background",
+                  "getNss_ns"_attr = getNss().ns(),
+                  "range"_attr = redact(range.toString()));
         }
     }
 
@@ -616,8 +628,10 @@ void MigrationSourceManager::cleanupOnError() {
     try {
         _cleanup();
     } catch (const DBException& ex) {
-        warning() << "Failed to clean up migration: " << redact(_args.toString())
-                  << "due to: " << redact(ex);
+        LOGV2_WARNING(22022,
+                      "Failed to clean up migration: {args}due to: {ex}",
+                      "args"_attr = redact(_args.toString()),
+                      "ex"_attr = redact(ex));
     }
 }
 

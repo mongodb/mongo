@@ -52,6 +52,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -158,8 +159,11 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         ? serverGlobalParams.featureCompatibility.getVersion() != newVersion
         : true;
     if (isDifferent) {
-        log() << "setting featureCompatibilityVersion to "
-              << FeatureCompatibilityVersionParser::toString(newVersion);
+        LOGV2(
+            20459,
+            "setting featureCompatibilityVersion to {FeatureCompatibilityVersionParser_newVersion}",
+            "FeatureCompatibilityVersionParser_newVersion"_attr =
+                FeatureCompatibilityVersionParser::toString(newVersion));
     }
 
     // Remove term field of config document on downgrade.
@@ -190,9 +194,10 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
             if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
-                log() << "featureCompatibilityVersion - "
-                         "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
-                         "Blocking until fail point is disabled.";
+                LOGV2(20460,
+                      "featureCompatibilityVersion - "
+                      "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
+                      "Blocking until fail point is disabled.");
                 hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
             }
             // Abort all open transactions when downgrading the featureCompatibilityVersion.

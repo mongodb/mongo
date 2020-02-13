@@ -34,6 +34,7 @@
 
 #include <boost/filesystem.hpp>
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -45,14 +46,20 @@ SharedLibrary::~SharedLibrary() {
     if (_handle) {
         if (FreeLibrary(static_cast<HMODULE>(_handle)) == 0) {
             DWORD lasterror = GetLastError();
-            LOG(2) << "Load library close failed: " << errnoWithDescription(lasterror);
+            LOGV2_DEBUG(22614,
+                        2,
+                        "Load library close failed: {errnoWithDescription_lasterror}",
+                        "errnoWithDescription_lasterror"_attr = errnoWithDescription(lasterror));
         }
     }
 }
 
 StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
     const boost::filesystem::path& full_path) {
-    LOG(1) << "Loading library: " << toUtf8String(full_path.c_str());
+    LOGV2_DEBUG(22615,
+                1,
+                "Loading library: {toUtf8String_full_path_c_str}",
+                "toUtf8String_full_path_c_str"_attr = toUtf8String(full_path.c_str()));
 
     HMODULE handle = LoadLibraryW(full_path.c_str());
     if (handle == nullptr) {

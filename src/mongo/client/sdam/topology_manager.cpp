@@ -31,6 +31,7 @@
 #include "mongo/client/sdam/topology_manager.h"
 
 #include "mongo/client/sdam/topology_state_machine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo::sdam {
@@ -76,10 +77,12 @@ void TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome
     boost::optional<int> poolResetCounter = boost::none;
     if (isMasterOutcome.isSuccess()) {
         if (isStaleTopologyVersion(lastTopologyVersion, newTopologyVersion)) {
-            log() << "Ignoring this isMaster response because our topologyVersion: "
-                  << lastTopologyVersion->toBSON()
-                  << "is fresher than the provided topologyVersion: "
-                  << newTopologyVersion->toBSON();
+            LOGV2(20218,
+                  "Ignoring this isMaster response because our topologyVersion: "
+                  "{lastTopologyVersion}is fresher than the provided topologyVersion: "
+                  "{newTopologyVersion}",
+                  "lastTopologyVersion"_attr = lastTopologyVersion->toBSON(),
+                  "newTopologyVersion"_attr = newTopologyVersion->toBSON());
             return;
         }
 

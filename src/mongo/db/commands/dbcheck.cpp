@@ -47,6 +47,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/background.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -210,7 +211,7 @@ protected:
             }
 
             if (_done) {
-                log() << "dbCheck terminated due to stepdown";
+                LOGV2(20451, "dbCheck terminated due to stepdown");
                 return;
             }
         }

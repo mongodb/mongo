@@ -42,6 +42,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -56,14 +57,16 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // so make a warning. need a better solution longer term.
     // massert(40389, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
-        log() << "warning flushMyDirectory couldn't find parent dir for file: " << file.string();
+        LOGV2(22274,
+              "warning flushMyDirectory couldn't find parent dir for file: {file_string}",
+              "file_string"_attr = file.string());
         return;
     }
 
 
     boost::filesystem::path dir = file.branch_path();  // parent_path in new boosts
 
-    LOG(1) << "flushing directory " << dir.string();
+    LOGV2_DEBUG(22275, 1, "flushing directory {dir_string}", "dir_string"_attr = dir.string());
 
     int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
     massert(40387,
@@ -74,12 +77,17 @@ void flushMyDirectory(const boost::filesystem::path& file) {
         int e = errno;
         if (e == EINVAL) {  // indicates filesystem does not support synchronization
             if (!_warnedAboutFilesystem) {
-                log() << "\tWARNING: This file system is not supported. For further information"
-                      << " see:" << startupWarningsLog;
-                log() << "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems"
-                      << startupWarningsLog;
-                log() << "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
-                      << "this warning." << startupWarningsLog;
+                LOGV2_OPTIONS(
+                    22276,
+                    {logv2::LogTag::kStartupWarnings},
+                    "\tWARNING: This file system is not supported. For further information see:");
+                LOGV2_OPTIONS(22277,
+                              {logv2::LogTag::kStartupWarnings},
+                              "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems");
+                LOGV2_OPTIONS(22278,
+                              {logv2::LogTag::kStartupWarnings},
+                              "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
+                              "this warning.");
                 _warnedAboutFilesystem = true;
             }
         } else {
@@ -225,13 +233,15 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     if (!_lockFileHandle->isValid()) {
         return;
     }
-    log() << "shutdown: removing fs lock...";
+    LOGV2(22279, "shutdown: removing fs lock...");
     // This ought to be an unlink(), but Eliot says the last
     // time that was attempted, there was a race condition
     // with StorageEngineLockFile::open().
     if (::ftruncate(_lockFileHandle->_fd, 0)) {
         int errorcode = errno;
-        log() << "couldn't remove fs lock " << errnoWithDescription(errorcode);
+        LOGV2(22280,
+              "couldn't remove fs lock {errnoWithDescription_errorcode}",
+              "errnoWithDescription_errorcode"_attr = errnoWithDescription(errorcode));
     }
     close();
 }

@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -67,14 +68,18 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
 
 bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKeys) {
     if (expectedKeys.size() != actualKeys.size()) {
-        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
-              << "Actual: " << dumpKeyset(actualKeys);
+        LOGV2(20695,
+              "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
+              "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
+              "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
         return false;
     }
 
     if (!std::equal(expectedKeys.begin(), expectedKeys.end(), actualKeys.begin())) {
-        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
-              << "Actual: " << dumpKeyset(actualKeys);
+        LOGV2(20696,
+              "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
+              "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
+              "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
         return false;
     }
 

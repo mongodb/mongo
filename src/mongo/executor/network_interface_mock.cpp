@@ -39,6 +39,7 @@
 
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -77,9 +78,11 @@ void NetworkInterfaceMock::logQueues() {
             continue;
         }
 
-        log() << "**** queue: " << queue.first << " ****";
+        LOGV2(22588, "**** queue: {queue_first} ****", "queue_first"_attr = queue.first);
         for (auto&& item : *queue.second) {
-            log() << "\t\t " << item.getDiagnosticString();
+            LOGV2(22589,
+                  "\t\t {item_getDiagnosticString}",
+                  "item_getDiagnosticString"_attr = item.getDiagnosticString());
         }
     }
 }
@@ -240,8 +243,10 @@ void NetworkInterfaceMock::shutdown() {
     _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
     lk.unlock();
     for (NetworkOperationIterator iter = todo.begin(); iter != todo.end(); ++iter) {
-        warning() << "Mock network interface shutting down with outstanding request: "
-                  << iter->getRequest();
+        LOGV2_WARNING(
+            22590,
+            "Mock network interface shutting down with outstanding request: {iter_getRequest}",
+            "iter_getRequest"_attr = iter->getRequest());
         iter->setResponse(
             now, {ErrorCodes::ShutdownInProgress, "Shutting down mock network", Milliseconds(0)});
         iter->finishResponse();
