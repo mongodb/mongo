@@ -7,8 +7,12 @@
 
             <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
             <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
-            <Publish Event="NewDialog" Value="ServiceDlg" Dialog="CustomizeDlg" Control="Next"></Publish>
-	        <Publish Event="NewDialog" Value="CompassDlg" Dialog="VerifyReadyDlg" Control="Back"></Publish>
+            <Publish Event="NewDialog" Value="ServiceDlg" Dialog="CustomizeDlg" Control="Next">
+                <![CDATA[&Server = 3]]>
+            </Publish>
+            <Publish Event="NewDialog" Value="CompassDlg" Dialog="CustomizeDlg" Control="Next">
+                <![CDATA[NOT (&Server = 3)]]>
+            </Publish>
 
             <!-- A custom setup type dialog box with only Complete and Custom buttons -->
             <Dialog Id="MongoSetupTypeDlg" X="50" Y="50" Width="370" Height="270" Title="[ProductName] Setup">
@@ -160,7 +164,19 @@
                 <Control Id="InstallCompass" CheckBoxValue="1" Property="SHOULD_INSTALL_COMPASS" X="15" Y="243" Width="150" Height="17" Text="Install MongoDB Compass" Type="CheckBox" />
 
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" TabSkip="no">
-                    <Publish Event="NewDialog" Value="ServiceDlg">1</Publish>
+                    <Publish Event="NewDialog" Value="ServiceDlg">
+                        <![CDATA[&Server = 3]]>
+                    </Publish>
+                    <Publish Event="NewDialog" Value="MongoSetupTypeDlg">
+                        <![CDATA[
+                            NOT (&Server = 3) AND (WixUI_InstallMode = "InstallTypical" OR WixUI_InstallMode = "InstallComplete")
+                        ]]>
+                    </Publish>
+                    <Publish Event="NewDialog" Value="CustomizeDlg" Order="2">
+                        <![CDATA[
+                            NOT (&Server = 3) AND WixUI_InstallMode = "InstallCustom"
+                        ]]>
+                    </Publish>
                 </Control>
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Text="&amp;Next" TabSkip="no" Disabled="no" >
                     <Publish Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
