@@ -555,7 +555,7 @@ functions:
         ${activate_virtualenv}
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
-        mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        mongo_ver=$($mongo_binary --version | perl -pe '/version v([^\"]*)(\"}})?$/; $_ = $1;' | tr -d '[ \r\n]')
         # The versions must match
         if [ "$bin_ver" != "$mongo_ver" ]; then
           echo "The mongo version is $mongo_ver, expected version is $bin_ver"
@@ -11497,98 +11497,6 @@ buildvariants:
   - name: .ssl
   - name: .updatefuzzer
 
-- name: enterprise-rhel-62-64-bit-logv2
-  display_name: "~ Enterprise RHEL 6.2 (logv2)"
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-large
-  batchtime: 1440 # 1 day
-  expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
-    mh_target: archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars CPPDEFINES=MONGO_CONFIG_LOGV2_DEFAULT
-    multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel62
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    large_distro_name: rhel62-large
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: burn_in_tests_gen
-  - name: burn_in_tests_multiversion_gen
-  - name: .aggfuzzer
-  - name: .aggregation
-  - name: audit
-  - name: .auth
-  - name: burn_in_tags_gen
-    distros:
-    - centos6-perf
-  - name: buildscripts_test
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
-    distros:
-    - rhel62-large
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: idl_tests
-  - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel62-large
-  - name: .jscore .common
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: jsCore_txns_large_txns_format
-  - name: jsonSchema
-  - name: .jstestfuzz
-  - name: .logical_session_cache
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_gen
-  - name: .query_fuzzer
-  - name: .read_write_concern .large
-    distros:
-    - rhel62-large
-  - name: .read_write_concern !.large
-  - name: .replica_sets !.encrypt !.auth
-    distros:
-    - rhel62-large
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
-    distros:
-    - rhel62-large
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: sharded_multi_stmt_txn_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: snmp
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
-
   # Builder with JSON log format, not needed when JSON is default format. See:
   # https://jira.mongodb.org/browse/SERVER-45138
 - name: enterprise-rhel-62-64-bit-logv2-json
@@ -11601,7 +11509,7 @@ buildvariants:
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
     mh_target: archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars CPPDEFINES=MONGO_CONFIG_LOGV2_DEFAULT
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars CPPDEFINES=MONGO_CONFIG_JSON_LOG_DEFAULT
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     has_packages: true
@@ -11616,7 +11524,7 @@ buildvariants:
     large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
     # This builder is the same as the regular logv2 builder defined above this. These flags are only difference
-    test_flags: --logFormat=json --excludeWithAnyTags=requires_text_logs
+    test_flags: --excludeWithAnyTags=requires_text_logs
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

@@ -69,6 +69,12 @@ def default_buildinfo_environment_data():
             True,
             False,
         ),
+        (
+            'cppdefines',
+            '$CPPDEFINES',
+            True,
+            False,
+        ),
     )
 
 

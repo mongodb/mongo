@@ -36,11 +36,13 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_format.h"
 #include "mongo/logv2/log_manager.h"
 
 namespace mongo {
 
 bool logV2Enabled();
+bool logV2IsJson(logv2::LogFormat format);
 void logV2Set(bool setting);
 
 /**

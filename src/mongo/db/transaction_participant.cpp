@@ -1989,7 +1989,7 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+            if (logV2IsJson(serverGlobalParams.logFormat)) {
                 logv2::DynamicAttributes attr;
                 _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs, &attr);
                 LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);

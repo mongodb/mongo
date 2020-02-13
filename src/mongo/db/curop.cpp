@@ -490,7 +490,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+        if (logV2IsJson(serverGlobalParams.logFormat)) {
             logv2::DynamicAttributes attr;
             _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), &attr);
             LOGV2(51803, "slow query", attr);

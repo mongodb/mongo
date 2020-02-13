@@ -792,8 +792,12 @@ int _main(int argc, char* argv[], char** envp) {
         auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
         consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
                                                                lv2Manager.getGlobalSettings()));
-        consoleSink->set_formatter(
-            ShellFormatter(shellGlobalParams.logFormat == logv2::LogFormat::kJson));
+#if defined(MONGO_CONFIG_JSON_LOG_DEFAULT)
+        bool isJson = shellGlobalParams.logFormat != logv2::LogFormat::kText;
+#else
+        bool isJson = shellGlobalParams.logFormat == logv2::LogFormat::kJson;
+#endif
+        consoleSink->set_formatter(ShellFormatter(isJson));
 
         consoleSink->locked_backend()->add_stream(
             boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));

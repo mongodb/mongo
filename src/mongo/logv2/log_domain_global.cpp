@@ -29,6 +29,7 @@
 
 #include "log_domain_global.h"
 
+#include "mongo/config.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
 #include "mongo/logv2/console.h"
@@ -174,11 +175,16 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     };
 
     switch (options.format) {
+#if !defined(MONGO_CONFIG_JSON_LOG_DEFAULT)
         case LogFormat::kDefault:
+#endif
         case LogFormat::kText:
             setFormatters(
                 [&] { return TextFormatter(options.maxAttributeSizeKB, options.timestampFormat); });
             break;
+#if defined(MONGO_CONFIG_JSON_LOG_DEFAULT)
+        case LogFormat::kDefault:
+#endif
         case LogFormat::kJson:
             setFormatters(
                 [&] { return JSONFormatter(options.maxAttributeSizeKB, options.timestampFormat); });

@@ -1333,7 +1333,7 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
 
 void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
                                                     TerminationCause terminationCause) const {
-    if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+    if (logV2IsJson(serverGlobalParams.logFormat)) {
         logv2::DynamicAttributes attrs;
         BSONObjBuilder parametersBuilder;
 

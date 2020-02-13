@@ -113,7 +113,7 @@ Status finishAndLogApply(OperationContext* opCtx,
                                         Milliseconds(opDuration),
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+            if (logV2IsJson(serverGlobalParams.logFormat)) {
 
                 logv2::DynamicAttributes attrs;
 

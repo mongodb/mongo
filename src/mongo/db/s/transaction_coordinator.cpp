@@ -422,7 +422,7 @@ void TransactionCoordinator::_done(Status status) {
 
 void TransactionCoordinator::_logSlowTwoPhaseCommit(
     const txn::CoordinatorCommitDecision& decision) {
-    if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+    if (logV2IsJson(serverGlobalParams.logFormat)) {
         logv2::DynamicAttributes attrs;
 
         BSONObjBuilder parametersBuilder;
