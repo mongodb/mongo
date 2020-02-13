@@ -62,6 +62,8 @@ Value JsExecution::doCallFunction(ScriptingFunction func,
                                   const BSONObj& params,
                                   const BSONObj& thisObj,
                                   bool noReturnVal) {
+    _scope->registerOperation(Client::getCurrent()->getOperationContext());
+    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
 
     int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, noReturnVal);
 

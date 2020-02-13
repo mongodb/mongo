@@ -51,7 +51,8 @@ public:
     /**
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
      * and reading the return value. This will load all stored procedures from database unless
-     * 'disableLoadStored' is set on the global ScriptEngine.
+     * 'disableLoadStored' is set on the global ScriptEngine. The JsExecution* returned is owned by
+     * 'opCtx'.
      */
     static JsExecution* get(OperationContext* opCtx,
                             const BSONObj& scope,
@@ -66,20 +67,14 @@ public:
         : _scope(getGlobalScriptEngine()->newScopeForCurrentThread(jsHeapLimitMB)) {
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);
-        _scope->registerOperation(Client::getCurrent()->getOperationContext());
-
         _fnCallTimeoutMillis = internalQueryJavaScriptFnTimeoutMillis.load();
-    }
-
-    ~JsExecution() {
-        _scope->unregisterOperation();
     }
 
     /**
      * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
      * input object 'thisObj'.
      *
-     * This method assumes that the desired function to execute does return a value.
+     * This method assumes that the desired function to execute does not return a value.
      */
     void callFunctionWithoutReturn(ScriptingFunction func,
                                    const BSONObj& params,

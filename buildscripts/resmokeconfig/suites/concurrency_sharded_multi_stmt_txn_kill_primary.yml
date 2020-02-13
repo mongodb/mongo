@@ -42,11 +42,6 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
   - jstests/concurrency/fsm_workloads/map_reduce_with_chunk_migrations.js
 
-  # Disabled due to thread local scope used in desugaring $where doesn't handle
-  # maxTimeMS timeouts correctly.
-  # TODO SERVER-46098: Remove when MaxTimeMs handling has been fixed for find with $where.
-  - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
-
   # Disabled due to MongoDB restrictions and/or workload restrictions
 
   # These workloads sometimes trigger 'Could not lock auth data update lock'
@@ -223,6 +218,10 @@ selector:
   # These start a transaction in one state function and use it in other state functions. This suite
   # would instead execute each state function as its own transaction.
   - state_functions_share_transaction
+  # Tests which expect commands to fail and catch the error can cause transactions to abort and
+  # retry indefinitely.
+  - catches_command_failures
+
   # Note that "requires_non_retryable_writes" does not need to be blacklisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.
 
