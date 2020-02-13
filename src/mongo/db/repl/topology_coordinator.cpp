@@ -679,10 +679,6 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
         hbArgs.setSetName(_rsConfig.getReplSetName());
         hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
         hbArgs.setConfigTerm(_rsConfig.getConfigTerm());
-        if (_currentPrimaryIndex >= 0) {
-            // Send primary member id if one exists.
-            hbArgs.setPrimaryId(_memberData.at(_currentPrimaryIndex).getMemberId().getData());
-        }
         if (_selfIndex >= 0) {
             const MemberConfig& me = _selfConfig();
             hbArgs.setSenderId(me.getId().getData());

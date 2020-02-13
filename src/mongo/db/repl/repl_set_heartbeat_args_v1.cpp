@@ -49,7 +49,6 @@ const std::string kSenderHostFieldName = "from";
 const std::string kSenderIdFieldName = "fromId";
 const std::string kSetNameFieldName = "replSetHeartbeat";
 const std::string kTermFieldName = "term";
-const std::string kPrimaryIdFieldName = "primaryId";
 
 const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
                                                  kConfigVersionFieldName,
@@ -58,8 +57,7 @@ const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
                                                  kSenderHostFieldName,
                                                  kSenderIdFieldName,
                                                  kSetNameFieldName,
-                                                 kTermFieldName,
-                                                 kPrimaryIdFieldName};
+                                                 kTermFieldName};
 
 }  // namespace
 
@@ -112,12 +110,6 @@ Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
         _hasSender = true;
     }
 
-    // If sender is version < 4.4, argsObj won't have the primaryId field,
-    // but we still parse and allow it whenever it is present.
-    status = bsonExtractIntegerFieldWithDefault(argsObj, kPrimaryIdFieldName, -1, &_primaryId);
-    if (!status.isOK())
-        return status;
-
     status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
     if (!status.isOK())
         return status;
@@ -167,10 +159,6 @@ void ReplSetHeartbeatArgsV1::setCheckEmpty() {
     _checkEmpty = true;
 }
 
-void ReplSetHeartbeatArgsV1::setPrimaryId(long long primaryId) {
-    _primaryId = primaryId;
-}
-
 BSONObj ReplSetHeartbeatArgsV1::toBSON(bool omitConfigTerm) const {
     invariant(isInitialized());
     BSONObjBuilder builder;
@@ -198,11 +186,6 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder, bool omitConfigT
     builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
     builder->appendIntOrLL(kSenderIdFieldName, _senderId);
     builder->appendIntOrLL(kTermFieldName, _term);
-
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        builder->append(kPrimaryIdFieldName, _primaryId);
-    }
 }
 
 }  // namespace repl
