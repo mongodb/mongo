@@ -212,7 +212,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryExecYieldIterations"
     cpp_vartype: AtomicWord<int>
-    default: 128
+    default: 1000
 
   internalQueryExecYieldPeriodMS:
     description: "Yield if it's been at least this many milliseconds since we last yielded."

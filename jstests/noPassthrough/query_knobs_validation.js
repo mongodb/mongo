@@ -28,7 +28,7 @@ const expectedParamDefaults = {
     internalQueryPlanOrChildrenIndependently: true,
     internalQueryMaxScansToExplode: 200,
     internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024,
-    internalQueryExecYieldIterations: 128,
+    internalQueryExecYieldIterations: 1000,
     internalQueryExecYieldPeriodMS: 10,
     internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
@@ -39,7 +39,7 @@ const expectedParamDefaults = {
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
     // Should be half the value of 'internalQueryExecYieldIterations' parameter.
-    internalInsertMaxBatchSize: 64,
+    internalInsertMaxBatchSize: 500,
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
