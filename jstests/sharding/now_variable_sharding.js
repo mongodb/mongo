@@ -107,20 +107,6 @@ function baseCollectionClusterTimeAgg() {
     return coll.aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]);
 }
 
-function baseCollectionNowUnion() {
-    return coll.aggregate([
-        {$addFields: {timeField: "$$NOW"}},
-        {$unionWith: {coll: "otherColl", pipeline: [{$addFields: {timeField: "$$NOW"}}]}}
-    ]);
-}
-
-function baseCollectionClusterTimeUnion() {
-    return coll.aggregate([
-        {$addFields: {timeField: "$$CLUSTER_TIME"}},
-        {$unionWith: {coll: "otherColl", pipeline: [{$addFields: {timeField: "$$CLUSTER_TIME"}}]}}
-    ]);
-}
-
 function fromViewWithNow() {
     return viewWithNow.find();
 }
@@ -140,7 +126,6 @@ function withExprClusterTime() {
 // $$NOW
 runTests(baseCollectionNowFind);
 runTests(baseCollectionNowAgg);
-runTests(baseCollectionNowUnion);
 runTests(fromViewWithNow);
 runTests(withExprNow);
 
@@ -152,7 +137,6 @@ assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$NOW"}
 // $$CLUSTER_TIME
 runTests(baseCollectionClusterTimeFind);
 runTests(baseCollectionClusterTimeAgg);
-runTests(baseCollectionClusterTimeUnion);
 runTests(fromViewWithClusterTime);
 runTests(withExprClusterTime);
 
