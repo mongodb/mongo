@@ -21,17 +21,17 @@
         <File Id="f_mongodWithService" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
               DiskId ="1" KeyPath="yes"/>
         <ServiceInstall Id='MyServiceInstall'
-              Description="MongoDB Database Server"
+              Description="MongoDB Database Server ([MONGO_SERVICE_NAME])"
               Arguments='--config "[BIN]mongod.cfg" --service'
-              DisplayName='MongoDB Server'
-              Name='MongoDB'
+              DisplayName='MongoDB Server ([MONGO_SERVICE_NAME])'
+              Name='[MONGO_SERVICE_NAME]'
               ErrorControl='normal'
               Start='auto'
               Type='ownProcess'
               Account='[MONGO_SERVICE_FULL_ACCOUNT_NAME]'
               Password='[MONGO_SERVICE_ACCOUNT_PASSWORD]'
               Vital='yes' />
-        <ServiceControl Id="StartStopService" Name="MongoDB" Start="install" Stop="both" Remove="uninstall" Wait="no" />
+        <ServiceControl Id="StartStopService" Name="[MONGO_SERVICE_NAME]" Start="install" Stop="both" Remove="uninstall" Wait="no" />
       </Component>
       <Component Id="c_mongodWithServiceUser" Guid="961B0579-4074-4437-B168-9B6C5E3C9E6A" KeyPath="yes">
         <Condition><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
