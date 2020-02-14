@@ -152,7 +152,9 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
-
+    bool maintenanceOk() const override {
+        return false;
+    }
     ReadWriteType getReadWriteType() const {
         return ReadWriteType::kRead;
     }

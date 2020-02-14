@@ -1955,10 +1955,15 @@ var ReplSetTest = function(opts) {
 
             print("checkDBHashesForReplSet checking data hashes against primary: " + primary.host);
 
-            slaves.forEach(secondary => {
+            slaves.forEach(node => {
+                // Arbiters have no replicated data.
+                if (isNodeArbiter(node)) {
+                    print("checkDBHashesForReplSet skipping data of arbiter: " + node.host);
+                    return;
+                }
                 print("checkDBHashesForReplSet going to check data hashes on secondary: " +
-                      secondary.host);
-                secondary.getDBNames().forEach(dbName => combinedDBs.add(dbName));
+                      node.host);
+                node.getDBNames().forEach(dbName => combinedDBs.add(dbName));
             });
 
             for (var dbName of combinedDBs) {
@@ -2320,7 +2325,14 @@ var ReplSetTest = function(opts) {
         }
 
         function checkCollectionCountsForReplSet(rst) {
-            rst.nodes.forEach(node => checkCollectionCountsForNode(node));
+            rst.nodes.forEach(node => {
+                // Arbiters have no replicated collections.
+                if (isNodeArbiter(node)) {
+                    print("checkCollectionCounts skipping counts for arbiter: " + node.host);
+                    return;
+                }
+                checkCollectionCountsForNode(node);
+            });
             assert(success, `Collection counts did not match. search for '${errPrefix}' in logs.`);
         }
 

@@ -98,6 +98,9 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
     virtual bool adminOnly() const {
         return false;
     }

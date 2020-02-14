@@ -75,6 +75,10 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

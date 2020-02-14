@@ -94,6 +94,12 @@ function CollectionValidator() {
             conn.setSlaveOk();
             jsTest.authenticate(conn);
 
+            // Skip validating collections for arbiters.
+            if (conn.getDB('admin').isMaster('admin').arbiterOnly === true) {
+                print('Skipping collection validation on arbiter ' + host);
+                return {ok: 1};
+            }
+
             const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
             if (requiredFCV) {
                 // Make sure this node has the desired FCV as it may take time for the updates to

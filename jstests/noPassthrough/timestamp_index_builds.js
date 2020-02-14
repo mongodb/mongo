@@ -26,7 +26,7 @@ const rst = new ReplSetTest({
     nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
 });
 const nodes = rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
     // Only snapshotting storage engines require correct timestamping of index builds.
@@ -78,6 +78,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
     {
         jsTestLog("Starting as a replica set. Both indexes should exist. Node: " + nodeIdentity);
         let conn = rst.start(nodeIdx, {startClean: false}, true);
+        rst.waitForState(conn, ReplSetTest.State.SECONDARY);
         conn.setSlaveOk();
         assert.eq(2, getColl(conn).getIndexes().length);
         rst.stop(nodeIdx);
