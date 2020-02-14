@@ -3,15 +3,10 @@
  * commands only if the node is a member of a replica set that is not a shard/config server,
  * and that we require the FCV to be 4.4.
  *
- * @tags: [requires_replication]
+ * @tags: [requires_replication, requires_persistence]
  */
 (function() {
 'use strict';
-
-if (jsTest.options().storageEngine == "inMemory") {
-    jsTestLog("Skipping test that isn't support on inMemory storage engine");
-    return;
-}
 
 // Start a mongod that's not in a replica set
 let conn = MongoRunner.runMongod({});
