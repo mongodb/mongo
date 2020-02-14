@@ -189,14 +189,14 @@ Status doSaslStep(OperationContext* opCtx,
 
     if (!swResponse.isOK()) {
         LOGV2(20249,
-              "SASL {mechanism_mechanismName} authentication failed for "
-              "{mechanism_getPrincipalName} on {mechanism_getAuthenticationDatabase} from client "
-              "{opCtx_getClient_getRemote} ; {swResponse_getStatus}",
-              "mechanism_mechanismName"_attr = mechanism.mechanismName(),
-              "mechanism_getPrincipalName"_attr = mechanism.getPrincipalName(),
-              "mechanism_getAuthenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-              "opCtx_getClient_getRemote"_attr = opCtx->getClient()->getRemote().toString(),
-              "swResponse_getStatus"_attr = redact(swResponse.getStatus()));
+              "SASL {mechanism} authentication failed for "
+              "{principalName} on {authDB} from client "
+              "{client} ; {result}",
+              "mechanism"_attr = mechanism.mechanismName(),
+              "principalName"_attr = mechanism.getPrincipalName(),
+              "authDB"_attr = mechanism.getAuthenticationDatabase(),
+              "client"_attr = opCtx->getClient()->getRemote().toString(),
+              "result"_attr = redact(swResponse.getStatus()));
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
@@ -218,13 +218,12 @@ Status doSaslStep(OperationContext* opCtx,
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20250,
-                  "Successfully authenticated as principal {mechanism_getPrincipalName} on "
-                  "{mechanism_getAuthenticationDatabase} from client "
-                  "{opCtx_getClient_session_remote}",
-                  "mechanism_getPrincipalName"_attr = mechanism.getPrincipalName(),
-                  "mechanism_getAuthenticationDatabase"_attr =
-                      mechanism.getAuthenticationDatabase(),
-                  "opCtx_getClient_session_remote"_attr = opCtx->getClient()->session()->remote());
+                  "Successfully authenticated as principal {principalName} on "
+                  "{authDB} from client "
+                  "{client}",
+                  "principalName"_attr = mechanism.getPrincipalName(),
+                  "authDB"_attr = mechanism.getAuthenticationDatabase(),
+                  "client"_attr = opCtx->getClient()->session()->remote());
         }
         if (session->isSpeculative()) {
             authCounter.incSpeculativeAuthenticateSuccessful(mechanism.mechanismName().toString());

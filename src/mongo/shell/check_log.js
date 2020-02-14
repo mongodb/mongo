@@ -51,6 +51,29 @@ checkLog = (function() {
     };
 
     /*
+     * Calls the 'getLog' function on the provided connection 'conn' to see if a log with the
+     * provided id is found in the logs. If the id is found it looks up the specified attrribute by
+     * attrName and checks if the msg is found in its value. Note: this function does not throw an
+     * exception, so the return value should not be ignored.
+     */
+    const checkContainsOnceJson = function(conn, id, attrName, msg) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return false;
+        }
+
+        for (let logMsg of logMessages) {
+            if (logMsg.search(`\"id\":${id},`) != -1) {
+                if (logMsg.search(`\"${attrName}\":\"?[^\"|\\\"]*` + msg) != -1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
+    /*
      * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
      * the provided 'msg' is found in the logs, or it times out. Throws an exception on timeout.
      */
@@ -145,6 +168,7 @@ checkLog = (function() {
     return {
         getGlobalLog: getGlobalLog,
         checkContainsOnce: checkContainsOnce,
+        checkContainsOnceJson: checkContainsOnceJson,
         contains: contains,
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
