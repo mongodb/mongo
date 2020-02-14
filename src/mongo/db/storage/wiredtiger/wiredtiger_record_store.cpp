@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
@@ -84,6 +85,8 @@ static const int kCurrentRecordStoreVersion = 1;  // New record stores use this 
 static const int kMaximumRecordStoreVersion = 1;
 MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
 MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
+
+const double kNumSecsInHour = 3600.0;
 
 void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
@@ -224,6 +227,27 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
         }
         _oplogReclaimCv.wait(lock);
     }
+}
+
+bool WiredTigerRecordStore::OplogStones::hasExcessStones_inlock() const {
+    int64_t totalBytes = 0;
+    for (auto&& stone : _stones) {
+        totalBytes += stone.bytes;
+    }
+
+    // check that oplog stones is at capacity
+    if (totalBytes <= _rs->cappedMaxSize()) {
+        return false;
+    }
+
+    double minRetentionHours = storageGlobalParams.oplogMinRetentionHours.load();
+
+    auto rc = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    double lastAppliedTs = rc->getMyLastAppliedOpTime().getTimestamp().getSecs();
+    double lastStoneTs = Timestamp(_stones.front().lastRecord.repr()).getSecs();
+
+    double currRetentionHours = (lastAppliedTs - lastStoneTs) / kNumSecsInHour;
+    return currRetentionHours >= minRetentionHours;
 }
 
 boost::optional<WiredTigerRecordStore::OplogStones::Stone>
