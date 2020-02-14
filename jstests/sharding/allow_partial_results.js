@@ -56,14 +56,11 @@ assert.commandFailed(coll.runCommand({find: collName}));
 jsTest.log("With 'allowPartialResults: false', if some shard down, find fails.");
 assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false}));
 
-// TODO (SERVER-45273): Remove this mongos bin version check.
-if (jsTestOptions().mongosBinVersion != "last-stable") {
-    jsTest.log(
-        "With 'allowPartialResults: true', if some shard down, find succeeds with partial results");
-    findRes = coll.runCommand({find: collName, allowPartialResults: true});
-    assert.commandWorked(findRes);
-    assert.eq(nDocs / 2, findRes.cursor.firstBatch.length);
-}
+jsTest.log(
+    "With 'allowPartialResults: true', if some shard down, find succeeds with partial results");
+findRes = coll.runCommand({find: collName, allowPartialResults: true});
+assert.commandWorked(findRes);
+assert.eq(nDocs / 2, findRes.cursor.firstBatch.length);
 
 jsTest.log("The allowPartialResults option does not currently apply to aggregation.");
 assert.commandFailedWithCode(coll.runCommand({
