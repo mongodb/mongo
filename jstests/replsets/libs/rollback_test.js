@@ -321,7 +321,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         log(`Wait for ${curSecondary.host} to finish rollback`);
         assert.soonNoExcept(() => {
             try {
-                log(`Wait for secondary ${curSecondary} and tiebreaker ${tiebreaker}`);
+                log(`Wait for secondary ${curSecondary} and tiebreaker ${tiebreakerNode}`);
                 rst.awaitSecondaryNodesForRollbackTest(
                     awaitSecondaryNodesForRollbackTimeout,
                     [curSecondary, tiebreakerNode],
