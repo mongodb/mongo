@@ -139,9 +139,7 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
  * Returns true if we should wait for a commitIndexBuild or abortIndexBuild oplog entry during oplog
  * application.
  */
-bool shouldWaitForCommitOrAbort(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ReplIndexBuildState& replState) {
+bool shouldWaitForCommitOrAbort(OperationContext* opCtx, const ReplIndexBuildState& replState) {
     if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
         return false;
     }
@@ -151,7 +149,8 @@ bool shouldWaitForCommitOrAbort(OperationContext* opCtx,
         return false;
     }
 
-    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+    const NamespaceStringOrUUID dbAndUUID(replState.dbName, replState.collectionUUID);
+    if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
         return false;
     }
 
@@ -1844,7 +1843,7 @@ Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
     std::shared_ptr<ReplIndexBuildState> replState,
     const Status& preAbortStatus) {
     Timestamp commitIndexBuildTimestamp;
-    if (shouldWaitForCommitOrAbort(opCtx, nss, *replState)) {
+    if (shouldWaitForCommitOrAbort(opCtx, *replState)) {
         LOGV2(20668,
               "Index build waiting for commit or abort before completing final phase: "
               "{replState_buildUUID}",
