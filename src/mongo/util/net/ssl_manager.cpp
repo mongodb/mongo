@@ -291,13 +291,22 @@ struct VerifiedChainDeleter {
     }
 };
 
+struct UniqueX509Deleter {
+    void operator()(X509* cert) {
+        if (cert) {
+            X509_free(cert);
+        }
+    }
+};
+using UniqueX509 = std::unique_ptr<X509, UniqueX509Deleter>;
+
 STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
     auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
-    auto* peer = SSL_get_peer_certificate(s);
+    UniqueX509 peer(SSL_get_peer_certificate(s));
     auto* peerChain = SSL_get_peer_cert_chain(s);
 
     UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
-    if (!X509_STORE_CTX_init(ctx.get(), store, peer, peerChain)) {
+    if (!X509_STORE_CTX_init(ctx.get(), store, peer.get(), peerChain)) {
         return nullptr;
     }
 
