@@ -94,6 +94,8 @@ using UniqueX509StoreCtx =
     std::unique_ptr<X509_STORE_CTX,
                     OpenSSLDeleter<decltype(X509_STORE_CTX_free), ::X509_STORE_CTX_free>>;
 
+using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
+
 // Modulus for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919
 constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58, 0xA2, 0xBB, 0x4A, 0x9A,
@@ -296,11 +298,11 @@ struct VerifiedChainDeleter {
 
 STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
     auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
-    auto* peer = SSL_get_peer_certificate(s);
+    UniqueX509 peer(SSL_get_peer_certificate(s));
     auto* peerChain = SSL_get_peer_cert_chain(s);
 
     UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
-    if (!X509_STORE_CTX_init(ctx.get(), store, peer, peerChain)) {
+    if (!X509_STORE_CTX_init(ctx.get(), store, peer.get(), peerChain)) {
         return nullptr;
     }
 
@@ -409,8 +411,6 @@ public:
 using UniqueSSLContext =
     std::unique_ptr<SSL_CTX, OpenSSLDeleter<decltype(::SSL_CTX_free), ::SSL_CTX_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
-
-using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
 
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
