@@ -941,11 +941,21 @@ Status _syncRollback(OperationContext* opCtx,
     invariant(commonPoint >= committedSnapshot);
 
     try {
-        ON_BLOCK_EXIT([&] {
-            auto status = replicationProcess->incrementRollbackID(opCtx);
-            fassertStatusOK(40497, status);
-        });
+        // It is always safe to increment the rollback ID first, even if we fail to complete
+        // the rollback.
+        auto status = replicationProcess->incrementRollbackID(opCtx);
+        fassertStatusOK(40497, status);
+
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
+
+        if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
+            log() << "rollbackExitEarlyAfterCollectionDrop fail point enabled. Returning early "
+                     "until fail point is disabled.";
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Failing rollback because "
+                                           "rollbackExitEarlyAfterCollectionDrop fail point "
+                                           "enabled.");
+        }
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }

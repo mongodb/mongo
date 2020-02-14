@@ -48,6 +48,9 @@ namespace repl {
 // Failpoint which causes rollback to hang before finishing.
 MONGO_FP_DECLARE(rollbackHangBeforeFinish);
 
+// Failpoint which exits early right after syncFixUp.
+MONGO_FP_DECLARE(rollbackExitEarlyAfterCollectionDrop);
+
 // Failpoint which causes rollback to hang and then fail after minValid is written.
 MONGO_FP_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
