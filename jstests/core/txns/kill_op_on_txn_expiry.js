@@ -5,6 +5,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallelTester.js');
+load("jstests/libs/logv2_helpers.js");
 
 const dbName = "test";
 const collName = "kill_op_on_txn_expiry";
@@ -71,7 +72,15 @@ try {
     failPoint.wait();
 
     jsTestLog("Wait for the transaction to expire");
-    checkLog.contains(db.getMongo(), "Aborting transaction with txnNumber " + txnNumber);
+    if (isJsonLogNoConn()) {
+        checkLog.contains(
+            db.getMongo(),
+            new RegExp(
+                "Aborting transaction with txnNumber.*\"txnParticipant_getActiveTxnNumber\":" +
+                txnNumber));
+    } else {
+        checkLog.contains(db.getMongo(), "Aborting transaction with txnNumber " + txnNumber);
+    }
 
     jsTestLog("Disabling fail point to enable insert to proceed and detect that the session " +
               "has been killed");

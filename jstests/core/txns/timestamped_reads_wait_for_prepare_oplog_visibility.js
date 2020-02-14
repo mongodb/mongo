@@ -38,6 +38,7 @@ TestData.otherDocFilter = {
  * certain reads and that prepare conflicts block other types of reads.
  */
 const readThreadFunc = function(readFunc, _collName, timesEntered) {
+    load("jstests/libs/logv2_helpers.js");
     load("jstests/libs/fail_point_util.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.
@@ -54,7 +55,12 @@ const readThreadFunc = function(readFunc, _collName, timesEntered) {
     // Let the transaction finish preparing and wait for 'prepareTransaction' to complete.
     assert.commandWorked(
         db.adminCommand({configureFailPoint: 'hangAfterReservingPrepareTimestamp', mode: 'off'}));
-    checkLog.contains(db.getMongo(), "command: prepareTransaction");
+
+    if (isJsonLogNoConn()) {
+        checkLog.contains(db.getMongo(), "\"command\":{\"prepareTransaction\":");
+    } else {
+        checkLog.contains(db.getMongo(), "command: prepareTransaction");
+    }
 
     readFuncObj.prepareConflict();
 };

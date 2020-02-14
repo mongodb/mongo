@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/logv2_helpers.js");
+
 const dbName = "test";
 const collName = "speculative_snapshot_includes_all_writes_1";
 const collName2 = "speculative_snapshot_includes_all_writes_2";
@@ -59,8 +61,15 @@ const joinHungWrite = startParallelShell(() => {
         {_id: "b"}, {writeConcern: {w: "majority"}}));
 });
 
-checkLog.contains(db.getMongo(),
-                  "hangAfterCollectionInserts fail point enabled for " + testColl2.getFullName());
+if (isJsonLogNoConn()) {
+    checkLog.contains(db.getMongo(),
+                      new RegExp("hangAfterCollectionInserts fail point enabled for.*\"ns\":\"" +
+                                 testColl2.getFullName() + "\""));
+} else {
+    checkLog.contains(
+        db.getMongo(),
+        "hangAfterCollectionInserts fail point enabled for " + testColl2.getFullName());
+}
 
 jsTest.log("Create a write following the uncommitted write.");
 // Note this write must use local write concern; it cannot be majority committed until
