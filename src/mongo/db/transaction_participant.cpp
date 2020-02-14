@@ -1901,6 +1901,77 @@ std::string TransactionParticipant::Participant::_transactionInfoForLog(
     return s.str();
 }
 
+
+void TransactionParticipant::Participant::_transactionInfoForLog(
+    OperationContext* opCtx,
+    const SingleThreadedLockStats* lockStats,
+    TerminationCause terminationCause,
+    repl::ReadConcernArgs readConcernArgs,
+    logv2::DynamicAttributes* pAttrs) const {
+    invariant(lockStats);
+
+    // User specified transaction parameters.
+    BSONObjBuilder parametersBuilder;
+
+    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
+    _sessionId().serialize(&lsidBuilder);
+    lsidBuilder.doneFast();
+
+    parametersBuilder.append("txnNumber", o().activeTxnNumber);
+    parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
+    readConcernArgs.appendInfo(&parametersBuilder);
+
+    pAttrs->add("parameters", parametersBuilder.obj());
+
+    const auto& singleTransactionStats = o().transactionMetricsObserver.getSingleTransactionStats();
+
+    pAttrs->addDeepCopy("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
+
+    singleTransactionStats.getOpDebug()->additiveMetrics.report(pAttrs);
+
+    std::string terminationCauseString =
+        terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
+    pAttrs->add("terminationCause", terminationCauseString);
+
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    auto curTick = tickSource->getTicks();
+
+    pAttrs->add("timeActive",
+                durationCount<Microseconds>(
+                    singleTransactionStats.getTimeActiveMicros(tickSource, curTick)));
+    pAttrs->add("timeInactive",
+                durationCount<Microseconds>(
+                    singleTransactionStats.getTimeInactiveMicros(tickSource, curTick)));
+
+    // Number of yields is always 0 in multi-document transactions, but it is included mainly to
+    // match the format with other slow operation logging messages.
+    pAttrs->add("numYields", 0);
+    // Aggregate lock statistics.
+
+    BSONObjBuilder locks;
+    lockStats->report(&locks);
+    pAttrs->add("locks", locks.obj());
+
+    if (singleTransactionStats.getOpDebug()->storageStats)
+        pAttrs->add("storage", singleTransactionStats.getOpDebug()->storageStats->toBSON());
+
+    // It is possible for a slow transaction to have aborted in the prepared state if an
+    // exception was thrown before prepareTransaction succeeds.
+    const auto totalPreparedDuration = durationCount<Microseconds>(
+        singleTransactionStats.getPreparedDuration(tickSource, curTick));
+    const bool txnWasPrepared = totalPreparedDuration > 0;
+    pAttrs->add("wasPrepared", txnWasPrepared);
+    if (txnWasPrepared) {
+        pAttrs->add("totalPreparedDuration", totalPreparedDuration);
+        pAttrs->add("prepareOpTime", o().prepareOpTime);
+    }
+
+    // Total duration of the transaction.
+    pAttrs->add(
+        "duration",
+        duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick)));
+}
+
 void TransactionParticipant::Participant::_logSlowTransaction(
     OperationContext* opCtx,
     const SingleThreadedLockStats* lockStats,
@@ -1918,13 +1989,20 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            LOGV2_OPTIONS(
-                22523,
-                {logComponentV1toV2(logger::LogComponent::kTransaction)},
-                "transaction "
-                "{transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs}",
-                "transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs"_attr =
-                    _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs));
+            if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+                logv2::DynamicAttributes attr;
+                _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs, &attr);
+                LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);
+            } else {
+                LOGV2_OPTIONS(
+                    22523,
+                    {logComponentV1toV2(logger::LogComponent::kTransaction)},
+                    "transaction "
+                    "{transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs}",
+                    "transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs"_attr =
+                        _transactionInfoForLog(
+                            opCtx, lockStats, terminationCause, readConcernArgs));
+            }
         }
     }
 }

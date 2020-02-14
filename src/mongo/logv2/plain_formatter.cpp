@@ -61,13 +61,13 @@ struct TextValueExtractor {
         operator()(name, StringData(_storage.back()));
     }
 
-    void operator()(StringData name, const BSONObj* val) {
-        _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
+    void operator()(StringData name, const BSONObj& val) {
+        _storage.push_back(val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
         operator()(name, StringData(_storage.back()));
     }
 
-    void operator()(StringData name, const BSONArray* val) {
-        _storage.push_back(val->jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+    void operator()(StringData name, const BSONArray& val) {
+        _storage.push_back(val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
         operator()(name, StringData(_storage.back()));
     }
 

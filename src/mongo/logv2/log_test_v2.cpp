@@ -624,6 +624,10 @@ TEST_F(LogTestV2, TextFormat) {
     ASSERT(lines.back().rfind(toString(t3)) != std::string::npos);
 }
 
+std::string hello() {
+    return "hello";
+}
+
 TEST_F(LogTestV2, JsonBsonFormat) {
     using namespace constants;
 
@@ -809,6 +813,8 @@ TEST_F(LogTestV2, JsonBsonFormat) {
     attrs.addUnsafe("unsafe but ok", 1);
     BSONObj bsonObj;
     attrs.add("bson", bsonObj);
+    attrs.add("millis", Milliseconds(1));
+    attrs.addDeepCopy("stdstr", hello());
     LOGV2(20083, "message", attrs);
     auto validateDynamic = [](const BSONObj& obj) {
         const BSONObj& attrObj = obj.getField(kAttributesFieldName).Obj();
@@ -819,6 +825,8 @@ TEST_F(LogTestV2, JsonBsonFormat) {
                              "enum"_sd,
                              "custom"_sd,
                              "bson"_sd,
+                             "millisMillis"_sd,
+                             "stdstr"_sd,
                              "unsafe but ok"_sd}) {
             ASSERT(attrObj.hasField(f));
         }

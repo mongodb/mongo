@@ -217,11 +217,11 @@ inline StringData mapValue(char* value) {
 inline StringData mapValue(const char* value) {
     return value;
 }
-inline const BSONObj* mapValue(BSONObj const& value) {
-    return &value;
+inline const BSONObj mapValue(BSONObj const& value) {
+    return value;
 }
-inline const BSONArray* mapValue(BSONArray const& value) {
-    return &value;
+inline const BSONArray mapValue(BSONArray const& value) {
+    return value;
 }
 inline CustomAttributeValue mapValue(BSONElement const& val) {
     CustomAttributeValue custom;
@@ -296,6 +296,7 @@ CustomAttributeValue mapValue(const T& val) {
             builder.append(fieldName, val);
         };
     }
+
     if constexpr (HasBSONSerialize<T>::value) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
     } else if constexpr (HasToBSON<T>::value) {
@@ -309,6 +310,7 @@ CustomAttributeValue mapValue(const T& val) {
             builder.appendElements(toBSON(val));
         };
     }
+
     if constexpr (HasStringSerialize<T>::value) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
     } else if constexpr (HasToString<T>::value) {
@@ -551,8 +553,8 @@ public:
                   Minutes,
                   Hours,
                   Days,
-                  const BSONObj*,
-                  const BSONArray*,
+                  BSONObj,
+                  BSONArray,
                   CustomAttributeValue>
         value;
 };
@@ -588,23 +590,47 @@ public:
     // Do not allow rvalue references and temporary objects to avoid lifetime problem issues
     template <size_t N,
               typename T,
-              std::enable_if_t<std::is_arithmetic_v<T> || std::is_pointer_v<T> || std::is_enum_v<T>,
+              std::enable_if_t<std::is_arithmetic_v<T> || std::is_pointer_v<T> ||
+                                   std::is_enum_v<T> || detail::IsDuration<T>::value,
                                int> = 0>
     void add(const char (&name)[N], T value) {
         _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
-    template <size_t N, typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    template <size_t N>
+    void add(const char (&name)[N], BSONObj value) {
+        BSONObj owned = value.getOwned();
+        _attributes.emplace_back(StringData(name, N - 1), owned);
+    }
+
+    template <size_t N>
+    void add(const char (&name)[N], BSONArray value) {
+        BSONArray owned = static_cast<BSONArray>(value.getOwned());
+        _attributes.emplace_back(StringData(name, N - 1), owned);
+    }
+
+    template <size_t N,
+              typename T,
+              std::enable_if_t<std::is_class_v<T> && !detail::IsDuration<T>::value, int> = 0>
     void add(const char (&name)[N], const T& value) {
         _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
-    template <size_t N, typename T, std::enable_if_t<std::is_class_v<T>, int> = 0>
+    template <size_t N,
+              typename T,
+              std::enable_if_t<std::is_class_v<T> && !detail::IsDuration<T>::value, int> = 0>
     void add(const char (&name)[N], T&& value) = delete;
 
     template <size_t N>
     void add(const char (&name)[N], StringData value) {
         _attributes.emplace_back(StringData(name, N - 1), value);
+    }
+
+    // Deep copies the string instead of taking it by reference
+    template <size_t N>
+    void addDeepCopy(const char (&name)[N], std::string value) {
+        _copiedStrings.push_front(std::move(value));
+        add(name, StringData(_copiedStrings.front()));
     }
 
     // Does not have the protections of add() above. Be careful about lifetime of value!
@@ -619,6 +645,9 @@ private:
     friend class mongo::logv2::TypeErasedAttributeStorage;
 
     boost::container::small_vector<detail::NamedAttribute, constants::kNumStaticAttrs> _attributes;
+
+    // Linked list of deep copies to std::string that we can take address-of.
+    std::forward_list<std::string> _copiedStrings;
 };
 
 // Wrapper around internal pointer of AttributeStorage so it does not need any template parameters

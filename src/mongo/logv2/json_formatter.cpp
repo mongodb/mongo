@@ -99,20 +99,20 @@ struct JSONValueExtractor {
         }
     }
 
-    void operator()(StringData name, const BSONObj* val) {
+    void operator()(StringData name, const BSONObj& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
-        BSONObj truncated = val->jsonStringBuffer(
+        BSONObj truncated = val.jsonStringBuffer(
             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer, _attributeMaxSize);
-        addTruncationReport(name, truncated, val->objsize());
+        addTruncationReport(name, truncated, val.objsize());
     }
 
-    void operator()(StringData name, const BSONArray* val) {
+    void operator()(StringData name, const BSONArray& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
-        BSONObj truncated = val->jsonStringBuffer(
+        BSONObj truncated = val.jsonStringBuffer(
             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, _buffer, _attributeMaxSize);
-        addTruncationReport(name, truncated, val->objsize());
+        addTruncationReport(name, truncated, val.objsize());
     }
 
     void operator()(StringData name, StringData value) {
@@ -121,6 +121,8 @@ struct JSONValueExtractor {
 
     template <typename Period>
     void operator()(StringData name, const Duration<Period>& value) {
+        // A suffix is automatically prepended
+        dassert(!name.endsWith(value.mongoUnitSuffix()));
         fmt::format_to(
             _buffer, R"({}"{}{}":{})", _separator, name, value.mongoUnitSuffix(), value.count());
         _separator = ","_sd;

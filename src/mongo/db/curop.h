@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/diagnostic_info.h"
 #include "mongo/util/progress_meter.h"
@@ -117,6 +118,8 @@ public:
          */
         std::string report() const;
 
+        void report(logv2::DynamicAttributes* pAttrs) const;
+
         boost::optional<long long> keysExamined;
         boost::optional<long long> docsExamined;
 
@@ -145,6 +148,10 @@ public:
     OpDebug() = default;
 
     std::string report(OperationContext* opCtx, const SingleThreadedLockStats* lockStats) const;
+
+    void report(OperationContext* opCtx,
+                const SingleThreadedLockStats* lockStats,
+                logv2::DynamicAttributes* pAttrs) const;
 
     /**
      * Appends information about the current operation to "builder"

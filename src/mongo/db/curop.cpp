@@ -490,7 +490,13 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        log(component) << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
+        if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+            logv2::DynamicAttributes attr;
+            _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), &attr);
+            LOGV2(51803, "slow query", attr);
+        } else {
+            log(component) << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
+        }
     }
 
     // Return 'true' if this operation should also be added to the profiler.
@@ -821,6 +827,170 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
     return s.str();
 }
 
+#define OPDEBUG_TOATTR_HELP(x) \
+    if (x >= 0)                \
+    pAttrs->add(#x, x)
+#define OPDEBUG_TOATTR_HELP_BOOL(x) \
+    if (x)                          \
+    pAttrs->add(#x, x)
+#define OPDEBUG_TOATTR_HELP_ATOMIC(x, y) \
+    if (auto __y = y.load(); __y > 0)    \
+    pAttrs->add(x, __y)
+#define OPDEBUG_TOATTR_HELP_OPTIONAL(x, y) \
+    if (y)                                 \
+    pAttrs->add(x, *y)
+
+void OpDebug::report(OperationContext* opCtx,
+                     const SingleThreadedLockStats* lockStats,
+                     logv2::DynamicAttributes* pAttrs) const {
+    Client* client = opCtx->getClient();
+    auto& curop = *CurOp::get(opCtx);
+    auto flowControlStats = opCtx->lockState()->getFlowControlStats();
+
+    if (iscommand) {
+        pAttrs->add("type", "command");
+    } else {
+        pAttrs->add("type", networkOpToString(networkOp));
+    }
+
+    pAttrs->addDeepCopy("ns", curop.getNS());
+
+    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+    if (clientMetadata) {
+        StringData appName = clientMetadata.get().getApplicationName();
+        if (!appName.empty()) {
+            pAttrs->add("appName", appName);
+        }
+    }
+
+    auto query = appendCommentField(opCtx, curop.opDescription());
+    if (!query.isEmpty()) {
+        if (iscommand) {
+            const Command* curCommand = curop.getCommand();
+            if (curCommand) {
+                mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
+                curCommand->snipForLogging(&cmdToLog);
+                pAttrs->add("command", redact(cmdToLog.getObject()));
+            } else {
+                // Should not happen but we need to handle curCommand == NULL gracefully.
+                // We don't know what the request payload is intended to be, so it might be
+                // sensitive, and we don't know how to redact it properly without a 'Command*'.
+                // So we just don't log it at all.
+                pAttrs->add("command", "unrecognized");
+            }
+        } else {
+            pAttrs->add("command", redact(query));
+        }
+    }
+
+    auto originatingCommand = curop.originatingCommand();
+    if (!originatingCommand.isEmpty()) {
+        pAttrs->add("originatingCommand", redact(originatingCommand));
+    }
+
+    if (!curop.getPlanSummary().empty()) {
+        pAttrs->addDeepCopy("planSummary", curop.getPlanSummary().toString());
+    }
+
+    if (prepareConflictDurationMillis > Milliseconds::zero()) {
+        pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
+    }
+
+    if (dataThroughputLastSecond) {
+        pAttrs->add("dataThroughputLastSecondMBperSec", *dataThroughputLastSecond);
+    }
+
+    if (dataThroughputAverage) {
+        pAttrs->add("dataThroughputAverageMBPerSec", *dataThroughputAverage);
+    }
+
+    OPDEBUG_TOATTR_HELP(nShards);
+    OPDEBUG_TOATTR_HELP(cursorid);
+    if (mongotCursorId) {
+        pAttrs->add("mongot", makeMongotDebugStatsObject());
+    }
+    OPDEBUG_TOATTR_HELP(ntoreturn);
+    OPDEBUG_TOATTR_HELP(ntoskip);
+    OPDEBUG_TOATTR_HELP_BOOL(exhaust);
+
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
+    OPDEBUG_TOATTR_HELP_BOOL(hasSortStage);
+    OPDEBUG_TOATTR_HELP_BOOL(usedDisk);
+    OPDEBUG_TOATTR_HELP_BOOL(fromMultiPlanner);
+    if (replanReason) {
+        bool replanned = true;
+        OPDEBUG_TOATTR_HELP_BOOL(replanned);
+        pAttrs->add("replanReason", redact(*replanReason));
+    }
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
+    OPDEBUG_TOATTR_HELP_BOOL(upsert);
+    OPDEBUG_TOATTR_HELP_BOOL(cursorExhausted);
+
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
+    OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
+    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
+
+    pAttrs->add("numYields", curop.numYields());
+    OPDEBUG_TOATTR_HELP(nreturned);
+
+    if (queryHash) {
+        pAttrs->addDeepCopy("queryHash", unsignedIntToFixedLengthHex(*queryHash));
+        invariant(planCacheKey);
+        pAttrs->addDeepCopy("planCacheKey", unsignedIntToFixedLengthHex(*planCacheKey));
+    }
+
+    if (!errInfo.isOK()) {
+        pAttrs->add("ok", 0);
+        if (!errInfo.reason().empty()) {
+            pAttrs->add("errMsg", redact(errInfo.reason()));
+        }
+        pAttrs->add("errName", errInfo.code());
+        pAttrs->add("errCode", static_cast<int>(errInfo.code()));
+    }
+
+    if (responseLength > 0) {
+        pAttrs->add("reslen", responseLength);
+    }
+
+    if (lockStats) {
+        BSONObjBuilder locks;
+        lockStats->report(&locks);
+        pAttrs->add("locks", locks.obj());
+    }
+
+    BSONObj flowControlObj = makeFlowControlObject(flowControlStats);
+    if (flowControlObj.nFields() > 0) {
+        pAttrs->add("flowControl", flowControlObj);
+    }
+
+    {
+        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+        if (readConcern.isSpecified()) {
+            pAttrs->add("readConcern", readConcern.toBSONInner());
+        }
+    }
+
+    if (writeConcern && !writeConcern->usedDefault) {
+        pAttrs->add("writeConcern", writeConcern->toBSON());
+    }
+
+    if (storageStats) {
+        pAttrs->add("storage", storageStats->toBSON());
+    }
+
+    if (iscommand) {
+        pAttrs->add("protocol", getProtoString(networkOp));
+    }
+
+    pAttrs->add("durationMillis", (executionTimeMicros / 1000));
+}
+
+
 #define OPDEBUG_APPEND_NUMBER(x) \
     if (x != -1)                 \
     b.appendNumber(#x, (x))
@@ -1077,6 +1247,19 @@ string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_ATOMIC("writeConflicts", writeConflicts);
 
     return s.str();
+}
+
+void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", keysExamined);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", docsExamined);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", nMatched);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", nModified);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", ninserted);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", ndeleted);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", keysInserted);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", keysDeleted);
+    OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
+    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", writeConflicts);
 }
 
 }  // namespace mongo

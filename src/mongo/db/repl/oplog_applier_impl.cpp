@@ -113,20 +113,35 @@ Status finishAndLogApply(OperationContext* opCtx,
                                         Milliseconds(opDuration),
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
+            if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
 
-            StringBuilder s;
-            s << "applied op: ";
+                logv2::DynamicAttributes attrs;
 
-            if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
-                s << "command ";
+                auto redacted = redact(entryOrGroupedInserts.toBSON());
+                if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
+                    attrs.add("command", redacted);
+                } else {
+                    attrs.add("CRUD", redacted);
+                }
+
+                attrs.add("duration", opDuration);
+
+                LOGV2(51801, "applied op", attrs);
             } else {
-                s << "CRUD ";
+                StringBuilder s;
+                s << "applied op: ";
+
+                if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
+                    s << "command ";
+                } else {
+                    s << "CRUD ";
+                }
+
+                s << redact(entryOrGroupedInserts.toBSON());
+                s << ", took " << opDuration << "ms";
+
+                LOGV2(21228, "{s_str}", "s_str"_attr = s.str());
             }
-
-            s << redact(entryOrGroupedInserts.toBSON());
-            s << ", took " << opDuration << "ms";
-
-            LOGV2(21228, "{s_str}", "s_str"_attr = s.str());
         }
     }
     return finalStatus;

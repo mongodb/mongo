@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -435,8 +436,12 @@ const BSONObj& ClientMetadata::getDocument() const {
 
 void ClientMetadata::logClientMetadata(Client* client) const {
     invariant(!getDocument().isEmpty());
-    log() << "received client metadata from " << client->getRemote().toString() << " "
-          << client->desc() << ": " << getDocument();
+    LOGV2(51800,
+          "received client metadata from {remote} {client}: {doc}",
+          "client metadata",
+          "remote"_attr = client->getRemote(),
+          "client"_attr = client->desc(),
+          "doc"_attr = getDocument());
 }
 
 StringData ClientMetadata::fieldName() {

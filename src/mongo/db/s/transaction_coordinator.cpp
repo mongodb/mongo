@@ -422,9 +422,82 @@ void TransactionCoordinator::_done(Status status) {
 
 void TransactionCoordinator::_logSlowTwoPhaseCommit(
     const txn::CoordinatorCommitDecision& decision) {
-    LOGV2(22448,
-          "{twoPhaseCommitInfoForLog_decision}",
-          "twoPhaseCommitInfoForLog_decision"_attr = _twoPhaseCommitInfoForLog(decision));
+    if (serverGlobalParams.logFormat == logv2::LogFormat::kJson) {
+        logv2::DynamicAttributes attrs;
+
+        BSONObjBuilder parametersBuilder;
+
+        BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
+        _lsid.serialize(&lsidBuilder);
+        lsidBuilder.doneFast();
+
+        parametersBuilder.append("txnNumber", _txnNumber);
+
+        attrs.add("parameters", parametersBuilder.obj());
+
+        std::string decisionTemp;
+        switch (decision.getDecision()) {
+            case txn::CommitDecision::kCommit:
+                attrs.add("terminationCause", "committed");
+                decisionTemp = decision.getCommitTimestamp()->toString();
+                attrs.add("commitTimestamp", decisionTemp);
+                break;
+            case txn::CommitDecision::kAbort:
+                attrs.add("terminationCause", "aborted");
+                attrs.add("terminationDetails", *decision.getAbortStatus());
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        };
+
+        attrs.add("numParticipants", _participants->size());
+
+        auto tickSource = _serviceContext->getTickSource();
+        auto curTick = tickSource->getTicks();
+        const auto& singleTransactionCoordinatorStats =
+            _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
+
+        BSONObjBuilder stepDurations;
+        stepDurations.append(
+            "writingParticipantListMicros",
+            durationCount<Microseconds>(
+                singleTransactionCoordinatorStats.getWritingParticipantListDuration(tickSource,
+                                                                                    curTick)));
+        stepDurations.append(
+            "waitingForVotesMicros",
+            durationCount<Microseconds>(
+                singleTransactionCoordinatorStats.getWaitingForVotesDuration(tickSource, curTick)));
+        stepDurations.append(
+            "writingDecisionMicros",
+            durationCount<Microseconds>(
+                singleTransactionCoordinatorStats.getWritingDecisionDuration(tickSource, curTick)));
+        stepDurations.append(
+            "waitingForDecisionAcksMicros",
+            durationCount<Microseconds>(
+                singleTransactionCoordinatorStats.getWaitingForDecisionAcksDuration(tickSource,
+                                                                                    curTick)));
+        stepDurations.append(
+            "deletingCoordinatorDocMicros",
+            durationCount<Microseconds>(
+                singleTransactionCoordinatorStats.getDeletingCoordinatorDocDuration(tickSource,
+                                                                                    curTick)));
+        attrs.add("stepDurations", stepDurations.obj());
+
+        // Total duration of the commit coordination. Logged at the end of the line for consistency
+        // with slow command logging. Note that this is reported in milliseconds while the step
+        // durations are reported in microseconds.
+        attrs.add(
+            "duration",
+            duration_cast<Milliseconds>(
+                singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick)));
+
+        LOGV2(51804, "two-phsase commit", attrs);
+
+    } else {
+        LOGV2(22448,
+              "{twoPhaseCommitInfoForLog_decision}",
+              "twoPhaseCommitInfoForLog_decision"_attr = _twoPhaseCommitInfoForLog(decision));
+    }
 }
 
 std::string TransactionCoordinator::_twoPhaseCommitInfoForLog(

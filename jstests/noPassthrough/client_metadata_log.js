@@ -2,6 +2,8 @@
  * Test that verifies client metadata is logged into log file on new connections.
  * @tags: [requires_sharding]
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 'use strict';
 
@@ -12,13 +14,20 @@ let checkLog = function(conn) {
     print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
     let log = cat(conn.fullOptions.logFile);
 
-    assert(
-        /received client metadata from .*: { application: { name: ".*" }, driver: { name: ".*", version: ".*" }, os: { type: ".*", name: ".*", architecture: ".*", version: ".*" } }/
-            .test(log),
-        "'received client metadata' log line missing in log file!\n" +
-            "Log file contents: " + conn.fullOptions.logFile +
-            "\n************************************************************\n" + log +
-            "\n************************************************************");
+    let predicate = null;
+    if (isJsonLog(conn)) {
+        predicate =
+            /received client metadata from .*:.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
+    } else {
+        predicate =
+            /received client metadata from .*: {"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
+    }
+
+    assert(predicate.test(log),
+           "'received client metadata' log line missing in log file!\n" +
+               "Log file contents: " + conn.fullOptions.logFile +
+               "\n************************************************************\n" + log +
+               "\n************************************************************");
 };
 
 // Test MongoD
