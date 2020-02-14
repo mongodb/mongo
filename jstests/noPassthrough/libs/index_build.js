@@ -3,13 +3,26 @@
 class IndexBuildTest {
     /**
      * Starts an index build in a separate mongo shell process with given options.
+     * Ensures the index build worked or failed with one of the expected failures.
      */
-    static startIndexBuild(conn, ns, keyPattern, options) {
+    static startIndexBuild(conn, ns, keyPattern, options, expectedFailures) {
         options = options || {};
-        return startParallelShell('const coll = db.getMongo().getCollection("' + ns + '");' +
-                                      'assert.commandWorked(coll.createIndex(' +
-                                      tojson(keyPattern) + ', ' + tojson(options) + '));',
-                                  conn.port);
+        expectedFailures = expectedFailures || [];
+
+        if (Array.isArray(keyPattern)) {
+            return startParallelShell(
+                'const coll = db.getMongo().getCollection("' + ns + '");' +
+                    'assert.commandWorkedOrFailedWithCode(coll.createIndexes(' +
+                    JSON.stringify(keyPattern) + ', ' + tojson(options) + '), ' +
+                    JSON.stringify(expectedFailures) + ');',
+                conn.port);
+        } else {
+            return startParallelShell('const coll = db.getMongo().getCollection("' + ns + '");' +
+                                          'assert.commandWorkedOrFailedWithCode(coll.createIndex(' +
+                                          tojson(keyPattern) + ', ' + tojson(options) + '), ' +
+                                          JSON.stringify(expectedFailures) + ');',
+                                      conn.port);
+        }
     }
 
     /**

@@ -36,12 +36,27 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * Drops the index from collection "nss" that matches the "idxDescriptor" and populates
- * "result" with some statistics about the dropped index.
+ * Drops one or more ready indexes, or aborts a single index builder from the "nss" collection that
+ * matches the caller's "cmdObj" input. Populates "result" with some statistics about the operation.
+ *
+ * "cmdObj" must have a field named "index" that has one of the following as its value:
+ * 1) "*" <-- Aborts all index builders and drops all ready indexes except the _id index.
+ * 2) "indexName" <-- Aborts an index builder or drops a ready index with the given name.
+ * 3) { keyPattern } <-- Aborts an index builder or drops a ready index with a matching key pattern.
+ * 4) ["indexName1", ..., "indexNameN"] <-- Aborts an index builder or drops ready indexes that
+ *                                          match the given names.
  */
 Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const BSONObj& idxDescriptor,
+                   const BSONObj& cmdObj,
                    BSONObjBuilder* result);
+
+/**
+ * Same behaviour as "dropIndexes" but only drops ready indexes.
+ */
+Status dropIndexesForApplyOps(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& cmdObj,
+                              BSONObjBuilder* result);
 
 }  // namespace mongo
