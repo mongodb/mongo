@@ -20,7 +20,7 @@ const X509USER = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,
 external.createUser({user: X509USER, roles: [{role: 'root', db: 'admin'}]});
 
 function test(uri) {
-    const x509 = runMongoProgram('./mongo',
+    const x509 = runMongoProgram('mongo',
                                  '--tls',
                                  '--tlsCAFile',
                                  'jstests/libs/ca.pem',

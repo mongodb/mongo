@@ -11,7 +11,7 @@ admin.createUser(
 admin.auth('admin', 'pwd');
 
 function test(uri, succeed) {
-    const shell = runMongoProgram('./mongo', uri, '--eval', ';');
+    const shell = runMongoProgram('mongo', uri, '--eval', ';');
 
     if (succeed) {
         assert.eq(0, shell);
