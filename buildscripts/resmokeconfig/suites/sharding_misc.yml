@@ -72,7 +72,6 @@ selector:
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/addshard2.js
-  - jstests/sharding/mr_shard_version.js
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - jstests/sharding/replmonitor_bad_seed.js
