@@ -1700,12 +1700,11 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
-    auto nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
     auto preAbortStatus = Status::OK();
     try {
         _scanCollectionAndInsertKeysIntoSorter(
             opCtx, dbAndUUID, replState, exclusiveCollectionLock);
-        nss = _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
     } catch (DBException& ex) {
         // Locks may no longer be held when we are interrupted. We should return immediately and, in
         // the case of a primary index build, signal downstream nodes to abort via the
@@ -1715,8 +1714,8 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
             throw;
         }
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto replSetAndNotPrimary =
-            replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss);
+        auto replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
+            !replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
         if (!replSetAndNotPrimary) {
             throw;
         }
@@ -1728,7 +1727,7 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
         preAbortStatus = ex.toStatus();
     }
 
-    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, nss, replState, preAbortStatus);
+    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, replState, preAbortStatus);
     _insertKeysFromSideTablesAndCommit(opCtx,
                                        dbAndUUID,
                                        replState,
@@ -1839,7 +1838,6 @@ NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlocking
  */
 Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     std::shared_ptr<ReplIndexBuildState> replState,
     const Status& preAbortStatus) {
     Timestamp commitIndexBuildTimestamp;

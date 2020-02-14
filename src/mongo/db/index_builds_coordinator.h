@@ -602,7 +602,6 @@ protected:
      * the index build.
      */
     Timestamp _waitForCommitOrAbort(OperationContext* opCtx,
-                                    const NamespaceString& nss,
                                     std::shared_ptr<ReplIndexBuildState> replState,
                                     const Status& preAbortStatus);
 
