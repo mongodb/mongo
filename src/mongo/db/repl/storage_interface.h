@@ -313,6 +313,18 @@ public:
                                   const NamespaceString& nss,
                                   const BSONObj& filter) = 0;
 
+    /**
+     * Searches for an oplog entry with a timestamp <= 'timestamp'. Returns boost::none if no
+     * matches are found.
+     */
+    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
+
+    /**
+     * Fetches the latest oplog entry's timestamp. Bypasses the oplog visibility rules.
+     */
+    virtual Timestamp getLatestOplogTimestamp(OperationContext* opCtx) = 0;
+
     using CollectionSize = uint64_t;
     using CollectionCount = uint64_t;
 

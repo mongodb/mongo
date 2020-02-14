@@ -143,6 +143,11 @@ public:
                           const NamespaceString& nss,
                           const BSONObj& filter) override;
 
+    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override;
+
+    Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override;
+
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override;
 

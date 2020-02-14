@@ -632,8 +632,10 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opC
 }
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
-                                               Timestamp truncateTimestamp) {
+                                               Timestamp truncateAfterTimestamp) {
     Timer timer;
+
+    // Fetch the oplog collection.
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
@@ -646,74 +648,48 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                    str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
     }
 
-    // Truncate the oplog after (non-inclusive of) the truncateTimestamp. Scan through the oplog in
-    // reverse, from latest entry to first, to find an entry lte truncateTimestamp. Once such an
-    // entry is found, we will truncate inclusive of the previous entry found that is greater than
-    // the truncate point. If only one entry is found lte to the truncateTimestamp, then nothing is
-    // truncated: nothing was found greater than the truncateTimestamp. Note that the
-    // truncateTimestamp does not have to be an exact match to an oplog entry: any entries after
-    // that time will be truncated.
-    RecordId previousRecordId;
-    Timestamp topOfOplog;
-    auto oplogRs = oplogCollection->getRecordStore();
-    auto oplogReverseCursor = oplogRs->getCursor(opCtx, /*forward=*/false);
-    size_t count = 0;
-    while (auto next = oplogReverseCursor->next()) {
-        const BSONObj entry = next->data.releaseToBson();
-        const RecordId id = next->id;
-        count++;
-
-        const auto tsElem = entry["ts"];
-        if (count == 1) {
-            if (tsElem.eoo()) {
-                LOGV2_DEBUG(21551, 2, "Oplog tail entry: {entry}", "entry"_attr = redact(entry));
-            } else {
-                LOGV2_DEBUG(
-                    21552, 2, "Oplog tail entry ts field: {tsElem}", "tsElem"_attr = tsElem);
-                topOfOplog = tsElem.timestamp();
-            }
-        }
-
-        if (tsElem.timestamp() <= truncateTimestamp) {
-            // If count == 1, that means that we have nothing to delete because everything in the
-            // oplog is <= truncateTimestamp.
-            if (count != 1) {
-                LOGV2(21553,
-                      "Truncating oplog from [{Timestamp_previousRecordId_repr} to {topOfOplog}]. "
-                      "Truncate after point is {truncateTimestamp}",
-                      "Timestamp_previousRecordId_repr"_attr = Timestamp(previousRecordId.repr()),
-                      "topOfOplog"_attr = topOfOplog,
-                      "truncateTimestamp"_attr = truncateTimestamp);
-                invariant(!previousRecordId.isNull());
-                oplogCollection->cappedTruncateAfter(opCtx, previousRecordId, /*inclusive*/ true);
-            } else {
-                LOGV2(21554,
-                      "There is no oplog after {truncateTimestamp} to truncate. The top of the "
-                      "oplog is {topOfOplog}",
-                      "truncateTimestamp"_attr = truncateTimestamp,
-                      "topOfOplog"_attr = topOfOplog);
-            }
-            LOGV2(21555,
-                  "Replication recovery oplog truncation finished in: {timer_millis}ms",
-                  "timer_millis"_attr = timer.millis());
-            return;
-        }
-
-        previousRecordId = id;
+    // Find an oplog entry <= truncateAfterTimestamp.
+    boost::optional<BSONObj> truncateAfterOplogEntryBSON =
+        _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
+            opCtx, oplogCollection, truncateAfterTimestamp);
+    if (!truncateAfterOplogEntryBSON) {
+        LOGV2_FATAL(21572,
+                    "Reached end of oplog looking for an oplog entry lte to "
+                    "{truncateAfterTimestamp} but did not find one",
+                    "truncateAfterTimestamp"_attr = truncateAfterTimestamp.toBSON());
+        fassertFailedNoTrace(40296);
     }
 
-    LOGV2_FATAL(21572,
-                "Reached end of oplog looking for oplog entry before {truncateTimestamp} but "
-                "couldn't find any after looking through {count} entries.",
-                "truncateTimestamp"_attr = truncateTimestamp.toBSON(),
-                "count"_attr = count);
-    fassertFailedNoTrace(40296);
+    // Parse the response.
+    auto truncateAfterOplogEntry =
+        fassert(51766, repl::OplogEntry::parse(truncateAfterOplogEntryBSON.get()));
+    auto truncateAfterRecordId = RecordId(truncateAfterOplogEntry.getTimestamp().asULL());
+
+    invariant(truncateAfterRecordId <= RecordId(truncateAfterTimestamp.asULL()),
+              str::stream() << "Should have found a oplog entry timestamp lte to "
+                            << truncateAfterTimestamp.toString() << ", but instead found "
+                            << truncateAfterOplogEntry.toString() << " with timestamp "
+                            << Timestamp(truncateAfterRecordId.repr()).toString());
+
+    // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.
+    LOGV2(21553,
+          "Truncating oplog from {truncateAfterOplogEntry_timestamp} (non-inclusive). Truncate "
+          "after point is {truncateAfterTimestamp}",
+          "truncateAfterOplogEntry_timestamp"_attr = truncateAfterOplogEntry.getTimestamp(),
+          "truncateAfterTimestamp"_attr = truncateAfterTimestamp);
+
+    oplogCollection->cappedTruncateAfter(opCtx, truncateAfterRecordId, /*inclusive*/ false);
+
+    LOGV2(21554,
+          "Replication recovery oplog truncation finished in: {timer_millis}ms",
+          "timer_millis"_attr = timer.millis());
 }
 
 void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
     OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) {
 
     Timestamp truncatePoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
+
     if (truncatePoint.isNull()) {
         // There are no holes in the oplog that necessitate truncation.
         return;

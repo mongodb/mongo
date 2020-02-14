@@ -131,9 +131,9 @@ private:
     StatusWith<OpTime> _getTopOfOplog(OperationContext* opCtx) const;
 
     /**
-     * Truncates the oplog after the "truncateTimestamp" entry.
+     * Truncates the oplog after the "truncateAfterTimestamp" entry.
      */
-    void _truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp);
+    void _truncateOplogTo(OperationContext* opCtx, Timestamp truncateAfterTimestamp);
 
     /**
      * Uses the oplogTruncateAfterPoint, accessed via '_consistencyMarkers', to decide whether to

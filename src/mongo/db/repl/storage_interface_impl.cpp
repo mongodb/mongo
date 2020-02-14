@@ -1019,6 +1019,47 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     });
 }
 
+boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestamp(
+    OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) {
+    invariant(oplog);
+    invariant(opCtx->lockState()->isLocked());
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
+        InternalPlanner::collectionScan(opCtx,
+                                        NamespaceString::kRsOplogNamespace.ns(),
+                                        oplog,
+                                        PlanExecutor::NO_YIELD,
+                                        InternalPlanner::BACKWARD);
+
+    // A record id in the oplog collection is equivalent to the document's timestamp field.
+    RecordId desiredRecordId = RecordId(timestamp.asULL());
+
+    // Iterate the collection in reverse until the desiredRecordId, or one less than, is found.
+    BSONObj bson;
+    RecordId recordId;
+    PlanExecutor::ExecState state;
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&bson, &recordId))) {
+        if (recordId <= desiredRecordId) {
+            invariant(!bson.isEmpty(),
+                      "An empty oplog entry was returned while searching for an oplog entry <= " +
+                          timestamp.toString());
+            return bson.getOwned();
+        }
+    }
+
+    return boost::none;
+}
+
+Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {
+    AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString::kRsOplogNamespace);
+    auto statusWithTimestamp =
+        autoColl.getCollection()->getRecordStore()->getLatestOplogTimestamp(opCtx);
+    invariant(statusWithTimestamp.isOK(),
+              str::stream() << "Expected oplog entries to exist: "
+                            << statusWithTimestamp.getStatus());
+    return statusWithTimestamp.getValue();
+}
+
 StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollectionSize(
     OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead autoColl(opCtx, nss);
