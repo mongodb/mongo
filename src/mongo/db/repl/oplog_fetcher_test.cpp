@@ -2910,10 +2910,20 @@ TEST_F(NewOplogFetcherTest, OplogFetcherAutoReconnectsButFails) {
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
 
     auto conn = oplogFetcher->getDBClientConnection_forTest();
-    // Shut down the mock server and simulate a disconnect for the first find command. And the
-    // OplogFetcher should retry with AutoReconnect.
-    _mockServer->shutdown();
+
+    auto beforeRecreatingCursor = globalFailPointRegistry().find("hangBeforeOplogFetcherRetries");
+    auto timesEntered = beforeRecreatingCursor->setMode(FailPoint::alwaysOn);
+
+    // Simulate a disconnect for the first find command. And the OplogFetcher should retry with
+    // AutoReconnect.
     simulateNetworkDisconnect(conn);
+
+    // Shut down the mock server before OplogFetcher reconnects.
+    beforeRecreatingCursor->waitForTimesEntered(timesEntered + 1);
+    _mockServer->shutdown();
+
+    // Allow retry and autoreconnect.
+    beforeRecreatingCursor->setMode(FailPoint::off);
 
     oplogFetcher->join();
 
