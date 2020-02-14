@@ -110,9 +110,11 @@ public:
 
     virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName);
 
-    bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceString& ns) override;
+    bool canAcceptWritesFor(OperationContext* opCtx,
+                            const NamespaceStringOrUUID& nsOrUUID) override;
 
-    bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx, const NamespaceString& ns) override;
+    bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
+                                   const NamespaceStringOrUUID& nsOrUUID) override;
 
     virtual Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 

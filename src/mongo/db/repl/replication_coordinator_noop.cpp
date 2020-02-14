@@ -80,12 +80,12 @@ bool ReplicationCoordinatorNoOp::canAcceptWritesForDatabase_UNSAFE(OperationCont
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
-                                                           const NamespaceString& ns) {
+                                                           const NamespaceStringOrUUID& nsOrUUID) {
     MONGO_UNREACHABLE;
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesFor(OperationContext* opCtx,
-                                                    const NamespaceString& ns) {
+                                                    const NamespaceStringOrUUID& nsOrUUID) {
     MONGO_UNREACHABLE;
 }
 

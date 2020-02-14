@@ -178,14 +178,14 @@ bool ReplicationCoordinatorMock::canAcceptWritesForDatabase_UNSAFE(OperationCont
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor(OperationContext* opCtx,
-                                                    const NamespaceString& ns) {
+                                                    const NamespaceStringOrUUID& nsOrUUID) {
     // TODO
-    return canAcceptWritesForDatabase(opCtx, ns.db());
+    return canAcceptWritesForDatabase(opCtx, nsOrUUID.db());
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
-                                                           const NamespaceString& ns) {
-    return canAcceptWritesFor(opCtx, ns);
+                                                           const NamespaceStringOrUUID& nsOrUUID) {
+    return canAcceptWritesFor(opCtx, nsOrUUID);
 }
 
 Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* opCtx,

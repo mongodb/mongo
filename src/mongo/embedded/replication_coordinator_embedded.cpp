@@ -79,12 +79,12 @@ bool ReplicationCoordinatorEmbedded::canAcceptWritesForDatabase_UNSAFE(Operation
 }
 
 bool ReplicationCoordinatorEmbedded::canAcceptWritesFor(OperationContext* opCtx,
-                                                        const NamespaceString& ns) {
+                                                        const NamespaceStringOrUUID& nsOrUUID) {
     return true;
 }
 
-bool ReplicationCoordinatorEmbedded::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
-                                                               const NamespaceString& ns) {
+bool ReplicationCoordinatorEmbedded::canAcceptWritesFor_UNSAFE(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
     return true;
 }
 

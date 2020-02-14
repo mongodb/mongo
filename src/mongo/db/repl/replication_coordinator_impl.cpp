@@ -2513,15 +2513,16 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
-                                                    const NamespaceString& ns) {
-    invariant(opCtx->lockState()->isRSTLLocked(), ns.ns());
-    return canAcceptWritesFor_UNSAFE(opCtx, ns);
+                                                    const NamespaceStringOrUUID& nsOrUUID) {
+    invariant(opCtx->lockState()->isRSTLLocked(), nsOrUUID.toString());
+    return canAcceptWritesFor_UNSAFE(opCtx, nsOrUUID);
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
-                                                           const NamespaceString& ns) {
-    StringData dbName = ns.db();
-    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
+                                                           const NamespaceStringOrUUID& nsOrUUID) {
+    invariant(nsOrUUID.nss(), nsOrUUID.toString());
+    const auto& ns = *nsOrUUID.nss();
+    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.db());
 
     if (!canWriteToDB && !ns.isSystemDotProfile()) {
         return false;

@@ -260,13 +260,15 @@ public:
      * The result of this function should be consistent with canAcceptWritesForDatabase()
      * for the database the namespace refers to, with additional checks on the collection.
      */
-    virtual bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceString& ns) = 0;
+    virtual bool canAcceptWritesFor(OperationContext* opCtx,
+                                    const NamespaceStringOrUUID& nsOrUUID) = 0;
 
     /**
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx, const NamespaceString& ns) = 0;
+    virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
+                                           const NamespaceStringOrUUID& nsOrUUID) = 0;
 
     /**
      * Checks if the current replica set configuration can satisfy the given write concern.

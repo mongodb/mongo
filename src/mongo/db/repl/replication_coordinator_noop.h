@@ -72,8 +72,9 @@ public:
     bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) final;
     bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName) final;
 
-    bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceString& ns) final;
-    bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx, const NamespaceString& ns) final;
+    bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) final;
+    bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
+                                   const NamespaceStringOrUUID& nsOrUUID) final;
 
     Status checkCanServeReadsFor(OperationContext* opCtx,
                                  const NamespaceString& ns,
