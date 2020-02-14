@@ -88,6 +88,15 @@ struct UniqueX509StoreCtxDeleter {
 };
 using UniqueX509StoreCtx = std::unique_ptr<X509_STORE_CTX, UniqueX509StoreCtxDeleter>;
 
+struct UniqueX509Deleter {
+    void operator()(X509* cert) {
+        if (cert) {
+            X509_free(cert);
+        }
+    }
+};
+using UniqueX509 = std::unique_ptr<X509, UniqueX509Deleter>;
+
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
@@ -208,11 +217,11 @@ struct VerifiedChainDeleter {
 
 STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
     auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
-    auto* peer = SSL_get_peer_certificate(s);
+    UniqueX509 peer(SSL_get_peer_certificate(s));
     auto* peerChain = SSL_get_peer_cert_chain(s);
 
     UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
-    if (!X509_STORE_CTX_init(ctx.get(), store, peer, peerChain)) {
+    if (!X509_STORE_CTX_init(ctx.get(), store, peer.get(), peerChain)) {
         return nullptr;
     }
 
@@ -373,14 +382,6 @@ SSLManagerInterface* theSSLManager = NULL;
 using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&free_ssl_context)>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
-
-struct UniqueX509Free {
-    void operator()(X509* ptr) const {
-        X509_free(ptr);
-    }
-};
-
-using UniqueX509 = std::unique_ptr<X509, UniqueX509Free>;
 
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
