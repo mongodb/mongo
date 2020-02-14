@@ -499,6 +499,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     virtual bool adminOnly() const {
         return false;
     }

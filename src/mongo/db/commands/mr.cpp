@@ -1384,6 +1384,10 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     std::size_t reserveBytesForReply() const override {
         return FindCommon::kInitReplyBufferSize;
     }

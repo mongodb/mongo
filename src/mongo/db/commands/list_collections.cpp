@@ -217,6 +217,9 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kOptIn;
     }
+    bool maintenanceOk() const override {
+        return false;
+    }
     bool adminOnly() const final {
         return false;
     }

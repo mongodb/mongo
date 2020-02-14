@@ -55,6 +55,10 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool adminOnly() const override {
         return true;
     }

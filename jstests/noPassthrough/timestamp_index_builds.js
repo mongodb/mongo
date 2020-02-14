@@ -80,6 +80,7 @@
             jsTestLog("Starting as a replica set. Both indexes should exist. Node: " +
                       nodeIdentity);
             let conn = rst.start(nodeIdx, {startClean: false}, true);
+            rst.waitForState(conn, ReplSetTest.State.SECONDARY);
             conn.setSlaveOk();
             assert.eq(2, getColl(conn).getIndexes().length);
             rst.stop(nodeIdx);

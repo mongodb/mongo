@@ -91,6 +91,12 @@ function CollectionValidator() {
             conn.setSlaveOk();
             jsTest.authenticate(conn);
 
+            // Skip validating collections for arbiters.
+            if (conn.getDB('admin').isMaster('admin').arbiterOnly === true) {
+                print('Skipping collection validation on arbiter ' + host);
+                return {ok: 1};
+            }
+
             const dbNames = conn.getDBNames();
             for (let dbName of dbNames) {
                 if (!validatorFunc(conn.getDB(dbName), {full: true})) {

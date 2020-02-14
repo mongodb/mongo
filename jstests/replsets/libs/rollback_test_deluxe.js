@@ -205,7 +205,13 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
 
         // Wait for collection drops to complete so that we don't get spurious failures during
         // consistency checks.
-        rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
+        rst.nodes.forEach(node => {
+            if (node.getDB('admin').isMaster('admin').arbiterOnly === true) {
+                log(`Skipping waiting for collection drops on arbiter ${node.host}`);
+                return;
+            }
+            TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete(node);
+        });
 
         const name = rst.name;
         // Check collection counts except when unclean shutdowns are allowed, as such a shutdown is

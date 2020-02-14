@@ -60,8 +60,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::stringstream;
+using std::unique_ptr;
 
 /**
  * The geoNear command is deprecated. Users should prefer the $near query operator, the $nearSphere
@@ -77,6 +77,9 @@ public:
     }
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
+    }
+    bool maintenanceOk() const override {
+        return false;
     }
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,

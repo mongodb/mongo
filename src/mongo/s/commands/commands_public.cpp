@@ -503,6 +503,10 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool adminOnly() const override {
         return false;
     }
@@ -645,6 +649,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
+    }
+
+    bool maintenanceOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

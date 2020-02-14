@@ -45,8 +45,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using stdx::make_unique;
 
 namespace {
@@ -61,6 +61,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
+    }
+
+    bool maintenanceOk() const override {
+        return false;
     }
 
     bool supportsReadConcern(const std::string& dbName,

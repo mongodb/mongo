@@ -145,7 +145,13 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // We must wait for collection drops to complete so that we don't get spurious failures
         // in the consistency checks.
-        rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
+        rst.nodes.forEach(node => {
+            if (node.getDB('admin').isMaster('admin').arbiterOnly === true) {
+                log(`Skipping waiting for collection drops on arbiter ${node.host}`);
+                return;
+            }
+            TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete(node);
+        });
 
         const name = rst.name;
         // We must check counts before we validate since validate fixes counts. We cannot check
