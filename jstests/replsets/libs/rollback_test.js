@@ -338,17 +338,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
                 throw e;
             }
 
-            if (this.isMajorityReadConcernEnabledOnRollbackNode) {
-                let rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-                assert(rbid > lastRBID,
-                       `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`);
-            } else {
-                // TODO: After fixing SERVER-45178, we can remove the else block as we are
-                // guaranteed that the rollback id will get updated if the rollback has happened on
-                // that node.
-                log(`Skipping RBID check on ${curSecondary.host} because shutdowns ` +
-                    `may prevent a rollback here.`);
-            }
+            let rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+            assert(rbid > lastRBID,
+                   `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`);
 
             assert.eq(oplogTop(curPrimary), oplogTop(curSecondary));
 
@@ -395,12 +387,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // rolled back.
         rst.awaitSecondaryNodes(null, [curSecondary, tiebreakerNode]);
         rst.awaitReplication(null, null, [curSecondary]);
-
-        // The current primary will be the node that rolls back. Check if it supports majority reads
-        // here while we are in a steady state.
-        this.isMajorityReadConcernEnabledOnRollbackNode =
-            assert.commandWorked(curPrimary.adminCommand({serverStatus: 1}))
-                .storageEngine.supportsCommittedReads;
 
         transitionIfAllowed(State.kRollbackOps);
 
