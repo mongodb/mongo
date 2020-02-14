@@ -26,8 +26,6 @@ except ImportError:
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MINIMUM_CODE = 10000
-# This limit is intended to be increased by 1000 when we get close.
-MAXIMUM_CODE = 51999
 
 # pylint: disable=invalid-name
 codes = []  # type: ignore
@@ -137,13 +135,6 @@ def read_error_codes():
 
         if not code in seen:
             seen[code] = assert_loc
-            # on first occurrence of a specific excessively large code, add to skips, errors
-            if int(code) > MAXIMUM_CODE:
-                skips.append(assert_loc)
-                errors.append(assert_loc)
-            elif int(code) > MAXIMUM_CODE - 20:
-                print("Approaching maximum error code.  Consider raising the limit soon.")
-
         else:
             if not code in dups:
                 # on first duplicate, add original to dups, errors
