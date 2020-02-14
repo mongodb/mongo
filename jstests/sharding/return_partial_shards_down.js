@@ -7,10 +7,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 var checkDocCount = function(coll, returnPartialFlag, shardsDown, expectedCount) {
-    // TODO (SERVER-45273): Remove this mongos bin version check.
-    if (jsTestOptions().mongosBinVersion != "last-stable") {
-        assert.eq(expectedCount, coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
-    }
+    assert.eq(expectedCount, coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 };
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}}});

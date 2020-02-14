@@ -88,34 +88,31 @@ assert.commandFailed(coll.runCommand({find: collName}));
 jsTest.log("With 'allowPartialResults: false', if some shards are down, find fails.");
 assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false}));
 
-// TODO (SERVER-45273): Remove this mongos bin version check.
-if (!isLastStable) {
-    nRemainingDocs = nDocs / 2;
+nRemainingDocs = nDocs / 2;
 
-    jsTest.log(
-        "With 'allowPartialResults: true', if some shards are down, find returns partial results");
-    findRes = coll.runCommand({find: collName, allowPartialResults: true, batchSize: batchSize});
-    assert.commandWorked(findRes);
-    assert.eq(batchSize, findRes.cursor.firstBatch.length);
-    assert.eq(true, findRes.cursor.partialResultsReturned);
-    nRemainingDocs -= batchSize;
+jsTest.log(
+    "With 'allowPartialResults: true', if some shards are down, find returns partial results");
+findRes = coll.runCommand({find: collName, allowPartialResults: true, batchSize: batchSize});
+assert.commandWorked(findRes);
+assert.eq(batchSize, findRes.cursor.firstBatch.length);
+assert.eq(isLastStable ? undefined : true, findRes.cursor.partialResultsReturned);
+nRemainingDocs -= batchSize;
 
-    jsTest.log(
-        "getMore after a find that returns partial results returns partialResultsReturned: 1");
-    getMoreRes =
-        coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
-    assert.commandWorked(getMoreRes);
-    assert.eq(batchSize, getMoreRes.cursor.nextBatch.length);
-    assert.eq(true, getMoreRes.cursor.partialResultsReturned);
-    nRemainingDocs -= batchSize;
+jsTest.log(
+    "getMore after a find that returns partial results returns partialResultsReturned: true");
+getMoreRes =
+    coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
+assert.commandWorked(getMoreRes);
+assert.eq(batchSize, getMoreRes.cursor.nextBatch.length);
+assert.eq(isLastStable ? undefined : true, getMoreRes.cursor.partialResultsReturned);
+nRemainingDocs -= batchSize;
 
-    jsTest.log(
-        "Subsequent getMores should return partialResultsReturned: 1 regardless of the batch size.");
-    getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName});
-    assert.commandWorked(getMoreRes);
-    assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
-    assert.eq(true, getMoreRes.cursor.partialResultsReturned);
-}
+jsTest.log(
+    "Subsequent getMores should return partialResultsReturned: true regardless of the batch size.");
+getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName});
+assert.commandWorked(getMoreRes);
+assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
+assert.eq(isLastStable ? undefined : true, getMoreRes.cursor.partialResultsReturned);
 
 jsTest.log("The allowPartialResults option does not currently apply to aggregation.");
 assert.commandFailedWithCode(coll.runCommand({
