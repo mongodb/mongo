@@ -2834,6 +2834,36 @@ TEST_F(NewOplogFetcherTest, OplogFetcherRetriesConnectionButFails) {
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
 }
 
+TEST_F(NewOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeReconnect) {
+    // Test that OplogFetcher returns CallbackCanceled error if it is shut down after failing the
+    // initial connection but before it retries the connection.
+    ShutdownState shutdownState;
+
+    // Shutdown the mock remote server before the OplogFetcher tries to connect.
+    _mockServer->shutdown();
+
+    // Hang OplogFetcher before it retries the connection.
+    auto beforeRetryingConnection = globalFailPointRegistry().find("hangBeforeOplogFetcherRetries");
+    auto timesEntered = beforeRetryingConnection->setMode(FailPoint::alwaysOn);
+
+    // Create an OplogFetcher with 1 retry attempt. This will also ensure that _runQuery was
+    // scheduled before returning.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState), 1);
+
+    // Wait until the first connect attempt fails but before it retries.
+    beforeRetryingConnection->waitForTimesEntered(timesEntered + 1);
+
+    // Shut down the OplogFetcher.
+    oplogFetcher->shutdown();
+
+    // Disable the failpoint to allow reconnection.
+    beforeRetryingConnection->setMode(FailPoint::off);
+
+    oplogFetcher->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+}
+
 TEST_F(NewOplogFetcherTest, OplogFetcherResetsNumRestartsOnSuccessfulConnection) {
     // Test that OplogFetcher resets the number of restarts after a successful connection on a
     // retry.

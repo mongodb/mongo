@@ -925,11 +925,21 @@ void NewOplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& call
 Status NewOplogFetcher::_connect() {
     Status connectStatus = Status::OK();
     do {
+        if (_isShuttingDown()) {
+            return Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down");
+        }
         connectStatus = [&] {
             try {
-                // Always try to start from scratch with a new connection if either the connection
-                // or the authentication fails from the previous attempt.
-                uassertStatusOK(_conn->connect(_source, "OplogFetcher"));
+                if (!connectStatus.isOK()) {
+                    // If this is a retry, let the DBClientConnection handle the reconnect itself
+                    // for proper backoff behavior.
+                    LOGV2(23437,
+                          "OplogFetcher reconnecting due to error: {status}",
+                          "status"_attr = connectStatus);
+                    _conn->checkConnection();
+                } else {
+                    uassertStatusOK(_conn->connect(_source, "OplogFetcher"));
+                }
                 uassertStatusOK(replAuthenticate(_conn.get())
                                     .withContext(str::stream()
                                                  << "OplogFetcher failed to authenticate to "
