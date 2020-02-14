@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGeo
 
 #include "logging.h"
 
@@ -37,72 +37,71 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/log.h"
 
 namespace s2_mongo {
-
-namespace ml = mongo::logger;
 
 // VLOG messages will be logged at debug level 5 with the S2 log component.
 // Expansion of MONGO_LOG_COMPONENT defined in mongo/util/log.h
 class VLogSink : public s2_env::LogMessageSink {
 public:
   explicit VLogSink(int verbosity)
-    : _v(verbosity),
-      _lsb(ml::globalLogDomain(),
-           mongo::getThreadName(),
-           ml::LogSeverity::Debug(5),
-           ml::LogComponent::kGeo) {}
-  std::ostream& stream() override { return _lsb.stream(); }
+    : _v(verbosity) {}
+    ~VLogSink() {
+      using namespace mongo;
+      LOGV2_DEBUG_OPTIONS(
+        25000, 5, {logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
+  }
+
+  std::ostream& stream() override { return _os; }
+
 private:
   int _v;
-  ml::LogstreamBuilderDeprecated _lsb;
+  std::ostringstream _os;
 };
 
 class SeverityLogSink : public s2_env::LogMessageSink {
 public:
-  // Fatal message will deconstruct it before abort to flush final message.
-  explicit SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilderDeprecated builder)
-    : _severity(severity),
-      _lsb(std::move(builder)) {}
+  explicit SeverityLogSink(s2_env::LogMessage::Severity severity)
+    : _severity(severity) {}
 
-  SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilderDeprecated builder,
+  SeverityLogSink(s2_env::LogMessage::Severity severity,
                   const char* file, int line)
-    : _severity(severity),
-      _lsb(std::move(builder)) {
-    std::ostringstream os;
-    os << file << ":" << line << ": ";
-    _lsb->setBaseMessage(os.str());
+    : _severity(severity) {
+    _os << file << ":" << line << ": ";
   }
   ~SeverityLogSink() {
+    using namespace mongo;
+    auto severity = logv2::LogSeverity::Log();
+    switch (_severity) {
+      case s2_env::LogMessage::Severity::kInfo:
+        break;
+      case s2_env::LogMessage::Severity::kWarning:
+        severity = logv2::LogSeverity::Warning();
+        break;
+      case s2_env::LogMessage::Severity::kFatal:
+      default:
+        severity = logv2::LogSeverity::Severe();
+        break;
+    };
+    LOGV2_IMPL(
+      25001, severity, {logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
     if (_severity == s2_env::LogMessage::Severity::kFatal) {
-      _lsb = {};  // killing _lsb early to force a log flush
       fassertFailed(40048);
     }
   }
 
-  std::ostream& stream() override { return _lsb->stream(); }
+  std::ostream& stream() override { return _os; }
 private:
   s2_env::LogMessage::Severity _severity;
-  boost::optional<ml::LogstreamBuilderDeprecated> _lsb;
+  std::ostringstream _os;
 };
 
 template <typename...A>
 std::unique_ptr<s2_env::LogMessageSink> makeSinkImpl(s2_env::LogMessage::Severity severity, A&&...a) {
-  auto builder = [&] {
-    switch (severity) {
-    case s2_env::LogMessage::Severity::kInfo:
-        return mongo::log();
-    case s2_env::LogMessage::Severity::kWarning:
-        return mongo::warning();
-    case s2_env::LogMessage::Severity::kFatal:
-    default:
-        return mongo::severe();
-    }
-  };
-  return std::make_unique<SeverityLogSink>(severity, builder(), std::forward<A>(a)...);
+  return std::make_unique<SeverityLogSink>(severity, std::forward<A>(a)...);
 }
 
 class MongoLoggingEnv : public s2_env::LoggingEnv {
@@ -110,9 +109,8 @@ public:
   MongoLoggingEnv() = default;
   ~MongoLoggingEnv() override {}
   bool shouldVLog(int verbosity) override {
-    return ml::globalLogDomain()->shouldLog(
-      ml::LogComponent::kGeo,
-      ml::LogSeverity::Debug(5));
+    return mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(
+      mongo::logv2::LogComponent::kGeo, mongo::logv2::LogSeverity::Debug(5));
   }
   std::unique_ptr<s2_env::LogMessageSink> makeSink(int verbosity) override {
     return std::make_unique<VLogSink>(verbosity);
