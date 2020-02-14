@@ -44,6 +44,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -2520,12 +2521,22 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceStringOrUUID& nsOrUUID) {
-    invariant(nsOrUUID.nss(), nsOrUUID.toString());
-    const auto& ns = *nsOrUUID.nss();
     bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.db());
 
-    if (!canWriteToDB && !ns.isSystemDotProfile()) {
-        return false;
+    if (!canWriteToDB) {
+        if (auto ns = nsOrUUID.nss()) {
+            if (!ns->isSystemDotProfile()) {
+                return false;
+            }
+        } else {
+            auto uuid = nsOrUUID.uuid();
+            invariant(uuid, nsOrUUID.toString());
+            if (auto ns = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, *uuid)) {
+                if (!ns->isSystemDotProfile()) {
+                    return false;
+                }
+            }
+        }
     }
 
     // Even if we think we can write to the database we need to make sure we're not trying
@@ -2537,8 +2548,16 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         return true;
     }
 
-    if (!ns.isOplog()) {
-        return true;
+    if (auto ns = nsOrUUID.nss()) {
+        if (!ns->isOplog()) {
+            return true;
+        }
+    } else if (auto oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
+        auto uuid = nsOrUUID.uuid();
+        invariant(uuid, nsOrUUID.toString());
+        if (oplogCollection->uuid() != *uuid) {
+            return true;
+        }
     }
 
     stdx::lock_guard<Latch> lock(_mutex);
