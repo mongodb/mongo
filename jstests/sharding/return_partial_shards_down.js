@@ -6,18 +6,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 var checkDocCount = function(coll, returnPartialFlag, shardsDown, expectedCount) {
-    if (jsTestOptions().mongosBinVersion == "last-stable" && shardsDown) {
-        // In v4.0, mongos was updated to swallow FailedToSatisfyReadPreference errors if
-        // allowPartialResults is true, allowing allowPartialResults to work with replica set shards
-        // (see SERVER-33597 for details). So when the mongos version is v3.6, the command should
-        // fail.
-        var error = assert.throws(function() {
-            coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount();
-        });
-        assert(ErrorCodes.FailedToSatisfyReadPreference == error.code);
-    } else {
-        assert.eq(expectedCount, coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
-    }
+    assert.eq(expectedCount, coll.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 };
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}}});
