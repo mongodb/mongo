@@ -432,8 +432,18 @@ public:
         return _uuid;
     }
 
+    /**
+     * Returns database name if this object was initialized with a UUID.
+     */
     const std::string& dbname() const {
         return _dbname;
+    }
+
+    /**
+     * Returns database name derived from either '_nss' or '_dbname'.
+     */
+    StringData db() const {
+        return _nss ? _nss->db() : StringData(_dbname);
     }
 
     std::string toString() const;
