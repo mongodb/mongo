@@ -1,4 +1,5 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
+load("jstests/libs/logv2_helpers.js");
 var conn = MongoRunner.runMongod({
     auth: "",
     sslMode: "requireSSL",
@@ -74,10 +75,28 @@ function authAndTest(mongo) {
     // Check that there's a "Successfully authenticated" message that includes the client IP
     const log =
         assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
-    const successRegex = new RegExp(`Successfully authenticated as principal ${CLIENT_USER} on ` +
-                                    `\\$external from client (?:\\d{1,3}\\.){3}\\d{1,3}:\\d+`);
 
-    assert(log.some((line) => successRegex.test(line)));
+    if (isJsonLog(mongo)) {
+        function checkAuthSuccess(element, index, array) {
+            // TODO SERVER-46018: Parse can show because RamLog may return a truncated log
+            try {
+                const logJson = JSON.parse(element);
+
+                return logJson.id === 20429 && logJson.attr.principalName === CLIENT_USER &&
+                    logJson.attr.DB === "$external" &&
+                    /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.client);
+            } catch (exception) {
+                return false;
+            }
+        }
+        assert(log.some(checkAuthSuccess));
+    } else {
+        const successRegex =
+            new RegExp(`Successfully authenticated as principal ${CLIENT_USER} on ` +
+                       `\\$external from client (?:\\d{1,3}\\.){3}\\d{1,3}:\\d+`);
+
+        assert(log.some((line) => successRegex.test(line)));
+    }
 
     // Check that we can add a user and read data
     test.createUser(

@@ -291,10 +291,10 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         if (!serverGlobalParams.quiet.load()) {
             auto const client = opCtx->getClient();
             LOGV2(20428,
-                  "Failed to authenticate {user} from client {client_getRemote} with mechanism "
+                  "Failed to authenticate {user} from client {client} with mechanism "
                   "{mechanism}: {status}",
                   "user"_attr = user,
-                  "client_getRemote"_attr = client->getRemote(),
+                  "client"_attr = client->getRemote(),
                   "mechanism"_attr = mechanism,
                   "status"_attr = status);
         }
@@ -311,11 +311,11 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(20429,
-              "Successfully authenticated as principal {user_getUser} on {user_getDB} from client "
-              "{opCtx_getClient_session_remote}",
-              "user_getUser"_attr = user.getUser(),
-              "user_getDB"_attr = user.getDB(),
-              "opCtx_getClient_session_remote"_attr = opCtx->getClient()->session()->remote());
+              "Successfully authenticated as principal {principalName} on {DB} from client "
+              "{client}",
+              "principalName"_attr = user.getUser(),
+              "DB"_attr = user.getDB(),
+              "client"_attr = opCtx->getClient()->session()->remote());
     }
 
     result.append("dbname", user.getDB());

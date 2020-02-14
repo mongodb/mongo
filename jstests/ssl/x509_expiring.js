@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/logv2_helpers.js");
+
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
@@ -33,9 +35,24 @@ function test(expiration, expect) {
     // Check that there's a "Successfully authenticated" message that includes the client IP
     const log =
         assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
-    const warning = `Peer certificate '${CLIENT_USER}' expires`;
 
-    assert.eq(log.some(line => line.includes(warning)), expect);
+    if (isJsonLog(mongo)) {
+        function checkPeerCertificateExpires(element, index, array) {
+            // TODO SERVER-46018: Parse can show because RamLog may return a truncated log
+            try {
+                const logJson = JSON.parse(element);
+
+                return (logJson.id === 23221 || logJson.id === 23222) &&
+                    logJson.attr.peerSubjectName === CLIENT_USER;
+            } catch (exception) {
+                return false;
+            }
+        }
+        assert.eq(log.some(checkPeerCertificateExpires), expect);
+    } else {
+        const warning = `Peer certificate '${CLIENT_USER}' expires`;
+        assert.eq(log.some(line => line.includes(warning)), expect);
+    }
 
     MongoRunner.stopMongod(mongo);
 }

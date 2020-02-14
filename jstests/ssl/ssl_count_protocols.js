@@ -3,6 +3,7 @@
 'use strict';
 
 load("jstests/ssl/libs/ssl_helpers.js");
+load("jstests/libs/logv2_helpers.js");
 
 var SERVER_CERT = "jstests/libs/server.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
@@ -73,22 +74,41 @@ function runTestWithoutSubset(client) {
     print(`Checking ${conn.fullOptions.logFile} for TLS version message`);
     const log = cat(conn.fullOptions.logFile);
 
-    // Find the last line in the log file and verify it has the right version
-    let re = /Accepted connection with TLS Version (1\.\d) from connection 127.0.0.1:\d+/g;
-    let result = re.exec(log);
-    let lastResult = null;
-    while (result !== null) {
-        lastResult = result;
-        result = re.exec(log);
+    if (isJsonLogNoConn()) {
+        const lines = log.split('\n');
+        let found = false;
+        for (let logMsg of lines) {
+            const logJson = JSON.parse(logMsg);
+            if (logJson.id === 23218 && /1\.\d/.test(logJson.attr.version) &&
+                /127.0.0.1:\d+/.test(logJson.attr.connection)) {
+                found = true;
+                break;
+            }
+        }
+        assert(found,
+               "'Accepted connection with TLS Version' log line missing in log file!\n" +
+                   "Log file contents: " + conn.fullOptions.logFile +
+                   "\n************************************************************\n" + log +
+                   "\n************************************************************");
+
+    } else {
+        // Find the last line in the log file and verify it has the right version
+        let re = /Accepted connection with TLS Version (1\.\d) from connection 127.0.0.1:\d+/g;
+        let result = re.exec(log);
+        let lastResult = null;
+        while (result !== null) {
+            lastResult = result;
+            result = re.exec(log);
+        }
+
+        assert(lastResult !== null,
+               "'Accepted connection with TLS Version' log line missing in log file!\n" +
+                   "Log file contents: " + conn.fullOptions.logFile +
+                   "\n************************************************************\n" + log +
+                   "\n************************************************************");
+
+        assert.eq(lastResult['1'], version_number);
     }
-
-    assert(lastResult !== null,
-           "'Accepted connection with TLS Version' log line missing in log file!\n" +
-               "Log file contents: " + conn.fullOptions.logFile +
-               "\n************************************************************\n" + log +
-               "\n************************************************************");
-
-    assert.eq(lastResult['1'], version_number);
 
     MongoRunner.stopMongod(conn);
 }

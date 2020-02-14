@@ -1128,11 +1128,10 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     }
 
     if (!versionString.empty()) {
-        LOGV2(
-            23218,
-            "Accepted connection with TLS Version {versionString} from connection {hostForLogging}",
-            "versionString"_attr = versionString,
-            "hostForLogging"_attr = hostForLogging);
+        LOGV2(23218,
+              "Accepted connection with TLS Version {version} from connection {connection}",
+              "version"_attr = versionString,
+              "connection"_attr = hostForLogging);
     }
 }
 
@@ -1160,13 +1159,14 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer) {
-    LOGV2_WARNING(23221, "Peer certificate '{peer}' expires soon", "peer"_attr = peer);
+    LOGV2_WARNING(
+        23221, "Peer certificate '{peerSubjectName}' expires soon", "peerSubjectName"_attr = peer);
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days) {
     LOGV2_WARNING(23222,
-                  "Peer certificate '{peer}' expires in {days}",
-                  "peer"_attr = peer,
+                  "Peer certificate '{peerSubjectName}' expires in {days}",
+                  "peerSubjectName"_attr = peer,
                   "days"_attr = days);
 }
 
