@@ -814,16 +814,14 @@ def get_command_env(env):
 def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
     """Generate a response file command provider for rule name."""
 
-    # If win32 and working on a compile rule then we don't want to
-    # calculate an environment for this command. It's a compile
-    # command and compiledb doesn't support shell syntax on
-    # Windows. We need the shell syntax to use environment variables
-    # on Windows so we just skip this platform / rule combination to
-    # keep the compiledb working.
+    # If win32 using the environment with a response file command will cause
+    # ninja to fail to create the response file. Additionally since these rules
+    # generally are not piping through cmd.exe /c any environment variables will
+    # make CreateProcess fail to start.
     #
     # On POSIX we can still set environment variables even for compile
     # commands so we do so.
-    use_command_env = not (env["PLATFORM"] == "win32" and rule in ["CC", "CXX"])
+    use_command_env = not env["PLATFORM"] == "win32"
     if "$" in tool:
         tool_is_dynamic = True
 
