@@ -68,9 +68,6 @@ public:
     bool adminOnly() const final {
         return true;
     }
-    bool maintenanceOk() const final {
-        return false;
-    }
     bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }

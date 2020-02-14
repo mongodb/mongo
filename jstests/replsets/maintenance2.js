@@ -34,7 +34,7 @@ assert.eq(2, slaves.length, "Expected 2 slaves but length was " + slaves.length)
 
 slaves.forEach(function(slave) {
     // put slave into maintenance (recovery) mode
-    assert.commandWorked(slave.getDB("foo").adminCommand({replSetMaintenance: 1}));
+    slave.getDB("foo").adminCommand({replSetMaintenance: 1});
 
     var stats = slave.getDB("foo").adminCommand({replSetGetStatus: 1});
     assert.eq(stats.myState, 3, "Slave should be in recovering state.");
@@ -42,9 +42,6 @@ slaves.forEach(function(slave) {
     print("count should fail in recovering state...");
     slave.slaveOk = true;
     assert.commandFailed(slave.getDB("foo").runCommand({count: "foo"}));
-
-    // unset maintenance mode when done
-    assert.commandWorked(slave.getDB("foo").adminCommand({replSetMaintenance: 0}));
 });
 
 // Shut down the set and finish the test.

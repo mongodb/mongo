@@ -41,9 +41,6 @@ doTest = function() {
 
     print("******* fsyncUnlock'n secondary ************* ");
     sDB.fsyncUnlock();
-
-    print("******* unset replSetMaintenance on secondary ************* ");
-    assert.commandWorked(sDB.adminCommand({replSetMaintenance: 0}));
     replTest.stopSet();
 };
 

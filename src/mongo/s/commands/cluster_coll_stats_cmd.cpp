@@ -53,10 +53,6 @@ public:
         return false;
     }
 
-    bool maintenanceOk() const override {
-        return false;
-    }
-
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
     }
