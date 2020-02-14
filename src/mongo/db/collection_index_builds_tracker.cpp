@@ -68,9 +68,7 @@ void CollectionIndexBuildsTracker::removeIndexBuild(
         _buildStateByIndexName.erase(indexName);
     }
 
-    if (_buildStateByBuildUUID.empty()) {
-        _noIndexBuildsRemainCondVar.notify_all();
-    }
+    _indexBuildFinishedCondVar.notify_all();
 }
 
 std::shared_ptr<ReplIndexBuildState> CollectionIndexBuildsTracker::getIndexBuildState(
@@ -86,6 +84,14 @@ bool CollectionIndexBuildsTracker::hasIndexBuildState(WithLock, StringData index
         return false;
     }
     return true;
+}
+
+std::vector<UUID> CollectionIndexBuildsTracker::getIndexBuildUUIDs(WithLock) const {
+    std::vector<UUID> buildUUIDs;
+    for (const auto& state : _buildStateByBuildUUID) {
+        buildUUIDs.push_back(state.first);
+    }
+    return buildUUIDs;
 }
 
 void CollectionIndexBuildsTracker::runOperationOnAllBuilds(
@@ -106,7 +112,7 @@ int CollectionIndexBuildsTracker::getNumberOfIndexBuilds(WithLock) const {
 }
 
 void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk) {
-    _noIndexBuildsRemainCondVar.wait(lk, [&] {
+    _indexBuildFinishedCondVar.wait(lk, [&] {
         if (_buildStateByBuildUUID.empty()) {
             return true;
         }
@@ -118,6 +124,18 @@ void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_loc
                   "indexBuild_first"_attr = indexBuild.first);
         }
 
+        return false;
+    });
+}
+
+void CollectionIndexBuildsTracker::waitUntilIndexBuildFinished(stdx::unique_lock<Latch>& lk,
+                                                               const UUID& buildUUID) {
+    log() << "Waiting until index build with UUID " << buildUUID << " is finished";
+
+    _indexBuildFinishedCondVar.wait(lk, [&] {
+        if (_buildStateByBuildUUID.find(buildUUID) == _buildStateByBuildUUID.end()) {
+            return true;
+        }
         return false;
     });
 }

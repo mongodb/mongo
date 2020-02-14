@@ -49,7 +49,9 @@ class IndexBuildsManager;
  * The owner of a CollectionIndexBuildsTracker instance must instantiate a mutex to use along with
  * the data structure to ensure it remains consistent across single or multiple function accesses.
  *
- * This is intended to only be used by the IndexBuildsCoordinator class.
+ * This is intended to only be used by the IndexBuildsCoordinator class. Functions expecting a lock
+ * to be passed in as a parameter require an already locked IndexBuildsCoordinator::_mutex in this
+ * case.
  */
 class CollectionIndexBuildsTracker {
     CollectionIndexBuildsTracker(const CollectionIndexBuildsTracker&) = delete;
@@ -72,6 +74,8 @@ public:
     std::shared_ptr<ReplIndexBuildState> getIndexBuildState(WithLock, StringData indexName) const;
 
     bool hasIndexBuildState(WithLock, StringData indexName) const;
+
+    std::vector<UUID> getIndexBuildUUIDs(WithLock) const;
 
     /**
      * Runs the provided function operation on all this collection's index builds
@@ -98,15 +102,22 @@ public:
      */
     void waitUntilNoIndexBuildsRemain(stdx::unique_lock<Latch>& lk);
 
+    /**
+     * Returns when the index build with the given build UUID is no longer active. When the build
+     * UUID does not correspond to an active index build, returns immediately.
+     */
+    void waitUntilIndexBuildFinished(stdx::unique_lock<Latch>& lk, const UUID& buildUUID);
+
 private:
     // Maps of index build states on the collection, by build UUID and index name.
     stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash>
         _buildStateByBuildUUID;
     stdx::unordered_map<std::string, std::shared_ptr<ReplIndexBuildState>> _buildStateByIndexName;
 
-    // Condition variable that is signaled when there are no active index builds remaining on the
-    // collection.
-    stdx::condition_variable _noIndexBuildsRemainCondVar;
+    // Condition variable that is signaled when an index build has finished on the collection. The
+    // accompanying mutex for this condition variable comes from the owner managing this class
+    // instance.
+    stdx::condition_variable _indexBuildFinishedCondVar;
 };
 
 }  // namespace mongo
