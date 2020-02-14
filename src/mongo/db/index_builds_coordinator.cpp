@@ -508,25 +508,44 @@ void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown() {
     }
 }
 
-void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUUID,
-                                                        const std::string& reason) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    // Ensure the caller correctly stopped any new index builds on the collection.
-    auto it = _disallowedCollections.find(collectionUUID);
-    invariant(it != _disallowedCollections.end());
-
+std::vector<UUID> IndexBuildsCoordinator::_abortCollectionIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                                                      const UUID& collectionUUID,
+                                                                      const std::string& reason,
+                                                                      bool shouldWait) {
     auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
     if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
-        return;
+        return {};
     }
 
+    log() << "About to abort all index builders on collection with UUID: " << collectionUUID;
+
+    std::vector<UUID> buildUUIDs = collIndexBuildsIt->second->getIndexBuildUUIDs(lk);
     collIndexBuildsIt->second->runOperationOnAllBuilds(
         lk, &_indexBuildsManager, abortIndexBuild, reason);
+
+    if (!shouldWait) {
+        return buildUUIDs;
+    }
+
     // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
     // object does not destruct while we are waiting, causing a use-after-free memory error.
     auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
     collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    return buildUUIDs;
+}
+
+void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUUID,
+                                                        const std::string& reason) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    const bool shouldWait = true;
+    _abortCollectionIndexBuilds(lk, collectionUUID, reason, shouldWait);
+}
+
+std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuildsNoWait(
+    const UUID& collectionUUID, const std::string& reason) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    const bool shouldWait = false;
+    return _abortCollectionIndexBuilds(lk, collectionUUID, reason, shouldWait);
 }
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::string& reason) {
@@ -682,13 +701,75 @@ void IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         return;
     }
 
-    auto replState = invariant(_getIndexBuild(buildUUID));
+    auto replState = invariant(_getIndexBuild(buildUUID),
+                               str::stream() << "Abort timestamp: " << abortTimestamp.toString());
 
     auto fut = replState->sharedPromise.getFuture();
     LOGV2(20655,
           "Index build joined after abort: {buildUUID}: {fut_waitNoThrow}",
           "buildUUID"_attr = buildUUID,
           "fut_waitNoThrow"_attr = fut.waitNoThrow());
+}
+
+boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNamesNoWait(
+    OperationContext* opCtx,
+    const UUID& collectionUUID,
+    const std::vector<std::string>& indexNames,
+    Timestamp abortTimestamp,
+    const std::string& reason) {
+    boost::optional<UUID> buildUUID;
+    auto indexBuilds = _getIndexBuilds();
+    auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
+        if (replState->collectionUUID != collectionUUID) {
+            return;
+        }
+
+        bool matchedBuilder = std::is_permutation(indexNames.begin(),
+                                                  indexNames.end(),
+                                                  replState->indexNames.begin(),
+                                                  replState->indexNames.end());
+        if (!matchedBuilder) {
+            return;
+        }
+
+        log() << "About to abort index builder: " << replState->buildUUID
+              << " on collection: " << collectionUUID
+              << ". First index: " << replState->indexNames.front();
+
+        if (this->abortIndexBuildByBuildUUIDNoWait(
+                opCtx, replState->buildUUID, abortTimestamp, reason)) {
+            buildUUID = replState->buildUUID;
+        }
+    };
+    forEachIndexBuild(indexBuilds,
+                      "IndexBuildsCoordinator::abortIndexBuildByIndexNamesNoWait - "_sd,
+                      onIndexBuild);
+    return buildUUID;
+}
+
+bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
+                                             const UUID& collectionUUID,
+                                             const std::vector<std::string>& indexNames) const {
+    bool foundIndexBuilder = false;
+    boost::optional<UUID> buildUUID;
+    auto indexBuilds = _getIndexBuilds();
+    auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
+        if (replState->collectionUUID != collectionUUID) {
+            return;
+        }
+
+        bool matchedBuilder = std::is_permutation(indexNames.begin(),
+                                                  indexNames.end(),
+                                                  replState->indexNames.begin(),
+                                                  replState->indexNames.end());
+        if (!matchedBuilder) {
+            return;
+        }
+
+        foundIndexBuilder = true;
+    };
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::hasIndexBuilder - "_sd, onIndexBuild);
+    return foundIndexBuilder;
 }
 
 bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
@@ -913,6 +994,21 @@ void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
             !inProgForDb(db));
 }
 
+void IndexBuildsCoordinator::awaitIndexBuildFinished(const UUID& collectionUUID,
+                                                     const UUID& buildUUID) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+
+    auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
+    if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
+        return;
+    }
+
+    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
+    // object does not destruct while we are waiting, causing a use-after-free memory error.
+    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
+    collIndexBuildsSharedPtr->waitUntilIndexBuildFinished(lk, buildUUID);
+}
+
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
     const UUID& collectionUUID) const {
     stdx::unique_lock<Latch> lk(_mutex);
@@ -926,6 +1022,7 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
     // object does not destruct while we are waiting, causing a use-after-free memory error.
     auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
     collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    invariant(collIndexBuildsSharedPtr->getNumberOfIndexBuilds(lk) == 0);
 }
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
@@ -1457,7 +1554,7 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     if (status == ErrorCodes::InterruptedAtShutdown) {
         // Leave it as-if kill -9 happened. Startup recovery will rebuild the index.
         _indexBuildsManager.abortIndexBuildWithoutCleanup(
-            opCtx, replState->buildUUID, "shutting down");
+            opCtx, collection, replState->buildUUID, "shutting down");
         _indexBuildsManager.tearDownIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         return;
@@ -1499,7 +1596,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
     if (status == ErrorCodes::InterruptedAtShutdown) {
         // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
         _indexBuildsManager.abortIndexBuildWithoutCleanup(
-            opCtx, replState->buildUUID, "shutting down");
+            opCtx, collection, replState->buildUUID, "shutting down");
         _indexBuildsManager.tearDownIndexBuild(
             opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
         return;
@@ -1532,7 +1629,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
             // rollback process to correct this state.
             if (abortIndexBuildTimestamp.isNull()) {
                 _indexBuildsManager.abortIndexBuildWithoutCleanup(
-                    opCtx, replState->buildUUID, "no longer primary");
+                    opCtx, collection, replState->buildUUID, "no longer primary");
                 _indexBuildsManager.tearDownIndexBuild(
                     opCtx, collection, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
                 return;

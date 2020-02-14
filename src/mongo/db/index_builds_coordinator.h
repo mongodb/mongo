@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -206,11 +207,17 @@ public:
      *     AutoGetCollection autoColl(..., collectionUUID, ...);
      *     autoColl->dropCollection(...);
      * }
-     *
-     * TODO: this is partially implemented. It calls IndexBuildsManager::abortIndexBuild that is not
-     * implemented.
      */
     void abortCollectionIndexBuilds(const UUID& collectionUUID, const std::string& reason);
+
+    /**
+     * Signals all of the index builds on the specified collection to abort and returns the build
+     * UUIDs of the index builds that will be aborted. Must identify the collection with a UUID. The
+     * provided 'reason' will be used in the error message that the index builders return to their
+     * callers.
+     */
+    std::vector<UUID> abortCollectionIndexBuildsNoWait(const UUID& collectionUUID,
+                                                       const std::string& reason);
 
     /**
      * Signals all of the index builds on the specified 'db' to abort and then waits until the index
@@ -227,9 +234,6 @@ public:
      *     AutoGetDb autoDb(...);
      *     autoDb->dropDatabase(...);
      * }
-     *
-     * TODO: this is partially implemented. It calls IndexBuildsManager::abortIndexBuild that is not
-     * implemented.
      */
     void abortDatabaseIndexBuilds(StringData db, const std::string& reason);
 
@@ -249,6 +253,27 @@ public:
                                           const UUID& buildUUID,
                                           Timestamp abortTimestamp,
                                           const std::string& reason);
+
+    /**
+     * Aborts an index build by its index name(s). This will only abort in-progress index builds if
+     * all of the indexes are specified that a single builder is building together. When an
+     * appropriate builder exists, this returns the build UUID of the index builder that will be
+     * aborted.
+     */
+    boost::optional<UUID> abortIndexBuildByIndexNamesNoWait(
+        OperationContext* opCtx,
+        const UUID& collectionUUID,
+        const std::vector<std::string>& indexNames,
+        Timestamp abortTimestamp,
+        const std::string& reason);
+
+    /**
+     * Returns true if there is an index builder building the given index names on a collection.
+     */
+    bool hasIndexBuilder(OperationContext* opCtx,
+                         const UUID& collectionUUID,
+                         const std::vector<std::string>& indexNames) const;
+
     /**
      * Returns number of index builds in process.
      *
@@ -325,6 +350,12 @@ public:
      * Uasserts if any index builds is in progress on the specified database.
      */
     void assertNoBgOpInProgForDb(StringData db) const;
+
+    /**
+     * Waits for the index build with 'buildUUID' to finish on the specified collection before
+     * returning. Returns immediately if no such index build with 'buildUUID' is found.
+     */
+    void awaitIndexBuildFinished(const UUID& collectionUUID, const UUID& buildUUID) const;
 
     /**
      * Waits for all index builds on a specified collection to finish.
@@ -632,6 +663,15 @@ protected:
      * it is fine to examine the returned index builds without re-locking 'mutex'.
      */
     std::vector<std::shared_ptr<ReplIndexBuildState>> _getIndexBuilds() const;
+
+    /**
+     * Helper for 'abortCollectionIndexBuilds' and 'abortCollectionIndexBuildsNoWait'. Returns the
+     * UUIDs of the aborted index builders
+     */
+    std::vector<UUID> _abortCollectionIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                                  const UUID& collectionUUID,
+                                                  const std::string& reason,
+                                                  bool shouldWait);
 
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");

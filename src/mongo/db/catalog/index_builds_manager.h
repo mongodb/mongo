@@ -153,6 +153,7 @@ public:
      * been cleared away, or not having yet started..
      */
     bool abortIndexBuildWithoutCleanup(OperationContext* opCtx,
+                                       Collection* collection,
                                        const UUID& buildUUID,
                                        const std::string& reason);
 
@@ -188,9 +189,9 @@ private:
     void _unregisterIndexBuild(const UUID& buildUUID);
 
     /**
-     * Returns a shared pointer to the builder. Invariants if the builder does not exist.
+     * Returns a shared pointer to the builder. Returns a bad status if the builder does not exist.
      */
-    std::shared_ptr<MultiIndexBlock> _getBuilder(const UUID& buildUUID);
+    StatusWith<std::shared_ptr<MultiIndexBlock>> _getBuilder(const UUID& buildUUID);
 
     // Protects the map data structures below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsManager::_mutex");
