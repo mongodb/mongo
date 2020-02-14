@@ -33,9 +33,10 @@ var $config = extendWorkload($config, function($config, $super) {
                 {x: 1}, {unique: true, background: Random.rand() < 0.5});
             if (TestData.runInsideTransaction) {
                 assertWhenOwnColl.commandWorkedOrFailedWithCode(
-                    res, ErrorCodes.IndexBuildAlreadyInProgress);
+                    res, [ErrorCodes.IndexBuildAborted, ErrorCodes.IndexBuildAlreadyInProgress]);
             } else {
-                assertWhenOwnColl.commandWorked(res);
+                assertWhenOwnColl.commandWorkedOrFailedWithCode(res,
+                                                                [ErrorCodes.IndexBuildAborted]);
             }
         }
     };

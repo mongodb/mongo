@@ -61,12 +61,14 @@ var $config = (function() {
             // Recreate the index that was dropped. (See populateIndexes() for why we ignore the
             // CannotImplicitlyCreateCollection error.)
             let res = db[this.collName].createIndex(indexSpec);
-            assertWorkedOrFailedHandleTxnErrors(res,
-                                                [
-                                                    ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAlreadyInProgress
-                                                ],
-                                                ErrorCodes.CannotImplicitlyCreateCollection);
+            assertWorkedOrFailedHandleTxnErrors(
+                res,
+                [
+                    ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.IndexBuildAlreadyInProgress
+                ],
+                [ErrorCodes.CannotImplicitlyCreateCollection, ErrorCodes.IndexBuildAborted]);
         }
     };
 

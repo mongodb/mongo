@@ -44,7 +44,10 @@ var $config = (function() {
 
             this.indexSpecs.forEach(indexSpec => {
                 let res = db[collName].createIndex(indexSpec);
-                assertWorkedHandleTxnErrors(res, ErrorCodes.IndexBuildAlreadyInProgress);
+                assertWorkedOrFailedHandleTxnErrors(
+                    res,
+                    [ErrorCodes.IndexBuildAborted, ErrorCodes.IndexBuildAlreadyInProgress],
+                    [ErrorCodes.IndexBuildAborted]);
             });
         },
 
@@ -235,7 +238,8 @@ var $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             // Re-create the index that was dropped.
-            assertAlways.commandWorked(myDB[targetColl].createIndex(indexSpec));
+            assertAlways.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec),
+                                                       [ErrorCodes.IndexBuildAborted]);
         }
     };
 

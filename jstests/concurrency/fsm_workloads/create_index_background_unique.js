@@ -37,14 +37,16 @@ var $config = (function() {
             });
             // Multi-statement Transactions can fail with SnapshotUnavailable if there are
             // pending catalog changes as of the transaction start (see SERVER-43018).
-            assertWorkedOrFailedHandleTxnErrors(res,
-                                                [
-                                                    ErrorCodes.IndexBuildAlreadyInProgress,
-                                                    ErrorCodes.SnapshotUnavailable,
-                                                    ErrorCodes.SnapshotTooOld,
-                                                    ErrorCodes.NotMaster
-                                                ],
-                                                [ErrorCodes.NotMaster]);
+            assertWorkedOrFailedHandleTxnErrors(
+                res,
+                [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.IndexBuildAlreadyInProgress,
+                    ErrorCodes.SnapshotUnavailable,
+                    ErrorCodes.SnapshotTooOld,
+                    ErrorCodes.NotMaster
+                ],
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.NotMaster]);
         }
 
         function dropIndex(db, collName) {

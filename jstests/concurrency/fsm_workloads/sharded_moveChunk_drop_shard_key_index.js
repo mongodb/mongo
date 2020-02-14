@@ -58,8 +58,10 @@ var $config = (function() {
             db[collName].dropIndex(this.shardKey);
 
             // Re-create the index that was dropped.
-            assertWorkedHandleTxnErrors(db[collName].createIndex(this.shardKey),
-                                        ErrorCodes.IndexBuildAlreadyInProgress);
+            assertWorkedOrFailedHandleTxnErrors(
+                db[collName].createIndex(this.shardKey),
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.IndexBuildAlreadyInProgress],
+                [ErrorCodes.IndexBuildAborted]);
         }
 
     };

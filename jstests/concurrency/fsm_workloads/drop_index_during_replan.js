@@ -46,7 +46,8 @@ var $config = (function() {
             db[collName].dropIndex({b: 1});
 
             // Recreate the index that was dropped.
-            assertAlways.commandWorked(db[collName].createIndex({b: 1}));
+            assertAlways.commandWorkedOrFailedWithCode(db[collName].createIndex({b: 1}),
+                                                       [ErrorCodes.IndexBuildAborted]);
         }
     };
 
