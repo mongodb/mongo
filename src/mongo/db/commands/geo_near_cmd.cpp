@@ -60,8 +60,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::stringstream;
+using std::unique_ptr;
 
 class Geo2dFindNearCmd : public ErrmsgCommandDeprecated {
 public:
@@ -75,6 +75,9 @@ public:
     }
     bool slaveOverrideOk() const {
         return true;
+    }
+    bool maintenanceOk() const override {
+        return false;
     }
     bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
         return true;

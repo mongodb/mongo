@@ -71,7 +71,9 @@ public:
                                      const BSONObj& cmdObj) const override {
         return !AggregationRequest::parseNs(dbName, cmdObj).isCollectionlessAggregateNS();
     }
-
+    bool maintenanceOk() const override {
+        return false;
+    }
     ReadWriteType getReadWriteType() const {
         return ReadWriteType::kRead;
     }

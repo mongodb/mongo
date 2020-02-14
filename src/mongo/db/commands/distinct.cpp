@@ -67,9 +67,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -83,6 +83,10 @@ public:
 
     virtual bool slaveOverrideOk() const {
         return true;
+    }
+
+    virtual bool maintenanceOk() const override {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

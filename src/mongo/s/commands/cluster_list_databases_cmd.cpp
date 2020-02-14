@@ -46,9 +46,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::map;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -63,6 +63,10 @@ public:
 
     virtual bool slaveOverrideOk() const {
         return true;
+    }
+
+    virtual bool maintenanceOk() const override {
+        return false;
     }
 
     virtual bool adminOnly() const {

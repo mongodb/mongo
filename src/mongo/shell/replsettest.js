@@ -1558,8 +1558,15 @@ var ReplSetTest = function(opts) {
             const replSetConfig =
                 rst.getReplSetConfigFromNode ? rst.getReplSetConfigFromNode() : undefined;
 
-            rst.liveNodes.slaves.forEach(secondary => {
-                secondary.getDBNames().forEach(dbName => combinedDBs.add(dbName));
+            rst.liveNodes.slaves.forEach(node => {
+                // Arbiters have no replicated data.
+                if (node.getDB('admin').isMaster('admin').arbiterOnly) {
+                    print("checkDBHashesForReplSet skipping data of arbiter: " + node.host);
+                    return;
+                }
+                print("checkDBHashesForReplSet going to check data hashes on secondary: " +
+                      node.host);
+                node.getDBNames().forEach(dbName => combinedDBs.add(dbName));
             });
 
             for (var dbName of combinedDBs) {

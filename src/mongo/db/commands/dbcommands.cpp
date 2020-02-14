@@ -911,6 +911,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
+    bool maintenanceOk() const override {
+        return false;
+    }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -992,6 +995,9 @@ public:
 
     virtual bool slaveOk() const {
         return true;
+    }
+    bool maintenanceOk() const override {
+        return false;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

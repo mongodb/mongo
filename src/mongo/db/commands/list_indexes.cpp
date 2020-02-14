@@ -84,6 +84,9 @@ public:
     virtual bool slaveOverrideOk() const {
         return true;
     }
+    virtual bool maintenanceOk() const override {
+        return false;
+    }
     virtual bool adminOnly() const {
         return false;
     }

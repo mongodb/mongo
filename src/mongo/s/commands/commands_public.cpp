@@ -71,15 +71,15 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::shared_ptr;
 using std::list;
 using std::make_pair;
 using std::map;
 using std::multimap;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -1090,6 +1090,10 @@ public:
         return false;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
@@ -1469,7 +1473,7 @@ public:
 
     void help(stringstream& h) const override {
         h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand";
-    }
+    }  // namespace
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
@@ -1608,6 +1612,10 @@ public:
         return false;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const string& dbName,
              const BSONObj& cmdObj,
@@ -1623,7 +1631,8 @@ public:
         return passthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, result);
     }
 
-} evalCmd;
+}  // namespace mongo
+evalCmd;
 
 class CmdListCollections final : public PublicGridCommand {
 public:

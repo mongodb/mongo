@@ -23,6 +23,12 @@ function validateCollections(db, obj) {
 
     var adminDB = db.getSiblingDB("admin");
 
+    // Skip validating collections for arbiters.
+    if (adminDB.isMaster('admin').arbiterOnly === true) {
+        print('Skipping collection validation on arbiter for db: ' + tojson(db));
+        return success;
+    }
+
     // Don't run validate on view namespaces.
     let filter = {type: "collection"};
     if (jsTest.options().skipValidationOnInvalidViewDefinitions) {

@@ -78,6 +78,10 @@ public:
         return true;
     }
 
+    bool maintenanceOk() const override {
+        return false;
+    }
+
     bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
         return true;
     }

@@ -1365,6 +1365,10 @@ public:
         return true;
     }
 
+    virtual bool maintenanceOk() const override {
+        return false;
+    }
+
     std::size_t reserveBytesForReply() const override {
         return FindCommon::kInitReplyBufferSize;
     }
@@ -1893,5 +1897,5 @@ public:
 
 } mapReduceFinishCommand;
 
-}  // namespace
+}  // namespace mr
 }  // namespace mongo

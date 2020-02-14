@@ -45,8 +45,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using stdx::make_unique;
 
 namespace {
@@ -64,8 +64,13 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     virtual bool slaveOk() const {
         return true;
+    }
+
+    virtual bool maintenanceOk() const override {
+        return false;
     }
 
     bool supportsNonLocalReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {

@@ -65,6 +65,7 @@
     assert.eq(["_id_"], hiddenAdminDb.system.roles.getIndexes().map(x => x.name).sort());
 
     secondary = rst.restart(secondary, {}, true /* wait for node to become healthy */);
+    rst.awaitSecondaryNodes();
     secondaryAdminDb = secondary.getDB("admin");
     assert.eq(["_id_"], secondaryAdminDb.system.users.getIndexes().map(x => x.name).sort());
     assert.eq(["_id_"], secondaryAdminDb.system.roles.getIndexes().map(x => x.name).sort());
