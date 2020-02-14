@@ -28,7 +28,7 @@ const baseURI = (function() {
 })();
 
 function test(uri) {
-    assert.eq(runMongoProgram('./mongo', uri, '--eval', ';'), 0);
+    assert.eq(runMongoProgram('mongo', uri, '--eval', ';'), 0);
 }
 
 // We've made no client connections for which speculation was possible,
