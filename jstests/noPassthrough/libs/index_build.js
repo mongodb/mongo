@@ -136,7 +136,7 @@ class IndexBuildTest {
         notReadyIndexes = notReadyIndexes || [];
         options = options || {};
 
-        let res = coll.runCommand("listIndexes", options);
+        let res = assert.commandWorked(coll.runCommand("listIndexes", options));
         assert.eq(numIndexes,
                   res.cursor.firstBatch.length,
                   'unexpected number of indexes in collection: ' + tojson(res));
