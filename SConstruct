@@ -4425,36 +4425,17 @@ if has_option("cache"):
 
 resmoke_install_dir = env.subst("$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
 resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
-resmoke_config = env.Substfile(
-    target="#resmoke.ini",
-    source="#buildscripts/resmoke.ini.in",
-    SUBST_DICT={
-        "@install_dir@": resmoke_install_dir,
-    }
-)
 
-# Self-testable installs (PM-1691) will make this unnecessary because we will be
-# installing resmoke (i.e. it will have it's own component and role) and it will
-# be able to detect where the binaries are. For now we need to generate this
-# config file to tell resmoke how to find mongod.
-def resmoke_config_scanner(old_scanner):
-    cfg_file = resmoke_config[0]
-
-    def new_scanner(node, env, path=()):
-        result = old_scanner.function(node, env, path)
-        result.append(cfg_file)
-        return result
-
-    return new_scanner
-
-
-program_builder = env["BUILDERS"]["Program"]
-program_builder.target_scanner = SCons.Scanner.Scanner(
-    function=resmoke_config_scanner(program_builder.target_scanner),
-    path_function=program_builder.target_scanner.path_function,
-)
-
-
+# Much blood sweat and tears were shed getting to this point. Any version of
+# this that uses SCons builders and a scanner will either not regenerate when it
+# should, cause everything to rebuild, or conflict with ninja. Sometimes all
+# three. So we've decieded it's best to just write this file here every time
+# because it's the only solution that always works.
+with open("resmoke.ini", "w") as resmoke_config:
+    resmoke_config.write("""
+[resmoke]
+install_dir = {install_dir}
+""".format(install_dir=resmoke_install_dir))
 
 env.SConscript(
     dirs=[
