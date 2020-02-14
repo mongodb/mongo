@@ -947,10 +947,11 @@ Status _syncRollback(OperationContext* opCtx,
     invariant(commonPoint >= committedSnapshot);
 
     try {
-        ON_BLOCK_EXIT([&] {
-            auto status = replicationProcess->incrementRollbackID(opCtx);
-            fassert(40497, status);
-        });
+        // It is always safe to increment the rollback ID first, even if we fail to complete
+        // the rollback.
+        auto status = replicationProcess->incrementRollbackID(opCtx);
+        fassert(40497, status);
+
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
 
         if (MONGO_FAIL_POINT(rollbackExitEarlyAfterCollectionDrop)) {
