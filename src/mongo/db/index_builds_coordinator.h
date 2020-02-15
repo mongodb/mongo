@@ -541,7 +541,6 @@ protected:
      * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.
      */
     void _buildIndex(OperationContext* opCtx,
-                     const NamespaceStringOrUUID& dbAndUUID,
                      std::shared_ptr<ReplIndexBuildState> replState,
                      const IndexBuildOptions& indexBuildOptions,
                      boost::optional<Lock::CollectionLock>* collLock);
@@ -552,7 +551,6 @@ protected:
      * createIndexes oplog entry.
      */
     void _buildIndexSinglePhase(OperationContext* opCtx,
-                                const NamespaceStringOrUUID& dbAndUUID,
                                 std::shared_ptr<ReplIndexBuildState> replState,
                                 const IndexBuildOptions& indexBuildOptions,
                                 boost::optional<Lock::CollectionLock>* collLock);
@@ -563,7 +561,6 @@ protected:
      * commitIndexBuild oplog entries, respectively.
      */
     void _buildIndexTwoPhase(OperationContext* opCtx,
-                             const NamespaceStringOrUUID& dbAndUUID,
                              std::shared_ptr<ReplIndexBuildState> replState,
                              const IndexBuildOptions& indexBuildOptions,
                              boost::optional<Lock::CollectionLock>* collLock);
@@ -573,20 +570,14 @@ protected:
      */
     void _scanCollectionAndInsertKeysIntoSorter(
         OperationContext* opCtx,
-        const NamespaceStringOrUUID& dbAndUUID,
         std::shared_ptr<ReplIndexBuildState> replState,
         boost::optional<Lock::CollectionLock>* exclusiveCollectionLock);
 
     /**
      * Second phase is extracting the sorted keys and writing them into the new index table.
-     * On completion, this function returns the namespace of the collection, which may have changed
-     * after the previous phase. The namespace is used in two phase index builds to determine the
-     * current replication state in _waitForCommitOrAbort().
      */
-    NamespaceString _insertKeysFromSideTablesWithoutBlockingWrites(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& dbAndUUID,
-        std::shared_ptr<ReplIndexBuildState> replState);
+    void _insertKeysFromSideTablesWithoutBlockingWrites(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
      * Waits for commit or abort signal from primary.
@@ -613,7 +604,6 @@ protected:
      */
     void _insertKeysFromSideTablesAndCommit(
         OperationContext* opCtx,
-        const NamespaceStringOrUUID& dbAndUUID,
         std::shared_ptr<ReplIndexBuildState> replState,
         const IndexBuildOptions& indexBuildOptions,
         boost::optional<Lock::CollectionLock>* exclusiveCollectionLock,

@@ -1586,11 +1586,10 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         // exception while checkForInterruptNoAssert() returns an error Status).
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->getSettings().usingReplSets()) {
-            _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+            _buildIndex(opCtx, replState, indexBuildOptions, &collLock);
         } else if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-            opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
-                _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
-            });
+            opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&, this] { _buildIndex(opCtx, replState, indexBuildOptions, &collLock); });
         } else {
             if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
                 // We need to drop the RSTL here, as we do not need synchronization with step up and
@@ -1602,11 +1601,10 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                 // TODO(SERVER-44045): Revisit this logic for the non-two phase index build case.
                 const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
                 invariant(unlocked);
-                opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
-                    _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
-                });
+                opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                    [&, this] { _buildIndex(opCtx, replState, indexBuildOptions, &collLock); });
             } else {
-                _buildIndex(opCtx, dbAndUUID, replState, indexBuildOptions, &collLock);
+                _buildIndex(opCtx, replState, indexBuildOptions, &collLock);
             }
         }
         // If _buildIndex returned normally, then we should have the collection X lock. It is not
@@ -1665,46 +1663,41 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
 void IndexBuildsCoordinator::_buildIndex(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
-        _buildIndexSinglePhase(
-            opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock);
+        _buildIndexSinglePhase(opCtx, replState, indexBuildOptions, exclusiveCollectionLock);
         return;
     }
 
     invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
               str::stream() << replState->buildUUID);
-    _buildIndexTwoPhase(opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock);
+    _buildIndexTwoPhase(opCtx, replState, indexBuildOptions, exclusiveCollectionLock);
 }
 
 void IndexBuildsCoordinator::_buildIndexSinglePhase(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
-    _scanCollectionAndInsertKeysIntoSorter(opCtx, dbAndUUID, replState, exclusiveCollectionLock);
-    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+    _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
+    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _insertKeysFromSideTablesAndCommit(
-        opCtx, dbAndUUID, replState, indexBuildOptions, exclusiveCollectionLock, {});
+        opCtx, replState, indexBuildOptions, exclusiveCollectionLock, {});
 }
 
 void IndexBuildsCoordinator::_buildIndexTwoPhase(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
     auto preAbortStatus = Status::OK();
     try {
-        _scanCollectionAndInsertKeysIntoSorter(
-            opCtx, dbAndUUID, replState, exclusiveCollectionLock);
-        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, dbAndUUID, replState);
+        _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
+        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     } catch (DBException& ex) {
         // Locks may no longer be held when we are interrupted. We should return immediately and, in
         // the case of a primary index build, signal downstream nodes to abort via the
@@ -1714,6 +1707,7 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
             throw;
         }
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         auto replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
             !replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
         if (!replSetAndNotPrimary) {
@@ -1728,17 +1722,12 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
     }
 
     auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, replState, preAbortStatus);
-    _insertKeysFromSideTablesAndCommit(opCtx,
-                                       dbAndUUID,
-                                       replState,
-                                       indexBuildOptions,
-                                       exclusiveCollectionLock,
-                                       commitIndexBuildTimestamp);
+    _insertKeysFromSideTablesAndCommit(
+        opCtx, replState, indexBuildOptions, exclusiveCollectionLock, commitIndexBuildTimestamp);
 }
 
 void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
@@ -1766,6 +1755,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     // background.
     exclusiveCollectionLock->reset();
     {
+        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IS);
 
         // The collection object should always exist while an index build is registered.
@@ -1785,13 +1775,11 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
 
 /**
  * Second phase is extracting the sorted keys and writing them into the new index table.
- * Looks up collection namespace while holding locks.
  */
-NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
-    std::shared_ptr<ReplIndexBuildState> replState) {
+void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Perform the first drain while holding an intent lock.
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IS);
@@ -1808,9 +1796,6 @@ NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlocking
         hangAfterIndexBuildFirstDrain.pauseWhileSet();
     }
 
-    // Cache collection namespace for shouldWaitForCommitOrAbort().
-    NamespaceString nss;
-
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -1821,16 +1806,12 @@ NamespaceString IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlocking
             replState->buildUUID,
             RecoveryUnit::ReadSource::kUnset,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
-
-        nss = *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildSecondDrain.shouldFail())) {
         LOGV2(20667, "Hanging after index build second drain");
         hangAfterIndexBuildSecondDrain.pauseWhileSet();
     }
-
-    return nss;
 }
 
 /**
@@ -1894,13 +1875,13 @@ Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
  */
 void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& dbAndUUID,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock,
     const Timestamp& commitIndexBuildTimestamp) {
     // Need to return the collection lock back to exclusive mode, to complete the index build.
     opCtx->recoveryUnit()->abandonSnapshot();
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     exclusiveCollectionLock->emplace(opCtx, dbAndUUID, MODE_X);
 
     // The collection object should always exist while an index build is registered.
