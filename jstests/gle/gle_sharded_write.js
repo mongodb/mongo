@@ -2,6 +2,9 @@
 // Ensures GLE correctly reports basic write stats and failures
 // Note that test should work correctly with and without write commands.
 //
+// @tags: [
+//   requires_sharding,
+// ]
 
 // Checking UUID and index consistency involves talking to shards, but this test shuts down one
 // shard.
