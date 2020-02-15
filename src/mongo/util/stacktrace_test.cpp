@@ -225,7 +225,15 @@ TEST(StackTrace, PosixFormat) {
     for (const auto& btElem : jsonObj["backtrace"].embeddedObject()) {
         btAddrs.push_back(fromHex(btElem.embeddedObject()["a"].String()));
     }
+
+    // Mac OS backtrace returns extra frames in "backtrace".
+#if defined(__APPLE__)
+    ASSERT_TRUE(std::search(btAddrs.begin(), btAddrs.end(), humanAddrs.begin(), humanAddrs.end()) ==
+                btAddrs.begin())
+        << LogVec(btAddrs) << " vs " << LogVec(humanAddrs);
+#else
     ASSERT_TRUE(btAddrs == humanAddrs) << LogVec(btAddrs) << " vs " << LogVec(humanAddrs);
+#endif  // __APPLE
 }
 
 TEST(StackTrace, WindowsFormat) {
