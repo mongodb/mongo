@@ -110,12 +110,6 @@ struct StorageGlobalParams {
     // workloads that rely heavily on creating many collections within a database.
     bool groupCollections;
 
-    // --oplogMinRetentionHours
-    // Controls what size the oplog should be in addition to oplogSize. If set, the oplog will only
-    // be truncated if it is over the capped size, and if the bucket of oldest oplog entries fall
-    // outside of the retention window which is set by this option.
-    AtomicWord<double> oplogMinRetentionHours;
-
     // Controls whether we allow the OplogStones mechanism to delete oplog history on WT.
     bool allowOplogTruncation = true;
 };

@@ -528,16 +528,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         invariant(replSettings.getOplogSizeBytes() > 0);
     }
 
-    if (params.count("storage.oplogMinRetentionHours")) {
-        storageGlobalParams.oplogMinRetentionHours.store(
-            params["storage.oplogMinRetentionHours"].as<double>());
-        if (storageGlobalParams.oplogMinRetentionHours.load() < 0) {
-            return Status(ErrorCodes::BadValue,
-                          "bad --oplogMinRetentionHours, argument must be greater or equal to 0");
-        }
-        invariant(storageGlobalParams.oplogMinRetentionHours.load() >= 0);
-    }
-
     if (params.count("cacheSize")) {
         long x = params["cacheSize"].as<long>();
         if (x <= 0) {
