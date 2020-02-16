@@ -66,7 +66,7 @@ public:
     static ReadWriteConcernDefaults& get(OperationContext* opCtx);
     static void create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
 
-    ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaultsFn);
+    ReadWriteConcernDefaults(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
     ~ReadWriteConcernDefaults();
 
     /**
@@ -162,7 +162,7 @@ private:
         Cache& operator=(const Cache&) = delete;
 
     public:
-        Cache(ThreadPoolInterface& threadPool, LookupFn lookupFn);
+        Cache(ServiceContext* service, ThreadPoolInterface& threadPool, LookupFn lookupFn);
         virtual ~Cache() = default;
 
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;

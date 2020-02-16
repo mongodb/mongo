@@ -73,16 +73,6 @@ public:
      */
     virtual void join() = 0;
 
-    /**
-     * Schedules "task" to run in the thread pool.
-     *
-     * Returns OK on success, ShutdownInProgress if shutdown() has already executed.
-     *
-     * It is safe to call this before startup(), but the scheduled task will not execute
-     * until after startup() is called.
-     */
-    virtual void schedule(Task task) = 0;
-
 protected:
     ThreadPoolInterface() = default;
 };

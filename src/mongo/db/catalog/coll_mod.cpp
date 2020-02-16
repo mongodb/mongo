@@ -410,8 +410,8 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
-        getGlobalServiceContext()->getOpObserver()->onCollMod(
-            opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, ttlInfo);
+        auto* const opObserver = opCtx->getServiceContext()->getOpObserver();
+        opObserver->onCollMod(opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, ttlInfo);
 
         wunit.commit();
         return Status::OK();

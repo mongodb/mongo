@@ -293,11 +293,10 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
-ExitCode _initAndListen(int listenPort) {
+ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     Client::initThread("initandlisten");
 
     initWireSpec();
-    auto serviceContext = getGlobalServiceContext();
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
 
@@ -767,9 +766,9 @@ ExitCode _initAndListen(int listenPort) {
     return waitForShutdown();
 }
 
-ExitCode initAndListen(int listenPort) {
+ExitCode initAndListen(ServiceContext* service, int listenPort) {
     try {
-        return _initAndListen(listenPort);
+        return _initAndListen(service, listenPort);
     } catch (DBException& e) {
         LOGV2(20557, "exception in initAndListen: {e}, terminating", "e"_attr = e.toString());
         return EXIT_UNCAUGHT;
@@ -789,7 +788,7 @@ ExitCode initAndListen(int listenPort) {
 
 #if defined(_WIN32)
 ExitCode initService() {
-    return initAndListen(serverGlobalParams.port);
+    return initAndListen(getGlobalServiceContext(), serverGlobalParams.port);
 }
 #endif
 
@@ -1247,18 +1246,23 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
         quickExit(EXIT_FAILURE);
     }
 
-    try {
-        setGlobalServiceContext(ServiceContext::make());
-    } catch (...) {
-        auto cause = exceptionToStatus();
-        LOGV2_FATAL_OPTIONS(20575,
-                            {logComponentV1toV2(LogComponent::kControl)},
-                            "Failed to create service context: {cause}",
-                            "cause"_attr = redact(cause));
-        quickExit(EXIT_FAILURE);
-    }
+    auto* service = [] {
+        try {
+            auto serviceContextHolder = ServiceContext::make();
+            auto* serviceContext = serviceContextHolder.get();
+            setGlobalServiceContext(std::move(serviceContextHolder));
 
-    auto service = getGlobalServiceContext();
+            return serviceContext;
+        } catch (...) {
+            auto cause = exceptionToStatus();
+            LOGV2_FATAL_OPTIONS(20575,
+                                {logComponentV1toV2(LogComponent::kControl)},
+                                "Failed to create service context: {cause}",
+                                "cause"_attr = redact(cause));
+            quickExit(EXIT_FAILURE);
+        }
+    }();
+
     setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);
@@ -1289,7 +1293,7 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     }
 #endif
 
-    ExitCode exitCode = initAndListen(serverGlobalParams.port);
+    ExitCode exitCode = initAndListen(service, serverGlobalParams.port);
     exitCleanly(exitCode);
     return 0;
 }

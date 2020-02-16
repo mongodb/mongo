@@ -231,10 +231,8 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
 
     _dbs.erase(it);
 
-    getGlobalServiceContext()
-        ->getStorageEngine()
-        ->closeDatabase(opCtx, dbName.toString())
-        .transitional_ignore();
+    auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    storageEngine->closeDatabase(opCtx, dbName.toString()).transitional_ignore();
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
@@ -250,6 +248,8 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
         dbs.insert(i->first);
     }
 
+    auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
     for (const auto& name : dbs) {
         LOGV2_DEBUG(20311, 2, "DatabaseHolder::closeAll name:{name}", "name"_attr = name);
 
@@ -259,10 +259,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
         _dbs.erase(name);
 
-        getGlobalServiceContext()
-            ->getStorageEngine()
-            ->closeDatabase(opCtx, name)
-            .transitional_ignore();
+        storageEngine->closeDatabase(opCtx, name).transitional_ignore();
     }
 }
 

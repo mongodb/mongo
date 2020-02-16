@@ -254,6 +254,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 "replOpTime"_attr = replOpTime,
                 "writeConcern"_attr = writeConcern.toBSON());
 
+    auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (!opCtx->getClient()->isInDirectClient()) {
@@ -273,7 +274,6 @@ Status waitForWriteConcern(OperationContext* opCtx,
         case WriteConcernOptions::SyncMode::NONE:
             break;
         case WriteConcernOptions::SyncMode::FSYNC: {
-            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             if (!storageEngine->isDurable()) {
                 storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
@@ -282,12 +282,12 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 result->fsyncFiles = 1;
             } else {
                 // We only need to commit the journal if we're durable
-                getGlobalServiceContext()->getStorageEngine()->waitForJournalFlush(opCtx);
+                storageEngine->waitForJournalFlush(opCtx);
             }
             break;
         }
         case WriteConcernOptions::SyncMode::JOURNAL:
-            getGlobalServiceContext()->getStorageEngine()->waitForJournalFlush(opCtx);
+            storageEngine->waitForJournalFlush(opCtx);
             break;
     }
 

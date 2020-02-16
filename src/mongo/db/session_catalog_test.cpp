@@ -569,7 +569,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
         // Normal check out should start after kill.
         normalCheckOutFinish = stdx::async(stdx::launch::async, [&] {
-            ThreadClient tc(getGlobalServiceContext());
+            ThreadClient tc(getServiceContext());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
             OperationContextSession normalCheckOut(sideOpCtx.get());
@@ -579,7 +579,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
         // Kill will short-cut the queue and be the next one to check out.
         killCheckOutFinish = stdx::async(stdx::launch::async, [&] {
-            ThreadClient tc(getGlobalServiceContext());
+            ThreadClient tc(getServiceContext());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
 

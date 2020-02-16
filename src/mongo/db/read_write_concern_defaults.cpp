@@ -43,7 +43,7 @@ static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
     repl::ReadConcernLevel::kSnapshotReadConcern, repl::ReadConcernLevel::kLinearizableReadConcern};
 
 const auto getReadWriteConcernDefaults =
-    ServiceContext::declareDecoration<std::unique_ptr<ReadWriteConcernDefaults>>();
+    ServiceContext::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
 
 }  // namespace
 
@@ -210,11 +210,11 @@ ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(OperationContext* opCtx)
 }
 
 void ReadWriteConcernDefaults::create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn) {
-    getReadWriteConcernDefaults(service) =
-        std::make_unique<ReadWriteConcernDefaults>(fetchDefaultsFn);
+    getReadWriteConcernDefaults(service).emplace(service, fetchDefaultsFn);
 }
 
-ReadWriteConcernDefaults::ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaultsFn)
+ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
+                                                   FetchDefaultsFn fetchDefaultsFn)
     : _threadPool([] {
           ThreadPool::Options options;
           options.poolName = "ReadWriteConcernDefaults";
@@ -228,14 +228,17 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(FetchDefaultsFn fetchDefaults
 
           return options;
       }()),
-      _defaults(_threadPool,
+      _defaults(service,
+                _threadPool,
                 [fetchDefaultsFn = std::move(fetchDefaultsFn)](
                     OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }) {}
 
 ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 
-ReadWriteConcernDefaults::Cache::Cache(ThreadPoolInterface& threadPool, LookupFn lookupFn)
-    : ReadThroughCache(_mutex, getGlobalServiceContext(), threadPool, 1 /* cacheSize */),
+ReadWriteConcernDefaults::Cache::Cache(ServiceContext* service,
+                                       ThreadPoolInterface& threadPool,
+                                       LookupFn lookupFn)
+    : ReadThroughCache(_mutex, service, threadPool, 1 /* cacheSize */),
       _lookupFn(std::move(lookupFn)) {}
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(

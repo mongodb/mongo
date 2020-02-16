@@ -1451,7 +1451,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
         o(lk).transactionMetricsObserver.onCommit(opCtx,
                                                   ServerTransactionsMetrics::get(opCtx),
                                                   tickSource,
-                                                  &Top::get(getGlobalServiceContext()),
+                                                  &Top::get(opCtx->getServiceContext()),
                                                   operationCount,
                                                   oplogOperationBytes);
         o(lk).transactionMetricsObserver.onTransactionOperation(

@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/commands/fsync.h"
 
 #include <string>
@@ -56,30 +58,30 @@
 #include "mongo/util/exit.h"
 
 namespace mongo {
-
-using std::string;
-using std::stringstream;
-
 namespace {
+
 // Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
 // lock time will be reported for a given user operation.
 Lock::ResourceMutex commandMutex("fsyncCommandMutex");
-}  // namespace
 
 /**
  * Maintains a global read lock while mongod is fsyncLocked.
  */
 class FSyncLockThread : public BackgroundJob {
 public:
-    FSyncLockThread(bool allowFsyncFailure)
-        : BackgroundJob(false), _allowFsyncFailure(allowFsyncFailure) {}
-    virtual ~FSyncLockThread() {}
-    virtual string name() const {
+    FSyncLockThread(ServiceContext* serviceContext, bool allowFsyncFailure)
+        : BackgroundJob(false),
+          _serviceContext(serviceContext),
+          _allowFsyncFailure(allowFsyncFailure) {}
+
+    std::string name() const override {
         return "FSyncLockThread";
     }
-    virtual void run();
+
+    void run() override;
 
 private:
+    ServiceContext* const _serviceContext;
     bool _allowFsyncFailure;
     static bool _shutdownTaskRegistered;
 };
@@ -124,9 +126,9 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
     virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
+                           const std::string& dbname,
                            const BSONObj& cmdObj,
-                           string& errmsg,
+                           std::string& errmsg,
                            BSONObjBuilder& result) {
         if (opCtx->lockState()->isLocked()) {
             errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
@@ -143,8 +145,8 @@ public:
 
         if (!lock) {
             // Take a global IS lock to ensure the storage engine is not shutdown
+            auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
             Lock::GlobalLock global(opCtx, MODE_IS);
-            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
 
             // This field has had a dummy value since MMAP went away. It is undocumented.
@@ -161,13 +163,13 @@ public:
         acquireLock();
 
         if (lockCountAtStart == 0) {
-
             Status status = Status::OK();
             {
                 stdx::unique_lock<Latch> lk(lockStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
-                _lockThread = std::make_unique<FSyncLockThread>(allowFsyncFailure);
+                _lockThread = std::make_unique<FSyncLockThread>(opCtx->getServiceContext(),
+                                                                allowFsyncFailure);
                 _lockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {
@@ -267,14 +269,14 @@ private:
 
     Mutex _fsyncLockedMutex = MONGO_MAKE_LATCH("FSyncCommand::_fsyncLockedMutex");
     bool _fsyncLocked = false;
+
 } fsyncCmd;
 
 class FSyncUnlockCommand : public ErrmsgCommandDeprecated {
 public:
     FSyncUnlockCommand() : ErrmsgCommandDeprecated("fsyncUnlock") {}
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -334,15 +336,12 @@ public:
         return true;
     }
 
-} unlockFsyncCmd;
-
-// Exposed publically via extern in fsync.h.
-SimpleMutex filesLockedFsync;
+} fsyncUnlockCmd;
 
 bool FSyncLockThread::_shutdownTaskRegistered = false;
 
 void FSyncLockThread::run() {
-    ThreadClient tc("fsyncLockWorker", getGlobalServiceContext());
+    ThreadClient tc("fsyncLockWorker", _serviceContext);
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
     stdx::unique_lock<Latch> lk(fsyncCmd.lockStateMutex);
 
@@ -353,8 +352,7 @@ void FSyncLockThread::run() {
         OperationContext& opCtx = *opCtxPtr;
         Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
 
-        ServiceContext* serviceContext = opCtx.getServiceContext();
-        StorageEngine* storageEngine = serviceContext->getStorageEngine();
+        StorageEngine* storageEngine = _serviceContext->getStorageEngine();
 
         // The fsync shutdown task has to be registered once the server is running otherwise it
         // conflicts with the servers shutdown task.
@@ -384,7 +382,7 @@ void FSyncLockThread::run() {
         }
 
         bool successfulFsyncLock = false;
-        auto backupCursorHooks = BackupCursorHooks::get(serviceContext);
+        auto backupCursorHooks = BackupCursorHooks::get(_serviceContext);
         try {
             writeConflictRetry(&opCtx,
                                "beginBackup",
@@ -444,4 +442,10 @@ MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
     return Status::OK();
 }
+
+}  // namespace
+
+// Exposed publically via extern in fsync.h.
+SimpleMutex filesLockedFsync;
+
 }  // namespace mongo
