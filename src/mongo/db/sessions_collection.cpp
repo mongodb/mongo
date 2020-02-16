@@ -56,11 +56,9 @@ constexpr size_t kMaxBatchSize = 1000;
 
 // Used to refresh or remove items from the session collection with write
 // concern majority
-const BSONObj kMajorityWriteConcern =
-    WriteConcernOptions(WriteConcernOptions::kMajority,
-                        WriteConcernOptions::SyncMode::UNSET,
-                        WriteConcernOptions::kWriteConcernTimeoutSystem)
-        .toBSON();
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kWriteConcernTimeoutSystem};
 
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
@@ -198,7 +196,7 @@ void SessionsCollection::_doRefresh(const NamespaceString& ns,
         batch->append("update", ns.coll());
         batch->append("ordered", false);
         batch->append("allowImplicitCollectionCreation", false);
-        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern);
+        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern.toBSON());
     };
 
     auto add = [](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
@@ -215,7 +213,7 @@ void SessionsCollection::_doRemove(const NamespaceString& ns,
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("delete", ns.coll());
         batch->append("ordered", false);
-        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern);
+        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern.toBSON());
     };
 
     auto add = [](BSONArrayBuilder* builder, const LogicalSessionId& lsid) {

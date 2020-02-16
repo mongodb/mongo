@@ -531,7 +531,7 @@ for (let command of commands) {
                 "command.$readPreference": {"mode": "secondary"},
                 "$or": [
                     {"command.readConcern": {"$exists": false}},
-                    {"command.readConcern": {}},
+                    {"command.readConcern": {"provenance": "implicitDefault"}},
                 ],
                 "errCode": {"$ne": ErrorCodes.StaleConfig},
             },

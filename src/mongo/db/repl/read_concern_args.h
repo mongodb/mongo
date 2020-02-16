@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/time_support.h"
@@ -168,6 +169,13 @@ public:
     BSONObj toBSONInner() const;
     std::string toString() const;
 
+    ReadWriteConcernProvenance& getProvenance() {
+        return _provenance;
+    }
+    const ReadWriteConcernProvenance& getProvenance() const {
+        return _provenance;
+    }
+
 private:
     /**
      * Appends level, afterOpTime, and the other "inner" fields of the read concern args.
@@ -200,6 +208,8 @@ private:
      * opposed to being absent or missing.
      */
     bool _specified;
+
+    ReadWriteConcernProvenance _provenance;
 };
 
 }  // namespace repl

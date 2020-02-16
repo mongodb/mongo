@@ -74,12 +74,20 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const ReadConcern& rc) 
             str::stream() << "'" << ReadConcern::kAtClusterTimeFieldName
                           << "' is not suitable for the default read concern",
             !rc.getArgsAtClusterTime());
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "'" << ReadWriteConcernProvenance::kSourceFieldName
+                          << "' must be unset in default read concern",
+            !rc.getProvenance().hasSource());
 }
 
 void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc) {
     uassert(ErrorCodes::BadValue,
             "Unacknowledged write concern is not suitable for the default write concern",
             !(wc.wMode.empty() && wc.wNumNodes < 1));
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "'" << ReadWriteConcernProvenance::kSourceFieldName
+                          << "' must be unset in default write concern",
+            !wc.getProvenance().hasSource());
 }
 
 RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(

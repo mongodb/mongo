@@ -82,10 +82,14 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     WriteConcernOptions writeConcern = wcResult.getValue();
 
-    // If no write concern is specified in the command (so usedDefault is true), then use the
-    // cluster-wide default WC (if there is one), or else the default WC from the ReplSetConfig
-    // (which takes the ReplicationCoordinator mutex).
-    if (writeConcern.usedDefault) {
+    bool clientSuppliedWriteConcern = !writeConcern.usedDefault;
+    bool customDefaultWasApplied = false;
+    bool getLastErrorDefaultsWasApplied = false;
+
+    // If no write concern is specified in the command, then use the cluster-wide default WC (if
+    // there is one), or else the default WC from the ReplSetConfig (which takes the
+    // ReplicationCoordinator mutex).
+    if (!clientSuppliedWriteConcern) {
         writeConcern = ([&]() {
             // WriteConcern defaults can only be applied on regular replica set members.  Operations
             // received by shard and config servers should always have WC explicitly specified.
@@ -95,9 +99,11 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                 (!opCtx->inMultiDocumentTransaction() ||
                  isTransactionCommand(cmdObj.firstElementFieldName())) &&
                 !opCtx->getClient()->isInDirectClient()) {
+
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern(opCtx);
                 if (wcDefault) {
+                    customDefaultWasApplied = true;
                     LOGV2_DEBUG(22548,
                                 2,
                                 "Applying default writeConcern on {cmdObj_firstElementFieldName} "
@@ -128,6 +134,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             if (getLastErrorDefault.wNumNodes == 1 && getLastErrorDefault.wTimeout == 0) {
                 getLastErrorDefault.usedDefault = true;
                 getLastErrorDefault.usedDefaultW = true;
+            } else {
+                getLastErrorDefaultsWasApplied = true;
             }
             return getLastErrorDefault;
         })();
@@ -135,6 +143,21 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             writeConcern.wNumNodes = 1;
         }
         writeConcern.usedDefaultW = true;
+    }
+
+    // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
+    // appropriate provenance needs to be determined.
+    auto& provenance = writeConcern.getProvenance();
+    if (!provenance.hasSource()) {
+        if (clientSuppliedWriteConcern) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
+        } else if (customDefaultWasApplied) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+        } else if (getLastErrorDefaultsWasApplied) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::getLastErrorDefaults);
+        } else {
+            provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+        }
     }
 
     if (writeConcern.usedDefault && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
@@ -146,6 +169,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         // does not specify writeConcern when writing to the config server.
         writeConcern = {
             WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
+        writeConcern.getProvenance().setSource(ReadWriteConcernProvenance::Source::implicitDefault);
     } else {
         Status wcStatus = validateWriteConcern(opCtx, writeConcern);
         if (!wcStatus.isOK()) {

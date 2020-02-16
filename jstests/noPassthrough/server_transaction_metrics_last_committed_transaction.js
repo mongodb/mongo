@@ -91,13 +91,13 @@ function runTests(prepare) {
     session.startTransaction({writeConcern: {w: 1}});
     assert.commandWorked(sessionColl.insert({}));
     commitTransaction();
-    checkLastCommittedTransaction(1, {w: 1, wtimeout: 0});
+    checkLastCommittedTransaction(1, {w: 1, wtimeout: 0, provenance: "clientSupplied"});
 
     // Run a read-only transaction with non-default writeConcern.
     session.startTransaction({writeConcern: {w: "majority"}});
     sessionColl.findOne();
     commitTransaction();
-    checkLastCommittedTransaction(0, {w: "majority", wtimeout: 0});
+    checkLastCommittedTransaction(0, {w: "majority", wtimeout: 0, provenance: "clientSupplied"});
 }
 
 runTests(true /*prepare*/);

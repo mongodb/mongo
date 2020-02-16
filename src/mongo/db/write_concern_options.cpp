@@ -131,6 +131,13 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
             // Ignore.
         } else if (fieldName.equalCaseInsensitive(kGetLastErrorFieldName)) {
             // Ignore GLE field.
+        } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
+            try {
+                writeConcern._provenance = ReadWriteConcernProvenance::parse(
+                    IDLParserErrorContext("WriteConcernOptions::parse"), obj);
+            } catch (const DBException&) {
+                return exceptionToStatus();
+            }
         } else {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "unrecognized write concern field: " << fieldName);
@@ -233,6 +240,8 @@ BSONObj WriteConcernOptions::toBSON() const {
     }
 
     builder.append("wtimeout", wTimeout);
+
+    _provenance.serialize(&builder);
 
     return builder.obj();
 }

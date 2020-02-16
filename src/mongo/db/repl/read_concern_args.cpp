@@ -182,6 +182,13 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
                                             << readConcernLevels::kAvailableName << "', or '"
                                             << readConcernLevels::kSnapshotName << "'");
             }
+        } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
+            try {
+                _provenance = ReadWriteConcernProvenance::parse(
+                    IDLParserErrorContext("ReadConcernArgs::parse"), readConcernObj);
+            } catch (const DBException&) {
+                return exceptionToStatus();
+            }
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "Unrecognized option in " << kReadConcernFieldName
@@ -283,6 +290,8 @@ void ReadConcernArgs::_appendInfoInner(BSONObjBuilder* builder) const {
     if (_atClusterTime) {
         builder->append(kAtClusterTimeFieldName, _atClusterTime->asTimestamp());
     }
+
+    _provenance.serialize(builder);
 }
 
 void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {

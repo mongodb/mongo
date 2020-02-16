@@ -361,12 +361,28 @@ env.Library(
 )
 
 env.Library(
+    target="read_write_concern_provenance",
+    source=[
+        "read_write_concern_provenance.cpp",
+        env.Idlc('read_write_concern_provenance_base.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        'server_options_core',
+    ],
+)
+
+env.Library(
     target="write_concern_options",
     source=[
         "write_concern_options.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        'read_write_concern_provenance',
     ],
 )
 
@@ -422,6 +438,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner',
+        'write_concern_options',
     ],
 )
 
@@ -1853,6 +1870,7 @@ envWithAsio.CppUnitTest(
         'operation_time_tracker_test.cpp',
         'range_arithmetic_test.cpp',
         'read_write_concern_defaults_test.cpp',
+        'read_write_concern_provenance_test.cpp',
         'record_id_test.cpp',
         'server_options_test.cpp',
         'session_catalog_mongod_test.cpp',

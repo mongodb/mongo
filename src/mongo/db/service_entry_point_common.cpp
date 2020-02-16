@@ -257,6 +257,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         return readConcernParseStatus;
     }
 
+    bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
+    bool customDefaultWasApplied = false;
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
     if (readConcernSupport.defaultReadConcernPermit.isOK() &&
         (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
@@ -283,6 +285,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                            .getDefaultReadConcern(opCtx);
                 if (rcDefault) {
+                    customDefaultWasApplied = true;
                     readConcernArgs = std::move(*rcDefault);
                     LOGV2_DEBUG(21955,
                                 2,
@@ -296,6 +299,19 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                         invocation->supportsReadConcern(readConcernArgs.getLevel());
                 }
             }
+        }
+    }
+
+    // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
+    // appropriate provenance needs to be determined.
+    auto& provenance = readConcernArgs.getProvenance();
+    if (!provenance.hasSource()) {
+        if (clientSuppliedReadConcern) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
+        } else if (customDefaultWasApplied) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+        } else {
+            provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
         }
     }
 
@@ -701,6 +717,12 @@ bool runCommandImpl(OperationContext* opCtx,
                 validateWriteConcernForTransaction(*extractedWriteConcern,
                                                    invocation->definition()->getName());
             }
+
+            // Ensure that the WC being set on the opCtx has provenance.
+            invariant(extractedWriteConcern->getProvenance().hasSource(),
+                      str::stream() << "unexpected unset provenance on writeConcern: "
+                                    << extractedWriteConcern->toBSON());
+
             opCtx->setWriteConcern(*extractedWriteConcern);
         }
 
@@ -1018,6 +1040,12 @@ void execCommandDatabase(OperationContext* opCtx,
         if (!skipReadConcern) {
             auto newReadConcernArgs = uassertStatusOK(
                 _extractReadConcern(opCtx, invocation.get(), request.body, startTransaction));
+
+            // Ensure that the RC being set on the opCtx has provenance.
+            invariant(newReadConcernArgs.getProvenance().hasSource(),
+                      str::stream() << "unexpected unset provenance on readConcern: "
+                                    << newReadConcernArgs.toBSONInner());
+
             {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.

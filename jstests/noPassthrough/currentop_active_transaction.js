@@ -37,11 +37,11 @@ function checkCurrentOpFields(currentOp,
               "Expected 'autocommit' to be false but got " +
                   transactionDocument.parameters.autocommit +
                   " instead: " + tojson(transactionDocument));
-    assert.docEq(transactionDocument.parameters.readConcern,
-                 {level: 'snapshot'},
-                 "Expected 'readConcern' to be level: snapshot but got " +
-                     tojson(transactionDocument.parameters.readConcern) +
-                     " instead: " + tojson(transactionDocument));
+    assert.eq(transactionDocument.parameters.readConcern.level,
+              'snapshot',
+              "Expected 'readConcern' level to be snapshot but got " +
+                  tojson(transactionDocument.parameters.readConcern) +
+                  " instead: " + tojson(transactionDocument));
     assert.gte(transactionDocument.readTimestamp,
                operationTime,
                "Expected 'readTimestamp' to be at least " + operationTime + " but got " +

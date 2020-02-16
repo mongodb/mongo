@@ -33,6 +33,8 @@
 
 #include "mongo/s/commands/strategy.h"
 
+#include <fmt/format.h>
+
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -86,6 +88,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
+
+using namespace fmt::literals;
 
 namespace mongo {
 namespace {
@@ -447,13 +451,17 @@ void runCommand(OperationContext* opCtx,
             return;
         }
 
-        if (supportsWriteConcern && wc.usedDefault &&
+        bool clientSuppliedWriteConcern = !wc.usedDefault;
+        bool customDefaultWriteConcernWasApplied = false;
+
+        if (supportsWriteConcern && !clientSuppliedWriteConcern &&
             (!TransactionRouter::get(opCtx) || isTransactionCommand(commandName))) {
             // This command supports WC, but wasn't given one - so apply the default, if there is
             // one.
             if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                            .getDefaultWriteConcern(opCtx)) {
                 wc = *wcDefault;
+                customDefaultWriteConcernWasApplied = true;
                 LOGV2_DEBUG(
                     22766,
                     2,
@@ -468,8 +476,41 @@ void runCommand(OperationContext* opCtx,
         }
 
         if (supportsWriteConcern) {
+            auto& provenance = wc.getProvenance();
+
+            // ClientSupplied is the only provenance that clients are allowed to pass to mongos.
+            if (provenance.hasSource() && !provenance.isClientSupplied()) {
+                auto responseBuilder = replyBuilder->getBodyBuilder();
+                CommandHelpers::appendCommandStatusNoThrow(
+                    responseBuilder,
+                    Status{ErrorCodes::InvalidOptions,
+                           "writeConcern provenance must be unset or \"{}\""_format(
+                               ReadWriteConcernProvenance::kClientSupplied)});
+                return;
+            }
+
+            // If the client didn't provide a provenance, then an appropriate value needs to be
+            // determined.
+            if (!provenance.hasSource()) {
+                if (clientSuppliedWriteConcern) {
+                    provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
+                } else if (customDefaultWriteConcernWasApplied) {
+                    provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+                } else {
+                    provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+                }
+            }
+
+            // Ensure that the WC being set on the opCtx has provenance.
+            invariant(wc.getProvenance().hasSource(),
+                      str::stream()
+                          << "unexpected unset provenance on writeConcern: " << wc.toBSON());
+
             opCtx->setWriteConcern(wc);
         }
+
+        bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
+        bool customDefaultReadConcernWasApplied = false;
 
         auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
         if (readConcernSupport.defaultReadConcernPermit.isOK() &&
@@ -485,6 +526,7 @@ void runCommand(OperationContext* opCtx,
                         stdx::lock_guard<Client> lk(*opCtx->getClient());
                         readConcernArgs = std::move(*rcDefault);
                     }
+                    customDefaultReadConcernWasApplied = true;
                     LOGV2_DEBUG(22767,
                                 2,
                                 "Applying default readConcern on {invocation_definition_getName} "
@@ -498,6 +540,39 @@ void runCommand(OperationContext* opCtx,
                 }
             }
         }
+
+        auto& provenance = readConcernArgs.getProvenance();
+
+        // ClientSupplied is the only provenance that clients are allowed to pass to mongos.
+        if (provenance.hasSource() && !provenance.isClientSupplied()) {
+            auto responseBuilder = replyBuilder->getBodyBuilder();
+            CommandHelpers::appendCommandStatusNoThrow(
+                responseBuilder,
+                Status{ErrorCodes::InvalidOptions,
+                       "readConcern provenance must be unset or \"{}\""_format(
+                           ReadWriteConcernProvenance::kClientSupplied)});
+            return;
+        }
+
+        // If the client didn't provide a provenance, then an appropriate value needs to be
+        // determined.
+        if (!provenance.hasSource()) {
+            // We must obtain the client lock to set the provenance of the opCtx's ReadConcernArgs
+            // as it may be concurrently read by CurrentOp.
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            if (clientSuppliedReadConcern) {
+                provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
+            } else if (customDefaultReadConcernWasApplied) {
+                provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+            } else {
+                provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+            }
+        }
+
+        // Ensure that the RC on the opCtx has provenance.
+        invariant(readConcernArgs.getProvenance().hasSource(),
+                  str::stream() << "unexpected unset provenance on readConcern: "
+                                << readConcernArgs.toBSONInner());
 
         // If we are starting a transaction, we only need to check whether the read concern is
         // appropriate for running a transaction. There is no need to check whether the specific

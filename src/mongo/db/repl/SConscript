@@ -759,6 +759,7 @@ env.Library('read_concern_args',
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
                 '$BUILD_DIR/mongo/db/logical_time',
+                '$BUILD_DIR/mongo/db/read_write_concern_provenance',
                 'optime',
             ])
 

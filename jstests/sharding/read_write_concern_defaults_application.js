@@ -669,14 +669,16 @@ let setDefaultRWConcernActualTestCase = {
 //                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //      writeConcern:{ w: "majority", wtimeout: 1234567 } storage:{} protocol:op_msg 275ms
 //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-function createLogLineRegularExpressionForTestCase(test, cmdName, targetId) {
+function createLogLineRegularExpressionForTestCase(test, cmdName, targetId, explicitRWC) {
+    let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
     let pattern = `command: ${cmdName} `;
     pattern += `.* comment: "${targetId}"`;
     if (test.checkReadConcern) {
-        pattern += '.* readConcern:{ level: "majority" }';
+        pattern += `.* readConcern:{ level: "majority", provenance: "${expectedProvenance}" }`;
     }
     if (test.checkWriteConcern) {
-        pattern += '.* writeConcern:{ w: "majority", wtimeout: 1234567 }';
+        pattern += `.* writeConcern:{ w: "majority", wtimeout: 1234567, provenance: "${
+            expectedProvenance}" }`;
     }
     return new RegExp(pattern);
 }
@@ -710,19 +712,27 @@ function createLogLineRegularExpressionForTestCase(test, cmdName, targetId) {
 //     "planSummary" : "COLLSCAN",
 //      ...
 // }
-function createProfileFilterForTestCase(test, targetId) {
+function createProfileFilterForTestCase(test, targetId, explicitRWC) {
+    let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
     let commandProfile = {"command.comment": targetId};
     if (test.checkReadConcern) {
-        commandProfile = Object.extend({"readConcern.level": "majority"}, commandProfile);
+        commandProfile = Object.extend(
+            {"readConcern.level": "majority", "readConcern.provenance": expectedProvenance},
+            commandProfile);
     }
     if (test.checkWriteConcern) {
-        commandProfile = Object.extend(
-            {"writeConcern.w": "majority", "writeConcern.wtimeout": 1234567}, commandProfile);
+        commandProfile = Object.extend({
+            "writeConcern.w": "majority",
+            "writeConcern.wtimeout": 1234567,
+            "writeConcern.provenance": expectedProvenance
+        },
+                                       commandProfile);
     }
     return commandProfile;
 }
 
-function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, explicitRWC) {
+function runScenario(
+    desc, conn, regularCheckConn, configSvrCheckConn, {explicitRWC, explicitProvenance = false}) {
     let runCommandTest = function(cmdName, test) {
         assert(test !== undefined,
                "coverage failure: must define a RWC defaults application test for " + cmdName);
@@ -784,11 +794,18 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, explicitR
         }
         if (explicitRWC) {
             if (test.checkReadConcern) {
-                actualCmd = Object.extend(actualCmd, {readConcern: {level: 'majority'}});
+                let explicitRC = {level: 'majority'};
+                if (explicitProvenance) {
+                    explicitRC = Object.extend(explicitRC, {provenance: "clientSupplied"});
+                }
+                actualCmd = Object.extend(actualCmd, {readConcern: explicitRC});
             }
             if (test.checkWriteConcern) {
-                actualCmd =
-                    Object.extend(actualCmd, {writeConcern: {w: "majority", wtimeout: 1234567}});
+                let explicitWC = {w: "majority", wtimeout: 1234567};
+                if (explicitProvenance) {
+                    explicitWC = Object.extend(explicitWC, {provenance: "clientSupplied"});
+                }
+                actualCmd = Object.extend(actualCmd, {writeConcern: explicitWC});
             }
         }
         if (!sharded) {
@@ -801,14 +818,15 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, explicitR
 
         // Check that the command applied the correct RWC.
         if (test.useLogs) {
-            let re = createLogLineRegularExpressionForTestCase(test, cmdName, targetId);
+            let re =
+                createLogLineRegularExpressionForTestCase(test, cmdName, targetId, explicitRWC);
             assert(checkLog.checkContainsOnce(checkConn, re),
                    "unable to find pattern " + re + " in logs on " + checkConn + " for test " +
                        thisTestDesc);
         } else {
             profilerHasSingleMatchingEntryOrThrow({
                 profileDB: checkConn.getDB(db),
-                filter: createProfileFilterForTestCase(test, targetId)
+                filter: createProfileFilterForTestCase(test, targetId, explicitRWC)
             });
         }
 
@@ -837,11 +855,16 @@ function runScenario(desc, conn, regularCheckConn, configSvrCheckConn, explicitR
 function runTests(conn, regularCheckConn, configSvrCheckConn) {
     // The target RWC is always {level: "majority"} and {w: "majority", wtimeout: 1234567}
 
-    runScenario("Scenario: RWC defaults never set, explicit RWC present",
+    runScenario("Scenario: RWC defaults never set, explicit RWC present, absent provenance",
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,
-                true);
+                {explicitRWC: true, explicitProvenance: false});
+    runScenario("Scenario: RWC defaults never set, explicit RWC present, explicit provenance",
+                conn,
+                regularCheckConn,
+                configSvrCheckConn,
+                {explicitRWC: true, explicitProvenance: true});
 
     assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
@@ -852,26 +875,36 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,
-                false);
+                {explicitRWC: false});
 
     assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
         defaultReadConcern: {level: "local"},
         defaultWriteConcern: {w: 1, wtimeout: 7654321}
     }));
-    runScenario("Scenario: RWC defaults set, explicit RWC present",
+    runScenario("Scenario: RWC defaults set, explicit RWC present, absent provenance",
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,
-                true);
+                {explicitRWC: true, explicitProvenance: false});
+    runScenario("Scenario: RWC defaults set, explicit RWC present, explicit provenance",
+                conn,
+                regularCheckConn,
+                configSvrCheckConn,
+                {explicitRWC: true, explicitProvenance: true});
 
     assert.commandWorked(conn.adminCommand(
         {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
-    runScenario("Scenario: RWC defaults unset, explicit RWC present",
+    runScenario("Scenario: RWC defaults unset, explicit RWC present, absent provenance",
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,
-                true);
+                {explicitRWC: true, explicitProvenance: false});
+    runScenario("Scenario: RWC defaults unset, explicit RWC present, explicit provenance",
+                conn,
+                regularCheckConn,
+                configSvrCheckConn,
+                {explicitRWC: true, explicitProvenance: true});
 }
 
 // TODO SERVER-45052: Move the main code into jstests/lib, and then call it from jstests/replsets

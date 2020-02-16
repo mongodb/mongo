@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/read_write_concern_provenance.h"
 
 namespace mongo {
 
@@ -97,6 +98,13 @@ public:
      */
     bool needToWaitForOtherNodes() const;
 
+    ReadWriteConcernProvenance& getProvenance() {
+        return _provenance;
+    }
+    const ReadWriteConcernProvenance& getProvenance() const {
+        return _provenance;
+    }
+
     // Returns the BSON representation of this object.
     // Warning: does not return the same object passed on the last parse() call.
     BSONObj toBSON() const;
@@ -119,6 +127,9 @@ public:
 
     // True if the default 'w' value of w:1 was used.
     bool usedDefaultW = false;
+
+private:
+    ReadWriteConcernProvenance _provenance;
 };
 
 }  // namespace mongo

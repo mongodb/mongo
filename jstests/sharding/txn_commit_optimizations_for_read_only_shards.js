@@ -291,7 +291,7 @@ const failureModes = {
             assert.commandWorkedIgnoringWriteConcernErrors(res);
             assertWriteConcernError(res);
             assert.eq(ErrorCodes.UnknownReplWriteConcern, res.writeConcernError.code);
-            assert.eq(null, res.writeConcernError.errInfo);  // errInfo only set for wtimeout
+            assert(!res.writeConcernError.errInfo || !res.writeConcernError.errInfo.wtimeout);
             assert.eq(null, res.errorLabels);
         },
         cleanUp: noop,
