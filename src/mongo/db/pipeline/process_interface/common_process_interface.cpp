@@ -183,19 +183,6 @@ std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(
     return result;
 }
 
-std::set<FieldPath> CommonProcessInterface::_convertToFieldPaths(
-    const std::vector<std::string>& fields) const {
-    std::set<FieldPath> fieldPaths;
-
-    for (const auto& field : fields) {
-        const auto res = fieldPaths.insert(FieldPath(field));
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Found a duplicate field '" << field << "'",
-                res.second);
-    }
-    return fieldPaths;
-}
-
 std::string CommonProcessInterface::getHostAndPort(OperationContext* opCtx) const {
     return getHostNameCachedAndPort();
 }

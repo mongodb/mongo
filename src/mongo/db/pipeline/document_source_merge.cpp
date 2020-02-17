@@ -284,6 +284,25 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
 
     return mergeSpec;
 }
+
+/**
+ * Converts an array of field names into a set of FieldPath. Throws if 'fields' contains
+ * duplicate elements.
+ */
+boost::optional<std::set<FieldPath>> convertToFieldPaths(
+    const boost::optional<std::vector<std::string>>& fields) {
+
+    if (!fields)
+        return boost::none;
+
+    std::set<FieldPath> fieldPaths;
+
+    for (const auto& field : *fields) {
+        const auto res = fieldPaths.insert(FieldPath(field));
+        uassert(31465, str::stream() << "Found a duplicate field '" << field << "'", res.second);
+    }
+    return fieldPaths;
+}
 }  // namespace
 
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
@@ -425,9 +444,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
     auto pipeline = mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->pipeline : boost::none;
+    auto fieldPaths = convertToFieldPaths(mergeSpec.getOn());
     auto [mergeOnFields, targetCollectionVersion] =
         expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
-            expCtx, mergeSpec.getOn(), mergeSpec.getTargetCollectionVersion(), targetNss);
+            expCtx, std::move(fieldPaths), mergeSpec.getTargetCollectionVersion(), targetNss);
 
     return DocumentSourceMerge::create(std::move(targetNss),
                                        expCtx,

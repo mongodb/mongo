@@ -888,5 +888,22 @@ TEST_F(DocumentSourceMergeTest, OnlyObjectCanBeUsedAsLetVariables) {
     }
 }
 
+TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldHaveDuplicates) {
+    auto spec = BSON("$merge" << BSON("into"
+                                      << "target_collection"
+                                      << "on"
+                                      << BSON_ARRAY("x"
+                                                    << "y"
+                                                    << "x")));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 31465);
+
+    spec = BSON("$merge" << BSON("into"
+                                 << "target_collection"
+                                 << "on"
+                                 << BSON_ARRAY("_id"
+                                               << "_id")));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 31465);
+}
+
 }  // namespace
 }  // namespace mongo

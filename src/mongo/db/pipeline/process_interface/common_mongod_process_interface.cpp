@@ -541,7 +541,7 @@ std::unique_ptr<ResourceYielder> CommonMongodProcessInterface::getResourceYielde
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
 CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<std::vector<std::string>> fields,
+    boost::optional<std::set<FieldPath>> fieldPaths,
     boost::optional<ChunkVersion> targetCollectionVersion,
     const NamespaceString& outputNs) const {
     if (targetCollectionVersion) {
@@ -551,20 +551,19 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
         checkRoutingInfoEpochOrThrow(expCtx, outputNs, *targetCollectionVersion);
     }
 
-    if (!fields) {
+    if (!fieldPaths) {
         uassert(51124, "Expected fields to be provided from mongos", !expCtx->fromMongos);
         return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
     }
 
     // Make sure the 'fields' array has a supporting index. Skip this check if the command is sent
     // from mongos since the 'fields' check would've happened already.
-    auto fieldPaths = _convertToFieldPaths(*fields);
     if (!expCtx->fromMongos) {
         uassert(51183,
                 "Cannot find index to verify that join fields will be unique",
-                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, fieldPaths));
+                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths));
     }
-    return {fieldPaths, targetCollectionVersion};
+    return {*fieldPaths, targetCollectionVersion};
 }
 
 write_ops::Insert CommonMongodProcessInterface::buildInsertOp(const NamespaceString& nss,

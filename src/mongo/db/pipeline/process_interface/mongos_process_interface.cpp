@@ -322,23 +322,21 @@ bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
 MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<std::vector<std::string>> fields,
+    boost::optional<std::set<FieldPath>> fieldPaths,
     boost::optional<ChunkVersion> targetCollectionVersion,
     const NamespaceString& outputNs) const {
     invariant(expCtx->inMongos);
     uassert(
         51179, "Received unexpected 'targetCollectionVersion' on mongos", !targetCollectionVersion);
 
-    if (fields) {
-        // Convert 'fields' array to a set of FieldPaths.
-        auto fieldPaths = _convertToFieldPaths(*fields);
+    if (fieldPaths) {
         uassert(51190,
                 "Cannot find index to verify that join fields will be unique",
-                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, fieldPaths));
+                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths));
 
         // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for the
         // shards since we are not at risk of 'guessing' the wrong shard key.
-        return {fieldPaths, boost::none};
+        return {*fieldPaths, boost::none};
     }
 
     // In case there are multiple shards which will perform this stage in parallel, we need to

@@ -408,17 +408,16 @@ public:
     virtual std::unique_ptr<ResourceYielder> getResourceYielder() const = 0;
 
     /**
-     * If the user supplied the 'fields' array, ensures that it can be used to uniquely identify a
-     * document. Otherwise, picks a default unique key, which can be either the "_id" field, or
-     * or a shard key, depending on the 'outputNs' collection type and the server type (mongod or
-     * mongos). Also returns an optional ChunkVersion, populated with the version stored in the
-     * sharding catalog when we asked for the shard key (on mongos only). On mongod, this is the
-     * value of the 'targetCollectionVersion' parameter, which is the target shard version of the
-     * collection, as sent by mongos.
+     * If the user did not provide the 'fieldPaths' set, a default unique key will be picked,
+     * which can be either the "_id" field, or a shard key, depending on the 'outputNs' collection
+     * type and the server type (mongod or mongos). Also returns an optional ChunkVersion,
+     * populated with the version stored in the sharding catalog when we asked for the shard key
+     * (on mongos only). On mongod, this is the value of the 'targetCollectionVersion' parameter,
+     * which is the target shard version of the collection, as sent by mongos.
      */
     virtual std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::vector<std::string>> fields,
+                                           boost::optional<std::set<FieldPath>> fieldPaths,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const = 0;
 };

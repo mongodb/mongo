@@ -63,21 +63,6 @@ public:
     }
 };
 
-TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfFieldsHaveDuplicates) {
-    auto expCtx = getExpCtx();
-    auto targetCollectionVersion = boost::none;
-    auto processInterface = makeProcessInterface();
-
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"_id", "_id"}}, targetCollectionVersion, expCtx->ns),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-                           expCtx, {{"x", "y", "x"}}, targetCollectionVersion, expCtx->ns),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-}
-
 TEST_F(ProcessInterfaceStandaloneTest,
        FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecifiedOnMongos) {
     auto expCtx = getExpCtx();

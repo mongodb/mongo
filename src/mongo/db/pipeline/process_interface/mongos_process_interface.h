@@ -219,7 +219,7 @@ public:
 
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::vector<std::string>> fields,
+                                           boost::optional<std::set<FieldPath>> fieldPaths,
                                            boost::optional<ChunkVersion> targetCollectionVersion,
                                            const NamespaceString& outputNs) const override;
 

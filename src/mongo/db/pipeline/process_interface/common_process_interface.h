@@ -103,12 +103,6 @@ protected:
     virtual void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
                                                              bool includeIdle,
                                                              std::vector<BSONObj>* ops) const = 0;
-
-    /**
-     * Converts an array of field names into a set of FieldPath. Throws if 'fields' contains
-     * duplicate elements.
-     */
-    std::set<FieldPath> _convertToFieldPaths(const std::vector<std::string>& fields) const;
 };
 
 }  // namespace mongo
