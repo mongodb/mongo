@@ -71,6 +71,10 @@ bool ErrorLabelBuilder::isRetryableWriteError() const {
     return false;
 }
 
+bool ErrorLabelBuilder::isNonResumableChangeStreamError() const {
+    return _code && ErrorCodes::isNonResumableChangeStreamError(_code.get());
+}
+
 bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Determine whether this operation is a candidate for the ResumableChangeStreamError label.
     const bool mayNeedResumableChangeStreamErrorLabel =
@@ -127,6 +131,8 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
     // not add a ResumableChangeStreamError label if either of them is set.
     if (!hasTransientTransactionOrRetryableWriteError && isResumableChangeStreamError()) {
         labels << ErrorLabel::kResumableChangeStream;
+    } else if (isNonResumableChangeStreamError()) {
+        labels << ErrorLabel::kNonResumableChangeStream;
     }
 }
 

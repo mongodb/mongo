@@ -346,7 +346,7 @@ void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(
     } else {
         // Very unusual case: the oplog is empty.  We can always resume. However, it should never be
         // possible to have obtained a document that matched the filter if the oplog is empty.
-        uassert(ErrorCodes::InternalError,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 "Oplog was empty but found an event in the change stream pipeline. It should not "
                 "be possible for this to happen",
                 nextInput.isEOF());

@@ -18,6 +18,7 @@ error_categories:
     - ExceededTimeLimitError
     - SnapshotError
     - VoteAbortError
+    - NonResumableChangeStreamError
     - RetriableError
 
 error_codes:
@@ -302,7 +303,7 @@ error_codes:
     - {code: 277,name: AlarmAlreadyFulfilled}
     - {code: 278,name: UnsatisfiableCommitQuorum}
     - {code: 279,name: ClientDisconnect,categories: [Interruption]}
-    - {code: 280,name: ChangeStreamFatalError}
+    - {code: 280,name: ChangeStreamFatalError,categories: [NonResumableChangeStreamError]}
 
     # The two codes below are for internal use only and must never be returned in a network response
     # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
@@ -313,7 +314,7 @@ error_codes:
     - {code: 284,name: ForTestingErrorExtraInfoWithExtraInfoInNamespace,
                   extra: 'nested::twice::NestedErrorExtraInfoExample'}
     - {code: 285,name: IndexBuildAlreadyInProgress}
-    - {code: 286,name: ChangeStreamHistoryLost}
+    - {code: 286,name: ChangeStreamHistoryLost,categories: [NonResumableChangeStreamError]}
 
     # The code below is for internal use only and must never be returned in a network response
     - {code: 287,name: TransactionCoordinatorDeadlineTaskCanceled}

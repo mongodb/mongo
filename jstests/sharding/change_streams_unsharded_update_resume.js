@@ -54,7 +54,7 @@ assert.soon(() => {
         assert.eq(csCur.hasNext(), false, () => tojson(csCur.next()));
         return false;
     } catch (ex) {
-        assert.eq(ex.code, ErrorCodes.TooManyMatchingDocuments);
+        assert.eq(ex.code, ErrorCodes.ChangeStreamFatalError);
         return true;
     }
 });

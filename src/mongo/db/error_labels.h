@@ -37,6 +37,7 @@ namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 static constexpr StringData kTransientTransaction = "TransientTransactionError"_sd;
 static constexpr StringData kRetryableWrite = "RetryableWriteError"_sd;
+static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
 static constexpr StringData kResumableChangeStream = "ResumableChangeStreamError"_sd;
 }  // namespace ErrorLabel
 
@@ -60,6 +61,7 @@ public:
     bool isTransientTransactionError() const;
     bool isRetryableWriteError() const;
     bool isResumableChangeStreamError() const;
+    bool isNonResumableChangeStreamError() const;
 
 private:
     bool _isCommitOrAbort() const;

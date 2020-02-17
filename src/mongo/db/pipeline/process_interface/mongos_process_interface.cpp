@@ -209,12 +209,12 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
         finalBatch.insert(
             finalBatch.end(), shardCursor.getBatch().begin(), shardCursor.getBatch().end());
         // We should have at most 1 result, and the cursor should be exhausted.
-        uassert(ErrorCodes::InternalError,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 str::stream() << "Shard cursor was unexpectedly open after lookup: "
                               << shardResult.getHostAndPort()
                               << ", id: " << shardCursor.getCursorId(),
                 shardCursor.getCursorId() == 0);
-        uassert(ErrorCodes::TooManyMatchingDocuments,
+        uassert(ErrorCodes::ChangeStreamFatalError,
                 str::stream() << "found more than one document matching " << filter.toString()
                               << " [" << finalBatch.begin()->toString() << ", "
                               << std::next(finalBatch.begin())->toString() << "]",

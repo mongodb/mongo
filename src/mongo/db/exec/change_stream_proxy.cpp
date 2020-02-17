@@ -86,7 +86,7 @@ void ChangeStreamProxyStage::_validateResumeToken(const Document& event) const {
     auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
     invariant(!resumeToken.missing());
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
                              "event makes it impossible to resume the stream from that point. Only "

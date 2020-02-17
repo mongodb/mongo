@@ -236,6 +236,14 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
     ASSERT_TRUE(abortBuilder.isRetryableWriteError());
 }
 
+TEST_F(ErrorLabelBuilderTest, NonResumableChangeStreamError) {
+    OperationSessionInfoFromClient sessionInfo;
+    std::string commandName;
+    ErrorLabelBuilder builder(
+        opCtx(), sessionInfo, commandName, ErrorCodes::ChangeStreamHistoryLost, boost::none, false);
+    ASSERT_TRUE(builder.isNonResumableChangeStreamError());
+}
+
 TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAggregations) {
     OperationSessionInfoFromClient sessionInfo;
     // Build the aggregation command and confirm that it parses correctly, so we know that the error
