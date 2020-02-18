@@ -55,6 +55,8 @@ replica_sets_multiversion:
 sharding_multiversion:
 - ticket: SERVER-38691
   test_file: jstests/sharding/explain_cmd.js
+- ticket: SERVER-43889
+  test_file: jstests/sharding/retryable_writes.js
 
 sharding_jscore_multiversion_passthrough:
 

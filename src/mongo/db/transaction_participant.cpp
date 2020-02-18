@@ -504,11 +504,25 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
                     getTestCommandsEnabled());
     }
 
-    uassert(ErrorCodes::TransactionTooOld,
-            str::stream() << "Cannot start transaction " << txnNumber << " on session "
-                          << _sessionId() << " because a newer transaction " << o().activeTxnNumber
-                          << " has already started.",
-            txnNumber >= o().activeTxnNumber);
+    if (txnNumber < o().activeTxnNumber) {
+        const std::string currOperation =
+            o().txnState.isInRetryableWriteMode() ? "retryable write" : "transaction";
+        if (!autocommit) {
+            uasserted(ErrorCodes::TransactionTooOld,
+                      str::stream()
+                          << "Retryable write with txnNumber " << txnNumber
+                          << " is prohibited on session " << _sessionId() << " because a newer "
+                          << currOperation << " with txnNumber " << o().activeTxnNumber
+                          << " has already started on this session.");
+        } else {
+            uasserted(ErrorCodes::TransactionTooOld,
+                      str::stream() << "Cannot start transaction " << txnNumber << " on session "
+                                    << _sessionId() << " because a newer " << currOperation
+                                    << " with txnNumber " << o().activeTxnNumber
+                                    << " has already started on this session.");
+        }
+    }
+
 
     // Requests without an autocommit field are interpreted as retryable writes. They cannot specify
     // startTransaction, which is verified earlier when parsing the request.

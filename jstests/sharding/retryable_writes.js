@@ -400,6 +400,30 @@ function runFailpointTests(mainConn, priConn) {
     assert.eq(1, collContents[1].y);
 }
 
+function runRetryableWriteErrorTest(mainConn) {
+    // Test TransactionTooOld error message on retryable writes
+    const lsid = UUID();
+    const testDb = mainConn.getDB('TestDB');
+
+    assert.commandWorked(testDb.runCommand({
+        insert: 'user',
+        documents: [{x: 1}],
+        ordered: true,
+        lsid: {id: lsid},
+        txnNumber: NumberLong(2)
+    }));
+    const writeResult = testDb.runCommand({
+        update: 'user',
+        updates: [{q: {x: 1}, u: {$inc: {x: 1}}}],
+        ordered: true,
+        lsid: {id: lsid},
+        txnNumber: NumberLong(1)
+    });
+    assert.commandFailedWithCode(writeResult, ErrorCodes.TransactionTooOld);
+    assert(writeResult.errmsg.includes("Retryable write with txnNumber 1 is prohibited"),
+           writeResult);
+}
+
 function runMultiTests(mainConn) {
     // Test the behavior of retryable writes with multi=true / limit=0
     var lsid = {id: UUID()};
@@ -514,6 +538,7 @@ var priConn = replTest.getPrimary();
 
 runTests(priConn, priConn);
 runFailpointTests(priConn, priConn);
+runRetryableWriteErrorTest(priConn);
 runMultiTests(priConn);
 runInvalidTests(priConn);
 

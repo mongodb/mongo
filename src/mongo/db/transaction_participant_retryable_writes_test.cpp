@@ -381,6 +381,42 @@ TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 }
 
+TEST_F(TransactionParticipantRetryableWritesTest,
+       OlderRetryableWriteFailsOnSessionWithNewerRetryableWrite) {
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.refreshFromStorageIfNeeded(opCtx());
+    const TxnNumber txnNum = 22;
+    const auto& sessionId = *opCtx()->getLogicalSessionId();
+
+    StringBuilder sb;
+    sb << "Retryable write with txnNumber 21 is prohibited on session " << sessionId
+       << " because a newer retryable write with txnNumber 22 has already started on this session.";
+    txnParticipant.beginOrContinue(opCtx(), txnNum, boost::none, boost::none);
+    ASSERT_THROWS_WHAT(
+        txnParticipant.beginOrContinue(opCtx(), txnNum - 1, boost::none, boost::none),
+        AssertionException,
+        sb.str());
+    ASSERT(txnParticipant.getLastWriteOpTime().isNull());
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest,
+       OldTransactionFailsOnSessionWithNewerRetryableWrite) {
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.refreshFromStorageIfNeeded(opCtx());
+    const TxnNumber txnNum = 22;
+    auto autocommit = false;
+    const auto& sessionId = *opCtx()->getLogicalSessionId();
+
+    StringBuilder sb;
+    sb << "Cannot start transaction 21 on session " << sessionId
+       << " because a newer retryable write with txnNumber 22 has already started on this session.";
+    txnParticipant.beginOrContinue(opCtx(), txnNum, boost::none, boost::none);
+    ASSERT_THROWS_WHAT(txnParticipant.beginOrContinue(opCtx(), txnNum - 1, autocommit, boost::none),
+                       AssertionException,
+                       sb.str());
+    ASSERT(txnParticipant.getLastWriteOpTime().isNull());
+}
+
 TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionNotDefaultCreated) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
