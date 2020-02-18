@@ -23,6 +23,9 @@ selector:
   # it attempts to connect to an upgraded mongoD. Un-blacklist when SERVER-42919 fixes this issue.
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
 
+  # Disable incompatible with json logging per SERVER-46235
+  - jstests/multiVersion/genericSetFCVUsage/upgrade_downgrade_while_creating_collection.js
+
 # Multiversion tests start their own mongod's.
 executor:
   config:

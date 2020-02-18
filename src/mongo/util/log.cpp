@@ -68,7 +68,7 @@ bool logV2Enabled() {
 
 bool logV2IsJson(logv2::LogFormat format) {
     return format == logv2::LogFormat::kJson
-#if defined(MONGO_CONFIG_JSON_LOG_DEFAULT)
+#if !defined(MONGO_CONFIG_TEXT_LOG_DEFAULT)
         || format == logv2::LogFormat::kDefault
 #endif
         ;

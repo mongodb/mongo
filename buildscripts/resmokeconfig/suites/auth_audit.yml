@@ -6,6 +6,8 @@ selector:
   exclude_files:
   # Skip until SERVER-25618 is resolved.
   - jstests/auth/repl.js
+  # Disable incompatible with json logging per SERVER-46235
+  - jstests/auth/mongoURIAuth.js
 
 # Auth tests start their own mongod's.
 executor:

@@ -17,6 +17,8 @@ selector:
   - jstests/noPassthrough/latency_includes_lock_acquisition_time.js
   - jstests/noPassthrough/log_and_profile_query_hash.js
   - jstests/noPassthrough/log_format_slowms_samplerate_loglevel.js
+  - jstests/noPassthrough/index_stepdown_unique.js
+  - jstests/noPassthrough/loglong.js
 
 # noPassthrough tests start their own mongod's.
 executor:

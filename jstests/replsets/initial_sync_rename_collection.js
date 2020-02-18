@@ -181,7 +181,7 @@ let expectedLogFor6and8 =
 
 if (isJsonLogNoConn()) {
     expectedLogFor6and8 =
-        '`CollectionCloner ns: \'{getCloner_getSourceNss}\' uuid: UUID("{getCloner_getSourceUuid}") stopped because collection was dropped on source.","attr":{"getCloner_getSourceNss":"${nss}","getCloner_getSourceUuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
+        '`CollectionCloner ns: \'{ns}\' uuid: UUID("{uuid}") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
 }
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the

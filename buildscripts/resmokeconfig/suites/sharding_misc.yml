@@ -340,6 +340,9 @@ selector:
   - jstests/sharding/current_op_no_shards.js
   - jstests/sharding/movechunk_include.js
   - jstests/sharding/move_chunk_with_session_helper.js
+  # Disable incompatible with json logging per SERVER-46235
+  - jstests/sharding/read_write_concern_defaults_application.js
+  - jstests/sharding/comment_field.js
 
 executor:
   config:
