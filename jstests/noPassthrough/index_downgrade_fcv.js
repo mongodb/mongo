@@ -36,7 +36,9 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
 try {
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    assert.commandFailedWithCode(
+        primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
+        ErrorCodes.ConflictingOperationInProgress);
 } finally {
     IndexBuildTest.resumeIndexBuilds(primary);
 }

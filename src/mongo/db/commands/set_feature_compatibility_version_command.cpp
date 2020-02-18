@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -289,6 +290,20 @@ public:
                     }
                 }
             }
+
+            // Two phase index builds are only supported in 4.4. If the user tries to downgrade the
+            // cluster to FCV42, they must first wait for all index builds to run to completion, or
+            // abort the index builds (using the dropIndexes command).
+            if (auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx)) {
+                auto numIndexBuilds = indexBuildsCoord->getActiveIndexBuildCount(opCtx);
+                uassert(
+                    ErrorCodes::ConflictingOperationInProgress,
+                    str::stream()
+                        << "Cannot downgrade the cluster when there are index builds in progress: "
+                        << numIndexBuilds,
+                    numIndexBuilds == 0U);
+            }
+
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
             {
