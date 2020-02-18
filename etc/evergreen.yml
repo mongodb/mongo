@@ -7611,7 +7611,7 @@ tasks:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-dist.${ext|tgz}
+        local_file: src/mongodb-dist-debugsymbols.${ext|tgz}
         remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
