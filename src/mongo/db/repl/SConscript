@@ -631,6 +631,7 @@ env.Library('topology_coordinator',
                 '$BUILD_DIR/mongo/db/audit',
                 '$BUILD_DIR/mongo/rpc/metadata',
                 '$BUILD_DIR/mongo/util/fail_point',
+                'ip_addr_lookup_service',
                 'isself',
                 'replica_set_messages',
                 'repl_settings',
@@ -641,6 +642,18 @@ env.Library('topology_coordinator',
                 '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
                 '$BUILD_DIR/mongo/idl/server_parameter',
             ])
+
+env.Library(
+    target='ip_addr_lookup_service',
+    source=[
+        'ip_addr_lookup_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
 
 env.Library(
     target='repl_coordinator_impl',
@@ -1307,6 +1320,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_repl_coordinator_test',
     source=[
+        'ip_addr_lookup_service_test.cpp',
         'replication_coordinator_impl_elect_v1_test.cpp',
         'replication_coordinator_impl_heartbeat_v1_test.cpp',
         'replication_coordinator_impl_reconfig_test.cpp',

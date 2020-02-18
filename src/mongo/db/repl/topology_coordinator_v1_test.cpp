@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
@@ -52,6 +53,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -1793,6 +1795,71 @@ TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCoun
     BSONObj rsStatus = statusBuilder.obj();
     ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
     ASSERT_EQUALS(2, rsStatus["writeMajorityCount"].numberInt());
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {
+    if (!hasGlobalServiceContext()) {
+        setGlobalServiceContext(ServiceContext::make());
+    }
+    getTopoCoord().getIPAddrLookupService()->init();
+
+    BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
+    std::string setName = "mySet";
+    auto now = Date_t::fromMillisSinceEpoch(100);
+    auto originalIPv6Enabled = IPv6Enabled();
+    ON_BLOCK_EXIT([&] {
+        enableIPv6(originalIPv6Enabled);
+        getTopoCoord().getIPAddrLookupService()->shutdown();
+    });
+
+    auto testIP = [&](const std::string& hostAndIP) -> boost::optional<std::string> {
+        // Test framework requires that time moves forward.
+        now += Milliseconds(10);
+        updateConfig(BSON("_id" << setName << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host" << hostAndIP))),
+                     0,
+                     now);
+
+        BSONObjBuilder statusBuilder;
+        Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+        getTopoCoord().prepareStatusResponse({}, &statusBuilder, &resultStatus);
+        ASSERT_OK(resultStatus);
+        BSONObj rsStatus = statusBuilder.obj();
+        unittest::log() << rsStatus;
+        auto elem = rsStatus["members"].Array()[0].Obj();
+        if (elem.hasField("ip"))
+            return elem["ip"].String();
+        return boost::none;
+    };
+
+    auto waitAndTestIP = [&](const std::string& hostAndIP) -> std::string {
+        auto now = Date_t::now();
+        const auto deadline = now + Seconds(10);
+
+        while (!testIP(hostAndIP)) {
+            if (Date_t::now() >= deadline) {
+                FAIL(str::stream() << "Timed out while waiting for the DNS cache to update");
+            }
+            sleepFor(Milliseconds(10));
+        }
+        return *testIP(hostAndIP);
+    };
+
+    // We can't rely on any hostname like mongodb.org that requires DNS from the CI machine, test
+    // localhost and IP literals.
+    enableIPv6(false);
+    ASSERT_EQUALS("127.0.0.1", waitAndTestIP("localhost:1234"));
+    enableIPv6(true);
+
+    // localhost can resolve to IPv4 or IPv6 depending on precedence.
+    auto localhostIP = waitAndTestIP("localhost:1234");
+    if (localhostIP != "127.0.0.1" && localhostIP != "::1") {
+        FAIL(str::stream() << "Expected localhost IP to be 127.0.0.1 or ::1, not " << localhostIP);
+    }
+
+    ASSERT_EQUALS("1.2.3.4", waitAndTestIP("1.2.3.4:1234"));
+    ASSERT_EQUALS("::1", waitAndTestIP("[::1]:1234"));
+    ASSERT(!testIP("test0:1234"));
 }
 
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {

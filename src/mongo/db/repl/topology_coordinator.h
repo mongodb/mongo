@@ -33,6 +33,7 @@
 #include <iosfwd>
 #include <string>
 
+#include "mongo/db/repl/ip_addr_lookup_service.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -751,6 +752,11 @@ public:
     // Returns the name for a role.  Only used in unittests.
     static std::string roleToString(TopologyCoordinator::Role role);
 
+    // Returns a pointer to the DNS lookup service.
+    IPAddrLookupService* getIPAddrLookupService() const noexcept {
+        return _ipAddrLookupService.get();
+    }
+
 private:
     typedef int UnelectableReasonMask;
     class PingStats;
@@ -1003,6 +1009,9 @@ private:
 
     // Whether or not the storage engine supports read committed.
     ReadCommittedSupport _storageEngineSupportsReadCommitted{ReadCommittedSupport::kUnknown};
+
+    // Pointer to the service that maintains a cache of resolved IPs for replica-set members.
+    std::unique_ptr<IPAddrLookupService> _ipAddrLookupService;
 };
 
 /**

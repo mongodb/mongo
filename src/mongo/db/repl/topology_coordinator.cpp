@@ -178,6 +178,7 @@ TopologyCoordinator::TopologyCoordinator(Options options)
     // Need an entry for self in the memberHearbeatData.
     _memberData.emplace_back();
     _memberData.back().setIsSelf(true);
+    _ipAddrLookupService = std::make_unique<IPAddrLookupService>();
 }
 
 TopologyCoordinator::Role TopologyCoordinator::getRole() const {
@@ -1580,6 +1581,12 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;
 
+    auto appendIP = [&](BSONObjBuilder* bob, const char* elemName, const HostAndPort& hostAndPort) {
+        if (auto ip = _ipAddrLookupService->lookup(hostAndPort.host())) {
+            bob->append(elemName, *ip);
+        }
+    };
+
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
         response->append("state", static_cast<int>(myState.s));
@@ -1611,6 +1618,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             BSONObjBuilder bb;
             bb.append("_id", _selfConfig().getId().getData());
             bb.append("name", _selfConfig().getHostAndPort().toString());
+            appendIP(&bb, "ip", _selfConfig().getHostAndPort());
             bb.append("health", 1.0);
             bb.append("state", static_cast<int>(myState.s));
             bb.append("stateStr", myState.toString());
@@ -1652,6 +1660,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             BSONObjBuilder bb;
             bb.append("_id", itConfig.getId().getData());
             bb.append("name", itConfig.getHostAndPort().toString());
+            appendIP(&bb, "ip", itConfig.getHostAndPort());
             double h = it->getHealth();
             bb.append("health", h);
             const MemberState state = it->getState();
@@ -2010,6 +2019,14 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
         newHeartbeatData.setIsSelf(true);
         _memberData.push_back(newHeartbeatData);
     }
+
+    _ipAddrLookupService->reconfigure([&]() {
+        std::vector<std::string> hostNames(_memberData.size());
+        for (size_t i = 0; i < _memberData.size(); i++) {
+            hostNames[i] = _memberData[i].getHostAndPort().host();
+        }
+        return hostNames;
+    }());
 }
 
 // This function installs a new config object and recreates MemberData objects
