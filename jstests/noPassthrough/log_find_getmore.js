@@ -3,6 +3,8 @@
  * Legacy operations should be upconverted to match the format of their command counterparts.
  * @tags: [requires_profiling]
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 "use strict";
 
@@ -62,6 +64,10 @@ let logLine =
     'command log_getmore.test appName: "MongoDB Shell" command: find { find: "test", filter:' +
     ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
     ' { a: 1.0 }, hint: { a: 1.0 }';
+if (isJsonLog(conn)) {
+    logLine =
+        '"msg":"slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1.0,"batchSize":5.0,"limit":10.0,"singleBatch":false,"sort":{"a":1.0},"hint":{"a":1.0}';
+}
 
 // Check the logs to verify that find appears as above.
 assertLogLineContains(conn, logLine);
@@ -90,6 +96,14 @@ logLine = [
         'false, sort: { a: 1.0 }, hint: { a: 1.0 }'
 ];
 
+if (isJsonLog(conn)) {
+    logLine = [
+        `"msg":"slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+            cursorIdToString(cursorid)},"collection":"test","batchSize":5.0,`,
+        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1.0,"batchSize":5.0,"limit":10.0,"singleBatch":false,"sort":{"a":1.0},"hint":{"a":1.0}'
+    ];
+}
+
 assertLogLineContains(conn, logLine);
 
 // TEST: Verify the log format of a getMore command following an aggregation.
@@ -104,6 +118,14 @@ logLine = [
     'originatingCommand: { aggregate: "test", pipeline: ' +
         '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
 ];
+
+if (isJsonLog(conn)) {
+    logLine = [
+        `"msg":"slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+            cursorIdToString(cursorid)},"collection":"test"`,
+        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0.0}}}],"cursor":{"batchSize":0.0},"hint":{"a":1.0}'
+    ];
+}
 
 assertLogLineContains(conn, logLine);
 
@@ -122,6 +144,11 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 logLine = 'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { a: ' +
     '{ $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
 
+if (isJsonLog(conn)) {
+    logLine =
+        '"msg":"slow query","attr":{"type":"query","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1,"ntoreturn":5,"sort":{"a":1.0},"hint":{"a":1.0}}';
+}
+
 assertLogLineContains(conn, logLine);
 
 // TEST: Verify that a query whose filter contains a field named 'query' appears as expected in
@@ -132,6 +159,11 @@ coll.find({query: "foo"}).itcount();
 logLine =
     'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { query:' +
     ' "foo" } }';
+
+if (isJsonLog(conn)) {
+    logLine =
+        '"msg":"slow query","attr":{"type":"query","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"query":"foo"}}';
+}
 
 assertLogLineContains(conn, logLine);
 
@@ -145,6 +177,10 @@ logLine = 'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore:
     cursorIdToString(cursorid) +
     ', collection: "test", batchSize: 5 } originatingCommand: { find: "test", filter: { a: {' +
     ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
+
+if (isJsonLog(conn)) {
+    logLine = `"msg":"slow query","attr":{"type":"getmore","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5},"originatingCommand":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1,"ntoreturn":5,"sort":{"a":1.0},"hint":{"a":1.0}}`;
+}
 
 assertLogLineContains(conn, logLine);
 
@@ -162,6 +198,14 @@ logLine = [
     'originatingCommand: { aggregate: "test", pipeline:' +
         ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
 ];
+
+if (isJsonLog(conn)) {
+    logLine = [
+        `"msg":"slow query","attr":{"type":"getmore","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+            cursorIdToString(cursorid)},"collection":"test","batchSize":0}`,
+        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0.0}}}],"cursor":{"batchSize":0.0},"hint":{"a":1.0}'
+    ];
+}
 
 assertLogLineContains(conn, logLine);
 MongoRunner.stopMongod(conn);

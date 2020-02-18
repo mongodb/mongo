@@ -10,6 +10,13 @@ selector:
   exclude_files:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
+  # Disable incompatible with json logging per SERVER-46235
+  - jstests/noPassthrough/currentop_secondary_slow_op.js
+  - jstests/noPassthrough/index_secondary_commit_after_scan_error.js
+  - jstests/noPassthrough/indexbg_killop_primary_after_init.js
+  - jstests/noPassthrough/latency_includes_lock_acquisition_time.js
+  - jstests/noPassthrough/log_and_profile_query_hash.js
+  - jstests/noPassthrough/log_format_slowms_samplerate_loglevel.js
 
 # noPassthrough tests start their own mongod's.
 executor:

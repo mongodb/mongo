@@ -23,7 +23,7 @@ assert.eq(mongosCfg.parsed.processManagement.timeZoneInfo, tzGoodInfo);
 // Test that a bad timezone file causes mongoS startup to fail.
 let conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo});
 assert.eq(conn, null, "expected launching mongos with bad timezone rules to fail");
-assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/) != -1);
+assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/));
 
 // Test that a non-existent timezone directory causes mongoS startup to fail.
 conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});

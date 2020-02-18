@@ -83,9 +83,11 @@ assert.commandWorked(secondDB.killOp(opId));
 // There should be a message for each index we tried to create.
 checkLog.containsWithCount(
     replTest.getSecondary(),
-    'index build: starting on ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
+    new RegExp(`(index build: starting on ${
+        masterColl
+            .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
+        masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
     indexSpecs.length);
-
 jsTest.log("Restarting secondary to retry replication");
 
 // Secondary should restart cleanly.
@@ -100,7 +102,10 @@ replTest.restart(secondaryId, {}, /*wait=*/true);
 // the message was logged twice in total.
 checkLog.containsWithCount(
     replTest.getSecondary(),
-    'index build: starting on ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
+    new RegExp(`(index build: starting on ${
+        masterColl
+            .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
+        masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
     indexSpecs.length);
 
 replTest.stopSet();

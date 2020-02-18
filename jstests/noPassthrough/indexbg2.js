@@ -77,7 +77,10 @@ let failOnInsertedDuplicateValue = function(coll) {
     try {
         bgIndexBuildPid = indexBuild();
         jsTestLog("Waiting to hang before index build of i=" + duplicateKey);
-        checkLog.contains(conn, "Hanging before index build of i=" + duplicateKey);
+        checkLog.contains(
+            conn,
+            new RegExp(`(Hanging before index build of i=${
+                duplicateKey}|Hanging.*index build of i.*"where":"before","i":${duplicateKey})`));
 
         assert.commandWorked(coll.save({i: duplicateKey}));
     } finally {
@@ -106,7 +109,10 @@ let succeedWithoutWriteErrors = function(coll, newKey) {
         bgIndexBuildPid = indexBuild();
 
         jsTestLog("Waiting to hang after index build of i=" + duplicateKey);
-        checkLog.contains(conn, "Hanging after index build of i=" + duplicateKey);
+        checkLog.contains(
+            conn,
+            new RegExp(`(Hanging after index build of i=${
+                duplicateKey}|Hanging.*index build of i.*"where":"after","i":${duplicateKey})`));
 
         assert.commandWorked(coll.insert({i: duplicateKey, n: true}));
 

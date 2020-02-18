@@ -3,7 +3,7 @@
 // Test that a bad file causes startup to fail.
 let conn = MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/bad_timezone_info"});
 assert.eq(conn, null, "expected launching mongod with bad timezone rules to fail");
-assert.neq(-1, rawMongoProgramOutput().indexOf("Fatal assertion 40475"));
+assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/));
 
 // Test that a non-existent directory causes startup to fail.
 conn = MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/missing_directory"});
