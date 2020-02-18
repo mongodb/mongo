@@ -24,7 +24,6 @@
  *   requires_fcv_44,
  *   requires_majority_read_concern,
  *   requires_profiling,
- *   requires_text_logs,
  *   uses_transactions,
  * ]
  */
@@ -32,6 +31,7 @@
 "use strict";
 
 load('jstests/libs/profiler.js');
+load("jstests/libs/logv2_helpers.js");
 
 let db = "test";
 let coll = "foo";
@@ -671,6 +671,19 @@ let setDefaultRWConcernActualTestCase = {
 //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 function createLogLineRegularExpressionForTestCase(test, cmdName, targetId, explicitRWC) {
     let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
+    if (isJsonLogNoConn()) {
+        let pattern = `"command":{"${cmdName}"`;
+        pattern += `.*"comment":"${targetId}"`;
+        if (test.checkReadConcern) {
+            pattern += `.*"readConcern":{"level":"majority","provenance":"${expectedProvenance}"}`;
+        }
+        if (test.checkWriteConcern) {
+            pattern += `.*"writeConcern":{"w":"majority","wtimeout":1234567,"provenance":"${
+                expectedProvenance}"}`;
+        }
+        return new RegExp(pattern);
+    }
+
     let pattern = `command: ${cmdName} `;
     pattern += `.* comment: "${targetId}"`;
     if (test.checkReadConcern) {

@@ -1,4 +1,5 @@
 // Test read after opTime functionality with maxTimeMS.
+load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";
@@ -38,6 +39,13 @@ var runTest = function(testDB, primaryConn) {
 
     var msg = 'Command on database ' + testDB.getName() +
         ' timed out waiting for read concern to be satisfied. Command:';
+
+    if (isJsonLogNoConn()) {
+        msg = new RegExp(
+            `Command on database {request_getDatabase} timed out waiting for read concern to be satisfied. Command:.*"attr":{"request_getDatabase":"${
+                testDB.getName()}",.*`);
+    }
+
     checkLog.containsWithCount(testDB.getMongo(), msg, 1);
 
     // Read concern timed out message should not be logged.

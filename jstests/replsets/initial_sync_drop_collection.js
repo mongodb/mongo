@@ -9,6 +9,7 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/libs/two_phase_drops.js');
 load("jstests/libs/uuid_util.js");
+load("jstests/libs/logv2_helpers.js");
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_drop_collection";
@@ -64,7 +65,9 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
 
 function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     // Get the uuid for use in checking the log line.
-    const uuid = extractUUIDFromObject(getUUIDFromListCollections(primaryDB, collName));
+    const uuid_obj = getUUIDFromListCollections(primaryDB, collName);
+    const uuid = extractUUIDFromObject(uuid_obj);
+    const uuid_base64 = uuid_obj.base64();
 
     jsTestLog("Dropping collection on primary: " + primaryColl.getFullName());
     assert(primaryColl.drop());
@@ -93,8 +96,9 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     assert.commandWorked(secondary.adminCommand({configureFailPoint: failPoint, mode: 'off'}));
 
     if (expectedLog) {
-        jsTestLog(eval(expectedLog));
-        checkLog.contains(secondary, eval(expectedLog));
+        expectedLog = eval(expectedLog);
+        jsTestLog(expectedLog);
+        checkLog.contains(secondary, expectedLog);
     }
 
     jsTestLog("Waiting for initial sync to complete.");
@@ -134,6 +138,11 @@ runDropTest({
 let expectedLogFor3and4 =
     "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`";
 
+if (isJsonLogNoConn()) {
+    expectedLogFor3and4 =
+        '`CollectionCloner ns: \'{getCloner_getSourceNss}\' uuid: UUID("{getCloner_getSourceUuid}") stopped because collection was dropped on source.","attr":{"getCloner_getSourceNss":"${nss}","getCloner_getSourceUuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
+}
+
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
 // collection will instead be renamed to a <db>.system.drop.* namespace before being dropped. Since
 // the cloner queries collection by UUID, it will observe the first drop phase as a rename.
@@ -169,8 +178,9 @@ runDropTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     waitForDrop: true,
-    expectedLog:
-        "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`"
+    expectedLog: isJsonLogNoConn()
+        ? '`CollectionCloner ns: \'{getCloner_getSourceNss}\' uuid: UUID("{getCloner_getSourceUuid}") stopped because collection was dropped on source.","attr":{"getCloner_getSourceNss":"${nss}","getCloner_getSourceUuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`'
+        : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`"
 });
 
 jsTestLog(
@@ -179,8 +189,9 @@ runDropTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     waitForDrop: true,
-    expectedLog:
-        "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`",
+    expectedLog: isJsonLogNoConn()
+        ? '`CollectionCloner ns: \'{getCloner_getSourceNss}\' uuid: UUID("{getCloner_getSourceUuid}") stopped because collection was dropped on source.","attr":{"getCloner_getSourceNss":"${nss}","getCloner_getSourceUuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`'
+        : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`",
     createNew: true
 });
 

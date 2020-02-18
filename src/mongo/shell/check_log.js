@@ -165,6 +165,30 @@ checkLog = (function() {
                                      : `{ ${serialized.join(', ')} }`);
     };
 
+    /**
+     * Format at the json for the log file which has no extra spaces.
+     */
+    const formatAsJsonLogLine = function(value, escapeStrings, toDecimal) {
+        if (typeof value === "string") {
+            return (escapeStrings ? `"${value}"` : value);
+        } else if (typeof value === "number") {
+            return (Number.isInteger(value) && toDecimal ? value.toFixed(1) : value);
+        } else if (value instanceof NumberLong) {
+            return `${value}`.match(/NumberLong..(.*)../m)[1];
+        } else if (typeof value !== "object") {
+            return value;
+        } else if (Object.keys(value).length === 0) {
+            return Array.isArray(value) ? "[]" : "{}";
+        }
+        let serialized = [];
+        escapeStrings = toDecimal = true;
+        for (let fieldName in value) {
+            const valueStr = formatAsJsonLogLine(value[fieldName], escapeStrings, toDecimal);
+            serialized.push(Array.isArray(value) ? valueStr : `"${fieldName}":${valueStr}`);
+        }
+        return (Array.isArray(value) ? `[${serialized.join(',')}]` : `{${serialized.join(',')}}`);
+    };
+
     return {
         getGlobalLog: getGlobalLog,
         checkContainsOnce: checkContainsOnce,
@@ -172,7 +196,8 @@ checkLog = (function() {
         contains: contains,
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
-        formatAsLogLine: formatAsLogLine
+        formatAsLogLine: formatAsLogLine,
+        formatAsJsonLogLine: formatAsJsonLogLine
     };
 })();
 })();

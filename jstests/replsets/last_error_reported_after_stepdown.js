@@ -2,6 +2,8 @@
  * Tests that writes which complete before stepdown correctly report their errors after the
  * stepdown.
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 "use strict";
 
@@ -28,6 +30,26 @@ assert.commandWorked(
                 {writeConcern: {w: 1}}));
 rst.awaitReplication();
 
+function getLogMsgFilter(command, collection) {
+    if (isJsonLogNoConn()) {
+        command = command.replace(/ /g, "");
+        let logMsg = `"type":"${command}",`;
+        if (collection != undefined) {
+            logMsg += `"ns":"${collection}",`;
+        } else {
+            logMsg += '.*';
+        }
+        logMsg += '"appName":"MongoDB Shell",';
+        return RegExp(logMsg);
+    }
+
+    let logMsg = command;
+    if (collection != undefined) {
+        logMsg += collection;
+    }
+    return logMsg + ' appName: "MongoDB Shell"';
+}
+
 // Note that "operation" should always be on primaryDataConn, so the stepdown doesn't clear
 // the last error.
 function runStepDownTest({description, logMsg, operation, errorCode, nDocs}) {
@@ -37,7 +59,7 @@ function runStepDownTest({description, logMsg, operation, errorCode, nDocs}) {
         primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 1}}));
     operation();
     // Wait for the operation to complete.
-    checkLog.contains(primary, logMsg + ' appName: "MongoDB Shell"');
+    checkLog.contains(primary, logMsg);
     assert.commandWorked(
         primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 0}}));
     assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
@@ -66,18 +88,18 @@ function runStepDownTest({description, logMsg, operation, errorCode, nDocs}) {
 assert.commandWorked(primaryAdmin.adminCommand({clearLog: 'global'}));
 runStepDownTest({
     description: "insert",
-    logMsg: "insert " + coll.getFullName(),
+    logMsg: getLogMsgFilter("insert ", coll.getFullName()),
     operation: () => coll.insert({_id: 0})
 });
 runStepDownTest({
     description: "update",
-    logMsg: "update ",
+    logMsg: getLogMsgFilter("update "),
     operation: () => coll.update({_id: 'updateme'}, {'$inc': {x: 1}}),
     nDocs: 1
 });
 runStepDownTest({
     description: "remove",
-    logMsg: "remove ",
+    logMsg: getLogMsgFilter("remove "),
     operation: () => coll.remove({_id: 'deleteme'}),
     nDocs: 1
 });
@@ -87,20 +109,20 @@ runStepDownTest({
 assert.commandWorked(primaryAdmin.adminCommand({clearLog: 'global'}));
 runStepDownTest({
     description: "insert with error",
-    logMsg: "insert " + coll.getFullName(),
+    logMsg: getLogMsgFilter("insert ", coll.getFullName()),
     operation: () => coll.insert({_id: 0}),
     errorCode: ErrorCodes.DuplicateKey
 });
 runStepDownTest({
     description: "update with error",
-    logMsg: "update ",
+    logMsg: getLogMsgFilter("update "),
     operation: () => coll.update({_id: 'updateme'}, {'$inc': {nullfield: 1}}),
     errorCode: ErrorCodes.TypeMismatch,
     nDocs: 0
 });
 runStepDownTest({
     description: "remove with error",
-    logMsg: "remove ",
+    logMsg: getLogMsgFilter("remove "),
     operation: () => coll.remove({'$nonsense': {x: 1}}),
     errorCode: ErrorCodes.BadValue,
     nDocs: 0

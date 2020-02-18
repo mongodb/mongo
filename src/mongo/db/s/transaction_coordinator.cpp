@@ -491,7 +491,7 @@ void TransactionCoordinator::_logSlowTwoPhaseCommit(
             duration_cast<Milliseconds>(
                 singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick)));
 
-        LOGV2(51804, "two-phsase commit", attrs);
+        LOGV2(51804, "two-phase commit", attrs);
 
     } else {
         LOGV2(22448,

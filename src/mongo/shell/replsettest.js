@@ -707,8 +707,8 @@ var ReplSetTest = function(opts) {
                         // Confirm that the node is unable to recover after rolling back.
                         checkLog.contains(
                             connToCheck,
-                            "remote oplog does not contain entry with optime matching our required optime ",
-                            60 * 1000);
+                            "remote oplog does not contain entry with optime matching our required optime",
+                            120 * 1000);
                     } catch (checkLogEx) {
                         throw originalEx;
                     }

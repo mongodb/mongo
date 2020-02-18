@@ -17,14 +17,17 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/initial_sync_test.js");
+load("jstests/libs/logv2_helpers.js");
 
 /**
  * Helper function to check that specific messages appeared or did not appear in the logs.
  */
 function checkLogForMsg(node, msg, contains) {
     if (contains) {
+        jsTest.log("Check for presence of message (" + node.port + "): |" + msg + "|");
         assert(checkLog.checkContainsOnce(node, msg));
     } else {
+        jsTest.log("Check for absence of message (" + node.port + "): |" + msg + "|");
         assert(!checkLog.checkContainsOnce(node, msg));
     }
 }
@@ -48,8 +51,18 @@ function checkLogForGetTimestampMsg(node, timestampName, timestamp, contains) {
 function checkLogForCollectionClonerMsg(node, commandName, dbname, contains, collUUID) {
     let msg =
         "Collection Cloner scheduled a remote command on the " + dbname + " db: { " + commandName;
+
+    if (isJsonLog(node)) {
+        msg =
+            'Collection Cloner scheduled a remote command on the {describeForFuzzer_stage}","attr":{"describeForFuzzer_stage":"' +
+            dbname + " db: { " + commandName;
+    }
+
     if (commandName === "listIndexes" && contains) {
         msg += ": " + collUUID;
+        if (isJsonLog(node)) {
+            msg = msg.replace('("', '(\\"').replace('")', '\\")');
+        }
     }
 
     checkLogForMsg(node, msg, contains);

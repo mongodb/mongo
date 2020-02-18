@@ -3,6 +3,8 @@
  * the number of shards that were actually available during each find or getMore operation.
  * @tags: [requires_replication, requires_sharding, requires_fcv_44]
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 "use strict";
 
@@ -52,16 +54,23 @@ function assertMatchingLogLineExists(fields) {
         const fieldNames = Object.keys(fields);
         return fieldNames.every((fieldName) => {
             const fieldValue = fields[fieldName];
-            let regex = escapeRegex(fieldName) + ":? ?(" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
+            let regex;
+            if (isJsonLogNoConn()) {
+                regex = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+            } else {
+                regex = escapeRegex(fieldName) + ":? ?(" +
+                    escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
+                    escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
+            }
             const match = line.match(regex);
             return match && match[0];
         });
     }
 
     const globalLog = assert.commandWorked(mongosDB.adminCommand({getLog: "global"}));
-    assert(globalLog.log.find((line) => lineMatches(line, fields)));
+    assert(globalLog.log.find((line) => lineMatches(line, fields)), "failed to find log line ");
 }
 
 // Issue a query with {allowPartialResults:true} on the collection. We sort by {_id:1} so that all

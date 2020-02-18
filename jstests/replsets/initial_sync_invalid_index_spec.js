@@ -2,6 +2,7 @@
  * Confirm that replica members undergoing initial sync fail if an invalid index specification is
  * encountered (where index version is >= 2).
  */
+load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";
@@ -48,9 +49,16 @@ replTest.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT
 const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
 const msgInitialSyncFatalAssertion = "Fatal assertion 40088 InitialSyncFailure";
 
-assert(rawMongoProgramOutput().match(msgInvalidOption) &&
-           rawMongoProgramOutput().match(msgInitialSyncFatalAssertion),
-       "Initial sync should have aborted on invalid index specification");
+if (isJsonLogNoConn()) {
+    assert(
+        rawMongoProgramOutput().search(
+            /Fatal assertion*40088.*InitialSyncFailure.*The field 'invalidOption' is not valid for an index specification/),
+        "Replication should have aborted on invalid index specification");
+} else {
+    assert(rawMongoProgramOutput().match(msgInvalidOption) &&
+               rawMongoProgramOutput().match(msgInitialSyncFatalAssertion),
+           "Initial sync should have aborted on invalid index specification");
+}
 
 replTest.stopSet();
 })();

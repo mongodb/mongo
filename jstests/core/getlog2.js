@@ -6,9 +6,8 @@
 //   # be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
-//   # TODO: Handle JSON logs. See SERVER-45140
-//   requires_text_logs,
 // ]
+load("jstests/libs/logv2_helpers.js");
 
 (function() {
 'use strict';
@@ -29,6 +28,16 @@ function contains(arr, func) {
         }
     }
     return false;
+}
+
+function stringContains(haystack, needle) {
+    if (isJsonLogNoConn()) {
+        if (needle.indexOf(":"))
+            needle = '"' + needle.replace(':', "\":");
+        needle = needle.replace(/ /g, "");
+    }
+
+    return haystack.indexOf(needle) != -1;
 }
 
 // test doesn't work when talking to mongos
@@ -55,8 +64,8 @@ assert(contains(query.log, function(v) {
     print(v);
     const opString = db.getMongo().useReadCommands() ? " find " : " query ";
     const filterString = db.getMongo().useReadCommands() ? "filter:" : "command:";
-    return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
-        v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
+    return stringContains(v, opString) && stringContains(v, filterString) &&
+        stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
         v.indexOf("SENTINEL") != -1;
 }));
 
@@ -76,9 +85,8 @@ assert.gt(update.log.length, 0, "no log lines");
 
 // Ensure that slow update is logged in deail.
 assert(contains(update.log, function(v) {
-    print(v);
-    return v.indexOf(" update ") != -1 && v.indexOf("command") != -1 &&
-        v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
+    return stringContains(v, " update ") != -1 && stringContains(v, "command") &&
+        stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
         v.indexOf("SENTINEL") != -1;
 }));
 })();

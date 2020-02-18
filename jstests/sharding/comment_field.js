@@ -3,13 +3,14 @@
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
  *
- * @tags: [requires_fcv_44, requires_text_logs]
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
+load("jstests/libs/logv2_helpers.js");
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -53,7 +54,7 @@ function verifyLogContains(connections, inputArray, expectedNumOccurrences) {
             numOccurrences += ((numMatches == inputArray.length) ? 1 : 0);
         }
     }
-    assert.eq(expectedNumOccurrences, numOccurrences);
+    assert.eq(expectedNumOccurrences, numOccurrences, "Failed to find messages " + inputArray);
 }
 
 function setPostCommandFailpointOnShards({mode, options}) {
@@ -162,15 +163,24 @@ function runCommentParamTest({
     // Run the 'checkLog' only for commands with uuid so that the we know the log line belongs to
     // current operation.
     if (commentObj["uuid"]) {
+        // Verify that a field with 'comment' exists in the same line as the command.
+        let expectStrings = [
+            ", comment: ",
+            checkLog.formatAsLogLine(commentObj),
+            'appName: "MongoDB Shell" command: ' + ((cmdName === "getMore") ? cmdName : "")
+        ];
+        if (isJsonLog(testDB)) {
+            expectStrings = [
+                ',"comment":',
+                checkLog.formatAsJsonLogLine(commentObj),
+                '"appName":"MongoDB Shell","command":{' +
+                    ((cmdName === "getMore") ? '"' + cmdName + '"' : "")
+            ];
+        }
+
         verifyLogContains(
             [testDB, shard0DB, shard1DB],
-            // Verify that a field with 'comment' exists in the same line as the command.
-            [
-                ", comment: ",
-                checkLog.formatAsLogLine(commentObj),
-                'appName: "MongoDB Shell" command: ' + ((cmdName === "getMore") ? cmdName : "")
-            ],
-
+            expectStrings,
             ((cmdName === "update" || cmdName === "delete")
                  ? expectedRunningOps
                  : 0) +  // For 'update' and 'delete' commands we also log an additional line

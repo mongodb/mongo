@@ -10,8 +10,12 @@
 'use strict';
 
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+load("jstests/libs/logv2_helpers.js");
 
-const readStatRegx = /storage:{ data: { bytesRead: ([0-9]+)/;
+let readStatRegx = /storage:{ data: { bytesRead: ([0-9]+)/;
+if (isJsonLogNoConn()) {
+    readStatRegx = /"storage":{"data":{"bytesRead":([0-9]+)/;
+}
 
 let checkLogStats = function() {
     // Check if the log output contains the expected statistics.

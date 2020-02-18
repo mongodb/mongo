@@ -2,6 +2,7 @@
  * Test that CollectionCloner completes without error when a collection is dropped during cloning,
  * specifically when that sync source is in 4.2.
  */
+load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";
@@ -99,8 +100,12 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     assert.commandWorked(secondary.adminCommand({configureFailPoint: failPoint, mode: 'off'}));
 
     if (expectedLog) {
-        jsTestLog(eval(expectedLog));
-        checkLog.contains(secondary, eval(expectedLog));
+        expectedLog = eval(expectedLog);
+        if (isJsonLog(primaryColl.getMongo())) {
+            expectedLog = expectedLog.replace(/"/g, "\\\"");
+        }
+        jsTestLog(expectedLog);
+        checkLog.contains(secondary, expectedLog);
     }
 
     jsTestLog("Waiting for initial sync to complete.");

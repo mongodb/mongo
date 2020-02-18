@@ -3,6 +3,8 @@
  * are behind the majority opTime.
  */
 
+load("jstests/libs/logv2_helpers.js");
+
 // Checking UUID and index consistency involves mongos being able to do a read from the config
 // server, but this test is designed to make mongos time out when reading from the config server.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
@@ -48,13 +50,18 @@ assert(ErrorCodes.isExceededTimeLimitError(exception.code));
 let msgAA = 'command config.$cmd command: find { find: "databases"';
 let msgAB = 'errCode:' + ErrorCodes.ClientDisconnect;
 let msgB = 'Command on database config timed out waiting for read concern to be satisfied.';
+if (isJsonLogNoConn()) {
+    msgB =
+        /Command on database {request_getDatabase} timed out waiting for read concern to be satisfied.*"request_getDatabase":"config"/;
+}
+
 assert.soon(
     function() {
         var logMessages =
             assert.commandWorked(delayedConfigSecondary.adminCommand({getLog: 'global'})).log;
         for (var i = 0; i < logMessages.length; i++) {
             if ((logMessages[i].indexOf(msgAA) != -1 && logMessages[i].indexOf(msgAB) != -1) ||
-                logMessages[i].indexOf(msgB) != -1) {
+                logMessages[i].search(msgB) != -1) {
                 return true;
             }
         }

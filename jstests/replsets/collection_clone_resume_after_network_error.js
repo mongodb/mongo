@@ -13,27 +13,37 @@
 
 load("jstests/replsets/rslib.js");  // For setLogVerbosity()
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/logv2_helpers.js");
 
 // Verify the 'find' command received by the primary includes a resume token request.
 function checkHasRequestResumeToken() {
-    checkLog.contains(primary, "$_requestResumeToken: true");
+    checkLog.contains(primary, /\$_requestResumeToken"?: ?true/);
 }
 
 // Verify the 'find' command received by the primary has no resumeAfter (yet).
 function checkNoResumeAfter() {
     assert.throws(function() {
-        checkLog.contains(primary, "$_resumeAfter", 3 * 1000);
+        checkLog.contains(primary, /\$_resumeAfter/, 3 * 1000);
     });
 }
 
 // Verify the 'find' command received by the primary has resumeAfter set with the given recordId.
 function checkHasResumeAfter(recordId) {
-    checkLog.contains(primary, "$_resumeAfter: { $recordId: " + recordId + " }");
+    if (isJsonLogNoConn()) {
+        checkLog.contains(primary, `"$_resumeAfter":{"$recordId":${recordId}}`);
+    } else {
+        checkLog.contains(primary, "$_resumeAfter: { $recordId: " + recordId + " }");
+    }
 }
 
 // Verify that we sent a killCursors command on the namespace we are cloning.
 function checkHasKillCursors() {
-    checkLog.contains(primary, "command test.test command: killCursors { killCursors: \"test\"");
+    if (isJsonLogNoConn()) {
+        checkLog.contains(primary, /"ns":"test.test",.*"command":{"killCursors":"test"/);
+    } else {
+        checkLog.contains(primary,
+                          "command test.test command: killCursors { killCursors: \"test\"");
+    }
 }
 
 const beforeRetryFailPointName = "hangBeforeRetryingClonerStage";

@@ -21,6 +21,7 @@
 
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 load("jstests/replsets/rslib.js");
+load("jstests/libs/logv2_helpers.js");
 
 // Returns a list of all collections in a given database. Use 'args' as the
 // 'listCollections' command arguments.
@@ -151,8 +152,17 @@ jsTestLog('Waiting for dropDatabase command on ' + primary.host + ' to complete.
 var exitCode = dropDatabaseProcess();
 
 let db = primary.getDB(dbNameToDrop);
-checkLog.contains(db.getMongo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
-checkLog.contains(db.getMongo(), "dropped 1 collection(s)");
+if (isJsonLog(db.getMongo())) {
+    checkLog.contains(db.getMongo(),
+                      `dropping collection: {nss}","attr":{"dbName":"${dbNameToDrop}","nss":"${
+                          dbNameToDrop}.${collNameToDrop}"`);
+    checkLog.contains(
+        db.getMongo(),
+        'dropped {numCollections} collection(s)","attr":{"dbName":"dbToDrop","numCollections":1}');
+} else {
+    checkLog.contains(db.getMongo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
+    checkLog.contains(db.getMongo(), "dropped 1 collection(s)");
+}
 
 assert.eq(0, exitCode, 'dropDatabase command on ' + primary.host + ' failed.');
 jsTestLog('Completed dropDatabase command on ' + primary.host);

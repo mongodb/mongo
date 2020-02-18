@@ -4,6 +4,8 @@
  * protocols.
  * @tags: [requires_replication, requires_sharding]
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 "use strict";
 
@@ -97,7 +99,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
     // which we do not expect them to appear.
     const ignoreFields =
             (isMongos
-                 ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary", 
+                 ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary",
 					 "usedDisk", "hasSortStage"]
                  : ["nShards"]);
 
@@ -419,9 +421,16 @@ function findMatchingLogLine(logLines, fields, ignoreFields) {
             Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
         return fieldNames.every((fieldName) => {
             const fieldValue = fields[fieldName];
-            let regex = escapeRegex(fieldName) + ":? ?(" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
-                escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
+            let regex;
+            if (isJsonLogNoConn()) {
+                regex = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+            } else {
+                regex = escapeRegex(fieldName) + ":? ?(" +
+                    escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
+                    escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
+            }
             const match = line.match(regex);
             return match && match[0];
         });
