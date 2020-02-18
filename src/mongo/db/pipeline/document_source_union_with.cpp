@@ -41,9 +41,11 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(unionWith,
-                         DocumentSourceUnionWith::LiteParsed::parse,
-                         DocumentSourceUnionWith::createFromBson);
+REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
+    unionWith,
+    DocumentSourceUnionWith::LiteParsed::parse,
+    DocumentSourceUnionWith::createFromBson,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
 namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(

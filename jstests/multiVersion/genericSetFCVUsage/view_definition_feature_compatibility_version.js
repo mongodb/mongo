@@ -36,6 +36,10 @@ const pipelinesWithNewFeatures = [
     [{$project: {x: {$replaceAll: {input: '', find: '', replacement: ''}}}}],
     [{$project: {x: {$first: {$literal: ['a']}}}}],
     [{$project: {x: {$last: {$literal: ['a']}}}}],
+    [{$unionWith: "A"}],
+    [{$unionWith: {coll: "A", pipeline: [{$match: {b: 1}}]}}],
+    [{$lookup: {from: "A", pipeline: [{$unionWith: "B"}], as: "result"}}],
+    [{$facet: {sub_pipe_invalid: [{$unionWith: "B"}], sub_pipe_valid: [{$match: {b: 1}}]}}],
 ];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
@@ -55,7 +59,7 @@ pipelinesWithNewFeatures.forEach(
         `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
             ` ${latestFCV}`));
 
-// Test that we are able to create a new view with any of the new features.
+// Test that we are able to update an existing view with any of the new features.
 pipelinesWithNewFeatures.forEach(function(pipe, i) {
     assert(testDB["firstView" + i].drop(), `Drop of view with pipeline ${tojson(pipe)} failed`);
     assert.commandWorked(testDB.createView("firstView" + i, "coll", []));

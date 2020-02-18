@@ -87,7 +87,7 @@ class Document;
  * If your stage is actually an alias which needs to return more than one stage (such as
  * $sortByCount), you should use the REGISTER_MULTI_STAGE_ALIAS macro instead.
  */
-#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, ...)             \
+#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, minVersion, ...) \
     MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
         if (!__VA_ARGS__) {                                                                  \
             return Status::OK();                                                             \
@@ -98,16 +98,19 @@ class Document;
                 (fullParser)(stageSpec, expCtx)};                                            \
         };                                                                                   \
         LiteParsedDocumentSource::registerParser("$" #key, liteParser);                      \
-        DocumentSource::registerParser("$" #key, fullParserWrapper);                         \
+        DocumentSource::registerParser("$" #key, fullParserWrapper, minVersion);             \
         return Status::OK();                                                                 \
     }
 
 #define REGISTER_DOCUMENT_SOURCE(key, liteParser, fullParser) \
-    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, true)
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, boost::none, true)
 
 #define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser) \
     REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                        \
-        key, liteParser, fullParser, ::mongo::getTestCommandsEnabled())
+        key, liteParser, fullParser, boost::none, ::mongo::getTestCommandsEnabled())
+
+#define REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(key, liteParser, fullParser, minVersion) \
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, minVersion, true)
 
 /**
  * Registers a multi-stage alias (such as $sortByCount) to have the single name 'key'. When a stage
@@ -125,7 +128,7 @@ class Document;
 #define REGISTER_MULTI_STAGE_ALIAS(key, liteParser, fullParser)                  \
     MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
         LiteParsedDocumentSource::registerParser("$" #key, (liteParser));        \
-        DocumentSource::registerParser("$" #key, (fullParser));                  \
+        DocumentSource::registerParser("$" #key, (fullParser), boost::none);     \
         return Status::OK();                                                     \
     }
 
@@ -354,7 +357,10 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(std::string name, Parser parser);
+    static void registerParser(
+        std::string name,
+        Parser parser,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
 
 private:
     /**

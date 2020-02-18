@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -56,16 +57,23 @@ DocumentSource::DocumentSource(const StringData stageName,
     : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {}
 
 namespace {
+struct ParserRegistration {
+    Parser parser;
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
+};
 // Used to keep track of which DocumentSources are registered under which name.
-static StringMap<Parser> parserMap;
+static StringMap<ParserRegistration> parserMap;
 }  // namespace
 
-void DocumentSource::registerParser(string name, Parser parser) {
+void DocumentSource::registerParser(
+    string name,
+    Parser parser,
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = parser;
+    parserMap[name] = {parser, requiredMinVersion};
 }
 
 list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
@@ -83,7 +91,15 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second(stageSpec, expCtx);
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << stageName
+                          << " is not allowed in the current feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !expCtx->maxFeatureCompatibilityVersion || !it->second.requiredMinVersion ||
+                (*it->second.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
+
+    return it->second.parser(stageSpec, expCtx);
 }
 
 const char* DocumentSource::getSourceName() const {
