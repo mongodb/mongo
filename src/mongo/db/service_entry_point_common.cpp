@@ -866,7 +866,8 @@ void execCommandDatabase(OperationContext* opCtx,
     BSONObjBuilder extraFieldsBuilder;
     auto startOperationTime = getClientOperationTime(opCtx);
 
-    auto invocation = command->parse(opCtx, request);
+    std::shared_ptr<CommandInvocation> invocation = command->parse(opCtx, request);
+    CommandInvocation::set(opCtx, invocation);
 
     OperationSessionInfoFromClient sessionOptions;
 

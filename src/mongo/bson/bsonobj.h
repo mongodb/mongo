@@ -52,6 +52,7 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
 class BSONObjStlIterator;
 class ExtendedCanonicalV200Generator;
 class ExtendedRelaxedV200Generator;
@@ -393,9 +394,11 @@ public:
      *    this.extractFieldsUnDotted({b : "blah"}) -> {"" : 5}
      *
      */
-    BSONObj extractFieldsUnDotted(const BSONObj& pattern) const;
+    BSONObj extractFieldsUndotted(const BSONObj& pattern) const;
+    void extractFieldsUndotted(BSONObjBuilder* b, const BSONObj& pattern) const;
 
     BSONObj filterFieldsUndotted(const BSONObj& filter, bool inFilter) const;
+    void filterFieldsUndotted(BSONObjBuilder* b, const BSONObj& filter, bool inFilter) const;
 
     BSONElement getFieldUsingIndexNames(StringData fieldName, const BSONObj& indexKey) const;
 

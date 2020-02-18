@@ -277,13 +277,10 @@ void initWireSpec() {
 
 void initializeCommandHooks(ServiceContext* serviceContext) {
     class MongodCommandInvocationHooks final : public CommandInvocationHooks {
-        void onBeforeRun(OperationContext* opCtx,
-                         const OpMsgRequest& request,
-                         CommandInvocation* invocation) {}
-        void onAfterRun(OperationContext* opCtx,
-                        const OpMsgRequest& request,
-                        CommandInvocation* invocation) {
-            MirrorMaestro::tryMirror(opCtx, request, invocation);
+        void onBeforeRun(OperationContext*, const OpMsgRequest&, CommandInvocation*) {}
+
+        void onAfterRun(OperationContext* opCtx, const OpMsgRequest&, CommandInvocation*) {
+            MirrorMaestro::tryMirrorRequest(opCtx);
         }
     };
 

@@ -65,14 +65,12 @@ public:
     static void shutdown(ServiceContext* serviceContext) noexcept;
 
     /**
-     * Check if a given invocation+request should be mirrored to secondaries, and schedule that work
-     * if so.
+     * Check if the request associated with opCtx should be mirrored to secondaries, and schedule
+     * that work if so.
      *
      * This function will noop if the MirrorMaestro is currently being initialized or shutdown.
      */
-    static void tryMirror(OperationContext* opCtx,
-                          const OpMsgRequest& request,
-                          const CommandInvocation* invocation) noexcept;
+    static void tryMirrorRequest(OperationContext* opCtx) noexcept;
 };
 
 }  // namespace mongo

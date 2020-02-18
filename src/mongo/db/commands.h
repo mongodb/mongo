@@ -514,6 +514,9 @@ public:
 
     virtual ~CommandInvocation();
 
+    static void set(OperationContext* opCtx, std::shared_ptr<CommandInvocation> invocation);
+    static std::shared_ptr<CommandInvocation> get(OperationContext* opCtx);
+
     /**
      * Runs the command, filling in result. Any exception thrown from here will cause result
      * to be reset and filled in with the error. Non-const to permit modifying the request
@@ -555,10 +558,17 @@ public:
     }
 
     /**
-     * Returns this invocation's support for readMirroring.
+     * Return if this invocation can be mirrored to secondaries
      */
     virtual bool supportsReadMirroring() const {
         return false;
+    }
+
+    /**
+     * Return a BSONObj that can be safely mirrored to secondaries for cache warming
+     */
+    virtual void appendMirrorableRequest(BSONObjBuilder*) const {
+        MONGO_UNREACHABLE;
     }
 
     /**
@@ -711,6 +721,20 @@ public:
                                                             "default read concern not permitted"};
         return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
                 {kDefaultReadConcernNotPermitted}};
+    }
+
+    /**
+     * Return if the cmdObj can be mirrored to secondaries in some form
+     */
+    virtual bool supportsReadMirroring(const BSONObj& cmdObj) const {
+        return false;
+    }
+
+    /**
+     * Return a modified form of cmdObj that can be safely mirrored to secondaries for cache warming
+     */
+    virtual void appendMirrorableRequest(BSONObjBuilder*, const BSONObj&) const {
+        MONGO_UNREACHABLE;
     }
 
     virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {

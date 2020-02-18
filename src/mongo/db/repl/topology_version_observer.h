@@ -69,22 +69,15 @@ constexpr auto kTopologyVersionObserverName = "TopologyVersionObserver";
  */
 class TopologyVersionObserver final {
 public:
-    TopologyVersionObserver() {}
-
-    TopologyVersionObserver(const TopologyVersionObserver&) = delete;
-
-    TopologyVersionObserver(TopologyVersionObserver&&) noexcept = delete;
-
-    TopologyVersionObserver& operator=(const TopologyVersionObserver&) = delete;
-
-    TopologyVersionObserver& operator=(TopologyVersionObserver&&) = delete;
+    TopologyVersionObserver() = default;
 
     ~TopologyVersionObserver() {
         auto state = _state.load();
         invariant(state == State::kShutdown || state == State::kUninitialized);
     }
 
-    void init(ReplicationCoordinator* replCoordinator) noexcept;
+    void init(ServiceContext* serviceContext,
+              ReplicationCoordinator* replCoordinator = nullptr) noexcept;
 
     void shutdown() noexcept;
 
@@ -106,7 +99,7 @@ private:
     };
 
     std::shared_ptr<const IsMasterResponse> _getIsMasterResponse(boost::optional<TopologyVersion>,
-                                                                 bool*);
+                                                                 bool*) noexcept;
 
     void _workerThreadBody() noexcept;
 
@@ -119,22 +112,33 @@ private:
      * is that the contention on this lock is insignificant.
      */
     mutable Mutex _mutex = MONGO_MAKE_LATCH(kTopologyVersionObserverName);
+    stdx::condition_variable _cv;
+
+    /**
+     * Tells the worker thread if it should continue to run
+     *
+     * This variable is set to true from false outside the worker thread
+     */
+    AtomicWord<bool> _shouldShutdown;
 
     // The reference to the latest cached version of `IsMasterResponse`
     std::shared_ptr<const IsMasterResponse> _cache;
 
-    // Holds a reference to the observer client to allow `shutdown()` to stop the observer thread.
-    Client* _observerClient;
-
     /**
      * Represents the current state of the observer.
-     * Note that the observer thread never updates the state.
+     *
+     * This variable is only changed from the worker thread
      */
     AtomicWord<State> _state;
 
+    // Holds a reference to the observer client to allow `shutdown()` to stop the observer thread.
+    // This variable is only consistent when _state == State::kRunning and _mutex is acquired.
+    Client* _observerClient;
+
     boost::optional<stdx::thread> _thread;
 
-    ReplicationCoordinator* _replCoordinator;
+    ServiceContext* _serviceContext = nullptr;
+    ReplicationCoordinator* _replCoordinator = nullptr;
 };
 
 }  // namespace repl

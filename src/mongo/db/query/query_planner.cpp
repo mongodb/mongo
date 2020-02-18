@@ -142,7 +142,7 @@ string optionString(size_t options) {
 }
 
 static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) {
-    return query.extractFieldsUnDotted(keyPattern);
+    return query.extractFieldsUndotted(keyPattern);
 }
 
 static bool indexCompatibleMaxMin(const BSONObj& obj,

@@ -488,20 +488,25 @@ env.Library(
     source=[
         'mirror_maestro.cpp',
         env.Idlc('mirror_maestro.idl')[0],
+        'mirroring_sampler.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
+        "$BUILD_DIR/mongo/rpc/protocol",
         'service_context',
+        "$BUILD_DIR/mongo/util/net/network",
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'commands/server_status',
         'repl/replica_set_messages',
         'repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'repl/topology_version_observer',
     ],
 )
 
@@ -1824,19 +1829,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='mirroring_sampler',
-    source=[
-        'mirroring_sampler.cpp',
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/replica_set_messages",
-        "$BUILD_DIR/mongo/rpc/protocol",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=['asio'])
 
@@ -1926,7 +1918,7 @@ envWithAsio.CppUnitTest(
         'logical_session_id',
         'logical_session_id_helpers',
         'logical_time',
-        'mirroring_sampler',
+        'mirror_maestro',
         'namespace_string',
         'op_observer',
         'op_observer_impl',

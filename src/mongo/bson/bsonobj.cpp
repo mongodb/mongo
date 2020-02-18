@@ -346,8 +346,7 @@ bool BSONObj::isFieldNamePrefixOf(const BSONObj& otherObj) const {
     return !a.more();
 }
 
-BSONObj BSONObj::extractFieldsUnDotted(const BSONObj& pattern) const {
-    BSONObjBuilder b;
+void BSONObj::extractFieldsUndotted(BSONObjBuilder* b, const BSONObj& pattern) const {
     BSONObjIterator i(pattern);
     while (i.moreWithEOO()) {
         BSONElement e = i.next();
@@ -355,13 +354,17 @@ BSONObj BSONObj::extractFieldsUnDotted(const BSONObj& pattern) const {
             break;
         BSONElement x = getField(e.fieldName());
         if (!x.eoo())
-            b.appendAs(x, "");
+            b->appendAs(x, "");
     }
+}
+
+BSONObj BSONObj::extractFieldsUndotted(const BSONObj& pattern) const {
+    BSONObjBuilder b;
+    extractFieldsUndotted(&b, pattern);
     return b.obj();
 }
 
-BSONObj BSONObj::filterFieldsUndotted(const BSONObj& filter, bool inFilter) const {
-    BSONObjBuilder b;
+void BSONObj::filterFieldsUndotted(BSONObjBuilder* b, const BSONObj& filter, bool inFilter) const {
     BSONObjIterator i(*this);
     while (i.moreWithEOO()) {
         BSONElement e = i.next();
@@ -369,8 +372,13 @@ BSONObj BSONObj::filterFieldsUndotted(const BSONObj& filter, bool inFilter) cons
             break;
         BSONElement x = filter.getField(e.fieldName());
         if ((x.eoo() && !inFilter) || (!x.eoo() && inFilter))
-            b.append(e);
+            b->append(e);
     }
+}
+
+BSONObj BSONObj::filterFieldsUndotted(const BSONObj& filter, bool inFilter) const {
+    BSONObjBuilder b;
+    filterFieldsUndotted(&b, filter, inFilter);
     return b.obj();
 }
 

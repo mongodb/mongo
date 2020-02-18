@@ -87,8 +87,9 @@ public:
         getNet()->advanceTime(Date_t::now() + sleepTime);
         getNet()->exitNetwork();
 
+        auto serviceContext = getServiceContext();
         observer = std::make_unique<TopologyVersionObserver>();
-        observer->init(replCoord);
+        observer->init(serviceContext, replCoord);
     }
 
     ~TopologyVersionObserverTest() {

@@ -93,6 +93,10 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
+    bool supportsReadMirroring(const BSONObj&) const override {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
@@ -309,6 +313,21 @@ public:
         uassert(31299, "distinct too big, 16mb cap", result.len() < kMaxResponseSize);
         return true;
     }
+
+    void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {
+        static const auto kMirrorableKeys = [] {
+            BSONObjBuilder keyBob;
+            keyBob.append("distinct", 1);
+            keyBob.append("key", 1);
+            keyBob.append("query", 1);
+            keyBob.append("collation", 1);
+            return keyBob.obj();
+        }();
+
+        // Filter the keys that can be mirrored
+        cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
+    }
+
 
 } distinctCmd;
 

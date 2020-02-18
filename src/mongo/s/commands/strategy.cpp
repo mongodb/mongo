@@ -364,7 +364,8 @@ void runCommand(OperationContext* opCtx,
         opCtx->setComment(commentField.wrap());
     }
 
-    auto invocation = command->parse(opCtx, request);
+    std::shared_ptr<CommandInvocation> invocation = command->parse(opCtx, request);
+    CommandInvocation::set(opCtx, invocation);
 
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command

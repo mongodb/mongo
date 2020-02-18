@@ -40,62 +40,83 @@
 namespace mongo {
 namespace repl {
 
-void TopologyVersionObserver::init(ReplicationCoordinator* replCoordinator) noexcept {
-    invariant(replCoordinator);
-    stdx::lock_guard<Mutex> lk(_mutex);
-    invariant(_state.load() == State::kUninitialized);
-
+void TopologyVersionObserver::init(ServiceContext* serviceContext,
+                                   ReplicationCoordinator* replCoordinator) noexcept {
     LOGV2_INFO(40440,
                "Starting {topologyVersionObserverName}",
                "topologyVersionObserverName"_attr = toString());
-    _replCoordinator = replCoordinator;
+
+    stdx::unique_lock lk(_mutex);
+
+    _serviceContext = serviceContext;
+    invariant(_serviceContext);
+
+    _replCoordinator =
+        replCoordinator ? replCoordinator : ReplicationCoordinator::get(_serviceContext);
+    invariant(_replCoordinator);
 
     invariant(!_thread);
+    invariant(_state.load() == State::kUninitialized);
     _thread = stdx::thread([&]() { this->_workerThreadBody(); });
 
-    // Wait for the observer thread to update the status.
-    while (_state.load() != State::kRunning) {
-    }
+    _cv.wait(lk, [&] { return _state.load() != State::kUninitialized; });
 }
 
 void TopologyVersionObserver::shutdown() noexcept {
-    stdx::unique_lock<Mutex> lk(_mutex);
-    if (_state.load() == State::kUninitialized) {
-        return;
-    }
+    auto shouldWaitForShutdown = _shouldShutdown.swap(true);
+    if (shouldWaitForShutdown) {
+        // If we aren't the first ones to call shutdown, wait for the thread to stop
+        stdx::unique_lock lk(_mutex);
 
-    // Check if another `shutdown()` has already completed.
-    if (!_thread) {
+        _cv.wait(lk, [&] { return _state.load() == State::kShutdown; });
+        invariant(_state.load() == State::kShutdown);
         return;
     }
 
     LOGV2_INFO(40441,
                "Stopping {topologyVersionObserverName}",
                "topologyVersionObserverName"_attr = toString());
-    auto state = _state.load();
-    invariant(state == State::kRunning || state == State::kShutdown);
 
-    // Wait for the observer client to exit from its main loop.
-    // Observer thread must update the state before attempting to acquire the mutex.
-    while (_state.load() == State::kRunning) {
-        invariant(_observerClient);
-        _observerClient->lock();
-        auto opCtx = _observerClient->getOperationContext();
-        if (opCtx) {
-            opCtx->markKilled(ErrorCodes::ShutdownInProgress);
-        }
-        _observerClient->unlock();
+    // Wait for the thread to stop and steal it to the local stack
+    auto thread = [&] {
+        stdx::unique_lock lk(_mutex);
+
+        _cv.wait(lk, [&] {
+            if (_state.load() != State::kRunning) {
+                // If we are no longer running, then we can safely join
+                return true;
+            }
+
+            // If we are still running, attempt to kill any opCtx
+            invariant(_observerClient);
+            stdx::lock_guard clientLk(*_observerClient);
+            auto opCtx = _observerClient->getOperationContext();
+            if (opCtx) {
+                _serviceContext->killOperation(clientLk, opCtx, ErrorCodes::ShutdownInProgress);
+            }
+
+            return false;
+        });
+        invariant(_state.load() == State::kShutdown);
+
+        return std::exchange(_thread, boost::none);
+    }();
+
+    if (!thread) {
+        // We never started
+        return;
     }
 
-    invariant(_state.load() == State::kShutdown);
-    auto thread = std::exchange(_thread, boost::none);
-    lk.unlock();
-
-    invariant(thread);
+    // Finally join
     thread->join();
 }
 
 std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::getCached() noexcept {
+    if (_state.load() != State::kRunning || _shouldShutdown.load()) {
+        // Early return if we know there isn't a worker
+        return {};
+    }
+
     // Acquires the lock to avoid potential races with `_workerThreadBody()`.
     // Atomics cannot be used here as `shared_ptr` cannot be atomically updated.
     stdx::lock_guard<Mutex> lk(_mutex);
@@ -107,7 +128,7 @@ std::string TopologyVersionObserver::toString() const {
 }
 
 std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::_getIsMasterResponse(
-    boost::optional<TopologyVersion> topologyVersion, bool* shouldShutdown) try {
+    boost::optional<TopologyVersion> topologyVersion, bool* shouldShutdown) noexcept try {
     invariant(*shouldShutdown == false);
     ServiceContext::UniqueOperationContext opCtx;
     try {
@@ -120,6 +141,8 @@ std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::_getIsMasterRes
     }
 
     invariant(opCtx);
+
+    invariant(_replCoordinator);
     auto future = _replCoordinator->getIsMasterResponseFuture({}, topologyVersion);
     auto response = future.get(opCtx.get());
     if (!response->isConfigSet()) {
@@ -140,17 +163,10 @@ std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::_getIsMasterRes
 }
 
 void TopologyVersionObserver::_workerThreadBody() noexcept {
-    invariant(_state.load() == State::kUninitialized);
-
     // Creates a new client and makes `_observerClient` to point to it, which allows `shutdown()`
     // to access the client object.
-    Client::initThread(kTopologyVersionObserverName);
-    _observerClient = Client::getCurrent();
-
-    // `init()` must hold the mutex until the observer updates the state.
-    invariant(!_mutex.try_lock());
-    // The following notifies `init()` that `_observerClient` is set and ready to use.
-    _state.store(State::kRunning);
+    invariant(_serviceContext);
+    ThreadClient tc(kTopologyVersionObserverName, _serviceContext);
 
     auto getTopologyVersion = [&]() -> boost::optional<TopologyVersion> {
         // Only the observer thread updates `_cache`, thus there is no need to hold the lock before
@@ -161,37 +177,54 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
         return boost::none;
     };
 
+    LOGV2_INFO(40445,
+               "Started {topologyVersionObserverName}",
+               "topologyVersionObserverName"_attr = toString());
+
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_state.load() == State::kUninitialized);
+        if (_shouldShutdown.load()) {
+            _state.store(State::kShutdown);
+            _cv.notify_all();
+
+            return;
+        }
+
+        // The following notifies `init()` that `_observerClient` is set and ready to use.
+        _state.store(State::kRunning);
+        _observerClient = tc.get();
+        _cv.notify_all();
+    }
+
     ON_BLOCK_EXIT([&] {
-        // Once the observer detects a shutdown, it must update the state first before attempting
-        // to acquire the lock. This is necessary to avoid deadlocks.
-        invariant(_state.load() == State::kRunning);
-        _state.store(State::kShutdown);
+        {
+            stdx::lock_guard lk(_mutex);
+            invariant(_state.load() == State::kRunning);
+            _state.store(State::kShutdown);
 
-        stdx::unique_lock lock(_mutex);
+            // Invalidate the cache as it is no longer updated
+            _cache.reset();
+            _observerClient = nullptr;
 
-        // Invalidate the cache as it is no longer updated
-        _cache.reset();
-
-        // Client object is local to this thread, and is no longer be available.
-        _observerClient = nullptr;
+            _cv.notify_all();
+        }
 
         LOGV2_INFO(40447,
                    "Stopped {topologyVersionObserverName}",
                    "topologyVersionObserverName"_attr = toString());
     });
 
-    bool shouldShutdown = false;
-    LOGV2_INFO(40445,
-               "Started {topologyVersionObserverName}",
-               "topologyVersionObserverName"_attr = toString());
-    while (!shouldShutdown) {
-        auto response = _getIsMasterResponse(getTopologyVersion(), &shouldShutdown);
-        // Only update if the version is more recent than the cached version, or `_cache` is null.
-        if (!shouldShutdown && response != _cache) {
-            stdx::lock_guard lock(_mutex);
-            _cache = response;
-        }
-    }
+    bool receivedShutdownError;
+    do {
+        receivedShutdownError = false;
+        auto response = _getIsMasterResponse(getTopologyVersion(), &receivedShutdownError);
+
+        stdx::lock_guard lk(_mutex);
+        _cache = response;
+
+        // If either the global shutdown flag was set or we received a shutdown error, we're done
+    } while (!(receivedShutdownError || _shouldShutdown.load()));
 }
 
 }  // namespace repl

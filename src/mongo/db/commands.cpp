@@ -690,8 +690,25 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
         });
 }
 
+namespace {
+// We store the CommandInvocation as a shared_ptr on the OperationContext in case we need to persist
+// the invocation past the lifetime of the op. If so, this shared_ptr can be copied off to another
+// thread. If not, there is only one shared_ptr and the invocation goes out of scope when the op
+// ends.
+auto invocationForOpCtx = OperationContext::declareDecoration<std::shared_ptr<CommandInvocation>>();
+}  // namespace
+
 //////////////////////////////////////////////////////////////
 // CommandInvocation
+
+void CommandInvocation::set(OperationContext* opCtx,
+                            std::shared_ptr<CommandInvocation> invocation) {
+    invocationForOpCtx(opCtx) = std::move(invocation);
+}
+
+std::shared_ptr<CommandInvocation> CommandInvocation::get(OperationContext* opCtx) {
+    return invocationForOpCtx(opCtx);
+}
 
 CommandInvocation::~CommandInvocation() = default;
 
@@ -737,13 +754,13 @@ public:
                BasicCommandWithReplyBuilderInterface* command)
         : CommandInvocation(command),
           _command(command),
-          _request(&request),
-          _dbName(_request->getDatabase().toString()) {}
+          _request(request),
+          _dbName(_request.getDatabase().toString()) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        opCtx->lockState()->setDebugInfo(redact(_request->body).toString());
-        bool ok = _command->runWithReplyBuilder(opCtx, _dbName, _request->body, result);
+        opCtx->lockState()->setDebugInfo(redact(_request.body).toString());
+        bool ok = _command->runWithReplyBuilder(opCtx, _dbName, _request.body, result);
         if (!ok) {
             BSONObjBuilder bob = result->getBodyBuilder();
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
@@ -753,7 +770,7 @@ private:
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
                  rpc::ReplyBuilderInterface* result) override {
-        uassertStatusOK(_command->explain(opCtx, *_request, verbosity, result));
+        uassertStatusOK(_command->explain(opCtx, _request, verbosity, result));
     }
 
     NamespaceString ns() const override {
@@ -768,6 +785,15 @@ private:
         return _command->supportsReadConcern(cmdObj(), level);
     }
 
+    bool supportsReadMirroring() const override {
+        return _command->supportsReadMirroring(cmdObj());
+    }
+
+    void appendMirrorableRequest(BSONObjBuilder* bob) const override {
+        invariant(cmdObj().isOwned());
+        _command->appendMirrorableRequest(bob, cmdObj());
+    }
+
     bool allowsAfterClusterTime() const override {
         return _command->allowsAfterClusterTime(cmdObj());
     }
@@ -778,15 +804,15 @@ private:
 
     void doCheckAuthorization(OperationContext* opCtx) const override {
         uassertStatusOK(_command->checkAuthForOperation(
-            opCtx, _request->getDatabase().toString(), _request->body));
+            opCtx, _request.getDatabase().toString(), _request.body));
     }
 
     const BSONObj& cmdObj() const {
-        return _request->body;
+        return _request.body;
     }
 
     BasicCommandWithReplyBuilderInterface* const _command;
-    const OpMsgRequest* const _request;
+    const OpMsgRequest _request;
     const std::string _dbName;
 };
 

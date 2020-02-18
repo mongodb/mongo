@@ -94,6 +94,10 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
+    bool supportsReadMirroring(const BSONObj&) const override {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
@@ -259,6 +263,24 @@ public:
 
         result.appendNumber("n", countStats->nCounted);
         return true;
+    }
+
+    void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {
+        static const auto kMirrorableKeys = [] {
+            BSONObjBuilder keyBob;
+
+            keyBob.append("count", 1);
+            keyBob.append("query", 1);
+            keyBob.append("skip", 1);
+            keyBob.append("limit", 1);
+            keyBob.append("hint", 1);
+            keyBob.append("collation", 1);
+
+            return keyBob.obj();
+        }();
+
+        // Filter the keys that can be mirrored
+        cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
     }
 
 } cmdCount;

@@ -182,7 +182,9 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request, StringData dbName)
-            : CommandInvocation(definition), _request(request), _dbName(dbName) {}
+            : CommandInvocation(definition), _request(request), _dbName(dbName) {
+            invariant(_request.body.isOwned());
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -592,8 +594,31 @@ public:
             firstBatch.done(cursorId, nss.ns());
         }
 
+        void appendMirrorableRequest(BSONObjBuilder* bob) const override {
+            // Filter the keys that can be mirrored
+            static const auto kMirrorableKeys = [] {
+                BSONObjBuilder keyBob;
+                keyBob.append("find", 1);
+                keyBob.append("filter", 1);
+                keyBob.append("skip", 1);
+                keyBob.append("limit", 1);
+                keyBob.append("sort", 1);
+                keyBob.append("hint", 1);
+                keyBob.append("collation", 1);
+                keyBob.append("min", 1);
+                keyBob.append("max", 1);
+                return keyBob.obj();
+            }();
+
+            _request.body.filterFieldsUndotted(bob, kMirrorableKeys, true);
+
+            // Tell the find to only return a single batch
+            bob->append("batchSize", 1);
+            bob->append("singleBatch", true);
+        }
+
     private:
-        const OpMsgRequest& _request;
+        const OpMsgRequest _request;
         const StringData _dbName;
     };
 

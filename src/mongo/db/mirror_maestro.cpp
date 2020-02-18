@@ -40,10 +40,15 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/mirror_maestro_gen.h"
+#include "mongo/db/mirroring_sampler.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/topology_version_observer.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -52,6 +57,21 @@
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
+
+namespace {
+constexpr auto kMirrorMaestroName = "MirrorMaestro"_sd;
+constexpr auto kMirrorMaestroThreadPoolMaxThreads = 2ull;  // Just enough to allow concurrency
+constexpr auto kMirrorMaestroConnPoolMinSize = 1ull;       // Always be able to mirror eventually
+constexpr auto kMirrorMaestroConnPoolMaxSize = 4ull;       // Never use more than a handful
+
+constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
+
+constexpr auto kMirroredReadsName = "mirroredReads"_sd;
+constexpr auto kMirroredReadsSeenKey = "seen"_sd;
+constexpr auto kMirroredReadsSentKey = "sent"_sd;
+constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
+
+MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
 
 class MirrorMaestroImpl {
 public:
@@ -68,11 +88,16 @@ public:
     /**
      * Mirror only if this maestro has been initialized
      */
-    void tryMirror(OperationContext* opCtx,
-                   const OpMsgRequest& request,
-                   const CommandInvocation* invocation) noexcept;
+    void tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept;
 
 private:
+    /**
+     * Attempt to mirror invocation to a subset of hosts based on params
+     *
+     * This command is expected to only run on the _executor
+     */
+    void _mirror(std::shared_ptr<CommandInvocation> invocation, MirroredReadsParameters params);
+
     /**
      * An enum detailing the liveness of the Maestro
      *
@@ -99,15 +124,47 @@ private:
     // inately thread safe. If _isInitialized is false, there may not even be correct pointers to
     // call member functions upon.
     AtomicWord<bool> _isInitialized;
+    MirroredReadsServerParameter* _params = nullptr;
     std::shared_ptr<executor::TaskExecutor> _executor;
+    repl::TopologyVersionObserver _topologyVersionObserver;
 };
 
-
-namespace {
-constexpr auto kMirrorMaestroName = "MirrorMaestro"_sd;
-constexpr auto kMirrorMaestroThreadPoolMaxThreads = 2ull;
-
 const auto getMirrorMaestroImpl = ServiceContext::declareDecoration<MirrorMaestroImpl>();
+
+// Define a new serverStatus section "mirroredReads"
+class MirroredReadsSection final : public ServerStatusSection {
+public:
+    using CounterT = long long;
+
+    MirroredReadsSection() : ServerStatusSection(kMirroredReadsName.toString()) {}
+
+    bool includeByDefault() const override {
+        return false;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        BSONObjBuilder section;
+        section.append(kMirroredReadsSeenKey, seen.loadRelaxed());
+        section.append(kMirroredReadsSentKey, sent.loadRelaxed());
+
+        if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail())) {
+            // We only can see if the command resolved if we got a response
+            section.append(kMirroredReadsResolvedKey, resolved.loadRelaxed());
+        }
+
+        return section.obj();
+    };
+
+    AtomicWord<CounterT> seen;
+    AtomicWord<CounterT> sent;
+    AtomicWord<CounterT> resolved;
+} gMirroredReadsSection;
+
+auto parseMirroredReadsParameters(const BSONObj& obj) {
+    IDLParserErrorContext ctx("mirrorReads");
+    return MirroredReadsParameters::parse(ctx, obj);
+}
+
 }  // namespace
 
 void MirroredReadsServerParameter::append(OperationContext*,
@@ -120,18 +177,21 @@ void MirroredReadsServerParameter::append(OperationContext*,
 Status MirroredReadsServerParameter::set(const BSONElement& value) try {
     auto obj = value.Obj();
 
-    IDLParserErrorContext ctx(name());
-    _data = MirroredReadsParameters::parse(ctx, obj);
+    _data = parseMirroredReadsParameters(obj);
 
     return Status::OK();
 } catch (const AssertionException& e) {
     return e.toStatus();
 }
 
-Status MirroredReadsServerParameter::setFromString(const std::string&) {
-    using namespace fmt::literals;
-    auto msg = "{:s} cannot be set from a string."_format(name());
-    return {ErrorCodes::BadValue, msg};
+Status MirroredReadsServerParameter::setFromString(const std::string& str) try {
+    auto obj = fromjson(str);
+
+    _data = parseMirroredReadsParameters(obj);
+
+    return Status::OK();
+} catch (const AssertionException& e) {
+    return e.toStatus();
 }
 
 void MirrorMaestro::init(ServiceContext* serviceContext) noexcept {
@@ -151,35 +211,110 @@ void MirrorMaestro::shutdown(ServiceContext* serviceContext) noexcept {
     impl.shutdown();
 }
 
-void MirrorMaestro::tryMirror(OperationContext* opCtx,
-                              const OpMsgRequest& request,
-                              const CommandInvocation* invocation) noexcept {
+void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
     auto& impl = getMirrorMaestroImpl(opCtx->getServiceContext());
-    impl.tryMirror(opCtx, request, invocation);
+
+    auto invocation = CommandInvocation::get(opCtx);
+
+    impl.tryMirror(std::move(invocation));
 }
 
-void MirrorMaestroImpl::tryMirror(OperationContext* opCtx,
-                                  const OpMsgRequest& request,
-                                  const CommandInvocation* invocation) noexcept {
+void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation) noexcept {
     if (!_isInitialized.load()) {
         // If we're not even available, nothing to do
         return;
     }
 
+    invariant(invocation);
     if (!invocation->supportsReadMirroring()) {
         // That's all, folks
         return;
     }
 
-    // TODO SERVER-45816 will add the sampling function and attach the command
-    repl::IsMasterResponse* imr = nullptr;
+    gMirroredReadsSection.seen.fetchAndAdd(1);
+
+    auto params = _params->_data.get();
+    if (params.getSamplingRate() <= 0.0) {
+        // We'll never need to sample
+        return;
+    }
+
+    // There is the potential to actually mirror requests, so schedule the _mirror() invocation
+    // out-of-line. This means the command itself can return quickly and we do the arduous work of
+    // building new bsons and evaluating randomness in a less important context.
+    ExecutorFuture(_executor)  //
+        .getAsync([this, invocation = std::move(invocation), params = std::move(params)](
+                      const auto& status) mutable {
+            invariant(status.isOK());
+
+            _mirror(std::move(invocation), std::move(params));
+        });
+}
+
+void MirrorMaestroImpl::_mirror(std::shared_ptr<CommandInvocation> invocation,
+                                MirroredReadsParameters params) {
+    auto imr = _topologyVersionObserver.getCached();
     if (!imr) {
         // If we don't have an IsMasterResponse, we can't know where to send our mirrored
         // request
         return;
     }
 
-    MONGO_UNREACHABLE;
+    auto hosts = MirroringSampler::getMirroringTargets(imr, params.getSamplingRate());
+    if (hosts.empty()) {
+        return;
+    }
+
+    auto payload = [&] {
+        BSONObjBuilder bob;
+
+        invocation->appendMirrorableRequest(&bob);
+
+        // Limit the maxTimeMS
+        bob.append("maxTimeMS", params.getMaxTimeMS());
+
+        {
+            // Set secondary read preference
+            BSONObjBuilder rpBob = bob.subobjStart("$readPreference");
+            rpBob.append("mode", "secondary");
+        }
+        return bob.obj();
+    }();
+
+    for (auto& host : hosts) {
+        static const auto mirrorResponseCallback = [host](auto& args) {
+            if (MONGO_likely(!mirrorMaestroExpectsResponse.shouldFail())) {
+                // If we don't expect responses, then there is nothing to do here
+                return;
+            }
+
+            if (args.response.isOK()) {
+                gMirroredReadsSection.resolved.fetchAndAdd(1);
+                LOGV2_DEBUG(31457,
+                            4,
+                            "Received response from {host}, response: {response}",
+                            "host"_attr = host,
+                            "response"_attr = args.response);
+            }
+        };
+
+        auto newRequest = executor::RemoteCommandRequest(
+            host, invocation->ns().db().toString(), payload, nullptr);
+        LOGV2_DEBUG(31455,
+                    4,
+                    "Mirroring to {host}, request: {request}",
+                    "host"_attr = host,
+                    "request"_attr = newRequest);
+        auto status =
+            _executor->scheduleRemoteCommand(newRequest, mirrorResponseCallback).getStatus();
+        if (!status.isOK()) {
+            LOGV2_DEBUG(
+                31456, 2, "Failed to mirror read command due to {error}", "error"_attr = status);
+            continue;
+        }
+
+        gMirroredReadsSection.sent.fetchAndAdd(1);
+    }
 }
 
 void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
@@ -203,7 +338,13 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
         } break;
     };
 
-    auto makeNet = [&] { return executor::makeNetworkInterface(kMirrorMaestroName.toString()); };
+    auto makeNet = [&] {
+        executor::ConnectionPool::Options options;
+        options.minConnections = kMirrorMaestroConnPoolMinSize;
+        options.maxConnections = kMirrorMaestroConnPoolMaxSize;
+        return executor::makeNetworkInterface(
+            kMirrorMaestroName.toString(), {}, {}, std::move(options));
+    };
 
     auto makePool = [&] {
         ThreadPool::Options options;
@@ -214,12 +355,17 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(makePool(), makeNet());
 
     _executor->startup();
+    _topologyVersionObserver.init(serviceContext);
+
+    _params =
+        ServerParameterSet::getGlobal()->get<MirroredReadsServerParameter>(kMirroredReadsParamName);
+    invariant(_params);
 
     // Set _initGuard.liveness to kRunning
     _initGuard.liveness = Liveness::kRunning;
 
-    // Mark the maestro as initialized. It is now safe to call tryMirror(), use the _executor, or
-    // otherwise rely on members to be alive and well.
+    // Mark the maestro as initialized. It is now safe to call tryMirrorRequest(), use the
+    // _executor, or otherwise rely on members to be alive and well.
     _isInitialized.store(true);
 }
 
@@ -239,6 +385,8 @@ void MirrorMaestroImpl::shutdown() noexcept {
             // Time to shut it all down
         } break;
     };
+
+    _topologyVersionObserver.shutdown();
 
     if (_executor) {
         _executor->shutdown();

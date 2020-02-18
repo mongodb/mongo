@@ -229,6 +229,10 @@ public:
         return true;
     }
 
+    bool supportsReadMirroring(const BSONObj&) const override {
+        return true;
+    }
+
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {
@@ -525,6 +529,25 @@ public:
 
             return true;
         });
+    }
+
+    void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {
+        // Filter the keys that can be mirrored
+        static const auto kMirrorableKeys = [] {
+            BSONObjBuilder keyBob;
+            keyBob.append("sort", 1);
+            keyBob.append("collation", 1);
+            return keyBob.obj();
+        }();
+
+        bob->append("find", cmdObj.firstElement().String());
+        bob->append("filter", cmdObj["query"].Obj());
+
+        cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
+
+        // Prevent the find from returning multiple documents since we can
+        bob->append("batchSize", 1);
+        bob->append("singleBatch", true);
     }
 
 } cmdFindAndModify;

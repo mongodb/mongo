@@ -46,6 +46,13 @@ structs:
         validator:
           gte: 0.0
           lte: 1.0
+      maxTimeMS:
+        description: >-
+            The maxTimeMS to apply to mirrored reads
+        type: int
+        default: 1000
+        validator:
+          gt: 0
 
 server_parameters:
   mirrorReads:
