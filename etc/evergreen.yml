@@ -521,6 +521,24 @@ functions:
       extract_to: src
       build_variants: *package_variants
 
+  "fetch dist tarball": &fetch_dist_tarball
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+      bucket: mciuploads
+      local_file: src/mongo-binaries.tgz
+
+  "fetch dist debugsymbols": &fetch_dist_debugsymbols
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.tgz
+
   "fetch binaries": &fetch_binaries
     command: s3.get
     params:
@@ -7593,6 +7611,17 @@ tasks:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
+        local_file: src/mongodb-dist.${ext|tgz}
+        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: Dist Debugsymbols
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
         local_file: packages.tgz
         remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
         bucket: mciuploads
@@ -7671,7 +7700,7 @@ tasks:
   commands:
     - func: "fetch artifacts"
     - func: "fetch packages"
-    - func: "fetch binaries"
+    - func: "fetch dist tarball"
     # Fetch the shell
     - command: s3.get
       params:
@@ -7700,7 +7729,7 @@ tasks:
         local_file: src/distsrc.${ext|tgz}
         build_variants: [rhel70, windows]
     - func: "apply compile expansions"
-    - func: "fetch debugsymbols archive"
+    - func: "fetch dist debugsymbols"
     - func: "set up remote credentials"
       vars:
         aws_key_remote: ${repo_aws_key}
