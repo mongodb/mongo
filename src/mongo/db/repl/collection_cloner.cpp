@@ -118,12 +118,11 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
     try {
         return ClonerStage<CollectionCloner>::run();
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        LOGV2(
-            21132,
-            "CollectionCloner ns: '{getCloner_getSourceNss}' uuid: "
-            "UUID(\"{getCloner_getSourceUuid}\") stopped because collection was dropped on source.",
-            "getCloner_getSourceNss"_attr = getCloner()->getSourceNss(),
-            "getCloner_getSourceUuid"_attr = getCloner()->getSourceUuid());
+        LOGV2(21132,
+              "CollectionCloner ns: '{ns}' uuid: "
+              "UUID(\"{uuid}\") stopped because collection was dropped on source.",
+              "ns"_attr = getCloner()->getSourceNss(),
+              "uuid"_attr = getCloner()->getSourceUuid());
         getCloner()->waitForDatabaseWorkToComplete();
         return kSkipRemainingStages;
     } catch (const DBException&) {

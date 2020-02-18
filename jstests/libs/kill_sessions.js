@@ -250,7 +250,7 @@ var _kill_sessions_api_module = (function() {
         for (let hostToCheck of hostsToCheck) {
             if (hostToCheck.host in this._cursors) {
                 if (isJsonLog(hostToCheck)) {
-                    assert(checkLog.checkContainsOnceJson(
+                    assert(checkLog.checkContainsOnceJsonStringMatch(
                                hostToCheck,
                                20528,
                                'id',

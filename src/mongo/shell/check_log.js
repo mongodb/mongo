@@ -50,13 +50,46 @@ checkLog = (function() {
         return false;
     };
 
+    const checkContainsOnceJson = function(conn, id, attrsDict) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return false;
+        }
+
+        for (let logMsg of logMessages) {
+            const obj = JSON.parse(logMsg);
+            if (obj.id === id) {
+                let allAttrMatch = true;
+                for (let attrKey in attrsDict) {
+                    const attrValue = attrsDict[attrKey];
+                    if (attrValue instanceof Function) {
+                        if (!attrValue(obj.attr[attrKey])) {
+                            allAttrMatch = false;
+                            break;
+                        }
+                    } else {
+                        if (obj.attr[attrKey] !== attrValue) {
+                            allAttrMatch = false;
+                            break;
+                        }
+                    }
+                }
+                if (allAttrMatch) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
     /*
      * Calls the 'getLog' function on the provided connection 'conn' to see if a log with the
      * provided id is found in the logs. If the id is found it looks up the specified attrribute by
      * attrName and checks if the msg is found in its value. Note: this function does not throw an
      * exception, so the return value should not be ignored.
      */
-    const checkContainsOnceJson = function(conn, id, attrName, msg) {
+    const checkContainsOnceJsonStringMatch = function(conn, id, attrName, msg) {
         const logMessages = getGlobalLog(conn);
         if (logMessages === null) {
             return false;
@@ -84,6 +117,19 @@ checkLog = (function() {
         }, 'Could not find log entries containing the following message: ' + msg, timeout, 300, {
             runHangAnalyzer: false
         });
+    };
+
+    let containsJson = function(conn, id, attrsDict, timeout = 5 * 60 * 1000) {
+        // Don't run the hang analyzer because we don't expect contains() to always succeed.
+        assert.soon(
+            function() {
+                return checkContainsOnceJson(conn, id, attrsDict);
+            },
+            'Could not find log entries containing the following id: ' + id +
+                ', and attrs: ' + attrsDict,
+            timeout,
+            300,
+            {runHangAnalyzer: false});
     };
 
     /*
@@ -193,7 +239,9 @@ checkLog = (function() {
         getGlobalLog: getGlobalLog,
         checkContainsOnce: checkContainsOnce,
         checkContainsOnceJson: checkContainsOnceJson,
+        checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
+        containsJson: containsJson,
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
         formatAsLogLine: formatAsLogLine,
