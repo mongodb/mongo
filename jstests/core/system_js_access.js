@@ -55,7 +55,8 @@ assert.commandWorked(db.runCommand({
     cursor: {}
 }));
 
-// Mixed queries with both $where and $function should fail.
+// Mixed queries with both $where and $function should fail, because $where has to provide system.js
+// to user code, and $function has to not provide it.
 assert.commandFailedWithCode(db.runCommand({
     find: coll.getName(),
     filter: {
@@ -77,8 +78,8 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              4649200);
 
-// Mixed queries with both $function and $accumulator should succeed.
-// TODO SERVER-45450: Change $_internalJsReduce to $accumulator.
+// Queries with both $function and $accumulator should succeed, because both of these operators
+// provide system.js to user code.
 assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
@@ -99,9 +100,18 @@ assert.commandWorked(db.runCommand({
             $group: {
                 _id: "$name",
                 age: {
-                    $_internalJsReduce: {
-                        data: {k: "$name", v: "$age"},
-                        eval: "function concat(key, values) {return Array.sum(values);}"
+                    $accumulator: {
+                        init: function() {
+                            return 0;
+                        },
+                        accumulate: function(state, value) {
+                            return state + value;
+                        },
+                        accumulateArgs: ["$age"],
+                        merge: function(state1, state2) {
+                            return state1 + state2;
+                        },
+                        lang: 'js',
                     }
                 }
             }
