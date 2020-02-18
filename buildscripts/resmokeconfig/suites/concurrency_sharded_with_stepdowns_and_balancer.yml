@@ -212,6 +212,7 @@ executor:
     wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture

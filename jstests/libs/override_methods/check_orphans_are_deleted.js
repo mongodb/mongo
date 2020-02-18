@@ -1,3 +1,5 @@
+load('jstests/libs/check_orphans_are_deleted_helpers.js');  // For CheckOrphansAreDeletedHelpers.
+
 /**
  * Asserts that all shards in the sharded cluster doesn't own any orphan documents.
  * Requires all shards and config server to have primary that is reachable.
@@ -12,63 +14,6 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
     }
 
     print('Running check orphans against cluster with mongos: ' + this.s.host);
-
-    let runCheck = function(mongosConn, shardConn, shardId) {
-        let configDB = shardConn.getDB('config');
-
-        let migrationCoordinatorDocs = [];
-        assert.soon(
-            () => {
-                try {
-                    migrationCoordinatorDocs = configDB.migrationCoordinators.find().toArray();
-                    return migrationCoordinatorDocs.length == 0;
-                } catch (exp) {
-                    // Primary purpose is to stabilize shell repl set monitor to recognize the
-                    // current primary.
-                    print('caught exception while checking migration coordinators, ' +
-                          'will retry again unless timed out: ' + tojson(exp));
-                }
-            },
-            () => {
-                return 'timed out waiting for migrationCoordinators to be empty @ ' + shardId +
-                    ', last known contents: ' + tojson(migrationCoordinatorDocs);
-            },
-            5 * 60 * 1000,
-            1000);
-
-        let rangeDeletions = [];
-        assert.soon(
-            () => {
-                rangeDeletions = configDB.rangeDeletions.find().toArray();
-                return rangeDeletions.length == 0;
-            },
-            () => {
-                return 'timed out waiting for rangeDeletions to be empty @ ' + shardId +
-                    ', last known contents: ' + tojson(rangeDeletions);
-            });
-
-        mongosConn.getDB('config').collections.find({dropped: false}).forEach(collDoc => {
-            let tempNsArray = collDoc._id.split('.');
-            let dbName = tempNsArray.shift();
-            let collName = tempNsArray.join('.');
-
-            let coll = shardConn.getDB(dbName)[collName];
-            mongosConn.getDB('config')
-                .chunks.find({ns: collDoc._id, shard: {$ne: shardId}})
-                .forEach(chunkDoc => {
-                    // Use $min/$max so this will also work with hashed and compound shard keys.
-                    let orphans = coll.find({})
-                                      .hint(collDoc.key)
-                                      .min(chunkDoc.min)
-                                      .max(chunkDoc.max)
-                                      .toArray();
-                    assert.eq(0,
-                              orphans.length,
-                              'found orphans @ ' + shardId + ' within chunk: ' + tojson(chunkDoc) +
-                                  ', orphans: ' + tojson(orphans));
-                });
-        });
-    };
 
     let getConn = function(connStr) {
         try {
@@ -98,7 +43,7 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
 
                 if (shardConn != null) {
                     authutil.asCluster(shardConn, keyFile, () => {
-                        runCheck(mongosConn, shardConn, shardDoc._id);
+                        CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
                     });
                 }
             });
@@ -112,7 +57,7 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
 
             if (shardConn != null) {
                 shardConn.host = shardDoc.host;
-                runCheck(mongosConn, shardConn, shardDoc._id);
+                CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
             }
         });
     }

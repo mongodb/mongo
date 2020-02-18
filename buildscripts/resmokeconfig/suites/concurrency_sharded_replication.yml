@@ -131,6 +131,7 @@ executor:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CheckOrphansDeleted
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
