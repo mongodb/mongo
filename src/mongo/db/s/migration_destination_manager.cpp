@@ -577,7 +577,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
           << epoch.toString() << " with session id " << *_sessionId;
 
     MoveTimingHelper timing(
-        opCtx, "to", _nss.ns(), min, max, 6 /* steps */, &_errmsg, ShardId(), ShardId());
+        opCtx, "to", _nss.ns(), min, max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
 
     const auto initialState = getState();
 
