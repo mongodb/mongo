@@ -232,7 +232,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    R"("{}":"{}"{: <{}})"  // component with padding for the comma
                    R"("{}":{},)"          // id
                    R"("{}":"{}",)"        // context
-                   R"("{}":"{}")",        // message
+                   R"("{}":")",           // message
                    // severity, left align the comma and add padding to create fixed column width
                    constants::kSeverityFieldName,
                    severity,
@@ -250,8 +250,10 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                    constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get(),
                    // message
-                   constants::kMessageFieldName,
-                   extract<StringData>(attributes::message(), rec).get());
+                   constants::kMessageFieldName);
+
+    str::escapeForJSON(buffer, extract<StringData>(attributes::message(), rec).get());
+    buffer.push_back('"');
 
     if (!attrs.empty()) {
         fmt::format_to(buffer, R"(,"{}":{{)", constants::kAttributesFieldName);
