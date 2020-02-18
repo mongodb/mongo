@@ -247,6 +247,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kRangeDeletionNamespace) {
+            if (!isStandaloneOrPrimary(opCtx)) {
+                return;
+            }
+
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
 
