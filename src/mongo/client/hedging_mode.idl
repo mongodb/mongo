@@ -41,8 +41,3 @@ structs:
               type: bool
               description: Enable hedged reads.
               default: true
-          delay:
-              cpp_name: delay
-              type: bool
-              description: Enable staggered reads.
-              default: true

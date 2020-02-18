@@ -78,13 +78,13 @@ protected:
     /**
      * Sets the given server parameters and sets the ReadPreferenceSetting decoration as given by
      * 'rspObj'on the 'opCtx'. Constructs a RemoteCommandRequestOnAny with 'cmdObjWithoutReadPref'.
-     * If 'expectedDelay' is not given, asserts that the RemoteCommandRequestOnAny does not have
-     * hedgingOptions set. Otherwise, asserts that hedgingOptions.delay is equal to 'expectedDelay'.
+     * If 'hedge' is true, asserts that the RemoteCommandRequestOnAny.hedgingOptions is set,
+     * otherwise asserts that it is not set.
      */
     void checkHedgeOptions(const BSONObj& serverParameters,
                            const BSONObj& cmdObjWithoutReadPref,
                            const BSONObj& rspObj,
-                           const boost::optional<Milliseconds> expectedDelay = boost::none) {
+                           const bool hedge) {
         setParameters(serverParameters);
 
         auto opCtx = _client->makeOperationContext();
@@ -92,9 +92,8 @@ protected:
             uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
 
         auto hedgeOptions = extractHedgeOptions(opCtx.get(), cmdObjWithoutReadPref);
-        if (expectedDelay) {
+        if (hedge) {
             ASSERT_TRUE(hedgeOptions.has_value());
-            ASSERT_EQUALS(hedgeOptions->delay, expectedDelay.get());
         } else {
             ASSERT_FALSE(hedgeOptions.has_value());
         }
@@ -105,139 +104,50 @@ protected:
     static inline const std::string kCollName = "testColl";
 
     static inline const std::string kReadHedgingModeFieldName = "readHedgingMode";
-    static inline const std::string kMaxTimeMSThresholdForHedgingFieldName =
-        "maxTimeMSThresholdForHedging";
-    static inline const std::string kHedgingDelayPercentageFieldName = "hedgingDelayPercentage";
-    static inline const std::string kDefaultHedgingDelayMSFieldName = "defaultHedgingDelayMS";
 
-    static inline const BSONObj kDefaultParameters =
-        BSON(kReadHedgingModeFieldName
-             << "on" << kMaxTimeMSThresholdForHedgingFieldName
-             << gMaxTimeMSThresholdForHedging.load() << kHedgingDelayPercentageFieldName
-             << gHedgingDelayPercentage.load() << kDefaultHedgingDelayMSFieldName
-             << gDefaultHedgingDelayMS.load());
+    static inline const BSONObj kDefaultParameters = BSON(kReadHedgingModeFieldName << "on");
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
     ServiceContext::UniqueClient _client = _serviceCtx->makeClient("RemoteCommandRequestTest");
 };
 
-TEST_F(HedgeOptionsUtilTestFixture, DefaultWithoutMaxTimeMS) {
+TEST_F(HedgeOptionsUtilTestFixture, ExplicitOperationHedging) {
     const auto parameters = BSONObj();
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "primaryPreferred"
                              << "hedge" << BSONObj());
-    const auto expectedDelay = Milliseconds{kDefaultHedgingDelayMSDefault};
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, expectedDelay);
+    checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, DefaultWithMaxTimeMS) {
+TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedging) {
     const auto parameters = BSONObj();
-    const auto maxTimeMS = 100;
-    const auto cmdObj = BSON("find" << kCollName << "maxTimeMS" << maxTimeMS);
+    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
-                             << "secondary"
-                             << "hedge" << BSONObj());
-    const auto expectedDelay = Milliseconds{kHedgingDelayPercentageDefault * maxTimeMS / 100};
+                             << "nearest");
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, expectedDelay);
+    checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, DefaultWithMaxTimeMSAboveThreshold) {
-    const auto parameters = BSONObj();
-    const auto cmdObj = BSON("find" << kCollName << "maxTimeMS" << 1000000);
-    const auto rspObj = BSON("mode"
-                             << "secondaryPreferred"
-                             << "hedge" << BSONObj());
-
-    checkHedgeOptions(parameters, cmdObj, rspObj);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, DelayDisabled) {
+TEST_F(HedgeOptionsUtilTestFixture, OperationHedgingDisabled) {
     const auto parameters = BSONObj();
     const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest"
-                             << "hedge" << BSON("delay" << false));
-    const auto expectedDelay = Milliseconds{0};
+                             << "hedge" << BSON("enabled" << false));
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, expectedDelay);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, HedgingDisabledCompletely) {
-    const auto parameters = BSONObj();
-    const auto cmdObj = BSON("find" << kCollName);
-    const auto rspObj = BSON("mode"
-                             << "primaryPreferred"
-                             << "hedge" << BSON("enabled" << false << "delay" << false));
-
-    checkHedgeOptions(parameters, cmdObj, rspObj);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, SetMaxTimeMSThreshold) {
-    const auto parameters = BSON(kMaxTimeMSThresholdForHedgingFieldName << 1000);
-    const auto rspObj = BSON("mode"
-                             << "secondary"
-                             << "hedge" << BSONObj());
-
-    auto maxTimeMS = 500;
-    auto expectedDelay = Milliseconds{kHedgingDelayPercentageDefault * maxTimeMS / 100};
-    checkHedgeOptions(
-        parameters, BSON("find" << kCollName << "maxTimeMS" << maxTimeMS), rspObj, expectedDelay);
-
-    maxTimeMS = 1200;
-    expectedDelay = Milliseconds{0};
-    checkHedgeOptions(parameters, BSON("find" << kCollName << "maxTimeMS" << maxTimeMS), rspObj);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, SetHedgingDelayPercentage) {
-    const auto parameters = BSON(kHedgingDelayPercentageFieldName << 50);
-    const auto rspObj = BSON("mode"
-                             << "secondaryPreferred"
-                             << "hedge" << BSONObj());
-
-    checkHedgeOptions(
-        parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj, Milliseconds{250});
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, SetMaxTimeMSThresholdAndHedgingDelayPercentage) {
-    const auto parameters = BSON(kMaxTimeMSThresholdForHedgingFieldName
-                                 << 1000 << kHedgingDelayPercentageFieldName << 50);
-    const auto rspObj = BSON("mode"
-                             << "secondaryPreferred"
-                             << "hedge" << BSONObj());
-
-    checkHedgeOptions(
-        parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj, Milliseconds{250});
-    checkHedgeOptions(parameters, BSON("find" << kCollName << "maxTimeMS" << 1200), rspObj);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, SetAll) {
-    const auto parameters = BSON(kMaxTimeMSThresholdForHedgingFieldName
-                                 << 1000 << kHedgingDelayPercentageFieldName << 50
-                                 << kDefaultHedgingDelayMSFieldName << 800);
-    const auto rspObj = BSON("mode"
-                             << "nearest"
-                             << "hedge" << BSONObj());
-
-    checkHedgeOptions(
-        parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj, Milliseconds{250});
-    checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj, Milliseconds{800});
+    checkHedgeOptions(parameters, cmdObj, rspObj, false);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
-    const auto parameters =
-        BSON(kReadHedgingModeFieldName << "off" << kMaxTimeMSThresholdForHedgingFieldName << 1000
-                                       << kHedgingDelayPercentageFieldName << 50
-                                       << kDefaultHedgingDelayMSFieldName << 800);
+    const auto parameters = BSON(kReadHedgingModeFieldName << "off");
     const auto rspObj = BSON("mode"
                              << "nearest"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, BSON("find" << kCollName << "maxTimeMS" << 500), rspObj);
-    checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj);
+    checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj, false);
 }
 
 }  // namespace

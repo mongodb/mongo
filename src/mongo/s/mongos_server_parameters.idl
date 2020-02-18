@@ -67,35 +67,12 @@ server_parameters:
     cpp_class:
       name: HedgingModeServerParameter
 
-  maxTimeMSThresholdForHedging:
+  maxTimeMSForHedgedReads:
     description: >-
-        The upper threshold for the expected running time of an operation (maxTimeMS)
-        for it to be worth hedging.
+        The maxTimeMS to set on hedged reads.
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int>
-    cpp_varname: "gMaxTimeMSThresholdForHedging"
+    cpp_varname: "gMaxTimeMSForHedgedReads"
     validator:
         gte: 0
-    default: 5000
-
-  hedgingDelayPercentage:
-    description: >-
-        The percentage of maxTimeMS to wait for before dispatching subsequent reads.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gHedgingDelayPercentage"
-    validator:
-        gte: 0
-        lte: 100
-    default: 25
-
-  defaultHedgingDelayMS:
-    description: >-
-          The default wait time in milliseconds before dispatching subsequent reads if
-          maxTimeMS is not given.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gDefaultHedgingDelayMS"
-    validator:
-        gte: 0
-    default: 1250
+    default: 10

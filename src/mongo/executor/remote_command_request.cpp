@@ -151,7 +151,6 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
 
     if (hedgeOptions) {
         out << " hedgeOptions.count: " << hedgeOptions->count;
-        out << " hedgeOptions.delay: " << hedgeOptions->delay;
     }
 
     out << " cmd:" << cmdObj.toString();

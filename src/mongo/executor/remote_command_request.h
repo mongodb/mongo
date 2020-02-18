@@ -45,7 +45,6 @@ namespace executor {
 struct RemoteCommandRequestBase {
     struct HedgeOptions {
         size_t count;
-        Milliseconds delay;
     };
 
     // Indicates that there is no timeout for the request to complete

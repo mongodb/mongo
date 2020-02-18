@@ -172,11 +172,6 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
                 ErrorCodes::InvalidOptions,
                 str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
         }
-
-        if (!hedgingMode->getEnabled() && hedgingMode->getDelay()) {
-            return {ErrorCodes::InvalidOptions,
-                    str::stream() << "cannot enable staggered reads without enabling hedging"};
-        }
     }
 
     if (!hedgingMode && mode == ReadPreference::Nearest) {

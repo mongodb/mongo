@@ -30,7 +30,6 @@
 #include "mongo/s/hedge_options_util.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/db/query/query_request.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 
 namespace mongo {
@@ -41,26 +40,7 @@ boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeO
 
     if (gReadHedgingMode.load() == ReadHedgingMode::kOn && hedgingMode &&
         hedgingMode->getEnabled()) {
-        boost::optional<int> maxTimeMS;
-        if (auto cmdOptionMaxTimeMSField = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
-            maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
-        }
-
-        // Check if the operation is worth hedging.
-        if (maxTimeMS && maxTimeMS > gMaxTimeMSThresholdForHedging.load()) {
-            return boost::none;
-        }
-
-        // Compute the delay.
-        auto delay = Milliseconds{0};
-        bool shouldDelayHedging = hedgingMode->getDelay();
-
-        if (shouldDelayHedging) {
-            delay = maxTimeMS ? Milliseconds{gHedgingDelayPercentage.load() * maxTimeMS.get() / 100}
-                              : Milliseconds{gDefaultHedgingDelayMS.load()};
-        }
-
-        return executor::RemoteCommandRequestOnAny::HedgeOptions{1, delay};
+        return executor::RemoteCommandRequestOnAny::HedgeOptions{1};
     }
 
     return boost::none;
