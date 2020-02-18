@@ -67,20 +67,19 @@ def add_package_name_alias(env, component, role, name):
 def get_package_name(env, component, role):
     """Return the package file name for the component and role combination."""
     basename = env[PACKAGE_ALIAS_MAP].get(
+        # TODO: silent roles shouldn't be included here
         (component, role), "{component}-{role}".format(component=component, role=role)
     )
 
     return basename
 
 
-def collect_transitive_files(env, entry, cache=None):
+def collect_transitive_files(env, entry):
     """
     Collect all installed and transitively installed files for entry.
     """
-    if not cache:
-        cache = set()
-
-    files = set()
+    cache = set()
+    files = []
     stack = [entry]
 
     # Find all the files directly contained in the component DAG for entry and
@@ -92,19 +91,27 @@ def collect_transitive_files(env, entry, cache=None):
         cache.add(s)
 
         stack.extend(s.dependencies)
-        files.update(s.files)
+        files.extend(s.files)
+
+    cache.clear()
+    files, stack = stack, files
 
     # Now we will call the scanner to find the transtive files of any files that
     # we found from the component DAG.
-    non_transitive_files = files.copy()
-    for f in non_transitive_files:
+
+    while stack:
+        s = stack.pop()
+        if s in cache:
+            continue
+        cache.add(s)
+
+        files.append(s)
         # scan_for_transitive_install is memoized so it's safe to call it in
         # this loop. If it hasn't already run for a file we need to run it
         # anyway.
-        transitive_files = set(env.GetTransitivelyInstalledFiles(f))
-        files.update(transitive_files)
+        stack.extend(env.GetTransitivelyInstalledFiles(s))
 
-    return list(files)
+    return sorted(files)
 
 
 def auto_archive_gen(first_env, make_archive_script, pkg_fmt):

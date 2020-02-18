@@ -229,7 +229,7 @@ def scan_for_transitive_install(node, env, _path):
     alias_map = env[ALIAS_MAP]
     entry = alias_map[component][role]
     role_deps = env[ROLE_DECLARATIONS].get(role).dependencies
-    results = []
+    results = set()
 
     # We have to explicitly look at the various BASE files here since it's not
     # guaranteed they'll be pulled in anywhere in our grandchildren but we need
@@ -242,13 +242,13 @@ def scan_for_transitive_install(node, env, _path):
     if base_component and component != base_component:
         base_role_entry = alias_map[base_component][role]
         if base_role_entry.files:
-            results.extend(base_role_entry.files)
+            results.update(base_role_entry.files)
 
     base_role = env.get(BASE_ROLE)
     if base_role and role != base_role:
         component_base_entry = alias_map[component][base_role]
         if component_base_entry.files:
-            results.extend(component_base_entry.files)
+            results.update(component_base_entry.files)
 
     if (
         base_role
@@ -258,7 +258,7 @@ def scan_for_transitive_install(node, env, _path):
     ):
         base_base_entry = alias_map[base_component][base_role]
         if base_base_entry.files:
-            results.extend(base_base_entry.files)
+            results.update(base_base_entry.files)
 
     installed_children = [
         grandchild
@@ -292,11 +292,12 @@ def scan_for_transitive_install(node, env, _path):
             elif component != child_component:
                 entry.dependencies.add(child_entry)
 
-            results.extend(auto_installed_files)
+            results.update(auto_installed_files)
 
     # Produce deterministic output for caching purposes
     results = sorted(results, key=str)
     setattr(node.attributes, "AIB_SCANNED", results)
+
     return results
 
 
