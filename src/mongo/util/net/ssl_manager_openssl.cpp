@@ -1689,8 +1689,18 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
                 return;
             }
 
-            Milliseconds duration = swDurationInitial.isOK() ? swDurationInitial.getValue()
-                                                             : kOCSPUnknownStatusRefreshRate;
+            // determine the OCSP validation refresh period
+            Milliseconds duration;
+            if (swDurationInitial.isOK()) {
+                // if the validation refresh period was set manually, use it
+                if (kOCSPValidationRefreshPeriodSecs != -1) {
+                    duration = Seconds(kOCSPValidationRefreshPeriodSecs);
+                } else {
+                    duration = swDurationInitial.getValue();
+                }
+            } else {
+                duration = kOCSPUnknownStatusRefreshRate;
+            }
 
             this->_ocspStaplingAnchor =
                 getGlobalServiceContext()->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob(
@@ -1702,9 +1712,15 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
                             if (!swDuration.isOK()) {
                                 this->_ocspStaplingAnchor.setPeriod(kOCSPUnknownStatusRefreshRate);
                                 return;
+                            } else {
+                                // if the validation refresh period was set manually, use it
+                                if (kOCSPValidationRefreshPeriodSecs != -1) {
+                                    this->_ocspStaplingAnchor.setPeriod(
+                                        Seconds(kOCSPValidationRefreshPeriodSecs));
+                                } else {
+                                    this->_ocspStaplingAnchor.setPeriod(swDuration.getValue());
+                                }
                             }
-
-                            this->_ocspStaplingAnchor.setPeriod(swDuration.getValue());
                         });
                     },
                     duration));

@@ -72,6 +72,14 @@ server_parameters:
     cpp_varname: "tlsOCSPCacheSize"
     validator:
       gt: 0
+  ocspValidationRefreshPeriodSecs:
+    description: "Interval at which the OCSP response will be refreshed"
+    set_at: startup
+    cpp_vartype: int
+    default: -1
+    cpp_varname: "kOCSPValidationRefreshPeriodSecs"
+    validator:
+      gte: 1
 
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"
