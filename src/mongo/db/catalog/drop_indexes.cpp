@@ -55,16 +55,28 @@ namespace {
 // Field name in dropIndexes command for indexes to drop.
 constexpr auto kIndexFieldName = "index"_sd;
 
-Status checkForViewOrMissingNS(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               Database* db,
-                               Collection* collection) {
+Status checkView(OperationContext* opCtx,
+                 const NamespaceString& nss,
+                 Database* db,
+                 Collection* collection) {
     if (!collection) {
         if (db && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "Cannot drop indexes on view " << nss);
         }
         return Status(ErrorCodes::NamespaceNotFound, str::stream() << "ns not found " << nss);
+    }
+    return Status::OK();
+}
+
+Status checkReplState(OperationContext* opCtx, NamespaceStringOrUUID dbAndUUID) {
+    bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() &&
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, dbAndUUID);
+
+    if (writesAreReplicatedAndNotPrimary) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while dropping indexes on database "
+                                    << dbAndUUID.db() << " with collection " << dbAndUUID.uuid());
     }
     return Status::OK();
 }
@@ -261,31 +273,25 @@ Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
-    // Protects the command from replica set state changes during its execution.
-    Lock::GlobalLock globalLk(opCtx, MODE_IX);
-
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
     boost::optional<AutoGetCollection> autoColl;
     autoColl.emplace(opCtx, nss, MODE_IX);
 
-    bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
-
-    if (writesAreReplicatedAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while dropping indexes in " << nss);
-    }
-
     Database* db = autoColl->getDb();
     Collection* collection = autoColl->getCollection();
-    Status status = checkForViewOrMissingNS(opCtx, nss, db, collection);
+    Status status = checkView(opCtx, nss, db, collection);
     if (!status.isOK()) {
         return status;
     }
 
     const UUID collectionUUID = collection->uuid();
-    const NamespaceStringOrUUID nssOrUUID = {nss.db().toString(), collectionUUID};
+    const NamespaceStringOrUUID dbAndUUID = {nss.db().toString(), collectionUUID};
+
+    status = checkReplState(opCtx, dbAndUUID);
+    if (!status.isOK()) {
+        return status;
+    }
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(51806,
@@ -345,7 +351,7 @@ Status dropIndexes(OperationContext* opCtx,
 
         // Take an exclusive lock on the collection now to be able to perform index catalog writes
         // when removing ready indexes from disk.
-        autoColl.emplace(opCtx, nssOrUUID, MODE_X);
+        autoColl.emplace(opCtx, dbAndUUID, MODE_X);
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the disk
         // state, which may have changed when we released the lock temporarily.
@@ -354,9 +360,14 @@ Status dropIndexes(OperationContext* opCtx,
         db = autoColl->getDb();
         collection = autoColl->getCollection();
         if (!collection) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Collection not found on database " << nss.db()
-                                  << " with UUID " << collectionUUID};
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "ns not found on database " << dbAndUUID.db()
+                                        << " with collection " << dbAndUUID.uuid());
+        }
+
+        status = checkReplState(opCtx, dbAndUUID);
+        if (!status.isOK()) {
+            return status;
         }
 
         // Check to see if a new index build was started that the caller requested to be aborted.
@@ -374,7 +385,7 @@ Status dropIndexes(OperationContext* opCtx,
         // We only need to hold an intent lock to send abort signals to the active index
         // builder(s) we intend to abort.
         autoColl = boost::none;
-        autoColl.emplace(opCtx, nssOrUUID, MODE_IX);
+        autoColl.emplace(opCtx, dbAndUUID, MODE_IX);
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the
         // disk state, which may have changed when we released the lock temporarily.
@@ -383,9 +394,14 @@ Status dropIndexes(OperationContext* opCtx,
         db = autoColl->getDb();
         collection = autoColl->getCollection();
         if (!collection) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Collection not found on database " << nss.db()
-                                  << " with UUID " << collectionUUID};
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "ns not found on database " << dbAndUUID.db()
+                                        << " with collection " << dbAndUUID.uuid());
+        }
+
+        status = checkReplState(opCtx, dbAndUUID);
+        if (!status.isOK()) {
+            return status;
         }
     }
 
@@ -395,7 +411,7 @@ Status dropIndexes(OperationContext* opCtx,
         invariant(abortedIndexBuilders.size() == 1);
 
         return writeConflictRetry(
-            opCtx, "dropIndexes", nss.db(), [opCtx, &collection, &indexNames, result] {
+            opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, result] {
                 WriteUnitOfWork wunit(opCtx);
 
                 // This is necessary to check shard version.
@@ -442,7 +458,7 @@ Status dropIndexes(OperationContext* opCtx,
     }
 
     return writeConflictRetry(
-        opCtx, "dropIndexes", nss.db(), [opCtx, &collection, &indexNames, result] {
+        opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, result] {
             WriteUnitOfWork wunit(opCtx);
 
             // This is necessary to check shard version.
@@ -473,7 +489,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         // If db/collection does not exist, short circuit and return.
         Database* db = autoColl.getDb();
         Collection* collection = autoColl.getCollection();
-        Status status = checkForViewOrMissingNS(opCtx, nss, db, collection);
+        Status status = checkView(opCtx, nss, db, collection);
         if (!status.isOK()) {
             return status;
         }
