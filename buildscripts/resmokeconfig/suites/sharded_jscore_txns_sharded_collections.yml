@@ -34,6 +34,8 @@ selector:
   # View tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/txns/view_reads_in_transaction.js
 
+    # TODO SERVER-46187: maxTimeMS doesn't work correctly for insert on mongos.
+  - jstests/core/txns/write_conflicts_with_non_txns.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.
