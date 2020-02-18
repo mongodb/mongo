@@ -57,15 +57,7 @@ public:
 
     void kill();
 
-    bool hasExcessStones_inlock() const {
-        int64_t total_bytes = 0;
-        for (std::deque<OplogStones::Stone>::const_iterator it = _stones.begin();
-             it != _stones.end();
-             ++it) {
-            total_bytes += it->bytes;
-        }
-        return total_bytes > _rs->cappedMaxSize();
-    }
+    bool hasExcessStones_inlock() const;
 
     void awaitHasExcessStonesOrDead();
 

@@ -122,3 +122,11 @@ configs:
         deprecated_short_name: nodur
         arg_vartype: Switch
         source: [ cli, ini ]
+
+    'storage.oplogMinRetentionHours':
+        description: 'Minimum number of hours to preserve in the oplog. Default is 0 (turned off). Fractions are allowed (e.g. 1.5 hours)'
+        short_name: oplogMinRetentionHours
+        arg_vartype: Double
+        default: 0.0
+        validator:
+            gte: 0.0

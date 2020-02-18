@@ -55,6 +55,7 @@ void StorageGlobalParams::reset() {
     syncdelay = 60.0;
     readOnly = false;
     groupCollections = false;
+    oplogMinRetentionHours.store(0.0);
 }
 
 StorageGlobalParams storageGlobalParams;
