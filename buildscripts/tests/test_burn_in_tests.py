@@ -78,7 +78,6 @@ def mock_git_diff(change_list):
 def mock_changed_git_files(add_files):
     repo = MagicMock()
     repo.index.diff.return_value = mock_git_diff([mock_a_file(f) for f in add_files])
-    repo.working_dir = "."
     return repo
 
 
@@ -121,9 +120,9 @@ class TestAcceptance(unittest.TestCase):
     @patch(ns("_write_json_file"))
     def test_tests_generated_if_a_file_changed(self, write_json_mock):
         """
-        Given a git repository with changes,
+        Given a git repository with no changes,
         When burn_in_tests is run,
-        Then tests are discovered to run.
+        Then no tests are discovered to run.
         """
         # Note: this test is using actual tests and suites. So changes to those suites could
         # introduce failures and require this test to be updated.
@@ -131,7 +130,7 @@ class TestAcceptance(unittest.TestCase):
         # 'auth_audit' test suites. It needs to be in at least one of those for the test to pass.
         _config.NAMED_SUITES = None
         variant = "enterprise-rhel-62-64-bit"
-        repos = [mock_changed_git_files(["jstests/auth/auth1.js"])]
+        repo = mock_changed_git_files(["jstests/auth/auth1.js"])
         repeat_config = under_test.RepeatConfig()
         gen_config = under_test.GenerateConfig(
             variant,
@@ -140,7 +139,7 @@ class TestAcceptance(unittest.TestCase):
         )  # yapf: disable
         evg_config = get_evergreen_config("etc/evergreen.yml")
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repos,
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repo,
                            None)
 
         write_json_mock.assert_called_once()
@@ -1115,7 +1114,7 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = True
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        found_tests = under_test.find_changed_tests(repo_mock)
 
         self.assertIn(file_list[0], found_tests)
         self.assertIn(file_list[2], found_tests)
@@ -1133,7 +1132,7 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = False
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        found_tests = under_test.find_changed_tests(repo_mock)
 
         self.assertEqual(0, len(found_tests))
 
@@ -1149,7 +1148,7 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = True
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        found_tests = under_test.find_changed_tests(repo_mock)
 
         self.assertIn(file_list[0], found_tests)
         self.assertIn(file_list[2], found_tests)

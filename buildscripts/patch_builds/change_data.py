@@ -1,6 +1,5 @@
 """Tools for detecting changes in a commit."""
 from typing import Any, Set
-import os
 
 from git import Repo, DiffIndex
 import structlog
@@ -64,9 +63,4 @@ def find_changed_files(repo: Repo) -> Set[str]:
     untracked_files = set(repo.untracked_files)
     LOGGER.info("untracked files", files=untracked_files, diff="untracked diff")
 
-    paths = work_tree_files.union(index_files).union(untracked_files)
-
-    return [
-        os.path.relpath(f"{repo.working_dir}/{os.path.normpath(path)}", os.getcwd())
-        for path in paths
-    ]
+    return work_tree_files.union(index_files).union(untracked_files)

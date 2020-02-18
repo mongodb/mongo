@@ -12,7 +12,7 @@ import sys
 
 from math import ceil
 from collections import defaultdict
-from typing import Optional, Set, Tuple, List, Dict, Iterable
+from typing import Optional, Set, Tuple, List, Dict
 
 import click
 import requests
@@ -58,7 +58,6 @@ AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_REPO_LOCATIONS = [".", "./src/mongo/db/modules/enterprise"]
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 MAX_TASKS_TO_CREATE = 1000
@@ -235,26 +234,21 @@ def is_file_a_test_file(file_path: str) -> bool:
     return True
 
 
-def find_changed_tests(repos: Iterable[Repo]) -> Set[str]:
+def find_changed_tests(repo: Repo) -> Set[str]:
     """
     Find the changed tests.
 
     Use git to find which files have changed in this patch.
+    TODO: This should be expanded to search for enterprise modules.
     The returned file paths are in normalized form (see os.path.normpath(path)).
 
     :returns: Set of changed tests.
     """
-    all_changed_tests = set()
-    for repo in repos:
-        changed_files = find_changed_files(repo)
-        LOGGER.debug("Found changed files", files=changed_files)
-        changed_tests = {
-            os.path.normpath(path)
-            for path in changed_files if is_file_a_test_file(path)
-        }
-        LOGGER.debug("Found changed tests", files=changed_tests)
-        all_changed_tests.update(changed_tests)
-    return all_changed_tests
+    changed_files = find_changed_files(repo)
+    LOGGER.debug("Found changed files", files=changed_files)
+    changed_tests = {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
+    LOGGER.debug("Found changed tests", files=changed_tests)
+    return changed_tests
 
 
 def find_excludes(selector_file: str) -> Tuple[List, List, List]:
@@ -710,17 +704,16 @@ def create_task_list_for_tests(
     return create_task_list(evg_conf, build_variant, tests_by_executor, exclude_tasks)
 
 
-def create_tests_by_task(build_variant: str, repos: Iterable[Repo],
-                         evg_conf: EvergreenProjectConfig) -> Dict:
+def create_tests_by_task(build_variant: str, repo: Repo, evg_conf: EvergreenProjectConfig) -> Dict:
     """
     Create a list of tests by task.
 
     :param build_variant: Build variant to collect tasks from.
-    :param repos: Git repositories being tracked.
+    :param repo: Git repo being tracked.
     :param evg_conf: Evergreen configuration.
     :return: Tests by task.
     """
-    changed_tests = find_changed_tests(repos)
+    changed_tests = find_changed_tests(repo)
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -819,8 +812,8 @@ def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi
 
 
 def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
-            generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig,
-            repos: Iterable[Repo], evg_api: EvergreenApi):
+            generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig, repo: Repo,
+            evg_api: EvergreenApi):
     """
     Run burn_in_tests with the given configuration.
 
@@ -830,13 +823,13 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     :param generate_tasks_file: File to write generated config to.
     :param no_exec: Do not execute tests, just discover tests to run.
     :param evg_conf: Evergreen configuration.
-    :param repos: Git repositories to check.
+    :param repo: Git repository.
     :param evg_api: Evergreen API client.
     """
     # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
-    tests_by_task = create_tests_by_task(generate_config.build_variant, repos, evg_conf)
+    tests_by_task = create_tests_by_task(generate_config.build_variant, repo, evg_conf)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
@@ -955,15 +948,13 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
                                      project=project,
                                      task_id=task_id,
                                      use_multiversion=use_multiversion)  # yapf: disable
-    if generate_tasks_file:
-        generate_config.validate(evg_conf, local_mode)
+    generate_config.validate(evg_conf, local_mode)
 
     evg_api = _get_evg_api(evg_api_config, local_mode)
-
-    repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
+    repo = Repo(".")
 
     burn_in(repeat_config, generate_config, resmoke_args, generate_tasks_file, no_exec, evg_conf,
-            repos, evg_api)
+            repo, evg_api)
 
 
 if __name__ == "__main__":
