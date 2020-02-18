@@ -732,6 +732,9 @@ enum class DERType : char {
     EndOfContent = 0,
 
     // Primitive
+    INTEGER = 2,
+
+    // Primitive
     UTF8String = 12,
 
     // Sequence or Sequence Of, Constructed
@@ -784,6 +787,16 @@ public:
     std::string readUtf8String() {
         invariant(_type == DERType::UTF8String);
         return std::string(_data, _length);
+    }
+
+    /**
+     * Get a vector representation for the value of this DER INTEGER
+     */
+    DERInteger readInt() {
+        invariant(_type == DERType::INTEGER);
+        DERInteger out(_length);
+        std::copy(_data, _data + _length, out.begin());
+        return out;
     }
 
     /**
@@ -852,6 +865,23 @@ StatusWith<std::string> readDERString(ConstDataRangeCursor& cdc) {
     return derString.readUtf8String();
 }
 
+StatusWith<DERInteger> readDERInt(ConstDataRangeCursor& cdc) {
+    auto swInt = cdc.readAndAdvanceNoThrow<DERToken>();
+    if (!swInt.isOK()) {
+        return swInt.getStatus();
+    }
+
+    auto derInt = swInt.getValue();
+
+    if (derInt.getType() != DERType::INTEGER) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "Unexpected DER Tag, Got "
+                                    << static_cast<char>(derInt.getType()) << ", Expected INTEGER");
+    }
+
+    return derInt.readInt();
+}
+
 
 StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
     const size_t kTagLength = 1;
@@ -882,6 +912,11 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
     // Validate the 6th bit is correct, and it is a known type
     switch (static_cast<DERType>(tag)) {
         case DERType::UTF8String:
+            if (!primitive) {
+                return Status(ErrorCodes::InvalidSSLConfiguration, "Unknown DER tag");
+            }
+            break;
+        case DERType::INTEGER:
             if (!primitive) {
                 return Status(ErrorCodes::InvalidSSLConfiguration, "Unknown DER tag");
             }
@@ -1025,6 +1060,39 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
     }
 
     return roles;
+}
+
+StatusWith<std::vector<DERInteger>> parseTLSFeature(ConstDataRange cdrExtension) {
+    std::vector<DERInteger> features;
+    ConstDataRangeCursor cdcExtension(cdrExtension);
+
+    /**
+     * FEATURES ::= SEQUENCE OF INTEGER
+     */
+    auto swSeq = cdcExtension.readAndAdvanceNoThrow<DERToken>();
+    if (!swSeq.isOK()) {
+        return swSeq.getStatus();
+    }
+
+    if (swSeq.getValue().getType() != DERType::SEQUENCE) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "Unexpected DER Tag, Got "
+                                    << static_cast<char>(swSeq.getValue().getType())
+                                    << ", Expected SEQUENCE");
+    }
+
+    ConstDataRangeCursor cdcSeq(swSeq.getValue().getSequenceRange());
+
+    while (!cdcSeq.empty()) {
+        auto swDERInt = readDERInt(cdcSeq);
+        if (!swDERInt.isOK()) {
+            return swDERInt.getStatus();
+        }
+
+        features.emplace_back(swDERInt.getValue());
+    }
+
+    return std::move(features);
 }
 
 std::string removeFQDNRoot(std::string name) {

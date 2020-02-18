@@ -76,6 +76,7 @@
 #include <openssl/asn1t.h>
 #include <openssl/dh.h>
 #include <openssl/evp.h>
+#include <openssl/obj_mac.h>
 #include <openssl/ocsp.h>
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
@@ -339,6 +340,13 @@ void DH_get0_pqg(const DH* dh, const BIGNUM** p, const BIGNUM** q, const BIGNUM*
         *g = dh->g;
     }
 }
+
+// TLS versions before 1.1.0 did not define the TLS Feature extension
+static ASN1OID tlsFeatureOID("1.3.6.1.5.5.7.1.24", "tlsfeature", "TLS Feature");
+static int const NID_tlsfeature = OBJ_create(tlsFeatureOID.identifier.c_str(),
+                                             tlsFeatureOID.shortDescription.c_str(),
+                                             tlsFeatureOID.longDescription.c_str());
+
 #else
 // No-op deleter for OpenSSL >= 1.1.0
 struct VerifiedChainDeleter {
@@ -1044,6 +1052,8 @@ private:
 
     StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
+    StatusWith<boost::optional<std::vector<DERInteger>>> _parseTLSFeature(X509* peerCert) const;
+
     /** @return true if was successful, otherwise false */
     bool _setupPEM(SSL_CTX* context, const std::string& keyFile, PasswordFetcher* password);
 
@@ -1565,15 +1575,32 @@ int ocspClientCallback(SSL* ssl, void* arg) {
 Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorPtr& reactor) {
     const unsigned char* response_ptr = NULL;
     long length = SSL_get_tlsext_status_ocsp_resp(ssl, &response_ptr);
+    UniqueX509 peerCert(SSL_get_peer_certificate(ssl));
+
+    auto tlsFeature = _parseTLSFeature(peerCert.get());
+    if (!tlsFeature.isOK()) {
+        return tlsFeature.getStatus();
+    }
+    auto features = tlsFeature.getValue();
+    // this DER INTEGER represents what a MustStaple feature should look like
+    DERInteger mustStapleFeature{TLSEXT_TYPE_status_request};
+    bool mustStaple = features != boost::none &&
+        std::any_of(features->begin(), features->end(), [&](DERInteger feature) {
+                          return feature == mustStapleFeature;
+                      });
 
     // If we see that we had a OCSP response, we can assume that it passed the callback
     // verification, so we can bypass other verification.
     if (length > 0) {
         return Status::OK();
+    } else if (mustStaple) {
+        // mustStaple means the peer cert has to have a stapled response.
+        // If length is 0, then there is no stapled response. This is bad.
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "Peer certificate requires a stapled OCSP response, but none were provided.");
     }
 
     // Do this after everything else - only if a roundtrip is required.
-    UniqueX509 peerCert(SSL_get_peer_certificate(ssl));
     UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(peerCert.get()));
 
     if (!aiaOCSP) {
@@ -2378,6 +2405,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     // The check to ensure that remoteHost is empty is to ensure that we only run OCSP
     // verification when we are a client, never as a server.
     if (tlsOCSPEnabled && !remoteHost.empty() && !_allowInvalidCertificates) {
+
         ocspFuture = ocspClientVerification(conn, reactor);
     }
 
@@ -2578,6 +2606,32 @@ StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X50
     }
 
     return roles;
+}
+
+StatusWith<boost::optional<std::vector<DERInteger>>> SSLManagerOpenSSL::_parseTLSFeature(
+    X509* peerCert) const {
+    // exts is owned by the peerCert
+    const STACK_OF(X509_EXTENSION)* exts = X509_get0_extensions(peerCert);
+
+    int extCount = 0;
+    if (exts) {
+        extCount = sk_X509_EXTENSION_num(exts);
+    }
+
+    ASN1_OBJECT* featuresObj = OBJ_nid2obj(NID_tlsfeature);
+    for (int i = 0; i < extCount; i++) {
+        X509_EXTENSION* ex = sk_X509_EXTENSION_value(exts, i);
+        ASN1_OBJECT* obj = X509_EXTENSION_get_object(ex);
+
+        if (!OBJ_cmp(obj, featuresObj)) {
+            // We've found an extension which has the features OID
+            ASN1_OCTET_STRING* data = X509_EXTENSION_get_data(ex);
+            return parseTLSFeature(
+                ConstDataRange(reinterpret_cast<char*>(data->data),
+                               reinterpret_cast<char*>(data->data) + data->length));
+        }
+    }
+    return boost::none;
 }
 
 void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {

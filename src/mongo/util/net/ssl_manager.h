@@ -56,6 +56,7 @@
 #endif  // #ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
+
 /*
  * @return the SSL version std::string prefixed with prefix and suffixed with suffix
  */
@@ -291,6 +292,14 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
  * Parse a binary blob of DER encoded ASN.1 into a set of RoleNames.
  */
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExtension);
+
+using DERInteger = std::vector<uint8_t>;
+
+/**
+ * Parse a binary blob of DER encoded ASN.1 into a list of features (integers).
+ * ASN.1 Integers can be very large, so they are stored in a vector of bytes.
+ */
+StatusWith<std::vector<DERInteger>> parseTLSFeature(ConstDataRange cdrExtension);
 
 /**
  * Strip the trailing '.' in FQDN.

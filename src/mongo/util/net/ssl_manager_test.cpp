@@ -249,6 +249,38 @@ TEST(SSLManager, MongoDBRolesParser) {
     }
 }
 
+TEST(SSLManager, TLSFeatureParser) {
+    {
+        // test correct feature resolution with one feature
+        unsigned char derData[] = {0x30, 0x03, 0x02, 0x01, 0x05};
+        std::vector<DERInteger> correctFeatures = {{0x05}};
+        auto swFeatures = parseTLSFeature(ConstDataRange(derData));
+        ASSERT_OK(swFeatures.getStatus());
+
+        auto features = swFeatures.getValue();
+        ASSERT_TRUE(features == correctFeatures);
+    }
+
+    {
+        // test incorrect feature resolution (malformed header)
+        unsigned char derData[] = {0xFF, 0x03, 0x02, 0x01, 0x05};
+        std::vector<DERInteger> correctFeatures = {{0x05}};
+        auto swFeatures = parseTLSFeature(ConstDataRange(derData));
+        ASSERT_NOT_OK(swFeatures.getStatus());
+    }
+
+    {
+        // test feature resolution with multiple features
+        unsigned char derData[] = {0x30, 0x06, 0x02, 0x01, 0x05, 0x02, 0x01, 0x01};
+        std::vector<DERInteger> correctFeatures = {{0x05}, {0x01}};
+        auto swFeatures = parseTLSFeature(ConstDataRange(derData));
+        ASSERT_OK(swFeatures.getStatus());
+
+        auto features = swFeatures.getValue();
+        ASSERT_TRUE(features == correctFeatures);
+    }
+}
+
 TEST(SSLManager, EscapeRFC2253) {
     ASSERT_EQ(escapeRfc2253("abc"), "abc");
     ASSERT_EQ(escapeRfc2253(" abc"), "\\ abc");
