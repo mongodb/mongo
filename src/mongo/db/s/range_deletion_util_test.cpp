@@ -348,9 +348,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotE
                        ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
 }
 
-
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingSingleBatch) {
-
     auto replCoord = checked_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()));
 
@@ -366,8 +364,10 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 10;
     const auto numBatches = ceil((double)numDocsToInsert / numDocsToRemovePerBatch);
-    const auto expectedNumTimesWaitedForReplication =
-        numBatches + 1 /* for deleting range deletion task */;
+    ASSERT_EQ(numBatches, 1);
+    // We should wait twice: Once after deleting documents in the range, and once after deleting the
+    // range deletion task.
+    const auto expectedNumTimesWaitedForReplication = 2;
 
     DBDirectClient dbclient(operationContext());
     for (auto i = 0; i < numDocsToInsert; ++i) {
@@ -392,7 +392,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
     ASSERT_EQ(numTimesWaitedForReplication, expectedNumTimesWaitedForReplication);
 }
 
-TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingEveryBatch) {
+TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterSeveralBatches) {
     auto replCoord = checked_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()));
 
@@ -408,8 +408,11 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingE
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 1;
     const auto numBatches = ceil((double)numDocsToInsert / numDocsToRemovePerBatch);
-    const auto expectedNumTimesWaitedForReplication =
-        numBatches + 1 /* for deleting range deletion task */;
+    ASSERT_GTE(numBatches, 1);
+
+    // We should wait twice: Once after deleting documents in the range, and once after deleting the
+    // range deletion task.
+    const auto expectedNumTimesWaitedForReplication = 2;
 
     DBDirectClient dbclient(operationContext());
     for (auto i = 0; i < numDocsToInsert; ++i) {
@@ -432,6 +435,47 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingE
 
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), 0);
     ASSERT_EQ(numTimesWaitedForReplication, expectedNumTimesWaitedForReplication);
+}
+
+TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorDuringDeletion) {
+    auto replCoord = checked_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()));
+
+    int numTimesWaitedForReplication = 0;
+    // Override special handler for waiting for replication to count the number of times we wait for
+    // replication.
+    replCoord->setAwaitReplicationReturnValueFunction(
+        [&](OperationContext* opCtx, const repl::OpTime& opTime) {
+            ++numTimesWaitedForReplication;
+            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
+        });
+
+    const auto numDocsToInsert = 3;
+    const auto numDocsToRemovePerBatch = 10;
+
+    DBDirectClient dbclient(operationContext());
+    for (auto i = 0; i < numDocsToInsert; ++i) {
+        dbclient.insert(kNss.toString(), BSON(kShardKey << i));
+    }
+
+    // Pretend we stepped down.
+    replCoord->setCanAcceptNonLocalWrites(false);
+    std::ignore = replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY);
+
+    auto queriesComplete = SemiFuture<void>::makeReady();
+    auto cleanupComplete =
+        removeDocumentsInRange(executor(),
+                               std::move(queriesComplete),
+                               kNss,
+                               uuid(),
+                               kShardKeyPattern,
+                               ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
+                               numDocsToRemovePerBatch,
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
+                               Milliseconds(0) /* delayBetweenBatches */);
+
+    ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
+    ASSERT_EQ(numTimesWaitedForReplication, 0);
 }
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) {

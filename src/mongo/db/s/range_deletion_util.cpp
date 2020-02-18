@@ -221,44 +221,6 @@ auto withTemporaryOperationContext(Callable&& callable) {
     return callable(opCtx);
 }
 
-ExecutorFuture<int> deleteBatchAndWaitForReplication(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const BSONObj& keyPattern,
-    const ChunkRange& range,
-    int numDocsToRemovePerBatch) {
-    // Delete a batch and wait for majority write concern.
-    return withTemporaryOperationContext([=](OperationContext* opCtx) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto* const collection = autoColl.getCollection();
-
-        // Ensure the collection exists and has not been dropped or dropped and recreated.
-        uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                "Collection has been dropped since enqueuing this range "
-                "deletion task. No need to delete documents.",
-                !collectionUuidHasChanged(nss, collection, collectionUuid));
-
-        auto numDeleted = uassertStatusOK(
-            deleteNextBatch(opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
-
-        LOG(0) << "Deleted " << numDeleted << " documents in pass in namespace " << nss.ns()
-               << " with UUID " << collectionUuid << " for range " << range.toString();
-
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-        LOG(0) << "Waiting for majority replication of local deletions in namespace " << nss.ns()
-               << " with UUID " << collectionUuid << " for range " << redact(range.toString());
-
-        // Asynchronously wait for majority write concern.
-        return WaitForMajorityService::get(opCtx->getServiceContext())
-            .waitUntilMajority(clientOpTime)
-            .thenRunOn(executor)
-            .then([=] { return numDeleted; });
-    });
-}
-
 /**
  * Delete the range in a sequence of batches until there are no more documents to
  * delete or deletion returns an error.
@@ -271,9 +233,26 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                           int numDocsToRemovePerBatch,
                                           Milliseconds delayBetweenBatches) {
     return AsyncTry([=] {
-               // Returns number of documents deleted.
-               return deleteBatchAndWaitForReplication(
-                   executor, nss, collectionUuid, keyPattern, range, numDocsToRemovePerBatch);
+               return withTemporaryOperationContext([=](OperationContext* opCtx) {
+                   AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                   auto* const collection = autoColl.getCollection();
+
+                   // Ensure the collection exists and has not been dropped or dropped and
+                   // recreated.
+                   uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                           "Collection has been dropped since enqueuing this range "
+                           "deletion task. No need to delete documents.",
+                           !collectionUuidHasChanged(nss, collection, collectionUuid));
+
+                   auto numDeleted = uassertStatusOK(deleteNextBatch(
+                       opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
+
+                   LOG(0) << "Deleted " << numDeleted << " documents in pass in namespace "
+                          << nss.ns() << " with UUID " << collectionUuid << " for range "
+                          << range.toString();
+
+                   return numDeleted;
+               });
            })
         .until([](StatusWith<int> swNumDeleted) {
             // Continue iterating until there are no more documents to delete, retrying on
@@ -326,6 +305,25 @@ void removePersistentRangeDeletionTask(const NamespaceString& nss,
     });
 }
 
+ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const NamespaceString& nss,
+    const UUID& collectionUuid,
+    const ChunkRange& range) {
+    return withTemporaryOperationContext([=](OperationContext* opCtx) {
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+        LOG(0) << "Waiting for majority replication of local deletions in namespace " << nss.ns()
+               << " with UUID " << collectionUuid << " for range " << redact(range.toString());
+
+        // Asynchronously wait for majority write concern.
+        return WaitForMajorityService::get(opCtx->getServiceContext())
+            .waitUntilMajority(clientOpTime)
+            .thenRunOn(executor);
+    });
+}
+
 }  // namespace
 
 SharedSemiFuture<void> removeDocumentsInRange(
@@ -365,6 +363,12 @@ SharedSemiFuture<void> removeDocumentsInRange(
                                         range,
                                         numDocsToRemovePerBatch,
                                         delayBetweenBatches);
+        })
+        .then([=] {
+            // We only need to do this if previous rounds succeed, because the only errors that
+            // would propagate to this point are errors that indicate that this node is no longer
+            // primary or is shutting down.
+            return waitForDeletionsToMajorityReplicate(executor, nss, collectionUuid, range);
         })
         .onCompletion([=](Status s) {
             if (s.isOK()) {
