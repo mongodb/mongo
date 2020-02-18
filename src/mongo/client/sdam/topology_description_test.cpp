@@ -304,7 +304,8 @@ TEST_F(TopologyDescriptionTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     topologyDescription.installServerDescription(newDescription);
     ASSERT_EQUALS(topologyDescription.getServers().size(), 3);
     auto topologyVersion = topologyDescription.getServers()[1]->getTopologyVersion();
-    ASSERT(topologyVersion == TopologyVersion(processId, 1));
+    ASSERT(topologyVersion->getProcessId() == processId);
+    ASSERT(topologyVersion->getCounter() == 1);
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotUpdateTopologyVersionOnError) {

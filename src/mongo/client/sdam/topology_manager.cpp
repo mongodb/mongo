@@ -38,12 +38,21 @@ namespace mongo::sdam {
 
 namespace {
 
-// Compare topologyVersions. If the isMaster response has topologyVersion < lastServerDescription's
-// toplogyVersion, we will ignore this reply because the lastServerDescription is fresher.
+/* Compare topologyVersions to determine if the isMaster response's topologyVersion is stale
+ * according to the following rules:
+ * 1. If the response's topologyVersion is unset or the lastServerDescription's topologyVersion is
+ * null, the client MUST assume the response is more recent.
+ * 2. If the response’s topologyVersion.processId != to lastServerDescription's, the client MUST
+ * assume the response is more recent.
+ * 3. If the response’s topologyVersion.processId == to lastServerDescription's and response's
+ * topologyVersion.counter < lastServerDescription's topologyVersion.counter, the client MUST ignore
+ * this reply because the lastServerDescription is fresher.
+ */
 bool isStaleTopologyVersion(boost::optional<TopologyVersion> lastTopologyVersion,
                             boost::optional<TopologyVersion> newTopologyVersion) {
     if (lastTopologyVersion && newTopologyVersion &&
-        (lastTopologyVersion.get() > newTopologyVersion.get())) {
+        ((lastTopologyVersion->getProcessId() == newTopologyVersion->getProcessId()) &&
+         (lastTopologyVersion->getCounter() > newTopologyVersion->getCounter()))) {
         return true;
     }
 
@@ -74,27 +83,20 @@ void TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome
     }
 
     boost::optional<TopologyVersion> newTopologyVersion = isMasterOutcome.getTopologyVersion();
-    boost::optional<int> poolResetCounter = boost::none;
-    if (isMasterOutcome.isSuccess()) {
-        if (isStaleTopologyVersion(lastTopologyVersion, newTopologyVersion)) {
-            LOGV2(20218,
-                  "Ignoring this isMaster response because our topologyVersion: "
-                  "{lastTopologyVersion}is fresher than the provided topologyVersion: "
-                  "{newTopologyVersion}",
-                  "lastTopologyVersion"_attr = lastTopologyVersion->toBSON(),
-                  "newTopologyVersion"_attr = newTopologyVersion->toBSON());
-            return;
-        }
-
-        // Maintain the poolResetCounter.
-        poolResetCounter = lastPoolResetCounter;
-    } else {
-        // Bump the poolResetCounter on error if we have one established already.
-        if (lastServerDescription) {
-            poolResetCounter = ++lastPoolResetCounter.get();
-        }
+    if (isStaleTopologyVersion(lastTopologyVersion, newTopologyVersion)) {
+        log() << "Ignoring this isMaster response because our topologyVersion: "
+              << lastTopologyVersion->toBSON()
+              << "is fresher than the provided topologyVersion: " << newTopologyVersion->toBSON();
+        return;
     }
 
+    boost::optional<int> poolResetCounter = lastPoolResetCounter;
+    if (!isMasterOutcome.isSuccess() && lastPoolResetCounter) {
+        // Bump the poolResetCounter on error if we have one established already.
+        poolResetCounter = ++lastPoolResetCounter.get();
+    }
+
+    // newTopologyVersion will be null if the isMaster response did not provide one.
     auto newServerDescription = std::make_shared<ServerDescription>(
         _clockSource, isMasterOutcome, lastRTT, newTopologyVersion, poolResetCounter);
 

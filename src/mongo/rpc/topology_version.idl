@@ -37,7 +37,6 @@ structs:
     TopologyVersion:
         description: "Clients and servers exchange topologyVersions to determine the relative
                      freshness of topology information in concurrent messages."
-        generate_comparison_operators: true
         fields:
             processId:
                 type: objectid
