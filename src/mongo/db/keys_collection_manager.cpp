@@ -159,7 +159,7 @@ void KeysCollectionManager::stopMonitoring() {
     _refresher.stop();
 }
 
-void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
+void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doEnable) try {
     if (doEnable) {
         _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
             KeyGenerator keyGenerator(_purpose, _client.get(), _keyValidForInterval);
@@ -182,6 +182,9 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
         _refresher.switchFunc(
             opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
+} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
+    LOGV2(518091, "{ex}, doEnable = {doEnable}", "ex"_attr = ex, "doEnable"_attr = doEnable);
+    return;
 }
 
 bool KeysCollectionManager::hasSeenKeys() {
