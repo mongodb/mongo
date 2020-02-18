@@ -830,7 +830,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "sessionId"_attr = *_sessionId);
 
     MoveTimingHelper timing(
-        outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, ShardId(), ShardId());
+        outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
 
     const auto initialState = getState();
 
