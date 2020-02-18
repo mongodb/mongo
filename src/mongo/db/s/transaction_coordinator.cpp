@@ -422,7 +422,7 @@ void TransactionCoordinator::_done(Status status) {
 
 void TransactionCoordinator::_logSlowTwoPhaseCommit(
     const txn::CoordinatorCommitDecision& decision) {
-    if (logV2IsJson(serverGlobalParams.logFormat)) {
+    {
         logv2::DynamicAttributes attrs;
 
         BSONObjBuilder parametersBuilder;
@@ -492,8 +492,9 @@ void TransactionCoordinator::_logSlowTwoPhaseCommit(
                 singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick)));
 
         LOGV2(51804, "two-phase commit", attrs);
-
-    } else {
+    }
+    // TODO SERVER-46219: Log also with old log system to not break unit tests
+    {
         LOGV2(22448,
               "{twoPhaseCommitInfoForLog_decision}",
               "twoPhaseCommitInfoForLog_decision"_attr = _twoPhaseCommitInfoForLog(decision));

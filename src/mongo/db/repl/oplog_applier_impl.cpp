@@ -113,7 +113,7 @@ Status finishAndLogApply(OperationContext* opCtx,
                                         Milliseconds(opDuration),
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            if (logV2IsJson(serverGlobalParams.logFormat)) {
+            {
 
                 logv2::DynamicAttributes attrs;
 
@@ -127,7 +127,10 @@ Status finishAndLogApply(OperationContext* opCtx,
                 attrs.add("duration", opDuration);
 
                 LOGV2(51801, "applied op", attrs);
-            } else {
+            }
+
+            // TODO SERVER-46219: Log also with old log system to not break unit tests
+            {
                 StringBuilder s;
                 s << "applied op: ";
 

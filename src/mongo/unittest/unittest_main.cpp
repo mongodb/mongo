@@ -34,6 +34,8 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/unittest_options_gen.h"
 #include "mongo/util/log_global_settings.h"
@@ -52,9 +54,19 @@ int main(int argc, char** argv, char** envp) {
 
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
+    auto& logManager = ::mongo::logv2::LogManager::global();
+    ::mongo::logv2::LogDomainGlobal::ConfigurationOptions logConfig;
+    logConfig.format = ::mongo::logv2::LogFormat::kText;
+
+    Status status = logManager.getGlobalDomainInternal().configure(logConfig);
+    if (!status.isOK()) {
+        std::cerr << status;
+        return EXIT_FAILURE;
+    }
+
     moe::OptionSection options;
 
-    Status status = mongo::unittest::addUnitTestOptions(&options);
+    status = mongo::unittest::addUnitTestOptions(&options);
     if (!status.isOK()) {
         std::cerr << status;
         return EXIT_FAILURE;

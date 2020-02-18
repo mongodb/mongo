@@ -2003,11 +2003,13 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            if (logV2IsJson(serverGlobalParams.logFormat)) {
+            {
                 logv2::DynamicAttributes attr;
                 _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs, &attr);
                 LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);
-            } else {
+            }
+            // TODO SERVER-46219: Log also with old log system to not break unit tests
+            {
                 LOGV2_OPTIONS(
                     22523,
                     {logComponentV1toV2(logger::LogComponent::kTransaction)},
