@@ -3250,6 +3250,76 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
     getIsMasterThread.join();
 }
 
+TEST_F(ReplCoordTest, AllIsMasterFieldsRespectHorizon) {
+    init();
+    const auto primaryHostName = "node1:12345";
+    const auto primaryHostNameHorizon = "horizon.com:15";
+    const auto passiveHostName = "node2:12345";
+    const auto passiveHostNameHorizon = "horizon.com:16";
+    const auto arbiterHostName = "node3:12345";
+    const auto arbiterHostNameHorizon = "horizon.com:17";
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("host" << primaryHostName << "_id" << 1 << "horizons"
+                                       << BSON("horizon" << primaryHostNameHorizon))
+                           << BSON("host" << passiveHostName << "_id" << 2 << "horizons"
+                                          << BSON("horizon" << passiveHostNameHorizon) << "priority"
+                                          << 0)
+                           << BSON("host" << arbiterHostName << "_id" << 3 << "horizons"
+                                          << BSON("horizon" << arbiterHostNameHorizon)
+                                          << "arbiterOnly" << true))),
+        HostAndPort(primaryHostName));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    auto opCtx = makeOperationContext();
+
+    // When no horizon is specified, the isMaster response uses the default horizon.
+    {
+        HostAndPort primaryHostAndPort(primaryHostName);
+        HostAndPort passiveHostAndPort(passiveHostName);
+        HostAndPort arbiterHostAndPort(arbiterHostName);
+
+        const auto response =
+            getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none);
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(hosts[0], primaryHostAndPort);
+        ASSERT_EQUALS(response->getPrimary(), primaryHostAndPort);
+        ASSERT_EQUALS(response->getMe(), primaryHostAndPort);
+        const auto passives = response->getPassives();
+        ASSERT_EQUALS(passives[0], passiveHostAndPort);
+        const auto arbiters = response->getArbiters();
+        ASSERT_EQUALS(arbiters[0], arbiterHostAndPort);
+    }
+
+    // The isMaster response respects the requested horizon.
+    {
+        HostAndPort primaryHostAndPort(primaryHostNameHorizon);
+        HostAndPort passiveHostAndPort(passiveHostNameHorizon);
+        HostAndPort arbiterHostAndPort(arbiterHostNameHorizon);
+
+        const std::string horizonSniName = "horizon.com";
+        const auto horizon = SplitHorizon::Parameters(horizonSniName);
+        const auto response =
+            getReplCoord()->awaitIsMasterResponse(opCtx.get(), horizon, boost::none, boost::none);
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(hosts[0], primaryHostAndPort);
+        ASSERT_EQUALS(response->getPrimary(), primaryHostAndPort);
+        ASSERT_EQUALS(response->getMe(), primaryHostAndPort);
+        const auto passives = response->getPassives();
+        ASSERT_EQUALS(passives[0], passiveHostAndPort);
+        const auto arbiters = response->getArbiters();
+        ASSERT_EQUALS(arbiters[0], arbiterHostAndPort);
+    }
+}
+
 TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsErrorOnHorizonChange) {
     init();
     assertStartSuccess(BSON("_id"
