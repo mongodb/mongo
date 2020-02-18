@@ -4,6 +4,9 @@
  */
 (function() {
 'use strict';
+
+load("jstests/libs/logv2_helpers.js");
+
 let tests = [
     {
         callback: function() {
@@ -96,9 +99,13 @@ tests.forEach(function(t) {
             }
         }
         assert(matchShellExp);
-        assertMatch(/^\s*$/, lines.pop());
+        assertMatch(/\s*/, lines.pop());
         assertMatch(/exiting with code/, lines.pop());
-        assertMatch(new RegExp("\\\[js\\\] " + t.match + "$"), lines.shift());
+        if (isJsonLogNoConn()) {
+            assertMatch(new RegExp("\"ctx\":\"js\".*" + t.match), lines.shift());
+        } else {
+            assertMatch(new RegExp("\\\[js\\\] " + t.match + "$"), lines.shift());
+        }
 
         if (t.stack == true) {
             assert.eq(lines.length,
