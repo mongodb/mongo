@@ -199,7 +199,7 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorJs::create(
     std::string init,
     std::string accumulate,
     std::string merge,
-    std::string finalize) {
+    boost::optional<std::string> finalize) {
     return new AccumulatorJs(
         expCtx, std::move(init), std::move(accumulate), std::move(merge), std::move(finalize));
 }
@@ -234,7 +234,9 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
     args.addField("accumulate", Value(_accumulate));
     args.addField("accumulateArgs", Value(argument->serialize(explain)));
     args.addField("merge", Value(_merge));
-    args.addField("finalize", Value(_finalize));
+    if (_finalize) {
+        args.addField("finalize", Value(*_finalize));
+    }
     args.addField("lang", Value("js"_sd));
     return DOC(getOpName() << args.freeze());
 }
@@ -262,7 +264,8 @@ AccumulationExpression AccumulatorJs::parse(boost::intrusive_ptr<ExpressionConte
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
-    std::string init, accumulate, merge, finalize;
+    std::string init, accumulate, merge;
+    boost::optional<std::string> finalize;
     boost::intrusive_ptr<Expression> initArgs, accumulateArgs;
 
     for (auto&& element : obj) {
@@ -296,11 +299,6 @@ AccumulationExpression AccumulatorJs::parse(boost::intrusive_ptr<ExpressionConte
     uassert(4544707, "$accumulator missing required argument 'init'", !init.empty());
     uassert(4544708, "$accumulator missing required argument 'accumulate'", !accumulate.empty());
     uassert(4544709, "$accumulator missing required argument 'merge'", !merge.empty());
-    if (finalize.empty()) {
-        // finalize is optional because many custom accumulators will return the final state
-        // unchanged.
-        finalize = "function(state) { return state; }";
-    }
     if (!initArgs) {
         // initArgs is optional because most custom accumulators don't need the state to depend on
         // the group key.
@@ -326,6 +324,10 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
     // empty group.
     invariant(_state);
 
+    // Ensure we've actually called accumulate/merge for every input document.
+    reducePendingCalls();
+    invariant(_pendingCalls.empty());
+
     // If toBeMerged then we return the current state, to be fed back in to accumulate / merge /
     // finalize later. If not toBeMerged then we return the final value, by calling finalize.
     if (toBeMerged) {
@@ -334,11 +336,25 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
 
     // Get the final value given the current accumulator state.
 
-    auto& expCtx = getExpressionContext();
-    auto jsExec = expCtx->getJsExecWithScope();
-    auto func = makeJsFunc(expCtx, _finalize);
+    if (_finalize) {
+        auto& expCtx = getExpressionContext();
+        auto jsExec = expCtx->getJsExecWithScope();
+        auto func = makeJsFunc(expCtx, *_finalize);
 
-    return jsExec->callFunction(func, BSON_ARRAY(*_state), {});
+        return jsExec->callFunction(func, BSON_ARRAY(*_state), {});
+    } else {
+        return *_state;
+    }
+}
+
+void AccumulatorJs::resetMemUsageBytes() {
+    _memUsageBytes = sizeof(*this) + _init.capacity() + _accumulate.capacity() + _merge.capacity();
+    if (_finalize) {
+        _memUsageBytes += _finalize->capacity();
+    }
+}
+void AccumulatorJs::incrementMemUsageBytes(size_t bytes) {
+    _memUsageBytes += bytes;
 }
 
 void AccumulatorJs::startNewGroup(Value const& input) {
@@ -364,55 +380,119 @@ void AccumulatorJs::startNewGroup(Value const& input) {
 
     _state = jsExec->callFunction(func, bob.arr(), {});
 
-    recomputeMemUsageBytes();
+    // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
+    // as part of sizeof(*this).
+    incrementMemUsageBytes(_state->getApproximateSize() - sizeof(Value));
 }
 
 void AccumulatorJs::reset() {
-    _state = std::nullopt;
-    recomputeMemUsageBytes();
+    _state = boost::none;
+    _pendingCalls.clear();
+    _pendingCallsMerging = false;
+    resetMemUsageBytes();
 }
 
 void AccumulatorJs::processInternal(const Value& input, bool merging) {
     // _state should be nonempty because we populate it in startNewGroup.
     invariant(_state);
+    invariant(_pendingCalls.empty() || _pendingCallsMerging == merging);
 
-    auto& expCtx = getExpressionContext();
-    auto jsExec = expCtx->getJsExecWithScope();
-
-    if (merging) {
-        // input is an intermediate state from another instance of this kind of accumulator. Call
-        // the user's merge function.
-        auto func = makeJsFunc(expCtx, _merge);
-        _state = jsExec->callFunction(func, BSON_ARRAY(*_state << input), {});
-        recomputeMemUsageBytes();
-    } else {
-        // input is a value produced by our AccumulationExpression::argument. Call the user's
-        // accumulate function.
-        auto func = makeJsFunc(expCtx, _accumulate);
+    if (!merging) {
         uassert(4544712,
                 str::stream() << "$accumulator accumulateArgs must evaluate to an array: "
                               << input.toString(),
                 input.getType() == BSONType::Array);
-
-        size_t index = 0;
-        BSONArrayBuilder bob;
-        _state->addToBsonArray(&bob, index++);
-        for (auto&& arg : input.getArray()) {
-            arg.addToBsonArray(&bob, index++);
-        }
-
-        _state = jsExec->callFunction(func, bob.done(), {});
-        recomputeMemUsageBytes();
     }
+
+    _pendingCalls.emplace_back(input);
+    _pendingCallsMerging = merging;
+
+    // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
+    // as part of sizeof(*this).
+    incrementMemUsageBytes(input.getApproximateSize() - sizeof(Value) +
+                           sizeof(std::pair<Value, bool>));
 }
 
-void AccumulatorJs::recomputeMemUsageBytes() {
-    auto stateSize = _state.value_or(Value{}).getApproximateSize();
-    uassert(4544713,
-            str::stream() << "$accumulator state exceeded max BSON size: " << stateSize,
-            stateSize <= BSONObjMaxUserSize);
-    _memUsageBytes = sizeof(*this) + stateSize + _init.capacity() + _accumulate.capacity() +
-        _merge.capacity() + _finalize.capacity();
+void AccumulatorJs::reducePendingCalls() {
+    // _state should be nonempty because we populate it in startNewGroup.
+    invariant(_state);
+    // $group and $bucketAuto never create empty groups. The only time an accumulator is asked to
+    // accumulate an empty set is in ExpressionFromArray, but $accumulator is never used that way
+    // ($accumulator is not registered as an expression the way $sum and $avg and others are).
+    invariant(!_pendingCalls.empty());
+
+    auto& expCtx = getExpressionContext();
+    auto jsExec = expCtx->getJsExecWithScope();
+
+    // Expose user functions.
+    if (_pendingCallsMerging) {
+        jsExec->getScope()->setFunction("__merge", _merge.c_str());
+    } else {
+        jsExec->getScope()->setFunction("__accumulate", _accumulate.c_str());
+    }
+
+    // Use a wrapper function that calls accumulate and merge in a JS loop, to cut down on the
+    // number of calls into the JS engine.
+    ScriptingFunction func;
+    if (_pendingCallsMerging) {
+        func = makeJsFunc(expCtx,
+                          "function(state, pendingCalls) {"
+                          "  const length = pendingCalls.length;"
+                          "  for (let i=0; i<length; ++i) {"
+                          "    state = __merge(state, pendingCalls[i]);"
+                          "  }"
+                          "  return state;"
+                          "}");
+    } else {
+        func = makeJsFunc(
+            expCtx,
+            "function(state, pendingCalls) {"
+            "  const length = pendingCalls.length;"
+            "  for (let i=0; i<length; ++i) {"
+            "    const input = pendingCalls[i];"
+            // Try to avoid doing an expensive argument spread by handling a few common arities as
+            // special cases.
+            "    switch (input.length) {"
+            "      case 1: state = __accumulate(state, input[0]); break;"
+            "      case 2: state = __accumulate(state, input[0], input[1]); break;"
+            "      case 3: state = __accumulate(state, input[0], input[1], input[2]); break;"
+            "      default: state = __accumulate(state, ...input); break;"
+            "    }"
+            "  }"
+            "  return state;"
+            "}");
+    }
+
+    for (auto it = _pendingCalls.begin(), end = _pendingCalls.end(); it != end;) {
+        // Take as many values as will fit in one BSON array.
+        BSONArrayBuilder args;
+        _state->addToBsonArray(&args);
+        BSONArrayBuilder pendingCalls = args.subarrayStart();
+        for (; it != end; ++it) {
+            auto&& input = *it;
+            // The JS call will fail if the arguments object is larger than BSONObjMaxInternalSize,
+            // which is a much greater limit than BSONObjMaxUserSize. So it should be safe to go
+            // slightly over the BSONObjMaxUserSize.
+            if (args.len() + input.getApproximateSize() > BSONObjMaxUserSize)
+                break;
+            input.addToBsonArray(&pendingCalls);
+        }
+        pendingCalls.done();
+
+        // For the outer loop to make progress, the inner loop needs to append at least one element
+        // of _pendingCalls to pendingCalls. Otherwise we would call `state = accumulate(state, [])`
+        // forever.
+        uassert(4545000,
+                str::stream() << "$accumulator arguments exceed max BSON size: "
+                              << args.len() + it->getApproximateSize(),
+                pendingCalls.arrSize() > 0);
+
+        _state = jsExec->callFunction(func, args.arr(), {});
+    }
+    _pendingCalls.clear();
+
+    resetMemUsageBytes();
+    incrementMemUsageBytes(_state->getApproximateSize());
 }
 
 }  // namespace mongo

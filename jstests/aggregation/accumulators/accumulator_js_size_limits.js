@@ -60,6 +60,30 @@ res = runExample(1, {
 });
 assert.commandFailedWithCode(res, [17260]);
 
+// Accumulator state and argument together exceed max BSON size.
+assert(coll.drop());
+const oneMBString = "a".repeat(1 * 1024 * 1024);
+const tenMBArray = Array.from({length: 10}, () => oneMBString);
+assert.commandWorked(coll.insert([{arr: tenMBArray}, {arr: tenMBArray}]));
+res = runExample(1, {
+    init: function() {
+        return [];
+    },
+    accumulate: function(state, input) {
+        state.push(input);
+        return state;
+    },
+    accumulateArgs: ["$arr"],
+    merge: function(state1, state2) {
+        return state1.concat(state2);
+    },
+    finalize: function() {
+        throw 'finalize should not be called';
+    },
+    lang: 'js',
+});
+assert.commandFailedWithCode(res, [4545000]);
+
 // $group size limit exceeded, and cannot spill.
 assert(coll.drop());
 assert.commandWorked(coll.insert(Array.from({length: 200}, (_, i) => ({_id: i}))));

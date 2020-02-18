@@ -90,7 +90,7 @@ public:
         std::string init,
         std::string accumulate,
         std::string merge,
-        std::string finalize);
+        boost::optional<std::string> finalize);
 
     static AccumulationExpression parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONElement elem,
@@ -110,25 +110,39 @@ private:
                   std::string init,
                   std::string accumulate,
                   std::string merge,
-                  std::string finalize)
+                  boost::optional<std::string> finalize)
         : AccumulatorState(expCtx),
-          _init(init),
-          _accumulate(accumulate),
-          _merge(merge),
-          _finalize(finalize) {
-        recomputeMemUsageBytes();
+          _init(std::move(init)),
+          _accumulate(std::move(accumulate)),
+          _merge(std::move(merge)),
+          _finalize(std::move(finalize)) {
+        resetMemUsageBytes();
     }
-    void recomputeMemUsageBytes();
+    void resetMemUsageBytes();
+    void incrementMemUsageBytes(size_t bytes);
 
     // static arguments
-    std::string _init, _accumulate, _merge, _finalize;
+    std::string _init, _accumulate, _merge;
+    boost::optional<std::string> _finalize;
 
     // accumulator state during execution
-    // - When the accumulator is first created, _state is empty.
-    // - When the accumulator is fed its first input Value, it runs the user init and accumulate
-    //   functions, and _state gets a Value.
-    // - When the accumulator is reset, _state becomes empty again.
-    std::optional<Value> _state;
+    // 1. Initially, _state is empty.
+    // 2. On .startNewGroup(...), _state becomes the result of the user's init function.
+    // 3. On .processInternal(...), instead of calling the user's accumulate or merge function right
+    //    away, we push_back the argument into _pendingCalls to be processed later. This is an
+    //    optimization to reduce the number of calls into the JS engine.
+    // 4. On .getValue(), we process all the _pendingCalls and update the _state.
+    // 5. On .reset(), _state becomes empty again.
+    boost::optional<Value> _state;
+    // Each element is an input passed to processInternal.
+    std::vector<Value> _pendingCalls;
+    // True means the elements of _pendingCalls should be interpreted as intermediate states from
+    // other instances of $accumulator. False means the elements of _pendingCalls should be
+    // interpreted as inputs from accumulateArgs.
+    bool _pendingCallsMerging;
+
+    // Call the user's accumulate/merge function for each element of _pendingCalls.
+    void reducePendingCalls();
 };
 
 }  // namespace mongo
