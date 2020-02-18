@@ -116,7 +116,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
 
             // If the document key from the resume token has more than one field, that means it
             // includes the shard key and thus should never change.
-            auto isFinal = docKey.size() > 1;
+            const bool isFinal = docKeyFields.size() > 1;
 
             _documentKeyCache[tokenData.uuid.get()] =
                 DocumentKeyCacheEntry({docKeyFields, isFinal});

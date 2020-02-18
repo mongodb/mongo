@@ -302,7 +302,8 @@ public:
         return kEmptyDoc;
     }
 
-    size_t size() const {
+    // The function adds up all iterator counts. Exp. runtime is O(N).
+    size_t computeSize() const {
         // can't use _numFields because it includes removed Fields
         size_t count = 0;
         for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())

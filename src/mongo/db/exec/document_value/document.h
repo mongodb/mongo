@@ -172,9 +172,9 @@ public:
     const Value getNestedField(const FieldPath& path,
                                std::vector<Position>* positions = nullptr) const;
 
-    /// Number of fields in this document. O(n)
-    size_t size() const {
-        return storage().size();
+    // Number of fields in this document. Exp. runtime O(n).
+    size_t computeSize() const {
+        return storage().computeSize();
     }
 
     /// True if this document has no fields.

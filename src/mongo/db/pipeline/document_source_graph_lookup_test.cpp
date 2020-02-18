@@ -207,7 +207,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
-    ASSERT_EQ(2U, next.getDocument().size());
+    ASSERT_EQ(2ULL, next.getDocument().computeSize());
     ASSERT_VALUE_EQ(Value(0), next.getDocument().getField("_id"));
 
     auto resultsValue = next.getDocument().getField("results");
@@ -525,7 +525,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
-    ASSERT_EQ(3U, next.getDocument().size());
+    ASSERT_EQ(3ULL, next.getDocument().computeSize());
     ASSERT_VALUE_EQ(Value(0), next.getDocument().getField("_id"));
 
     auto resultsValue = next.getDocument().getField("results");
@@ -598,7 +598,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 
-    ASSERT_EQ(3U, next.getDocument().size());
+    ASSERT_EQ(3ULL, next.getDocument().computeSize());
     ASSERT_VALUE_EQ(Value(0), next.getDocument().getField("_id"));
 
     auto resultsValue = next.getDocument().getField("results");

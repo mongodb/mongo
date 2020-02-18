@@ -402,7 +402,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
 
     auto serializedStage = serializedDoc["$lookup"].getDocument();
-    ASSERT_EQ(serializedStage.size(), 4UL);
+    ASSERT_EQ(serializedStage.computeSize(), 4ULL);
     ASSERT_VALUE_EQ(serializedStage["from"], Value(std::string("coll")));
     ASSERT_VALUE_EQ(serializedStage["as"], Value(std::string("as")));
 

@@ -515,7 +515,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToReParseSerializedStage) {
     ASSERT_EQUALS(serialization.size(), 1UL);
     ASSERT_EQUALS(serialization[0].getType(), BSONType::Object);
 
-    ASSERT_EQUALS(serialization[0].getDocument().size(), 1UL);
+    ASSERT_EQUALS(serialization[0].getDocument().computeSize(), 1ULL);
     ASSERT_EQUALS(serialization[0].getDocument()["$bucketAuto"].getType(), BSONType::Object);
 
     auto serializedBson = serialization[0].getDocument().toBson();

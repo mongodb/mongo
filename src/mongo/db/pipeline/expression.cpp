@@ -686,8 +686,8 @@ Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variabl
             uassert(40392,
                     str::stream() << "$arrayToObject requires an object keys of 'k' and 'v'. "
                                      "Found incorrect number of keys:"
-                                  << elem.getDocument().size(),
-                    (elem.getDocument().size() == 2));
+                                  << elem.getDocument().computeSize(),
+                    (elem.getDocument().computeSize() == 2));
 
             Value key = elem.getDocument().getField("k");
             Value value = elem.getDocument().getField("v");

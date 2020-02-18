@@ -154,7 +154,8 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
 
     // In order for the relaxed comparison to be applicable, the client token must have a single _id
     // field, and the resumed stream token must have additional fields beyond _id.
-    if (!(documentKeyFromClient.size() == 1 && documentKeyFromResumedStream.size() > 1)) {
+    if (!(documentKeyFromClient.computeSize() == 1 &&
+          documentKeyFromResumedStream.computeSize() > 1)) {
         return defaultResumeStatus;
     }
 

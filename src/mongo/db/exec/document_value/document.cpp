@@ -687,8 +687,8 @@ string Document::toString() const {
 }
 
 void Document::serializeForSorter(BufBuilder& buf) const {
-    const int numElems = size();
-    buf.appendNum(numElems);
+    const size_t numElems = computeSize();
+    buf.appendNum(static_cast<int>(numElems));
 
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         buf.appendStr(it->nameSD(), /*NUL byte*/ true);

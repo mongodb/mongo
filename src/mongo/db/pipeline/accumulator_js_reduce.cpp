@@ -102,7 +102,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
         str::stream() << kAccumulatorName
                       << " requires the 'data' argument to have a 'k' and 'v' field. Instead found"
                       << data.toString(),
-        data.size() == 2ull && !data["k"].missing() && !data["v"].missing());
+        data.computeSize() == 2ull && !data["k"].missing() && !data["v"].missing());
 
     _key = data["k"];
 

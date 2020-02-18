@@ -362,7 +362,7 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
         expectedOutputs.emplace_back(input.releaseDocument());
     }
     ASSERT(output.isAdvanced());
-    ASSERT_EQ(output.getDocument().size(), 2UL);
+    ASSERT_EQ(output.getDocument().computeSize(), 2ULL);
     ASSERT_VALUE_EQ(output.getDocument()["first"], Value(expectedOutputs));
     ASSERT_VALUE_EQ(output.getDocument()["second"], Value(expectedOutputs));
 
@@ -401,7 +401,7 @@ TEST_F(DocumentSourceFacetTest,
 
     // The output fields are in no guaranteed order.
     ASSERT(output.isAdvanced());
-    ASSERT_EQ(output.getDocument().size(), 2UL);
+    ASSERT_EQ(output.getDocument().computeSize(), 2ULL);
     ASSERT_VALUE_EQ(output.getDocument()["all"], Value(expectedPassthroughOutput));
     ASSERT_VALUE_EQ(output.getDocument()["first"],
                     Value(vector<Value>{Value(expectedPassthroughOutput.front())}));
@@ -504,12 +504,12 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
 
     // The fields are in no guaranteed order, so we can't make a simple Document comparison.
-    ASSERT_EQ(serialization[0].getDocument().size(), 1UL);
+    ASSERT_EQ(serialization[0].getDocument().computeSize(), 1ULL);
     ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::Object);
 
     // Should have two fields: "skippedOne" and "skippedTwo".
     auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();
-    ASSERT_EQ(serializedStage.size(), 2UL);
+    ASSERT_EQ(serializedStage.computeSize(), 2ULL);
     ASSERT_VALUE_EQ(serializedStage["skippedOne"],
                     Value(vector<Value>{Value(Document{{"$skip", 1}})}));
     ASSERT_VALUE_EQ(serializedStage["skippedTwo"],
