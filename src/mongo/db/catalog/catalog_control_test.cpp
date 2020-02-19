@@ -34,173 +34,11 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-/**
- * Mock storage engine.
- */
-class MockStorageEngine : public StorageEngine {
-public:
-    void finishInit() final {}
-    RecoveryUnit* newRecoveryUnit() final {
-        return nullptr;
-    }
-    std::vector<std::string> listDatabases() const final {
-        return {};
-    }
-    bool supportsDocLocking() const final {
-        return false;
-    }
-    bool supportsDBLocking() const final {
-        return true;
-    }
-    bool supportsCappedCollections() const final {
-        return true;
-    }
-    bool supportsCheckpoints() const final {
-        return false;
-    }
-    bool isDurable() const final {
-        return false;
-    }
-    bool isEphemeral() const final {
-        return true;
-    }
-    void loadCatalog(OperationContext* opCtx) final {}
-    void closeCatalog(OperationContext* opCtx) final {}
-    Status closeDatabase(OperationContext* opCtx, StringData db) final {
-        return Status::OK();
-    }
-    Status dropDatabase(OperationContext* opCtx, StringData db) final {
-        return Status::OK();
-    }
-    void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
-    Status beginBackup(OperationContext* opCtx) final {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
-    void endBackup(OperationContext* opCtx) final {}
-    Status disableIncrementalBackup(OperationContext* opCtx) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
-    StatusWith<StorageEngine::BackupInformation> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) final {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
-    void endNonBlockingBackup(OperationContext* opCtx) final {}
-    StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) final {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
-    Status repairRecordStore(OperationContext* opCtx,
-                             RecordId catalogId,
-                             const NamespaceString& ns) final {
-        return Status::OK();
-    }
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx) final {
-        return {};
-    }
-    void cleanShutdown() final {}
-    SnapshotManager* getSnapshotManager() const final {
-        return nullptr;
-    }
-    void setJournalListener(JournalListener* jl) final {}
-    bool supportsRecoverToStableTimestamp() const final {
-        return false;
-    }
-    bool supportsRecoveryTimestamp() const final {
-        return false;
-    }
-    bool supportsReadConcernSnapshot() const final {
-        return false;
-    }
-    bool supportsReadConcernMajority() const final {
-        return false;
-    }
-    bool supportsOplogStones() const final {
-        return false;
-    }
-    bool supportsPendingDrops() const final {
-        return false;
-    }
-    void clearDropPendingState() final {}
-    bool supportsTwoPhaseIndexBuild() const final {
-        return false;
-    }
-    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
-        fassertFailed(40547);
-    }
-    boost::optional<Timestamp> getRecoveryTimestamp() const final {
-        MONGO_UNREACHABLE;
-    }
-    boost::optional<Timestamp> getLastStableRecoveryTimestamp() const final {
-        MONGO_UNREACHABLE;
-    }
-    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
-    void setInitialDataTimestamp(Timestamp timestamp) final {}
-    void setOldestTimestampFromStable() final {}
-    void setOldestTimestamp(Timestamp timestamp) final {}
-    void setOldestActiveTransactionTimestampCallback(
-        OldestActiveTransactionTimestampCallback callback) final {}
-    bool isCacheUnderPressure(OperationContext* opCtx) const final {
-        return false;
-    }
-    void setCachePressureForTest(int pressure) final {}
-    void triggerJournalFlush() const final {}
-    void waitForJournalFlush(OperationContext* opCtx) const final {}
-    void interruptJournalFlusherForReplStateChange() const final {}
-    StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx) final {
-        return ReconcileResult{};
-    }
-    Timestamp getAllDurableTimestamp() const final {
-        return {};
-    }
-    Timestamp getOldestOpenReadTimestamp() const final {
-        return {};
-    }
-    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
-        return boost::none;
-    }
-    std::string getFilesystemPathForDb(const std::string& dbName) const final {
-        return "";
-    }
-    std::set<std::string> getDropPendingIdents() const final {
-        return {};
-    }
-    Status currentFilesCompatible(OperationContext* opCtx) const final {
-        return Status::OK();
-    }
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {
-        return 0;
-    }
-    KVEngine* getEngine() final {
-        return nullptr;
-    }
-    const KVEngine* getEngine() const final {
-        return nullptr;
-    }
-    DurableCatalog* getCatalog() final {
-        return nullptr;
-    }
-    const DurableCatalog* getCatalog() const final {
-        return nullptr;
-    }
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) final {
-        return nullptr;
-    }
-    void addIndividuallyCheckpointedIndexToList(const std::string& ident) final {}
-    void clearIndividuallyCheckpointedIndexesList() final {}
-    bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const final {
-        return false;
-    }
-};
 
 /**
  * Simple test for openCatalog() and closeCatalog() to check library dependencies.
@@ -216,7 +54,7 @@ private:
 void CatalogControlTest::setUp() {
     {
         auto serviceContext = ServiceContext::make();
-        auto storageEngine = std::make_unique<MockStorageEngine>();
+        auto storageEngine = std::make_unique<StorageEngineMock>();
         serviceContext->setStorageEngine(std::move(storageEngine));
         DatabaseHolder::set(serviceContext.get(), std::make_unique<DatabaseHolderMock>());
         // Only need the IndexBuildsCoordinator to call into and check whether there are any index
