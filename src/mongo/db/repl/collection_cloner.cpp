@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner_gen.h"
@@ -153,7 +154,9 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
-    auto indexSpecs = getClient()->getIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk);
+    auto indexSpecs = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()
+        ? getClient()->getReadyIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk)
+        : getClient()->getIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk);
     if (indexSpecs.empty()) {
         LOGV2_WARNING(
             21143,
