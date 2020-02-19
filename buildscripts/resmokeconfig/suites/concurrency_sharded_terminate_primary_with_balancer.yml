@@ -116,6 +116,7 @@ selector:
 
   # Uses getmores.
   - jstests/concurrency/fsm_workloads/agg_base.js
+  - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
   - jstests/concurrency/fsm_workloads/create_capped_collection.js
   - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
   - jstests/concurrency/fsm_workloads/create_index_background.js
