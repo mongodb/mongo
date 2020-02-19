@@ -42,6 +42,7 @@ This provides an API similar to the C API, with the following modifications:
   - Statistics cursors behave a little differently and are best handled using the C-like functions
   - C Constants starting with WT_STAT_DSRC are instead exposed under wiredtiger.stat.dsrc
   - C Constants starting with WT_STAT_CONN are instead exposed under wiredtiger.stat.conn
+  - C Constants starting with WT_STAT_SESSION are instead exposed under wiredtiger.stat.session
 "
 %enddef
 
@@ -1472,12 +1473,17 @@ class stat:
 		'''keys for cursors on data source statistics'''
 		pass
 
+	class session:
+		'''keys for cursors on session statistics'''
+		pass
+
 ## @}
 
 import sys
 # All names starting with 'WT_STAT_DSRC_' are renamed to
 # the wiredtiger.stat.dsrc class, those starting with 'WT_STAT_CONN' are
-# renamed to wiredtiger.stat.conn class.
+# renamed to the wiredtiger.stat.conn class. All names starting with 'WT_STAT_SESSION'
+# are renamed to the wiredtiger.stat.session class.
 def _rename_with_prefix(prefix, toclass):
 	curmodule = sys.modules[__name__]
 	for name in dir(curmodule):
@@ -1488,5 +1494,6 @@ def _rename_with_prefix(prefix, toclass):
 
 _rename_with_prefix('WT_STAT_CONN_', stat.conn)
 _rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
+_rename_with_prefix('WT_STAT_SESSION_', stat.session)
 del _rename_with_prefix
 %}

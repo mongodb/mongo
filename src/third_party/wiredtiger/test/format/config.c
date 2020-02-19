@@ -840,9 +840,9 @@ config_file(const char *name)
         testutil_die(errno, "fopen: %s", name);
 
     /*
-     * Skip leading Evergreen timestamps by skipping past anything that precedes a blank, unless we
-     * find a hash (comment) character. This is a little fragile, it requires Evergreen not include
-     * comment characters in its timestamps, and no format configuration commands including blanks.
+     * Skip leading Evergreen timestamps by skipping up to a closing brace and following whitespace.
+     * This is a little fragile: we're in trouble if Evergreen changes its timestamp format or if
+     * this program includes closing braces in its commands.
      */
     while (fgets(buf, sizeof(buf), fp) != NULL) {
         for (p = t = buf; *p != '\0'; ++p) {
@@ -854,8 +854,11 @@ config_file(const char *name)
                 t = p;
                 break;
             }
-            if (isblank(*p)) /* Blank, configuration starts after it. */
-                t = p + 1;
+            if (t == buf && *p == ']') { /* Closing brace, configuration starts after it. */
+                while (isblank(*++p))
+                    ;
+                t = p--;
+            }
         }
         if (*t == '\0' || *t == '#')
             continue;

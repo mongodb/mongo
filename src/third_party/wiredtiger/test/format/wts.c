@@ -177,11 +177,6 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     if (DATASOURCE("lsm") || g.c_cache < 20)
         CONFIG_APPEND(p, ",eviction_dirty_trigger=95");
 
-    /* Checkpoints. */
-    if (g.c_checkpoint_flag == CHECKPOINT_WIREDTIGER)
-        CONFIG_APPEND(p, ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")", g.c_checkpoint_wait,
-          MEGABYTE(g.c_checkpoint_log_size));
-
     /* Eviction worker configuration. */
     if (g.c_evict_max != 0)
         CONFIG_APPEND(p, ",eviction=(threads_max=%" PRIu32 ")", g.c_evict_max);
@@ -296,6 +291,32 @@ wts_reopen(void)
 
     g.wt_api = conn->get_extension_api(conn);
     g.wts_conn = conn;
+}
+
+/*
+ * wts_checkpoints --
+ *     Configure WiredTiger library checkpoints.
+ */
+void
+wts_checkpoints(void)
+{
+    char config[1024];
+
+    /*
+     * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
+     * original database open because format tests small caches and you can get into cache stuck
+     * trouble during the initial load (where bulk load isn't configured). There's a single thread
+     * doing lots of inserts and creating huge leaf pages. Those pages can't be evicted if there's a
+     * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
+     * we're not going to fix it in the library, so configure it away here.
+     */
+    if (g.c_checkpoint_flag != CHECKPOINT_WIREDTIGER)
+        return;
+
+    testutil_check(
+      __wt_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
+        g.c_checkpoint_wait, MEGABYTE(g.c_checkpoint_log_size)));
+    testutil_check(g.wts_conn->reconfigure(g.wts_conn, config));
 }
 
 /*
