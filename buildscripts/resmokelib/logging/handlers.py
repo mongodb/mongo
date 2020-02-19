@@ -21,7 +21,7 @@ import urllib3.util.retry as urllib3_retry
 from . import flush
 from .. import utils
 
-_TIMEOUT_SECS = 10
+_TIMEOUT_SECS = 20
 
 
 class BufferedHandler(logging.Handler):
