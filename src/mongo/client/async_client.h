@@ -47,7 +47,8 @@ namespace mongo {
 
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
-    using RemoteCommandCallbackFn = unique_function<void(const executor::RemoteCommandResponse&)>;
+    using RemoteCommandCallbackFn =
+        unique_function<void(const executor::RemoteCommandResponse&, bool isMoreToComeSet)>;
 
     struct ExhaustRequestParameters {
         ExhaustRequestParameters(ExhaustRequestParameters&&) = default;

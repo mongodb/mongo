@@ -81,6 +81,11 @@ public:
 
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                              RemoteCommandRequest request);
+    Future<void> startExhaustCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest request,
+        std::function<void(const RemoteCommandResponse&)> exhaustUtilCB,
+        const BatonHandle& baton = nullptr);
 
     RemoteCommandResponse runCommandSync(RemoteCommandRequest& request);
 

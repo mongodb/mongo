@@ -133,6 +133,13 @@ Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
     return Status::OK();
 }
 
+Status NetworkInterfaceMock::startExhaustCommand(const CallbackHandle& cbHandle,
+                                                 RemoteCommandRequestOnAny& request,
+                                                 RemoteCommandOnReplyFn&& onReply,
+                                                 const BatonHandle& baton) {
+    MONGO_UNREACHABLE;
+}
+
 void NetworkInterfaceMock::setHandshakeReplyForHost(
     const mongo::HostAndPort& host, mongo::executor::RemoteCommandResponse&& reply) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

@@ -113,6 +113,39 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
     });
 }
 
+Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
+    const TaskExecutor::CallbackHandle& cbHandle,
+    RemoteCommandRequest request,
+    std::function<void(const RemoteCommandResponse&)> exhaustUtilCB,
+    const BatonHandle& baton) {
+    RemoteCommandRequestOnAny rcroa{request};
+    auto pf = makePromiseFuture<void>();
+
+    auto status = net().startExhaustCommand(
+        cbHandle,
+        rcroa,
+        [p = std::move(pf.promise), exhaustUtilCB = std::move(exhaustUtilCB)](
+            const TaskExecutor::ResponseOnAnyStatus& rs, bool isMoreToComeSet) mutable {
+            exhaustUtilCB(rs);
+
+            if (!rs.status.isOK()) {
+                invariant(!isMoreToComeSet);
+                p.setError(rs.status);
+                return;
+            }
+
+            if (!isMoreToComeSet) {
+                p.emplaceValue();
+            }
+        },
+        baton);
+
+    if (!status.isOK()) {
+        return status;
+    }
+    return std::move(pf.future);
+}
+
 RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
     RemoteCommandRequest& request) {
     auto deferred = runCommand(makeCallbackHandle(), request);

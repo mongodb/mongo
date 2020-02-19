@@ -60,7 +60,7 @@ class ClockSource {
 public:
     /**
      * A StopWatch tracks the time that its ClockSource believes has passed since the creation of
-     * the StopWatch.
+     * the StopWatch or since 'restart' has been invoked.
      *
      * For microsecond accurate metrics, use a Timer instead.
      */
@@ -87,9 +87,13 @@ public:
             return now() - _start;
         }
 
+        auto restart() {
+            _start = now();
+        }
+
     private:
         ClockSource* const _clockSource;
-        const Date_t _start;
+        Date_t _start;
     };
 
     virtual ~ClockSource() = default;

@@ -74,6 +74,10 @@ public:
                         RemoteCommandRequestOnAny& request,
                         RemoteCommandCompletionFn&& onFinish,
                         const BatonHandle& baton) override;
+    Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                               RemoteCommandRequestOnAny& request,
+                               RemoteCommandOnReplyFn&& onReply,
+                               const BatonHandle& baton) override;
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton) override;
@@ -92,22 +96,16 @@ public:
 private:
     struct RequestState;
 
-    struct CommandState final : public std::enable_shared_from_this<CommandState> {
-        CommandState(NetworkInterfaceTL* interface_,
-                     RemoteCommandRequestOnAny request_,
-                     const TaskExecutor::CallbackHandle& cbHandle_);
-        virtual ~CommandState() = default;
-
-        // Create a new CommandState in a shared_ptr
-        // Prefer this over raw construction
-        static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequestOnAny request,
-                         const TaskExecutor::CallbackHandle& cbHandle);
+    struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
+        CommandStateBase(NetworkInterfaceTL* interface_,
+                         RemoteCommandRequestOnAny request_,
+                         const TaskExecutor::CallbackHandle& cbHandle_);
+        virtual ~CommandStateBase() = default;
 
         /**
          * Use the current RequestState to send out a command request.
          */
-        virtual Future<RemoteCommandResponse> sendRequest();
+        virtual Future<RemoteCommandResponse> sendRequest() = 0;
 
         /**
          * Return the maximum number of request failures this Command can tolerate
@@ -120,6 +118,11 @@ private:
          * Set a timer to fulfill the promise with a timeout error.
          */
         virtual void setTimer();
+
+        /**
+         * Fulfill the promise with the response.
+         */
+        virtual void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) = 0;
 
         /**
          * Fulfill the promise for the Command.
@@ -150,13 +153,56 @@ private:
         std::weak_ptr<RequestState> requestStatePtr;
 
         StrongWeakFinishLine finishLine;
-        Promise<RemoteCommandOnAnyResponse> promise;
 
         boost::optional<UUID> operationKey;
     };
 
+    struct CommandState final : public CommandStateBase {
+        CommandState(NetworkInterfaceTL* interface_,
+                     RemoteCommandRequestOnAny request_,
+                     const TaskExecutor::CallbackHandle& cbHandle_);
+        ~CommandState() = default;
+
+        // Create a new CommandState in a shared_ptr
+        // Prefer this over raw construction
+        static auto make(NetworkInterfaceTL* interface,
+                         RemoteCommandRequestOnAny request,
+                         const TaskExecutor::CallbackHandle& cbHandle);
+
+        Future<RemoteCommandResponse> sendRequest() override;
+
+        void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
+
+        Promise<RemoteCommandOnAnyResponse> promise;
+    };
+
+    struct ExhaustCommandState final : public CommandStateBase {
+        ExhaustCommandState(NetworkInterfaceTL* interface_,
+                            RemoteCommandRequestOnAny request_,
+                            const TaskExecutor::CallbackHandle& cbHandle_,
+                            RemoteCommandOnReplyFn&& onReply_);
+        virtual ~ExhaustCommandState() = default;
+
+        // Create a new ExhaustCommandState in a shared_ptr
+        // Prefer this over raw construction
+        static auto make(NetworkInterfaceTL* interface,
+                         RemoteCommandRequestOnAny request,
+                         const TaskExecutor::CallbackHandle& cbHandle,
+                         RemoteCommandOnReplyFn&& onReply);
+
+        Future<RemoteCommandResponse> sendRequest() override;
+
+        void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
+
+        Promise<void> promise;
+        RemoteCommandResponse prevResponse;
+        Mutex _onReplyMutex =
+            MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_onReplyMutex");
+        RemoteCommandOnReplyFn onReplyFn;
+    };
+
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
-        RequestState(std::shared_ptr<CommandState> cmdState_)
+        RequestState(std::shared_ptr<CommandStateBase> cmdState_)
             : cmdState{std::move(cmdState_)},
               connFinishLine(cmdState->requestOnAny.target.size()) {}
         ~RequestState();
@@ -198,7 +244,7 @@ private:
             return cmdState->interface;
         }
 
-        std::shared_ptr<CommandState> cmdState;
+        std::shared_ptr<CommandStateBase> cmdState;
 
         ClockSource::StopWatch stopwatch;
 
@@ -263,7 +309,7 @@ private:
 
     Mutex _inProgressMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_inProgressMutex");
-    stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandState>> _inProgress;
+    stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandStateBase>> _inProgress;
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
         _inProgressAlarms;
 

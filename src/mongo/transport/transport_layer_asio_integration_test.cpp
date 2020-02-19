@@ -178,7 +178,7 @@ private:
 
     // called when a server sends a new isMaster exhaust response. Updates _reply and _replyUpdated.
     AsyncDBClient::RemoteCommandCallbackFn _callbackFn =
-        [&](const executor::RemoteCommandResponse& response) {
+        [&](const executor::RemoteCommandResponse& response, bool isMoreToComeSet) {
             {
                 stdx::unique_lock<Latch> lk(_mutex);
                 _reply = response;
@@ -302,6 +302,18 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
             nullptr};
     assertOK(failpointHandle->runCommandRequest(configureFailPointRequest).get());
 
+    ON_BLOCK_EXIT([&] {
+        auto stopFpRequest = executor::RemoteCommandRequest{server,
+                                                            "admin",
+                                                            BSON("configureFailPoint"
+                                                                 << "failCommand"
+                                                                 << "mode"
+                                                                 << "off"),
+                                                            BSONObj(),
+                                                            nullptr};
+        assertOK(failpointHandle->runCommandRequest(stopFpRequest).get());
+    });
+
     // Send a dummy topologyVersion because the mongod generates this and sends it to the client on
     // the initial handshake.
     auto isMasterRequest = executor::RemoteCommandRequest{
@@ -323,18 +335,6 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
         ASSERT_OK(reply.status);
         ASSERT_EQ(reply.data["ok"].Double(), 0.0);
     }
-
-    ON_BLOCK_EXIT([&] {
-        auto stopFpRequest = executor::RemoteCommandRequest{server,
-                                                            "admin",
-                                                            BSON("configureFailPoint"
-                                                                 << "failCommand"
-                                                                 << "mode"
-                                                                 << "off"),
-                                                            BSONObj(),
-                                                            nullptr};
-        assertOK(failpointHandle->runCommandRequest(stopFpRequest).get());
-    });
 }
 
 }  // namespace

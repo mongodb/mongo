@@ -56,6 +56,8 @@ public:
     using Response = RemoteCommandResponse;
     using RemoteCommandCompletionFn =
         unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
+    using RemoteCommandOnReplyFn =
+        unique_function<void(const TaskExecutor::ResponseOnAnyStatus&, bool isMoreToComeSet)>;
 
     virtual ~NetworkInterface();
 
@@ -150,6 +152,10 @@ public:
                                 RemoteCommandRequestOnAny& request,
                                 RemoteCommandCompletionFn&& onFinish,
                                 const BatonHandle& baton = nullptr) = 0;
+    virtual Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                       RemoteCommandRequestOnAny& request,
+                                       RemoteCommandOnReplyFn&& onReply,
+                                       const BatonHandle& baton = nullptr) = 0;
 
     Future<TaskExecutor::ResponseOnAnyStatus> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle,

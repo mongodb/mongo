@@ -303,10 +303,12 @@ Future<void> AsyncDBClient::_continueReceiveExhaustResponse(
             // Run callback
             auto now = exhaustParameters.clkSource->now();
             auto duration = duration_cast<Milliseconds>(now - exhaustParameters.start);
+            bool isMoreToComeSet = OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome);
             rpc::UniqueReply response = rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
-            exhaustParameters.cb(executor::RemoteCommandResponse(*response, duration));
+            exhaustParameters.cb(executor::RemoteCommandResponse(*response, duration),
+                                 isMoreToComeSet);
 
-            if (!OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome)) {
+            if (!isMoreToComeSet) {
                 return Status::OK();
             }
 

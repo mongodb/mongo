@@ -46,6 +46,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
@@ -587,6 +588,139 @@ TEST_F(NetworkInterfaceTest, IsMasterRequestMissingInternalClientInfoWhenNotInte
     auto res = deferred.get();
     ASSERT(res.elapsedMillis);
     assertNumOps(0u, 0u, 0u, 1u);
+}
+
+class ExhaustRequestHandlerUtil {
+public:
+    struct responseOutcomeCount {
+        int _success = 0;
+        int _failed = 0;
+    };
+
+    std::function<void(const RemoteCommandResponse&)>&& getExhaustRequestCallbackFn() {
+        return std::move(_callbackFn);
+    }
+
+    ExhaustRequestHandlerUtil::responseOutcomeCount getCountersWhenReady() {
+        stdx::unique_lock<Latch> lk(_mutex);
+        _cv.wait(_mutex, [&] { return _replyUpdated; });
+        _replyUpdated = false;
+        return _responseOutcomeCount;
+    }
+
+private:
+    // set to true once '_responseOutcomeCount' has been updated. Used to indicate that a new
+    // response has been sent.
+    bool _replyUpdated = false;
+
+    // counter of how many successful and failed responses were received.
+    responseOutcomeCount _responseOutcomeCount;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("ExhaustRequestHandlerUtil::_mutex");
+    stdx::condition_variable _cv;
+
+    // called when a server sends a new isMaster exhaust response. Updates _responseOutcomeCount
+    // and _replyUpdated.
+    std::function<void(const RemoteCommandResponse&)> _callbackFn =
+        [&](const executor::RemoteCommandResponse& response) {
+            {
+                stdx::unique_lock<Latch> lk(_mutex);
+                if (response.status.isOK()) {
+                    _responseOutcomeCount._success++;
+                } else {
+                    _responseOutcomeCount._failed++;
+                }
+                _replyUpdated = true;
+            }
+
+            _cv.notify_all();
+        };
+};
+
+TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldReceiveMultipleResponses) {
+    auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
+                                       << TopologyVersion(OID::max(), 0).toBSON());
+
+    auto request = makeTestCommand(boost::none, isMasterCmd);
+    auto cbh = makeCallbackHandle();
+    ExhaustRequestHandlerUtil exhaustRequestHandler;
+
+    auto exhaustFuture = startExhaustCommand(
+        cbh, std::move(request), exhaustRequestHandler.getExhaustRequestCallbackFn());
+
+    {
+        // The server sends a response either when a topology change occurs or when it has not sent
+        // a response in 'maxAwaitTimeMS'. In this case we expect a response every 'maxAwaitTimeMS'
+        // = 1000 (set in the isMaster cmd above)
+        auto counters = exhaustRequestHandler.getCountersWhenReady();
+        ASSERT(!exhaustFuture.isReady());
+
+        // The first response should be successful
+        ASSERT_EQ(counters._success, 1);
+        ASSERT_EQ(counters._failed, 0);
+    }
+
+    {
+        auto counters = exhaustRequestHandler.getCountersWhenReady();
+        ASSERT(!exhaustFuture.isReady());
+
+        // The second response should also be successful
+        ASSERT_EQ(counters._success, 2);
+        ASSERT_EQ(counters._failed, 0);
+    }
+
+    net().cancelCommand(cbh);
+    auto error = exhaustFuture.getNoThrow();
+    ASSERT((error == ErrorCodes::CallbackCanceled) || (error == ErrorCodes::HostUnreachable));
+
+    auto counters = exhaustRequestHandler.getCountersWhenReady();
+
+    // The command was cancelled so the 'fail' counter should be incremented
+    ASSERT_EQ(counters._success, 2);
+    ASSERT_EQ(counters._failed, 1);
+}
+
+TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
+    // Both assetCommandOK and makeTestCommand target the first host in the connection string, so we
+    // are guaranteed that the failpoint is set on the same host that we run the exhaust command on.
+    auto configureFailpointCmd = BSON("configureFailPoint"
+                                      << "failCommand"
+                                      << "mode"
+                                      << "alwaysOn"
+                                      << "data"
+                                      << BSON("errorCode" << ErrorCodes::CommandFailed
+                                                          << "failCommands"
+                                                          << BSON_ARRAY("isMaster")));
+    assertCommandOK("admin", configureFailpointCmd);
+
+    ON_BLOCK_EXIT([&] {
+        auto stopFpRequest = BSON("configureFailPoint"
+                                  << "failCommand"
+                                  << "mode"
+                                  << "off");
+        assertCommandOK("admin", stopFpRequest);
+    });
+
+    auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
+                                       << TopologyVersion(OID::max(), 0).toBSON());
+
+    auto request = makeTestCommand(boost::none, isMasterCmd);
+    auto cbh = makeCallbackHandle();
+    ExhaustRequestHandlerUtil exhaustRequestHandler;
+
+    auto exhaustFuture = startExhaustCommand(
+        cbh, std::move(request), exhaustRequestHandler.getExhaustRequestCallbackFn());
+
+    {
+        auto counters = exhaustRequestHandler.getCountersWhenReady();
+
+        auto error = exhaustFuture.getNoThrow();
+        ASSERT_EQ(error, ErrorCodes::CommandFailed);
+
+        // The response should be marked as failed
+        ASSERT_EQ(counters._success, 0);
+        ASSERT_EQ(counters._failed, 1);
+    }
 }
 
 }  // namespace

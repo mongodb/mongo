@@ -113,6 +113,10 @@ public:
                         RemoteCommandRequestOnAny& request,
                         RemoteCommandCompletionFn&& onFinish,
                         const BatonHandle& baton = nullptr) override;
+    Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                               RemoteCommandRequestOnAny& request,
+                               RemoteCommandOnReplyFn&& onReply,
+                               const BatonHandle& baton = nullptr) override;
 
     /**
      * If the network operation is in the _unscheduled or _processing queues, moves the operation
