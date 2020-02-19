@@ -21,7 +21,7 @@ var runTest = function(optionValue, expected) {
                      .split("\n")
                      .map(function(str) {
                          str = str.replace(/^sh[0-9]+\| /, "");
-                         if (!/^{/.test(str)) {
+                         if (!/^{.*ismaster/.test(str)) {
                              return "";
                          }
                          return str;
