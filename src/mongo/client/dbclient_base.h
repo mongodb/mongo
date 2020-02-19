@@ -510,8 +510,18 @@ public:
      */
     virtual void createIndexes(StringData ns, const std::vector<BSONObj>& specs);
 
+    /**
+     * Lists indexes on the collection 'nsOrUuid'.
+     * Includes in-progress indexes.
+     */
     virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                              int options = 0);
+
+    /**
+     * Lists completed indexes on the collection 'nsOrUuid'.
+     */
+    virtual std::list<BSONObj> getReadyIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                                  int options = 0);
 
     virtual void dropIndex(const std::string& ns, BSONObj keys);
     virtual void dropIndex(const std::string& ns, const std::string& indexName);
@@ -730,6 +740,13 @@ protected:
     std::vector<std::string> _saslMechsForAuth;
 
 private:
+    /**
+     * Implementation for getIndexes() and getReadyIndexes().
+     */
+    std::list<BSONObj> _getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                      const BSONObj& cmd,
+                                      int options);
+
     auth::RunCommandHook _makeAuthRunCommandHook();
 
     /**

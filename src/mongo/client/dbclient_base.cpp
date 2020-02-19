@@ -834,9 +834,12 @@ void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
         OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
 }
 
-list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid, int options) {
-    list<BSONObj> specs;
+namespace {
 
+/**
+ * Constructs command object for listIndexes.
+ */
+BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
     BSONObjBuilder bob;
     if (nsOrUuid.nss()) {
         bob.append("listIndexes", (*nsOrUuid.nss()).coll());
@@ -846,10 +849,37 @@ list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
         uuid.appendToBuilder(&bob, "listIndexes");
         bob.append("cursor", BSONObj());
     }
+    if (includeBuildUUIDs) {
+        bob.appendBool("includeBuildUUIDs", true);
+    }
+    return bob.obj();
+}
 
-    BSONObj cmd = bob.obj();
+}  // namespace
+
+list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid, int options) {
+    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, false), options);
+}
+
+std::list<BSONObj> DBClientBase::getReadyIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                                    int options) {
+    auto specsWithBuildUUIDs =
+        _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, true), options);
+    list<BSONObj> specs;
+    for (const auto& spec : specsWithBuildUUIDs) {
+        if (spec["buildUUID"]) {
+            continue;
+        }
+        specs.push_back(spec);
+    }
+    return specs;
+}
+
+std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                                const BSONObj& cmd,
+                                                int options) {
+    list<BSONObj> specs;
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
-
     BSONObj res;
     if (runCommand(dbName, cmd, res, options)) {
         BSONObj cursorObj = res["cursor"].Obj();
