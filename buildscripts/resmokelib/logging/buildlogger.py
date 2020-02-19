@@ -115,7 +115,11 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 
         self.endpoint = endpoint
         self.retry_buffer = []
-        self.max_size = None
+        # Set a reasonable max payload size in case we don't get a HTTP 413 from LogKeeper
+        # before timing out. This limit is intentionally slightly larger than LogKeeper's
+        # limit of 32MB so we can still receive a 413 where appropriate but won't cause
+        # side effects.
+        self.max_size = 33 * 1024 * 1024
 
     def process_record(self, record):
         """Return a tuple of the time the log record was created, and the message.
