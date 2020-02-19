@@ -59,6 +59,18 @@ using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
+namespace {
+
+// Attaches the write concern to the given batch request. If it looks like 'writeConcern' has
+// been default initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
+void attachWriteConcern(const WriteConcernOptions& writeConcern, BatchedCommandRequest* request) {
+    if (!writeConcern.wMode.empty() || writeConcern.wNumNodes > 0) {
+        request->setWriteConcern(writeConcern.toBSON());
+    }
+}
+
+}  // namespace
+
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
@@ -113,7 +125,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
         buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
     // If applicable, attach a write concern to the batched command request.
-    CommonMongodProcessInterface::attachWriteConcern(&insertCommand, wc);
+    attachWriteConcern(wc, &insertCommand);
 
     ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
@@ -134,7 +146,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
 
     // If applicable, attach a write concern to the batched command request.
-    CommonMongodProcessInterface::attachWriteConcern(&updateCommand, wc);
+    attachWriteConcern(wc, &updateCommand);
 
     ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 
@@ -157,22 +169,10 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& destinationNs,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    BSONObjBuilder newCmd;
-    newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
-    newCmd.append("from", renameCommandObj["renameCollection"].String());
-    newCmd.append("to", renameCommandObj["to"].String());
-    newCmd.append("collectionOptions", originalCollectionOptions);
-    if (!opCtx->getWriteConcern().usedDefault) {
-        newCmd.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
-    }
-    BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
-    for (auto&& index : originalIndexes) {
-        indexArrayBuilder.append(index);
-    }
-    indexArrayBuilder.done();
+    auto newCmdObj = CommonMongodProcessInterface::_convertRenameToInternalRename(
+        opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, destinationNs.db()));
-    auto newCmdObj = newCmd.obj();
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
                                              // internalRenameIfOptionsAndIndexesMatch is adminOnly.

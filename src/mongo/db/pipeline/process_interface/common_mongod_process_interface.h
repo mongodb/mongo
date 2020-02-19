@@ -114,13 +114,6 @@ public:
 
 protected:
     /**
-     * Attaches the write concern to the given batch request. If 'writeConcern' has been default
-     * initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
-     */
-    static void attachWriteConcern(BatchedCommandRequest* request,
-                                   const WriteConcernOptions& writeConcern);
-
-    /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */
     Insert buildInsertOp(const NamespaceString& nss,
@@ -148,6 +141,14 @@ protected:
     void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
                                                      bool includeIdle,
                                                      std::vector<BSONObj>* ops) const final;
+
+    /**
+     * Converts a renameCollection command into an internalRenameIfOptionsAndIndexesMatch command.
+     */
+    BSONObj _convertRenameToInternalRename(OperationContext* opCtx,
+                                           const BSONObj& renameCommandObj,
+                                           const BSONObj& originalCollectionOptions,
+                                           const std::list<BSONObj>& originalIndexes);
 
 private:
     /**

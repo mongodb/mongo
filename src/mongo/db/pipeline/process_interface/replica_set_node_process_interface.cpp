@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -79,9 +78,7 @@ Status ReplicaSetNodeProcessInterface::insert(const boost::intrusive_ptr<Express
     BatchedCommandRequest insertCommand(
         buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
-    return _executeCommandOnPrimary(
-               opCtx, ns, _buildCommandObject(opCtx, std::move(insertCommand), wc))
-        .getStatus();
+    return _executeCommandOnPrimary(opCtx, ns, std::move(insertCommand.toBSON())).getStatus();
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::update(
@@ -99,8 +96,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::
     }
 
     BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-    auto result = _executeCommandOnPrimary(
-        opCtx, ns, _buildCommandObject(opCtx, std::move(updateCommand), wc));
+    auto result = _executeCommandOnPrimary(opCtx, ns, std::move(updateCommand.toBSON()));
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -112,91 +108,64 @@ StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::
     return UpdateResult{response.getN(), response.getNModified()};
 }
 
-std::list<BSONObj> ReplicaSetNodeProcessInterface::getIndexSpecs(OperationContext* opCtx,
-                                                                 const NamespaceString& ns,
-                                                                 bool includeBuildUUIDs) {
-    return listIndexesEmptyListIfMissing(opCtx, ns, includeBuildUUIDs);
-}
-
 void ReplicaSetNodeProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
-    AutoGetCollection autoColl(opCtx, ns, MODE_X);
-    writeConflictRetry(
-        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
-            uassert(ErrorCodes::DatabaseDropPending,
-                    str::stream() << "The database is in the process of being dropped " << ns.db(),
-                    autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
-
-            auto collection = autoColl.getCollection();
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Failed to create indexes for aggregation because collection "
-                                     "does not exist: "
-                                  << ns << ": " << BSON("indexes" << indexSpecs),
-                    collection);
-
-            invariant(0U == collection->numRecords(opCtx),
-                      str::stream() << "Expected empty collection for index creation: " << ns
-                                    << ": numRecords: " << collection->numRecords(opCtx) << ": "
-                                    << BSON("indexes" << indexSpecs));
-
-            // Secondary index builds do not filter existing indexes so we have to do this on the
-            // primary.
-            auto removeIndexBuildsToo = false;
-            auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
-                opCtx, indexSpecs, removeIndexBuildsToo);
-            if (filteredIndexes.empty()) {
-                return;
-            }
-
-            WriteUnitOfWork wuow(opCtx);
-            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection->uuid(), filteredIndexes, false  // fromMigrate
-            );
-            wuow.commit();
-        });
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::createIndexesOnEmptyCollection(
+            opCtx, ns, indexSpecs);
+    }
+    BSONObjBuilder cmd;
+    cmd.append("createIndexes", ns.coll());
+    cmd.append("indexes", indexSpecs);
+    uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
+
 void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const BSONObj& renameCommandObj,
     const NamespaceString& targetNs,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    NamespaceString sourceNs = NamespaceString(renameCommandObj["renameCollection"].String());
-    doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
-                                                   sourceNs,
-                                                   targetNs,
-                                                   renameCommandObj["dropTarget"].trueValue(),
-                                                   renameCommandObj["stayTemp"].trueValue(),
-                                                   originalIndexes,
-                                                   originalCollectionOptions);
+    if (_canWriteLocally(opCtx, targetNs)) {
+        return NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
+            opCtx, renameCommandObj, targetNs, originalCollectionOptions, originalIndexes);
+    }
+    // internalRenameIfOptionsAndIndexesMatch can only be run against the admin DB.
+    NamespaceString adminNs{NamespaceString::kAdminDb};
+    auto cmd = CommonMongodProcessInterface::_convertRenameToInternalRename(
+        opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
+    uassertStatusOK(_executeCommandOnPrimary(opCtx, adminNs, cmd));
 }
 
 void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
                                                       const std::string& dbName,
                                                       const BSONObj& cmdObj) {
-    uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
+    NamespaceString dbNs{dbName};
+    if (_canWriteLocally(opCtx, dbNs)) {
+        return NonShardServerProcessInterface::createCollection(opCtx, dbName, cmdObj);
+    }
+    auto ns = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+    uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmdObj));
 }
 
 void ReplicaSetNodeProcessInterface::dropCollection(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
-    uassertStatusOK(mongo::dropCollectionForApplyOps(
-        opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-}
-
-std::unique_ptr<Pipeline, PipelineDeleter>
-ReplicaSetNodeProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::dropCollection(opCtx, ns);
+    }
+    BSONObjBuilder cmd;
+    cmd.append("drop", ns.coll());
+    uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
 
 StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     OperationContext* opCtx, const NamespaceString& ns, const BSONObj& cmdObj) const {
+    BSONObjBuilder cmd(cmdObj);
+    _attachGenericCommandArgs(opCtx, &cmd);
     executor::RemoteCommandRequest request(
         repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort(),
         ns.db().toString(),
-        cmdObj,
+        cmd.obj(),
         opCtx);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
@@ -238,13 +207,12 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     return rcr.response.data;
 }
 
-BSONObj ReplicaSetNodeProcessInterface::_buildCommandObject(OperationContext* opCtx,
-                                                            BatchedCommandRequest bcr,
-                                                            const WriteConcernOptions& wc) const {
-    CommonMongodProcessInterface::attachWriteConcern(&bcr, wc);
-    BSONObjBuilder cmdObjBuilder;
-    bcr.serialize(&cmdObjBuilder);
-    return cmdObjBuilder.obj();
+void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext* opCtx,
+                                                               BSONObjBuilder* cmd) const {
+    auto writeConcern = opCtx->getWriteConcern();
+    if (!writeConcern.usedDefault) {
+        cmd->append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+    }
 }
 
 bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,

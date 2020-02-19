@@ -35,7 +35,6 @@ env.Library(
         'common_mongod_process_interface.cpp',
         'non_shardsvr_process_interface.cpp',
         'replica_set_node_process_interface.cpp',
-        'standalone_process_interface.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',

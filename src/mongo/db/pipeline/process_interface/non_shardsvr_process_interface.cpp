@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -40,6 +41,20 @@
 #include "mongo/db/index_builds_coordinator.h"
 
 namespace mongo {
+
+std::unique_ptr<Pipeline, PipelineDeleter>
+NonShardServerProcessInterface::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+}
+
+std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
+                                                                 const NamespaceString& ns,
+                                                                 bool includeBuildUUIDs) {
+    return listIndexesEmptyListIfMissing(opCtx, ns, includeBuildUUIDs);
+}
 
 std::pair<std::vector<FieldPath>, bool>
 NonShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(
@@ -93,4 +108,68 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
     return updateResult;
 }
 
+void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
+    OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
+    AutoGetCollection autoColl(opCtx, ns, MODE_X);
+    writeConflictRetry(
+        opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
+            uassert(ErrorCodes::DatabaseDropPending,
+                    str::stream() << "The database is in the process of being dropped " << ns.db(),
+                    autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
+
+            auto collection = autoColl.getCollection();
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Failed to create indexes for aggregation because collection "
+                                     "does not exist: "
+                                  << ns << ": " << BSON("indexes" << indexSpecs),
+                    collection);
+
+            invariant(0U == collection->numRecords(opCtx),
+                      str::stream() << "Expected empty collection for index creation: " << ns
+                                    << ": numRecords: " << collection->numRecords(opCtx) << ": "
+                                    << BSON("indexes" << indexSpecs));
+
+            // Secondary index builds do not filter existing indexes so we have to do this on the
+            // primary.
+            auto removeIndexBuildsToo = false;
+            auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
+                opCtx, indexSpecs, removeIndexBuildsToo);
+            if (filteredIndexes.empty()) {
+                return;
+            }
+
+            WriteUnitOfWork wuow(opCtx);
+            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                opCtx, collection->uuid(), filteredIndexes, false  // fromMigrate
+            );
+            wuow.commit();
+        });
+}
+void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
+    OperationContext* opCtx,
+    const BSONObj& renameCommandObj,
+    const NamespaceString& targetNs,
+    const BSONObj& originalCollectionOptions,
+    const std::list<BSONObj>& originalIndexes) {
+    NamespaceString sourceNs = NamespaceString(renameCommandObj["renameCollection"].String());
+    doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
+                                                   sourceNs,
+                                                   targetNs,
+                                                   renameCommandObj["dropTarget"].trueValue(),
+                                                   renameCommandObj["stayTemp"].trueValue(),
+                                                   originalIndexes,
+                                                   originalCollectionOptions);
+}
+
+void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,
+                                                      const std::string& dbName,
+                                                      const BSONObj& cmdObj) {
+    uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
+}
+
+void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,
+                                                    const NamespaceString& ns) {
+    uassertStatusOK(mongo::dropCollectionForApplyOps(
+        opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+}
 }  // namespace mongo

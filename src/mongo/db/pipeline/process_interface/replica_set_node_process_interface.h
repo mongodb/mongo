@@ -71,9 +71,6 @@ public:
                                     bool multi,
                                     boost::optional<OID> targetEpoch) override;
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs);
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                  const BSONObj& renameCommandObj,
                                                  const NamespaceString& targetNs,
@@ -86,10 +83,6 @@ public:
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs);
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) override;
 
 private:
     /**
@@ -102,12 +95,9 @@ private:
                                                  const BSONObj& cmdObj) const;
 
     /**
-     * Attaches the given write concern to the command and returns the serialized BSONObj
-     * representation of the command.
+     * Attaches command arguments such as writeConcern to 'cmd'.
      */
-    BSONObj _buildCommandObject(OperationContext* opCtx,
-                                BatchedCommandRequest bcr,
-                                const WriteConcernOptions& wc) const;
+    void _attachGenericCommandArgs(OperationContext* opCtx, BSONObjBuilder* cmd) const;
 
     /**
      * Returns whether we are the primary and can therefore perform writes locally. Result may be

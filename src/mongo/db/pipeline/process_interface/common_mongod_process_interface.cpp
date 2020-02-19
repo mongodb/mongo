@@ -617,11 +617,26 @@ Update CommonMongodProcessInterface::buildUpdateOp(
     return updateOp;
 }
 
-void CommonMongodProcessInterface::attachWriteConcern(BatchedCommandRequest* request,
-                                                      const WriteConcernOptions& writeConcern) {
-    if (!writeConcern.usedDefault) {
-        request->setWriteConcern(writeConcern.toBSON());
+BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
+    OperationContext* opCtx,
+    const BSONObj& renameCommandObj,
+    const BSONObj& originalCollectionOptions,
+    const std::list<BSONObj>& originalIndexes) {
+
+    BSONObjBuilder newCmd;
+    newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
+    newCmd.append("from", renameCommandObj["renameCollection"].String());
+    newCmd.append("to", renameCommandObj["to"].String());
+    newCmd.append("collectionOptions", originalCollectionOptions);
+    if (!opCtx->getWriteConcern().usedDefault) {
+        newCmd.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
     }
+    BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
+    for (auto&& index : originalIndexes) {
+        indexArrayBuilder.append(index);
+    }
+    indexArrayBuilder.done();
+    return newCmd.obj();
 }
 
 }  // namespace mongo

@@ -213,9 +213,6 @@ function runTest() {
     assert.commandFailedWithCode(mapReduce({level: 'linearizable'}, secondaryTestDB),
                                  ErrorCodes.InvalidOptions);
 
-    jsTestLog("Test mapReduce that writes is not allowed to run on secondaries.");
-    assert.commandFailedWithCode(mapReduce({}, secondaryTestDB, "outColl"), [ErrorCodes.NotMaster]);
-
     jsTestLog("Test mapReduce on secondary doesn't block on a prepared transaction.");
     assert.commandWorked(mapReduce({}, secondaryTestDB));
 

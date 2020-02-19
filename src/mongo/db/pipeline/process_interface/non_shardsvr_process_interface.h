@@ -43,11 +43,18 @@ namespace mongo {
  */
 class NonShardServerProcessInterface : public CommonMongodProcessInterface {
 public:
-    using CommonMongodProcessInterface::CommonMongodProcessInterface;
-
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
         return false;
     }
+
+    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     bool includeBuildUUIDs) override;
+
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool allowTargetingShards) override;
 
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
@@ -85,6 +92,30 @@ public:
                                     UpsertType upsert,
                                     bool multi,
                                     boost::optional<OID> targetEpoch) override;
+
+    void renameIfOptionsAndIndexesHaveNotChanged(
+        OperationContext* opCtx,
+        const BSONObj& renameCommandObj,
+        const NamespaceString& targetNs,
+        const BSONObj& originalCollectionOptions,
+        const std::list<BSONObj>& originalIndexes) override;
+
+    void createCollection(OperationContext* opCtx,
+                          const std::string& dbName,
+                          const BSONObj& cmdObj) override;
+
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
+
+    void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const std::vector<BSONObj>& indexSpecs) override;
+
+protected:
+    // This constructor is marked as protected in order to prevent instantiation since this
+    // interface is designed to have a concrete process interface for each possible
+    // configuration of a mongod.
+    NonShardServerProcessInterface(std::shared_ptr<executor::TaskExecutor> exec)
+        : CommonMongodProcessInterface(std::move(exec)) {}
 };
 
 }  // namespace mongo

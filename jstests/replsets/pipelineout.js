@@ -16,16 +16,6 @@ for (i = 0; i < 5; i++) {
 }
 replTest.awaitReplication();
 
-// make sure $out cannot be run on a secondary
-assert.throws(function() {
-    secondary.coll.aggregate({$out: "out"}).itcount();
-});
-// even if slaveOk
-secondary.setSlaveOk();
-assert.throws(function() {
-    secondary.coll.aggregate({$out: "out"}).itcount();
-});
-
 // run one and check for proper replication
 primary.coll.aggregate({$out: "out"}).itcount();
 replTest.awaitReplication();

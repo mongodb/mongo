@@ -29,41 +29,19 @@
 
 #pragma once
 
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
 namespace mongo {
 
 /**
- * Class to provide access to standalone specific implementations of methods required by some
- * document sources.
+ * Process interface intended to be used for mongod servers configured as standalones.
  */
 class StandaloneProcessInterface : public NonShardServerProcessInterface {
 public:
-    using NonShardServerProcessInterface::NonShardServerProcessInterface;
+    StandaloneProcessInterface(std::shared_ptr<executor::TaskExecutor> exec)
+        : NonShardServerProcessInterface(std::move(exec)) {}
 
     virtual ~StandaloneProcessInterface() = default;
-
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs);
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const BSONObj& renameCommandObj,
-                                                 const NamespaceString& targetNs,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes);
-    void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const BSONObj& cmdObj);
-    void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
-    void createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                        const NamespaceString& ns,
-                                        const std::vector<BSONObj>& indexSpecs);
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) override;
 };
 
 }  // namespace mongo
