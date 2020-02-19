@@ -21,12 +21,12 @@ build-stamp: configure-stamp
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
 	# scons
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
-	echo -n > debian/mongodb-enterprise-tools.manpages
+	echo -n > debian/mongodb-enterprise-database-tools-extra.manpages
 	for binary in ${TOOLS} ; \
 	do \
 		if [ -e debian/$$binary.1 ] ; \
 		then \
-			echo debian/$$binary.1 >> debian/mongodb-enterprise-tools.manpages ; \
+			echo debian/$$binary.1 >> debian/mongodb-enterprise-database-tools-extra.manpages ; \
 		fi ; \
 	done
 
@@ -51,7 +51,7 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-shell
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-server
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-mongos
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-tools
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-database-tools-extra
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-cryptd
 	rm -f config.log
 	rm -f mongo
@@ -80,17 +80,17 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/bin
 	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/etc
@@ -99,12 +99,12 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-cryptd/usr/share/lintian/overrides/
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/mongodb-enterprise-shell
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/mongodb-enterprise-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/mongodb-enterprise-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/mongodb-enterprise-tools
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/share/lintian/overrides/mongodb-enterprise-database-tools-extra
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-cryptd/usr/share/lintian/overrides/mongodb-enterprise-cryptd
 
 # Build architecture-independent files here.

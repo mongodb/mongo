@@ -21,10 +21,10 @@ build-stamp: configure-stamp
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 	# scons 
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
-	echo -n > debian/mongodb-org-tools.manpages
+	echo -n > debian/mongodb-org-database-tools-extra.manpages
 	for binary in ${TOOLS} ; \
 	do \
-	  echo debian/$$binary.1 >> debian/mongodb-org-tools.manpages ; \
+	  echo debian/$$binary.1 >> debian/mongodb-org-database-tools-extra.manpages ; \
 	done
 
 	echo debian/mongo.1 > debian/mongodb-org-shell.manpages
@@ -48,7 +48,7 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-org-shell
 	rm -rf $(CURDIR)/debian/mongodb-org-server
 	rm -rf $(CURDIR)/debian/mongodb-org-mongos
-	rm -rf $(CURDIR)/debian/mongodb-org-tools
+	rm -rf $(CURDIR)/debian/mongodb-org-database-tools-extra
 	rm -f config.log
 	rm -f mongo
 	rm -f mongod
@@ -75,15 +75,15 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-shell/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-org-tools/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-tools/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/etc
@@ -92,11 +92,11 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-org-tools/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-org-database-tools-extra/usr/share/lintian/overrides/
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-shell/usr/share/lintian/overrides/mongodb-org-shell
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-server/usr/share/lintian/overrides/mongodb-org-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-mongos/usr/share/lintian/overrides/mongodb-org-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-tools/usr/share/lintian/overrides/mongodb-org-tools
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-database-tools-extra/usr/share/lintian/overrides/mongodb-org-database-tools-extra
 
 # Build architecture-independent files here.
 binary-indep: build install

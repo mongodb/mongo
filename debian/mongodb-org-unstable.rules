@@ -22,10 +22,10 @@ build-stamp: configure-stamp
 	# scons 
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
 
-	echo -n > debian/mongodb-org-unstable-tools.manpages
+	echo -n > debian/mongodb-org-unstable-database-tools-extra.manpages
 	for binary in ${TOOLS} ; \
 	do \
-	  echo debian/$$binary.1 >> debian/mongodb-org-unstable-tools.manpages ; \
+	  echo debian/$$binary.1 >> debian/mongodb-org-unstable-database-tools-extra.manpages ; \
 	done
 
 	echo debian/mongo.1 > debian/mongodb-org-unstable-shell.manpages
@@ -49,7 +49,7 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-org-unstable-shell
 	rm -rf $(CURDIR)/debian/mongodb-org-unstable-server
 	rm -rf $(CURDIR)/debian/mongodb-org-unstable-mongos
-	rm -rf $(CURDIR)/debian/mongodb-org-unstable-tools
+	rm -rf $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra
 	rm -f config.log
 	rm -f mongo
 	rm -f mongod
@@ -76,15 +76,15 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/etc
@@ -93,11 +93,11 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-tools/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/share/lintian/overrides/
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-shell/usr/share/lintian/overrides/mongodb-org-unstable-shell
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/mongodb-org-unstable-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-mongos/usr/share/lintian/overrides/mongodb-org-unstable-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-tools/usr/share/lintian/overrides/mongodb-org-unstable-tools
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/share/lintian/overrides/mongodb-org-unstable-database-tools-extra
 
 # Build architecture-independent files here.
 binary-indep: build install
