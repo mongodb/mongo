@@ -166,9 +166,9 @@ private:
      *
      * requiredRBID is reset to empty after the first call.
      */
-    Status _enqueueDocuments(NewOplogFetcher::Documents::const_iterator begin,
-                             NewOplogFetcher::Documents::const_iterator end,
-                             const NewOplogFetcher::DocumentsInfo& info);
+    Status _enqueueDocuments(OplogFetcher::Documents::const_iterator begin,
+                             OplogFetcher::Documents::const_iterator end,
+                             const OplogFetcher::DocumentsInfo& info);
 
     /**
      * Executes a rollback.
@@ -262,7 +262,7 @@ private:
     std::unique_ptr<SyncSourceResolver> _syncSourceResolver;  // (M)
 
     // Current oplog fetcher tailing the oplog on the sync source.
-    std::unique_ptr<NewOplogFetcher> _oplogFetcher;
+    std::unique_ptr<OplogFetcher> _oplogFetcher;
 
     // Current rollback process. If this component is active, we are currently reverting local
     // operations in the local oplog in order to bring this server to a consistent state relative

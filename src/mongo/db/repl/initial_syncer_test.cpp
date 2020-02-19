@@ -432,16 +432,16 @@ protected:
                    OpTime lastFetched,
                    HostAndPort source,
                    ReplSetConfig config,
-                   std::unique_ptr<NewOplogFetcher::OplogFetcherRestartDecision>
+                   std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision>
                        oplogFetcherRestartDecision,
                    int requiredRBID,
                    bool requireFresherSyncSource,
                    DataReplicatorExternalState* dataReplicatorExternalState,
-                   NewOplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-                   NewOplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+                   OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+                   OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
                    const int batchSize,
-                   NewOplogFetcher::StartingPoint startingPoint) {
-                    return std::unique_ptr<NewOplogFetcher>(
+                   OplogFetcher::StartingPoint startingPoint) {
+                    return std::unique_ptr<OplogFetcher>(
                         new OplogFetcherMock(executor,
                                              lastFetched,
                                              source,

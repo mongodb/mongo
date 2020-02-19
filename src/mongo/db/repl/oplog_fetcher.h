@@ -38,7 +38,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/abstract_oplog_fetcher.h"
+#include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/fail_point.h"
@@ -47,165 +47,6 @@ namespace mongo {
 namespace repl {
 
 extern FailPoint stopReplProducer;
-
-/**
- * The oplog fetcher, once started, reads operations from a remote oplog using a tailable cursor.
- *
- * The initial find command is generated from last fetched optime and may contain the current term
- * depending on the replica set config provided.
- *
- * Forwards metadata in each find/getMore response to the data replicator external state.
- *
- * Performs additional validation on first batch of operations returned from the query to ensure we
- * are able to continue from our last known fetched operation.
- *
- * Validates each batch of operations.
- *
- * Pushes operations from each batch of operations onto a buffer using the "enqueueDocumentsFn"
- * function.
- *
- * Issues a getMore command after successfully processing each batch of operations.
- *
- * When there is an error or when it is not possible to issue another getMore request, calls
- * "onShutdownCallbackFn" to signal the end of processing.
- *
- * This class subclasses AbstractOplogFetcher which takes care of scheduling the Fetcher and
- * `getMore` commands, and handles restarting on errors.
- */
-class OplogFetcher : public AbstractOplogFetcher {
-    OplogFetcher(const OplogFetcher&) = delete;
-    OplogFetcher& operator=(const OplogFetcher&) = delete;
-
-public:
-    static Seconds kDefaultProtocolZeroAwaitDataTimeout;
-
-    /**
-     * Statistics on current batch of operations returned by the fetcher.
-     */
-    struct DocumentsInfo {
-        size_t networkDocumentCount = 0;
-        size_t networkDocumentBytes = 0;
-        size_t toApplyDocumentCount = 0;
-        size_t toApplyDocumentBytes = 0;
-        OpTime lastDocument = OpTime();
-    };
-
-    /**
-     * An enum that indicates if we want to skip the first document during oplog fetching or not.
-     * Currently, the only time we don't want to skip the first document is during initial sync
-     * if the sync source has a valid oldest active transaction optime, as we need to include
-     * the corresponding oplog entry when applying.
-     */
-    enum class StartingPoint { kSkipFirstDoc, kEnqueueFirstDoc };
-
-    /**
-     * Type of function that accepts a pair of iterators into a range of operations
-     * within the current batch of results and copies the operations into
-     * a buffer to be consumed by the next stage of the replication process.
-     *
-     * Additional information on the operations is provided in a DocumentsInfo
-     * struct.
-     */
-    using EnqueueDocumentsFn = std::function<Status(Fetcher::Documents::const_iterator begin,
-                                                    Fetcher::Documents::const_iterator end,
-                                                    const DocumentsInfo& info)>;
-
-    /**
-     * Validates documents in current batch of results returned from tailing the remote oplog.
-     * 'first' should be set to true if this set of documents is the first batch returned from the
-     * query.
-     * On success, returns statistics on operations.
-     */
-    static StatusWith<DocumentsInfo> validateDocuments(
-        const Fetcher::Documents& documents,
-        bool first,
-        Timestamp lastTS,
-        StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
-
-    /**
-     * Invariants if validation fails on any of the provided arguments.
-     */
-    OplogFetcher(executor::TaskExecutor* executor,
-                 OpTime lastFetched,
-                 HostAndPort source,
-                 NamespaceString nss,
-                 ReplSetConfig config,
-                 std::size_t maxFetcherRestarts,
-                 int requiredRBID,
-                 bool requireFresherSyncSource,
-                 DataReplicatorExternalState* dataReplicatorExternalState,
-                 EnqueueDocumentsFn enqueueDocumentsFn,
-                 OnShutdownCallbackFn onShutdownCallbackFn,
-                 const int batchSize,
-                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
-
-    OplogFetcher(executor::TaskExecutor* executor,
-                 OpTime lastFetched,
-                 HostAndPort source,
-                 NamespaceString nss,
-                 ReplSetConfig config,
-                 std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-                 int requiredRBID,
-                 bool requireFresherSyncSource,
-                 DataReplicatorExternalState* dataReplicatorExternalState,
-                 EnqueueDocumentsFn enqueueDocumentsFn,
-                 OnShutdownCallbackFn onShutdownCallbackFn,
-                 const int batchSize,
-                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
-
-    virtual ~OplogFetcher();
-
-    // ================== Test support API ===================
-
-    /**
-     * Returns metadata object sent in remote commands.
-     */
-    BSONObj getMetadataObject_forTest() const;
-
-    /**
-     * Returns timeout for remote commands to complete.
-     */
-    Milliseconds getRemoteCommandTimeout_forTest() const;
-
-    /**
-     * Returns the await data timeout used for the "maxTimeMS" field in getMore command requests.
-     */
-    Milliseconds getAwaitDataTimeout_forTest() const;
-
-private:
-    BSONObj _makeFindCommandObject(const NamespaceString& nss,
-                                   OpTime lastOpTimeFetched,
-                                   Milliseconds findMaxTime) const override;
-
-    BSONObj _makeMetadataObject() const override;
-
-    Milliseconds _getGetMoreMaxTime() const override;
-
-    /**
-     * This function is run by the AbstractOplogFetcher on a successful batch of oplog entries.
-     */
-    StatusWith<BSONObj> _onSuccessfulBatch(const Fetcher::QueryResponse& queryResponse) override;
-
-    // The metadata object sent with the Fetcher queries.
-    const BSONObj _metadataObject;
-
-    // Rollback ID that the sync source is required to have after the first batch.
-    int _requiredRBID;
-
-    // A boolean indicating whether we should error if the sync source is not ahead of our initial
-    // last fetched OpTime on the first batch. Most of the time this should be set to true,
-    // but there are certain special cases, namely during initial sync, where it's acceptable for
-    // our sync source to have no ops newer than _lastFetched.
-    bool _requireFresherSyncSource;
-
-    DataReplicatorExternalState* const _dataReplicatorExternalState;
-    const EnqueueDocumentsFn _enqueueDocumentsFn;
-    const Milliseconds _awaitDataTimeout;
-    const int _batchSize;
-
-    // Indicates if we want to skip the first document during oplog fetching or not.
-    StartingPoint _startingPoint;
-};
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable,
@@ -231,47 +72,10 @@ private:
  * "onShutdownCallbackFn" to signal the end of processing.
  *
  * An oplog fetcher is an abstract async component, which takes care of startup and shutdown logic.
- *
- * TODO SERVER-45574: edit or remove this flowchart when the NewOplogFetcher is implemented.
- *
- * NewOplogFetcher flowchart:
- *
- *             _runQuery()
- *                  |
- *                  |
- *                  +---------+
- *                            |
- *                            |
- *                            V
- *                    _createNewCursor()
- *                            |
- *                            |
- *                            +<--------------------------+
- *                            |                           ^
- *                            |                           |
- *                      _getNextBatch()                   |
- *                        |       |                       |
- *                        |       |                       |
- *  (unsuccessful batch   |       | (successful batch)    |
- *       or error)        |       |                       |
- *                        |       V                       |
- *                        |  _onSuccessfulBatch()         |
- *                        |       |                       |
- *                        |       |                       |
- *                        |       |                       |
- *                        V       |                       |
- *            _createNewCursor()  |                       |
- *                        |       |                       |
- *                        |       |                       |
- *                        +---V---+                       |
- *                            |                           |
- *                            |                           |
- *                            +-------------------------->+
- *
  */
-class NewOplogFetcher : public AbstractAsyncComponent {
-    NewOplogFetcher(const OplogFetcher&) = delete;
-    NewOplogFetcher& operator=(const OplogFetcher&) = delete;
+class OplogFetcher : public AbstractAsyncComponent {
+    OplogFetcher(const OplogFetcher&) = delete;
+    OplogFetcher& operator=(const OplogFetcher&) = delete;
 
 public:
     /**
@@ -330,27 +134,25 @@ public:
          * Defines which situations the oplog fetcher will restart after encountering an error.
          * Called when getting the next batch failed for some reason.
          */
-        virtual bool shouldContinue(NewOplogFetcher* fetcher, Status status) = 0;
+        virtual bool shouldContinue(OplogFetcher* fetcher, Status status) = 0;
 
         /**
          * Called when a batch was successfully fetched to reset any state needed to track restarts.
          */
-        virtual void fetchSuccessful(NewOplogFetcher* fetcher) = 0;
+        virtual void fetchSuccessful(OplogFetcher* fetcher) = 0;
     };
 
     class OplogFetcherRestartDecisionDefault : public OplogFetcherRestartDecision {
     public:
         OplogFetcherRestartDecisionDefault(std::size_t maxRestarts) : _maxRestarts(maxRestarts){};
 
-        bool shouldContinue(NewOplogFetcher* fetcher, Status status) final;
+        bool shouldContinue(OplogFetcher* fetcher, Status status) final;
 
-        void fetchSuccessful(NewOplogFetcher* fetcher) final;
+        void fetchSuccessful(OplogFetcher* fetcher) final;
 
         ~OplogFetcherRestartDecisionDefault(){};
 
     private:
-        NewOplogFetcher* _newOplogFetcher;
-
         // Restarts since the last successful oplog query response.
         std::size_t _numRestarts = 0;
 
@@ -360,20 +162,20 @@ public:
     /**
      * Invariants if validation fails on any of the provided arguments.
      */
-    NewOplogFetcher(executor::TaskExecutor* executor,
-                    OpTime lastFetched,
-                    HostAndPort source,
-                    ReplSetConfig config,
-                    std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-                    int requiredRBID,
-                    bool requireFresherSyncSource,
-                    DataReplicatorExternalState* dataReplicatorExternalState,
-                    EnqueueDocumentsFn enqueueDocumentsFn,
-                    OnShutdownCallbackFn onShutdownCallbackFn,
-                    const int batchSize,
-                    StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
+    OplogFetcher(executor::TaskExecutor* executor,
+                 OpTime lastFetched,
+                 HostAndPort source,
+                 ReplSetConfig config,
+                 std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+                 int requiredRBID,
+                 bool requireFresherSyncSource,
+                 DataReplicatorExternalState* dataReplicatorExternalState,
+                 EnqueueDocumentsFn enqueueDocumentsFn,
+                 OnShutdownCallbackFn onShutdownCallbackFn,
+                 const int batchSize,
+                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
 
-    virtual ~NewOplogFetcher();
+    virtual ~OplogFetcher();
 
     /**
      * Validates documents in current batch of results returned from tailing the remote oplog.

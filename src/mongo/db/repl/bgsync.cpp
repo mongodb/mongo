@@ -487,7 +487,7 @@ void BackgroundSync::_produce() {
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
         _replCoord, _replicationCoordinatorExternalState, this);
-    NewOplogFetcher* oplogFetcher;
+    OplogFetcher* oplogFetcher;
     try {
         auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
             fetcherReturnStatus = status;
@@ -496,12 +496,12 @@ void BackgroundSync::_produce() {
         // replication coordinator.
         auto numRestarts =
             _replicationCoordinatorExternalState->getOplogFetcherSteadyStateMaxFetcherRestarts();
-        auto oplogFetcherPtr = std::make_unique<NewOplogFetcher>(
+        auto oplogFetcherPtr = std::make_unique<OplogFetcher>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             lastOpTimeFetched,
             source,
             _replCoord->getConfig(),
-            std::make_unique<NewOplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
+            std::make_unique<OplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
             syncSourceResp.rbid,
             true /* requireFresherSyncSource */,
             &dataReplicatorExternalState,
@@ -589,9 +589,9 @@ void BackgroundSync::_produce() {
     }
 }
 
-Status BackgroundSync::_enqueueDocuments(NewOplogFetcher::Documents::const_iterator begin,
-                                         NewOplogFetcher::Documents::const_iterator end,
-                                         const NewOplogFetcher::DocumentsInfo& info) {
+Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator begin,
+                                         OplogFetcher::Documents::const_iterator end,
+                                         const OplogFetcher::DocumentsInfo& info) {
     // If this is the first batch of operations returned from the query, "toApplyDocumentCount" will
     // be one fewer than "networkDocumentCount" because the first document (which was applied
     // previously) is skipped.

@@ -77,8 +77,7 @@ server_parameters:
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
 
-    # TODO SERVER-45574: change to oplog_fetcher.cpp
-    # From abstract_oplog_fetcher.cpp
+    # From oplog_fetcher.cpp
     oplogInitialFindMaxSeconds:
         description: >-
             Number of seconds for the `maxTimeMS` on the initial `find` command.
@@ -181,7 +180,7 @@ server_parameters:
     # From collection_bulk_loader_impl.cpp
     collectionBulkLoaderBatchSizeInBytes:
         description: >-
-            Limit for the number of bytes of data inserted per storage transaction 
+            Limit for the number of bytes of data inserted per storage transaction
             (WriteUnitOfWork) by collectionBulkLoader during initial sync collection cloning
         set_at: startup
         cpp_vartype: int

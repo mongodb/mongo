@@ -33,7 +33,7 @@
 
 namespace mongo {
 namespace repl {
-class OplogFetcherMock : public NewOplogFetcher {
+class OplogFetcherMock : public OplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,
