@@ -17,7 +17,6 @@ selector:
   - jstests/noPassthrough/index_stepdown_unique.js
   - jstests/noPassthrough/loglong.js
   - jstests/noPassthrough/hybrid_index_with_updates.js
-  - jstests/noPassthrough/hybrid_unique_index_with_updates.js
 
 # noPassthrough tests start their own mongod's.
 executor:

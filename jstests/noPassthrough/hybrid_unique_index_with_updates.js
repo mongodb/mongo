@@ -8,6 +8,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/logv2_helpers.js");
+
 let replSetTest = new ReplSetTest({name: "hybrid_updates", nodes: 2});
 replSetTest.startSet();
 replSetTest.initiate();
@@ -18,14 +20,18 @@ let testDB = conn.getDB('test');
 // Enables a failpoint, runs 'hitFailpointFunc' to hit the failpoint, then runs
 // 'duringFailpointFunc' while the failpoint is active.
 let doDuringFailpoint = function(
-    failPointName, logMessage, hitFailpointFunc, duringFailpointFunc, i) {
+    failPointName, logMessage, structuredLogMessage, hitFailpointFunc, duringFailpointFunc, i) {
     clearRawMongoProgramOutput();
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn", data: {"i": i}}));
 
     hitFailpointFunc();
 
-    assert.soon(() => rawMongoProgramOutput().indexOf(logMessage) >= 0);
+    if (isJsonLogNoConn()) {
+        assert.soon(() => rawMongoProgramOutput().search(structuredLogMessage));
+    } else {
+        assert.soon(() => rawMongoProgramOutput().indexOf(logMessage) >= 0);
+    }
 
     duringFailpointFunc();
 
@@ -119,6 +125,7 @@ let runTest = function(config) {
         case 0:
             doDuringFailpoint("hangBeforeIndexBuildOf",
                               "Hanging before index build of i=" + stopKey,
+                              new RegExp("\"id\":20386.*\"where\":\"before\",\"i\":" + stopKey),
                               buildIndex,
                               doOperation,
                               stopKey);
@@ -127,6 +134,7 @@ let runTest = function(config) {
         case 1:
             doDuringFailpoint("hangAfterIndexBuildOf",
                               "Hanging after index build of i=" + stopKey,
+                              new RegExp("\"id\":20386.*\"where\":\"after\",\"i\":" + stopKey),
                               buildIndex,
                               doOperation,
                               stopKey);
@@ -136,6 +144,7 @@ let runTest = function(config) {
         case 2:
             doDuringFailpoint("hangAfterIndexBuildDumpsInsertsFromBulk",
                               "Hanging after dumping inserts from bulk builder",
+                              new RegExp("\"id\":20665"),
                               buildIndex,
                               doOperation);
             break;
@@ -143,6 +152,7 @@ let runTest = function(config) {
         case 3:
             doDuringFailpoint("hangAfterIndexBuildFirstDrain",
                               "Hanging after index build first drain",
+                              new RegExp("\"id\":20666"),
                               buildIndex,
                               doOperation);
             break;
@@ -150,6 +160,7 @@ let runTest = function(config) {
         case 4:
             doDuringFailpoint("hangAfterIndexBuildSecondDrain",
                               "Hanging after index build second drain",
+                              new RegExp("\"id\":20667"),
                               buildIndex,
                               doOperation);
             break;
