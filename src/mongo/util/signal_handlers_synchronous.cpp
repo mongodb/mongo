@@ -183,8 +183,8 @@ void writeMallocFreeStreamToLog() {
 // must hold MallocFreeOStreamGuard to call
 void printSignalAndBacktrace(int signalNum) {
     mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\n";
-    printStackTrace(mallocFreeOStream);
     writeMallocFreeStreamToLog();
+    printStackTrace();
 }
 
 // this will be called in certain c++ error cases, for example if there are two active
@@ -231,9 +231,8 @@ void myTerminate() {
     } else {
         mallocFreeOStream << "terminate() called. No exception is active";
     }
-
-    printStackTrace(mallocFreeOStream);
     writeMallocFreeStreamToLog();
+    printStackTrace();
     breakpoint();
     endProcessWithSignal(SIGABRT);
 }
@@ -347,8 +346,9 @@ void setupSynchronousSignalHandlers() {
 
 void reportOutOfMemoryErrorAndExit() {
     MallocFreeOStreamGuard lk{};
-    printStackTrace(mallocFreeOStream << "out of memory.\n");
+    mallocFreeOStream << "out of memory.\n";
     writeMallocFreeStreamToLog();
+    printStackTrace();
     quickExit(EXIT_ABRUPT);
 }
 
