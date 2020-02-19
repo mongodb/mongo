@@ -398,8 +398,8 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm,
         auto waitForMillis = Milliseconds(customWait["waitForMillis"].numberInt());
         LOGV2(21451,
               "election succeeded - electionHangsBeforeUpdateMemberState fail point "
-              "enabled, sleeping {waitForMillis}",
-              "waitForMillis"_attr = waitForMillis);
+              "enabled, sleeping {waitFor}",
+              "waitFor"_attr = waitForMillis);
         sleepFor(waitForMillis);
     });
 
