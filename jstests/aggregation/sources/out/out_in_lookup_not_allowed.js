@@ -9,7 +9,6 @@ load("jstests/libs/discover_topology.js");                       // For findNonC
 load("jstests/libs/fixture_helpers.js");                         // For isSharded.
 
 const ERROR_CODE_OUT_BANNED_IN_LOOKUP = 51047;
-const ERROR_CODE_OUT_LAST_STAGE_ONLY = 40601;
 const coll = db.out_in_lookup_not_allowed;
 coll.drop();
 
@@ -54,10 +53,7 @@ pipeline = [
           }
         },
     ];
-
-// Pipeline will fail because $out is not last in the subpipeline.
-// Validation for $out in a $lookup's subpipeline occurs at a later point.
-assertErrorCode(coll, pipeline, ERROR_CODE_OUT_LAST_STAGE_ONLY);
+assertErrorCode(coll, pipeline, ERROR_CODE_OUT_BANNED_IN_LOOKUP);
 
 // Create view which contains $out within $lookup.
 assertDropCollection(coll.getDB(), "view1");

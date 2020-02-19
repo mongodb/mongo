@@ -70,12 +70,10 @@ TEST_F(DocumentSourceUnionWithTest, BasicSerialUnions) {
     mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
     auto unionWithOne = DocumentSourceUnionWith(
         mockCtxOne,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo = DocumentSourceUnionWith(
         mockCtxTwo,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     unionWithOne.setSource(mock.get());
     unionWithTwo.setSource(&unionWithOne);
 
@@ -106,12 +104,11 @@ TEST_F(DocumentSourceUnionWithTest, BasicNestedUnions) {
     mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
     auto unionWithOne = make_intrusive<DocumentSourceUnionWith>(
         mockCtxOne,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo = DocumentSourceUnionWith(
         mockCtxTwo,
-        uassertStatusOK(Pipeline::create(
-            std::list<boost::intrusive_ptr<DocumentSource>>{unionWithOne}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{unionWithOne},
+                         getExpCtx()));
     unionWithTwo.setSource(mock.get());
 
     auto comparator = DocumentComparator();
@@ -144,12 +141,10 @@ TEST_F(DocumentSourceUnionWithTest, UnionsWithNonEmptySubPipelines) {
     const auto proj = DocumentSourceAddFields::create(BSON("d" << 1), mockCtxTwo);
     auto unionWithOne = DocumentSourceUnionWith(
         mockCtxOne,
-        uassertStatusOK(Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter},
-                                         getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{filter}, getExpCtx()));
     auto unionWithTwo = DocumentSourceUnionWith(
         mockCtxTwo,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{proj}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{proj}, getExpCtx()));
     unionWithOne.setSource(mock.get());
     unionWithTwo.setSource(&unionWithOne);
 
@@ -312,12 +307,10 @@ TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {
     mockCtxTwo->mongoProcessInterface = std::make_unique<MockMongoInterface>(mockDequeTwo);
     auto unionWithOne = DocumentSourceUnionWith(
         mockCtxOne,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     auto unionWithTwo = DocumentSourceUnionWith(
         mockCtxTwo,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     unionWithOne.setSource(mock.get());
     unionWithTwo.setSource(&unionWithOne);
 
@@ -339,13 +332,11 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
                                                       .firstElement(),
                                                   expCtx);
     const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
-        expCtx,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx)));
+        expCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx));
 
     // With the $unionWith *before* the $replaceRoot, the dependency analysis will report that all
     // fields are needed.
-    auto pipeline = uassertStatusOK(Pipeline::create({unionWith, replaceRoot}, expCtx));
+    auto pipeline = Pipeline::create({unionWith, replaceRoot}, expCtx);
 
     auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
@@ -361,13 +352,11 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBef
                                                       .firstElement(),
                                                   expCtx);
     const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
-        expCtx,
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx)));
+        expCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx));
 
     // With the $unionWith *after* the $replaceRoot, the dependency analysis will now report only
     // the referenced fields.
-    auto pipeline = uassertStatusOK(Pipeline::create({replaceRoot, unionWith}, expCtx));
+    auto pipeline = Pipeline::create({replaceRoot, unionWith}, expCtx);
 
     auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("b" << 1 << "_id" << 0));
@@ -459,8 +448,7 @@ TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
     auto emptyUnion = DocumentSourceUnionWith(
         getExpCtx(),
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, getExpCtx()));
     StageConstraints defaultConstraints(StageConstraints::StreamType::kStreaming,
                                         StageConstraints::PositionRequirement::kNone,
                                         StageConstraints::HostTypeRequirement::kAnyShard,
@@ -485,8 +473,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
     mock->mockConstraints = stricterConstraint;
     auto unionWithOne = DocumentSourceUnionWith(
         getExpCtx(),
-        uassertStatusOK(
-            Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{mock}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{mock}, getExpCtx()));
     ASSERT_TRUE(unionWithOne.constraints(Pipeline::SplitState::kUnsplit) == stricterConstraint);
 }
 
@@ -525,9 +512,9 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
     mockThree->mockConstraints = constraintPersistentDataTransactionLookupNotAllowed;
     auto unionStage = DocumentSourceUnionWith(
         getExpCtx(),
-        uassertStatusOK(Pipeline::create(
+        Pipeline::create(
             std::list<boost::intrusive_ptr<DocumentSource>>{mockOne, mockTwo, mockThree},
-            getExpCtx())));
+            getExpCtx()));
     StageConstraints strict(StageConstraints::StreamType::kStreaming,
                             StageConstraints::PositionRequirement::kNone,
                             StageConstraints::HostTypeRequirement::kAnyShard,
@@ -549,14 +536,13 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
                                       StageConstraints::LookupRequirement::kNotAllowed,
                                       StageConstraints::UnionRequirement::kAllowed);
     mock->mockConstraints = strictConstraint;
-    auto facetPipeline = uassertStatusOK(Pipeline::createFacetPipeline({mock}, getExpCtx()));
+    auto facetPipeline = Pipeline::create({mock}, getExpCtx());
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("pipeline", std::move(facetPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), getExpCtx());
     auto unionStage = DocumentSourceUnionWith(
         getExpCtx(),
-        uassertStatusOK(Pipeline::create(
-            std::list<boost::intrusive_ptr<DocumentSource>>{facetStage}, getExpCtx())));
+        Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{facetStage}, getExpCtx()));
     StageConstraints expectedConstraints(StageConstraints::StreamType::kStreaming,
                                          StageConstraints::PositionRequirement::kNone,
                                          StageConstraints::HostTypeRequirement::kAnyShard,

@@ -627,7 +627,7 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 
     Pipeline::SourceContainer shardStages;
     boost::optional<BSONObj> inputsSort = findSplitPoint(&shardStages, mergePipeline.get());
-    auto shardsPipeline = uassertStatusOK(Pipeline::create(std::move(shardStages), expCtx));
+    auto shardsPipeline = Pipeline::create(std::move(shardStages), expCtx);
 
     // The order in which optimizations are applied can have significant impact on the efficiency of
     // the final pipeline. Be Careful!
@@ -987,7 +987,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     } else {
         // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
         // empty local pipeline which we will attach the merge cursors stage to.
-        mergePipeline = uassertStatusOK(Pipeline::parse(std::vector<BSONObj>(), expCtx));
+        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
     }
 
     addMergeCursorsSource(mergePipeline.get(),

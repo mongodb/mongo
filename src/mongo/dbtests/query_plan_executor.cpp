@@ -215,7 +215,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // in the pipeline.
     innerExec->saveState();
     auto cursorSource = DocumentSourceCursor::create(collection, std::move(innerExec), expCtx);
-    auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
+    auto pipeline = Pipeline::create({cursorSource}, expCtx);
 
     // Create the output PlanExecutor that pulls results from the pipeline.
     auto ws = std::make_unique<WorkingSet>();

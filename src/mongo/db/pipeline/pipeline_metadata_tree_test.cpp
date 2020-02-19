@@ -83,7 +83,7 @@ protected:
         AggregationRequest request(testNss, rawPipeline);
         getExpCtx()->ns = testNss;
 
-        return uassertStatusOK(Pipeline::parse(request.getPipeline(), getExpCtx()));
+        return Pipeline::parse(request.getPipeline(), getExpCtx());
     }
 
     template <typename T, typename... Args>
@@ -391,7 +391,7 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
 }
 
 TEST_F(PipelineMetadataTreeTest, MakeTreeWithEmptyPipeline) {
-    auto pipeline = uassertStatusOK(Pipeline::parse({}, getExpCtx()));
+    auto pipeline = Pipeline::parse({}, getExpCtx());
     auto result =
         makeTree<std::string>({{NamespaceString("unittests.pipeline_test"), std::string("input")}},
                               *pipeline,

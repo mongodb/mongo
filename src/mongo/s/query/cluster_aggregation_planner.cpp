@@ -374,8 +374,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
         }
 
         // Create a pipeline for a consumer and add the merging stage.
-        auto consumerPipeline = uassertStatusOK(Pipeline::create(
-            shardDispatchResults->splitPipeline->mergePipeline->getSources(), expCtx));
+        auto consumerPipeline = Pipeline::create(
+            shardDispatchResults->splitPipeline->mergePipeline->getSources(), expCtx);
 
         sharded_agg_helpers::addMergeCursorsSource(
             consumerPipeline.get(),
@@ -409,7 +409,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
     // The merging pipeline is just a union of the results from each of the shards involved on the
     // consumer side of the exchange.
-    auto mergePipeline = uassertStatusOK(Pipeline::create({}, expCtx));
+    auto mergePipeline = Pipeline::create({}, expCtx);
     mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
 
     SplitPipeline splitPipeline{nullptr, std::move(mergePipeline), boost::none};

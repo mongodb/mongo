@@ -441,7 +441,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
             // DocumentSourceExchange.
             boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
                 expCtx, exchange, idx, expCtx->mongoProcessInterface->getResourceYielder());
-            pipelines.emplace_back(uassertStatusOK(Pipeline::create({consumer}, expCtx)));
+            pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
         }
     } else {
         pipelines.emplace_back(std::move(pipeline));
@@ -638,7 +638,7 @@ Status runAggregate(OperationContext* opCtx,
             // Use default value for the ExpressionContext's 'sortKeyFormat' member variable.
         }
 
-        auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
+        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
 
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.

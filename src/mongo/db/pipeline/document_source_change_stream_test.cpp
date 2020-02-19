@@ -1489,8 +1489,8 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     // equivalent to the original serialization.
     //
     auto serializedBson = serializedDoc.toBson();
-    auto roundTripped = uassertStatusOK(Pipeline::create(
-        DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx));
+    auto roundTripped = Pipeline::create(
+        DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx);
 
     auto newSerialization = roundTripped->serialize();
 

@@ -397,7 +397,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     }
 
     try {
-        auto pipeline = uassertStatusOK(Pipeline::create(
+        auto pipeline = Pipeline::create(
             makeFlattenedList<boost::intrusive_ptr<DocumentSource>>(
                 parsedMr.getQuery().map(
                     [&](auto&& query) { return DocumentSourceMatch::create(query, expCtx); }),
@@ -415,7 +415,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
                              std::move(targetCollectionVersion),
                              parsedMr.getReduce().getCode(),
                              parsedMr.getFinalize())),
-            expCtx));
+            expCtx);
         pipeline->optimizePipeline();
         return pipeline;
     } catch (DBException& ex) {

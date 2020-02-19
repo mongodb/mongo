@@ -607,7 +607,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
 void DocumentSourceGraphLookUp::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_fromExpCtx->ns);
-    auto introspectionPipeline = uassertStatusOK(Pipeline::parse(_fromPipeline, _fromExpCtx));
+    auto introspectionPipeline = Pipeline::parse(_fromPipeline, _fromExpCtx);
     for (auto&& stage : introspectionPipeline->getSources()) {
         stage->addInvolvedCollections(collectionNames);
     }

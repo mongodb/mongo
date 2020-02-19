@@ -116,7 +116,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
-    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats, match}, getExpCtx()));
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
     pipeline->optimizePipeline();
@@ -133,7 +133,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
-    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats, match}, getExpCtx()));
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
     pipeline->optimizePipeline();
@@ -170,7 +170,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
-    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats, match}, getExpCtx()));
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     pipeline->optimizePipeline();
 
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
@@ -197,7 +197,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
     const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
-    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats}, getExpCtx()));
+    auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
                       BSON("foo"
                            << "bar"
@@ -223,7 +223,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) 
     const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
-    auto pipeline = unittest::assertGet(Pipeline::create({planCacheStats}, getExpCtx()));
+    auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
     ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
                       BSON("foo"
                            << "bar"

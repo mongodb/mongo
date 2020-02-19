@@ -172,8 +172,7 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchange1Consumer) {
     spec.setConsumers(1);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex =
-        new Exchange(spec, unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
 
     auto input = ex->getNext(getExpCtx()->opCtx, 0, nullptr);
 
@@ -198,8 +197,7 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex =
-        new Exchange(spec, unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -241,8 +239,7 @@ TEST_F(DocumentSourceExchangeTest, ExchangeNConsumerEarlyout) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex =
-        new Exchange(spec, unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -291,8 +288,7 @@ TEST_F(DocumentSourceExchangeTest, BroadcastExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex =
-        new Exchange(spec, unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -339,7 +335,7 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
     spec.setBufferSize(1024);
 
     boost::intrusive_ptr<Exchange> ex =
-        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+        new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -401,7 +397,7 @@ TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
     spec.setBufferSize(1024);
 
     boost::intrusive_ptr<Exchange> ex =
-        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+        new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -454,7 +450,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     spec.setBufferSize(1024);
 
     boost::intrusive_ptr<Exchange> ex =
-        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+        new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -522,7 +518,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
     auto artificalGlobalMutex = MONGO_MAKE_LATCH();
 
     boost::intrusive_ptr<Exchange> ex =
-        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+        new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));
     std::vector<ThreadInfo> threads;
 
     for (size_t idx = 0; idx < nConsumers; ++idx) {
@@ -601,7 +597,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
     spec.setBufferSize(1024);
 
     boost::intrusive_ptr<Exchange> ex =
-        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+        new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));
 
     std::vector<ThreadInfo> threads = createNProducers(nConsumers, ex);
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -641,9 +637,7 @@ TEST_F(DocumentSourceExchangeTest, RejectNoConsumers) {
                         << "broadcast"
                         << "consumers" << 0);
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50901);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50901);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKey) {
@@ -651,9 +645,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidKey) {
                         << "broadcast"
                         << "consumers" << 1 << "key" << BSON("a" << 2));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50896);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50896);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyHashExpected) {
@@ -663,9 +655,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyHashExpected) {
                         << BSON("a"
                                 << "nothash"));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50895);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50895);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyWrongType) {
@@ -673,9 +663,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyWrongType) {
                         << "broadcast"
                         << "consumers" << 1 << "key" << BSON("a" << true));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50897);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50897);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyEmpty) {
@@ -683,9 +671,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyEmpty) {
                         << "broadcast"
                         << "consumers" << 1 << "key" << BSON("" << 1));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        40352);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 40352);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
@@ -695,9 +681,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
                         << BSON_ARRAY(BSON("a" << MAXKEY) << BSON("a" << MINKEY)) << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50893);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50893);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
@@ -707,9 +691,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
                         << BSON_ARRAY(BSON("a" << 0) << BSON("a" << MAXKEY)) << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50958);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50958);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
@@ -719,9 +701,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << 0)) << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50959);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50959);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
@@ -731,9 +711,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
                         << BSON_ARRAY(0 << 1));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50900);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50900);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
@@ -743,9 +721,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50899);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50899);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
@@ -755,9 +731,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
                         << BSON_ARRAY(1));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50894);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50894);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
@@ -767,9 +741,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY)) << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
-        AssertionException,
-        50967);
+        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50967);
 }
 
 }  // namespace mongo

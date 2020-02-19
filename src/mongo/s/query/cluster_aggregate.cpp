@@ -266,7 +266,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             opCtx, request, collationObj, uuid, resolveInvolvedNamespaces(involvedNamespaces));
 
         // Parse and optimize the full pipeline.
-        auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
+        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         pipeline->optimizePipeline();
         return pipeline;
     };

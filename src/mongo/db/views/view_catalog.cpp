@@ -342,29 +342,38 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     // to apply some additional checks.
     expCtx->isParsingViewDefinition = true;
 
-    auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
-    if (!pipelineStatus.isOK()) {
-        return pipelineStatus.getStatus();
-    }
+    try {
+        auto pipeline =
+            Pipeline::parse(viewDef.pipeline(), std::move(expCtx), [&](const Pipeline& pipeline) {
+                // Validate that the view pipeline does not contain any ineligible stages.
+                const auto& sources = pipeline.getSources();
+                const auto firstPersistentStage =
+                    std::find_if(sources.begin(), sources.end(), [](const auto& source) {
+                        return source->constraints().writesPersistentData();
+                    });
 
-    // Validate that the view pipeline does not contain any ineligible stages.
-    const auto& sources = pipelineStatus.getValue()->getSources();
-    if (!sources.empty()) {
-        const auto firstPersistentStage =
-            std::find_if(sources.begin(), sources.end(), [](const auto& source) {
-                return source->constraints().writesPersistentData();
+                uassert(ErrorCodes::OptionNotSupportedOnView,
+                        str::stream()
+                            << "The aggregation stage "
+                            << firstPersistentStage->get()->getSourceName() << " in location "
+                            << std::distance(sources.begin(), firstPersistentStage)
+                            << " of the pipeline cannot be used in the view definition of "
+                            << viewDef.name().ns() << " because it writes to disk",
+                        firstPersistentStage == sources.end());
+
+                uassert(ErrorCodes::OptionNotSupportedOnView,
+                        "$changeStream cannot be used in a view definition",
+                        sources.empty() || !sources.front()->constraints().isChangeStreamStage());
+
+                std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+                    uassert(ErrorCodes::InvalidNamespace,
+                            str::stream() << "'" << stage->getSourceName()
+                                          << "' cannot be used in a view definition",
+                            !stage->constraints().isIndependentOfAnyCollection);
+                });
             });
-        if (sources.front()->constraints().isChangeStreamStage()) {
-            return {ErrorCodes::OptionNotSupportedOnView,
-                    "$changeStream cannot be used in a view definition"};
-        } else if (firstPersistentStage != sources.end()) {
-            mongo::StringBuilder errorMessage;
-            errorMessage << "The aggregation stage " << firstPersistentStage->get()->getSourceName()
-                         << " in location " << std::distance(sources.begin(), firstPersistentStage)
-                         << " of the pipeline cannot be used in the view definition of "
-                         << viewDef.name().ns() << " because it writes to disk";
-            return {ErrorCodes::OptionNotSupportedOnView, errorMessage.str()};
-        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     return std::move(involvedNamespaces);

@@ -664,20 +664,15 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
     _resolvedIntrospectionPipeline =
-        uassertStatusOK(Pipeline::parse(_resolvedPipeline, _fromExpCtx));
-
-    auto& sources = _resolvedIntrospectionPipeline->getSources();
-
-    auto it = std::find_if(
-        sources.begin(), sources.end(), [](const boost::intrusive_ptr<DocumentSource>& src) {
-            return !src->constraints().isAllowedInLookupPipeline();
+        Pipeline::parse(_resolvedPipeline, _fromExpCtx, [](const Pipeline& pipeline) {
+            const auto& sources = pipeline.getSources();
+            std::for_each(sources.begin(), sources.end(), [](auto& src) {
+                uassert(51047,
+                        str::stream() << src->getSourceName()
+                                      << " is not allowed within a $lookup's sub-pipeline",
+                        src->constraints().isAllowedInLookupPipeline());
+            });
         });
-
-    // For other stages, use a generic error.
-    uassert(51047,
-            str::stream() << (*it)->getSourceName()
-                          << " is not allowed within a $lookup's sub-pipeline",
-            it == sources.end());
 }
 
 void DocumentSourceLookUp::serializeToArray(

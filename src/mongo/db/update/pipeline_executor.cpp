@@ -67,7 +67,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     }
 
     _expCtx->setResolvedNamespaces(resolvedNamespaces);
-    _pipeline = uassertStatusOK(Pipeline::parse(pipeline, _expCtx));
+    _pipeline = Pipeline::parse(pipeline, _expCtx);
 
     // Validate the update pipeline.
     for (auto&& stage : _pipeline->getSources()) {

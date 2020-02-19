@@ -101,28 +101,22 @@ public:
         MatchExpressionParser::AllowedFeatures::kGeoNear;
 
     /**
-     * Parses a Pipeline from a vector of BSONObjs. Returns a non-OK status if it failed to parse.
-     * The returned pipeline is not optimized, but the caller may convert it to an optimized
-     * pipeline by calling optimizePipeline().
+     * Parses a Pipeline from a vector of BSONObjs then invokes the optional 'validator' callback
+     * with a reference to the newly created Pipeline. If no validator callback is given, this
+     * method assumes that we're parsing a top-level pipeline. Throws an exception if it failed to
+     * parse or if any exception occurs in the validator. The returned pipeline is not optimized,
+     * but the caller may convert it to an optimized pipeline by calling optimizePipeline().
      *
      * It is illegal to create a pipeline using an ExpressionContext which contains a collation that
      * will not be used during execution of the pipeline. Doing so may cause comparisons made during
      * parse-time to return the wrong results.
      */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parse(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
 
-    /**
-     * Parses a $facet Pipeline from a vector of BSONObjs. Validation checks which are only relevant
-     * to top-level pipelines are skipped, and additional checks applicable to $facet pipelines are
-     * performed. Returns a non-OK status if it failed to parse. The returned pipeline is not
-     * optimized, but the caller may convert it to an optimized pipeline by calling
-     * optimizePipeline().
-     */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parseFacetPipeline(
+    static std::unique_ptr<Pipeline, PipelineDeleter> parse(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator = nullptr);
 
     /**
      * Creates a Pipeline from an existing SourceContainer.
@@ -130,16 +124,7 @@ public:
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
      * is present but is not the last stage.
      */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> create(
-        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    /**
-     * Creates a $facet Pipeline from an existing SourceContainer.
-     *
-     * Returns a non-OK status if any stage is invalid. For example, if the pipeline is empty or if
-     * any stage is an initial source.
-     */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> createFacetPipeline(
+    static std::unique_ptr<Pipeline, PipelineDeleter> create(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -335,24 +320,6 @@ public:
 private:
     friend class PipelineDeleter;
 
-    /**
-     * Used by both Pipeline::parse() and Pipeline::parseFacetPipeline() to build and validate the
-     * pipeline.
-     */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parseTopLevelOrFacetPipeline(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const bool isFacetPipeline);
-
-    /**
-     * Used by both Pipeline::create() and Pipeline::createFacetPipeline() to build and validate the
-     * pipeline.
-     */
-    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> createTopLevelOrFacetPipeline(
-        SourceContainer sources,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const bool isSubPipeline);
-
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
@@ -370,25 +337,6 @@ private:
      * optimization process, where we might swap or destroy stages.
      */
     void unstitch();
-
-    /**
-     * Throws if the pipeline fails any of a set of semantic checks. For example, if an $out stage
-     * is present then it must come last in the pipeline, while initial stages such as $indexStats
-     * must be at the start.
-     */
-    void validate(bool isFacetPipeline) const;
-
-    /**
-     * Performs validation checking specific to top-level pipelines. Throws if the pipeline is
-     * invalid.
-     */
-    void validateTopLevelPipeline() const;
-
-    /**
-     * Performs validation checking specific to nested $facet pipelines. Throws if the pipeline is
-     * invalid.
-     */
-    void validateFacetPipeline() const;
 
     /**
      * Performs common validation for top-level or facet pipelines. Throws if the pipeline is

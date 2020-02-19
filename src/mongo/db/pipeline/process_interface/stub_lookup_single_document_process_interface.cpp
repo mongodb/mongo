@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {

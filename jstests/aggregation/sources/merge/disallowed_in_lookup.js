@@ -9,7 +9,6 @@ load("jstests/libs/discover_topology.js");                       // For findNonC
 load("jstests/libs/fixture_helpers.js");                         // For isSharded.
 
 const kErrorCodeMergeBannedInLookup = 51047;
-const kErrorCodeMergeLastStageOnly = 40601;
 const coll = db.merge_in_lookup_not_allowed;
 coll.drop();
 
@@ -53,9 +52,7 @@ pipeline = [
           }
         },
     ];
-// Pipeline will fail because $merge is not last in the subpipeline.
-// Validation for $merge in a $lookup's subpipeline occurs at a later point.
-assertErrorCode(coll, pipeline, kErrorCodeMergeLastStageOnly);
+assertErrorCode(coll, pipeline, kErrorCodeMergeBannedInLookup);
 
 // Create view which contains $merge within $lookup.
 assertDropCollection(coll.getDB(), "view1");
