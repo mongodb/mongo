@@ -7,6 +7,7 @@
 "use strict";
 
 load('jstests/noPassthrough/libs/index_build.js');
+load("jstests/libs/logv2_helpers.js");
 
 const rst = new ReplSetTest({
     nodes: [
@@ -34,8 +35,15 @@ assert.commandWorked(primary.adminCommand(
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
-checkLog.contains(
-    primary, 'index build: starting on ' + coll.getFullName() + ' properties: { v: 2, key: { a:');
+if (isJsonLogNoConn()) {
+    checkLog.contains(
+        primary,
+        /\"index build: starting on {ns} properties: {descriptor} using method: {method}\".*\"descriptor\":\"{ v: 2, key: { a:/);
+} else {
+    checkLog.contains(
+        primary,
+        'index build: starting on ' + coll.getFullName() + ' properties: { v: 2, key: { a:');
+}
 
 try {
     // Step down the primary.
@@ -54,7 +62,12 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Wait for the IndexBuildCoordinator thread, not the command thread, to report the index build
     // as failed.
-    checkLog.contains(primary, '[IndexBuildsCoordinatorMongod-0] Index build failed: ');
+    if (isJsonLogNoConn()) {
+        checkLog.contains(
+            primary, "\"ctx\":\"IndexBuildsCoordinatorMongod-0\",\"msg\":\"Index build failed");
+    } else {
+        checkLog.contains(primary, '[IndexBuildsCoordinatorMongod-0] Index build failed: ');
+    }
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
