@@ -232,8 +232,9 @@ var $config = (function() {
         }
 
         function createIndex(db, collName) {
-            assertWhenOwnColl.commandWorked(
-                db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}));
+            assertWhenOwnColl.commandWorkedOrFailedWithCode(
+                db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
+                [ErrorCodes.IndexBuildAborted]);
         }
 
         function dropColl(db, collName) {
