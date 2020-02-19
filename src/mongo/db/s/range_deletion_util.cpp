@@ -351,7 +351,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .then([=]() mutable {
             LOG(0) << "Beginning deletion of any documents in " << nss.ns() << " range "
-                   << redact(range.toString()) << "with numDocsToRemovePerBatch "
+                   << redact(range.toString()) << " with numDocsToRemovePerBatch "
                    << numDocsToRemovePerBatch;
 
             notifySecondariesThatDeletionIsOccurring(nss, collectionUuid, range);
