@@ -1649,6 +1649,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     opCtx->lockState()->unsetMaxLockTimeout();
+    invariant(UncommittedCollections::get(opCtx).isEmpty());
 }
 
 void TransactionParticipant::Participant::_checkIsCommandValidWithTxnState(

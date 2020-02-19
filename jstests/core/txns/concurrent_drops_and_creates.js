@@ -39,12 +39,12 @@ assert.commandWorked(sessionCollA.insert({}));
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
 assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
-// We cannot write to collection B in the transaction, since it is illegal to implicitly create
-// collections in transactions. The collection drop is visible to the transaction in this way,
-// since our implementation of the in-memory collection catalog always has the most recent
-// collection metadata.
-assert.commandFailedWithCode(sessionCollB.insert({}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+// Ensure the collection drop is visible to the transaction, since our implementation of the in-
+// memory collection catalog always has the most recent collection metadata. We can detect the
+// drop by attempting a findandmodify with upsert=true on the dropped collection, since findand-
+// -modify on a nonexisting collection is not supported inside multi-document transactions.
+// TODO(SERVER-45956) remove or rethink this test case.
+assert.throws(() => (sessionCollB.findAndModify(({update: {a: 1}, upsert: true}))));
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 //

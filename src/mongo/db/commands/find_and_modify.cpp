@@ -449,6 +449,9 @@ public:
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
+                    // We do not allow acquisition of exclusive locks inside multi-document
+                    // transactions, so fail early if we are inside of such a transaction.
+                    // TODO(SERVER-45956) remove below assertion.
                     uassert(ErrorCodes::OperationNotSupportedInTransaction,
                             str::stream() << "Cannot create namespace " << nsString.ns()
                                           << " in multi-document transaction.",

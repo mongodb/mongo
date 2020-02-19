@@ -28,6 +28,9 @@ res = db.runCommand({
 });
 assert.commandFailedWithCode(res, ErrorCodes.BadValue, "$meta sortKey update");
 
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, a: 2}));
+
 res = db.runCommand({
     findAndModify: coll.getName(),
     query: {_id: 1},

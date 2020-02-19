@@ -213,11 +213,18 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns, b
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    auto isFullyUpgradedTo44 =
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
     auto inTransaction = opCtx->inMultiDocumentTransaction();
+
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot create namespace " << ns.ns()
-                          << " in multi-document transaction.",
-            !inTransaction);
+            str::stream()
+                << "Cannot create namespace " << ns.ns()
+                << " in multi-document transaction unless featureCompatibilityVersion is 4.4.",
+            isFullyUpgradedTo44 || !inTransaction);
 
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);

@@ -1002,6 +1002,10 @@ const txnOverrideTests = [
             assert.eq(cmdRes.cursor.ns, coll1.getFullName());
             assert.eq(cmdRes.cursor.firstBatch.length, 1);
 
+            // The transactions override commits the current transaction whenever it sees a DDL
+            // command.
+            assert.commandWorked(testDB.createCollection(collName2));
+
             assert.commandWorked(coll2.insert({_id: 3}));
             assert.eq(coll1.find().itcount(), 2);
             assert.eq(coll2.find().itcount(), 1);
@@ -1147,8 +1151,12 @@ const txnOverrideTests = [
     {
         name: "implicit collection creation with stepdown",
         test: function() {
+            // We set a failpoint on "create" since an implicit collection creation via
+            // findAndModify inside of a transaction will fail and this suite will attempt to
+            // explicitly create the collection outside of a transaction, and then retry the
+            // entire transaction.
             failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
@@ -1157,7 +1165,7 @@ const txnOverrideTests = [
             failCommandWithFailPoint(
                 ["create"],
                 {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
@@ -1165,7 +1173,7 @@ const txnOverrideTests = [
         test: function() {
             failCommandWithErrorAndWCENoRun(
                 "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
@@ -1176,28 +1184,28 @@ const txnOverrideTests = [
                                             "OperationFailed",
                                             ErrorCodes.NotMaster,
                                             "NotMaster");
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with ordinary error",
         test: function() {
             failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.OperationFailed});
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with network error",
         test: function() {
             failCommandWithFailPoint(["create"], {closeConnection: true});
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with WriteConcernError no success",
         test: function() {
             failCommandWithWCENoRun("create", ErrorCodes.NotMaster, "NotMaster");
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
@@ -1455,8 +1463,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
-            assert.commandWorked(coll1.insert({_id: 1}));
-            assert.commandWorked(coll2.insert({_id: 1}));
+            let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc1.a, 1);
+            let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2.a, 1);
             assert.eq(coll1.find().itcount(), 1);
             assert.eq(coll2.find().itcount(), 1);
 
@@ -1472,8 +1482,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithFailPoint(
                 ["create"],
                 {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
-            assert.commandWorked(coll1.insert({_id: 1}));
-            assert.commandWorked(coll2.insert({_id: 1}));
+            let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc1.a, 1);
+            let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2.a, 1);
             assert.eq(coll1.find().itcount(), 1);
             assert.eq(coll2.find().itcount(), 1);
 
@@ -1488,8 +1500,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithErrorAndWCENoRun(
                 "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
-            assert.commandWorked(coll1.insert({_id: 1}));
-            assert.commandWorked(coll2.insert({_id: 1}));
+            let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc1.a, 1);
+            let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2.a, 1);
             assert.eq(coll1.find().itcount(), 1);
             assert.eq(coll2.find().itcount(), 1);
 
@@ -1506,14 +1520,14 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
                                             "OperationFailed",
                                             ErrorCodes.NotMaster,
                                             "NotMaster");
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with ordinary error",
         test: function() {
             failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.OperationFailed});
-            assert.throws(() => coll1.insert({_id: 1}));
+            assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
@@ -1521,8 +1535,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithFailPoint(["create"], {closeConnection: true});
-            assert.commandWorked(coll1.insert({_id: 1}));
-            assert.commandWorked(coll2.insert({_id: 1}));
+            let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc1.a, 1);
+            let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2.a, 1);
             assert.eq(coll1.find().itcount(), 1);
             assert.eq(coll2.find().itcount(), 1);
 
@@ -1536,8 +1552,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithWCENoRun("create", ErrorCodes.NotMaster, "NotMaster");
-            assert.commandWorked(coll1.insert({_id: 1}));
-            assert.commandWorked(coll2.insert({_id: 1}));
+            let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc1.a, 1);
+            let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2.a, 1);
             assert.eq(coll1.find().itcount(), 1);
             assert.eq(coll2.find().itcount(), 1);
 
@@ -1819,13 +1837,14 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             });
             failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
             assert.commandWorked(coll1.insert({_id: 1, x: 2}));
-            assert.commandWorked(coll2.insert({_id: 2}));
+            let resDoc2 = coll2.findAndModify(({update: {_id: 1}, upsert: true, 'new': true}));
+            assert.eq(resDoc2._id, 1);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 4}}));
 
             endCurrentTransactionIfOpen();
 
             assert.docEq(coll1.find().toArray(), [{_id: 1, x: 6}]);
-            assert.docEq(coll2.find().toArray(), [{_id: 2}]);
+            assert.docEq(coll2.find().toArray(), [resDoc2]);
         }
     },
     {

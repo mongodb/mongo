@@ -1,11 +1,11 @@
-// Tests that it is illegal to implicitly create a collection using insert or upsert in a
-// multi-document transaction.
-// @tags: [uses_transactions]
+// Tests that it is allowed to implicitly create a collection using insert or upsert in a
+// multi-document transaction, except for via findAndModify.
+// @tags: [uses_transactions, requires_fcv_44]
 (function() {
 "use strict";
 
 const dbName = "test";
-const collName = "no_implicit_collection_creation_in_txn";
+const collName = "implicit_collection_creation_in_txn";
 const testDB = db.getSiblingDB(dbName);
 const testColl = testDB[collName];
 
@@ -18,28 +18,27 @@ const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
-jsTest.log("Cannot implicitly create a collection in a transaction using insert.");
+jsTest.log("Implicitly create a collection in a transaction using insert.");
 
 // Insert succeeds when the collection exists.
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
 session.startTransaction({writeConcern: {w: "majority"}});
-sessionColl.insert({_id: "doc"});
+assert.commandWorked(sessionColl.insert({_id: "doc"}));
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq({_id: "doc"}, testColl.findOne({_id: "doc"}));
 
-// Insert fails when the collection does not exist.
+// Insert succeeds when the collection does not exist.
 assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 
 session.startTransaction({writeConcern: {w: "majority"}});
-assert.commandFailedWithCode(sessionColl.insert({_id: "doc"}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandWorked(sessionColl.insert({_id: "doc"}));
+assert.commandWorked(session.commitTransaction_forTesting());
+assert.eq({_id: "doc"}, testColl.findOne({_id: "doc"}));
 
-// Committing the transaction should fail, since it should never have been started.
-assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-assert.eq(null, testColl.findOne({_id: "doc"}));
+assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 
-jsTest.log("Cannot implicitly create a collection in a transaction using update.");
+jsTest.log("Implicitly create a collection in a transaction using update.");
 
 // Update with upsert=true succeeds when the collection exists.
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
@@ -49,19 +48,16 @@ sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true});
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq({_id: "doc", updated: true}, testColl.findOne({_id: "doc"}));
 
-// Update with upsert=true fails when the collection does not exist.
+// Update with upsert=true succeeds when the collection does not exist.
 assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 
 session.startTransaction({writeConcern: {w: "majority"}});
-assert.commandFailedWithCode(
-    sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true}),
-    ErrorCodes.OperationNotSupportedInTransaction);
-
-// Committing the transaction should fail, since it should never have been started.
-assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-assert.eq(null, testColl.findOne({_id: "doc"}));
+assert.commandWorked(sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true}));
+assert.commandWorked(session.commitTransaction_forTesting());
+assert.eq({_id: "doc", updated: true}, testColl.findOne({_id: "doc"}));
 
 // Update with upsert=false succeeds when the collection does not exist.
+assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 session.startTransaction({writeConcern: {w: "majority"}});
 assert.commandWorked(sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: false}));
 assert.commandWorked(session.commitTransaction_forTesting());

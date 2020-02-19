@@ -682,6 +682,8 @@ function retryWithTxnOverride(res, conn, dbName, cmdName, cmdObj, lsid, logError
         assert.gt(ops.length, 0);
         abortTransaction(conn, lsid, txnOptions.txnNumber);
 
+        // TODO(SERVER-45956) the below retry logic is necessary because findAndModify with upsert=
+        // true is not presently permitted inside multi-document transactions.
         // If the command inserted data and is not supported in a transaction, we assume it
         // failed because the collection did not exist. We will create the collection and retry
         // the entire transaction. We should not receive this error in this override for any

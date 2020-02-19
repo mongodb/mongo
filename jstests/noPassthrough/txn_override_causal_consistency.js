@@ -153,7 +153,7 @@ function runTest() {
 
         // Command that attempts to implicitly create a collection.
         conn.getDB(dbName)[collName].drop();
-        testInsert(conn, isCausal, true /*expectRetry*/);
+        testInsert(conn, isCausal, false /*expectRetry*/);
 
         // Command that can accept read concern with retryable error.
         mockFirstResponse = {ok: 0, code: ErrorCodes.CursorKilled};

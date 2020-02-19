@@ -946,9 +946,11 @@ Status RollbackImpl::_processRollbackOpForApplyOps(OperationContext* opCtx,
     invariant(oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps);
 
     try {
+        // Roll back operations in reverse order in order to account for non-commutative
+        // members of applyOps (e.g., commands inside of multi-document transactions).
         auto subOps = ApplyOps::extractOperations(oplogEntry);
-        for (auto& subOp : subOps) {
-            auto subStatus = _processRollbackOp(opCtx, subOp);
+        for (auto reverseIt = subOps.rbegin(); reverseIt != subOps.rend(); ++reverseIt) {
+            auto subStatus = _processRollbackOp(opCtx, *reverseIt);
             if (!subStatus.isOK()) {
                 return subStatus;
             }

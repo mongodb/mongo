@@ -65,9 +65,11 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : ops) {
         try {
-            Status status = Status::OK();
+            // Presently, it is not allowed to run a prepared transaction with a command
+            // inside. TODO(SERVER-46105)
+            invariant(!op.isCommand());
             AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
-            status = repl::applyOperation_inlock(
+            auto status = repl::applyOperation_inlock(
                 opCtx, coll.getDb(), &op, false /*alwaysUpsert*/, oplogApplicationMode);
             if (!status.isOK()) {
                 return status;

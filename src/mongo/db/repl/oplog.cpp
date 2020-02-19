@@ -1427,11 +1427,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
         switch (replMode) {
             case ReplicationCoordinator::modeReplSet: {
-                // The 'applyOps' command never logs 'applyOps' oplog entries with nested
-                // command operations, so this code will never be run from inside the 'applyOps'
-                // command on secondaries. Thus, the timestamps in the command oplog
-                // entries are always real timestamps from this oplog and we should
-                // timestamp our writes with them.
+                // The timestamps in the command oplog entries are always real timestamps from this
+                // oplog and we should timestamp our writes with them.
                 return true;
             }
             case ReplicationCoordinator::modeNone: {

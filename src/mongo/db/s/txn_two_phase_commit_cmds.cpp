@@ -107,6 +107,11 @@ public:
                         "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
                         "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
 
+            // TODO(SERVER-46105) remove
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    "Cannot create new collections inside distributed transactions",
+                    UncommittedCollections::get(opCtx).isEmpty());
+
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());

@@ -52,6 +52,16 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
 
+    jsTest.log("Testing multiple createIndexes in a transaction that aborts");
+    session.startTransaction({writeConcern: {w: "majority"}});
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate);
+    session.abortTransaction();
+    assert.eq(sessionColl.find({}).itcount(), 0);
+    assert.eq(sessionColl.getIndexes().length, 0);
+    assert.eq(secondSessionColl.find({}).itcount(), 0);
+    assert.eq(secondSessionColl.getIndexes().length, 0);
+
     sessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log(

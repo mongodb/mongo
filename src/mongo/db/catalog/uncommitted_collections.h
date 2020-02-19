@@ -51,6 +51,10 @@ public:
         bool empty() {
             return _collections.empty() && _nssIndex.empty();
         }
+        void erase(UUID uuid, NamespaceString nss) {
+            _collections.erase(uuid);
+            _nssIndex.erase(nss);
+        }
         std::map<UUID, std::unique_ptr<Collection>> _collections;
         std::map<NamespaceString, UUID> _nssIndex;
     };
@@ -92,9 +96,15 @@ public:
                        Timestamp createTs,
                        UncommittedCollectionsMap* map);
 
+    /**
+     * Erases the UUID/NamespaceString entries corresponding to `uuid` and `nss` from `map`.
+     */
+    static void erase(UUID uuid, NamespaceString nss, UncommittedCollectionsMap* map);
+
     bool isUncommittedCollection(OperationContext* opCtx, const NamespaceString& nss) const;
     void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                  const NamespaceString& nss) const;
+    bool isEmpty();
 
     static void clear(UncommittedCollectionsMap* map) {
         map->_collections.clear();

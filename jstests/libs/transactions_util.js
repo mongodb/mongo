@@ -4,6 +4,10 @@
 var TransactionsUtil = (function() {
     load("jstests/libs/override_methods/override_helpers.js");
 
+    // Although createCollection and createIndexes are supported inside multi-document
+    // transactions, we intentionally exclude them from this list since they are non-
+    // idempotent and, for createIndexes, are not supported inside multi-document
+    // transactions for all cases.
     const kCmdsSupportingTransactions = new Set([
         'aggregate',
         'delete',

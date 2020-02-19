@@ -49,7 +49,16 @@ var $config = (function() {
 
             // Commit or abort the transaction.
             if (success) {
-                assertWhenOwnColl.commandWorked(session.commitTransaction_forTesting());
+                let commitRes = session.commitTransaction_forTesting();
+                if (!commitRes.ok && commitRes.hasOwnProperty("code") &&
+                    commitRes["code"] == ErrorCodes.WriteConflict) {
+                    // As of SERVER-45405, inserts that implicitly create collections inside of
+                    // multi- document transactions can fail at commit time with WriteConflict
+                    // errors, if a conflicting collection does not get created until commit time.
+                    success = false;
+                } else {
+                    assertWhenOwnColl.commandWorked(commitRes);
+                }
             } else {
                 // The failed operation already aborted the transaction. Run abortTransaction to
                 // update the transaction state in the shell.

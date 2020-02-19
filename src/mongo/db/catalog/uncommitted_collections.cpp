@@ -75,8 +75,9 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
             invariant(collPtr->getMinimumVisibleSnapshot() == createTime);
             UncommittedCollections::clear(collListUnowned.lock().get());
         });
-    opCtx->recoveryUnit()->onRollback(
-        [collListUnowned]() { UncommittedCollections::clear(collListUnowned.lock().get()); });
+    opCtx->recoveryUnit()->onRollback([collListUnowned, uuid, nss]() {
+        UncommittedCollections::erase(uuid, nss, collListUnowned.lock().get());
+    });
 }
 
 Collection* UncommittedCollections::getForTxn(OperationContext* opCtx,
@@ -106,6 +107,10 @@ Collection* UncommittedCollections::getForTxn(OperationContext* opCtx, const UUI
     }
 
     return it->second.get();
+}
+
+void UncommittedCollections::erase(UUID uuid, NamespaceString nss, UncommittedCollectionsMap* map) {
+    map->erase(uuid, nss);
 }
 
 void UncommittedCollections::commit(OperationContext* opCtx,
@@ -144,6 +149,10 @@ void UncommittedCollections::invariantHasExclusiveAccessToCollection(
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
                   isUncommittedCollection(opCtx, nss),
               nss.toString());
+}
+
+bool UncommittedCollections::isEmpty() {
+    return _resourcesPtr->empty();
 }
 
 }  // namespace mongo
