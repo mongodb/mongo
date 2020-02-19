@@ -30,16 +30,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/read_preference.h"
 #include "mongo/executor/remote_command_request.h"
 
 namespace mongo {
 
 /**
- * Constructs and returns hedge options based on the ReadPreferenceSetting on the 'opCtx'
- * (assumes that it is not null), the hedging server parameters, and maxTimeMS in 'cmdObj'.
+ * Constructs and returns hedge options based on the given read preference setting.
  * If no hedging should be performed, returns boost::none.
  */
 boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
-    OperationContext* opCtx, const BSONObj& cmdObj);
+    const ReadPreferenceSetting& readPref);
 
 }  // namespace mongo

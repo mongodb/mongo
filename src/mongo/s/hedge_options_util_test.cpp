@@ -76,22 +76,19 @@ protected:
     }
 
     /**
-     * Sets the given server parameters and sets the ReadPreferenceSetting decoration as given by
-     * 'rspObj'on the 'opCtx'. Constructs a RemoteCommandRequestOnAny with 'cmdObjWithoutReadPref'.
-     * If 'hedge' is true, asserts that the RemoteCommandRequestOnAny.hedgingOptions is set,
-     * otherwise asserts that it is not set.
+     * Sets the given server parameters and creates ReadPreferenceSetting from 'rspObj' and extracts
+     * HedgeOptions from it. If 'hedge' is true, asserts that the resulting HedgeOptions is not
+     * empty, otherwise asserts that it is empty. Resets the server parameters to the defaults
+     * before returning.
      */
     void checkHedgeOptions(const BSONObj& serverParameters,
-                           const BSONObj& cmdObjWithoutReadPref,
                            const BSONObj& rspObj,
                            const bool hedge) {
         setParameters(serverParameters);
 
-        auto opCtx = _client->makeOperationContext();
-        ReadPreferenceSetting::get(opCtx.get()) =
-            uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
+        auto readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
+        auto hedgeOptions = extractHedgeOptions(readPref);
 
-        auto hedgeOptions = extractHedgeOptions(opCtx.get(), cmdObjWithoutReadPref);
         if (hedge) {
             ASSERT_TRUE(hedgeOptions.has_value());
         } else {
@@ -114,31 +111,28 @@ private:
 
 TEST_F(HedgeOptionsUtilTestFixture, ExplicitOperationHedging) {
     const auto parameters = BSONObj();
-    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "primaryPreferred"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, true);
+    checkHedgeOptions(parameters, rspObj, true);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedging) {
     const auto parameters = BSONObj();
-    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest");
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, true);
+    checkHedgeOptions(parameters, rspObj, true);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, OperationHedgingDisabled) {
     const auto parameters = BSONObj();
-    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest"
                              << "hedge" << BSON("enabled" << false));
 
-    checkHedgeOptions(parameters, cmdObj, rspObj, false);
+    checkHedgeOptions(parameters, rspObj, false);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
@@ -147,7 +141,7 @@ TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
                              << "nearest"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, BSON("find" << kCollName), rspObj, false);
+    checkHedgeOptions(parameters, rspObj, false);
 }
 
 }  // namespace

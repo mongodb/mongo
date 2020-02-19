@@ -29,17 +29,14 @@
 
 #include "mongo/s/hedge_options_util.h"
 
-#include "mongo/client/read_preference.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 
 namespace mongo {
 
 boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
-    OperationContext* opCtx, const BSONObj& cmdObj) {
-    const auto hedgingMode = ReadPreferenceSetting::get(opCtx).hedgingMode;
-
-    if (gReadHedgingMode.load() == ReadHedgingMode::kOn && hedgingMode &&
-        hedgingMode->getEnabled()) {
+    const ReadPreferenceSetting& readPref) {
+    if (gReadHedgingMode.load() == ReadHedgingMode::kOn && readPref.hedgingMode &&
+        readPref.hedgingMode->getEnabled()) {
         return executor::RemoteCommandRequestOnAny::HedgeOptions{1};
     }
 
