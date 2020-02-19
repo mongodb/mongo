@@ -166,6 +166,7 @@ selector:
   ##
 
   # Uses getMore in the same state function as a command not supported in a transaction.
+  - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
   - jstests/concurrency/fsm_workloads/list_indexes.js
   - jstests/concurrency/fsm_workloads/agg_union_with_chunk_migrations.js
 
