@@ -1510,6 +1510,19 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         ipv6 = true;
     }
 
+    if (sslOCSPEnabled && !remoteHost.empty()) {
+        CFArrayRef policies = nullptr;
+        ::SecTrustCopyPolicies(cftrust.get(), &policies);
+        CFUniquePtr<::CFArrayRef> cfpolicies(policies);
+
+        CFUniquePtr<::CFMutableArrayRef> policiesMutable(
+            ::CFArrayCreateMutableCopy(NULL, 0, policies));
+        CFUniquePtr<::SecPolicyRef> cfRevPolicy(
+            ::SecPolicyCreateRevocation(kSecRevocationOCSPMethod));
+        ::CFArrayAppendValue(policiesMutable.get(), cfRevPolicy.get());
+        ::SecTrustSetPolicies(cftrust.get(), policiesMutable.get());
+    }
+
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
 
