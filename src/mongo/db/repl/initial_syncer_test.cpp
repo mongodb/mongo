@@ -59,6 +59,7 @@
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/platform/mutex.h"
@@ -338,6 +339,9 @@ protected:
         };
         _dbWorkThreadPool = std::make_unique<ThreadPool>(dbThreadPoolOptions);
         _dbWorkThreadPool->startup();
+
+        // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.
+        service->setStorageEngine(std::make_unique<StorageEngineMock>());
 
         _target = HostAndPort{"localhost:12346"};
         _mockServer = std::make_unique<MockRemoteDBServer>(_target.toString());
