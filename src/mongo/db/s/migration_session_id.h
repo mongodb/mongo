@@ -44,10 +44,12 @@ class StatusWith;
 /**
  * Encapsulates the logic for generating, parsing and comparing migration sessions. The migration
  * session id is a unique identifier for a particular moveChunk command and is exchanged as part of
- * all communication between the source and donor shards.
+ * all communication between the donor and recipient shards.
  */
 class MigrationSessionId {
 public:
+    MigrationSessionId() = default;
+
     /**
      * Constructs a new migration session identifier with the following format:
      *  DonorId_RecipientId_UniqueIdentifier
@@ -77,6 +79,11 @@ public:
     void append(BSONObjBuilder* builder) const;
 
     std::string toString() const;
+
+    static MigrationSessionId fromString(StringData sessionId) {
+        MigrationSessionId id(sessionId.toString());
+        return id;
+    }
 
 private:
     explicit MigrationSessionId(std::string sessionId);

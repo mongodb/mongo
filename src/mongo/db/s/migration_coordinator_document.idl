@@ -31,12 +31,15 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/migration_session_id.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/chunk_range.idl"
     - "mongo/s/chunk_version.idl"
+    - "mongo/db/logical_session_id.idl"
 
 enums:
     Decision:
@@ -45,6 +48,16 @@ enums:
         values:
             kCommitted: "committed"
             kAborted: "aborted"
+
+types:
+    MigrationSessionId:
+        bson_serialization_type: string
+        description: "The migration session id is the legacy unique identifier for a particular
+                      moveChunk command and is exchanged as part of all communication between the
+                      donor and recipient shards."
+        cpp_type: "mongo::MigrationSessionId"
+        deserializer: "mongo::MigrationSessionId::fromString"
+        serializer: "mongo::MigrationSessionId::toString"
 
 structs:
     migrationCoordinatorDocument:
@@ -56,6 +69,12 @@ structs:
                 type: uuid
                 description: "A unique identifier for the migration."
                 cpp_name: id
+            migrationSessionId:
+                type: MigrationSessionId
+                description: "A legacy unique identifier for the migration session."
+            lsid:
+                type: LogicalSessionId
+                description: "The sessionId to use to communicate with the recipient"
             nss:
                 type: namespacestring
                 description: "The namespace of the collection that the chunk belongs to."

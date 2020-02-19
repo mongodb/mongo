@@ -218,6 +218,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
 MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
+MONGO_FAIL_POINT_DEFINE(hangOnRecipientFailure);
 
 }  // namespace
 
@@ -798,6 +799,8 @@ void MigrationDestinationManager::_migrateThread() {
             _migrateDriver(opCtx);
         }
     } catch (...) {
+        log() << "In catch handler";
+        hangOnRecipientFailure.pauseWhileSet();
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 

@@ -300,6 +300,8 @@ Status MigrationSourceManager::startClone() {
         if (_enableResumableRangeDeleter) {
             _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
                 migrationId,
+                _cloneDriver->getSessionId(),
+                _lsid,
                 _args.getFromShardId(),
                 _args.getToShardId(),
                 getNss(),
@@ -765,8 +767,6 @@ void MigrationSourceManager::_cleanup() {
             auto newOpCtx = newOpCtxPtr.get();
             _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
         }
-
-        LogicalSessionCache::get(_opCtx)->endSessions({_lsid});
     }
 
     _state = kDone;

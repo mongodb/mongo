@@ -161,6 +161,15 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const UUID& migrationId);
 
 /**
+ * Advances the optime for the current transaction by performing a write operation as a retryable
+ * write. This is to prevent a write of the deletion task once the decision has been recorded.
+ */
+void advanceTransactionOnRecipient(OperationContext* opCtx,
+                                   const ShardId& recipientId,
+                                   const LogicalSessionId& lsid,
+                                   TxnNumber txnNumber);
+
+/**
  * Removes the 'pending' flag from the range deletion task document with the specified id from
  * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
  * deletion.

@@ -35,6 +35,7 @@
 namespace mongo {
 
 class BSONObj;
+class MigrationSessionId;
 class OperationContext;
 class Status;
 class Timestamp;
@@ -160,6 +161,12 @@ public:
                             const BSONObj& deletedDocId,
                             const repl::OpTime& opTime,
                             const repl::OpTime& preImageOpTime) = 0;
+
+    /**
+     * Returns the migration session id associated with this cloner, so stale sessions can be
+     * disambiguated.
+     */
+    virtual const MigrationSessionId& getSessionId() const = 0;
 
 protected:
     MigrationChunkClonerSource();

@@ -4,6 +4,9 @@
 //
 // Note: don't use coll1 in this test after a coll1 migration is interrupted -- the distlock isn't
 // released promptly when interrupted.
+// TODO(SERVER-46230): The requires_fcv_44 tag can be removed when the disableResumableRangeDeleter
+// option is no longer needed.
+// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -12,7 +15,9 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-var st = new ShardingTest({shards: 3});
+// TODO(SERVER-46230): Update test to run with resumable range deleter enabled.
+var st = new ShardingTest(
+    {shards: 3, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
 
 var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
     ns2 = dbName + ".bar", coll1 = mongos.getCollection(ns1), coll2 = mongos.getCollection(ns2),

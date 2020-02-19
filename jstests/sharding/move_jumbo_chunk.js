@@ -9,7 +9,13 @@
 (function() {
 'use strict';
 
-let st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
+// TODO(SERVER-46230): Update test to run with resumable range deleter enabled.
+let st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    other: {chunkSize: 1},
+    shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}
+});
 
 let kDbName = "test";
 assert.commandWorked(st.s.adminCommand({enablesharding: kDbName}));

@@ -52,6 +52,8 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeForgettingMigrationAfterAbortDecision);
 namespace migrationutil {
 
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
+                                           MigrationSessionId sessionId,
+                                           LogicalSessionId lsid,
                                            ShardId donorShard,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
@@ -60,6 +62,8 @@ MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            ChunkVersion preMigrationChunkVersion,
                                            bool waitForDelete)
     : _migrationInfo(migrationId,
+                     std::move(sessionId),
+                     std::move(lsid),
                      std::move(collectionNamespace),
                      collectionUuid,
                      std::move(donorShard),
@@ -108,6 +112,7 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
            << " to self and to recipient";
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
+
     switch (*_decision) {
         case Decision::kAborted:
             _abortMigrationOnDonorAndRecipient(opCtx);
@@ -118,7 +123,9 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
             hangBeforeForgettingMigrationAfterCommitDecision.pauseWhileSet();
             break;
     }
+
     forgetMigration(opCtx);
+
     return cleanupCompleteFuture;
 }
 
@@ -128,6 +135,11 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     LOG(0) << _logPrefix() << "Making commit decision durable";
     migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
+
+    LOG(0) << _logPrefix() << "Bumping transaction for " << _migrationInfo.getRecipientShardId()
+           << " lsid: " << _migrationInfo.getLsid().toBSON() << " txn: " << TxnNumber{1};
+    migrationutil::advanceTransactionOnRecipient(
+        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
 
     hangBeforeSendingCommitDecision.pauseWhileSet();
 
@@ -155,6 +167,11 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
 
     LOG(0) << _logPrefix() << "Making abort decision durable";
     migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
+
+    LOG(0) << _logPrefix() << "Bumping transaction for " << _migrationInfo.getRecipientShardId()
+           << " lsid: " << _migrationInfo.getLsid().toBSON() << " txn: " << TxnNumber{1};
+    migrationutil::advanceTransactionOnRecipient(
+        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
 

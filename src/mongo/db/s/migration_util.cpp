@@ -83,17 +83,21 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout);
 
 template <typename Cmd>
-void sendToRecipient(OperationContext* opCtx, const ShardId& recipientId, const Cmd& cmd) {
+void sendToRecipient(OperationContext* opCtx,
+                     const ShardId& recipientId,
+                     const Cmd& cmd,
+                     const BSONObj& passthroughFields = {}) {
     auto recipientShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
 
-    LOGV2_DEBUG(22023, 1, "Sending request {cmd} to recipient.", "cmd"_attr = cmd.toBSON({}));
+    auto cmdBSON = cmd.toBSON(passthroughFields);
+    LOGV2_DEBUG(22023, 1, "Sending request {cmd} to recipient.", "cmd"_attr = cmdBSON);
 
     auto response = recipientShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "config",
-        cmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority)),
+        cmd.getDbName().toString(),
+        cmdBSON,
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
@@ -416,7 +420,10 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                    false /*multi*/);
     deleteOp.setDeletes({query});
 
-    sendToRecipient(opCtx, recipientId, deleteOp);
+    sendToRecipient(opCtx,
+                    recipientId,
+                    deleteOp,
+                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 }
 
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
@@ -444,7 +451,30 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(false);
     updateOp.setUpdates({updateEntry});
 
-    sendToRecipient(opCtx, recipientId, updateOp);
+    sendToRecipient(opCtx,
+                    recipientId,
+                    updateOp,
+                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+}
+
+void advanceTransactionOnRecipient(OperationContext* opCtx,
+                                   const ShardId& recipientId,
+                                   const LogicalSessionId& lsid,
+                                   TxnNumber txnNumber) {
+    write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
+    auto queryFilter = BSON("_id"
+                            << "migrationCoordinatorStats");
+    auto updateModification = write_ops::UpdateModification(BSON("$inc" << BSON("count" << 1)));
+
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(true);
+    updateOp.setUpdates({updateEntry});
+
+    auto passthroughFields =
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority << "lsid"
+                                                     << lsid.toBSON() << "txnNumber" << txnNumber);
+    sendToRecipient(opCtx, recipientId, updateOp, passthroughFields);
 }
 
 void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
@@ -610,7 +640,7 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
             // Wait for the latest OpTime to be majority committed to ensure any decision that is
             // read is on the true branch of history.
             // Note (Esha): I don't think this is strictly required for correctness, but it is
-            // is difficult to reason about, and being pessimistic by waiting for the decision to be
+            // difficult to reason about, and being pessimistic by waiting for the decision to be
             // majority committed does not cost much, since stepup should be rare. It *is* required
             // that this node ensure a decision that it itself recovers is majority committed. For
             // example, it is possible that this node is a stale primary, and the true primary has
@@ -647,6 +677,8 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
 
                 // Create a MigrationCoordinator to complete the coordination.
                 MigrationCoordinator coordinator(doc.getId(),
+                                                 doc.getMigrationSessionId(),
+                                                 doc.getLsid(),
                                                  doc.getDonorShardId(),
                                                  doc.getRecipientShardId(),
                                                  doc.getNss(),
