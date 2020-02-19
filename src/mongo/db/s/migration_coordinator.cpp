@@ -93,7 +93,7 @@ void MigrationCoordinator::setMigrationDecision(Decision decision) {
 }
 
 
-boost::optional<SemiFuture<bool>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
+boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
     if (!_decision) {
         LOG(0) << _logPrefix()
                << "Migration completed without setting a decision. This node might have started "
@@ -107,23 +107,22 @@ boost::optional<SemiFuture<bool>> MigrationCoordinator::completeMigration(Operat
            << (_decision == Decision::kCommitted ? "committed" : "aborted")
            << " to self and to recipient";
 
-    boost::optional<SemiFuture<bool>> rangeDeletionScheduledOnSuccess = boost::none;
+    boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
     switch (*_decision) {
         case Decision::kAborted:
             _abortMigrationOnDonorAndRecipient(opCtx);
             hangBeforeForgettingMigrationAfterAbortDecision.pauseWhileSet();
             break;
         case Decision::kCommitted:
-            auto rangeDeletionScheduledFuture = _commitMigrationOnDonorAndRecipient(opCtx);
-            rangeDeletionScheduledOnSuccess.emplace(std::move(rangeDeletionScheduledFuture));
+            cleanupCompleteFuture = _commitMigrationOnDonorAndRecipient(opCtx);
             hangBeforeForgettingMigrationAfterCommitDecision.pauseWhileSet();
             break;
     }
     forgetMigration(opCtx);
-    return rangeDeletionScheduledOnSuccess;
+    return cleanupCompleteFuture;
 }
 
-SemiFuture<bool> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
+SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     OperationContext* opCtx) {
     hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
 

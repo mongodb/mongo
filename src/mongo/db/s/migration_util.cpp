@@ -131,7 +131,7 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
     return store.count(opCtx, overlappingRangeQuery(range, uuid)) > 0;
 }
 
-ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
+ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                              const RangeDeletionTask& deletionTask) {
     const auto serviceContext = opCtx->getServiceContext();
     return ExecutorFuture<void>(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
@@ -173,41 +173,19 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                 // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
                 // thread pool.
                 autoColl.reset();
-                try {
-                    forceShardFilteringMetadataRefresh(opCtx, deletionTask.getNss(), true);
-                } catch (const DBException& ex) {
-                    if (ex.toStatus() == ErrorCodes::NamespaceNotFound) {
-                        deleteRangeDeletionTaskLocally(
-                            opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
-                        return false;
-                    }
-                    throw;
-                }
+                refreshFilteringMetadataUntilSuccess(opCtx, deletionTask.getNss());
             }
 
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
-            if (!css->getCurrentMetadataIfKnown() || !css->getCurrentMetadata()->isSharded() ||
-                !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
-                LOGV2(
-                    22025,
-                    "Even after forced refresh, filtering metadata for namespace in deletion "
-                    "task "
-                    "{deletionTask}{css_getCurrentMetadataIfKnown_css_getCurrentMetadata_isSharded_"
-                    "has_UUID_that_does_not_match_UUID_of_the_deletion_task_is_unsharded_is_not_"
-                    "known}, deleting the task.",
-                    "deletionTask"_attr = deletionTask.toBSON(),
-                    "css_getCurrentMetadataIfKnown_css_getCurrentMetadata_isSharded_has_UUID_that_does_not_match_UUID_of_the_deletion_task_is_unsharded_is_not_known"_attr =
-                        (css->getCurrentMetadataIfKnown()
-                             ? (css->getCurrentMetadata()->isSharded()
-                                    ? " has UUID that does not match UUID of the deletion task"
-                                    : " is unsharded")
-                             : " is not known"));
-
-                autoColl.reset();
-                deleteRangeDeletionTaskLocally(
-                    opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
-                return false;
-            }
+            uassert(
+                ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                str::stream() << "Even after forced refresh, filtering metadata for namespace in "
+                                 "deletion task "
+                              << (css->getCurrentMetadata()->isSharded()
+                                      ? " has UUID that does not match UUID of the deletion task"
+                                      : " is unsharded"),
+                css->getCurrentMetadata()->isSharded() &&
+                    css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid()));
 
             LOGV2(22026,
                   "Submitting range deletion task {deletionTask}",
@@ -217,19 +195,31 @@ ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* opCtx,
                 ? CollectionShardingRuntime::kNow
                 : CollectionShardingRuntime::kDelayed;
 
-            auto cleanupCompleteFuture = css->cleanUpRange(deletionTask.getRange(), whenToClean);
-
-            if (cleanupCompleteFuture.isReady() &&
-                !cleanupCompleteFuture.getNoThrow(opCtx).isOK()) {
-                LOGV2(22027,
-                      "Failed to submit range deletion task "
-                      "{deletionTask}{causedBy_cleanupCompleteFuture_getNoThrow_opCtx}",
-                      "deletionTask"_attr = deletionTask.toBSON(),
-                      "causedBy_cleanupCompleteFuture_getNoThrow_opCtx"_attr =
-                          causedBy(cleanupCompleteFuture.getNoThrow(opCtx)));
-                return false;
+            return css->cleanUpRange(deletionTask.getRange(), whenToClean);
+        })
+        .onError([=](const Status status) {
+            ThreadClient tc(kRangeDeletionThreadName, serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
             }
-            return true;
+            auto uniqueOpCtx = tc->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+
+            LOGV2(22027,
+                  "Failed to submit range deletion task "
+                  "{deletionTask}{causedBy_status}",
+                  "deletionTask"_attr = deletionTask.toBSON(),
+                  "causedBy_status"_attr = causedBy(status));
+
+            if (status == ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
+                deleteRangeDeletionTaskLocally(
+                    opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
+            }
+
+            // Note, we use onError and make it return its input status, because ExecutorFuture does
+            // not support tapError.
+            return status;
         });
 }
 
@@ -240,7 +230,7 @@ void submitPendingDeletions(OperationContext* opCtx) {
 
     std::vector<RangeDeletionTask> invalidRanges;
     store.forEach(opCtx, query, [&opCtx, &invalidRanges](const RangeDeletionTask& deletionTask) {
-        migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+        migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
         return true;
     });
 }
@@ -574,6 +564,10 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
                 uasserted(ErrorCodes::InternalError,
                           "simulate an error response for forceShardFilteringMetadataRefresh");
             }
+            break;
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // A filtering metadata refresh can throw NamespaceNotFound if the database was dropped
+            // from the cluster.
             break;
         } catch (const DBException& ex) {
             // If the server is already doing a clean shutdown, join the shutdown.

@@ -83,11 +83,13 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
  *
  * Note that if the current filtering metadata's UUID does not match the task's UUID, the filtering
  * metadata will be refreshed once. If the UUID's still don't match, the task will be deleted from
- * disk. If the UUID's do match, the task will be submitted for processing.
+ * disk. If the UUID's do match, the range will be submitted for deletion.
  *
- * The returned future will contain whether the task was submitted for processing.
+ * If the range is submitted for deletion, the returned future is set when the range deletion
+ * completes. If the range is not submitted for deletion, the returned future is set with an error
+ * explaining why.
  */
-ExecutorFuture<bool> submitRangeDeletionTask(OperationContext* oppCtx,
+ExecutorFuture<void> submitRangeDeletionTask(OperationContext* oppCtx,
                                              const RangeDeletionTask& deletionTask);
 
 /**

@@ -558,15 +558,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                   "getNss_ns"_attr = getNss().ns(),
                   "range"_attr = redact(range.toString()));
 
-            invariant(_scheduledRangeDeletionOnSuccess);
-            auto scheduleSW = _scheduledRangeDeletionOnSuccess->getNoThrow(_opCtx);
-            if (!scheduleSW.isOK()) {
-                return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                        orphanedRangeCleanUpErrMsg + redact(scheduleSW.getStatus())};
-            }
-
-            auto deleteStatus = CollectionShardingRuntime::waitForClean(
-                _opCtx, getNss(), _collectionUuid.get(), range);
+            invariant(_cleanupCompleteFuture);
+            auto deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
             if (!deleteStatus.isOK()) {
                 return {ErrorCodes::OrphanedRangeCleanUpFailed,
                         orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
@@ -770,7 +763,7 @@ void MigrationSourceManager::_cleanup() {
             AlternativeClientRegion acr(newClient);
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
-            _scheduledRangeDeletionOnSuccess = _coordinator->completeMigration(newOpCtx);
+            _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
         }
 
         LogicalSessionCache::get(_opCtx)->endSessions({_lsid});

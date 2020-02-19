@@ -81,10 +81,10 @@ public:
      * If a decision has been set, makes the decision durable, then communicates the decision by
      * updating the local (donor's) and remote (recipient's) config.rangeDeletions entries.
      *
-     * If the decision was to commit, returns a future that completes when the moved away range is
-     * scheduled to be deleted and contains whether the task was submitted successfully.
+     * If the decision was to commit, returns a future that is set when range deletion for
+     * the donated range completes.
      */
-    boost::optional<SemiFuture<bool>> completeMigration(OperationContext* opCtx);
+    boost::optional<SemiFuture<void>> completeMigration(OperationContext* opCtx);
 
     /**
      * Deletes the persistent state for this migration from config.migrationCoordinators.
@@ -94,10 +94,10 @@ public:
 private:
     /**
      * Deletes the range deletion task from the recipient node and marks the range deletion task on
-     * the donor as ready to be processed. Returns a future that completes when the moved away range
-     * is scheduled to be deleted and contains whether the task was submitted successfully.
+     * the donor as ready to be processed. Returns a future that is set when range deletion for
+     * the donated range completes.
      */
-    SemiFuture<bool> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    SemiFuture<void> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
      * Deletes the range deletion task from the donor node and marks the range deletion task on the

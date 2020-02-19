@@ -272,9 +272,10 @@ private:
     boost::optional<CollectionCriticalSection> _critSec;
     LogicalSessionId _lsid;
 
-    // Future that completes when a range deletion task has been scheduled for a successfully moved
-    // away chunk. A value of boost::none indicates that the task was not submitted for processing.
-    boost::optional<SemiFuture<bool>> _scheduledRangeDeletionOnSuccess;
+    // Optional future that is populated if the migration succeeds and range deletion is scheduled
+    // on this node. The future is set when the range deletion completes. Used if the moveChunk was
+    // sent with waitForDelete.
+    boost::optional<SemiFuture<void>> _cleanupCompleteFuture;
 };
 
 }  // namespace mongo

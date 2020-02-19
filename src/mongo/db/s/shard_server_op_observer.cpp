@@ -255,7 +255,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
 
             if (!deletionTask.getPending())
-                migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+                migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
         }
 
         if (metadata->isSharded()) {
@@ -377,7 +377,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
                 // Range deletion tasks for moved away chunks are scheduled through the
                 // MigrationCoordinator, so only schedule a task for received chunks.
-                migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+                migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
             }
         }
     }
