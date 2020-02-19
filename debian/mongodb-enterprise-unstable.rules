@@ -22,12 +22,12 @@ build-stamp: configure-stamp
 	# scons
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
 
-	echo -n > debian/mongodb-enterprise-unstable-tools.manpages
+	echo -n > debian/mongodb-enterprise-unstable-database-tools-extra.manpages
 	for binary in ${TOOLS} ; \
 	do \
 		if [ -e debian/$$binary.1 ] ; \
 		then \
-			echo debian/$$binary.1 >> debian/mongodb-enterprise-tools.manpages ; \
+			echo debian/$$binary.1 >> debian/mongodb-enterprise-unstable-database-tools-extra.manpages ; \
 		fi ; \
 	done
 
@@ -52,7 +52,7 @@ clean:
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-shell
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-server
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-mongos
-	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-tools
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra
 	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-cryptd
 	rm -f config.log
 	rm -f mongo
@@ -81,17 +81,17 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/bin
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-cryptd/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/bin
-	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra/usr/bin
 	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-unstable-cryptd/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/etc
@@ -100,12 +100,12 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/share/lintian/overrides/
-	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-cryptd/usr/share/lintian/overrides/
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/share/lintian/overrides/mongodb-enterprise-unstable-shell
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/share/lintian/overrides/mongodb-enterprise-unstable-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/share/lintian/overrides/mongodb-enterprise-unstable-mongos
-	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/share/lintian/overrides/mongodb-enterprise-unstable-tools
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-database-tools-extra/usr/share/lintian/overrides/mongodb-enterprise-unstable-database-tools-extra
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-cryptd/usr/share/lintian/overrides/mongodb-enterprise-unstable-cryptd
 
 # Build architecture-independent files here.
