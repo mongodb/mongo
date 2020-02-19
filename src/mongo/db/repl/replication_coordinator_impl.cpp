@@ -4259,6 +4259,12 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
     WithLock lk, const OpTimeAndWallTime& committedOpTimeAndWallTime, bool fromSyncSource) {
     if (_topCoord->advanceLastCommittedOpTimeAndWallTime(committedOpTimeAndWallTime,
                                                          fromSyncSource)) {
+        // The last committed opTime should never advance beyond the global timestamp (i.e. the
+        // latest cluster time). Not enforced if the logical clock is disabled, e.g. for arbiters.
+        dassert(!LogicalClock::get(getServiceContext())->isEnabled() ||
+                _externalState->getGlobalTimestamp(getServiceContext()) >=
+                    committedOpTimeAndWallTime.opTime.getTimestamp());
+
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.

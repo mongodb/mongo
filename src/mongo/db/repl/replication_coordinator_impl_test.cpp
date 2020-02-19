@@ -5579,13 +5579,13 @@ TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeIsNewer
     replCoordSetMyLastAppliedOpTime(time, wallTime);
 
     // higher OpTime, should change
-    getReplCoord()->advanceCommitPoint({time, wallTime}, false);
+    replCoordAdvanceCommitPoint({time, wallTime}, false);
     ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(wallTime, getReplCoord()->getLastCommittedOpTimeAndWallTime().wallTime);
     ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // lower OpTime, should not change
-    getReplCoord()->advanceCommitPoint({oldTime, Date_t() + Seconds(5)}, false);
+    replCoordAdvanceCommitPoint({oldTime, Date_t() + Seconds(5)}, false);
     ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(wallTime, getReplCoord()->getLastCommittedOpTimeAndWallTime().wallTime);
     ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshotOpTime());
@@ -5724,7 +5724,7 @@ TEST_F(ReplCoordTest, AdvanceCommitPointFromSyncSourceCanSetCommitPointToLastApp
     replCoordSetMyLastAppliedOpTime(lastApplied.opTime, lastApplied.wallTime);
 
     const bool fromSyncSource = true;
-    getReplCoord()->advanceCommitPoint(commitPoint, fromSyncSource);
+    replCoordAdvanceCommitPoint(commitPoint, fromSyncSource);
 
     // The commit point can be set to lastApplied, even though lastApplied is in a lower term.
     ASSERT_EQUALS(lastApplied.opTime, getReplCoord()->getLastCommittedOpTime());
@@ -5754,7 +5754,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
 
     replCoordSetMyLastAppliedOpTime(optime2, wallTime2);
     // pass dummy Date_t to avoid advanceCommitPoint invariant
-    getReplCoord()->advanceCommitPoint({optime1, wallTime1}, false);
+    replCoordAdvanceCommitPoint({optime1, wallTime1}, false);
 
     auto opCtx = makeOperationContext();
 
@@ -6533,7 +6533,7 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
         optime.getTerm(), {optime, Date_t() + Seconds(optime.getSecs())}, optime, 1, OID(), -1, 1);
     getReplCoord()->processReplSetMetadata(syncSourceMetadata);
     // Pass dummy Date_t to avoid advanceCommitPoint invariant.
-    getReplCoord()->advanceCommitPoint({optime, Date_t() + Seconds(optime.getSecs())}, true);
+    replCoordAdvanceCommitPoint({optime, Date_t() + Seconds(optime.getSecs())}, true);
 
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand());
     auto metadata = unittest::assertGet(rpc::ReplSetMetadata::readFromMetadata(cmd));

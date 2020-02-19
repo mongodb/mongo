@@ -506,5 +506,22 @@ void ReplCoordTest::simulateCatchUpAbort() {
     net->exitNetwork();
 }
 
+void ReplCoordTest::replCoordAdvanceCommitPoint(const OpTime& opTime,
+                                                Date_t wallTime,
+                                                bool fromSyncSource) {
+    if (wallTime == Date_t()) {
+        wallTime = Date_t() + Seconds(opTime.getSecs());
+    }
+    getExternalState()->setGlobalTimestamp(getGlobalServiceContext(), opTime.getTimestamp());
+    getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
+}
+
+void ReplCoordTest::replCoordAdvanceCommitPoint(const OpTimeAndWallTime& opTimeAndWallTime,
+                                                bool fromSyncSource) {
+    getExternalState()->setGlobalTimestamp(getGlobalServiceContext(),
+                                           opTimeAndWallTime.opTime.getTimestamp());
+    getReplCoord()->advanceCommitPoint(opTimeAndWallTime, fromSyncSource);
+}
+
 }  // namespace repl
 }  // namespace mongo

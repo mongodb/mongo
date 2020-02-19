@@ -137,16 +137,10 @@ protected:
 
     void replCoordAdvanceCommitPoint(const OpTime& opTime,
                                      Date_t wallTime = Date_t(),
-                                     bool fromSyncSource = false) {
-        if (wallTime == Date_t()) {
-            wallTime = Date_t() + Seconds(opTime.getSecs());
-        }
-        getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
-    }
+                                     bool fromSyncSource = false);
 
-    void replCoordAdvanceCommitPoint(const OpTimeAndWallTime& opTime, bool fromSyncSource = false) {
-        getReplCoord()->advanceCommitPoint(opTime, fromSyncSource);
-    }
+    void replCoordAdvanceCommitPoint(const OpTimeAndWallTime& opTimeAndWallTime,
+                                     bool fromSyncSource = false);
 
     /**
      * Gets the storage interface.

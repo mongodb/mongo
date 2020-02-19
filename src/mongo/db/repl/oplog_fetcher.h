@@ -37,6 +37,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -370,6 +371,9 @@ private:
 
     // Used to keep track of the last oplog entry read and processed from the sync source.
     OpTime _lastFetched;
+
+    // Logical time metadata handling hook for the DBClientConnection.
+    std::unique_ptr<rpc::LogicalTimeMetadataHook> _logicalTimeMetadataHook;
 
     // Set by the ReplyMetadataReader upon receiving a new batch.
     BSONObj _metadataObj;
