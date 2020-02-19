@@ -359,10 +359,10 @@ bool Socket::connect(SockAddr& remote, Milliseconds connectTimeoutMillis) {
             if (pollReturn == 0) {
                 LOGV2_WARNING(23192,
                               "Failed to connect to {remote_getAddr}:{remote_getPort} after "
-                              "{connectTimeoutMillis} milliseconds, giving up.",
+                              "{connectTimeout} milliseconds, giving up.",
                               "remote_getAddr"_attr = _remote.getAddr(),
                               "remote_getPort"_attr = _remote.getPort(),
-                              "connectTimeoutMillis"_attr = connectTimeoutMillis);
+                              "connectTimeout"_attr = connectTimeoutMillis);
                 return false;
             }
 
