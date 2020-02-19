@@ -834,6 +834,25 @@ env_vars.Add('MSVC_VERSION',
     help='Sets the version of Visual C++ to use (e.g. 14.1 for VS2017, 14.2 for VS2019)',
     default="14.2")
 
+env_vars.Add('NINJA_PREFIX',
+    default="build",
+    help="""A prefix to add to the beginning of generated ninja
+files. Useful for when compiling multiple build ninja files for
+different configurations, for instance:
+
+    scons --sanitize=asan --ninja NINJA_PREFIX=asan asan.ninja
+    scons --sanitize=tsan --ninja NINJA_PREFIX=tsan tsan.ninja
+
+Will generate the files (respectively):
+
+    asan.ninja
+    tsan.ninja
+
+Defaults to build, best used with the generate-ninja alias so you don't have to
+reiterate the prefix in the target name and variable.
+""")
+
+
 env_vars.Add('NINJA_SUFFIX',
     help="""A suffix to add to the end of generated build.ninja
 files. Useful for when compiling multiple build ninja files for
@@ -3783,9 +3802,13 @@ if get_option('ninja') != 'disabled':
         env.Alias("all", env.Alias("generated-sources"))
         env.Alias("core", env.Alias("generated-sources"))
 
+    ninja_suffix = env.get("NINJA_SUFFIX", "")
+    if ninja_suffix and ninja_suffix[0] != ".":
+        env["NINJA_SUFFIX"] = "." + ninja_suffix
+
     if get_option("install-mode") == "hygienic":
         ninja_build = env.Ninja(
-            target="build.ninja",
+            target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
             source=[
                 env.Alias("install-all-meta"),
                 env.Alias("test-execution-aliases"),
@@ -3793,7 +3816,7 @@ if get_option('ninja') != 'disabled':
         )
     else:
         ninja_build = env.Ninja(
-            target="build.ninja",
+            target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
             source=[
                 env.Alias("all"),
                 env.Alias("test-execution-aliases"),

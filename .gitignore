@@ -3,7 +3,7 @@
 /.jsdbshell
 /.dbshell
 /*.ninja
-/*.ninja.deps
+/*.ninja.*
 /.ninja_deps
 /.ninja_log
 /perf.data
