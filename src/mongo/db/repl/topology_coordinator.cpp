@@ -681,8 +681,16 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
         response->setElectionTime(_electionTime);
     }
 
-    const OpTimeAndWallTime lastOpApplied = getMyLastAppliedOpTimeAndWallTime();
-    const OpTimeAndWallTime lastOpDurable = getMyLastDurableOpTimeAndWallTime();
+    OpTimeAndWallTime lastOpApplied;
+    OpTimeAndWallTime lastOpDurable;
+
+    // We include null times for lastApplied and lastDurable if we are in STARTUP_2, as we do not
+    // want to report replication progress and be part of write majorities while in initial sync.
+    if (!myState.startup2()) {
+        lastOpApplied = getMyLastAppliedOpTimeAndWallTime();
+        lastOpDurable = getMyLastDurableOpTimeAndWallTime();
+    }
+
     response->setAppliedOpTimeAndWallTime(lastOpApplied);
     response->setDurableOpTimeAndWallTime(lastOpDurable);
 
