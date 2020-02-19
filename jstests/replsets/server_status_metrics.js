@@ -255,6 +255,12 @@ jsTestLog(`Secondary ${secondary.host} metrics before restarting replication: ${
 // Enable periodic noops to aid sync source selection.
 assert.commandWorked(primary.adminCommand({setParameter: 1, writePeriodicNoops: true}));
 
+// Enable the setSmallOplogGetMoreMaxTimeMS failpoint on secondary so that it will start using
+// a small awaitData timeout for oplog fetching after re-choosing the sync source. This is needed to
+// make sync source return empty batches more frequently in order to test the metric
+// numEmptyBatches.
+configureFailPoint(secondary, 'setSmallOplogGetMoreMaxTimeMS');
+
 // Repeatedly restart replication and wait for the sync source to be rechosen. If the sync source
 // gets set to empty between stopping and restarting replication, then the secondary won't
 // increment numTimesChoseSame, so we do this in a loop.
@@ -278,6 +284,17 @@ assert.soon(
 
 assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremented");
 assert.gt(ssNew.numTimesChoseSame, ssOld.numTimesChoseSame, "same sync source not chosen");
+
+// Get the base number of empty batches after the secondary is up to date. Assert that the secondary
+// eventually gets an empty batch due to awaitData timeout.
+rt.awaitLastOpCommitted();
+const targetNumEmptyBatches =
+    secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches + 1;
+assert.soon(
+    () => secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches >=
+        targetNumEmptyBatches,
+    `Timed out waiting for numEmptyBatches reach ${targetNumEmptyBatches}, current ${
+        secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches}`);
 
 // Stop the primary so the secondary cannot choose a sync source.
 ssOld = ssNew;

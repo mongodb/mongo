@@ -61,11 +61,36 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
 
 namespace {
+class OplogBatchStats {
+public:
+    void recordMillis(int millis, bool isEmptyBatch);
+    BSONObj getReport() const;
+    operator BSONObj() const {
+        return getReport();
+    }
+
+private:
+    TimerStats _getMores;
+    Counter64 _numEmptyBatches;
+};
+
+void OplogBatchStats::recordMillis(int millis, bool isEmptyBatch) {
+    _getMores.recordMillis(millis);
+    if (isEmptyBatch) {
+        _numEmptyBatches.increment();
+    }
+}
+
+BSONObj OplogBatchStats::getReport() const {
+    BSONObjBuilder b(_getMores.getReport());
+    b.append("numEmptyBatches", _numEmptyBatches.get());
+    return b.obj();
+}
 
 // The number and time spent reading batches off the network
-TimerStats getmoreReplStats;
-ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
-                                                           &getmoreReplStats);
+OplogBatchStats oplogBatchStats;
+ServerStatusMetricField<OplogBatchStats> displayBatchesRecieved("repl.network.getmores",
+                                                                &oplogBatchStats);
 // The oplog entries read via the oplog reader
 Counter64 opsReadStats;
 ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
@@ -876,7 +901,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     opsReadStats.increment(info.networkDocumentCount);
     networkByteStats.increment(info.networkDocumentBytes);
 
-    getmoreReplStats.recordMillis(_lastBatchElapsedMS);
+    oplogBatchStats.recordMillis(_lastBatchElapsedMS, documents.empty());
 
     auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
     if (!status.isOK()) {
