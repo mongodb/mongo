@@ -8,9 +8,6 @@
 
 load("jstests/libs/uuid_util.js");
 
-// TODO: remove after SERVER-45338 is fixed.
-TestData.skipCheckOrphans = true;
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
@@ -18,34 +15,87 @@ const ns = dbName + "." + collName;
 // Create 2 shards with 3 replicas each.
 let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
-// Create a sharded collection with two chunks: [-inf, 50), [50, inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
+(() => {
+    jsTestLog("Test simple shard key");
 
-const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
+    // Create a sharded collection with one chunk and a single-field shard key.
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
-let deletionTask = {
-    _id: UUID(),
-    nss: ns,
-    collectionUuid: collectionUuid,
-    donorShardId: "unused",
-    pending: true,
-    range: {min: {x: 70}, max: {x: 90}},
-    whenToClean: "now"
-};
+    // Pause range deletion on shard0.
+    let suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRangeDeletion");
 
-const rangeDeletionNs = "config.rangeDeletions";
-let deletionsColl = st.shard1.getCollection(rangeDeletionNs);
+    // Move the only chunk from shard0 to shard1. This will leave orphans on shard0 since we paused
+    // range deletion.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
 
-// Write range to deletion collection
-deletionsColl.insert(deletionTask);
+    // Move the only chunk back to shard0 and expect timeout failure, since range deletion was
+    // paused and there are orphans on shard0.
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard0.shardName, maxTimeMS: 5000}),
+        ErrorCodes.MaxTimeMSExpired);
 
-// Move chunk [50, inf) to shard1 and expect timeout failure.
-const result = assert.commandFailedWithCode(
-    st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+    suspendRangeDeletionFailpoint.off();
+
+    st.s.getCollection(ns).drop();
+})();
+
+(() => {
+    jsTestLog("Test hashed shard key");
+
+    // Create a sharded collection with one chunk and a hashed shard key.
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
+
+    // Pause range deletion on shard0.
+    let suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRangeDeletion");
+
+    // Move the only chunk from shard0 to shard1. This will leave orphans on shard0 since we paused
+    // range deletion.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
+
+    // Move the only chunk back to shard0 and expect timeout failure, since range deletion was
+    // paused and there are orphans on shard0.
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard0.shardName, maxTimeMS: 5000}),
+        ErrorCodes.MaxTimeMSExpired);
+
+    suspendRangeDeletionFailpoint.off();
+
+    st.s.getCollection(ns).drop();
+})();
+
+(() => {
+    jsTestLog("Test compound shard key");
+
+    // Create a sharded collection with one chunk and a compound shard key.
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
+
+    // Pause range deletion on shard0.
+    let suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRangeDeletion");
+
+    // Move the only chunk from shard0 to shard1. This will leave orphans on shard0 since we paused
+    // range deletion.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50, y: 50}, to: st.shard1.shardName}));
+
+    // Move the only chunk back to shard0 and expect timeout failure, since range deletion was
+    // paused and there are orphans on shard0.
+    assert.commandFailedWithCode(
+        st.s.adminCommand(
+            {moveChunk: ns, find: {x: 50, y: 50}, to: st.shard0.shardName, maxTimeMS: 5000}),
+        ErrorCodes.MaxTimeMSExpired);
+
+    suspendRangeDeletionFailpoint.off();
+
+    st.s.getCollection(ns).drop();
+})();
 
 st.stop();
 })();

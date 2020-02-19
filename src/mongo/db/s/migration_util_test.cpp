@@ -274,8 +274,9 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
     std::ignore = CollectionShardingRuntime::get(opCtx, nss)->beginReceive(range);
 }
 
+template <typename ShardKey>
 RangeDeletionTask createDeletionTask(
-    NamespaceString nss, const UUID& uuid, int min, int max, bool pending = true) {
+    const NamespaceString& nss, const UUID& uuid, ShardKey min, ShardKey max, bool pending = true) {
     auto task = RangeDeletionTask(UUID::gen(),
                                   nss,
                                   uuid,
@@ -304,7 +305,7 @@ RangeDeletionTask createDeletionTask(
 //                                         |---------O [40 50)
 //           1    1    2    2    3    3    4    4    5
 // 0----5----0----5----0----5----0----5----0----5----0
-TEST_F(MigrationUtilsTest, TestOverlappingRangeQuery) {
+TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithIntegerShardKey) {
     auto opCtx = operationContext();
     const auto uuid = UUID::gen();
 
@@ -356,6 +357,155 @@ TEST_F(MigrationUtilsTest, TestOverlappingRangeQuery) {
     ASSERT_EQ(results, 0);
     ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range8, uuid));
     auto range9 = ChunkRange{BSON("_id" << 20), BSON("_id" << 30)};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range9, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range9, uuid));
+}
+
+TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithCompoundShardKeyWhereFirstValueIsConstant) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+
+    auto deletionTasks = {
+        createDeletionTask(
+            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 0), BSON("a" << 0 << "b" << 10)),
+        createDeletionTask(
+            NamespaceString{"two"}, uuid, BSON("a" << 0 << "b" << 10), BSON("a" << 0 << "b" << 20)),
+        createDeletionTask(
+            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 40), BSON("a" << 0 << "b" << 50)),
+    };
+
+    for (auto&& task : deletionTasks) {
+        store.add(opCtx, task);
+    }
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    // 1. Non-overlapping range
+    auto range1 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 25)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 35))};
+    auto results = store.count(opCtx, migrationutil::overlappingRangeQuery(range1, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range1, uuid));
+
+    // 2, 3. Find overlapping ranges, either direction.
+    auto range2 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 5)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 15))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range2, uuid));
+    ASSERT_EQ(results, 2);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range2, uuid));
+
+    // 4. Identical range
+    auto range4 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 10)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 20))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range4, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range4, uuid));
+
+    // 5, 6. Find overlapping edge, either direction.
+    auto range5 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 5))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range5, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range5, uuid));
+    auto range6 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 5)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 10))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range6, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range6, uuid));
+
+    // 7. Find fully enclosed range
+    auto range7 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 12)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 18))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range7, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range7, uuid));
+
+    // 8, 9. Open max doesn't overlap closed min, either direction.
+    auto range8 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 30)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 40))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range8, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range8, uuid));
+    auto range9 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 20)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 30))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range9, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range9, uuid));
+}
+
+TEST_F(MigrationUtilsTest,
+       TestOverlappingRangeQueryWithCompoundShardKeyWhereSecondValueIsConstant) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+
+    auto deletionTasks = {
+        createDeletionTask(
+            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 0), BSON("a" << 10 << "b" << 0)),
+        createDeletionTask(
+            NamespaceString{"two"}, uuid, BSON("a" << 10 << "b" << 0), BSON("a" << 20 << "b" << 0)),
+        createDeletionTask(
+            NamespaceString{"one"}, uuid, BSON("a" << 40 << "b" << 0), BSON("a" << 50 << "b" << 0)),
+    };
+
+    for (auto&& task : deletionTasks) {
+        store.add(opCtx, task);
+    }
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    // 1. Non-overlapping range
+    auto range1 = ChunkRange{BSON("_id" << BSON("a" << 25 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 35 << "b" << 0))};
+    auto results = store.count(opCtx, migrationutil::overlappingRangeQuery(range1, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range1, uuid));
+
+    // 2, 3. Find overlapping ranges, either direction.
+    auto range2 = ChunkRange{BSON("_id" << BSON("a" << 5 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 15 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range2, uuid));
+    ASSERT_EQ(results, 2);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range2, uuid));
+
+    // 4. Identical range
+    auto range4 = ChunkRange{BSON("_id" << BSON("a" << 10 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 20 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range4, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range4, uuid));
+
+    // 5, 6. Find overlapping edge, either direction.
+    auto range5 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 5 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range5, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range5, uuid));
+    auto range6 = ChunkRange{BSON("_id" << BSON("a" << 5 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 10 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range6, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range6, uuid));
+
+    // 7. Find fully enclosed range
+    auto range7 = ChunkRange{BSON("_id" << BSON("a" << 12 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 18 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range7, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(migrationutil::checkForConflictingDeletions(opCtx, range7, uuid));
+
+    // 8, 9. Open max doesn't overlap closed min, either direction.
+    auto range8 = ChunkRange{BSON("_id" << BSON("a" << 30 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 40 << "b" << 0))};
+    results = store.count(opCtx, migrationutil::overlappingRangeQuery(range8, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range8, uuid));
+    auto range9 = ChunkRange{BSON("_id" << BSON("a" << 20 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 30 << "b" << 0))};
     results = store.count(opCtx, migrationutil::overlappingRangeQuery(range9, uuid));
     ASSERT_EQ(results, 0);
     ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range9, uuid));
