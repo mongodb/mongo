@@ -167,9 +167,8 @@ void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
 
 void ReplicaSetNodeProcessInterface::dropCollection(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
-    BSONObjBuilder result;
-    uassertStatusOK(mongo::dropCollection(
-        opCtx, ns, result, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    uassertStatusOK(mongo::dropCollectionForApplyOps(
+        opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>

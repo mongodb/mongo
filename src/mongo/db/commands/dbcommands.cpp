@@ -255,7 +255,6 @@ public:
             dropCollection(opCtx,
                            nsToDrop,
                            result,
-                           {},
                            DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
         return true;
     }

@@ -581,15 +581,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     // Dismissed on success
     auto tmpCollectionDropper = makeGuard([&] {
-        BSONObjBuilder unusedResult;
         Status status = Status::OK();
         try {
-            status =
-                dropCollection(opCtx,
-                               tmpName,
-                               unusedResult,
-                               {},
-                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+            status = dropCollectionForApplyOps(
+                opCtx,
+                tmpName,
+                {},
+                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
         } catch (...) {
             status = exceptionToStatus();
         }
@@ -738,13 +736,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return status;
 
     tmpCollectionDropper.dismiss();
-
-    BSONObjBuilder unusedResult;
-    return dropCollection(opCtx,
-                          source,
-                          unusedResult,
-                          {},
-                          DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    return dropCollectionForApplyOps(
+        opCtx, source, {}, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
 }
 
 }  // namespace
@@ -941,12 +934,11 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
         // Downgrade renameCollection to dropCollection.
         if (dropTargetNss) {
-            BSONObjBuilder unusedResult;
-            return dropCollection(opCtx,
-                                  *dropTargetNss,
-                                  unusedResult,
-                                  renameOpTime,
-                                  DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+            return dropCollectionForApplyOps(
+                opCtx,
+                *dropTargetNss,
+                renameOpTime,
+                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
         }
 
         return Status(ErrorCodes::NamespaceNotFound,

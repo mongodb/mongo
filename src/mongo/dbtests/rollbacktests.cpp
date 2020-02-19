@@ -337,13 +337,11 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            BSONObjBuilder result;
-            ASSERT_OK(
-                dropCollection(&opCtx,
-                               target,
-                               result,
-                               {},
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            ASSERT_OK(dropCollectionForApplyOps(
+                &opCtx,
+                target,
+                {},
+                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT_OK(renameCollection(&opCtx, source, target));
             ASSERT(!collectionExists(&opCtx, &ctx, source.ns()));
             ASSERT(collectionExists(&opCtx, &ctx, target.ns()));
@@ -398,13 +396,11 @@ public:
 
         {
             WriteUnitOfWork uow(&opCtx);
-            BSONObjBuilder result;
-            ASSERT_OK(
-                dropCollection(&opCtx,
-                               nss,
-                               result,
-                               {},
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            ASSERT_OK(dropCollectionForApplyOps(
+                &opCtx,
+                nss,
+                {},
+                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             ASSERT(!collectionExists(&opCtx, &ctx, nss.ns()));
             CollectionOptions collectionOptions =
                 assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForCommand));

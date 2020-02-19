@@ -38,21 +38,28 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
-/**
- * Drops the collection "collectionName" and populates "result" with statistics about what
- * was removed.
- *
- * If we are applying an oplog entry for a collection drop on a secondary, 'dropOpTime' is set
- * to the optime in the oplog entry.
- */
 enum class DropCollectionSystemCollectionMode {
     kDisallowSystemCollectionDrops,
     kAllowSystemCollectionDrops
 };
+
+/**
+ * Drops the collection "collectionName" and populates "result" with statistics about what
+ * was removed. Aborts in-progress index builds on the collection if two phase index builds are
+ * supported.
+ */
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result,
-                      const repl::OpTime& dropOpTime,
                       DropCollectionSystemCollectionMode systemCollectionMode);
+
+/**
+ * Drops the collection "collectionName". When applying a 'drop' oplog entry on a secondary, the
+ * 'dropOpTime' will contain the optime of the oplog entry.
+ */
+Status dropCollectionForApplyOps(OperationContext* opCtx,
+                                 const NamespaceString& collectionName,
+                                 const repl::OpTime& dropOpTime,
+                                 DropCollectionSystemCollectionMode systemCollectionMode);
 
 }  // namespace mongo
