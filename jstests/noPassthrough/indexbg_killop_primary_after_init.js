@@ -61,8 +61,7 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-checkLog.contains(
-    primary, /IndexBuildAborted: Index build aborted: |Index build aborted:.*IndexBuildAborted/);
+checkLog.contains(primary, /IndexBuildAborted:?.*Index build aborted: /);
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.
