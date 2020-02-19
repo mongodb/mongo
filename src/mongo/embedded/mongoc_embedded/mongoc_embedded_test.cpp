@@ -57,6 +57,7 @@ namespace moe = mongo::optionenvironment;
 
 mongo_embedded_v1_lib* global_lib_handle;
 
+namespace mongo {
 namespace {
 
 std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
@@ -253,6 +254,7 @@ struct StatusDestroy {
 };
 using StatusPtr = std::unique_ptr<mongo_embedded_v1_status, StatusDestroy>;
 }  // namespace
+}  // namespace mongo
 
 // Define main function as an entry to these tests.
 // These test functions cannot use the main() defined for unittests because they
@@ -299,7 +301,7 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_FAILURE;
     }
 
-    StatusPtr status(mongo_embedded_v1_status_create());
+    mongo::StatusPtr status(mongo_embedded_v1_status_create());
     mongoc_init();
 
     mongo_embedded_v1_init_params params;
@@ -321,6 +323,6 @@ int main(int argc, char** argv, char** envp) {
     }
 
     mongoc_cleanup();
-    globalTempDir.reset();
+    mongo::globalTempDir.reset();
     mongo::quickExit(result);
 }
