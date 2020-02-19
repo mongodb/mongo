@@ -747,3 +747,14 @@ commands:
         fields:
             field1: int
 
+    validated_command:
+        description: Renamed command with validator
+        namespace: ignored
+        cpp_name: doubleBasicRanges
+        fields:
+            positive_double:
+                type: double
+                validator: { gt: 0.0 }
+            negative_double:
+                type: double
+                validator: { lt: 0.0 }

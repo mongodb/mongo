@@ -242,8 +242,8 @@ bool WiredTigerRecordStore::OplogStones::hasExcessStones_inlock() const {
 
     double minRetentionHours = storageGlobalParams.oplogMinRetentionHours.load();
 
-    // if we are not checking for time, then yes, there is a stone to be reaped
-    // because oplog is at capacity
+    // If we are not checking for time, then yes, there is a stone to be reaped
+    // because oplog is at capacity.
     if (minRetentionHours == 0.0) {
         return true;
     }

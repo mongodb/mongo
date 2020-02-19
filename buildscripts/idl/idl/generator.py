@@ -1477,7 +1477,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             param_type += '&'
 
         method_template = {
-            'class_name': common.title_case(struct.name),
+            'class_name': common.title_case(struct.cpp_name),
             'method_name': _get_field_member_validator_name(field),
             'param_type': param_type,
             'optional_param': optional_params[0],

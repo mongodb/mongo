@@ -21,23 +21,39 @@ assert.eq(primary.getDB('local').oplog.rs.stats().maxSize, 50 * MB);
 
 // Too small: 990MB
 assert.commandFailedWithCode(primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: 900}),
-                             ErrorCodes.InvalidOptions,
+                             51024,  // IDL Error code for invalid fields
                              "Expected replSetResizeOplog to fail because the size was too small");
 
 // Way too small: -1GB
 assert.commandFailedWithCode(
     primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: -1 * GB / MB}),
-    ErrorCodes.InvalidOptions,
+    51024,  // IDL Error code for invalid fields
     "Expected replSetResizeOplog to fail because the size was too small");
 
 // Too big: 8EB
 assert.commandFailedWithCode(
     primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: 8 * EB / MB}),
-    ErrorCodes.InvalidOptions,
+    51024,  // IDL Error code for invalid fields
     "Expected replSetResizeOplog to fail because the size was too big");
+
+// Size not supplied
+assert.commandFailedWithCode(
+    primary.getDB('admin').runCommand({replSetResizeOplog: 1, minRetentionHours: 1}),
+    40414,  // IDL Error code for required fields not being passed in
+    "Expected replSetResizeOplog to fail because the size was not supplied");
+
+// Min Retention Hours not valid: -1hr
+assert.commandFailedWithCode(
+    primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: 990, minRetentionHours: -1}),
+    51024,  // IDL Error code for invalid fields
+    "Expected replSetResizeOplog to fail because the minimum retention hours was too low");
 
 // The maximum: 1PB
 assert.commandWorked(primary.getDB('admin').runCommand({replSetResizeOplog: 1, size: 1 * PB / MB}));
+
+// Valid size and minRetentionHours
+assert.commandWorked(primary.getDB('admin').runCommand(
+    {replSetResizeOplog: 1, size: 1 * PB / MB, minRetentionHours: 5}));
 
 assert.eq(primary.getDB('local').oplog.rs.stats().maxSize, 1 * PB);
 
