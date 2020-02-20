@@ -6,9 +6,6 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_44
-  exclude_files:
-  # SERVER-46018 Disable incompatible with ramlog truncation.
-  - jstests/sharding/read_write_concern_defaults_application.js
 executor:
   config:
     shell_options:

@@ -30,8 +30,6 @@ selector:
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
-  # SERVER-46018 Disable incompatible with ramlog truncation.
-  - jstests/sharding/read_write_concern_defaults_application.js
 
 executor:
   config:

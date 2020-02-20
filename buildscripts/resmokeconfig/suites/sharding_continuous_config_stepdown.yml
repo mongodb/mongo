@@ -213,8 +213,6 @@ selector:
   # Runs commands on mongos which target the primary configsvr, and then checks the outcome using
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
-  # SERVER-46018 Disable incompatible with ramlog truncation.
-  - jstests/sharding/read_write_concern_defaults_application.js
 
 executor:
   config:
