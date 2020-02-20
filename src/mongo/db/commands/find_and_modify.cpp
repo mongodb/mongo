@@ -70,6 +70,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -97,9 +98,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
         // We should always have a valid status member object at this point.
         auto status = WorkingSetCommon::getMemberObjectStatus(value);
         invariant(!status.isOK());
-        warning() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
-                  << ", status: " << status
-                  << ", stats: " << redact(Explain::getWinningPlanStats(exec));
+        LOGV2_WARNING(23802,
+                      "Plan executor error during findAndModify: {PlanExecutor_statestr_state}, "
+                      "status: {status}, stats: {Explain_getWinningPlanStats_exec}",
+                      "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
+                      "status"_attr = status,
+                      "Explain_getWinningPlanStats_exec"_attr =
+                          redact(Explain::getWinningPlanStats(exec)));
 
         uassertStatusOKWithContext(status, "Plan executor error during findAndModify");
         MONGO_UNREACHABLE;

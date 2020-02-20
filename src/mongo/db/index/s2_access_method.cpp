@@ -41,6 +41,7 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -77,7 +78,9 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
             geoFields >= 1);
 
     if (descriptor->isSparse()) {
-        warning() << "Sparse option ignored for index spec " << descriptor->keyPattern().toString();
+        LOGV2_WARNING(23742,
+                      "Sparse option ignored for index spec {descriptor_keyPattern}",
+                      "descriptor_keyPattern"_attr = descriptor->keyPattern().toString());
     }
 }
 

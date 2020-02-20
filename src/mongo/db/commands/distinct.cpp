@@ -57,6 +57,7 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -271,10 +272,14 @@ public:
             // We should always have a valid status member object at this point.
             auto status = WorkingSetCommon::getMemberObjectStatus(obj);
             invariant(!status.isOK());
-            warning() << "Plan executor error during distinct command: "
-                      << redact(PlanExecutor::statestr(state)) << ", status: " << status
-                      << ", stats: "
-                      << redact(Explain::getWinningPlanStats(executor.getValue().get()));
+            LOGV2_WARNING(
+                23797,
+                "Plan executor error during distinct command: {PlanExecutor_statestr_state}, "
+                "status: {status}, stats: {Explain_getWinningPlanStats_executor_getValue_get}",
+                "PlanExecutor_statestr_state"_attr = redact(PlanExecutor::statestr(state)),
+                "status"_attr = status,
+                "Explain_getWinningPlanStats_executor_getValue_get"_attr =
+                    redact(Explain::getWinningPlanStats(executor.getValue().get())));
 
             uassertStatusOK(status.withContext("Executor error during distinct command"));
         }

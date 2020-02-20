@@ -42,6 +42,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -141,7 +142,9 @@ PlanStage::StageState ProjectionStage::doWork(WorkingSetID* out) {
         // Punt to our specific projection impl.
         Status projStatus = transform(member);
         if (!projStatus.isOK()) {
-            warning() << "Couldn't execute projection, status = " << redact(projStatus);
+            LOGV2_WARNING(23827,
+                          "Couldn't execute projection, status = {projStatus}",
+                          "projStatus"_attr = redact(projStatus));
             *out = WorkingSetCommon::allocateStatusMember(&_ws, projStatus);
             return PlanStage::FAILURE;
         }

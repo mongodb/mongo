@@ -46,6 +46,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -635,8 +636,11 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
     }
 
     if (keysToAdd.size() > params.maxKeysPerInsert) {
-        warning() << "Insert of geo object generated a high number of keys."
-                  << " num keys: " << keysToAdd.size() << " obj inserted: " << redact(obj);
+        LOGV2_WARNING(23755,
+                      "Insert of geo object generated a high number of keys. num keys: "
+                      "{keysToAdd_size} obj inserted: {obj}",
+                      "keysToAdd_size"_attr = keysToAdd.size(),
+                      "obj"_attr = redact(obj));
     }
 
     invariant(keys->empty());

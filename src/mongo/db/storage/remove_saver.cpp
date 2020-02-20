@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log.h"
 
@@ -84,30 +85,39 @@ RemoveSaver::~RemoveSaver() {
         size_t resultLen;
         Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
-            severe() << "Unable to finalize DataProtector while closing RemoveSaver: "
-                     << redact(status);
+            LOGV2_FATAL(23736,
+                        "Unable to finalize DataProtector while closing RemoveSaver: {status}",
+                        "status"_attr = redact(status));
             fassertFailed(34350);
         }
 
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
-            severe() << "Couldn't write finalized DataProtector data to: " << _file.string()
-                     << " for remove saving: " << redact(errnoWithDescription());
+            LOGV2_FATAL(23737,
+                        "Couldn't write finalized DataProtector data to: {file_string} for remove "
+                        "saving: {errnoWithDescription}",
+                        "file_string"_attr = _file.string(),
+                        "errnoWithDescription"_attr = redact(errnoWithDescription()));
             fassertFailed(34351);
         }
 
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
         status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
-            severe() << "Unable to get finalizeTag from DataProtector while closing RemoveSaver: "
-                     << redact(status);
+            LOGV2_FATAL(
+                23738,
+                "Unable to get finalizeTag from DataProtector while closing RemoveSaver: {status}",
+                "status"_attr = redact(status));
             fassertFailed(34352);
         }
 
         if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
-            severe() << "Attempted to write tag of size " << resultLen
-                     << " when DataProtector only reserved "
-                     << _protector->getNumberOfBytesReservedForTag() << " bytes";
+            LOGV2_FATAL(23739,
+                        "Attempted to write tag of size {resultLen} when DataProtector only "
+                        "reserved {protector_getNumberOfBytesReservedForTag} bytes",
+                        "resultLen"_attr = resultLen,
+                        "protector_getNumberOfBytesReservedForTag"_attr =
+                            _protector->getNumberOfBytesReservedForTag());
             fassertFailed(34353);
         }
 
@@ -115,8 +125,11 @@ RemoveSaver::~RemoveSaver() {
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
 
         if (_out->fail()) {
-            severe() << "Couldn't write finalizeTag from DataProtector to: " << _file.string()
-                     << " for remove saving: " << redact(errnoWithDescription());
+            LOGV2_FATAL(23740,
+                        "Couldn't write finalizeTag from DataProtector to: {file_string} for "
+                        "remove saving: {errnoWithDescription}",
+                        "file_string"_attr = _file.string(),
+                        "errnoWithDescription"_attr = redact(errnoWithDescription()));
             fassertFailed(34354);
         }
     }
@@ -133,7 +146,7 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
         if (_out->fail()) {
             string msg = str::stream() << "couldn't create file: " << _file.string()
                                        << " for remove saving: " << redact(errnoWithDescription());
-            error() << msg;
+            LOGV2_ERROR(23734, "{msg}", "msg"_attr = msg);
             _out.reset();
             _out = nullptr;
             return Status(ErrorCodes::FileNotOpen, msg);
@@ -168,7 +181,7 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
     if (_out->fail()) {
         string msg = str::stream() << "couldn't write document to file: " << _file.string()
                                    << " for remove saving: " << redact(errnoWithDescription());
-        error() << msg;
+        LOGV2_ERROR(23735, "{msg}", "msg"_attr = msg);
         return Status(ErrorCodes::OperationFailed, msg);
     }
 

@@ -36,6 +36,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/util/log.h"
 
@@ -98,13 +99,19 @@ void SingleServerPingMonitor::_scheduleServerPing() {
     }
 
     if (ErrorCodes::isShutdownError(schedulePingHandle.getStatus().code())) {
-        LOG(1) << "Can't schedule ping for " << _hostAndPort << ". Executor shutdown in progress";
+        LOGV2_DEBUG(23727,
+                    1,
+                    "Can't schedule ping for {hostAndPort}. Executor shutdown in progress",
+                    "hostAndPort"_attr = _hostAndPort);
         return;
     }
 
     if (!schedulePingHandle.isOK()) {
-        severe() << "Can't continue scheduling pings to " << _hostAndPort << " due to "
-                 << redact(schedulePingHandle.getStatus());
+        LOGV2_FATAL(23732,
+                    "Can't continue scheduling pings to {hostAndPort} due to "
+                    "{schedulePingHandle_getStatus}",
+                    "hostAndPort"_attr = _hostAndPort,
+                    "schedulePingHandle_getStatus"_attr = redact(schedulePingHandle.getStatus()));
         fassertFailed(31434);
     }
 
@@ -149,13 +156,18 @@ void SingleServerPingMonitor::_doServerPing() {
         });
 
     if (ErrorCodes::isShutdownError(remotePingHandle.getStatus().code())) {
-        LOG(1) << "Can't ping " << _hostAndPort << ". Executor shutdown in progress";
+        LOGV2_DEBUG(23728,
+                    1,
+                    "Can't ping {hostAndPort}. Executor shutdown in progress",
+                    "hostAndPort"_attr = _hostAndPort);
         return;
     }
 
     if (!remotePingHandle.isOK()) {
-        severe() << "Can't continue pinging " << _hostAndPort << " due to "
-                 << redact(remotePingHandle.getStatus());
+        LOGV2_FATAL(23733,
+                    "Can't continue pinging {hostAndPort} due to {remotePingHandle_getStatus}",
+                    "hostAndPort"_attr = _hostAndPort,
+                    "remotePingHandle_getStatus"_attr = redact(remotePingHandle.getStatus()));
         fassertFailed(31435);
     }
 
@@ -228,21 +240,26 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(const sdam::ServerAddress
         std::make_shared<SingleServerPingMonitor>(address, _rttListener, _pingFrequency, _executor);
     _serverPingMonitorMap[address] = newSingleMonitor;
     newSingleMonitor->init();
-    LOG(1) << "ServerPingMonitor is now monitoring " << address;
+    LOGV2_DEBUG(
+        23729, 1, "ServerPingMonitor is now monitoring {address}", "address"_attr = address);
 }
 
 void ServerPingMonitor::onServerClosedEvent(const sdam::ServerAddress& address, OID topologyId) {
     stdx::lock_guard lk(_mutex);
     if (_isShutdown) {
-        LOG(1) << "ServerPingMonitor is in shutdown and will stop monitoring " << address
-               << " if it has not already done so.";
+        LOGV2_DEBUG(23730,
+                    1,
+                    "ServerPingMonitor is in shutdown and will stop monitoring {address} if it has "
+                    "not already done so.",
+                    "address"_attr = address);
         return;
     }
     auto it = _serverPingMonitorMap.find(address);
     invariant(it != _serverPingMonitorMap.end());
     it->second->drop();
     _serverPingMonitorMap.erase(it);
-    LOG(1) << "ServerPingMonitor stopped  monitoring " << address;
+    LOGV2_DEBUG(
+        23731, 1, "ServerPingMonitor stopped  monitoring {address}", "address"_attr = address);
 }
 
 

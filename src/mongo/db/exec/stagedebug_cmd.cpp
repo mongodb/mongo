@@ -63,6 +63,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -195,8 +196,11 @@ public:
         resultBuilder.done();
 
         if (PlanExecutor::FAILURE == state) {
-            error() << "Plan executor error during StageDebug command: FAILURE, stats: "
-                    << redact(Explain::getWinningPlanStats(exec.get()));
+            LOGV2_ERROR(23795,
+                        "Plan executor error during StageDebug command: FAILURE, stats: "
+                        "{Explain_getWinningPlanStats_exec_get}",
+                        "Explain_getWinningPlanStats_exec_get"_attr =
+                            redact(Explain::getWinningPlanStats(exec.get())));
 
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
                 "Executor error during StageDebug command"));

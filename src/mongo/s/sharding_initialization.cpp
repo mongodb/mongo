@@ -54,6 +54,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/balancer_configuration.h"
@@ -255,9 +256,10 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
             continue;
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
-            warning()
-                << "Error initializing sharding state, sleeping for 2 seconds and trying again"
-                << causedBy(status);
+            LOGV2_WARNING(23834,
+                          "Error initializing sharding state, sleeping for 2 seconds and trying "
+                          "again{causedBy_status}",
+                          "causedBy_status"_attr = causedBy(status));
             sleepFor(kRetryInterval);
             continue;
         }

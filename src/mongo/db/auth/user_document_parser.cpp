@@ -41,6 +41,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -456,30 +457,42 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
     std::string errmsg;
     for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
         if ((*it).type() != Object) {
-            warning() << "Wrong type of element in inheritedPrivileges array for "
-                      << user->getName() << ": " << *it;
+            LOGV2_WARNING(
+                23743,
+                "Wrong type of element in inheritedPrivileges array for {user_getName}: {it}",
+                "user_getName"_attr = user->getName(),
+                "it"_attr = *it);
             continue;
         }
         Privilege privilege;
         ParsedPrivilege pp;
         if (!pp.parseBSON((*it).Obj(), &errmsg)) {
-            warning() << "Could not parse privilege element in user document for "
-                      << user->getName() << ": " << errmsg;
+            LOGV2_WARNING(
+                23744,
+                "Could not parse privilege element in user document for {user_getName}: {errmsg}",
+                "user_getName"_attr = user->getName(),
+                "errmsg"_attr = errmsg);
             continue;
         }
         std::vector<std::string> unrecognizedActions;
         Status status =
             ParsedPrivilege::parsedPrivilegeToPrivilege(pp, &privilege, &unrecognizedActions);
         if (!status.isOK()) {
-            warning() << "Could not parse privilege element in user document for "
-                      << user->getName() << causedBy(status);
+            LOGV2_WARNING(23745,
+                          "Could not parse privilege element in user document for "
+                          "{user_getName}{causedBy_status}",
+                          "user_getName"_attr = user->getName(),
+                          "causedBy_status"_attr = causedBy(status));
             continue;
         }
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
             str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
-            warning() << "Encountered unrecognized actions \" " << unrecognizedActionsString
-                      << "\" while parsing user document for " << user->getName();
+            LOGV2_WARNING(23746,
+                          "Encountered unrecognized actions \" {unrecognizedActionsString}\" while "
+                          "parsing user document for {user_getName}",
+                          "unrecognizedActionsString"_attr = unrecognizedActionsString,
+                          "user_getName"_attr = user->getName());
         }
         privileges.push_back(privilege);
     }

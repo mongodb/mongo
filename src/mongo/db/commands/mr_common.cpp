@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -310,7 +311,7 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
                         (outputOptions.outType == OutputType::Reduce ||
                          outputOptions.outType == OutputType::Merge));
             } else if (nonAtomicDeprecationSampler.tick()) {
-                warning() << "Setting out.nonAtomic to false in MapReduce is deprecated.";
+                LOGV2_WARNING(23796, "Setting out.nonAtomic to false in MapReduce is deprecated.");
             }
         }
     } else {

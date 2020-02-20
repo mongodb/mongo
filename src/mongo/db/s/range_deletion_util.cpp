@@ -60,6 +60,7 @@
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/log.h"
 
@@ -85,15 +86,25 @@ bool collectionUuidHasChanged(const NamespaceString& nss,
                               UUID expectedCollectionUuid) {
 
     if (!currentCollection) {
-        LOG(1) << "Abandoning range deletion task for " << nss.ns() << " with UUID "
-               << expectedCollectionUuid << " because the collection has been dropped";
+        LOGV2_DEBUG(23763,
+                    1,
+                    "Abandoning range deletion task for {nss_ns} with UUID "
+                    "{expectedCollectionUuid} because the collection has been dropped",
+                    "nss_ns"_attr = nss.ns(),
+                    "expectedCollectionUuid"_attr = expectedCollectionUuid);
         return true;
     }
 
     if (currentCollection->uuid() != expectedCollectionUuid) {
-        LOG(1) << "Abandoning range deletion task for " << nss.ns() << " with UUID "
-               << expectedCollectionUuid << " because UUID of " << nss.ns()
-               << "has changed (current is " << currentCollection->uuid() << ")";
+        LOGV2_DEBUG(
+            23764,
+            1,
+            "Abandoning range deletion task for {nss_ns} with UUID {expectedCollectionUuid} "
+            "because UUID of {nss_ns2}has changed (current is {currentCollection_uuid})",
+            "nss_ns"_attr = nss.ns(),
+            "expectedCollectionUuid"_attr = expectedCollectionUuid,
+            "nss_ns2"_attr = nss.ns(),
+            "currentCollection_uuid"_attr = currentCollection->uuid());
         return true;
     }
 
@@ -123,7 +134,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     if (!idx) {
         std::string msg = str::stream()
             << "Unable to find shard key index for " << keyPattern.toString() << " in " << nss.ns();
-        LOG(0) << msg;
+        LOGV2(23765, "{msg}", "msg"_attr = msg);
         return {ErrorCodes::InternalError, msg};
     }
 
@@ -136,7 +147,12 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     const auto min = extend(range.getMin());
     const auto max = extend(range.getMax());
 
-    LOG(1) << "begin removal of " << min << " to " << max << " in " << nss.ns();
+    LOGV2_DEBUG(23766,
+                1,
+                "begin removal of {min} to {max} in {nss_ns}",
+                "min"_attr = min,
+                "max"_attr = max,
+                "nss_ns"_attr = nss.ns());
 
     const auto indexName = idx->indexName();
     const IndexDescriptor* descriptor =
@@ -144,7 +160,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     if (!descriptor) {
         std::string msg = str::stream()
             << "shard key index with name " << indexName << " on '" << nss.ns() << "' was dropped";
-        LOG(0) << msg;
+        LOGV2(23767, "{msg}", "msg"_attr = msg);
         return {ErrorCodes::InternalError, msg};
     }
 
@@ -169,7 +185,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                                      InternalPlanner::FORWARD);
 
     if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
-        LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
+        LOGV2(23768, "Hit hangBeforeDoingDeletion failpoint");
         hangBeforeDoingDeletion.pauseWhileSet(opCtx);
     }
 
@@ -194,9 +210,16 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::FAILURE) {
-            warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                      << redact(min) << " to " << redact(max) << " in " << nss
-                      << ": FAILURE, stats: " << Explain::getWinningPlanStats(exec.get());
+            LOGV2_WARNING(
+                23776,
+                "{PlanExecutor_statestr_state} - cursor error while trying to delete {min} to "
+                "{max} in {nss}: FAILURE, stats: {Explain_getWinningPlanStats_exec_get}",
+                "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
+                "min"_attr = redact(min),
+                "max"_attr = redact(max),
+                "nss"_attr = nss,
+                "Explain_getWinningPlanStats_exec_get"_attr =
+                    Explain::getWinningPlanStats(exec.get()));
             break;
         }
 
@@ -247,9 +270,13 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                    auto numDeleted = uassertStatusOK(deleteNextBatch(
                        opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
 
-                   LOG(0) << "Deleted " << numDeleted << " documents in pass in namespace "
-                          << nss.ns() << " with UUID " << collectionUuid << " for range "
-                          << range.toString();
+                   LOGV2(23769,
+                         "Deleted {numDeleted} documents in pass in namespace {nss_ns} with UUID "
+                         "{collectionUuid} for range {range}",
+                         "numDeleted"_attr = numDeleted,
+                         "nss_ns"_attr = nss.ns(),
+                         "collectionUuid"_attr = collectionUuid,
+                         "range"_attr = range.toString());
 
                    return numDeleted;
                });
@@ -299,8 +326,12 @@ void removePersistentRangeDeletionTask(const NamespaceString& nss,
                                << collectionUuid << RangeDeletionTask::kRangeFieldName
                                << range.toBSON()));
         } catch (const DBException& e) {
-            LOG(0) << "Failed to delete range deletion task for range " << range
-                   << " in collection " << nss << causedBy(e.what());
+            LOGV2(23770,
+                  "Failed to delete range deletion task for range {range} in collection "
+                  "{nss}{causedBy_e_what}",
+                  "range"_attr = range,
+                  "nss"_attr = nss,
+                  "causedBy_e_what"_attr = causedBy(e.what()));
         }
     });
 }
@@ -314,8 +345,12 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
-        LOG(0) << "Waiting for majority replication of local deletions in namespace " << nss.ns()
-               << " with UUID " << collectionUuid << " for range " << redact(range.toString());
+        LOGV2(23771,
+              "Waiting for majority replication of local deletions in namespace {nss_ns} with UUID "
+              "{collectionUuid} for range {range}",
+              "nss_ns"_attr = nss.ns(),
+              "collectionUuid"_attr = collectionUuid,
+              "range"_attr = redact(range.toString()));
 
         // Asynchronously wait for majority write concern.
         return WaitForMajorityService::get(opCtx->getServiceContext())
@@ -350,9 +385,12 @@ SharedSemiFuture<void> removeDocumentsInRange(
                               executor->now() + delayForActiveQueriesOnSecondariesToComplete);
         })
         .then([=]() mutable {
-            LOG(0) << "Beginning deletion of any documents in " << nss.ns() << " range "
-                   << redact(range.toString()) << " with numDocsToRemovePerBatch "
-                   << numDocsToRemovePerBatch;
+            LOGV2(23772,
+                  "Beginning deletion of any documents in {nss_ns} range {range} with "
+                  "numDocsToRemovePerBatch {numDocsToRemovePerBatch}",
+                  "nss_ns"_attr = nss.ns(),
+                  "range"_attr = redact(range.toString()),
+                  "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch);
 
             notifySecondariesThatDeletionIsOccurring(nss, collectionUuid, range);
 
@@ -372,11 +410,16 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .onCompletion([=](Status s) {
             if (s.isOK()) {
-                LOG(0) << "Completed deletion of documents in " << nss.ns() << " range "
-                       << redact(range.toString());
+                LOGV2(23773,
+                      "Completed deletion of documents in {nss_ns} range {range}",
+                      "nss_ns"_attr = nss.ns(),
+                      "range"_attr = redact(range.toString()));
             } else {
-                LOG(0) << "Failed to delete of documents in " << nss.ns() << " range "
-                       << redact(range.toString()) << causedBy(redact(s));
+                LOGV2(23774,
+                      "Failed to delete of documents in {nss_ns} range {range}{causedBy_s}",
+                      "nss_ns"_attr = nss.ns(),
+                      "range"_attr = redact(range.toString()),
+                      "causedBy_s"_attr = causedBy(redact(s)));
             }
 
             if (s.isOK() ||
@@ -384,8 +427,12 @@ SharedSemiFuture<void> removeDocumentsInRange(
                     ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 removePersistentRangeDeletionTask(nss, collectionUuid, range);
 
-                LOG(1) << "Completed removal of persistent range deletion task for " << nss.ns()
-                       << " range " << redact(range.toString());
+                LOGV2_DEBUG(23775,
+                            1,
+                            "Completed removal of persistent range deletion task for {nss_ns} "
+                            "range {range}",
+                            "nss_ns"_attr = nss.ns(),
+                            "range"_attr = redact(range.toString()));
             }
 
             // Propagate any errors to callers waiting on the result.

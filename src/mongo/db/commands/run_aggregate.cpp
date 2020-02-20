@@ -71,6 +71,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
@@ -201,9 +202,13 @@ bool handleCursorCommand(OperationContext* opCtx,
             // We should always have a valid status member object at this point.
             auto status = WorkingSetCommon::getMemberObjectStatus(nextDoc);
             invariant(!status.isOK());
-            warning() << "Aggregate command executor error: " << PlanExecutor::statestr(state)
-                      << ", status: " << status
-                      << ", stats: " << redact(Explain::getWinningPlanStats(exec));
+            LOGV2_WARNING(23799,
+                          "Aggregate command executor error: {PlanExecutor_statestr_state}, "
+                          "status: {status}, stats: {Explain_getWinningPlanStats_exec}",
+                          "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
+                          "status"_attr = status,
+                          "Explain_getWinningPlanStats_exec"_attr =
+                              redact(Explain::getWinningPlanStats(exec)));
 
             uassertStatusOK(status.withContext("PlanExecutor error during aggregation"));
         }

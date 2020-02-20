@@ -34,6 +34,7 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -65,7 +66,7 @@ void NetworkInterfaceThreadPool::_dtorImpl() {
 void NetworkInterfaceThreadPool::startup() {
     stdx::unique_lock<Latch> lk(_mutex);
     if (_started) {
-        severe() << "Attempting to start pool, but it has already started";
+        LOGV2_FATAL(23790, "Attempting to start pool, but it has already started");
         fassertFailed(34358);
     }
     _started = true;
@@ -87,7 +88,7 @@ void NetworkInterfaceThreadPool::join() {
         stdx::unique_lock<Latch> lk(_mutex);
 
         if (_joining) {
-            severe() << "Attempted to join pool more than once";
+            LOGV2_FATAL(23791, "Attempted to join pool more than once");
             fassertFailed(34357);
         }
 

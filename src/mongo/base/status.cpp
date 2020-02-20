@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -57,7 +58,7 @@ Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
         // have extra info.
         if (kDebugBuild) {
             // Make it easier to find this issue by fatally failing in debug builds.
-            severe() << "Code " << code << " is supposed to have extra info";
+            LOGV2_FATAL(23805, "Code {code} is supposed to have extra info", "code"_attr = code);
             fassertFailed(40680);
         }
 
@@ -126,8 +127,9 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& sb, const
             // This really shouldn't happen but it would be really annoying if it broke error
             // logging in production.
             if (kDebugBuild) {
-                severe() << "Error serializing extra info for " << status.code()
-                         << " in Status::toString()";
+                LOGV2_FATAL(23806,
+                            "Error serializing extra info for {status_code} in Status::toString()",
+                            "status_code"_attr = status.code());
                 std::terminate();
             }
         }

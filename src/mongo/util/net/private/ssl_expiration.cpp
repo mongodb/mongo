@@ -33,6 +33,7 @@
 
 #include <string>
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -58,8 +59,10 @@ void CertificateExpirationMonitor::taskDoWork() {
 
     if (_certExpiration <= now) {
         // The certificate has expired.
-        warning() << "Server certificate is now invalid. It expired on "
-                  << dateToISOStringUTC(_certExpiration);
+        LOGV2_WARNING(
+            23785,
+            "Server certificate is now invalid. It expired on {dateToISOStringUTC_certExpiration}",
+            "dateToISOStringUTC_certExpiration"_attr = dateToISOStringUTC(_certExpiration));
         return;
     }
 
@@ -67,8 +70,13 @@ void CertificateExpirationMonitor::taskDoWork() {
 
     if (remainingValidDuration <= 30 * oneDay) {
         // The certificate will expire in the next 30 days.
-        warning() << "Server certificate will expire on " << dateToISOStringUTC(_certExpiration)
-                  << " in " << durationCount<Hours>(remainingValidDuration) / 24 << " days.";
+        LOGV2_WARNING(23786,
+                      "Server certificate will expire on {dateToISOStringUTC_certExpiration} in "
+                      "{durationCount_Hours_remainingValidDuration_24} days.",
+                      "dateToISOStringUTC_certExpiration"_attr =
+                          dateToISOStringUTC(_certExpiration),
+                      "durationCount_Hours_remainingValidDuration_24"_attr =
+                          durationCount<Hours>(remainingValidDuration) / 24);
     }
 }
 

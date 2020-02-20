@@ -54,6 +54,7 @@
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
@@ -535,9 +536,14 @@ public:
                 // We should always have a valid status member object at this point.
                 auto status = WorkingSetCommon::getMemberObjectStatus(doc);
                 invariant(!status.isOK());
-                warning() << "Plan executor error during find command: "
-                          << PlanExecutor::statestr(state) << ", status: " << status
-                          << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
+                LOGV2_WARNING(
+                    23798,
+                    "Plan executor error during find command: {PlanExecutor_statestr_state}, "
+                    "status: {status}, stats: {Explain_getWinningPlanStats_exec_get}",
+                    "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
+                    "status"_attr = status,
+                    "Explain_getWinningPlanStats_exec_get"_attr =
+                        redact(Explain::getWinningPlanStats(exec.get())));
 
                 uassertStatusOK(status.withContext("Executor error during find command"));
             }

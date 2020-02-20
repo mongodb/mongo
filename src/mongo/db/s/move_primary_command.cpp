@@ -36,6 +36,7 @@
 #include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/log.h"
@@ -49,7 +50,9 @@ namespace {
  */
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
-        warning() << "movePrimary failed" << causedBy(redact(status));
+        LOGV2_WARNING(23762,
+                      "movePrimary failed{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(redact(status)));
         uassertStatusOK(status);
     }
 }

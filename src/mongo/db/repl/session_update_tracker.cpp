@@ -39,6 +39,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -191,10 +192,16 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
         return;
     }
 
-    severe() << "Entry for session " << lsid->toBSON() << " has txnNumber "
-             << *sessionInfo.getTxnNumber() << " < " << *existingSessionInfo.getTxnNumber();
-    severe() << "New oplog entry: " << redact(entry.toString());
-    severe() << "Existing oplog entry: " << redact(iter->second.toString());
+    LOGV2_FATAL(23792,
+                "Entry for session {lsid} has txnNumber {sessionInfo_getTxnNumber} < "
+                "{existingSessionInfo_getTxnNumber}",
+                "lsid"_attr = lsid->toBSON(),
+                "sessionInfo_getTxnNumber"_attr = *sessionInfo.getTxnNumber(),
+                "existingSessionInfo_getTxnNumber"_attr = *existingSessionInfo.getTxnNumber());
+    LOGV2_FATAL(23793, "New oplog entry: {entry}", "entry"_attr = redact(entry.toString()));
+    LOGV2_FATAL(23794,
+                "Existing oplog entry: {iter_second}",
+                "iter_second"_attr = redact(iter->second.toString()));
 
     fassertFailedNoTrace(50843);
 }

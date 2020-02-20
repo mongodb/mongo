@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/perfctr_collect.h"
 
@@ -144,8 +145,9 @@ void installSystemMetricsCollector(FTDCController* controller) {
 
     auto swCollector = createCollector();
     if (!swCollector.getStatus().isOK()) {
-        warning() << "Failed to initialize Performance Counters for FTDC: "
-                  << swCollector.getStatus();
+        LOGV2_WARNING(23718,
+                      "Failed to initialize Performance Counters for FTDC: {swCollector_getStatus}",
+                      "swCollector_getStatus"_attr = swCollector.getStatus());
         return;
     }
 

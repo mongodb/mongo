@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -171,7 +172,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
     }
 
     if (options.hasField("uniqueDocs"))
-        warning() << "ignoring deprecated uniqueDocs option in $geoNear aggregation stage";
+        LOGV2_WARNING(23758, "ignoring deprecated uniqueDocs option in $geoNear aggregation stage");
 
     if (auto keyElt = options[kKeyFieldName]) {
         uassert(ErrorCodes::TypeMismatch,

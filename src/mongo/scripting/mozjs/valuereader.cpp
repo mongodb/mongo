@@ -39,6 +39,7 @@
 #include <js/Date.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -79,7 +80,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 scope->getProto<CodeInfo>().newInstance(args, _value);
             } else {
                 if (!elem.codeWScopeObject().isEmpty())
-                    warning() << "CodeWScope doesn't transfer to db.eval";
+                    LOGV2_WARNING(23826, "CodeWScope doesn't transfer to db.eval");
                 scope->newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
                                    _value);
             }

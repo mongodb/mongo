@@ -43,6 +43,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
@@ -162,9 +163,11 @@ void startWatchdog() {
 
             checks.push_back(std::move(journalCheck));
         } else {
-            warning()
-                << "Watchdog is skipping check for journal directory since it does not exist: '"
-                << journalDirectory.generic_string() << "'";
+            LOGV2_WARNING(23835,
+                          "Watchdog is skipping check for journal directory since it does not "
+                          "exist: '{journalDirectory_generic_string}'",
+                          "journalDirectory_generic_string"_attr =
+                              journalDirectory.generic_string());
         }
     }
 

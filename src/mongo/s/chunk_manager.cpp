@@ -41,6 +41,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/util/log.h"
@@ -350,8 +351,9 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     // children.size() > 1, assert it's OR / SORT_MERGE.
     if (node->getType() != STAGE_OR && node->getType() != STAGE_SORT_MERGE) {
         // Unexpected node. We should never reach here.
-        error() << "could not generate index bounds on query solution tree: "
-                << redact(node->toString());
+        LOGV2_ERROR(23833,
+                    "could not generate index bounds on query solution tree: {node}",
+                    "node"_attr = redact(node->toString()));
         dassert(false);  // We'd like to know this error in testing.
 
         // Bail out with all shards in production, since this isn't a fatal error.

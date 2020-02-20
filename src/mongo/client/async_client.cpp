@@ -44,6 +44,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_request_builder.h"
@@ -111,7 +112,9 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     auto validateStatus =
         rpc::validateWireVersion(WireSpec::instance().outgoing, protocolSet.version);
     if (!validateStatus.isOK()) {
-        warning() << "remote host has incompatible wire version: " << validateStatus;
+        LOGV2_WARNING(23741,
+                      "remote host has incompatible wire version: {validateStatus}",
+                      "validateStatus"_attr = validateStatus);
         uasserted(validateStatus.code(),
                   str::stream() << "remote host has incompatible wire version: "
                                 << validateStatus.reason());

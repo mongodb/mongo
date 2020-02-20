@@ -43,6 +43,7 @@
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -61,7 +62,9 @@ namespace {
  */
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
-        warning() << "Chunk move failed" << causedBy(redact(status));
+        LOGV2_WARNING(23777,
+                      "Chunk move failed{causedBy_status}",
+                      "causedBy_status"_attr = causedBy(redact(status)));
         uassertStatusOK(status);
     }
 }

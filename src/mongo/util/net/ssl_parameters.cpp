@@ -37,6 +37,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
@@ -111,7 +112,8 @@ void SSLModeServerParameter::append(OperationContext*,
                                     BSONObjBuilder& builder,
                                     const std::string& fieldName) {
     std::call_once(warnForSSLMode, [] {
-        warning() << "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.";
+        LOGV2_WARNING(
+            23803, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
     });
 
     builder.append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
@@ -127,7 +129,8 @@ void TLSModeServerParameter::append(OperationContext*,
 
 Status SSLModeServerParameter::setFromString(const std::string& strMode) {
     std::call_once(warnForSSLMode, [] {
-        warning() << "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.";
+        LOGV2_WARNING(
+            23804, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
     });
 
     auto swNewMode = checkTLSModeTransition(

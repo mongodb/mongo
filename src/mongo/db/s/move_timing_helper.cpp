@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -90,8 +91,10 @@ MoveTimingHelper::~MoveTimingHelper() {
                                                 _b.obj(),
                                                 ShardingCatalogClient::kMajorityWriteConcern);
     } catch (const std::exception& e) {
-        warning() << "couldn't record timing for moveChunk '" << _where
-                  << "': " << redact(e.what());
+        LOGV2_WARNING(23759,
+                      "couldn't record timing for moveChunk '{where}': {e_what}",
+                      "where"_attr = _where,
+                      "e_what"_attr = redact(e.what()));
     }
 }
 

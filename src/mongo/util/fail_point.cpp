@@ -41,6 +41,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -174,7 +175,9 @@ FailPoint::RetCode FailPoint::_slowShouldFailOpenBlockWithoutIncrementingTimesEn
             return slowOff;
         }
         default:
-            error() << "FailPoint Mode not supported: " << static_cast<int>(_mode);
+            LOGV2_ERROR(23832,
+                        "FailPoint Mode not supported: {static_cast_int_mode}",
+                        "static_cast_int_mode"_attr = static_cast<int>(_mode));
             fassertFailed(16444);
     }
 }
@@ -302,7 +305,10 @@ auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
     if (failPoint == nullptr)
         uasserted(ErrorCodes::FailPointSetFailed, failPointName + " not found");
     auto timesEntered = failPoint->setMode(uassertStatusOK(FailPoint::parseBSON(cmdObj)));
-    warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
+    LOGV2_WARNING(23829,
+                  "failpoint: {failPointName} set to: {failPoint}",
+                  "failPointName"_attr = failPointName,
+                  "failPoint"_attr = failPoint->toBSON());
     return timesEntered;
 }
 
@@ -316,12 +322,18 @@ FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj da
 
     _initialTimesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
 
-    warning() << "failpoint: " << _failPointName << " set to: " << _failPoint->toBSON();
+    LOGV2_WARNING(23830,
+                  "failpoint: {failPointName} set to: {failPoint}",
+                  "failPointName"_attr = _failPointName,
+                  "failPoint"_attr = _failPoint->toBSON());
 }
 
 FailPointEnableBlock::~FailPointEnableBlock() {
     _failPoint->setMode(FailPoint::off);
-    warning() << "failpoint: " << _failPointName << " set to: " << _failPoint->toBSON();
+    LOGV2_WARNING(23831,
+                  "failpoint: {failPointName} set to: {failPoint}",
+                  "failPointName"_attr = _failPointName,
+                  "failPoint"_attr = _failPoint->toBSON());
 }
 
 FailPointRegistry::FailPointRegistry() : _frozen(false) {}

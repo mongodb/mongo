@@ -44,6 +44,7 @@
 #endif
 
 #include "mongo/base/init.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -74,7 +75,7 @@ void EnablePrivilege(const wchar_t* name) {
     LUID luid;
     if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
         auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
-        warning() << str;
+        LOGV2_WARNING(23704, "{str}", "str"_attr = str);
         return;
     }
 
@@ -82,7 +83,7 @@ void EnablePrivilege(const wchar_t* name) {
     HANDLE accessToken;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &accessToken)) {
         auto str = errnoWithPrefix("Failed to OpenProcessToken");
-        warning() << str;
+        LOGV2_WARNING(23705, "{str}", "str"_attr = str);
         return;
     }
 
@@ -97,12 +98,13 @@ void EnablePrivilege(const wchar_t* name) {
     if (!AdjustTokenPrivileges(
             accessToken, false, &privileges, sizeof(privileges), nullptr, nullptr)) {
         auto str = errnoWithPrefix("Failed to AdjustTokenPrivileges");
-        warning() << str;
+        LOGV2_WARNING(23706, "{str}", "str"_attr = str);
     }
 
     if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
-        warning() << "Failed to adjust token privilege for privilege '" << toUtf8String(name)
-                  << "'";
+        LOGV2_WARNING(23707,
+                      "Failed to adjust token privilege for privilege '{toUtf8String_name}'",
+                      "toUtf8String_name"_attr = toUtf8String(name));
     }
 }
 
@@ -132,7 +134,7 @@ void growWorkingSize(std::size_t bytes) {
 
     if (!GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize)) {
         auto str = errnoWithPrefix("Failed to GetProcessWorkingSetSize");
-        severe() << str;
+        LOGV2_FATAL(23708, "{str}", "str"_attr = str);
         fassertFailed(40285);
     }
 
@@ -147,7 +149,7 @@ void growWorkingSize(std::size_t bytes) {
                                     QUOTA_LIMITS_HARDWS_MIN_ENABLE |
                                         QUOTA_LIMITS_HARDWS_MAX_DISABLE)) {
         auto str = errnoWithPrefix("Failed to SetProcessWorkingSetSizeEx");
-        severe() << str;
+        LOGV2_FATAL(23709, "{str}", "str"_attr = str);
         fassertFailed(40286);
     }
 }
@@ -167,7 +169,7 @@ void* systemAllocate(std::size_t bytes) {
 
     if (!ptr) {
         auto str = errnoWithPrefix("Failed to VirtualAlloc");
-        severe() << str;
+        LOGV2_FATAL(23710, "{str}", "str"_attr = str);
         fassertFailed(28835);
     }
 
@@ -184,7 +186,7 @@ void* systemAllocate(std::size_t bytes) {
         }
 
         auto str = errnoWithPrefix("Failed to VirtualLock");
-        severe() << str;
+        LOGV2_FATAL(23711, "{str}", "str"_attr = str);
         fassertFailed(28828);
     }
 
@@ -194,7 +196,7 @@ void* systemAllocate(std::size_t bytes) {
 void systemDeallocate(void* ptr, std::size_t bytes) {
     if (VirtualUnlock(ptr, bytes) == 0) {
         auto str = errnoWithPrefix("Failed to VirtualUnlock");
-        severe() << str;
+        LOGV2_FATAL(23712, "{str}", "str"_attr = str);
         fassertFailed(28829);
     }
 
@@ -202,7 +204,7 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
     // (that's how the api works).
     if (VirtualFree(ptr, 0, MEM_RELEASE) == 0) {
         auto str = errnoWithPrefix("Failed to VirtualFree");
-        severe() << str;
+        LOGV2_FATAL(23713, "{str}", "str"_attr = str);
         fassertFailed(28830);
     }
 }
@@ -242,7 +244,7 @@ void* systemAllocate(std::size_t bytes) {
 
     if (!ptr) {
         auto str = errnoWithPrefix("Failed to mmap");
-        severe() << str;
+        LOGV2_FATAL(23714, "{str}", "str"_attr = str);
         fassertFailed(28831);
     }
 
@@ -250,7 +252,7 @@ void* systemAllocate(std::size_t bytes) {
         auto str = errnoWithPrefix(
             "Failed to mlock: Cannot allocate locked memory. For more details see: "
             "https://dochub.mongodb.org/core/cannot-allocate-locked-memory");
-        severe() << str;
+        LOGV2_FATAL(23715, "{str}", "str"_attr = str);
         fassertFailed(28832);
     }
 
@@ -270,12 +272,17 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
 #endif
 
     if (munlock(ptr, bytes) != 0) {
-        severe() << errnoWithPrefix("Failed to munlock");
+        LOGV2_FATAL(23716,
+                    "{errnoWithPrefix_Failed_to_munlock}",
+                    "errnoWithPrefix_Failed_to_munlock"_attr =
+                        errnoWithPrefix("Failed to munlock"));
         fassertFailed(28833);
     }
 
     if (munmap(ptr, bytes) != 0) {
-        severe() << errnoWithPrefix("Failed to munmap");
+        LOGV2_FATAL(23717,
+                    "{errnoWithPrefix_Failed_to_munmap}",
+                    "errnoWithPrefix_Failed_to_munmap"_attr = errnoWithPrefix("Failed to munmap"));
         fassertFailed(28834);
     }
 }

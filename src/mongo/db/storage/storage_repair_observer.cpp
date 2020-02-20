@@ -49,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 
@@ -123,8 +124,11 @@ void StorageRepairObserver::_touchRepairIncompleteFile() {
     boost::filesystem::ofstream fileStream(_repairIncompleteFilePath);
     fileStream << "This file indicates that a repair operation is in progress or incomplete.";
     if (fileStream.fail()) {
-        severe() << "Failed to write to file " << _repairIncompleteFilePath.string() << ": "
-                 << errnoWithDescription();
+        LOGV2_FATAL(
+            23756,
+            "Failed to write to file {repairIncompleteFilePath_string}: {errnoWithDescription}",
+            "repairIncompleteFilePath_string"_attr = _repairIncompleteFilePath.string(),
+            "errnoWithDescription"_attr = errnoWithDescription());
         fassertFailedNoTrace(50920);
     }
     fileStream.close();
@@ -138,8 +142,10 @@ void StorageRepairObserver::_removeRepairIncompleteFile() {
     boost::filesystem::remove(_repairIncompleteFilePath, ec);
 
     if (ec) {
-        severe() << "Failed to remove file " << _repairIncompleteFilePath.string() << ": "
-                 << ec.message();
+        LOGV2_FATAL(23757,
+                    "Failed to remove file {repairIncompleteFilePath_string}: {ec_message}",
+                    "repairIncompleteFilePath_string"_attr = _repairIncompleteFilePath.string(),
+                    "ec_message"_attr = ec.message());
         fassertFailedNoTrace(50921);
     }
     fassertNoTrace(50927, fsyncParentDirectory(_repairIncompleteFilePath));

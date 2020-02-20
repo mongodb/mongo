@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
@@ -111,28 +112,34 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {
         invariant(!engine->isEphemeral() || getTestCommandsEnabled());
-        warning() << "Attempted to increase the time window of available snapshots for "
-                     "point-in-time operations (readConcern level 'snapshot' or transactions), but "
-                     "the storage engine cache pressure, per the cachePressureThreshold setting of "
-                     "'"
-                  << snapshotWindowParams.cachePressureThreshold.load()
-                  << "', is too high to allow it to increase. If this happens frequently, consider "
-                     "either increasing the cache pressure threshold or increasing the memory "
-                     "available to the storage engine cache, in order to improve the success rate "
-                     "or speed of point-in-time requests.";
+        LOGV2_WARNING(
+            23788,
+            "Attempted to increase the time window of available snapshots for "
+            "point-in-time operations (readConcern level 'snapshot' or transactions), but "
+            "the storage engine cache pressure, per the cachePressureThreshold setting of "
+            "'{snapshotWindowParams_cachePressureThreshold_load}', is too high to allow it to "
+            "increase. If this happens frequently, consider "
+            "either increasing the cache pressure threshold or increasing the memory "
+            "available to the storage engine cache, in order to improve the success rate "
+            "or speed of point-in-time requests.",
+            "snapshotWindowParams_cachePressureThreshold_load"_attr =
+                snapshotWindowParams.cachePressureThreshold.load());
         _decreaseTargetSnapshotWindowSize(lock, opCtx);
         return;
     }
 
     if (snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load() ==
         snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load()) {
-        warning() << "Attempted to increase the time window of available snapshots for "
-                     "point-in-time operations (readConcern level 'snapshot' or transactions), but "
-                     "maxTargetSnapshotHistoryWindowInSeconds has already been reached. If this "
-                     "happens frequently, consider increasing the "
-                     "maxTargetSnapshotHistoryWindowInSeconds setting value, which is currently "
-                     "set to '"
-                  << snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load() << "'.";
+        LOGV2_WARNING(
+            23789,
+            "Attempted to increase the time window of available snapshots for "
+            "point-in-time operations (readConcern level 'snapshot' or transactions), but "
+            "maxTargetSnapshotHistoryWindowInSeconds has already been reached. If this "
+            "happens frequently, consider increasing the "
+            "maxTargetSnapshotHistoryWindowInSeconds setting value, which is currently "
+            "set to '{snapshotWindowParams_maxTargetSnapshotHistoryWindowInSeconds_load}'.",
+            "snapshotWindowParams_maxTargetSnapshotHistoryWindowInSeconds_load"_attr =
+                snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
         return;
     }
 

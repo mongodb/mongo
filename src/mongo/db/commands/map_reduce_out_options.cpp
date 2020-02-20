@@ -34,6 +34,7 @@
 
 #include "mongo/db/commands/map_reduce_out_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -68,7 +69,7 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                 uassert(
                     ErrorCodes::BadValue, "sharded field value must be true", sharded.boolean());
                 if (shardedDeprecationSampler.tick()) {
-                    warning() << "The out.sharded option in MapReduce is deprecated";
+                    LOGV2_WARNING(23703, "The out.sharded option in MapReduce is deprecated");
                 }
                 return true;
             } else {

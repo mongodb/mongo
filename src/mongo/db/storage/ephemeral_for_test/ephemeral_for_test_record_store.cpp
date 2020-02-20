@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"
@@ -305,8 +306,10 @@ const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecor
     WithLock, const RecordId& loc) const {
     Records::const_iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
-        error() << "EphemeralForTestRecordStore::recordFor cannot find record for " << ns() << ":"
-                << loc;
+        LOGV2_ERROR(23720,
+                    "EphemeralForTestRecordStore::recordFor cannot find record for {ns}:{loc}",
+                    "ns"_attr = ns(),
+                    "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
     return &it->second;
@@ -316,8 +319,10 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
     WithLock, const RecordId& loc) {
     Records::iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
-        error() << "EphemeralForTestRecordStore::recordFor cannot find record for " << ns() << ":"
-                << loc;
+        LOGV2_ERROR(23721,
+                    "EphemeralForTestRecordStore::recordFor cannot find record for {ns}:{loc}",
+                    "ns"_attr = ns(),
+                    "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
     return &it->second;

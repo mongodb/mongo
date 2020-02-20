@@ -40,6 +40,7 @@
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -187,8 +188,10 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
                                                const executor::RemoteCommandResponse& response) {
     ++_numResponses;
     if (!response.isOK()) {
-        warning() << "Failed to complete heartbeat request to " << request.target << "; "
-                  << response.status;
+        LOGV2_WARNING(23722,
+                      "Failed to complete heartbeat request to {request_target}; {response_status}",
+                      "request_target"_attr = request.target,
+                      "response_status"_attr = response.status);
         _badResponses.push_back(std::make_pair(request.target, response.status));
         return;
     }
@@ -201,13 +204,17 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
         std::string message = str::stream()
             << "Our set name did not match that of " << request.target.toString();
         _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
-        warning() << message;
+        LOGV2_WARNING(23723, "{message}", "message"_attr = message);
         return;
     }
 
     if (!hbStatus.isOK() && hbStatus != ErrorCodes::InvalidReplicaSetConfig) {
-        warning() << "Got error (" << hbStatus << ") response on heartbeat request to "
-                  << request.target << "; " << hbResp;
+        LOGV2_WARNING(
+            23724,
+            "Got error ({hbStatus}) response on heartbeat request to {request_target}; {hbResp}",
+            "hbStatus"_attr = hbStatus,
+            "request_target"_attr = request.target,
+            "hbResp"_attr = hbResp);
         _badResponses.push_back(std::make_pair(request.target, hbStatus));
         return;
     }
@@ -219,7 +226,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
                 << " is no larger than the version on " << request.target.toString()
                 << ", which is " << hbResp.getConfigVersion();
             _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
-            warning() << message;
+            LOGV2_WARNING(23725, "{message}", "message"_attr = message);
             return;
         }
     }
@@ -234,7 +241,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
                 << " did not match that of " << request.target.toString() << ", which is "
                 << replMetadata.getValue().getReplicaSetId();
             _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
-            warning() << message;
+            LOGV2_WARNING(23726, "{message}", "message"_attr = message);
         }
     }
 

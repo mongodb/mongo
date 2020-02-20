@@ -44,6 +44,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -110,8 +111,11 @@ ServiceContext::ServiceContext()
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
     for (const auto& client : _clients) {
-        severe() << "Client " << client->desc() << " still exists while destroying ServiceContext@"
-                 << reinterpret_cast<uint64_t>(this);
+        LOGV2_FATAL(23828,
+                    "Client {client_desc} still exists while destroying "
+                    "ServiceContext@{reinterpret_cast_uint64_t_this}",
+                    "client_desc"_attr = client->desc(),
+                    "reinterpret_cast_uint64_t_this"_attr = reinterpret_cast<uint64_t>(this));
     }
     invariant(_clients.empty());
 }

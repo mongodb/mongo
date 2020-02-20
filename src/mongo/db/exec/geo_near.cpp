@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/geo_near.h"
 
+#include "mongo/logv2/log.h"
 #include <memory>
 #include <vector>
 
@@ -125,12 +126,15 @@ static void extractGeometries(const BSONObj& doc,
                     // Valid geometry element
                     geometries->push_back(std::move(stored));
                 } else {
-                    warning() << "geoNear stage read non-geometry element " << redact(nextEl)
-                              << " in array " << redact(el);
+                    LOGV2_WARNING(23760,
+                                  "geoNear stage read non-geometry element {nextEl} in array {el}",
+                                  "nextEl"_attr = redact(nextEl),
+                                  "el"_attr = redact(el));
                 }
             }
         } else {
-            warning() << "geoNear stage read non-geometry element " << redact(el);
+            LOGV2_WARNING(
+                23761, "geoNear stage read non-geometry element {el}", "el"_attr = redact(el));
         }
     }
 }
