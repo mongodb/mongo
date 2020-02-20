@@ -211,6 +211,25 @@ def main():
     trace_doc = trace_doc[trace_doc.find('{'):]
     trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
+    # Search the trace_doc for an object having "backtrace" and "processInfo" keys.
+    def bt_search(obj):
+        try:
+            if "backtrace" in obj and "processInfo" in obj:
+                return obj
+            for _, val in obj.items():
+                res = bt_search(val)
+                if res:
+                    return res
+        except (TypeError, AttributeError):
+            pass
+        return None
+
+    trace_doc = bt_search(trace_doc)
+
+    if not trace_doc:
+        print("could not find json backtrace object in input", file=sys.stderr)
+        exit(1)
+
     output_fn = None
     if options.output_format == 'json':
         output_fn = json.dump
