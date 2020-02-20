@@ -216,11 +216,10 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                 // If lastError is set, this is a retry.
                 hangBeforeRetryingClonerStage.executeIf(
                     [&](const BSONObj& data) {
-                        LOGV2(
-                            21074,
-                            "Cloner {getClonerName} hanging before retrying stage {stage_getName}",
-                            "getClonerName"_attr = getClonerName(),
-                            "stage_getName"_attr = stage->getName());
+                        LOGV2(21074,
+                              "Cloner {cloner} hanging before retrying stage {stage}",
+                              "cloner"_attr = getClonerName(),
+                              "stage"_attr = stage->getName());
                         while (!mustExit() &&
                                hangBeforeRetryingClonerStage.shouldFail(isThisStageFailPoint)) {
                             sleepmillis(100);
@@ -228,10 +227,10 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     },
                     isThisStageFailPoint);
                 LOGV2(21075,
-                      "Initial Sync retrying {getClonerName} stage {stage_getName} due to "
+                      "Initial Sync retrying {cloner} stage {stage} due to "
                       "{lastError}",
-                      "getClonerName"_attr = getClonerName(),
-                      "stage_getName"_attr = stage->getName(),
+                      "cloner"_attr = getClonerName(),
+                      "stage"_attr = stage->getName(),
                       "lastError"_attr = lastError);
                 bool shouldRetry = [&] {
                     stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
@@ -249,10 +248,10 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                 hangBeforeCheckingRollBackIdClonerStage.executeIf(
                     [&](const BSONObj& data) {
                         LOGV2(21076,
-                              "Cloner {getClonerName} hanging before checking rollBackId for stage "
-                              "{stage_getName}",
-                              "getClonerName"_attr = getClonerName(),
-                              "stage_getName"_attr = stage->getName());
+                              "Cloner {cloner} hanging before checking rollBackId for stage "
+                              "{stage}",
+                              "cloner"_attr = getClonerName(),
+                              "stage"_attr = stage->getName());
                         while (!mustExit() &&
                                hangBeforeCheckingRollBackIdClonerStage.shouldFail(
                                    isThisStageFailPoint)) {
@@ -275,18 +274,18 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
             if (!stage->isTransientError(lastError)) {
                 LOGV2(21077,
                       "Non-retryable error occured during cloner "
-                      "{getClonerName}{stage_stage_getName}: {lastError}",
-                      "getClonerName"_attr = getClonerName(),
-                      "stage_stage_getName"_attr = " stage " + stage->getName(),
+                      "{cloner} stage {stage}: {lastError}",
+                      "cloner"_attr = getClonerName(),
+                      "stage"_attr = stage->getName(),
                       "lastError"_attr = lastError);
                 throw;
             }
             LOGV2_DEBUG(21078,
                         1,
                         "Transient error occured during cloner "
-                        "{getClonerName}{stage_stage_getName}: {lastError}",
-                        "getClonerName"_attr = getClonerName(),
-                        "stage_stage_getName"_attr = " stage " + stage->getName(),
+                        "{cloner} stage {stage}: {lastError}",
+                        "cloner"_attr = getClonerName(),
+                        "stage"_attr = stage->getName(),
                         "lastError"_attr = lastError);
         }
     }

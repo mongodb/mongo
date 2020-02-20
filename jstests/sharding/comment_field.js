@@ -169,7 +169,7 @@ function runCommentParamTest({
             checkLog.formatAsLogLine(commentObj),
             'appName: "MongoDB Shell" command: ' + ((cmdName === "getMore") ? cmdName : "")
         ];
-        if (isJsonLog(testDB)) {
+        if (isJsonLog(testDB.getMongo())) {
             expectStrings = [
                 ',"comment":',
                 checkLog.formatAsJsonLogLine(commentObj),

@@ -3,10 +3,6 @@ test_kind: js_test
 selector:
   roots:
   - jstests/replsets/*.js
-  exclude_files:
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/replsets/initial_sync_drop_collection.js
-  - jstests/replsets/initial_sync_rename_collection.js
 
 executor:
   config:

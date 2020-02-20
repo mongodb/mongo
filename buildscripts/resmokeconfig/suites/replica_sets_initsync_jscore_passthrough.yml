@@ -36,8 +36,6 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
 
 run_hook_interval: &run_hook_interval 20
 executor:

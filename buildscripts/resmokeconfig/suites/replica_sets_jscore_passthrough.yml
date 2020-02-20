@@ -19,8 +19,6 @@ selector:
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
   - jstests/core/set_param1.js
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
 
 executor:
   archive:

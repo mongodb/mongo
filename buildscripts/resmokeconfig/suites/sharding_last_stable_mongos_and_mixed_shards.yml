@@ -30,9 +30,8 @@ selector:
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable when SERVER-43310 is backported
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
-  # Disable incompatible with json logging per SERVER-46235
+  # SERVER-46018 Disable incompatible with ramlog truncation.
   - jstests/sharding/read_write_concern_defaults_application.js
-  - jstests/sharding/comment_field.js
 
 executor:
   config:

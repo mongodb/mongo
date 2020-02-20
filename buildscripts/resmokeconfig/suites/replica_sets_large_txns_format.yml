@@ -6,10 +6,6 @@ selector:
   exclude_with_any_tags:
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
-  exclude_files:
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/replsets/initial_sync_drop_collection.js
-  - jstests/replsets/initial_sync_rename_collection.js
 
 executor:
   config:

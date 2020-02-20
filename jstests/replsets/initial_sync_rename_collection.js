@@ -163,9 +163,7 @@ runRenameTest({
 });
 
 const expectedLogFor5and7 = isJsonLogNoConn()
-    ?
-
-    '`Initial Sync retrying {getClonerName} stage {stage_getName} due to {lastError}","attr":{"getClonerName":"CollectionCloner","stage_getName":"query","lastError":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}"}}}`'
+    ? '`Initial Sync retrying {cloner} stage {stage} due to {lastError}","attr":{"cloner":"CollectionCloner","stage":"query","lastError":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}"}}}`'
     : "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
 
 jsTestLog("[5] Testing rename between getMores.");
@@ -180,8 +178,9 @@ let expectedLogFor6and8 =
     "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`";
 
 if (isJsonLogNoConn()) {
+    // Double escape the backslash as eval will do unescaping
     expectedLogFor6and8 =
-        '`CollectionCloner ns: \'{ns}\' uuid: UUID("{uuid}") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
+        '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
 }
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
@@ -189,8 +188,13 @@ if (isJsonLogNoConn()) {
 // the cloner queries collection by UUID, it will observe the first drop phase as a rename.
 // We still want to check that initial sync succeeds in such a case.
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
-    expectedLogFor6and8 =
-        "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${dropPendingNss}'. UUID ${uuid}`";
+    if (isJsonLogNoConn()) {
+        expectedLogFor6and8 =
+            '`Initial Sync retrying {cloner} stage {stage} due to {lastError}","attr":{"cloner":"CollectionCloner","stage":"query","lastError":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${dropPendingNss}\'. UUID ${uuid}`';
+    } else {
+        expectedLogFor6and8 =
+            "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${dropPendingNss}'. UUID ${uuid}`";
+    }
 }
 
 jsTestLog("[6] Testing cross-DB rename between getMores.");

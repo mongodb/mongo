@@ -13,8 +13,6 @@ selector:
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
   - jstests/core/capped_update.js
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
 
 executor:
   archive:

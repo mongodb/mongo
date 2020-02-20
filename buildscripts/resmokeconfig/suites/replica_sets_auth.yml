@@ -15,9 +15,6 @@ selector:
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
-  # Disable incompatible with json logging per SERVER-46235
-  - jstests/replsets/initial_sync_drop_collection.js
-  - jstests/replsets/initial_sync_rename_collection.js
 
 executor:
   config:
