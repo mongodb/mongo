@@ -99,6 +99,10 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
+#include <fmt/format.h>
+
+using namespace fmt::literals;
+
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
@@ -250,7 +254,8 @@ private:
 StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                                                       const CommandInvocation* invocation,
                                                       const BSONObj& cmdObj,
-                                                      bool startTransaction) {
+                                                      bool startTransaction,
+                                                      bool isInternalClient) {
     repl::ReadConcernArgs readConcernArgs;
 
     auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
@@ -265,19 +270,30 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
         repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
         !opCtx->getClient()->isInDirectClient()) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-            serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // ReadConcern should always be explicitly specified by operations received on shard and
-            // config servers, even if it is empty (ie. readConcern: {}).  In this context
-            // (shard/config servers) an empty RC indicates the operation should use the implicit
-            // server defaults.  So, warn if the operation has not specified readConcern and is on a
-            // shard/config server.
-            if (!readConcernArgs.isSpecified()) {
-                // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                // LOGV2(21954, "Missing readConcern on {invocation_definition_getName}",
-                // "invocation_definition_getName"_attr = invocation->definition()->getName());
+
+        if (serverGlobalParams.featureCompatibility.isVersion(
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+            if (isInternalClient) {
+                // ReadConcern should always be explicitly specified by operations received from
+                // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
+                // readConcern: {}, meaning to use the implicit server defaults).
+                uassert(
+                    4569200,
+                    "received command without explicit readConcern on an internalClient connection {}"_format(
+                        redact(cmdObj.toString())),
+                    readConcernArgs.isSpecified());
+            } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                       serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                if (!readConcernArgs.isSpecified()) {
+                    // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                    // LOGV2(21954, "Missing readConcern on {invocation_definition_getName}",
+                    // "invocation_definition_getName"_attr = invocation->definition()->getName());
+                }
             }
-        } else {
+        }
+
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             // A member in a regular replica set.  Since these servers receive client queries, in
             // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
@@ -670,6 +686,9 @@ bool runCommandImpl(OperationContext* opCtx,
 #endif
     replyBuilder->reserveBytes(bytesToReserve);
 
+    const auto isInternalClient = opCtx->getClient()->session() &&
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+
     const bool shouldCheckOutSession =
         sessionOptions.getTxnNumber() && !shouldCommandSkipSessionCheckout(command->getName());
 
@@ -699,13 +718,27 @@ bool runCommandImpl(OperationContext* opCtx,
             // a shard/config server.
             if (!opCtx->getClient()->isInDirectClient() &&
                 (!opCtx->inMultiDocumentTransaction() ||
-                 isTransactionCommand(command->getName())) &&
-                (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer) &&
-                !request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
-                // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                // LOGV2(21959, "Missing writeConcern on {command_getName}", "command_getName"_attr
-                // = command->getName());
+                 isTransactionCommand(command->getName()))) {
+                if (serverGlobalParams.featureCompatibility.isVersion(
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+                    if (isInternalClient) {
+                        // WriteConcern should always be explicitly specified by operations received
+                        // from internal clients (ie. from a mongos or mongod), even if it is empty
+                        // (ie. writeConcern: {}, which is equivalent to { w: 1, wtimeout: 0 }).
+                        uassert(
+                            4569201,
+                            "received command without explicit writeConcern on an internalClient connection {}"_format(
+                                redact(request.body.toString())),
+                            request.body.hasField(WriteConcernOptions::kWriteConcernField));
+                    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                               serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                        if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
+                            // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                            // LOGV2(21959, "Missing writeConcern on {command_getName}",
+                            // "command_getName"_attr = command->getName());
+                        }
+                    }
+                }
             }
             extractedWriteConcern.emplace(
                 uassertStatusOK(extractWriteConcern(opCtx, request.body)));
@@ -837,8 +870,6 @@ bool runCommandImpl(OperationContext* opCtx,
         if (response.hasField("writeConcernError")) {
             wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
         }
-        auto isInternalClient = opCtx->getClient()->session() &&
-            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         appendErrorLabelsAndTopologyVersion(
             opCtx, &body, sessionOptions, command->getName(), code, wcCode, isInternalClient);
     }
@@ -869,6 +900,9 @@ void execCommandDatabase(OperationContext* opCtx,
     CommandInvocation::set(opCtx, invocation);
 
     OperationSessionInfoFromClient sessionOptions;
+
+    const auto isInternalClient = opCtx->getClient()->session() &&
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
 
     try {
         {
@@ -1035,8 +1069,8 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction();
         bool startTransaction = static_cast<bool>(sessionOptions.getStartTransaction());
         if (!skipReadConcern) {
-            auto newReadConcernArgs = uassertStatusOK(
-                _extractReadConcern(opCtx, invocation.get(), request.body, startTransaction));
+            auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(
+                opCtx, invocation.get(), request.body, startTransaction, isInternalClient));
 
             // Ensure that the RC being set on the opCtx has provenance.
             invariant(newReadConcernArgs.getProvenance().hasSource(),
@@ -1154,8 +1188,6 @@ void execCommandDatabase(OperationContext* opCtx,
         if (response.hasField("writeConcernError")) {
             wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
         }
-        auto isInternalClient = opCtx->getClient()->session() &&
-            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         appendErrorLabelsAndTopologyVersion(opCtx,
                                             &extraFieldsBuilder,
                                             sessionOptions,
@@ -1172,7 +1204,7 @@ void execCommandDatabase(OperationContext* opCtx,
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         if (readConcernArgs.isEmpty()) {
             auto readConcernArgsStatus =
-                _extractReadConcern(opCtx, invocation.get(), request.body, false);
+                _extractReadConcern(opCtx, invocation.get(), request.body, false, isInternalClient);
             if (readConcernArgsStatus.isOK()) {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
