@@ -309,13 +309,13 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber);
         })
-        .onCompletion([this, deadlineFuture = std::move(deadlineFuture)](Status s) mutable {
+        .getAsync([this, deadlineFuture = std::move(deadlineFuture)](Status s) mutable {
             // Interrupt this coordinator's scheduler hierarchy and join the deadline task's future
             // in order to guarantee that there are no more threads running within the coordinator.
             _scheduler->shutdown(
                 {ErrorCodes::TransactionCoordinatorDeadlineTaskCanceled, "Coordinator completed"});
 
-            return std::move(deadlineFuture).onCompletion([this, s = std::move(s)](Status) {
+            return std::move(deadlineFuture).getAsync([this, s = std::move(s)](Status) {
                 // Notify all the listeners which are interested in the coordinator's lifecycle.
                 // After this call, the coordinator object could potentially get destroyed by its
                 // lifetime controller, so there shouldn't be any accesses to `this` after this

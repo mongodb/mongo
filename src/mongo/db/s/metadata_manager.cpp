@@ -456,7 +456,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     // from the _rangesScheduledForDeletion.  std::list iterators are never invalidated, which
     // allows us to save the iterator pointing to the newly added element for use later when
     // deleting it.
-    cleanupComplete.thenRunOn(_executor).onCompletion(
+    cleanupComplete.thenRunOn(_executor).getAsync(
         [self = shared_from_this(), it = _rangesScheduledForDeletion.begin()](Status s) {
             stdx::lock_guard<Latch> lg(self->_managerLock);
             self->_rangesScheduledForDeletion.erase(it);

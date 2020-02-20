@@ -540,7 +540,7 @@ Future(StatusWith<T>)->Future<T>;
  * because they will propagate out BrokenPromise if the executor refuses work.
  */
 template <typename T>
-class ExecutorFuture : private SemiFuture<T> {
+class MONGO_WARN_UNUSED_RESULT_CLASS ExecutorFuture : private SemiFuture<T> {
     using Impl = typename SemiFuture<T>::Impl;
     using T_unless_void = typename SemiFuture<T>::T_unless_void;
 
