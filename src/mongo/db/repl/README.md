@@ -57,16 +57,12 @@ satisfy write concerns.
 
 A secondary keeps its data synchronized with its sync source by fetching oplog entries from its sync
 source. This is done via the
-[`OplogFetcher`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/oplog_fetcher.h).
+[`OplogFetcher`](https://github.com/mongodb/mongo/blob/929cd5af6623bb72f05d3364942e84d053ddea0d/src/mongo/db/repl/oplog_fetcher.h).
 
-The `OplogFetcher` first sends a `find` command to the sync source's oplog, and then follows with a
-series of `getMore`s on the cursor.
-
-The `OplogFetcher` makes use of the
-[`Fetcher`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/client/fetcher.h) for this task,
-which is a generic class used for fetching data from a collection on a remote node. A `Fetcher` is
-given a `find` command and then follows that command with `getMore` requests. The `Fetcher` also
-takes in a callback function that is called with the results of every batch.
+The `OplogFetcher` first creates a connection to the sync source. Through this connection, it will
+establish an **exhaust cursor** to fetch oplog entries. This means that after the initial `find` and
+`getMore` are sent, the sync source will keep sending all subsequent batches without needing the
+fetching node to run any additional `getMore`s.
 
 Let’s refer to the sync source as node A and the fetching node as node B.
 
@@ -82,14 +78,18 @@ After getting the original `find` response, secondaries check the metadata that 
 response to see if the sync source is still a good sync source. Secondaries check that the node has
 not rolled back since it was chosen and that it is still ahead of them.
 
-The `OplogFetcher` uses **long-polling**. It specifies `awaitData: true, tailable: true` so that the
-`getMore`s block until their `maxTimeMS` expires waiting for more data instead of returning
+The `OplogFetcher` specifies `awaitData: true, tailable: true` on the cursor so that subsequent
+batches block until their `maxTimeMS` expires waiting for more data instead of returning
 immediately. If there is no data to return at the end of `maxTimeMS`, the `OplogFetcher` receives an
-empty batch and simply issues another `getMore`.
+empty batch and will wait on the next batch.
 
-If any fetch requests have an error, then the `OplogFetcher` creates a new `Fetcher`. It restarts
-the `Fetcher` with a new `find` command each time it receives an error for a maximum of 3 retries.
-If it expires its retries then the `OplogFetcher` shuts down with an error status.
+If the `OplogFetcher` encounters any errors while trying to connect to the sync source or get a
+batch, it will use `OplogFetcherRestartDecision` to check that it has enough retries left to create
+a new cursor. The connection class will automatically handle reconnecting to the sync source when
+needed. Whenever the `OplogFetcher` successfully receives a batch, it will reset its retries. If it
+errors enough times in a row to exhaust its retries, that might be an indication that there is
+something wrong with the connection or the sync source. In that case, the `OplogFetcher` will shut
+down with an error status.
 
 The `OplogFetcher` is owned by the
 [`BackgroundSync`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/bgsync.h) thread.
