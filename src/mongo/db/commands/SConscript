@@ -550,6 +550,21 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="command_mirroring_test",
+    source=[
+        'command_mirroring_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/commands/standalone',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.CppUnitTest(
     target="db_commands_test",
     source=[
         "index_filter_commands_test.cpp",
