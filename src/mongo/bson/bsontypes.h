@@ -79,7 +79,7 @@ enum BSONType {
     Array = 4,
     /** binary data */
     BinData = 5,
-    /** Undefined type */
+    /** (Deprecated) Undefined type */
     Undefined = 6,
     /** ObjectId */
     jstOID = 7,
@@ -91,13 +91,13 @@ enum BSONType {
     jstNULL = 10,
     /** regular expression, a pattern with options */
     RegEx = 11,
-    /** deprecated / will be redesigned */
+    /** (Deprecated) */
     DBRef = 12,
-    /** deprecated / use CodeWScope */
+    /** code type */
     Code = 13,
-    /** a programming language (e.g., Python) symbol */
+    /** (Deprecated) a programming language (e.g., Python) symbol */
     Symbol = 14,
-    /** javascript code that can execute on the database server, with SavedContext */
+    /** (Deprecated) javascript code that can execute on the database server, with SavedContext */
     CodeWScope = 15,
     /** 32 bit signed integer */
     NumberInt = 16,

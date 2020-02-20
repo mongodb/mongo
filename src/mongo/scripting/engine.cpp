@@ -239,8 +239,15 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         BSONElement n = o["_id"];
         BSONElement v = o["value"];
 
-        uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
-        uassert(10210, "value has to be set", v.type() != EOO);
+        uassert(
+            10209, str::stream() << "name has to be a string: " << n, n.type() == BSONType::String);
+        uassert(10210, "value has to be set", v.type() != BSONType::EOO);
+
+        uassert(4546000,
+                str::stream() << "BSON type 'CodeWithScope' not supported in system.js scripts. As "
+                                 "an alternative use 'Code'. Script _id value: '"
+                              << n.String() << "'",
+                v.type() != BSONType::CodeWScope);
 
         if (MONGO_unlikely(mr_killop_test_fp.shouldFail())) {
 
