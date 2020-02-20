@@ -147,7 +147,7 @@ struct HasToString : std::false_type {};
 
 template <class T>
 struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>>
-    : std::is_same<decltype(std::declval<T>().toString()), std::string> {};
+    : std::is_same<std::remove_cv_t<decltype(std::declval<T>().toString())>, std::string> {};
 
 template <class T, class = void>
 struct HasToStringReturnStringData : std::false_type {};
