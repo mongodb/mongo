@@ -76,7 +76,7 @@ public:
         stats.appendToBSON(builder, true /* forFTDC */);
 
         // All replica sets being tracked.
-        globalRSMonitorManager.report(&builder, true /* forFTDC */);
+        ReplicaSetMonitorManager::get()->report(&builder, true /* forFTDC */);
     }
 
     std::string name() const override {

@@ -53,8 +53,10 @@ class ReplicaSetMonitorManager {
     ReplicaSetMonitorManager& operator=(const ReplicaSetMonitorManager&) = delete;
 
 public:
-    ReplicaSetMonitorManager();
+    ReplicaSetMonitorManager() = default;
     ~ReplicaSetMonitorManager();
+
+    static ReplicaSetMonitorManager* get();
 
     /**
      * Create or retrieve a monitor for a particular replica set. The getter method returns

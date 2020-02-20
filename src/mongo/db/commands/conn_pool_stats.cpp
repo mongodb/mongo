@@ -107,7 +107,7 @@ public:
         stats.appendToBSON(result);
 
         // Always report all replica sets being tracked.
-        globalRSMonitorManager.report(&result);
+        ReplicaSetMonitorManager::get()->report(&result);
 
         return true;
     }

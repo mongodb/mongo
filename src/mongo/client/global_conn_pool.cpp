@@ -51,6 +51,4 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeGlobalConnectionPool, ("EndStartu
 
 DBConnectionPool globalConnPool;
 
-ReplicaSetMonitorManager globalRSMonitorManager;
-
 }  // namespace mongo

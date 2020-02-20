@@ -189,8 +189,10 @@ Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
 ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
 
 ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri)
-    : ReplicaSetMonitor(std::make_shared<SetState>(
-          uri, &globalRSMonitorManager.getNotifier(), globalRSMonitorManager.getExecutor())) {}
+    : ReplicaSetMonitor(
+          std::make_shared<SetState>(uri,
+                                     &ReplicaSetMonitorManager::get()->getNotifier(),
+                                     ReplicaSetMonitorManager::get()->getExecutor())) {}
 
 void ReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest.load()) {
@@ -432,20 +434,20 @@ bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const string& name,
                                                                 const set<HostAndPort>& servers) {
-    return globalRSMonitorManager.getOrCreateMonitor(
+    return ReplicaSetMonitorManager::get()->getOrCreateMonitor(
         ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())));
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const MongoURI& uri) {
-    return globalRSMonitorManager.getOrCreateMonitor(uri);
+    return ReplicaSetMonitorManager::get()->getOrCreateMonitor(uri);
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name) {
-    return globalRSMonitorManager.getMonitor(name);
+    return ReplicaSetMonitorManager::get()->getMonitor(name);
 }
 
 void ReplicaSetMonitor::remove(const string& name) {
-    globalRSMonitorManager.removeMonitor(name);
+    ReplicaSetMonitorManager::get()->removeMonitor(name);
 
     // Kill all pooled ReplicaSetConnections for this set. They will not function correctly
     // after we kill the ReplicaSetMonitor.
@@ -453,7 +455,7 @@ void ReplicaSetMonitor::remove(const string& name) {
 }
 
 ReplicaSetChangeNotifier& ReplicaSetMonitor::getNotifier() {
-    return globalRSMonitorManager.getNotifier();
+    return ReplicaSetMonitorManager::get()->getNotifier();
 }
 
 // TODO move to correct order with non-statics before pushing
@@ -491,11 +493,11 @@ void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, bool forFTDC)
 }
 
 void ReplicaSetMonitor::shutdown() {
-    globalRSMonitorManager.shutdown();
+    ReplicaSetMonitorManager::get()->shutdown();
 }
 
 void ReplicaSetMonitor::cleanup() {
-    globalRSMonitorManager.removeAllMonitors();
+    ReplicaSetMonitorManager::get()->removeAllMonitors();
 }
 
 void ReplicaSetMonitor::disableRefreshRetries_forTest() {

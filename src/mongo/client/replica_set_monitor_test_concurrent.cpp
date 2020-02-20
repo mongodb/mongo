@@ -56,6 +56,7 @@ using StepKind = ReplicaSetMonitor::Refresher::NextStep::StepKind;
 class ReplicaSetMonitorConcurrentTest : public ThreadPoolExecutorTest {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
         ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
         _startTime = getNet()->now();
@@ -65,6 +66,7 @@ protected:
             globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kNetwork,
                                                         LogSeverity::Debug(2));
         }
+        setGlobalServiceContext(std::move(serviceContext));
     }
 
     void tearDown() {

@@ -79,6 +79,9 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 class BasicRS : public unittest::Test {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -204,6 +207,9 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
 class AllNodesDown : public unittest::Test {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -312,6 +318,9 @@ TEST_F(AllNodesDown, CommandNearest) {
 class PrimaryDown : public unittest::Test {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -418,6 +427,9 @@ TEST_F(PrimaryDown, Nearest) {
 class SecondaryDown : public unittest::Test {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -529,6 +541,9 @@ TEST_F(SecondaryDown, CommandNearest) {
 class TaggedFiveMemberRS : public unittest::Test {
 protected:
     void setUp() {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
         // Tests for pinning behavior require this.
         ReplicaSetMonitor::useDeterministicHostSelection = true;
 

@@ -63,10 +63,17 @@ using executor::TaskExecutor;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
-ReplicaSetMonitorManager::ReplicaSetMonitorManager() {}
+namespace {
+const auto getGlobalRSMMonitorManager =
+    ServiceContext::declareDecoration<ReplicaSetMonitorManager>();
+}  // namespace
 
 ReplicaSetMonitorManager::~ReplicaSetMonitorManager() {
     shutdown();
+}
+
+ReplicaSetMonitorManager* ReplicaSetMonitorManager::get() {
+    return &getGlobalRSMMonitorManager(getGlobalServiceContext());
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
@@ -155,11 +162,6 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
 }
 
 void ReplicaSetMonitorManager::shutdown() {
-    // Sadly, this function can run very late in the post-main shutdown because there is still
-    // a globalRSMonitorManager. We have to be very carefully how we log because this can actually
-    // shutdown later than the logging subsystem. This will be less of an issue once SERVER-42437 is
-    // done.
-
     decltype(_monitors) monitors;
     decltype(_taskExecutor) taskExecutor;
     {

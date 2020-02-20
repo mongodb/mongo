@@ -49,9 +49,6 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
-    // TODO Remove in SERVER-42437
-    ReplicaSetMonitor::shutdown();
-
     setGlobalServiceContext({});
 }
 

@@ -923,7 +923,7 @@ void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallA
     }
 
     std::string rsName = ValueWriter(cx, args.get(0)).toString();
-    globalRSMonitorManager.removeMonitor(rsName);
+    ReplicaSetMonitorManager::get()->removeMonitor(rsName);
 
     args.rval().setUndefined();
 }
