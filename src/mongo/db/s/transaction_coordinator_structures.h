@@ -47,6 +47,8 @@ enum class PrepareVote {
     kAbort,
 };
 
+StringData toString(PrepareVote prepareVote);
+
 using CommitDecision = PrepareVote;
 
 /**
@@ -54,9 +56,6 @@ using CommitDecision = PrepareVote;
  */
 CommitDecision readCommitDecisionEnumProperty(StringData decision);
 StringData writeCommitDecisionEnumProperty(CommitDecision decision);
-
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                     const CommitDecision& decision);
 
 /**
  * Optional serializer/deserializer for the generic server 'Status' type.

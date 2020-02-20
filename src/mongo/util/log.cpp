@@ -123,13 +123,6 @@ void logContext(const char* errmsg) {
     printStackTrace(log().setIsTruncatable(false).stream());
 }
 
-void setPlainConsoleLogger() {
-    logger::globalLogManager()->getGlobalDomain()->clearAppenders();
-    logger::globalLogManager()->getGlobalDomain()->attachAppender(
-        std::make_unique<logger::ConsoleAppender<logger::MessageEventEphemeral>>(
-            std::make_unique<logger::MessageEventUnadornedEncoder>()));
-}
-
 Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
 }  // namespace mongo

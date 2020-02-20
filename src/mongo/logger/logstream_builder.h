@@ -50,7 +50,7 @@ class Tee;
 /**
  * Stream-ish object used to build and append log messages.
  */
-class LogstreamBuilder {
+class LogstreamBuilderDeprecated {
 public:
     static LogSeverity severityCast(int ll) {
         return LogSeverity::cast(ll);
@@ -65,7 +65,9 @@ public:
      * "contextName" is a short name of the thread or other context.
      * "severity" is the logging severity of the message.
      */
-    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LogSeverity severity);
+    LogstreamBuilderDeprecated(MessageLogDomain* domain,
+                               StringData contextName,
+                               LogSeverity severity);
 
     /**
      * Construct a LogstreamBuilder that writes to "domain" on destruction.
@@ -79,31 +81,31 @@ public:
      * logs messages. Set "shouldCache" to false to create a new ostream
      * for each instance of this class rather than cacheing.
      */
-    LogstreamBuilder(MessageLogDomain* domain,
-                     StringData contextName,
-                     LogSeverity severity,
-                     LogComponent component,
-                     bool shouldCache = true);
+    LogstreamBuilderDeprecated(MessageLogDomain* domain,
+                               StringData contextName,
+                               LogSeverity severity,
+                               LogComponent component,
+                               bool shouldCache = true);
 
-    LogstreamBuilder(LogstreamBuilder&& other) = default;
-    LogstreamBuilder& operator=(LogstreamBuilder&& other) = default;
+    LogstreamBuilderDeprecated(LogstreamBuilderDeprecated&& other) = default;
+    LogstreamBuilderDeprecated& operator=(LogstreamBuilderDeprecated&& other) = default;
 
     /**
      * Destroys a LogstreamBuilder().  If anything was written to it via stream() or operator<<,
      * constructs a MessageLogDomain::Event and appends it to the associated domain.
      */
-    ~LogstreamBuilder();
+    ~LogstreamBuilderDeprecated();
 
 
     /**
      * Sets an optional prefix for the message.
      */
-    LogstreamBuilder& setBaseMessage(const std::string& baseMessage) {
+    LogstreamBuilderDeprecated& setBaseMessage(const std::string& baseMessage) {
         _baseMessage = baseMessage;
         return *this;
     }
 
-    LogstreamBuilder& setIsTruncatable(bool isTruncatable) {
+    LogstreamBuilderDeprecated& setIsTruncatable(bool isTruncatable) {
         _isTruncatable = isTruncatable;
         return *this;
     }
@@ -114,100 +116,100 @@ public:
         return *_os;
     }
 
-    LogstreamBuilder& operator<<(const char* x) {
+    LogstreamBuilderDeprecated& operator<<(const char* x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(const std::string& x) {
+    LogstreamBuilderDeprecated& operator<<(const std::string& x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(StringData x) {
+    LogstreamBuilderDeprecated& operator<<(StringData x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(char* x) {
+    LogstreamBuilderDeprecated& operator<<(char* x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(char x) {
+    LogstreamBuilderDeprecated& operator<<(char x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(int x) {
+    LogstreamBuilderDeprecated& operator<<(int x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(ExitCode x) {
+    LogstreamBuilderDeprecated& operator<<(ExitCode x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(long x) {
+    LogstreamBuilderDeprecated& operator<<(long x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(unsigned long x) {
+    LogstreamBuilderDeprecated& operator<<(unsigned long x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(unsigned x) {
+    LogstreamBuilderDeprecated& operator<<(unsigned x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(unsigned short x) {
+    LogstreamBuilderDeprecated& operator<<(unsigned short x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(double x) {
+    LogstreamBuilderDeprecated& operator<<(double x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(long long x) {
+    LogstreamBuilderDeprecated& operator<<(long long x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(unsigned long long x) {
+    LogstreamBuilderDeprecated& operator<<(unsigned long long x) {
         stream() << x;
         return *this;
     }
-    LogstreamBuilder& operator<<(bool x) {
+    LogstreamBuilderDeprecated& operator<<(bool x) {
         stream() << x;
         return *this;
     }
 
     template <typename Period>
-    LogstreamBuilder& operator<<(const Duration<Period>& d) {
+    LogstreamBuilderDeprecated& operator<<(const Duration<Period>& d) {
         stream() << d;
         return *this;
     }
 
-    LogstreamBuilder& operator<<(BSONType t) {
+    LogstreamBuilderDeprecated& operator<<(BSONType t) {
         stream() << typeName(t);
         return *this;
     }
 
-    LogstreamBuilder& operator<<(ErrorCodes::Error ec) {
+    LogstreamBuilderDeprecated& operator<<(ErrorCodes::Error ec) {
         stream() << ErrorCodes::errorString(ec);
         return *this;
     }
 
     template <typename T>
-    LogstreamBuilder& operator<<(const T& x) {
+    LogstreamBuilderDeprecated& operator<<(const T& x) {
         stream() << x.toString();
         return *this;
     }
 
-    LogstreamBuilder& operator<<(std::ostream& (*manip)(std::ostream&)) {
+    LogstreamBuilderDeprecated& operator<<(std::ostream& (*manip)(std::ostream&)) {
         stream() << manip;
         return *this;
     }
-    LogstreamBuilder& operator<<(std::ios_base& (*manip)(std::ios_base&)) {
+    LogstreamBuilderDeprecated& operator<<(std::ios_base& (*manip)(std::ios_base&)) {
         stream() << manip;
         return *this;
     }
 
     template <typename OptionalType>
-    LogstreamBuilder& operator<<(const boost::optional<OptionalType>& optional) {
+    LogstreamBuilderDeprecated& operator<<(const boost::optional<OptionalType>& optional) {
         if (optional) {
             (*this << *optional);
         } else {

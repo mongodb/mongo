@@ -60,7 +60,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             auto opKiller = OperationKiller(opCtx->getClient());
             for (auto& opKey : request().getOperationKeys()) {
-                LOGV2(4615601,
+                LOGV2(46156011,
                       "Attempting to kill operation with OperationKey '{operationKey}'",
                       "operationKey"_attr = opKey);
                 opKiller.killOperation(OperationKey(opKey));

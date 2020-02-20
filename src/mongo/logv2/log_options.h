@@ -54,6 +54,8 @@ public:
 
     LogOptions(LogTruncation truncation) : _truncation(truncation) {}
 
+    LogOptions(LogTag tags, LogTruncation truncation) : _tags(tags), _truncation(truncation) {}
+
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
         : _domain(domain), _tags(tags), _component(component) {}
 

@@ -37,6 +37,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/diagnostic_info.h"
 #include "mongo/util/progress_meter.h"
@@ -331,7 +332,7 @@ public:
      * operation should also be profiled.
      */
     bool completeAndLogOperation(OperationContext* opCtx,
-                                 logger::LogComponent logComponent,
+                                 logv2::LogComponent logComponent,
                                  boost::optional<size_t> responseLength = boost::none,
                                  boost::optional<long long> slowMsOverride = boost::none,
                                  bool forceLog = false);

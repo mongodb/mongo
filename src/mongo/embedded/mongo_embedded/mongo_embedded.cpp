@@ -30,6 +30,7 @@
 
 #include "mongo_embedded/mongo_embedded.h"
 
+#include <boost/log/core.hpp>
 #include <cstring>
 #include <exception>
 #include <thread>
@@ -40,9 +41,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
-#include "mongo/embedded/embedded_log_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/embedded/embedded_log_backend.h"
+#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/service_entry_point.h"
@@ -107,10 +110,9 @@ struct mongo_embedded_v1_lib {
     ~mongo_embedded_v1_lib() {
         invariant(this->databaseCount.load() == 0);
 
-        if (this->logCallbackHandle) {
-            using mongo::logger::globalLogDomain;
-            globalLogDomain()->detachAppender(this->logCallbackHandle);
-            this->logCallbackHandle.reset();
+        if (this->logSink) {
+            boost::log::core::get()->remove_sink(this->logSink);
+            this->logSink.reset();
         }
     }
 
@@ -121,7 +123,8 @@ struct mongo_embedded_v1_lib {
 
     mongo::AtomicWord<int> databaseCount;
 
-    mongo::logger::ComponentMessageLogDomain::AppenderHandle logCallbackHandle;
+    boost::shared_ptr<boost::log::sinks::synchronous_sink<mongo::embedded::EmbeddedLogBackend>>
+        logSink;
 
     std::unique_ptr<mongo_embedded_v1_instance> onlyDB;
 };
@@ -204,13 +207,16 @@ std::unique_ptr<mongo_embedded_v1_lib> library;
 void registerLogCallback(mongo_embedded_v1_lib* const lib,
                          const mongo_embedded_v1_log_callback logCallback,
                          void* const logUserData) {
-    using logger::globalLogDomain;
-    using logger::MessageEventEphemeral;
-    using logger::MessageEventUnadornedEncoder;
-
-    lib->logCallbackHandle = globalLogDomain()->attachAppender(
-        std::make_unique<embedded::EmbeddedLogAppender<MessageEventEphemeral>>(
-            logCallback, logUserData, std::make_unique<MessageEventUnadornedEncoder>()));
+    auto backend = boost::make_shared<embedded::EmbeddedLogBackend>(logCallback, logUserData);
+    auto sink =
+        boost::make_shared<boost::log::sinks::synchronous_sink<embedded::EmbeddedLogBackend>>(
+            std::move(backend));
+    sink->set_filter(
+        logv2::ComponentSettingsFilter(logv2::LogManager::global().getGlobalDomain(),
+                                       logv2::LogManager::global().getGlobalSettings()));
+    sink->set_formatter(logv2::PlainFormatter());
+    boost::log::core::get()->add_sink(sink);
+    lib->logSink = sink;
 }
 
 mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params) try {
@@ -224,15 +230,21 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
 
     // TODO(adam.martin): Fold all of this log initialization into the ctor of lib.
     if (params) {
-        using logger::globalLogManager;
         // The standard console log appender may or may not be installed here, depending if this is
         // the first time we initialize the library or not. Make sure we handle both cases.
+        using namespace logv2;
+        auto& globalDomain = LogManager::global().getGlobalDomainInternal();
+        LogDomainGlobal::ConfigurationOptions config = globalDomain.config();
         if (params->log_flags & MONGO_EMBEDDED_V1_LOG_STDOUT) {
-            if (!globalLogManager()->isDefaultConsoleAppenderAttached())
-                globalLogManager()->reattachDefaultConsoleAppender();
+            if (!config.consoleEnabled) {
+                config.consoleEnabled = true;
+                invariant(globalDomain.configure(config).isOK());
+            }
         } else {
-            if (globalLogManager()->isDefaultConsoleAppenderAttached())
-                globalLogManager()->detachDefaultConsoleAppender();
+            if (config.consoleEnabled) {
+                config.consoleEnabled = false;
+                invariant(globalDomain.configure(config).isOK());
+            }
         }
 
         if ((params->log_flags & MONGO_EMBEDDED_V1_LOG_CALLBACK) && params->log_callback) {
@@ -247,9 +259,10 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
     // Make sure that no actual logger is attached if library cannot be initialized.  Also prevent
     // exception leaking failures here.
     []() noexcept {
-        using logger::globalLogManager;
-        if (globalLogManager()->isDefaultConsoleAppenderAttached())
-            globalLogManager()->detachDefaultConsoleAppender();
+        using namespace logv2;
+        LogDomainGlobal::ConfigurationOptions config;
+        config.makeDisabled();
+        LogManager::global().getGlobalDomainInternal().configure(config).ignore();
     }
     ();
     throw;

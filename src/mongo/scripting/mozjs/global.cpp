@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/global.h"
@@ -34,8 +36,7 @@
 #include <js/Conversions.h>
 
 #include "mongo/base/init.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
@@ -59,17 +60,8 @@ const JSFunctionSpec GlobalInfo::freeFunctions[7] = {
 
 const char* const GlobalInfo::className = "Global";
 
-namespace {
-
-logger::MessageLogDomain* plainShellOutputDomain;
-
-}  // namespace
-
 void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
-    logger::LogstreamBuilder builder(
-        plainShellOutputDomain, getThreadName(), logger::LogSeverity::Log());
-    builder.setIsTruncatable(false);
-    std::ostream& ss = builder.stream();
+    std::ostringstream ss;
 
     bool first = true;
     for (size_t i = 0; i < args.length(); i++) {
@@ -87,9 +79,13 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
         JSStringWrapper jsstr(cx, JS::ToString(cx, args.get(i)));
         ss << jsstr.toStringData();
     }
-    ss << std::endl;
 
     args.rval().setUndefined();
+
+    LOGV2_OPTIONS(4615635,
+                  logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+                  "{message}",
+                  "message"_attr = ss.str());
 }
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
@@ -125,11 +121,6 @@ void GlobalInfo::Functions::sleep::call(JSContext* cx, JS::CallArgs args) {
     scope->sleep(Milliseconds(duration));
 
     args.rval().setUndefined();
-}
-
-MONGO_INITIALIZER(PlainShellOutputDomain)(InitializerContext*) {
-    plainShellOutputDomain = logger::globalLogManager()->getNamedDomain("plainShellOutput");
-    return Status::OK();
 }
 
 }  // namespace mozjs

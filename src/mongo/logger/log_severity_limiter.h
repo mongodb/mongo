@@ -65,8 +65,8 @@ public:
      */
     explicit LogSeverityLimiter(Milliseconds period, int limitedDLevel, int normalDLevel)
         : _period{period},
-          _limitedLogSeverity{LogstreamBuilder::severityCast(limitedDLevel)},
-          _normalLogSeverity{LogstreamBuilder::severityCast(normalDLevel)} {
+          _limitedLogSeverity{LogstreamBuilderDeprecated::severityCast(limitedDLevel)},
+          _normalLogSeverity{LogstreamBuilderDeprecated::severityCast(normalDLevel)} {
         // This widget has no point if limited isn't a lower verbosity than normal
         invariant(limitedDLevel < normalDLevel);
     }

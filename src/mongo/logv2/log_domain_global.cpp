@@ -66,8 +66,11 @@ struct LogDomainGlobal::Impl {
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
     Status rotate(bool rename, StringData renameSuffix);
 
+    const ConfigurationOptions& config() const;
+
     LogDomainGlobal& _parent;
     LogComponentSettings _settings;
+    ConfigurationOptions _config;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<ConsoleBackend>> _consoleSink;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<RotatableFileBackend>> _rotatableFileSink;
 #ifndef _WIN32
@@ -182,6 +185,9 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
             setFormatters(
                 [&] { return TextFormatter(options.maxAttributeSizeKB, options.timestampFormat); });
             break;
+        case LogFormat::kPlain:
+            setFormatters([&] { return PlainFormatter(options.maxAttributeSizeKB); });
+            break;
 #if !defined(MONGO_CONFIG_TEXT_LOG_DEFAULT)
         case LogFormat::kDefault:
 #endif
@@ -191,7 +197,13 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
             break;
     }
 
+    _config = options;
+
     return Status::OK();
+}
+
+const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::Impl::config() const {
+    return _config;
 }
 
 Status LogDomainGlobal::Impl::rotate(bool rename, StringData renameSuffix) {
@@ -217,6 +229,10 @@ LogSource& LogDomainGlobal::source() {
 
 Status LogDomainGlobal::configure(LogDomainGlobal::ConfigurationOptions const& options) {
     return _impl->configure(options);
+}
+
+const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::config() const {
+    return _impl->config();
 }
 
 Status LogDomainGlobal::rotate(bool rename, StringData renameSuffix) {

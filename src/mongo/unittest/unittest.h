@@ -338,8 +338,8 @@ void setupTestLogger();
  * Gets a LogstreamBuilder for logging to the unittest log domain, which may have
  * different target from the global log domain.
  */
-logger::LogstreamBuilder log();
-logger::LogstreamBuilder warning();
+logger::LogstreamBuilderDeprecated log();
+logger::LogstreamBuilderDeprecated warning();
 
 /**
  * Representation of a collection of tests.

@@ -247,12 +247,11 @@ void ProgramOutputMultiplexer::appendLine(int port,
             sink << name << pid << "| " << line << endl;
         }
     };
-    auto plainShellOutputDomain = logger::globalLogManager()->getNamedDomain("plainShellOutput");
-    logger::LogstreamBuilder builder(
-        plainShellOutputDomain, getThreadName(), logger::LogSeverity::Log());
 
+    std::ostringstream ss;
     sinkProgramOutput(_buffer);
-    sinkProgramOutput(builder);
+    sinkProgramOutput(ss);
+    LOGV2_OPTIONS(4615640, {logv2::LogTag::kPlainShell}, "{message}", "message"_attr = ss.str());
 }
 
 string ProgramOutputMultiplexer::str() const {

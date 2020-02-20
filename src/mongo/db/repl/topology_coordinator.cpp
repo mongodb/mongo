@@ -306,12 +306,16 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
             return _syncSource;
         } else if (_memberData.at(_currentPrimaryIndex).getLastAppliedOpTime() <
                    lastOpTimeFetched) {
-            LOG(1) << "Cannot select a sync source because chaining is not allowed and the primary "
-                      "is behind me. Last oplog optime of primary {}: {}, my last fetched oplog "
-                      "optime: {}"_format(
-                          getCurrentPrimaryMember()->getHostAndPort(),
-                          _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime().toBSON(),
-                          lastOpTimeFetched.toBSON());
+            LOGV2_DEBUG(
+                4615639,
+                1,
+                "Cannot select a sync source because chaining is not allowed and the primary "
+                "is behind me. Last oplog optime of primary {primary}: {primaryOpTime}, my "
+                "last fetched oplog "
+                "optime: {lastFetchedOpTime}",
+                "primary"_attr = getCurrentPrimaryMember()->getHostAndPort(),
+                "primaryOpTime"_attr = _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime(),
+                "lastFetchedOpTime"_attr = lastOpTimeFetched);
             _syncSource = HostAndPort();
             return _syncSource;
         } else {
@@ -837,13 +841,18 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
             } else {
                 LOGV2_DEBUG(21804, 2, "Config from heartbeat response was same as ours.");
             }
-            if (shouldLog(MongoLogDefaultComponent_component,
-                          ::mongo::LogstreamBuilder::severityCast(2))) {
-                LogstreamBuilder lsb = log();
-                if (_rsConfig.isInitialized()) {
-                    lsb << "Current config: " << _rsConfig.toBSON() << "; ";
-                }
-                lsb << "Config in heartbeat: " << newConfig.toBSON();
+            if (_rsConfig.isInitialized()) {
+                LOGV2_DEBUG(
+                    4615641,
+                    2,
+                    "Current config: {currentConfig}; Config in heartbeat: {heartbeatConfig}",
+                    "currentConfig"_attr = _rsConfig.toBSON(),
+                    "heartbeatConfig"_attr = newConfig.toBSON());
+            } else {
+                LOGV2_DEBUG(4615647,
+                            2,
+                            "Config in heartbeat: {heartbeatConfig}",
+                            "heartbeatConfig"_attr = newConfig.toBSON());
             }
         }
     }

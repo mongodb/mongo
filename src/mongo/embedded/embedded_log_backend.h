@@ -30,47 +30,47 @@
 #pragma once
 
 #include <functional>
-#include <sstream>
+
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/sinks.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/logger/appender.h"
-#include "mongo/logger/encoder.h"
+#include "mongo/logv2/attributes.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 
 namespace mongo {
 namespace embedded {
 
 /**
- * Appender for writing to callbacks registered with the embedded C API.
+ * Sink backend for writing to callbacks registered with the embedded C API.
  */
-template <typename Event>
-class EmbeddedLogAppender : public logger::Appender<Event> {
-    EmbeddedLogAppender(EmbeddedLogAppender const&) = delete;
-    EmbeddedLogAppender& operator=(EmbeddedLogAppender const&) = delete;
-
+class EmbeddedLogBackend
+    : public boost::log::sinks::
+          basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
 public:
-    typedef logger::Encoder<Event> EventEncoder;
-
-    explicit EmbeddedLogAppender(
+    EmbeddedLogBackend(
         std::function<void(void*, const char*, const char*, const char*, int)> callback,
-        void* callbackUserData,
-        std::unique_ptr<EventEncoder> encoder)
-        : _encoder(std::move(encoder)),
-          _callback(std::move(callback)),
-          _callbackUserData(callbackUserData) {}
+        void* callbackUserData)
+        : _callback(std::move(callback)), _callbackUserData(callbackUserData) {}
 
-    Status append(const Event& event) final {
-        std::stringstream output;
-        _encoder->encode(event, output);
+    void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
+        using boost::log::extract;
+
+        auto severity = extract<logv2::LogSeverity>(logv2::attributes::severity(), rec).get();
+        auto component = extract<logv2::LogComponent>(logv2::attributes::component(), rec).get();
+        auto context = extract<StringData>(logv2::attributes::threadName(), rec).get();
+
         _callback(_callbackUserData,
-                  output.str().c_str(),
-                  event.getComponent().getShortName().c_str(),
-                  event.getContextName().toString().c_str(),
-                  event.getSeverity().toInt());
-        return Status::OK();
+                  formatted_string.c_str(),
+                  component.getShortName().c_str(),
+                  context.toString().c_str(),
+                  severity.toInt());
     }
 
 private:
-    std::unique_ptr<EventEncoder> _encoder;
     std::function<void(void*, const char*, const char*, const char*, int)> _callback;
     void* const _callbackUserData;
 };

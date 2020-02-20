@@ -89,15 +89,9 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
     auto&& vii = VersionInfoInterface::instance();
     if (params.count("version") || params.count("help")) {
-        setPlainConsoleLogger();
-        LOGV2(22808,
-              "{mongoShellVersion_vii}",
-              "mongoShellVersion_vii"_attr = mongoShellVersion(vii));
+        std::cout << mongoShellVersion(vii) << std::endl;
         if (params.count("help")) {
-            LOGV2(22809,
-                  "{getMongoShellHelp_args_0_moe_startupOptions}",
-                  "getMongoShellHelp_args_0_moe_startupOptions"_attr =
-                      getMongoShellHelp(args[0], moe::startupOptions));
+            std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
         } else {
             vii.logBuildInfo();
         }

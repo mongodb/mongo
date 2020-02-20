@@ -51,7 +51,7 @@ namespace {
 /// flag is true, LogstreamBuilder instances must not use the cache.
 bool isThreadOstreamCacheInitialized = false;
 
-MONGO_INITIALIZER(LogstreamBuilder)(InitializerContext*) {
+MONGO_INITIALIZER(LogstreamBuilderDeprecated)(InitializerContext*) {
     isThreadOstreamCacheInitialized = true;
     return Status::OK();
 }
@@ -71,16 +71,17 @@ struct ThreadOstreamCacheFinalizer {
 
 namespace logger {
 
-LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                   StringData contextName,
-                                   LogSeverity severity)
-    : LogstreamBuilder(domain, contextName, std::move(severity), LogComponent::kDefault) {}
+LogstreamBuilderDeprecated::LogstreamBuilderDeprecated(MessageLogDomain* domain,
+                                                       StringData contextName,
+                                                       LogSeverity severity)
+    : LogstreamBuilderDeprecated(domain, contextName, std::move(severity), LogComponent::kDefault) {
+}
 
-LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                   StringData contextName,
-                                   LogSeverity severity,
-                                   LogComponent component,
-                                   bool shouldCache)
+LogstreamBuilderDeprecated::LogstreamBuilderDeprecated(MessageLogDomain* domain,
+                                                       StringData contextName,
+                                                       LogSeverity severity,
+                                                       LogComponent component,
+                                                       bool shouldCache)
     : _domain(domain),
       _contextName(contextName.toString()),
       _severity(std::move(severity)),
@@ -88,7 +89,7 @@ LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
       _tee(nullptr),
       _shouldCache(shouldCache) {}
 
-LogstreamBuilder::~LogstreamBuilder() {
+LogstreamBuilderDeprecated::~LogstreamBuilderDeprecated() {
     if (_os) {
         if (!_baseMessage.empty())
             _baseMessage.push_back(' ');
@@ -113,13 +114,13 @@ LogstreamBuilder::~LogstreamBuilder() {
     }
 }
 
-void LogstreamBuilder::operator<<(Tee* tee) {
+void LogstreamBuilderDeprecated::operator<<(Tee* tee) {
     makeStream();  // Adding a Tee counts for purposes of deciding to make a log message.
     // TODO: dassert(!_tee);
     _tee = tee;
 }
 
-void LogstreamBuilder::makeStream() {
+void LogstreamBuilderDeprecated::makeStream() {
     if (!_os) {
         if (_shouldCache && isThreadOstreamCacheInitialized && threadOstreamCache) {
             _os = std::move(threadOstreamCache);

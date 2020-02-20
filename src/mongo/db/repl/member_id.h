@@ -31,7 +31,8 @@
 
 #include <iostream>
 
-#include "mongo/logger/logstream_builder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {
@@ -88,11 +89,6 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& stream, const MemberId& id) {
-        return stream << id.toString();
-    }
-
-    friend logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                                const MemberId& id) {
         return stream << id.toString();
     }
 

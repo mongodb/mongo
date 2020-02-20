@@ -64,14 +64,13 @@ StringData writeCommitDecisionEnumProperty(CommitDecision decision) {
     MONGO_UNREACHABLE;
 }
 
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                     const CommitDecision& decision) {
-    // clang-format off
-    switch (decision) {
-        case txn::CommitDecision::kCommit:     return stream << "kCommit";
-        case txn::CommitDecision::kAbort:      return stream << "kAbort";
+StringData toString(PrepareVote prepareVote) {
+    switch (prepareVote) {
+        case txn::PrepareVote::kCommit:
+            return "kCommit"_sd;
+        case txn::PrepareVote::kAbort:
+            return "kAbort"_sd;
     };
-    // clang-format on
     MONGO_UNREACHABLE;
 }
 

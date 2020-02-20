@@ -54,6 +54,8 @@
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -125,15 +127,23 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
         printMongodHelp(moe::startupOptions);
         return false;
     }
+
+    auto setPlainLogFormat = []() {
+        auto& globalDomain = logv2::LogManager::global().getGlobalDomainInternal();
+        logv2::LogDomainGlobal::ConfigurationOptions config = globalDomain.config();
+        config.format = logv2::LogFormat::kPlain;
+        invariant(globalDomain.configure(config).isOK());
+    };
+
     if (params.count("version") && params["version"].as<bool>() == true) {
-        setPlainConsoleLogger();
+        setPlainLogFormat();
         auto&& vii = VersionInfoInterface::instance();
         LOGV2(20876, "{mongodVersion_vii}", "mongodVersion_vii"_attr = mongodVersion(vii));
         vii.logBuildInfo();
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
-        setPlainConsoleLogger();
+        setPlainLogFormat();
         sysRuntimeInfo();
         return false;
     }

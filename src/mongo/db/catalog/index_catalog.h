@@ -77,6 +77,8 @@ enum class IndexBuildMethod {
     kForeground,
 };
 
+StringData toString(IndexBuildMethod method);
+
 enum class CreateIndexEntryFlags : int {
     kNone = 0x0,
     /**

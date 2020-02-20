@@ -387,7 +387,11 @@ private:
                     sb << "recv(): message msgLen " << msgLen << " is invalid. "
                        << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
                     const auto str = sb.str();
-                    LOGV2(23837, "{str}", "str"_attr = str);
+                    LOGV2(4615638,
+                          "recv(): message msgLen {msgLen} is invalid. Min: {min} Max: {max}",
+                          "msgLen"_attr = msgLen,
+                          "min"_attr = kHeaderSize,
+                          "max"_attr = MaxMessageSizeBytes);
 
                     return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
                 }

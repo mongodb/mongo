@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -1580,8 +1581,10 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     const auto opDuration =
         duration_cast<Milliseconds>(timingStats.getDuration(tickSource, curTicks));
 
-    if (shouldLogSlowOpWithSampling(
-            opCtx, MONGO_LOG_DEFAULT_COMPONENT, opDuration, Milliseconds(serverGlobalParams.slowMS))
+    if (shouldLogSlowOpWithSampling(opCtx,
+                                    MONGO_LOGV2_DEFAULT_COMPONENT,
+                                    opDuration,
+                                    Milliseconds(serverGlobalParams.slowMS))
             .first) {
         _logSlowTransaction(opCtx, terminationCause);
     }

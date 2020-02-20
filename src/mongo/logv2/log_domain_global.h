@@ -63,6 +63,8 @@ public:
     Status configure(ConfigurationOptions const& options);
     Status rotate(bool rename, StringData renameSuffix);
 
+    const ConfigurationOptions& config() const;
+
     LogComponentSettings& settings();
 
 private:

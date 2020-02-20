@@ -28,8 +28,9 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
@@ -123,7 +124,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
     _catalogRecordStore = _engine->getGroupedRecordStore(
         opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
     if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
-        LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
+        LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
     }
 
@@ -280,7 +281,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
     if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
-        LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
+        LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
     }
     CollectionCatalog::get(opCtx).deregisterAllCollections();
@@ -354,7 +355,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         engineIdents.erase(catalogInfo);
     }
 
-    LOG_FOR_RECOVERY(2) << "Reconciling collection and index idents.";
+    LOGV2_FOR_RECOVERY(4615633, 2, "Reconciling collection and index idents.");
     std::set<std::string> catalogIdents;
     {
         std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
@@ -907,8 +908,11 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     while (rec) {
         // This should only be called by a parent that's done an appropriate `shouldLog` check. Do
         // not duplicate the log level policy.
-        LOG_FOR_RECOVERY(kCatalogLogLevel)
-            << "\tId: " << rec->id << " Value: " << rec->data.toBson();
+        LOGV2_FOR_RECOVERY(4615634,
+                           kCatalogLogLevel.toInt(),
+                           "Id: {rec_id} Value: {rec_data_toBson}",
+                           "rec_id"_attr = rec->id,
+                           "rec_data_toBson"_attr = rec->data.toBson());
         auto valueBson = rec->data.toBson();
         if (valueBson.hasField("md")) {
             std::string ns = valueBson.getField("md").Obj().getField("ns").String();

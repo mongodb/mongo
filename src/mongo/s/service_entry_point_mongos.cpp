@@ -96,7 +96,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
 
         // Mark the op as complete, populate the response length, and log it if appropriate.
         CurOp::get(opCtx)->completeAndLogOperation(
-            opCtx, logger::LogComponent::kCommand, dbResponse.response.size());
+            opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
 
         return dbResponse;
     }
@@ -179,7 +179,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
 
     // Mark the op as complete, populate the response length, and log it if appropriate.
     CurOp::get(opCtx)->completeAndLogOperation(
-        opCtx, logger::LogComponent::kCommand, dbResponse.response.size());
+        opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
 
     return dbResponse;
 }

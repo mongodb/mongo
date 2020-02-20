@@ -2000,7 +2000,7 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                 tickSource, tickSource->getTicks()));
 
         if (shouldLogSlowOpWithSampling(opCtx,
-                                        logger::LogComponent::kTransaction,
+                                        logv2::LogComponent::kTransaction,
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {

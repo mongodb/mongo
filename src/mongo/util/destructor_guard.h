@@ -29,24 +29,24 @@
 
 #pragma once
 
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/util/assert_util.h"
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
-#define MONGO_DESTRUCTOR_GUARD(expression)                                                     \
-    try {                                                                                      \
-        expression;                                                                            \
-    } catch (const std::exception& e) {                                                        \
-        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                          ::mongo::getThreadName(),                            \
-                                          ::mongo::logger::LogSeverity::Log())                 \
-            << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ << ")"  \
-            << std::endl;                                                                      \
-    } catch (...) {                                                                            \
-        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                          ::mongo::getThreadName(),                            \
-                                          ::mongo::logger::LogSeverity::Log())                 \
-            << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << std::endl; \
+#define MONGO_DESTRUCTOR_GUARD(expression)                             \
+    try {                                                              \
+        expression;                                                    \
+    } catch (const std::exception& e) {                                \
+        logv2::detail::doLog(4615600,                                  \
+                             logv2::LogSeverity::Log(),                \
+                             {logv2::LogComponent::kDefault},          \
+                             "caught exception in destructor",         \
+                             "exception"_attr = e.what(),              \
+                             "function"_attr = __FUNCTION__);          \
+    } catch (...) {                                                    \
+        logv2::detail::doLog(4615601,                                  \
+                             logv2::LogSeverity::Log(),                \
+                             {logv2::LogComponent::kDefault},          \
+                             "caught unknown exception in destructor", \
+                             "function"_attr = __FUNCTION__);          \
     }

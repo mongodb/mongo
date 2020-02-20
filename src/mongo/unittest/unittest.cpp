@@ -83,12 +83,14 @@ auto& suitesMap() {
 
 }  // namespace
 
-logger::LogstreamBuilder log() {
-    return LogstreamBuilder(unittestOutput(), getThreadName(), logger::LogSeverity::Log());
+logger::LogstreamBuilderDeprecated log() {
+    return LogstreamBuilderDeprecated(
+        unittestOutput(), getThreadName(), logger::LogSeverity::Log());
 }
 
-logger::LogstreamBuilder warning() {
-    return LogstreamBuilder(unittestOutput(), getThreadName(), logger::LogSeverity::Warning());
+logger::LogstreamBuilderDeprecated warning() {
+    return LogstreamBuilderDeprecated(
+        unittestOutput(), getThreadName(), logger::LogSeverity::Warning());
 }
 
 void setupTestLogger() {

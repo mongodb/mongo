@@ -58,17 +58,17 @@ public:
   std::ostream& stream() override { return _lsb.stream(); }
 private:
   int _v;
-  ml::LogstreamBuilder _lsb;
+  ml::LogstreamBuilderDeprecated _lsb;
 };
 
 class SeverityLogSink : public s2_env::LogMessageSink {
 public:
   // Fatal message will deconstruct it before abort to flush final message.
-  explicit SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilder builder)
+  explicit SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilderDeprecated builder)
     : _severity(severity),
       _lsb(std::move(builder)) {}
 
-  SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilder builder,
+  SeverityLogSink(s2_env::LogMessage::Severity severity, ml::LogstreamBuilderDeprecated builder,
                   const char* file, int line)
     : _severity(severity),
       _lsb(std::move(builder)) {
@@ -86,7 +86,7 @@ public:
   std::ostream& stream() override { return _lsb->stream(); }
 private:
   s2_env::LogMessage::Severity _severity;
-  boost::optional<ml::LogstreamBuilder> _lsb;
+  boost::optional<ml::LogstreamBuilderDeprecated> _lsb;
 };
 
 template <typename...A>

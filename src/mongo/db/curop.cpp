@@ -422,7 +422,7 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
 }
 
 bool CurOp::completeAndLogOperation(OperationContext* opCtx,
-                                    logger::LogComponent component,
+                                    logv2::LogComponent component,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
@@ -472,13 +472,13 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                     _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
                 } else {
                     LOGV2_WARNING_OPTIONS(20525,
-                                          {logComponentV1toV2(component)},
+                                          {component},
                                           "Unable to gather storage statistics for a slow "
                                           "operation due to lock aquire timeout");
                 }
             } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
                 LOGV2_WARNING_OPTIONS(20526,
-                                      {logComponentV1toV2(component)},
+                                      {component},
                                       "Unable to gather storage statistics for a slow "
                                       "operation due to interrupt");
             }
@@ -495,7 +495,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         LOGV2(51803, "slow query", attr);
 
         // TODO SERVER-46219: Log also with old log system to not break unit tests
-        log(component) << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
+        log(logComponentV2toV1(component))
+            << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
     // Return 'true' if this operation should also be added to the profiler.

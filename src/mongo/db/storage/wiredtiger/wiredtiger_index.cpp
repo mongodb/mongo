@@ -59,14 +59,14 @@
 
 #define TRACING_ENABLED 0
 
-#define TRACE_CURSOR(ID, NAME, ...)                         \
+#define LOGV2_TRACE_CURSOR(ID, NAME, ...)                   \
     if (TRACING_ENABLED)                                    \
     LOGV2(ID,                                               \
           "WT index ({index}) " #NAME,                      \
           "index"_attr = reinterpret_cast<uint64_t>(&_idx), \
           ##__VA_ARGS__)
 
-#define TRACE_INDEX(ID, NAME, ...)                         \
+#define LOGV2_TRACE_INDEX(ID, NAME, ...)                   \
     if (TRACING_ENABLED)                                   \
     LOGV2(ID,                                              \
           "WT index ({index}) " #NAME,                     \
@@ -254,7 +254,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
     dassert(opCtx->lockState()->isWriteLocked());
     dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
-    TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
+    LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
     curwrap.assertInActiveTxn();
@@ -311,7 +311,7 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
 
     auto cursor = newCursor(opCtx);
     long long count = 0;
-    TRACE_INDEX(20094, "fullValidate");
+    LOGV2_TRACE_INDEX(20094, "fullValidate");
 
     const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
 
@@ -324,7 +324,7 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
         );
 
     for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
-        TRACE_INDEX(20095, "fullValidate {kv}", "kv"_attr = kv);
+        LOGV2_TRACE_INDEX(20095, "fullValidate {kv}", "kv"_attr = kv);
         count++;
     }
     if (numKeysOut) {
@@ -831,10 +831,10 @@ public:
     }
 
     void setEndPosition(const BSONObj& key, bool inclusive) override {
-        TRACE_CURSOR(20098,
-                     "setEndPosition inclusive: {inclusive} {key}",
-                     "inclusive"_attr = inclusive,
-                     "key"_attr = key);
+        LOGV2_TRACE_CURSOR(20098,
+                           "setEndPosition inclusive: {inclusive} {key}",
+                           "inclusive"_attr = inclusive,
+                           "key"_attr = key);
         if (key.isEmpty()) {
             // This means scan to end of index.
             _endPosition.reset();
@@ -953,9 +953,9 @@ public:
             // Unique indexes can have both kinds of KeyStrings, ie with or without the record id.
             // Restore for unique indexes gets handled separately in it's own implementation.
             _lastMoveSkippedKey = !seekWTCursor(_key.getValueCopy());
-            TRACE_CURSOR(20099,
-                         "restore _lastMoveSkippedKey: {lastMoveSkippedKey}",
-                         "lastMoveSkippedKey"_attr = _lastMoveSkippedKey);
+            LOGV2_TRACE_CURSOR(20099,
+                               "restore _lastMoveSkippedKey: {lastMoveSkippedKey}",
+                               "lastMoveSkippedKey"_attr = _lastMoveSkippedKey);
         }
     }
 
@@ -1028,7 +1028,7 @@ protected:
             bson =
                 KeyString::toBson(_key.getBuffer(), _key.getSize(), _idx.getOrdering(), _typeBits);
 
-            TRACE_CURSOR(20000, "returning {bson} {id}", "bson"_attr = bson, "id"_attr = _id);
+            LOGV2_TRACE_CURSOR(20000, "returning {bson} {id}", "bson"_attr = bson, "id"_attr = _id);
         }
 
         return {{std::move(bson), _id}};
@@ -1084,13 +1084,13 @@ protected:
         int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
-            TRACE_CURSOR(20088, "not found");
+            LOGV2_TRACE_CURSOR(20088, "not found");
             return false;
         }
         invariantWTOK(ret);
         _cursorAtEof = false;
 
-        TRACE_CURSOR(20089, "cmp: {cmp}", "cmp"_attr = cmp);
+        LOGV2_TRACE_CURSOR(20089, "cmp: {cmp}", "cmp"_attr = cmp);
 
         if (cmp == 0) {
             // Found it!
@@ -1192,16 +1192,16 @@ protected:
             keyWithRecordId.appendRecordId(_id);
             keyWithRecordId.setTypeBits(_typeBits);
 
-            TRACE_CURSOR(20090,
-                         "returning {keyWithRecordId} {id}",
-                         "keyWithRecordId"_attr = keyWithRecordId,
-                         "id"_attr = _id);
+            LOGV2_TRACE_CURSOR(20090,
+                               "returning {keyWithRecordId} {id}",
+                               "keyWithRecordId"_attr = keyWithRecordId,
+                               "id"_attr = _id);
             return KeyStringEntry(keyWithRecordId.getValueCopy(), _id);
         }
 
         _key.setTypeBits(_typeBits);
 
-        TRACE_CURSOR(20091, "returning {key} {id}", "key"_attr = _key, "id"_attr = _id);
+        LOGV2_TRACE_CURSOR(20091, "returning {key} {id}", "key"_attr = _key, "id"_attr = _id);
         return KeyStringEntry(_key.getValueCopy(), _id);
     }
 
@@ -1246,7 +1246,7 @@ public:
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
     void updateIdAndTypeBits() override {
-        TRACE_INDEX(
+        LOGV2_TRACE_INDEX(
             20096, "Unique Index KeyString: [{keyString}]", "keyString"_attr = _key.toString());
 
         // After a rolling upgrade an index can have keys from both timestamp unsafe (old) and
@@ -1303,7 +1303,7 @@ public:
             // the keys with size greater than or equal to that of the _key.
             if (item.size >= keySize && std::memcmp(_key.getBuffer(), item.data, keySize) == 0) {
                 _lastMoveSkippedKey = false;
-                TRACE_CURSOR(20092, "restore _lastMoveSkippedKey changed to false.");
+                LOGV2_TRACE_CURSOR(20092, "restore _lastMoveSkippedKey changed to false.");
             }
         }
     }
@@ -1541,7 +1541,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
                                                    WT_CURSOR* c,
                                                    const KeyString::Value& keyString,
                                                    bool dupsAllowed) {
-    TRACE_INDEX(
+    LOGV2_TRACE_INDEX(
         20097, "Timestamp safe unique idx KeyString: {keyString}", "keyString"_attr = keyString);
 
     int ret;

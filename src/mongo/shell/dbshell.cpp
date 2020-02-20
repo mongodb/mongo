@@ -279,7 +279,7 @@ void completionHook(const char* text, linenoiseCompletions* lc) {
 void shellHistoryInit() {
     Status res = linenoiseHistoryLoad(shell_utils::getHistoryFilePath().string().c_str());
     if (!res.isOK()) {
-        error() << "Error loading history file: " << res;
+        std::cout << "Error loading history file: " << res << std::endl;
     }
     linenoiseSetCompletionCallback(completionHook);
 }
@@ -287,7 +287,7 @@ void shellHistoryInit() {
 void shellHistoryDone() {
     Status res = linenoiseHistorySave(shell_utils::getHistoryFilePath().string().c_str());
     if (!res.isOK()) {
-        error() << "Error saving history file: " << res;
+        std::cout << "Error saving history file: " << res << std::endl;
     }
     linenoiseHistoryFree();
 }
@@ -922,7 +922,7 @@ int _main(int argc, char* argv[], char** envp) {
     if (!shellGlobalParams.script.empty()) {
         mongo::shell_utils::MongoProgramScope s;
         if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
-            error() << "exiting with code " << static_cast<int>(kEvalError);
+            std::cout << "exiting with code " << static_cast<int>(kEvalError) << std::endl;
             return kEvalError;
         }
         scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
@@ -935,8 +935,8 @@ int _main(int argc, char* argv[], char** envp) {
             std::cout << "loading file: " << shellGlobalParams.files[i] << std::endl;
 
         if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
-            severe() << "failed to load: " << shellGlobalParams.files[i];
-            error() << "exiting with code " << static_cast<int>(kInputFileError);
+            std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
+            std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
             return kInputFileError;
         }
 
@@ -950,9 +950,10 @@ int _main(int argc, char* argv[], char** envp) {
             std::cout << std::endl;
 
             if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
-                severe() << "one more more child processes exited with an error during "
-                         << shellGlobalParams.files[i];
-                error() << "exiting with code " << static_cast<int>(kProcessTerminationError);
+                std::cout << "one more more child processes exited with an error during "
+                          << shellGlobalParams.files[i] << std::endl;
+                std::cout << "exiting with code " << static_cast<int>(kProcessTerminationError)
+                          << std::endl;
                 return kProcessTerminationError;
             }
 
@@ -965,10 +966,12 @@ int _main(int argc, char* argv[], char** envp) {
             failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
             if (failIfUnterminatedProcesses) {
-                severe() << "exiting with a failure due to unterminated processes, "
-                            "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
-                            "ShardingTest#stop() may be missing from the test";
-                error() << "exiting with code " << static_cast<int>(kUnterminatedProcess);
+                std::cout << "exiting with a failure due to unterminated processes, "
+                             "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
+                             "ShardingTest#stop() may be missing from the test"
+                          << std::endl;
+                std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
+                          << std::endl;
                 return kUnterminatedProcess;
             }
         }
@@ -996,9 +999,12 @@ int _main(int argc, char* argv[], char** envp) {
             if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
                 hasMongoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
-                    severe() << "The \".mongorc.js\" file located in your home folder could not be "
-                                "executed";
-                    error() << "exiting with code " << static_cast<int>(kMongorcError);
+                    std::cout
+                        << "The \".mongorc.js\" file located in your home folder could not be "
+                           "executed"
+                        << std::endl;
+                    std::cout << "exiting with code " << static_cast<int>(kMongorcError)
+                              << std::endl;
                     return kMongorcError;
                 }
             }
@@ -1186,8 +1192,8 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
         WindowsCommandLine wcl(argc, argvW, envpW);
         returnCode = _main(argc, wcl.argv(), wcl.envp());
     } catch (mongo::DBException& e) {
-        severe() << "exception: " << e.what();
-        error() << "exiting with code " << static_cast<int>(kDBException);
+        std::cout << "exception: " << e.what() << std::endl;
+        std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
         returnCode = kDBException;
     }
     quickExit(returnCode);
@@ -1198,8 +1204,8 @@ int main(int argc, char* argv[], char** envp) {
     try {
         returnCode = _main(argc, argv, envp);
     } catch (mongo::DBException& e) {
-        severe() << "exception: " << e.what();
-        error() << "exiting with code " << static_cast<int>(kDBException);
+        std::cout << "exception: " << e.what() << std::endl;
+        std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
         returnCode = kDBException;
     }
     quickExit(returnCode);

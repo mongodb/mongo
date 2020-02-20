@@ -218,12 +218,15 @@ ServiceContext* initialize(const char* yaml_config) {
 
     {
         ProcessId pid = ProcessId::getCurrent();
-        LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
-          << " dbpath=" << storageGlobalParams.dbpath;
-
         const bool is32bit = sizeof(int*) == 4;
-        l << (is32bit ? " 32" : " 64") << "-bit" << endl;
+        LOGV2_OPTIONS(4615667,
+                      {logv2::LogComponent::kControl},
+                      "MongoDB starting",
+                      "pid"_attr = pid.toNative(),
+                      "port"_attr = serverGlobalParams.port,
+                      "dbpath"_attr =
+                          boost::filesystem::path(storageGlobalParams.dbpath).generic_string(),
+                      "architecture"_attr = (is32bit ? "32-bit" : "64-bit"));
     }
 
     if (kDebugBuild)

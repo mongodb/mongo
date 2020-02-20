@@ -42,12 +42,12 @@ namespace mongo {
  * is if we should sample this operation for profiling.
  */
 inline std::pair<bool, bool> shouldLogSlowOpWithSampling(OperationContext* opCtx,
-                                                         logger::LogComponent logComponent,
+                                                         logv2::LogComponent logComponent,
                                                          Milliseconds opDuration,
                                                          Milliseconds slowMS) {
     // Log the operation if log message verbosity for operation component is >= 1.
     const bool componentHasTargetLogVerbosity =
-        shouldLog(logComponent, logger::LogSeverity::Debug(1));
+        shouldLog(logComponentV2toV1(logComponent), logger::LogSeverity::Debug(1));
 
     const auto client = opCtx->getClient();
     const bool shouldSample =

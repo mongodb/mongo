@@ -47,8 +47,7 @@ def parse_source_files(callback):
         re.compile(r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE),
         re.compile(r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
                    re.MULTILINE),
-        re.compile(r"LOGV2(?:_INFO|_WARNING|_ERROR|_FATAL|_DEBUG)?(?:_OPTIONS)?\s*\(\s*(\d+)",
-                   re.MULTILINE),
+        re.compile(r"LOGV2(?:\w*)?\s*\(\s*(\d+)", re.MULTILINE),
         re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
     ]
 

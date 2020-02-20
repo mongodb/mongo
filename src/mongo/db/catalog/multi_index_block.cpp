@@ -921,34 +921,22 @@ void MultiIndexBlock::_setStateToAbortedIfNotCommitted(StringData reason) {
     _abortReason = reason.toString();
 }
 
-std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state) {
+StringData toString(MultiIndexBlock::State state) {
     switch (state) {
         case MultiIndexBlock::State::kUninitialized:
-            return os << "Uninitialized";
+            return "Uninitialized"_sd;
         case MultiIndexBlock::State::kRunning:
-            return os << "Running";
+            return "Running"_sd;
         case MultiIndexBlock::State::kCommitted:
-            return os << "Committed";
+            return "Committed"_sd;
         case MultiIndexBlock::State::kAborted:
-            return os << "Aborted";
+            return "Aborted"_sd;
     }
     MONGO_UNREACHABLE;
 }
 
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& out,
-                                     const IndexBuildMethod& method) {
-    switch (method) {
-        case IndexBuildMethod::kHybrid:
-            out.stream() << "Hybrid";
-            break;
-        case IndexBuildMethod::kBackground:
-            out.stream() << "Background";
-            break;
-        case IndexBuildMethod::kForeground:
-            out.stream() << "Foreground";
-            break;
-    }
-    return out;
+std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state) {
+    return os << toString(state);
 }
 
 }  // namespace mongo

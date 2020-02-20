@@ -325,6 +325,7 @@ public:
      * For testing only. Callers should not have to query the state of the MultiIndexBlock directly.
      */
     enum class State { kUninitialized, kRunning, kCommitted, kAborted };
+    StringData toString(State state);
     State getState_forTest() const;
 
 private:
@@ -387,6 +388,4 @@ private:
 // For unit tests that need to check MultiIndexBlock states.
 // The ASSERT_*() macros use this function to print the value of 'state' when the predicate fails.
 std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state);
-
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& out, const IndexBuildMethod& method);
 }  // namespace mongo

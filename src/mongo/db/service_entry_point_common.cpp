@@ -1669,7 +1669,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be sampled for profiling.
     const bool shouldSample = currentOp.completeAndLogOperation(
-        opCtx, MONGO_LOG_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
+        opCtx, MONGO_LOGV2_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(

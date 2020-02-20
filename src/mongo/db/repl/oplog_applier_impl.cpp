@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/db/repl/oplog_applier_impl.h"
 
@@ -109,7 +110,7 @@ Status finishAndLogApply(OperationContext* opCtx,
         auto opDuration = durationCount<Milliseconds>(applyEndTime - applyStartTime);
 
         if (shouldLogSlowOpWithSampling(opCtx,
-                                        MONGO_LOG_DEFAULT_COMPONENT,
+                                        MONGO_LOGV2_DEFAULT_COMPONENT,
                                         Milliseconds(opDuration),
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {

@@ -582,24 +582,20 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
             if (auto elem = op["client"]) {
                 // mongod currentOp client
                 if (elem.type() != String) {
-                    LOGV2_WARNING(23916,
-                                  "Ignoring operation {op_opid_false}; expected 'client' field in "
-                                  "currentOp response to have type "
-                                  "string, but found {typeName_elem_type}",
-                                  "op_opid_false"_attr = op["opid"].toString(false),
-                                  "typeName_elem_type"_attr = typeName(elem.type()));
+                    std::cout << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type()) << std::endl;
                     continue;
                 }
                 client = elem.str();
             } else if (auto elem = op["client_s"]) {
                 // mongos currentOp client
                 if (elem.type() != String) {
-                    LOGV2_WARNING(23917,
-                                  "Ignoring operation {op_opid_false}; expected 'client_s' field "
-                                  "in currentOp response to have type "
-                                  "string, but found {typeName_elem_type}",
-                                  "op_opid_false"_attr = op["opid"].toString(false),
-                                  "typeName_elem_type"_attr = typeName(elem.type()));
+                    std::cout << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client_s' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type()) << std::endl;
                     continue;
                 }
                 client = elem.str();
