@@ -105,7 +105,8 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     int nToSkip,
     const BSONObj* fieldsToReturn,
     int queryOptions,
-    int batchSize) {
+    int batchSize,
+    boost::optional<BSONObj> readConcernObj) {
     checkConnection();
 
     try {
@@ -117,7 +118,8 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
                                                      nToSkip,
                                                      fieldsToReturn,
                                                      queryOptions,
-                                                     batchSize));
+                                                     batchSize,
+                                                     readConcernObj));
 
         BSONArray resultsInCursor;
 
@@ -189,26 +191,37 @@ unsigned long long MockDBClientConnection::query(
     mongo::Query query,
     const mongo::BSONObj* fieldsToReturn,
     int queryOptions,
-    int batchSize) {
-    return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
+    int batchSize,
+    boost::optional<BSONObj> readConcernObj) {
+    return DBClientBase::query(
+        f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize, readConcernObj);
 }
 
 uint64_t MockDBClientConnection::getSockCreationMicroSec() const {
     return _sockCreationTime;
 }
 
-void MockDBClientConnection::insert(const string& ns, BSONObj obj, int flags) {
+void MockDBClientConnection::insert(const string& ns,
+                                    BSONObj obj,
+                                    int flags,
+                                    boost::optional<BSONObj> writeConcernObj) {
     invariant(_remoteServer);
     _remoteServer->insert(ns, obj, flags);
 }
 
-void MockDBClientConnection::insert(const string& ns, const vector<BSONObj>& objList, int flags) {
+void MockDBClientConnection::insert(const string& ns,
+                                    const vector<BSONObj>& objList,
+                                    int flags,
+                                    boost::optional<BSONObj> writeConcernObj) {
     for (vector<BSONObj>::const_iterator iter = objList.begin(); iter != objList.end(); ++iter) {
         insert(ns, *iter, flags);
     }
 }
 
-void MockDBClientConnection::remove(const string& ns, Query query, int flags) {
+void MockDBClientConnection::remove(const string& ns,
+                                    Query query,
+                                    int flags,
+                                    boost::optional<BSONObj> writeConcernObj) {
     invariant(_remoteServer);
     _remoteServer->remove(ns, query, flags);
 }

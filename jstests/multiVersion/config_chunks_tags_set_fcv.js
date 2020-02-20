@@ -16,9 +16,18 @@ function verifyChunkOperationsFailDuringSetFCV(st, ns) {
                                  ErrorCodes.ConflictingOperationInProgress);
     verifyChunkDistribution(st, ns, [2, 1]);
 
-    assert.commandFailedWithCode(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
-        ErrorCodes.ConflictingOperationInProgress);
+    // Shards running with old FCV won't automatically add writeConcern when running moveChunk or
+    // _recvChunkStart on shards, which shards running FCV find objectionable.  So we pass explicit
+    // writeConcern to the mongos moveChunk command (which also requires secondaryThrottle: true),
+    // which causes it to be passed through to the shard commands.
+    assert.commandFailedWithCode(st.s.adminCommand({
+        moveChunk: ns,
+        find: {_id: 0},
+        to: st.shard0.shardName,
+        secondaryThrottle: true,
+        writeConcern: {w: 1}
+    }),
+                                 ErrorCodes.ConflictingOperationInProgress);
     verifyChunkDistribution(st, ns, [2, 1]);
 
     assert.commandFailedWithCode(

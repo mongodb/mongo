@@ -57,6 +57,11 @@ const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
 }
 
 
+// The "kImplicitDefault" read concern, used by internal operations, is deliberately empty (no
+// 'level' specified). This allows internal operations to specify a read concern, while still
+// allowing it to be either local or available on sharded secondaries.
+const BSONObj ReadConcernArgs::kImplicitDefault;
+
 ReadConcernArgs::ReadConcernArgs() : _specified(false) {}
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<ReadConcernLevel> level)

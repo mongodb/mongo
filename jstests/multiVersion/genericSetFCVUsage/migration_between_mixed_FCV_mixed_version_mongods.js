@@ -30,11 +30,17 @@ checkFCV(st.shard0.getDB("admin"), latestFCV);
 checkFCV(st.shard1.getDB("admin"), lastStableFCV);
 
 // It is not possible to move a chunk from a latestFCV shard to a last-stable binary version
-// shard.
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {moveChunk: testDB.coll.getFullName(), find: {a: 1}, to: st.shard1.shardName}),
-    ErrorCodes.IncompatibleServerVersion);
+// shard. Pass explicit writeConcern (which requires secondaryThrottle: true) to avoid problems
+// if the last-stable doesn't automatically include writeConcern when running _recvChunkStart on the
+// newer shard.
+assert.commandFailedWithCode(st.s.adminCommand({
+    moveChunk: testDB.coll.getFullName(),
+    find: {a: 1},
+    to: st.shard1.shardName,
+    secondaryThrottle: true,
+    writeConcern: {w: 1}
+}),
+                             ErrorCodes.IncompatibleServerVersion);
 
 st.stop();
 })();

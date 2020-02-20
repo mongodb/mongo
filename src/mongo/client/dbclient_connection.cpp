@@ -625,16 +625,18 @@ unsigned long long DBClientConnection::query(std::function<void(DBClientCursorBa
                                              Query query,
                                              const BSONObj* fieldsToReturn,
                                              int queryOptions,
-                                             int batchSize) {
+                                             int batchSize,
+                                             boost::optional<BSONObj> readConcernObj) {
     if (!(queryOptions & QueryOption_Exhaust) || !(availableOptions() & QueryOption_Exhaust)) {
-        return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
+        return DBClientBase::query(
+            f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize, readConcernObj);
     }
 
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk | QueryOption_Exhaust);
 
-    unique_ptr<DBClientCursor> c(
-        this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
+    unique_ptr<DBClientCursor> c(this->query(
+        nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize, readConcernObj));
     // Note that this->query will throw for network errors, so it is OK to return a numeric
     // error code here.
     uassert(13386, "socket error for mapping query", c.get());

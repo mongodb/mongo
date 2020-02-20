@@ -132,7 +132,12 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
-    auto count = getClient()->count(_sourceDbAndUuid, {} /* Query */, QueryOption_SlaveOk);
+    auto count = getClient()->count(_sourceDbAndUuid,
+                                    {} /* Query */,
+                                    QueryOption_SlaveOk,
+                                    0 /* limit */,
+                                    0 /* skip */,
+                                    ReadConcernArgs::kImplicitDefault);
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -233,7 +238,8 @@ void CollectionCloner::runQuery() {
                            nullptr /* fieldsToReturn */,
                            QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
                                (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-                           _collectionClonerBatchSize);
+                           _collectionClonerBatchSize,
+                           ReadConcernArgs::kImplicitDefault);
     } catch (...) {
         auto status = exceptionToStatus();
 

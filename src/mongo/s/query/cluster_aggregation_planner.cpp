@@ -146,7 +146,10 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         mergeCmd.remove("readConcern");
     }
 
-    return mergeCmd.freeze().toBson();
+    return applyReadWriteConcern(mergeCtx->opCtx,
+                                 !(txnRouter && mergingShardContributesData), /* appendRC */
+                                 !mergeCtx->explain,                          /* appendWC */
+                                 mergeCmd.freeze().toBson());
 }
 
 Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -389,7 +392,10 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
             expCtx, serializedCommand, consumerPipelines.back(), boost::none, false);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
-                              consumerCmdObj);
+                              applyReadWriteConcern(opCtx,
+                                                    true,             /* appendRC */
+                                                    !expCtx->explain, /* appendWC */
+                                                    consumerCmdObj));
     }
     auto cursors = establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),

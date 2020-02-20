@@ -58,6 +58,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -311,7 +312,9 @@ void Cloner::copy(OperationContext* opCtx,
                      from_collection,
                      query,
                      nullptr,
-                     options);
+                     options,
+                     0 /* batchSize */,
+                     repl::ReadConcernArgs::kImplicitDefault);
     }
 
     uassert(ErrorCodes::PrimarySteppedDown,

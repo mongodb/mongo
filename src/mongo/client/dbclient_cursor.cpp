@@ -153,6 +153,12 @@ Message DBClientCursor::_assembleInit() {
                 // QueryRequest doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
             }
+            if (!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName) && _readConcernObj) {
+                cmd = BSONObjBuilder(std::move(cmd))
+                          .append(repl::ReadConcernArgs::kReadConcernFieldName, *_readConcernObj)
+                          .obj();
+            }
+
             return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
         }
         // else use legacy OP_QUERY request.
@@ -516,7 +522,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
                                int queryOptions,
-                               int batchSize)
+                               int batchSize,
+                               boost::optional<BSONObj> readConcernObj)
     : DBClientCursor(client,
                      nsOrUuid,
                      query,
@@ -526,7 +533,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      fieldsToReturn,
                      queryOptions,
                      batchSize,
-                     {}) {}
+                     {},
+                     readConcernObj) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
@@ -543,7 +551,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      nullptr,  // fieldsToReturn
                      queryOptions,
                      0,
-                     std::move(initialBatch)) {}  // batchSize
+                     std::move(initialBatch),  // batchSize
+                     boost::none) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
@@ -554,7 +563,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                const BSONObj* fieldsToReturn,
                                int queryOptions,
                                int batchSize,
-                               std::vector<BSONObj> initialBatch)
+                               std::vector<BSONObj> initialBatch,
+                               boost::optional<BSONObj> readConcernObj)
     : batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
@@ -572,7 +582,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       cursorId(cursorId),
       _ownCursor(true),
       wasError(false),
-      _enabledBSONVersion(Validator<BSONObj>::enabledBSONVersion()) {
+      _enabledBSONVersion(Validator<BSONObj>::enabledBSONVersion()),
+      _readConcernObj(readConcernObj) {
     if (queryOptions & QueryOptionLocal_forceOpQuery) {
         // Legacy OP_QUERY does not support UUIDs.
         invariant(!_nsOrUuid.uuid());

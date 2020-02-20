@@ -1736,7 +1736,8 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
 Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
     Fetcher::CallbackFn callback, LastOplogEntryFetcherRetryStrategy retryStrategy) {
     BSONObj query = BSON("find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1)
-                                << "limit" << 1);
+                                << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
+                                << ReadConcernArgs::kImplicitDefault);
 
     _lastOplogEntryFetcher = std::make_unique<Fetcher>(
         _exec,

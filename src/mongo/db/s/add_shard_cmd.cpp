@@ -79,7 +79,7 @@ public:
 
     private:
         bool supportsWriteConcern() const override {
-            return true;
+            return false;
         }
 
         // The command parameter happens to be string so it's historically been interpreted
