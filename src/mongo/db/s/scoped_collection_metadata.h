@@ -38,7 +38,7 @@ namespace mongo {
  * operations. It is allowed to be referenced outside of collection lock, but all implementations
  * must be able to outlive the object from which they were obtained.
  */
-class ScopedCollectionMetadata {
+class ScopedCollectionDescription {
 public:
     class Impl {
     public:
@@ -50,7 +50,7 @@ public:
         Impl() = default;
     };
 
-    ScopedCollectionMetadata(std::shared_ptr<Impl> impl) : _impl(std::move(impl)) {}
+    ScopedCollectionDescription(std::shared_ptr<Impl> impl) : _impl(std::move(impl)) {}
 
     const auto& get() const {
         return _impl->get();
@@ -68,25 +68,58 @@ public:
         return _impl->get().isSharded();
     }
 
+    ChunkVersion getShardVersion() const {
+        return _impl->get().getShardVersion();
+    }
+
+    ChunkVersion getCollVersion() const {
+        return _impl->get().getCollVersion();
+    }
+
+    bool isValidKey(const BSONObj& key) const {
+        return _impl->get().isValidKey(key);
+    }
+
     const BSONObj& getKeyPattern() const {
         return _impl->get().getKeyPattern();
+    }
+
+    const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
+        return _impl->get().getKeyPatternFields();
+    }
+
+    BSONObj getMinKey() const {
+        return _impl->get().getMinKey();
+    }
+
+    BSONObj getMaxKey() const {
+        return _impl->get().getMaxKey();
+    }
+
+    BSONObj extractDocumentKey(const BSONObj& doc) const {
+        return _impl->get().extractDocumentKey(doc);
+    }
+
+    bool uuidMatches(UUID uuid) const {
+        return _impl->get().uuidMatches(uuid);
     }
 
     const BSONObj extractShardKeyFromDoc(const BSONObj& doc) const {
         return _impl->get().getChunkManager()->getShardKeyPattern().extractShardKeyFromDoc(doc);
     }
 
+
 protected:
     std::shared_ptr<Impl> _impl;
 };
 
-class ScopedCollectionFilter : public ScopedCollectionMetadata {
+class ScopedCollectionFilter : public ScopedCollectionDescription {
 public:
     ScopedCollectionFilter(std::shared_ptr<Impl> impl)
-        : ScopedCollectionMetadata(std::move(impl)) {}
+        : ScopedCollectionDescription(std::move(impl)) {}
 
-    ScopedCollectionFilter(ScopedCollectionMetadata&& scopedMetadata)
-        : ScopedCollectionMetadata(std::move(scopedMetadata)) {}
+    ScopedCollectionFilter(ScopedCollectionDescription&& scopedMetadata)
+        : ScopedCollectionDescription(std::move(scopedMetadata)) {}
 
     bool keyBelongsToMe(const BSONObj& key) const {
         return _impl->get().keyBelongsToMe(key);

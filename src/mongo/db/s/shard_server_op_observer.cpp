@@ -228,7 +228,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
     auto* const css = CollectionShardingState::get(opCtx, nss);
-    const auto metadata = css->getCurrentMetadata();
+    const auto collDesc = css->getCollectionDescription();
 
     for (auto it = begin; it != end; ++it) {
         const auto& insertedDoc = it->doc;
@@ -258,10 +258,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
         }
 
-        if (metadata->isSharded()) {
+        if (collDesc.isSharded()) {
             incrementChunkOnInsertOrUpdate(opCtx,
                                            nss,
-                                           *metadata->getChunkManager(),
+                                           *collDesc->getChunkManager(),
                                            insertedDoc,
                                            insertedDoc.objsize(),
                                            fromMigrate);
@@ -271,7 +271,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     auto* const css = CollectionShardingState::get(opCtx, args.nss);
-    const auto metadata = css->getCurrentMetadata();
+    const auto collDesc = css->getCollectionDescription();
 
     if (args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries
@@ -382,10 +382,10 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (metadata->isSharded()) {
+    if (collDesc.isSharded()) {
         incrementChunkOnInsertOrUpdate(opCtx,
                                        args.nss,
-                                       *metadata->getChunkManager(),
+                                       *collDesc->getChunkManager(),
                                        args.updateArgs.updatedDoc,
                                        args.updateArgs.updatedDoc.objsize(),
                                        args.updateArgs.fromMigrate);

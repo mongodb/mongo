@@ -650,7 +650,7 @@ void MigrationSourceManager::abortDueToConflictingIndexOperation() {
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
 }
 
-ScopedCollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
+ScopedCollectionDescription MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
     auto metadata = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
@@ -675,7 +675,7 @@ ScopedCollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoc
 }
 
 void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
-    const ScopedCollectionMetadata& metadata) {
+    const ScopedCollectionDescription& metadata) {
     // If this is not the first donation, there is nothing to be done
     if (metadata->getChunkManager()->getVersion(_args.getToShardId()).isSet())
         return;

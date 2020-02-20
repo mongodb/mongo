@@ -66,10 +66,11 @@ public:
      *
      * Holding a reference on a particular instance of the metadata means that orphan cleanup is not
      * allowed to run and delete chunks which are covered by that metadata. When the returned
-     * ScopedCollectionMetadata goes out of scope, the reference counter on the metadata will be
+     * ScopedCollectionDescription goes out of scope, the reference counter on the metadata will be
      * decremented and if it reaches to zero, orphan cleanup may proceed.
      */
-    ScopedCollectionMetadata getActiveMetadata(const boost::optional<LogicalTime>& atClusterTime);
+    ScopedCollectionDescription getActiveMetadata(
+        const boost::optional<LogicalTime>& atClusterTime);
 
     /**
      * Returns the shard version of the active metadata object.

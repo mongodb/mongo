@@ -122,127 +122,77 @@ protected:
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     prepareTestData();
 
-    {
-        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
-            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
-            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
-            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
-            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
-        };
+    const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+        ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
+        ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
+        ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
+        ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
+    };
 
-        BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                         << "snapshot"
-                                                         << "atClusterTime" << Timestamp(100, 0)));
+    BSONObj readConcern = BSON("readConcern" << BSON("level"
+                                                     << "snapshot"
+                                                     << "atClusterTime" << Timestamp(100, 0)));
 
-        auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
-        ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
+    ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-        auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext()));
-    }
-
-    {
-        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -500)));
-            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 50)));
-            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -50)));
-            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 500)));
-        };
-
-        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(100, 0)));
-        testFn(scm);
-    }
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto* const css = CollectionShardingState::get(operationContext(), kNss);
+    testFilterFn(css->getOwnershipFilter(operationContext()));
 }
 
 // Verifies that a different set of documents is visible for a timestamp in the past
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     prepareTestData();
 
-    {
-        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
-            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
-            ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
-            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
-            ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
-        };
+    const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+        ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)));
+        ASSERT_FALSE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)));
+        ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)));
+        ASSERT_TRUE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)));
+    };
 
-        BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                         << "snapshot"
-                                                         << "atClusterTime" << Timestamp(50, 0)));
+    BSONObj readConcern = BSON("readConcern" << BSON("level"
+                                                     << "snapshot"
+                                                     << "atClusterTime" << Timestamp(50, 0)));
 
-        auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
-        ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
+    ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-        auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext()));
-    }
-
-    {
-        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -500)));
-            ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 50)));
-            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -50)));
-            ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 500)));
-        };
-
-        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(50, 0)));
-        testFn(scm);
-    }
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto* const css = CollectionShardingState::get(operationContext(), kNss);
+    testFilterFn(css->getOwnershipFilter(operationContext()));
 }
 
 // Verifies that when accessing too far into the past we get the stale error
 TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStaleChunkHistory) {
     prepareTestData();
 
-    {
-        const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
-            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-        };
+    const auto testFilterFn = [](const ScopedCollectionFilter& collectionFilter) {
+        ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -500)),
+                           AssertionException,
+                           ErrorCodes::StaleChunkHistory);
+        ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 50)),
+                           AssertionException,
+                           ErrorCodes::StaleChunkHistory);
+        ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << -50)),
+                           AssertionException,
+                           ErrorCodes::StaleChunkHistory);
+        ASSERT_THROWS_CODE(collectionFilter.keyBelongsToMe(BSON("_id" << 500)),
+                           AssertionException,
+                           ErrorCodes::StaleChunkHistory);
+    };
 
-        BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                         << "snapshot"
-                                                         << "atClusterTime" << Timestamp(10, 0)));
+    BSONObj readConcern = BSON("readConcern" << BSON("level"
+                                                     << "snapshot"
+                                                     << "atClusterTime" << Timestamp(10, 0)));
 
-        auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
-        ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
+    ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-        auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext()));
-    }
-
-    {
-        const auto testFn = [](const ScopedCollectionMetadata& metadata) {
-            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -500)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 50)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -50)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-            ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << 500)),
-                               AssertionException,
-                               ErrorCodes::StaleChunkHistory);
-        };
-
-        const auto scm = _manager->getActiveMetadata(LogicalTime(Timestamp(10, 0)));
-        testFn(scm);
-    }
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto* const css = CollectionShardingState::get(operationContext(), kNss);
+    testFilterFn(css->getOwnershipFilter(operationContext()));
 }
 
 }  // namespace

@@ -176,14 +176,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     bool docWasModified = false;
 
     auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-    auto metadata = css->getCurrentMetadata();
+    auto collDesc = css->getCollectionDescription();
     Status status = Status::OK();
     const bool validateForStorage = opCtx()->writesAreReplicated() && _enforceOkForStorage;
     const bool isInsert = false;
     FieldRefSet immutablePaths;
     if (opCtx()->writesAreReplicated() && !request->isFromMigration()) {
-        if (metadata->isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
-            immutablePaths.fillFrom(metadata->getKeyPatternFields());
+        if (collDesc.isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
+            immutablePaths.fillFrom(collDesc.getKeyPatternFields());
         }
         immutablePaths.keepShortest(&idFieldRef);
     }
@@ -252,7 +252,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (!request->isExplain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            args.criteria = metadata->extractDocumentKey(newObj);
+            args.criteria = collDesc.extractDocumentKey(newObj);
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));
@@ -270,9 +270,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
+                if (collDesc.isSharded() && _shouldCheckForShardKeyUpdate) {
                     bool changesShardKeyOnSameNode =
-                        checkUpdateChangesShardKeyFields(metadata, oldObj);
+                        checkUpdateChangesShardKeyFields(collDesc, oldObj);
                     if (changesShardKeyOnSameNode && !args.preImageDoc) {
                         args.preImageDoc = oldObj.value().getOwned();
                     }
@@ -298,9 +298,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->isExplain()) {
-                if (metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
+                if (collDesc.isSharded() && _shouldCheckForShardKeyUpdate) {
                     bool changesShardKeyOnSameNode =
-                        checkUpdateChangesShardKeyFields(metadata, oldObj);
+                        checkUpdateChangesShardKeyFields(collDesc, oldObj);
                     if (changesShardKeyOnSameNode && !args.preImageDoc) {
                         args.preImageDoc = oldObj.value().getOwned();
                     }
@@ -701,20 +701,20 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata metadata,
+bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription collDesc,
                                                    const Snapshotted<BSONObj>& oldObj) {
     auto newObj = _doc.getObject();
-    const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+    const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
     // If the shard key fields remain unchanged by this update or if this document is an orphan and
     // so does not belong to this shard, we can skip the rest of the checks.
-    if ((newShardKey.woCompare(oldShardKey) == 0) || !metadata->keyBelongsToMe(oldShardKey)) {
+    if ((newShardKey.woCompare(oldShardKey) == 0) || !collDesc->keyBelongsToMe(oldShardKey)) {
         return false;
     }
 
-    FieldRefSet shardKeyPaths(metadata->getKeyPatternFields());
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
 
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     _assertPathsNotArray(_doc, shardKeyPaths);
@@ -732,7 +732,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
             "retryWrites: true.",
             opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
 
-    if (!metadata->keyBelongsToMe(newShardKey)) {
+    if (!collDesc->keyBelongsToMe(newShardKey)) {
         if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
             LOGV2(20605, "Hit hangBeforeThrowWouldChangeOwningShard failpoint");
             hangBeforeThrowWouldChangeOwningShard.pauseWhileSet(opCtx());

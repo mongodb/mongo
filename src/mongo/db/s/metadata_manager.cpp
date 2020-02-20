@@ -54,7 +54,7 @@ using TaskExecutor = executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 }  // namespace
 
-class RangePreserver : public ScopedCollectionMetadata::Impl {
+class RangePreserver : public ScopedCollectionDescription::Impl {
 public:
     // Must be called locked with the MetadataManager's _managerLock
     RangePreserver(WithLock,
@@ -74,7 +74,7 @@ public:
             // that are older than the oldest metadata still in use by queries (some start out at
             // zero, some go to zero but can't be expired yet).
             //
-            // Note that new instances of ScopedCollectionMetadata may get attached to
+            // Note that new instances of ScopedCollectionDescription may get attached to
             // _metadata.back(), so its usage count can increase from zero, unlike other reference
             // counts.
             _metadataManager->_retireExpiredMetadata(managerLock);
@@ -105,7 +105,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
 }
 
-ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+ScopedCollectionDescription MetadataManager::getActiveMetadata(
     const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<Latch> lg(_managerLock);
 
@@ -115,7 +115,7 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(
     // We don't keep routing history for unsharded collections, so if the collection is unsharded
     // just return the active metadata
     if (!atClusterTime || !activeMetadata->isSharded()) {
-        return ScopedCollectionMetadata(std::make_shared<RangePreserver>(
+        return ScopedCollectionDescription(std::make_shared<RangePreserver>(
             lg, shared_from_this(), std::move(activeMetadataTracker)));
     }
 
@@ -123,7 +123,7 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(
     auto chunkManagerAtClusterTime = std::make_shared<ChunkManager>(
         chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
 
-    class MetadataAtTimestamp : public ScopedCollectionMetadata::Impl {
+    class MetadataAtTimestamp : public ScopedCollectionDescription::Impl {
     public:
         MetadataAtTimestamp(CollectionMetadata metadata) : _metadata(std::move(metadata)) {}
 
@@ -135,7 +135,7 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(
         CollectionMetadata _metadata;
     };
 
-    return ScopedCollectionMetadata(std::make_shared<MetadataAtTimestamp>(
+    return ScopedCollectionDescription(std::make_shared<MetadataAtTimestamp>(
         CollectionMetadata(chunkManagerAtClusterTime, activeMetadata->shardId())));
 }
 

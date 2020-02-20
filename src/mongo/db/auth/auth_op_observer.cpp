@@ -72,8 +72,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 BSONObj AuthOpObserver::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
-    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
-    return metadata->extractDocumentKey(doc).getOwned();
+    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    return collDesc.extractDocumentKey(doc).getOwned();
 }
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,

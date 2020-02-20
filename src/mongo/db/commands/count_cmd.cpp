@@ -168,7 +168,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
 
         auto expCtx = makeExpressionContextForGetExecutor(
             opCtx, request.getCollation().value_or(BSONObj()), nss);
@@ -228,7 +228,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
 
         auto statusWithPlanExecutor =
             getExecutorCount(makeExpressionContextForGetExecutor(

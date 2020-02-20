@@ -326,11 +326,11 @@ void checkUniqueIndexConstraints(OperationContext* opCtx,
                                  const BSONObj& newIdxKey) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
-    if (!metadata->isSharded())
+    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    if (!collDesc.isSharded())
         return;
 
-    const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+    const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     uassert(ErrorCodes::CannotCreateIndex,
             str::stream() << "cannot create unique index over " << newIdxKey
                           << " with shard key pattern " << shardKeyPattern.toBSON(),

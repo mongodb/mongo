@@ -58,12 +58,12 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
                              const ChunkRange& chunkRange) {
     const auto metadataAfterMerge = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " changed since merge start",
-            metadataAfterMerge->getCollVersion().epoch() == epoch);
+            metadataAfterMerge.getCollVersion().epoch() == epoch);
 
     ChunkType chunk;
     if (!metadataAfterMerge->getNextChunk(chunkRange.getMin(), &chunk)) {
@@ -94,16 +94,16 @@ void mergeChunks(OperationContext* opCtx,
     // check
     forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
 
-    const auto metadata = [&] {
+    const auto collDesc = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " became unsharded",
-            metadata->isSharded());
+            collDesc.isSharded());
 
-    const auto shardVersion = metadata->getShardVersion();
+    const auto shardVersion = collDesc.getShardVersion();
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "could not merge chunks, collection " << nss.ns()
                           << " has changed since merge was sent (sent epoch: " << epoch.toString()
@@ -114,8 +114,8 @@ void mergeChunks(OperationContext* opCtx,
             str::stream() << "could not merge chunks, the range "
                           << redact(ChunkRange(minKey, maxKey).toString()) << " is not valid"
                           << " for collection " << nss.ns() << " with key pattern "
-                          << metadata->getKeyPattern().toString(),
-            metadata->isValidKey(minKey) && metadata->isValidKey(maxKey));
+                          << collDesc.getKeyPattern().toString(),
+            collDesc.isValidKey(minKey) && collDesc.isValidKey(maxKey));
 
     //
     // Get merged chunk information
@@ -129,7 +129,7 @@ void mergeChunks(OperationContext* opCtx,
     itChunk.setMax(minKey);
 
     while (itChunk.getMax().woCompare(maxKey) < 0 &&
-           metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
+           collDesc->getNextChunk(itChunk.getMax(), &itChunk)) {
         chunkBoundaries.push_back(itChunk.getMax());
         chunksToMerge.push_back(itChunk);
     }

@@ -78,17 +78,17 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
         auto* const css = CollectionShardingRuntime::get(opCtx, ns);
-        const auto metadata = css->getCurrentMetadata();
-        if (!metadata->isSharded()) {
+        const auto collDesc = css->getCollectionDescription();
+        if (!collDesc.isSharded()) {
             LOGV2(21911,
                   "skipping orphaned data cleanup for {ns_ns}, collection is not sharded",
                   "ns_ns"_attr = ns.ns());
             return CleanupResult::kDone;
         }
 
-        BSONObj keyPattern = metadata->getKeyPattern();
+        BSONObj keyPattern = collDesc.getKeyPattern();
         if (!startingFromKey.isEmpty()) {
-            if (!metadata->isValidKey(startingFromKey)) {
+            if (!collDesc.isValidKey(startingFromKey)) {
                 *errMsg = str::stream()
                     << "could not cleanup orphaned data, start key " << startingFromKey
                     << " does not match shard key pattern " << keyPattern;
@@ -97,7 +97,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                 return CleanupResult::kError;
             }
         } else {
-            startingFromKey = metadata->getMinKey();
+            startingFromKey = collDesc.getMinKey();
         }
 
         targetRange = css->getNextOrphanRange(startingFromKey);

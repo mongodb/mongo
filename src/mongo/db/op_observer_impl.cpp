@@ -235,8 +235,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
 BSONObj OpObserverImpl::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
-    auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
-    return metadata->extractDocumentKey(doc).getOwned();
+    auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    return collDesc.extractDocumentKey(doc).getOwned();
 }
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,

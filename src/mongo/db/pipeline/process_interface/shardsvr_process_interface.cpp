@@ -74,8 +74,7 @@ void attachWriteConcern(const WriteConcernOptions& writeConcern, BatchedCommandR
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
-    return metadata->isSharded();
+    return CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
@@ -94,15 +93,15 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
                                                                          UUID uuid) const {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    const auto metadata = [opCtx, &nss]() -> ScopedCollectionMetadata {
+    const auto collDesc = [opCtx, &nss]() -> ScopedCollectionDescription {
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
     }();
 
-    if (!metadata->isSharded() || !metadata->uuidMatches(uuid)) {
+    if (!collDesc.isSharded() || !collDesc.uuidMatches(uuid)) {
         // An unsharded collection can still become sharded so is not final. If the uuid doesn't
-        // match the one stored in the ScopedCollectionMetadata, this implies that the collection
+        // match the one stored in the ScopedCollectionDescription, this implies that the collection
         // has been dropped and recreated as sharded. We don't know what the old document key fields
         // might have been in this case so we return just _id.
         return {{"_id"}, false};
@@ -110,7 +109,7 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
 
     // Unpack the shard key. Collection is now sharded so the document key fields will never change,
     // mark as final.
-    return {_shardKeyToDocumentKeyFields(metadata->getKeyPatternFields()), true};
+    return {_shardKeyToDocumentKeyFields(collDesc.getKeyPatternFields()), true};
 }
 
 Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,

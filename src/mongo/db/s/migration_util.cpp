@@ -244,8 +244,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
 
             auto css = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-            if (!css->getCurrentMetadataIfKnown() || !css->getCurrentMetadata()->isSharded() ||
-                !css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid())) {
+            if (!css->getCurrentMetadataIfKnown() || !css->getCollectionDescription().isSharded() ||
+                !css->getCollectionDescription().uuidMatches(deletionTask.getCollectionUuid())) {
                 // If the collection's filtering metadata is not known, is unsharded, or its UUID
                 // does not match the UUID of the deletion task, force a filtering metadata refresh
                 // once, because this node may have just stepped up and therefore may have a stale
@@ -253,16 +253,14 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 LOGV2(
                     22024,
                     "Filtering metadata for namespace in deletion task "
-                    "{deletionTask}{css_getCurrentMetadataIfKnown_css_getCurrentMetadata_isSharded_"
-                    "has_UUID_that_does_not_match_UUID_of_the_deletion_task_is_unsharded_is_not_"
-                    "known}, forcing a refresh of {deletionTask_getNss}",
+                    "{deletionTask} {collectionStatus}, forcing a refresh of {deletionTask_getNss}",
                     "deletionTask"_attr = deletionTask.toBSON(),
-                    "css_getCurrentMetadataIfKnown_css_getCurrentMetadata_isSharded_has_UUID_that_does_not_match_UUID_of_the_deletion_task_is_unsharded_is_not_known"_attr =
+                    "collectionStatus"_attr =
                         (css->getCurrentMetadataIfKnown()
-                             ? (css->getCurrentMetadata()->isSharded()
-                                    ? " has UUID that does not match UUID of the deletion task"
-                                    : " is unsharded")
-                             : " is not known"),
+                             ? (css->getCollectionDescription().isSharded()
+                                    ? "has UUID that does not match UUID of the deletion task"
+                                    : "is unsharded")
+                             : "is not known"),
                     "deletionTask_getNss"_attr = deletionTask.getNss(),
                     "migrationId"_attr = deletionTask.getId());
 
@@ -278,11 +276,11 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
                 str::stream() << "Even after forced refresh, filtering metadata for namespace in "
                                  "deletion task "
-                              << (css->getCurrentMetadata()->isSharded()
+                              << (css->getCollectionDescription().isSharded()
                                       ? " has UUID that does not match UUID of the deletion task"
                                       : " is unsharded"),
-                css->getCurrentMetadata()->isSharded() &&
-                    css->getCurrentMetadata()->uuidMatches(deletionTask.getCollectionUuid()));
+                css->getCollectionDescription().isSharded() &&
+                    css->getCollectionDescription().uuidMatches(deletionTask.getCollectionUuid()));
 
             LOGV2(22026,
                   "Submitting range deletion task {deletionTask}",
@@ -362,21 +360,21 @@ void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Cal
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
     const auto css = CollectionShardingRuntime::get(opCtx, nss);
-    const auto metadata = css->getCurrentMetadata();
+    const auto collDesc = css->getCollectionDescription();
     const auto emptyChunkMap =
         RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
 
-    if (!metadata->isSharded()) {
+    if (!collDesc.isSharded()) {
         LOGV2(22029,
               "Upgrade: skipping orphaned range enumeration for {nss}, collection is not sharded",
               "nss"_attr = nss);
         return;
     }
 
-    auto startingKey = metadata->getMinKey();
+    auto startingKey = collDesc.getMinKey();
 
     while (true) {
-        auto range = metadata->getNextOrphanRange(emptyChunkMap, startingKey);
+        auto range = collDesc->getNextOrphanRange(emptyChunkMap, startingKey);
         if (!range) {
             LOGV2_DEBUG(22030,
                         2,

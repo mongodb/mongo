@@ -74,8 +74,7 @@ boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, c
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     auto* const css = CollectionShardingState::get(opCtx, nss);
-    const auto metadata = css->getCurrentMetadata();
-    return metadata->isSharded();
+    return css->getCollectionDescription().isSharded();
 }
 
 // From a replicated to an unreplicated collection or vice versa.

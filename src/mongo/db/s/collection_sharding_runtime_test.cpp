@@ -60,21 +60,21 @@ CollectionMetadata makeShardedMetadata(UUID uuid = UUID::gen()) {
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataReturnsUnshardedBeforeSetFilteringMetadataIsCalled) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
-    ASSERT_FALSE(csr.getCurrentMetadata().isSharded());
+    ASSERT_FALSE(csr.getCollectionDescription().isSharded());
 }
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     csr.setFilteringMetadata(operationContext(), CollectionMetadata());
-    ASSERT_FALSE(csr.getCurrentMetadata().isSharded());
+    ASSERT_FALSE(csr.getCollectionDescription().isSharded());
 }
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCurrentMetadataReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     csr.setFilteringMetadata(operationContext(), makeShardedMetadata());
-    ASSERT_TRUE(csr.getCurrentMetadata().isSharded());
+    ASSERT_TRUE(csr.getCollectionDescription().isSharded());
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -173,7 +173,7 @@ TEST_F(CollectionShardingRuntimeTest,
     csr.setFilteringMetadata(operationContext(), newMetadata);
 
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 2);
-    ASSERT_EQ(*csr.getCurrentMetadata()->getChunkManager()->getUUID(),
+    ASSERT_EQ(*csr.getCollectionDescription()->getChunkManager()->getUUID(),
               *newMetadata.getChunkManager()->getUUID());
 }
 

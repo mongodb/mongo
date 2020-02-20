@@ -100,12 +100,12 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const std::vector<BSONObj>& splitKeys) {
     const auto metadataAfterSplit = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " changed since split start",
-            metadataAfterSplit->getCollVersion().epoch() == epoch);
+            metadataAfterSplit.getCollVersion().epoch() == epoch);
 
     auto newChunkBounds(splitKeys);
     auto startKey = chunkRange.getMin();

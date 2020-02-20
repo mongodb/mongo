@@ -101,13 +101,13 @@ protected:
      * It will fassert if the chunk bounds are incorrect or overlap an existing chunk or if the
      * chunk version is lower than the maximum one.
      */
-    static CollectionMetadata cloneMetadataPlusChunk(const ScopedCollectionMetadata& metadata,
+    static CollectionMetadata cloneMetadataPlusChunk(const ScopedCollectionDescription& collDesc,
                                                      const ChunkRange& range) {
         const BSONObj& minKey = range.getMin();
         const BSONObj& maxKey = range.getMax();
-        ASSERT(!rangeMapOverlaps(metadata->getChunks(), minKey, maxKey));
+        ASSERT(!rangeMapOverlaps(collDesc->getChunks(), minKey, maxKey));
 
-        auto cm = metadata->getChunkManager();
+        auto cm = collDesc->getChunkManager();
 
         const auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
         ASSERT_BSONOBJ_GTE(minKey, chunkToSplit.getMin());
@@ -135,13 +135,13 @@ protected:
         return CollectionMetadata(std::make_shared<ChunkManager>(rt, boost::none), kThisShard);
     }
 
-    static CollectionMetadata cloneMetadataMinusChunk(const ScopedCollectionMetadata& metadata,
+    static CollectionMetadata cloneMetadataMinusChunk(const ScopedCollectionDescription& collDesc,
                                                       const ChunkRange& range) {
         const BSONObj& minKey = range.getMin();
         const BSONObj& maxKey = range.getMax();
-        ASSERT(rangeMapOverlaps(metadata->getChunks(), minKey, maxKey));
+        ASSERT(rangeMapOverlaps(collDesc->getChunks(), minKey, maxKey));
 
-        auto cm = metadata->getChunkManager();
+        auto cm = collDesc->getChunkManager();
 
         const auto chunkToMoveOut = cm->findIntersectingChunkWithSimpleCollation(minKey);
         ASSERT_BSONOBJ_EQ(minKey, chunkToMoveOut.getMin());
@@ -206,7 +206,7 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
         cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none), rangeToClean));
 
     // Optional so that it can be reset.
-    boost::optional<ScopedCollectionMetadata> cursorOnMovedMetadata{
+    boost::optional<ScopedCollectionDescription> cursorOnMovedMetadata{
         _manager->getActiveMetadata(boost::none)};
 
     _manager->setFilteringMetadata(
@@ -225,8 +225,8 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     ASSERT(!notif.isReady());
     ASSERT(!optNotif->isReady());
 
-    // Destroys the ScopedCollectionMetadata object and causes the destructor of MetadataManager to
-    // run, which should trigger all deletion notifications.
+    // Destroys the ScopedCollectionDescription object and causes the destructor of MetadataManager
+    // to run, which should trigger all deletion notifications.
     cursorOnMovedMetadata.reset();
 
     // Advance time to simulate orphanCleanupDelaySecs passing.

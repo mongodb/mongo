@@ -59,7 +59,7 @@ bool isNamespaceAlwaysUnsharded(const NamespaceString& nss) {
     return nss.isNamespaceAlwaysUnsharded();
 }
 
-class UnshardedCollection : public ScopedCollectionMetadata::Impl {
+class UnshardedCollection : public ScopedCollectionDescription::Impl {
 public:
     UnshardedCollection() = default;
 
@@ -132,7 +132,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationCo
     return {std::move(*optMetadata)};
 }
 
-ScopedCollectionMetadata CollectionShardingRuntime::getCurrentMetadata() {
+ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     if (!optMetadata)
         return {kUnshardedCollection};
@@ -140,7 +140,8 @@ ScopedCollectionMetadata CollectionShardingRuntime::getCurrentMetadata() {
     return *optMetadata;
 }
 
-boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() {
+boost::optional<ScopedCollectionDescription>
+CollectionShardingRuntime::getCurrentMetadataIfKnown() {
     return _getCurrentMetadataIfKnown(boost::none);
 }
 
@@ -305,21 +306,22 @@ boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONOb
     return _metadataManager->getNextOrphanRange(from);
 }
 
-boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getCurrentMetadataIfKnown(
+boost::optional<ScopedCollectionDescription> CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard lk(_metadataManagerLock);
     switch (_metadataType) {
         case MetadataType::kUnknown:
             return boost::none;
         case MetadataType::kUnsharded:
-            return ScopedCollectionMetadata{kUnshardedCollection};
+            return ScopedCollectionDescription{kUnshardedCollection};
         case MetadataType::kSharded:
             return _metadataManager->getActiveMetadata(atClusterTime);
     };
     MONGO_UNREACHABLE;
 }
 
-boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
+boost::optional<ScopedCollectionDescription>
+CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion) {

@@ -36,7 +36,7 @@
 namespace mongo {
 
 namespace {
-class UnshardedCollection : public ScopedCollectionMetadata::Impl {
+class UnshardedCollection : public ScopedCollectionDescription::Impl {
 public:
     UnshardedCollection() = default;
     const CollectionMetadata& get() override {
@@ -54,10 +54,10 @@ public:
     ScopedCollectionFilter getOwnershipFilter(OperationContext*) override {
         return {kUnshardedCollection};
     }
-    ScopedCollectionMetadata getCurrentMetadata() override {
+    ScopedCollectionDescription getCollectionDescription() override {
         return {kUnshardedCollection};
     }
-    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown() noexcept override {
+    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() noexcept override {
         return boost::none;
     }
     boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() noexcept override {

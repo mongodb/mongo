@@ -283,10 +283,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collMetadata =
-            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getCurrentMetadata();
-        if (collMetadata->isSharded()) {
-            plannerParams->shardKey = collMetadata->getKeyPattern();
+        auto collDesc =
+            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getCollectionDescription();
+        if (collDesc.isSharded()) {
+            plannerParams->shardKey = collDesc.getKeyPattern();
         } else {
             // If there's no metadata don't bother w/the shard filter since we won't know what
             // the key pattern is anyway...

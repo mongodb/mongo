@@ -96,11 +96,11 @@ private:
     // Stats
     ShardingFilterStats _specificStats;
 
-    // Note: it is important that this owns the ScopedCollectionMetadata from the time this stage
-    // is constructed. See ScopedCollectionMetadata class comment and MetadataManager comment for
-    // details. The existence of the ScopedCollectionMetadata prevents data which may have been
+    // Note: it is important that this owns the ScopedCollectionFilter from the time this stage
+    // is constructed. See ScopedCollectionFilter class comment and MetadataManager comment for
+    // details. The existence of the ScopedCollectionFilter prevents data which may have been
     // migrated from being deleted while the query is still active. If we didn't hold one
-    // ScopedCollectionMetadata for the entire query, it'd be possible for data which the query
+    // ScopedCollectionFilter for the entire query, it'd be possible for data which the query
     // needs to read to be deleted while it's still running.
     ShardFiltererImpl _shardFilterer;
 };

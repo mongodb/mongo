@@ -51,13 +51,13 @@ const FieldRef idFieldRef(idFieldName);
  * are not modifiable, respectively. The contents of these two sets may or may not be identical.
  */
 void getShardKeyAndImmutablePaths(OperationContext* opCtx,
-                                  const ScopedCollectionMetadata& metadata,
+                                  const ScopedCollectionDescription& collDesc,
                                   bool isInternalRequest,
                                   FieldRefSet* shardKeyPaths,
                                   FieldRefSet* immutablePaths) {
     // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths' set.
-    if (metadata->isSharded()) {
-        shardKeyPaths->fillFrom(metadata->getKeyPatternFields());
+    if (collDesc.isSharded()) {
+        shardKeyPaths->fillFrom(collDesc.getKeyPatternFields());
     }
     // If this is an internal request, no fields are immutable and we leave 'immutablePaths' empty.
     if (!isInternalRequest) {
@@ -148,13 +148,13 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // throw so that MongoS can target the insert to the correct shard.
     if (_shouldCheckForShardKeyUpdate) {
         auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-        const auto& metadata = css->getCurrentMetadata();
+        const auto& collDesc = css->getCollectionDescription();
 
-        if (metadata->isSharded()) {
-            const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+        if (collDesc.isSharded()) {
+            const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
 
-            if (!metadata->keyBelongsToMe(newShardKey)) {
+            if (!collDesc->keyBelongsToMe(newShardKey)) {
                 // An attempt to upsert a document with a shard key value that belongs on another
                 // shard must either be a retryable write or inside a transaction.
                 uassert(ErrorCodes::IllegalOperation,
@@ -190,15 +190,16 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 }
 
 BSONObj UpsertStage::_produceNewDocumentForInsert(bool isInternalRequest) {
-    // Obtain the sharding metadata. This will be needed to compute the shardKey paths. The metadata
-    // must remain in scope since it owns the pointers used by 'shardKeyPaths' and 'immutablePaths'.
+    // Obtain the collection description. This will be needed to compute the shardKey paths.
+    // The collection description must remain in scope since it owns the pointers used by
+    // 'shardKeyPaths' and 'immutablePaths'.
     auto* css = CollectionShardingState::get(opCtx(), _params.request->getNamespaceString());
-    auto metadata = css->getCurrentMetadata();
+    auto collDesc = css->getCollectionDescription();
 
     // Compute the set of shard key paths and the set of immutable paths. Either may be empty.
     FieldRefSet shardKeyPaths, immutablePaths;
     getShardKeyAndImmutablePaths(
-        opCtx(), metadata, isInternalRequest, &shardKeyPaths, &immutablePaths);
+        opCtx(), collDesc, isInternalRequest, &shardKeyPaths, &immutablePaths);
 
     // Reset the document into which we will be writing.
     _doc.reset();
