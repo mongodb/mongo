@@ -1733,6 +1733,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
     ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
     ASSERT_EQUALS(3, rsStatus["writeMajorityCount"].numberInt());
+    ASSERT_EQUALS(4, rsStatus["votingMembersCount"].numberInt());
+    ASSERT_EQUALS(4, rsStatus["writableVotingMembersCount"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
     ASSERT_BSONOBJ_EQ(electionCandidateMetrics, rsStatus["electionCandidateMetrics"].Obj());
     ASSERT_BSONOBJ_EQ(electionParticipantMetrics, rsStatus["electionParticipantMetrics"].Obj());
@@ -1797,6 +1799,40 @@ TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCoun
     BSONObj rsStatus = statusBuilder.obj();
     ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
     ASSERT_EQUALS(2, rsStatus["writeMajorityCount"].numberInt());
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembersCountSetCorrectly) {
+    // This test verifies that `votingMembersCount` and `writableVotingMembersCount` in
+    // replSetGetStatus are set correctly when arbiters and non-voting nodes are included in the
+    // replica set.
+    updateConfig(BSON("_id"
+                      << "mySet"
+                      << "version" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "test0:1234")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "test1:1234")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "test2:1234"
+                                                  << "arbiterOnly" << true)
+                                    << BSON("_id" << 3 << "host"
+                                                  << "test3:1234"
+                                                  << "arbiterOnly" << true)
+                                    << BSON("_id" << 4 << "host"
+                                                  << "test4:1234"
+                                                  << "votes" << 0 << "priority" << 0))),
+                 0);
+    BSONObjBuilder statusBuilder;
+    Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+    getTopoCoord().prepareStatusResponse(
+        TopologyCoordinator::ReplSetStatusArgs{Date_t(), 10, OpTimeAndWallTime(), BSONObj()},
+        &statusBuilder,
+        &resultStatus);
+    ASSERT_OK(resultStatus);
+
+    BSONObj rsStatus = statusBuilder.obj();
+    ASSERT_EQUALS(4, rsStatus["votingMembersCount"].numberInt());
+    ASSERT_EQUALS(2, rsStatus["writableVotingMembersCount"].numberInt());
 }
 
 TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {

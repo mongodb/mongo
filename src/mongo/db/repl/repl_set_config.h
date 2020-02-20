@@ -414,6 +414,13 @@ public:
     std::vector<std::string> getWriteConcernNames() const;
 
     /**
+     *  Returns the number of voting data-bearing members.
+     */
+    int getWritableVotingMembersCount() {
+        return _writableVotingMembersCount;
+    }
+
+    /**
      * Returns the number of voting data-bearing members that must acknowledge a write
      * in order to satisfy a write concern of {w: "majority"}.
      */
@@ -517,6 +524,7 @@ private:
     bool _chainingAllowed = kDefaultChainingAllowed;
     bool _writeConcernMajorityJournalDefault = false;
     int _majorityVoteCount = 0;
+    int _writableVotingMembersCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;
     ReplSetTagConfig _tagConfig;

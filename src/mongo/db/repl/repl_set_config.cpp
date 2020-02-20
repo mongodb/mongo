@@ -810,7 +810,8 @@ void ReplSetConfig::_calculateMajorities() {
         std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
     _totalVotingMembers = voters;
     _majorityVoteCount = voters / 2 + 1;
-    _writeMajority = std::min(_majorityVoteCount, voters - arbiters);
+    _writableVotingMembersCount = voters - arbiters;
+    _writeMajority = std::min(_majorityVoteCount, _writableVotingMembersCount);
 }
 
 void ReplSetConfig::_addInternalWriteConcernModes() {

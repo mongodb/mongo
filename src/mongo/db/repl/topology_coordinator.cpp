@@ -1803,6 +1803,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     response->append("majorityVoteCount", _rsConfig.getMajorityVoteCount());
     response->append("writeMajorityCount", _rsConfig.getWriteMajority());
+    response->append("votingMembersCount", _rsConfig.getTotalVotingMembers());
+    response->append("writableVotingMembersCount", _rsConfig.getWritableVotingMembersCount());
 
     // New optimes, to hold them all.
     BSONObjBuilder optimes;
