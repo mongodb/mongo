@@ -40,7 +40,7 @@ var runTest = function(testDB, primaryConn) {
     var msg = 'Command on database ' + testDB.getName() +
         ' timed out waiting for read concern to be satisfied. Command:';
 
-    if (isJsonLogNoConn()) {
+    if (isJsonLog(testDB.getMongo())) {
         msg = new RegExp(
             `Command on database {request_getDatabase} timed out waiting for read concern to be satisfied. Command:.*"attr":{"request_getDatabase":"${
                 testDB.getName()}",.*`);
