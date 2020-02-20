@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/working_set_common.h"
+
+#include <boost/iterator/transform_iterator.hpp>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
@@ -39,7 +41,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -93,7 +95,25 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                << ". Consider dropping and then re-creating the index with key pattern "
                << keyDataIt->indexKeyPattern << " and then running the validate command on the "
                << ns << " collection.";
-            error() << ss.str();
+
+            auto indexKeyEntryToObjFn = [](const IndexKeyDatum& ikd) {
+                BSONObjBuilder builder;
+                builder.append("key"_sd, redact(ikd.keyData));
+                builder.append("pattern"_sd, ikd.indexKeyPattern);
+                return builder.obj();
+            };
+            LOGV2_ERROR(
+                4615603,
+                "Erroneous index key found with reference to non-existent record id "
+                "{recordId}: "
+                "{indexKeyData}. Consider dropping and then re-creating the index with key "
+                "pattern "
+                "{indexKeyPattern} and then running the validate command on the collection.",
+                "recordId"_attr = member->recordId,
+                "indexKeyData"_attr = logv2::seqLog(
+                    boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
+                    boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn)),
+                "indexKeyPattern"_attr = keyDataIt->indexKeyPattern);
             uasserted(ErrorCodes::DataCorruptionDetected, ss.str());
         }
         return false;

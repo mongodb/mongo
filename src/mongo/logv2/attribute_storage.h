@@ -400,6 +400,10 @@ public:
 
                 } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
                     fmt::format_to(buffer, "{}", val.toString());
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
+                    val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
+                    val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
                     fmt::format_to(buffer, "{}", val);
                 }
@@ -493,6 +497,12 @@ public:
                     }
                 } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
                     fmt::format_to(buffer, "{}: {}", key, val.toString());
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
+                    fmt::format_to(buffer, "{}: ", key);
+                    val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
+                    fmt::format_to(buffer, "{}: ", key);
+                    val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
                     fmt::format_to(buffer, "{}: {}", key, val);
                 }

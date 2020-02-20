@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -39,8 +39,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
+
+#include <sstream>
 
 namespace mongo {
 
@@ -369,8 +370,13 @@ void ThreadPool::_consumeTasks() {
         _threads.pop_back();
         return;
     }
-    severe().stream() << "Could not find this thread, with id " << stdx::this_thread::get_id()
-                      << " in pool " << _options.poolName;
+
+    std::ostringstream threadId;
+    threadId << stdx::this_thread::get_id();
+    LOGV2_FATAL(4615600,
+                "Could not find this thread, with id {threadId} in pool {pool}",
+                "threadId"_attr = threadId.str(),
+                "pool"_attr = _options.poolName);
     fassertFailedNoTrace(28703);
 }
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -177,7 +177,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/latch_analyzer.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -311,12 +310,14 @@ ExitCode _initAndListen(int listenPort) {
 
     {
         ProcessId pid = ProcessId::getCurrent();
-        LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
-          << " dbpath=" << storageGlobalParams.dbpath;
-
         const bool is32bit = sizeof(int*) == 4;
-        l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
+        LOGV2(4615611,
+              "MongoDB starting",
+              "pid"_attr = pid.toNative(),
+              "port"_attr = serverGlobalParams.port,
+              "dbpath"_attr = boost::filesystem::path(storageGlobalParams.dbpath).generic_string(),
+              "architecture"_attr = (is32bit ? "32-bit" : "64-bit"),
+              "host"_attr = getHostNameCached());
     }
 
     if (kDebugBuild)

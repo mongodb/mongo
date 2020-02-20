@@ -1107,8 +1107,11 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (shouldLog(logger::LogComponent::kTracking, logger::LogSeverity::Debug(1)) &&
             rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
-            MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
-                << rpc::TrackingMetadata::get(opCtx).toString();
+            LOGV2_DEBUG_OPTIONS(4615605,
+                                1,
+                                {logv2::LogComponent::kTracking},
+                                "{trackingMetadata}",
+                                "trackingMetadata"_attr = rpc::TrackingMetadata::get(opCtx));
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 
@@ -1380,7 +1383,10 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     int n = dbmessage.pullInt();
 
     if (n > 2000) {
-        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
+        if (n < 30000)
+            LOGV2_WARNING(4615606, "receivedKillCursors, n={n}", "n"_attr = n);
+        else
+            LOGV2_ERROR(4615607, "receivedKillCursors, n={n}", "n"_attr = n);
         uassert(51250, "must kill fewer than 30000 cursors", n < 30000);
     }
 

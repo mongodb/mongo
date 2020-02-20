@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -36,11 +36,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
-using namespace fmt::literals;
-
 PlanStage::StageState ReturnKeyStage::doWork(WorkingSetID* out) {
     WorkingSetID id = WorkingSet::INVALID_ID;
     StageState status = child()->work(&id);
@@ -50,8 +48,10 @@ PlanStage::StageState ReturnKeyStage::doWork(WorkingSetID* out) {
         Status indexKeyStatus = _extractIndexKey(member);
 
         if (!indexKeyStatus.isOK()) {
-            warning() << "Couldn't execute {}, status = {}"_format(kStageName,
-                                                                   redact(indexKeyStatus));
+            LOGV2_WARNING(4615602,
+                          "Couldn't execute {stage}, status = {indexKeyStatus}",
+                          "stage"_attr = kStageName,
+                          "indexKeyStatus"_attr = redact(indexKeyStatus));
             *out = WorkingSetCommon::allocateStatusMember(&_ws, indexKeyStatus);
             return PlanStage::FAILURE;
         }

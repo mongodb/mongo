@@ -183,7 +183,10 @@ public:
     }
 
     void cancelAsyncOperations(const BatonHandle& baton = nullptr) override {
-        LOG(3) << "Cancelling outstanding I/O operations on connection to " << _remote;
+        LOGV2_DEBUG(4615608,
+                    3,
+                    "Cancelling outstanding I/O operations on connection to {remote}",
+                    "remote"_attr = _remote);
         if (baton && baton->networking()) {
             baton->networking()->cancelSession(*this);
         } else {
@@ -205,8 +208,9 @@ public:
         auto swPollEvents = pollASIOSocket(getSocket(), POLLIN, Milliseconds{0});
         if (!swPollEvents.isOK()) {
             if (swPollEvents != ErrorCodes::NetworkTimeout) {
-                warning() << "Failed to poll socket for connectivity check: "
-                          << swPollEvents.getStatus();
+                LOGV2_WARNING(4615609,
+                              "Failed to poll socket for connectivity check: {reason}",
+                              "reason"_attr = swPollEvents.getStatus());
                 return false;
             }
             return true;
@@ -219,8 +223,9 @@ public:
             if (size == sizeof(testByte)) {
                 return true;
             } else if (size == -1) {
-                auto errDesc = errnoWithDescription(errno);
-                warning() << "Failed to check socket connectivity: " << errDesc;
+                LOGV2_WARNING(4615610,
+                              "Failed to check socket connectivity: {errDesc}",
+                              "errDesc"_attr = errnoWithDescription(errno));
             }
             // If size == 0 then we got disconnected and we should return false.
         }

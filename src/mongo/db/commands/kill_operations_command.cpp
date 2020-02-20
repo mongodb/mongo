@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -45,7 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_killer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -58,12 +58,11 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            using namespace fmt::literals;
-
             auto opKiller = OperationKiller(opCtx->getClient());
             for (auto& opKey : request().getOperationKeys()) {
-                log() << "Attempting to kill operation with OperationKey '{}'"_format(
-                    opKey.toString());
+                LOGV2(4615601,
+                      "Attempting to kill operation with OperationKey '{operationKey}'",
+                      "operationKey"_attr = opKey);
                 opKiller.killOperation(OperationKey(opKey));
             }
         }
