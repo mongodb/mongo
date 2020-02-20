@@ -138,6 +138,13 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
+     * Returns whether the specified read preference is supported assuming that the agg operation
+     * will perform writes e.g. $out/$merge.
+     */
+    virtual bool supportsReadPreferenceForWriteOp(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+
+    /**
      * Inserts 'objs' into 'ns' and returns an error Status if the insert fails. If 'targetEpoch' is
      * set, throws ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or
      * the epoch changes during the course of the insert.

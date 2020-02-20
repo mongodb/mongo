@@ -68,6 +68,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const override;
 
+    bool supportsReadPreferenceForWriteOp(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) override;
+
     std::string getHostAndPort(OperationContext* opCtx) const override;
 
 protected:

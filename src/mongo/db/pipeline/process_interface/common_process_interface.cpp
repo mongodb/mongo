@@ -174,6 +174,11 @@ boost::optional<ChunkVersion> CommonProcessInterface::refreshAndGetCollectionVer
     return boost::none;
 }
 
+bool CommonProcessInterface::supportsReadPreferenceForWriteOp(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return true;
+}
+
 std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(
     const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
     std::vector<FieldPath> result;

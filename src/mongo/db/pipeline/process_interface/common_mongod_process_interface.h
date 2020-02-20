@@ -106,6 +106,9 @@ public:
 
     std::unique_ptr<ResourceYielder> getResourceYielder() const final;
 
+    bool supportsReadPreferenceForWriteOp(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) final;
+
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            boost::optional<std::set<FieldPath>> fieldPaths,

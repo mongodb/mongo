@@ -74,14 +74,16 @@ sourceColl.aggregate(finalPipeline);
 assert.sameMembers(targetColl.find().toArray(), expectedOldBehaviourOutput);
 assert.commandWorked(targetColl.remove({}));
 
-// Since we cannot run $merge on a Secondary, we cannot end up in a situation where an upgraded
-// Secondary issues an 'upsertSupplied' request to the pre-backport Primary.
-assert.throws(
+// Even though we can run $merge on a secondary, this will fail an FCV check because the primary
+// is not upgraded to 4.4.
+const error = assert.throws(
     () => rst.getSecondaries()[0].getCollection(sourceColl.getFullName()).aggregate(finalPipeline));
+assert.commandFailedWithCode(error, 31476);
 
 // Upgrade the Primary to latest. We should now see that the $merge adopts the new behaviour, and
 // inserts the exact source document rather than generating one from the whenMatched pipeline.
 refreshReplSet(latestVersion);
+assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 sourceColl.aggregate(finalPipeline);
 assert.sameMembers(targetColl.find().toArray(), sourceColl.find().toArray());
 assert.commandWorked(targetColl.remove({}));

@@ -445,6 +445,18 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     return false;
 }
 
+bool CommonMongodProcessInterface::supportsReadPreferenceForWriteOp(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // The global copy of the FCV is checked instead of the ExpressionContext's copy of the
+    // FCV because the FCV on ExpressionContext is only set when persisting queries in the
+    // catalog.
+    if (ReadPreferenceSetting::get(expCtx->opCtx).equals(ReadPreferenceSetting()))
+        return true;
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+}
+
 BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
     OperationContext* opCtx,
     Client* client,

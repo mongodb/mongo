@@ -94,7 +94,12 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
           _outputNs(std::move(outputNs)),
-          _writeConcern(expCtx->opCtx->getWriteConcern()) {}
+          _writeConcern(expCtx->opCtx->getWriteConcern()) {
+        uassert(31476,
+                "Cluster must be fully upgraded to version 4.4 with featureCompatibilityVersion"
+                " 4.4 before attempting to run $out/$merge with a non-primary read preference",
+                pExpCtx->mongoProcessInterface->supportsReadPreferenceForWriteOp(pExpCtx));
+    }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;

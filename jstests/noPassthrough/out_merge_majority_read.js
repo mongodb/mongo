@@ -180,6 +180,13 @@ replTest.initiateWithAnyNodeAsPrimary(
 
 const mongod = replTest.getPrimary();
 
+// When a replica set is started with --shardsvr nodes, the FCV for the new shard is initialized
+// to the last-stable FCV. This is done so that the shard can be safely added to a cluster which
+// has the previous FCV. When the shard is actually added to a cluster with 'latestFCV', the
+// config servers will run the setFCV command explicitly against the new shard. In this context,
+// however, all nodes are the latest binary version and so we want them to have the latest FCV.
+mongod.getDB("admin").adminCommand({setFeatureCompatibilityVersion: latestFCV});
+
 (function testSingleNode() {
     const db = mongod.getDB("singleNode");
     runTests(db.collection, mongod);
