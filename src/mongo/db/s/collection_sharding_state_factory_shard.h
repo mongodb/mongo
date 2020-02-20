@@ -45,13 +45,13 @@ public:
     std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
 
 private:
-    std::shared_ptr<executor::TaskExecutor> _getExecutor();
+    std::shared_ptr<executor::TaskExecutor> _getRangeDeletionExecutor();
 
     // Serializes the instantiation of the task executor
     Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateFactoryShard::_mutex");
 
     // Required to be a shared_ptr since it is used as an executor for ExecutorFutures.
-    std::shared_ptr<executor::TaskExecutor> _taskExecutor = {nullptr};
+    std::shared_ptr<executor::TaskExecutor> _rangeDeletionExecutor = {nullptr};
 };
 
 }  // namespace mongo

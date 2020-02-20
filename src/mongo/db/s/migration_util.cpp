@@ -59,6 +59,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -103,6 +104,27 @@ void sendToRecipient(OperationContext* opCtx,
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
+// Returns an executor to be used to run commands related to submitting tasks to the range deleter.
+// The executor is initialized on the first call to this function. Uses a shared_ptr
+// because a shared_ptr is required to work with ExecutorFutures.
+static std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
+    static Mutex mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
+    static std::shared_ptr<ThreadPool> executor;
+
+    stdx::lock_guard<Latch> lg(mutex);
+    if (!executor) {
+        ThreadPool::Options options;
+        options.poolName = "MoveChunk";
+        options.minThreads = 0;
+        options.maxThreads = 16;
+        executor = std::make_shared<ThreadPool>(std::move(options));
+        executor->startup();
+    }
+
+    return executor;
+}
+
+
 }  // namespace
 
 BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
@@ -138,7 +160,7 @@ bool checkForConflictingDeletions(OperationContext* opCtx,
 ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                              const RangeDeletionTask& deletionTask) {
     const auto serviceContext = opCtx->getServiceContext();
-    return ExecutorFuture<void>(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
+    return ExecutorFuture<void>(getMigrationUtilExecutor())
         .then([=] {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
             {
@@ -242,19 +264,18 @@ void submitPendingDeletions(OperationContext* opCtx) {
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22028, "Starting pending deletion submission thread.");
 
-    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
+    ExecutorFuture<void>(getMigrationUtilExecutor())
+        .getAsync([serviceContext](const Status& status) {
+            ThreadClient tc("ResubmitRangeDeletions", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillable(lk);
+            }
 
-    ExecutorFuture<void>(executor).getAsync([serviceContext](const Status& status) {
-        ThreadClient tc("ResubmitRangeDeletions", serviceContext);
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc->setSystemOperationKillable(lk);
-        }
+            auto opCtx = tc->makeOperationContext();
 
-        auto opCtx = tc->makeOperationContext();
-
-        submitPendingDeletions(opCtx.get());
-    });
+            submitPendingDeletions(opCtx.get());
+        });
 }
 
 void dropRangeDeletionsCollection(OperationContext* opCtx) {
@@ -626,8 +647,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
 void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22037, "Starting migration coordinator stepup recovery thread.");
 
-    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
-    ExecutorFuture<void>(executor)
+    ExecutorFuture<void>(getMigrationUtilExecutor())
         .then([serviceContext] {
             ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
             {
@@ -659,7 +679,7 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
                   "lastOpTime"_attr = lastOpTime);
             return WaitForMajorityService::get(serviceContext).waitUntilMajority(lastOpTime);
         })
-        .thenRunOn(executor)
+        .thenRunOn(getMigrationUtilExecutor())
         .then([serviceContext]() {
             ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
             {

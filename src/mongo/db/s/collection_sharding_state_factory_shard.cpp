@@ -48,20 +48,22 @@ CollectionShardingStateFactoryShard::~CollectionShardingStateFactoryShard() {
 }
 
 void CollectionShardingStateFactoryShard::join() {
-    if (_taskExecutor) {
-        _taskExecutor->shutdown();
-        _taskExecutor->join();
+    if (_rangeDeletionExecutor) {
+        _rangeDeletionExecutor->shutdown();
+        _rangeDeletionExecutor->join();
     }
 }
 
 std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryShard::make(
     const NamespaceString& nss) {
-    return std::make_unique<CollectionShardingRuntime>(_serviceContext, nss, _getExecutor());
+    return std::make_unique<CollectionShardingRuntime>(
+        _serviceContext, nss, _getRangeDeletionExecutor());
 }
 
-std::shared_ptr<executor::TaskExecutor> CollectionShardingStateFactoryShard::_getExecutor() {
+std::shared_ptr<executor::TaskExecutor>
+CollectionShardingStateFactoryShard::_getRangeDeletionExecutor() {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_taskExecutor) {
+    if (!_rangeDeletionExecutor) {
         const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
 
         auto net = executor::makeNetworkInterface(kExecName);
@@ -70,10 +72,10 @@ std::shared_ptr<executor::TaskExecutor> CollectionShardingStateFactoryShard::_ge
             std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
         taskExecutor->startup();
 
-        _taskExecutor = std::move(taskExecutor);
+        _rangeDeletionExecutor = std::move(taskExecutor);
     }
 
-    return _taskExecutor;
+    return _rangeDeletionExecutor;
 }
 
 
