@@ -102,12 +102,12 @@ SetOption('random', 1)
 #
 
 add_option('ninja',
-    choices=['true', 'false'],
-    default='false',
+    choices=['stable', 'next', 'disabled'],
+    default='disabled',
     nargs='?',
-    const='true',
+    const='stable',
     type='choice',
-    help='Enable the build.ninja generator tool',
+    help='Enable the build.ninja generator tool stable or canary version',
 )
 
 add_option('prefix',
@@ -1538,11 +1538,12 @@ if link_model.startswith("dynamic"):
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
+
 # Enable the fast decider if explicitly requested or if in 'auto' mode
 # and not in conflict with other options like the ninja option which
 # sets it's own decider
 if (
-        not get_option('ninja') == 'true' and
+        get_option('ninja') == 'disabled' and
         get_option('build-fast-and-loose') == 'on' or
         (
             get_option('build-fast-and-loose') == 'auto' and
@@ -3763,8 +3764,11 @@ env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 env.Tool('ccache')
 env.Tool('icecream')
 
-if get_option('ninja') == 'true':
-    ninja_builder = Tool("ninja")
+if get_option('ninja') != 'disabled':
+    if get_option('ninja') == 'stable':
+        ninja_builder = Tool("ninja")
+    else:
+        ninja_builder = Tool("ninja_next")
     ninja_builder.generate(env)
 
     # Explicitly add all generated sources to the DAG so NinjaBuilder can
@@ -3797,7 +3801,6 @@ if get_option('ninja') == 'true':
         )
 
     env.Alias("generate-ninja", ninja_build)
-
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4076,7 +4079,7 @@ if split_dwarf.exists(env):
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
-if get_option('ninja') == 'false':
+if get_option('ninja') == 'disabled':
     env.Tool("compilation_db")
 
 # If we can, load the dagger tool for build dependency graph introspection.
@@ -4279,7 +4282,7 @@ def injectModule(env, module, **kwargs):
     return env
 env.AddMethod(injectModule, 'InjectModule')
 
-if get_option('ninja') == 'false':
+if get_option('ninja') == 'disabled':
     compileCommands = env.CompilationDatabase('compile_commands.json')
     compileDb = env.Alias("compiledb", compileCommands)
 
@@ -4289,7 +4292,7 @@ if 'MSVC_VERSION' in env and env['MSVC_VERSION']:
     msvc_version = "--version " + env['MSVC_VERSION'] + " "
 
 # Microsoft Visual Studio Project generation for code browsing
-if get_option("ninja") == "false":
+if get_option("ninja") == "disabled":
     vcxprojFile = env.Command(
         "mongodb.vcxproj",
         compileCommands,
@@ -4332,7 +4335,7 @@ env.Alias("distsrc", "distsrc-tgz")
 # psutil.cpu_count returns None when it can't determine the number. This always
 # fails on BSD's for example.
 cpu_count = psutil.cpu_count()
-if cpu_count is not None and 'ICECC' in env and get_option("ninja") != "true":
+if cpu_count is not None and 'ICECC' in env and get_option("ninja") == "disabled":
     env.SetOption('num_jobs', 8 * cpu_count)
 elif cpu_count is not None:
     env.SetOption('num_jobs', cpu_count)
