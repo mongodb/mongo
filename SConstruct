@@ -758,7 +758,7 @@ env_vars.Add('ICERUN',
 
 env_vars.Add('ICECC_CREATE_ENV',
     help='Tell SCons where icecc-create-env tool is',
-    default='buildscripts/icecc_create_env')
+    default='icecc-create-env')
 
 env_vars.Add('ICECC_SCHEDULER',
     help='Tell ICECC where the sceduler daemon is running')
@@ -3781,6 +3781,12 @@ env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 # icecream, if available. Per the rules declared in the icecream tool,
 # load the ccache tool first.
 env.Tool('ccache')
+
+if env.ToolchainIs("clang"):
+    env["ICECC_COMPILER_TYPE"] = "clang"
+elif env.ToolchainIs("gcc"):
+    env["ICECC_COMPILER_TYPE"] = "gcc"
+
 env.Tool('icecream')
 
 if get_option('ninja') != 'disabled':
@@ -3864,7 +3870,6 @@ if get_option('ninja') != 'disabled':
         }
 
     env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja)
-
 
     def ninja_test_list_builder(env, node):
         test_files = [test_file.path for test_file in env["MONGO_TEST_REGISTRY"][node.path]]

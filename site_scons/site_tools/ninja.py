@@ -100,6 +100,13 @@ def alias_to_ninja_build(node):
     }
 
 
+def get_order_only(node):
+    """Return a list of order only dependencies for node."""
+    if node.prerequisites is None:
+        return []
+    return [get_path(src_file(prereq)) for prereq in node.prerequisites]
+
+
 def get_dependencies(node):
     """Return a list of dependencies for node."""
     return [get_path(src_file(child)) for child in node.children()]
@@ -154,39 +161,37 @@ class SConsToNinjaTranslator:
     # pylint: disable=too-many-return-statements
     def action_to_ninja_build(self, node, action=None):
         """Generate build arguments dictionary for node."""
-        # Use False since None is a valid value for this Attribute
-        build = getattr(node.attributes, NINJA_BUILD, False)
-        if build is not False:
-            return build
-
         if node.builder is None:
             return None
 
         if action is None:
             action = node.builder.action
 
+        build = {}
+
         # Ideally this should never happen, and we do try to filter
         # Ninja builders out of being sources of ninja builders but I
         # can't fix every DAG problem so we just skip ninja_builders
         # if we find one
         if node.builder == self.env["BUILDERS"]["Ninja"]:
-            return None
-
-        if isinstance(action, SCons.Action.FunctionAction):
-            return self.handle_func_action(node, action)
-
-        if isinstance(action, SCons.Action.LazyAction):
+            build = None
+        elif isinstance(action, SCons.Action.FunctionAction):
+            build = self.handle_func_action(node, action)
+        elif isinstance(action, SCons.Action.LazyAction):
             # pylint: disable=protected-access
             action = action._generate_cache(node.env if node.env else self.env)
-            return self.action_to_ninja_build(node, action=action)
+            build = self.action_to_ninja_build(node, action=action)
+        elif isinstance(action, SCons.Action.ListAction):
+            build = self.handle_list_action(node, action)
+        elif isinstance(action, COMMAND_TYPES):
+            build = get_command(node.env if node.env else self.env, node, action)
+        else:
+            raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
 
-        if isinstance(action, SCons.Action.ListAction):
-            return self.handle_list_action(node, action)
+        if build is not None:
+            build["order_only"] = get_order_only(node)
+        return build
 
-        if isinstance(action, COMMAND_TYPES):
-            return get_command(node.env if node.env else self.env, node, action)
-
-        raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
 
     def handle_func_action(self, node, action):
         """Determine how to handle the function action."""
@@ -480,6 +485,8 @@ class NinjaState:
 
                 self.built = self.built.union(outputs)
                 stack.append(child.children())
+                if child.prerequisites is not None:
+                    stack.append(child.prerequisites)
 
                 if isinstance(child, SCons.Node.Alias.Alias):
                     build = alias_to_ninja_build(child)
@@ -585,7 +592,9 @@ class NinjaState:
                 # generated source was rebuilt. We just need to make
                 # sure that all of these sources are generated before
                 # other builds.
-                build["order_only"] = "_generated_sources"
+                order_only = build.get("order_only", [])
+                order_only.append("_generated_sources")
+                build["order_only"] = order_only
 
             # When using a depfile Ninja can only have a single output
             # but SCons will usually have emitted an output for every
@@ -889,7 +898,8 @@ def generate_command(env, node, action, targets, sources, executor=None):
         if cmd.endswith("&&"):
             cmd = cmd[0:-2].strip()
 
-    return cmd
+    # Escape dollars as necessary
+    return cmd.replace("$", "$$")
 
 
 def get_shell_command(env, node, action, targets, sources, executor=None):
@@ -941,6 +951,7 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
     implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
 
     ninja_build = {
+        "order_only": get_order_only(node),
         "outputs": get_outputs(node),
         "inputs": get_inputs(node),
         "implicit": implicit,
