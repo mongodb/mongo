@@ -679,6 +679,224 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
     ASSERT_NOT_OK(getStatusFromCommandResult(res));
 }
 
+TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
+    std::string errMsg;
+    auto fixtureConn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
+    DBClientBase* conn = fixtureConn.get();
+
+    if (fixtureConn->isReplicaSetMember()) {
+        // Connect directly to the primary.
+        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        ASSERT(conn);
+    }
+
+    // Issue an isMaster command without a topology version.
+    auto isMasterCmd = BSON("isMaster" << 1);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+    auto topologyVersion = res["topologyVersion"].Obj().getOwned();
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    isMasterCmd =
+        BSON("isMaster" << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
+    opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run isMaster command to initiate the exhaust stream.
+    ASSERT(conn->call(request, reply));
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Start a new connection to the server to check the serverStatus metrics.
+    std::string newErrMsg;
+    auto conn2 = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+    uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    auto serverStatusCmd = BSON("serverStatus" << 1);
+    BSONObj serverStatusReply;
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    // The exhaust stream would continue indefinitely.
+}
+
+TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream) {
+    std::string errMsg;
+    auto fixtureConn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
+    DBClientBase* conn1 = fixtureConn.get();
+
+    if (fixtureConn->isReplicaSetMember()) {
+        // Connect directly to the primary.
+        conn1 = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        ASSERT(conn1);
+    }
+
+    // Issue an isMaster command without a topology version.
+    auto isMasterCmd = BSON("isMaster" << 1);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn1->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+    auto topologyVersion = res["topologyVersion"].Obj().getOwned();
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    isMasterCmd =
+        BSON("isMaster" << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
+    opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run isMaster command to initiate the exhaust stream.
+    ASSERT(conn1->call(request, reply));
+    auto lastRequestId = reply.header().getId();
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Start a new connection to the server to check the serverStatus metrics.
+    std::string newErrMsg;
+    auto conn2 = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+    uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    auto serverStatusCmd = BSON("serverStatus" << 1);
+    BSONObj serverStatusReply;
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    const auto failPointObj = BSON("configureFailPoint"
+                                   << "failCommand"
+                                   << "mode" << BSON("times" << 1) << "data"
+                                   << BSON("errorCode" << ErrorCodes::NotMaster << "failCommands"
+                                                       << BSON_ARRAY("isMaster")));
+    auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
+    ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
+
+    // Receive the next exhaust isMaster.
+    ASSERT_OK(conn1->recv(reply, lastRequestId));
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    lastRequestId = reply.header().getId();
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Receive the failed exhaust isMaster. This should close the exhaust stream.
+    ASSERT_OK(conn1->recv(reply, lastRequestId));
+    res = OpMsg::parse(reply).body;
+    ASSERT_NOT_OK(getStatusFromCommandResult(res));
+
+    // Terminating the exhaust stream should not decrement the number of 'exhaustIsMaster'.
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    // 'exhaustIsMaster' should now decrement after calling serverStatus on the connection that used
+    // to have the exhaust stream.
+    ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+}
+
+TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStream) {
+    std::string errMsg;
+    auto fixtureConn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
+    DBClientBase* conn1 = fixtureConn.get();
+
+    if (fixtureConn->isReplicaSetMember()) {
+        // Connect directly to the primary.
+        conn1 = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        ASSERT(conn1);
+    }
+
+    // Issue an isMaster command without a topology version.
+    auto isMasterCmd = BSON("isMaster" << 1);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn1->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+    auto topologyVersion = res["topologyVersion"].Obj().getOwned();
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    isMasterCmd =
+        BSON("isMaster" << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
+    opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run isMaster command to initiate the exhaust stream.
+    ASSERT(conn1->call(request, reply));
+    auto lastRequestId = reply.header().getId();
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Start a new connection to the server to check the serverStatus metrics.
+    std::string newErrMsg;
+    auto conn2 = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+    uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    auto serverStatusCmd = BSON("serverStatus" << 1);
+    BSONObj serverStatusReply;
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    const auto failPointObj = BSON("configureFailPoint"
+                                   << "failCommand"
+                                   << "mode" << BSON("times" << 1) << "data"
+                                   << BSON("errorCode" << ErrorCodes::NotMaster << "failCommands"
+                                                       << BSON_ARRAY("isMaster")));
+    auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
+    ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
+
+    // Receive the next exhaust isMaster.
+    ASSERT_OK(conn1->recv(reply, lastRequestId));
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    lastRequestId = reply.header().getId();
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Receive the failed exhaust isMaster. This should close the exhaust stream.
+    ASSERT_OK(conn1->recv(reply, lastRequestId));
+    res = OpMsg::parse(reply).body;
+    ASSERT_NOT_OK(getStatusFromCommandResult(res));
+
+    // Terminating the exhaust stream should not decrement the number of 'exhaustIsMaster'.
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    opMsgRequest = OpMsgRequest::fromDBAndBody("admin", isMasterCmd);
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run isMaster command on conn1 to initiate a new exhaust stream.
+    ASSERT(conn1->call(request, reply));
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // 'exhaustIsMaster' should not increment or decrement after initiating a new exhaust stream.
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+}
+
 TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     // This test simply tries to verify that using the exhaust option with DBClientCursor works
     // correctly. The externally visible behavior should technically be the same as a non-exhaust

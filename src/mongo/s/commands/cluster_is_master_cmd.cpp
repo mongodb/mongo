@@ -38,9 +38,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/transport/ismaster_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -49,7 +51,11 @@
 
 namespace mongo {
 
+// Hangs in the beginning of each isMaster command when set.
 MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+// Awaitable isMaster requests with the proper topologyVersions are expected to sleep for
+// maxAwaitTimeMS on mongos. This failpoint will hang right before doing this sleep when set.
+MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
 
 TopologyVersion mongosTopologyVersion;
 
@@ -152,6 +158,13 @@ public:
 
                 // The topologyVersion never changes on a running mongos process, so just sleep for
                 // maxAwaitTimeMS.
+                IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+                ON_BLOCK_EXIT(
+                    [&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
+                if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
+                    LOGV2(31463, "hangWhileWaitingForIsMasterResponse failpoint enabled.");
+                    hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
+                }
                 opCtx->sleepFor(Milliseconds(maxAwaitTimeMS));
             }
         } else {
@@ -199,6 +212,9 @@ public:
                     "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
+
+            InExhaustIsMaster::get(opCtx->getClient()->session().get())
+                ->setInExhaustIsMaster(true /* inExhaustIsMaster */);
 
             if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == mongosTopologyVersion.getCounter()) {

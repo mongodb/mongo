@@ -60,8 +60,10 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/transport/ismaster_metrics.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -69,7 +71,11 @@
 
 namespace mongo {
 
+// Hangs in the beginning of each isMaster command when set.
 MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+// Awaitable isMaster requests with the proper topologyVersions will sleep for maxAwaitTimeMS on
+// standalones. This failpoint will hang right before doing this sleep when set.
+MONGO_FAIL_POINT_DEFINE(hangWaitingForIsMasterResponseOnStandalone);
 
 using std::list;
 using std::string;
@@ -106,7 +112,6 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         invariant(isMasterResponse->getTopologyVersion());
         return isMasterResponse->getTopologyVersion().get();
     }
-
     auto currentTopologyVersion = replCoord->getTopologyVersion();
 
     if (clientTopologyVersion &&
@@ -121,6 +126,15 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         // The topologyVersion never changes on a running standalone process, so just sleep for
         // maxAwaitTimeMS.
         invariant(maxAwaitTimeMS);
+
+        IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+        ON_BLOCK_EXIT([&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
+        if (MONGO_unlikely(hangWaitingForIsMasterResponseOnStandalone.shouldFail())) {
+            // Used in tests that wait for this failpoint to be entered to guarantee that the
+            // request is waiting and metrics have been updated.
+            LOGV2(31462, "Hanging due to hangWaitingForIsMasterResponseOnStandalone failpoint.");
+            hangWaitingForIsMasterResponseOnStandalone.pauseWhileSet(opCtx);
+        }
         opCtx->sleepFor(Milliseconds(*maxAwaitTimeMS));
     }
 
@@ -498,6 +512,9 @@ public:
                     "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
+
+            InExhaustIsMaster::get(opCtx->getClient()->session().get())
+                ->setInExhaustIsMaster(true /* inExhaustIsMaster */);
 
             if (clientTopologyVersion->getProcessId() == currentTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == currentTopologyVersion.getCounter()) {
