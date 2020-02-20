@@ -1327,6 +1327,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/util/clock_sources',
         'repl_coordinator_impl',
         'repl_coordinator_test_fixture',
         'topology_version_observer',

@@ -44,6 +44,7 @@
 #include "mongo/db/repl/topology_version_observer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -158,15 +159,33 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
     auto cachedResponse = getObserverCache();
     ASSERT(cachedResponse);
 
-    // Kill the operation waiting on the `isMaster` future to make it throw
+    Client* observerClient = nullptr;
     auto cur = ServiceContext::LockedClientsCursor(getGlobalServiceContext());
     while (auto client = cur.next()) {
         if (client->desc() == kTopologyVersionObserverName) {
-            client->lock();
-            ASSERT(client->getOperationContext());
-            client->getOperationContext()->markKilled(ErrorCodes::ShutdownInProgress);
-            client->unlock();
+            observerClient = client;
+            break;
         }
+    }
+    // The client should not go out-of-scope as it is attached to the observer thread.
+    ASSERT(observerClient);
+
+    ClockSource::StopWatch timer;
+    constexpr auto maxWait = Seconds(10);
+
+    // Kill the operation waiting on the `isMaster` future to make it throw
+    bool wasAbleToKillOpCtx = false;
+    while (!wasAbleToKillOpCtx) {
+        if (timer.elapsed() > maxWait) {
+            FAIL(str::stream() << "Timed out while waiting for the observer to create OpCtx.");
+        }
+
+        observerClient->lock();
+        if (observerClient->getOperationContext()) {
+            observerClient->getOperationContext()->markKilled(ErrorCodes::ShutdownInProgress);
+            wasAbleToKillOpCtx = true;
+        }
+        observerClient->unlock();
     }
 
     // Observer thread must handle the exception and fetch the most recent IMR
