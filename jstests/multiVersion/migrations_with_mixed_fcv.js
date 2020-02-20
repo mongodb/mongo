@@ -181,10 +181,19 @@ function testMigrateFromLastStableToLatest() {
     checkFCV(st.shard0.getDB("admin"), lastStableFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
-    // Move chunk [50, inf) to shard1 should fail.
-    assert.commandFailedWithCode(
-        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}),
-        ErrorCodes.ConflictingOperationInProgress);
+    // Move chunk [50, inf) to shard1 should fail. Since shard1 is running FCV 4.4, it expects
+    // _recvChunkStart to include explicit writeConcern. Since shard0 is running FCV 4.2, it will
+    // not add it automatically. So we pass explicit writeConcern to the mongos moveChunk command
+    // (which also requires secondaryThrottle: true), which causes it to be passed through
+    // explicitly to shard0, which will use it when calling _recvChunkStart on shard1
+    assert.commandFailedWithCode(st.s.adminCommand({
+        moveChunk: ns,
+        find: {x: 50},
+        to: st.shard1.shardName,
+        secondaryThrottle: true,
+        writeConcern: {w: 1}
+    }),
+                                 ErrorCodes.ConflictingOperationInProgress);
 
     st.stop();
 }

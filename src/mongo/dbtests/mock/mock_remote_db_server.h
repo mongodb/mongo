@@ -168,7 +168,8 @@ public:
                            int nToSkip = 0,
                            const mongo::BSONObj* fieldsToReturn = nullptr,
                            int queryOptions = 0,
-                           int batchSize = 0);
+                           int batchSize = 0,
+                           boost::optional<BSONObj> readConcernObj = boost::none);
 
     //
     // Getters

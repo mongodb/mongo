@@ -80,7 +80,8 @@ bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
 }
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
-                                                    const BSONObj& cmdObj) {
+                                                    const BSONObj& cmdObj,
+                                                    bool isInternalClient) {
     // The default write concern if empty is {w:1}. Specifying {w:0} is/was allowed, but is
     // interpreted identically to {w:1}.
     auto wcResult = WriteConcernOptions::extractWCFromCommand(cmdObj);
@@ -106,7 +107,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                 repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
                 (!opCtx->inMultiDocumentTransaction() ||
                  isTransactionCommand(cmdObj.firstElementFieldName())) &&
-                !opCtx->getClient()->isInDirectClient()) {
+                !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
 
                 auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                      .getDefaultWriteConcern(opCtx);

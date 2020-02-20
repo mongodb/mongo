@@ -98,8 +98,12 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
         }
 
         if (secondaryThrottle != kOn) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Cannot specify write concern when secondaryThrottle is not set");
+            // Ignore the specified writeConcern, since it won't be used.  This is necessary
+            // to normalize the otherwise non-standard way that moveChunk uses writeConcern (ie.
+            // only using it when secondaryThrottle: true), so that shardsvrs can enforce always
+            // receiving writeConcern on internalClient connections (at the ServiceEntryPoint
+            // layer).
+            return MigrationSecondaryThrottleOptions(secondaryThrottle, boost::none);
         }
 
         writeConcernBSON = writeConcernElem.Obj().getOwned();

@@ -167,7 +167,8 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
         }
     }
 
-    auto countCmd = BSON("count" << nss.coll());
+    auto countCmd = BSON("count" << nss.coll() << repl::ReadConcernArgs::kReadConcernFieldName
+                                 << repl::ReadConcernArgs::kImplicitDefault);
     auto countRes =
         uassertStatusOK(primaryShard->runCommand(opCtx,
                                                  ReadPreferenceSetting(ReadPreference::PrimaryOnly),

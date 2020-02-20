@@ -181,7 +181,8 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
                                            int nToSkip,
                                            const BSONObj* fieldsToReturn,
                                            int queryOptions,
-                                           int batchSize) {
+                                           int batchSize,
+                                           boost::optional<BSONObj> readConcernObj) {
     checkIfUp(id);
 
     if (_delayMilliSec > 0) {

@@ -835,6 +835,10 @@ Status QueryRequest::init(int ntoskip,
         } else {
             _filter = queryObj.getOwned();
         }
+        // It's not possible to specify readConcern in a legacy query message, so initialize it to
+        // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
+        // mongos passes this empty readConcern to shards.
+        _readConcern = BSONObj();
     } else {
         // This is the debugging code path.
         _filter = queryObj.getOwned();

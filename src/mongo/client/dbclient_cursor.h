@@ -152,7 +152,8 @@ public:
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
                    int queryOptions,
-                   int bs);
+                   int bs,
+                   boost::optional<BSONObj> readConcernObj = boost::none);
 
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
@@ -273,7 +274,8 @@ private:
                    const BSONObj* fieldsToReturn,
                    int queryOptions,
                    int bs,
-                   std::vector<BSONObj> initialBatch);
+                   std::vector<BSONObj> initialBatch,
+                   boost::optional<BSONObj> readConcernObj);
 
     int nextBatchSize();
 
@@ -307,6 +309,7 @@ private:
     boost::optional<long long> _term;
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
     boost::optional<BSONObj> _postBatchResumeToken;
+    boost::optional<BSONObj> _readConcernObj;
 
     void dataReceived(const Message& reply) {
         bool retry;

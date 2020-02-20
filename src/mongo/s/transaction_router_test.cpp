@@ -733,7 +733,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyReadConcernAfterFir
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughNoReadConcernToParticipants) {
+TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToParticipants) {
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
 
     TxnNumber txnNum{3};
@@ -745,8 +745,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughNoReadConcernToPart
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum);
+                                  << "readConcern" << BSONObj() << "startTransaction" << true
+                                  << "coordinator" << true << "autocommit" << false << "txnNumber"
+                                  << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,

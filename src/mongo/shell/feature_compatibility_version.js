@@ -25,7 +25,13 @@ function checkFCV(adminDB, version, targetVersion) {
     assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
     assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
 
-    let doc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+    // This query specifies an explicit readConcern because some FCV tests pass a connection that
+    // has manually run isMaster with internalClient, and mongod expects internalClients (ie. other
+    // cluster members) to include read/write concern (on commands that accept read/write concern).
+    let doc = adminDB.system.version.find({_id: "featureCompatibilityVersion"})
+                  .limit(1)
+                  .readConcern("local")
+                  .next();
     assert.eq(doc.version, version, tojson(doc));
     assert.eq(doc.targetVersion, targetVersion, tojson(doc));
 }
