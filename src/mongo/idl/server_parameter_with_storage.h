@@ -248,8 +248,9 @@ public:
     Status set(const BSONElement& newValueElement) final {
         element_type newValue;
 
-        if (!newValueElement.coerce(&newValue)) {
-            return Status(ErrorCodes::BadValue, "Can't coerce value");
+        if (auto status = newValueElement.tryCoerce(&newValue); !status.isOK()) {
+            return {status.code(),
+                    str::stream() << "Failed setting " << name() << ": " << status.reason()};
         }
 
         return setValue(newValue);

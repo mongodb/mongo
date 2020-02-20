@@ -771,6 +771,9 @@ public:
     bool coerce(Decimal128* out) const;
     bool coerce(std::vector<std::string>* out) const;
 
+    template <typename T>
+    Status tryCoerce(T* out) const;
+
     /**
      * Constant double representation of 2^63, the smallest value that will overflow a long long.
      *
@@ -946,6 +949,61 @@ inline long long BSONElement::safeNumberLong() const {
     }
 }
 
+/**
+ * Attempt to coerce the BSONElement to a primitive type.
+ * For integral targets, we do additional checking that the
+ * source file is a finite real number and fits within the
+ * target type.
+ */
+template <typename T>
+Status BSONElement::tryCoerce(T* out) const {
+    if constexpr (std::is_integral<T>::value && !std::is_same<bool, T>::value) {
+        if (type() == NumberDouble) {
+            double d = numberDouble();
+            if (!std::isfinite(d)) {
+                return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
+            }
+            if ((d > std::numeric_limits<T>::max()) || (d < std::numeric_limits<T>::lowest())) {
+                return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
+            }
+        } else if (type() == NumberDecimal) {
+            Decimal128 d = numberDecimal();
+            if (!d.isFinite()) {
+                return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
+            }
+            if (d.isGreater(Decimal128(std::numeric_limits<T>::max())) ||
+                d.isLess(Decimal128(std::numeric_limits<T>::lowest()))) {
+                return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
+            }
+        } else if (type() == mongo::Bool) {
+            *out = Bool();
+            return Status::OK();
+        }
+
+        long long val;
+        if (!coerce(&val)) {
+            return {ErrorCodes::BadValue, "Unable to coerce value to integral type"};
+        }
+
+        if (std::is_same<long long, T>::value) {
+            *out = val;
+            return Status::OK();
+        }
+
+        if ((val > std::numeric_limits<T>::max()) || (val < std::numeric_limits<T>::lowest())) {
+            return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
+        }
+
+        *out = static_cast<T>(val);
+        return Status::OK();
+    }
+
+    if (!coerce(out)) {
+        return {ErrorCodes::BadValue, "Unable to coerce value to correct type"};
+    }
+
+    return Status::OK();
+}
 /**
  * This safeNumberLongForHash() function does the same thing as safeNumberLong, but it preserves
  * edge-case behavior from older versions. It's provided for use by hash functions that need to

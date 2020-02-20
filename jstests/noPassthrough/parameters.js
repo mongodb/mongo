@@ -1,29 +1,29 @@
-var dbConn = MongoRunner.runMongod();
+// Test runtime setting of various setParameters on a mongod.
+
+(function() {
+'use strict';
+
+const dbConn = MongoRunner.runMongod();
 
 function setAndCheckParameter(dbConn, parameterName, newValue, expectedResult) {
     jsTest.log("Test setting parameter: " + parameterName + " to value: " + newValue);
-    var getParameterCommand = {getParameter: 1};
+    const getParameterCommand = {getParameter: 1};
     getParameterCommand[parameterName] = 1;
-    var ret = dbConn.adminCommand(getParameterCommand);
-    assert.eq(ret.ok, 1, tojson(ret));
-    oldValue = ret[parameterName];
+    const getResult = assert.commandWorked(dbConn.adminCommand(getParameterCommand));
+    const oldValue = getResult[parameterName];
 
-    var setParameterCommand = {setParameter: 1};
+    const setParameterCommand = {setParameter: 1};
     setParameterCommand[parameterName] = newValue;
-    var ret = dbConn.adminCommand(setParameterCommand);
-    assert.eq(ret.ok, 1, tojson(ret));
-    assert.eq(ret.was, oldValue, tojson(ret));
+    const setResult = assert.commandWorked(dbConn.adminCommand(setParameterCommand));
+    assert.eq(setResult.was, oldValue, tojson(setResult));
 
-    var ret = dbConn.adminCommand(getParameterCommand);
-    assert.eq(ret.ok, 1, tojson(ret));
+    const finalResult = assert.commandWorked(dbConn.adminCommand(getParameterCommand));
     // If we have explicitly set an "exptectedResult", use that, else use "newValue".  This is for
     // cases where the server does some type coersion that changes the value.
     if (typeof expectedResult === "undefined") {
-        assert.eq(ret[parameterName], newValue, tojson(ret));
-    } else {
-        assert.eq(ret[parameterName], expectedResult, tojson(ret));
+        expectedResult = newValue;
     }
-    return newValue;
+    assert.eq(finalResult[parameterName], expectedResult, tojson(finalResult));
 }
 
 setAndCheckParameter(dbConn, "logLevel", 1);
@@ -38,13 +38,15 @@ setAndCheckParameter(dbConn, "traceExceptions", "", true);
 setAndCheckParameter(dbConn, "syncdelay", 0);
 setAndCheckParameter(dbConn, "syncdelay", 8000);
 
-function ensureSetParameterFailure(dbConn, parameterName, newValue) {
+function ensureSetParameterFailure(dbConn, parameterName, newValue, reason) {
     jsTest.log("Test setting parameter: " + parameterName + " to invalid value: " + newValue);
-    var setParameterCommand = {setParameter: 1};
+    const setParameterCommand = {setParameter: 1};
     setParameterCommand[parameterName] = newValue;
-    var ret = dbConn.adminCommand(setParameterCommand);
-    assert.eq(ret.ok, 0, tojson(ret));
+    const ret = assert.commandFailed(dbConn.adminCommand(setParameterCommand));
     printjson(ret);
+    if (reason !== undefined) {
+        assert(ret.errmsg.includes(reason));
+    }
 }
 
 ensureSetParameterFailure(dbConn, "logLevel", "foo");
@@ -57,7 +59,15 @@ ensureSetParameterFailure(dbConn, "journalCommitInterval", 1000);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 0);
 ensureSetParameterFailure(dbConn, "syncdelay", 10 * 1000 * 1000);
 ensureSetParameterFailure(dbConn, "syncdelay", -10 * 1000 * 1000);
+ensureSetParameterFailure(
+    dbConn, "scramSHA256IterationCount", 18446744073709551616, 'Out of bounds');
+ensureSetParameterFailure(
+    dbConn, "scramSHA256IterationCount", -18446744073709551616, 'Out of bounds');
+ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", NaN, 'Unable to coerce NaN/Inf');
+ensureSetParameterFailure(
+    dbConn, "scramSHA256IterationCount", Infinity, 'Unable to coerce NaN/Inf');
 
 MongoRunner.stopMongod(dbConn);
 
 jsTest.log("noPassthrough_parameters_test succeeded!");
+})();
