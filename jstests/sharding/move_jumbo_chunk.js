@@ -9,7 +9,7 @@
 (function() {
 'use strict';
 
-// TODO(SERVER-46230): Update test to run with resumable range deleter enabled.
+// TODO(SERVER-46420): Update test to run with resumable range deleter enabled.
 let st = new ShardingTest({
     shards: 2,
     mongos: 1,
