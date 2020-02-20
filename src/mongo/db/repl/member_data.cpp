@@ -36,7 +36,6 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

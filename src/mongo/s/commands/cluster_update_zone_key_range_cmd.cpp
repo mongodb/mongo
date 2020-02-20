@@ -43,7 +43,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/update_zone_key_range_request_type.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

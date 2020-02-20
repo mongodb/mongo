@@ -54,7 +54,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

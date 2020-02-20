@@ -42,7 +42,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>

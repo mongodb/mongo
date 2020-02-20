@@ -36,7 +36,6 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/dh_openssl.h"

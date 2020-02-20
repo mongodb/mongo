@@ -41,7 +41,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {

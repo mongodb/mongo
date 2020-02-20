@@ -45,7 +45,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace_windows.h"
 #include "mongo/util/text.h"

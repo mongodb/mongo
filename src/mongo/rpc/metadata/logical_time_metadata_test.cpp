@@ -36,7 +36,6 @@
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace rpc {

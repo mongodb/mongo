@@ -43,7 +43,6 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

@@ -46,7 +46,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"

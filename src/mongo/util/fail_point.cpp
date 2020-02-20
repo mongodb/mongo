@@ -46,7 +46,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_server_parameter_gen.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

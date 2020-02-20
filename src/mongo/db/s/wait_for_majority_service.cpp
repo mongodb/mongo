@@ -41,7 +41,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

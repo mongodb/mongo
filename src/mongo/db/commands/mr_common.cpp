@@ -57,7 +57,6 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo::map_reduce_common {

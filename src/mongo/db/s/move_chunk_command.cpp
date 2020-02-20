@@ -51,7 +51,6 @@
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

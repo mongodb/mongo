@@ -76,7 +76,6 @@
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {

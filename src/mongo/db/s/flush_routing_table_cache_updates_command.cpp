@@ -48,7 +48,6 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

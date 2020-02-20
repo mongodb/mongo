@@ -54,7 +54,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/icu.h"
-#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {

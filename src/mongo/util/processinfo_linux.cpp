@@ -56,7 +56,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
-#include "mongo/util/log.h"
 
 #define KLONG long
 #define KLF "l"

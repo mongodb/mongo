@@ -33,7 +33,6 @@
 
 #include <utility>
 
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

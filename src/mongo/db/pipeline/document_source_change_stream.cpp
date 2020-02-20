@@ -54,7 +54,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

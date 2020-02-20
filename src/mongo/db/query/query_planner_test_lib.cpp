@@ -47,9 +47,9 @@
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace {
 
@@ -138,7 +138,9 @@ bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFiel
     while (i.more()) {
         BSONElement child = i.next();
         if (!allowedFields.count(child.fieldName())) {
-            error() << "Did not expect to find " << child.fieldName();
+            LOGV2_ERROR(23932,
+                        "Did not expect to find {child_fieldName}",
+                        "child_fieldName"_attr = child.fieldName());
             return false;
         }
     }

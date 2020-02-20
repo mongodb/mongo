@@ -50,7 +50,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -659,8 +659,10 @@ bool isInterestingDisk(const boost::filesystem::path& path) {
     }
 
     if (ec) {
-        warning() << "Error checking directory '" << blockDevicePath.generic_string()
-                  << "': " << ec.message();
+        LOGV2_WARNING(23912,
+                      "Error checking directory '{blockDevicePath_generic_string}': {ec_message}",
+                      "blockDevicePath_generic_string"_attr = blockDevicePath.generic_string(),
+                      "ec_message"_attr = ec.message());
         return false;
     }
 
@@ -679,13 +681,19 @@ std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
 
     auto statusSysBlock = boost::filesystem::status(sysBlockPathStr, ec);
     if (ec) {
-        warning() << "Error checking directory '" << sysBlockPathStr << "': " << ec.message();
+        LOGV2_WARNING(23913,
+                      "Error checking directory '{sysBlockPathStr}': {ec_message}",
+                      "sysBlockPathStr"_attr = sysBlockPathStr,
+                      "ec_message"_attr = ec.message());
         return {};
     }
 
     if (!(boost::filesystem::exists(statusSysBlock) &&
           boost::filesystem::is_directory(statusSysBlock))) {
-        warning() << "Could not find directory '" << sysBlockPathStr << "': " << ec.message();
+        LOGV2_WARNING(23914,
+                      "Could not find directory '{sysBlockPathStr}': {ec_message}",
+                      "sysBlockPathStr"_attr = sysBlockPathStr,
+                      "ec_message"_attr = ec.message());
         return {};
     }
 
@@ -696,8 +704,10 @@ std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
     // disk device. It does not contain disk partitions.
     boost::filesystem::directory_iterator di(sysBlockPathStr, ec);
     if (ec) {
-        warning() << "Error getting directory iterator '" << sysBlockPathStr
-                  << "': " << ec.message();
+        LOGV2_WARNING(23915,
+                      "Error getting directory iterator '{sysBlockPathStr}': {ec_message}",
+                      "sysBlockPathStr"_attr = sysBlockPathStr,
+                      "ec_message"_attr = ec.message());
         return {};
     }
 

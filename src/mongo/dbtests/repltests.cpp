@@ -50,7 +50,6 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
-#include "mongo/util/log.h"
 
 using namespace mongo::repl;
 

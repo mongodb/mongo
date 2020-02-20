@@ -44,7 +44,6 @@
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"

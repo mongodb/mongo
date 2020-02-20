@@ -46,7 +46,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"

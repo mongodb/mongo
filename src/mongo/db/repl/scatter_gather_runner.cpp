@@ -40,7 +40,6 @@
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

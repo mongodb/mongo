@@ -44,7 +44,6 @@
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

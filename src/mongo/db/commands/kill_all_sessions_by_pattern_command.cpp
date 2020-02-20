@@ -48,7 +48,6 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

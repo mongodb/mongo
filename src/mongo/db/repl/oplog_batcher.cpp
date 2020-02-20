@@ -36,7 +36,6 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

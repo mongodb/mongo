@@ -37,7 +37,6 @@
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

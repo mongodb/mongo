@@ -53,7 +53,6 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

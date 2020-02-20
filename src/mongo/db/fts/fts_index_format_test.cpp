@@ -38,7 +38,6 @@
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

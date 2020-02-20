@@ -46,7 +46,6 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 
 namespace {
 std::string initTestData();

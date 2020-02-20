@@ -47,7 +47,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

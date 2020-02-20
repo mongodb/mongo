@@ -47,7 +47,6 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

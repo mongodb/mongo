@@ -37,7 +37,6 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
-#include "mongo/util/log.h"
 
 using namespace std::literals::string_literals;
 

@@ -36,7 +36,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

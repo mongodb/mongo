@@ -38,7 +38,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

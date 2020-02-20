@@ -46,7 +46,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
 
 namespace mongo {

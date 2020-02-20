@@ -39,7 +39,6 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 

@@ -44,7 +44,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/database_version_helpers.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

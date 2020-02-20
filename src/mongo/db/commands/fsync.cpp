@@ -54,7 +54,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

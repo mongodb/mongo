@@ -40,7 +40,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

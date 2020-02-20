@@ -33,7 +33,6 @@
 
 #include "mongo/executor/egress_tag_closer_manager.h"
 
-#include "mongo/util/log.h"
 
 #include "mongo/util/net/hostandport.h"
 

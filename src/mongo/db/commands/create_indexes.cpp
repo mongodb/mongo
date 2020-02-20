@@ -64,7 +64,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 

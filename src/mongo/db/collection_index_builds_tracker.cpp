@@ -35,7 +35,6 @@
 
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -130,7 +129,9 @@ void CollectionIndexBuildsTracker::waitUntilNoIndexBuildsRemain(stdx::unique_loc
 
 void CollectionIndexBuildsTracker::waitUntilIndexBuildFinished(stdx::unique_lock<Latch>& lk,
                                                                const UUID& buildUUID) {
-    log() << "Waiting until index build with UUID " << buildUUID << " is finished";
+    LOGV2(23867,
+          "Waiting until index build with UUID {buildUUID} is finished",
+          "buildUUID"_attr = buildUUID);
 
     _indexBuildFinishedCondVar.wait(lk, [&] {
         if (_buildStateByBuildUUID.find(buildUUID) == _buildStateByBuildUUID.end()) {

@@ -59,7 +59,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/options_parser/constraints.h"

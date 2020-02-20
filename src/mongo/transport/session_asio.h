@@ -145,7 +145,9 @@ public:
             std::error_code ec;
             getSocket().shutdown(GenericSocket::shutdown_both, ec);
             if ((ec) && (ec != asio::error::not_connected)) {
-                error() << "Error shutting down socket: " << ec.message();
+                LOGV2_ERROR(23841,
+                            "Error shutting down socket: {ec_message}",
+                            "ec_message"_attr = ec.message());
             }
         }
     }
@@ -385,7 +387,7 @@ private:
                     sb << "recv(): message msgLen " << msgLen << " is invalid. "
                        << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
                     const auto str = sb.str();
-                    LOG(0) << str;
+                    LOGV2(23837, "{str}", "str"_attr = str);
 
                     return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
                 }
@@ -660,8 +662,11 @@ private:
         } else {
             if (!sslGlobalParams.disableNonSSLConnectionLogging &&
                 _tl->_sslMode() == SSLParams::SSLMode_preferSSL) {
-                LOG(0) << "SSL mode is set to 'preferred' and connection " << id() << " to "
-                       << remote() << " is not using SSL.";
+                LOGV2(23838,
+                      "SSL mode is set to 'preferred' and connection {id} to {remote} is not using "
+                      "SSL.",
+                      "id"_attr = id(),
+                      "remote"_attr = remote());
             }
             return Future<bool>::makeReady(false);
         }

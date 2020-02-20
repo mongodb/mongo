@@ -54,7 +54,6 @@
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

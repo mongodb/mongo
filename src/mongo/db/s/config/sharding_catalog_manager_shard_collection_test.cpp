@@ -47,7 +47,6 @@
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 

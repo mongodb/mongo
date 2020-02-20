@@ -44,7 +44,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

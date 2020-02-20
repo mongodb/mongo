@@ -36,7 +36,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

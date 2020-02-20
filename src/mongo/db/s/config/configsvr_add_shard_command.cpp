@@ -46,7 +46,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_request_type.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

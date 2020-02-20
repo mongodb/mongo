@@ -39,7 +39,6 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -38,7 +38,6 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 template std::ostream& operator<<(std::ostream& os,

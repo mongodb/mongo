@@ -44,7 +44,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace ThreadedTests {

@@ -51,7 +51,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {

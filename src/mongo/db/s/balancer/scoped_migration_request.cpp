@@ -38,7 +38,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

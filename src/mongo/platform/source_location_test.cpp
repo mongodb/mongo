@@ -33,7 +33,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/platform/source_location_test.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

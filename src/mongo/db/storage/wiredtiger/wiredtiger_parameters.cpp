@@ -33,7 +33,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

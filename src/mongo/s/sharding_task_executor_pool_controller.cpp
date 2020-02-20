@@ -33,7 +33,6 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

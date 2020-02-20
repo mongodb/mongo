@@ -49,7 +49,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

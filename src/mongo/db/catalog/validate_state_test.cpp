@@ -39,7 +39,6 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

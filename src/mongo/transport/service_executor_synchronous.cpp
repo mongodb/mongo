@@ -38,7 +38,6 @@
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_task_names.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {

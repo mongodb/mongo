@@ -49,7 +49,6 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -40,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

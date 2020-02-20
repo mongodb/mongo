@@ -45,7 +45,6 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/interruptible.h"
-#include "mongo/util/log.h"
 
 using namespace fmt::literals;
 

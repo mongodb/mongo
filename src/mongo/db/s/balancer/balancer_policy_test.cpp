@@ -36,7 +36,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

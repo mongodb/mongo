@@ -73,7 +73,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"

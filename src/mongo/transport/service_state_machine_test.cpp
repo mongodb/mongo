@@ -50,7 +50,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

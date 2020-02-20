@@ -47,7 +47,6 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/future.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

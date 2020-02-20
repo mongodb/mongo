@@ -41,7 +41,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"

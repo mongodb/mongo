@@ -37,7 +37,6 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

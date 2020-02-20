@@ -45,7 +45,6 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

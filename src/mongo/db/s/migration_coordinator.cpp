@@ -35,8 +35,8 @@
 
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -75,10 +75,13 @@ MigrationCoordinator::MigrationCoordinator(UUID migrationId,
 MigrationCoordinator::~MigrationCoordinator() = default;
 
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
-    LOG(0) << _logPrefix() << "Persisting migration coordinator doc";
+    LOGV2(
+        23889, "{logPrefix}Persisting migration coordinator doc", "logPrefix"_attr = _logPrefix());
     migrationutil::persistMigrationCoordinatorLocally(opCtx, _migrationInfo);
 
-    LOG(0) << _logPrefix() << "Persisting range deletion task on donor";
+    LOGV2(23890,
+          "{logPrefix}Persisting range deletion task on donor",
+          "logPrefix"_attr = _logPrefix());
     RangeDeletionTask donorDeletionTask(_migrationInfo.getId(),
                                         _migrationInfo.getNss(),
                                         _migrationInfo.getCollectionUuid(),
@@ -91,25 +94,34 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
 }
 
 void MigrationCoordinator::setMigrationDecision(Decision decision) {
-    LOG(0) << _logPrefix() << "MigrationCoordinator setting migration decision to "
-           << (decision == Decision::kCommitted ? "committed" : "aborted");
+    LOGV2(23891,
+          "{logPrefix}MigrationCoordinator setting migration decision to "
+          "{decision_Decision_kCommitted_committed_aborted}",
+          "logPrefix"_attr = _logPrefix(),
+          "decision_Decision_kCommitted_committed_aborted"_attr =
+              (decision == Decision::kCommitted ? "committed" : "aborted"));
     _decision = decision;
 }
 
 
 boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
     if (!_decision) {
-        LOG(0) << _logPrefix()
-               << "Migration completed without setting a decision. This node might have started "
-                  "stepping down or shutting down after having initiated commit against the config "
-                  "server but before having found out if the commit succeeded. The new primary of "
-                  "this replica set will complete the migration coordination.";
+        LOGV2(23892,
+              "{logPrefix}Migration completed without setting a decision. This node might have "
+              "started "
+              "stepping down or shutting down after having initiated commit against the config "
+              "server but before having found out if the commit succeeded. The new primary of "
+              "this replica set will complete the migration coordination.",
+              "logPrefix"_attr = _logPrefix());
         return boost::none;
     }
 
-    LOG(0) << _logPrefix() << "MigrationCoordinator delivering decision "
-           << (_decision == Decision::kCommitted ? "committed" : "aborted")
-           << " to self and to recipient";
+    LOGV2(23893,
+          "{logPrefix}MigrationCoordinator delivering decision "
+          "{decision_Decision_kCommitted_committed_aborted} to self and to recipient",
+          "logPrefix"_attr = _logPrefix(),
+          "decision_Decision_kCommitted_committed_aborted"_attr =
+              (_decision == Decision::kCommitted ? "committed" : "aborted"));
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
 
@@ -133,26 +145,37 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     OperationContext* opCtx) {
     hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
 
-    LOG(0) << _logPrefix() << "Making commit decision durable";
+    LOGV2(23894, "{logPrefix}Making commit decision durable", "logPrefix"_attr = _logPrefix());
     migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
 
-    LOG(0) << _logPrefix() << "Bumping transaction for " << _migrationInfo.getRecipientShardId()
-           << " lsid: " << _migrationInfo.getLsid().toBSON() << " txn: " << TxnNumber{1};
+    LOGV2(23895,
+          "{logPrefix}Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
+          "{migrationInfo_getLsid} txn: {TxnNumber_1}",
+          "logPrefix"_attr = _logPrefix(),
+          "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+          "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
+          "TxnNumber_1"_attr = TxnNumber{1});
     migrationutil::advanceTransactionOnRecipient(
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
 
     hangBeforeSendingCommitDecision.pauseWhileSet();
 
-    LOG(0) << _logPrefix() << "Deleting range deletion task on recipient";
+    LOGV2(23896,
+          "{logPrefix}Deleting range deletion task on recipient",
+          "logPrefix"_attr = _logPrefix());
     migrationutil::deleteRangeDeletionTaskOnRecipient(
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 
-    LOG(0) << _logPrefix() << "Marking range deletion task on donor as ready for processing";
+    LOGV2(23897,
+          "{logPrefix}Marking range deletion task on donor as ready for processing",
+          "logPrefix"_attr = _logPrefix());
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
     // At this point the decision cannot be changed and will be recovered in the event of a
     // failover, so it is safe to schedule the deletion task after updating the persisted state.
-    LOG(0) << _logPrefix() << "Scheduling range deletion task on donor";
+    LOGV2(23898,
+          "{logPrefix}Scheduling range deletion task on donor",
+          "logPrefix"_attr = _logPrefix());
     RangeDeletionTask deletionTask(_migrationInfo.getId(),
                                    _migrationInfo.getNss(),
                                    _migrationInfo.getCollectionUuid(),
@@ -165,26 +188,36 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
     hangBeforeMakingAbortDecisionDurable.pauseWhileSet();
 
-    LOG(0) << _logPrefix() << "Making abort decision durable";
+    LOGV2(23899, "{logPrefix}Making abort decision durable", "logPrefix"_attr = _logPrefix());
     migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
 
-    LOG(0) << _logPrefix() << "Bumping transaction for " << _migrationInfo.getRecipientShardId()
-           << " lsid: " << _migrationInfo.getLsid().toBSON() << " txn: " << TxnNumber{1};
+    LOGV2(23900,
+          "{logPrefix}Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
+          "{migrationInfo_getLsid} txn: {TxnNumber_1}",
+          "logPrefix"_attr = _logPrefix(),
+          "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+          "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
+          "TxnNumber_1"_attr = TxnNumber{1});
     migrationutil::advanceTransactionOnRecipient(
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
 
-    LOG(0) << _logPrefix() << "Deleting range deletion task on donor";
+    LOGV2(
+        23901, "{logPrefix}Deleting range deletion task on donor", "logPrefix"_attr = _logPrefix());
     migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
-    LOG(0) << _logPrefix() << "Marking range deletion task on recipient as ready for processing";
+    LOGV2(23902,
+          "{logPrefix}Marking range deletion task on recipient as ready for processing",
+          "logPrefix"_attr = _logPrefix());
     migrationutil::markAsReadyRangeDeletionTaskOnRecipient(
         opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
-    LOG(0) << _logPrefix() << "Deleting migration coordinator document";
+    LOGV2(23903,
+          "{logPrefix}Deleting migration coordinator document",
+          "logPrefix"_attr = _logPrefix());
     migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
 }
 

@@ -42,7 +42,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

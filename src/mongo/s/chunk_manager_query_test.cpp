@@ -36,7 +36,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

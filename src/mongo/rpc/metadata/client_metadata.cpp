@@ -43,7 +43,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 

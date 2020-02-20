@@ -36,7 +36,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/request_types/move_primary_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

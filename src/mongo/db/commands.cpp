@@ -63,7 +63,6 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/invariant.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

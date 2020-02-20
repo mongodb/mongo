@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config_server_test_fixture.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

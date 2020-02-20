@@ -55,7 +55,6 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 

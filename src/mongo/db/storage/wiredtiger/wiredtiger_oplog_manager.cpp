@@ -40,7 +40,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

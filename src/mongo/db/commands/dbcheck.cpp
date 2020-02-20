@@ -48,7 +48,6 @@
 #include "mongo/util/background.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

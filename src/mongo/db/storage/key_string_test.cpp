@@ -54,7 +54,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 using std::string;

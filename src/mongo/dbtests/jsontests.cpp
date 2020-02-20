@@ -48,7 +48,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 
 namespace {

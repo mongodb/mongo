@@ -41,7 +41,6 @@
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/str.h"
 

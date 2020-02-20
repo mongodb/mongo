@@ -69,7 +69,6 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"

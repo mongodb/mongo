@@ -38,7 +38,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

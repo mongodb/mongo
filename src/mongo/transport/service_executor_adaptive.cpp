@@ -42,7 +42,6 @@
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

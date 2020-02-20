@@ -43,7 +43,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clear_jumbo_flag_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

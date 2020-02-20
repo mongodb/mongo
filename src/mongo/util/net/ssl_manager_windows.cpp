@@ -53,7 +53,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_exception.h"

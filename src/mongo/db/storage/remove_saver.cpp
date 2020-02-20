@@ -41,7 +41,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/log.h"
 
 
 using std::ios_base;

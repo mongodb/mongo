@@ -37,7 +37,6 @@
 #include "mongo/s/commands/document_shard_key_update_util.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 
 namespace mongo {

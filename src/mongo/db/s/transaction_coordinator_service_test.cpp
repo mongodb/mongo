@@ -38,7 +38,6 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

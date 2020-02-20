@@ -36,7 +36,7 @@
 #include <cstring>
 
 #include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/secure_zero_memory.h"
 #include "mongo/util/str.h"
 
@@ -66,7 +66,9 @@ SymmetricKey::SymmetricKey(const uint8_t* key,
       _initializationCount(initializationCount),
       _invocationCount(0) {
     if (_keySize < crypto::minKeySize || _keySize > crypto::maxKeySize) {
-        error() << "Attempt to construct symmetric key of invalid size: " << _keySize;
+        LOGV2_ERROR(23866,
+                    "Attempt to construct symmetric key of invalid size: {keySize}",
+                    "keySize"_attr = _keySize);
         return;
     }
 }

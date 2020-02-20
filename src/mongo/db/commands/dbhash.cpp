@@ -52,7 +52,6 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/timer.h"

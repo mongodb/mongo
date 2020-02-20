@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace DocumentTests {
 

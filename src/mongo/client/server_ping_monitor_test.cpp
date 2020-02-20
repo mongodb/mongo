@@ -41,9 +41,9 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -113,7 +113,10 @@ protected:
         // Check that it is a ping request from the expected hostAndPort.
         executor::TaskExecutorTest::assertRemoteCommandNameEquals("ping", request);
         ASSERT_EQ(request.target.toString(), hostAndPort);
-        LOG(0) << "at " << elapsed() << " got mock network operation " << request.toString();
+        LOGV2(23925,
+              "at {elapsed} got mock network operation {request}",
+              "elapsed"_attr = elapsed(),
+              "request"_attr = request.toString());
 
         const auto node = replSet->getNode(hostAndPort);
         node->setCommandReply("ping", BSON("ok" << 1));
@@ -132,9 +135,13 @@ protected:
         InNetworkGuard guard(_net);
 
         // Operations can happen inline with advanceTime(), so log before and after the call.
-        LOG(1) << "Advancing time from " << elapsed() << " to " << (elapsed() + d);
+        LOGV2_DEBUG(23926,
+                    1,
+                    "Advancing time from {elapsed} to {elapsed_d}",
+                    "elapsed"_attr = elapsed(),
+                    "elapsed_d"_attr = (elapsed() + d));
         _net->advanceTime(_net->now() + d);
-        LOG(1) << "Advanced to " << elapsed();
+        LOGV2_DEBUG(23927, 1, "Advanced to {elapsed}", "elapsed"_attr = elapsed());
     }
 
     /**

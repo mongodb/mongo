@@ -41,7 +41,6 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

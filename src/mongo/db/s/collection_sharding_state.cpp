@@ -36,7 +36,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

@@ -38,7 +38,6 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

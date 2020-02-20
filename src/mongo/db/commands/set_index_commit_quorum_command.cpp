@@ -39,7 +39,6 @@
 #include "mongo/db/commands/set_index_commit_quorum_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

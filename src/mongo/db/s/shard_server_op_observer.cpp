@@ -54,7 +54,6 @@
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

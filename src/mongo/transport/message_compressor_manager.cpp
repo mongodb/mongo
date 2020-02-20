@@ -41,7 +41,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

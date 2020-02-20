@@ -49,7 +49,6 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 

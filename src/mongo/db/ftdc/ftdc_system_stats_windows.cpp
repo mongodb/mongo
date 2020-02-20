@@ -43,7 +43,6 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/perfctr_collect.h"
 
 namespace mongo {

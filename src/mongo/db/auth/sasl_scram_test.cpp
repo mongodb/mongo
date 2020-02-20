@@ -50,7 +50,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {

@@ -50,7 +50,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update_index_data.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

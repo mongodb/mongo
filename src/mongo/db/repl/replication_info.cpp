@@ -60,11 +60,11 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -438,7 +438,7 @@ public:
 
             uassert(31373, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
 
-            LOG(3) << "Using maxAwaitTimeMS for awaitable isMaster protocol.";
+            LOGV2_DEBUG(23904, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
         } else {
             uassert(31368,
                     (topologyVersionElement
@@ -492,7 +492,7 @@ public:
         saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
 
         if (opCtx->isExhaust()) {
-            LOG(3) << "Using exhaust for isMaster protocol";
+            LOGV2_DEBUG(23905, 3, "Using exhaust for isMaster protocol");
 
             uassert(51756,
                     "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",

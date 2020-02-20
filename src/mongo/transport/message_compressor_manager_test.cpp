@@ -44,7 +44,6 @@
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

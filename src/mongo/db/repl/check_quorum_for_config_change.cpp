@@ -42,7 +42,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -34,7 +34,6 @@
 
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/log.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {

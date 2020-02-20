@@ -33,7 +33,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

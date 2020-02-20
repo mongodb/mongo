@@ -56,7 +56,6 @@
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

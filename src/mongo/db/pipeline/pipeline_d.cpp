@@ -87,7 +87,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

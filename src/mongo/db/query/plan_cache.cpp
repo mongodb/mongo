@@ -54,7 +54,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {

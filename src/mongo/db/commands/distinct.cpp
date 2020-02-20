@@ -58,7 +58,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

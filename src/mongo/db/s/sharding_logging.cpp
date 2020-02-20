@@ -40,7 +40,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

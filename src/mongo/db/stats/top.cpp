@@ -35,7 +35,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

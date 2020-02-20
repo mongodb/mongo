@@ -45,7 +45,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace {
 

@@ -39,7 +39,6 @@
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {

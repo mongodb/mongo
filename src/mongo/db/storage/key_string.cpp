@@ -43,7 +43,6 @@
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 
 #define keyStringAssert(msgid, msg, expr) \
     uassert(msgid, str::stream() << "KeyString format error: " << msg, expr)

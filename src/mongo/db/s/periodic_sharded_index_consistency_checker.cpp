@@ -40,7 +40,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

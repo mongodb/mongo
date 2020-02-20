@@ -39,7 +39,7 @@
 #include <termios.h>
 #endif
 
-#include "mongo/util/log.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/password_params_gen.h"
 
 namespace mongo {

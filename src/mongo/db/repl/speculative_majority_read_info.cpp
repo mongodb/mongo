@@ -36,7 +36,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

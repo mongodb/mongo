@@ -46,7 +46,6 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace biggie {

@@ -40,7 +40,6 @@
 #include "mongo/scripting/mozjs/scripting_util_gen.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

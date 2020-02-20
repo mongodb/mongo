@@ -43,7 +43,6 @@
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 

@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

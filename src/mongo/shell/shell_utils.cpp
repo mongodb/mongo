@@ -51,6 +51,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/hasher.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
@@ -59,7 +60,6 @@
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
@@ -582,20 +582,24 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
             if (auto elem = op["client"]) {
                 // mongod currentOp client
                 if (elem.type() != String) {
-                    warning() << "Ignoring operation " << op["opid"].toString(false)
-                              << "; expected 'client' field in currentOp response to have type "
-                                 "string, but found "
-                              << typeName(elem.type());
+                    LOGV2_WARNING(23916,
+                                  "Ignoring operation {op_opid_false}; expected 'client' field in "
+                                  "currentOp response to have type "
+                                  "string, but found {typeName_elem_type}",
+                                  "op_opid_false"_attr = op["opid"].toString(false),
+                                  "typeName_elem_type"_attr = typeName(elem.type()));
                     continue;
                 }
                 client = elem.str();
             } else if (auto elem = op["client_s"]) {
                 // mongos currentOp client
                 if (elem.type() != String) {
-                    warning() << "Ignoring operation " << op["opid"].toString(false)
-                              << "; expected 'client_s' field in currentOp response to have type "
-                                 "string, but found "
-                              << typeName(elem.type());
+                    LOGV2_WARNING(23917,
+                                  "Ignoring operation {op_opid_false}; expected 'client_s' field "
+                                  "in currentOp response to have type "
+                                  "string, but found {typeName_elem_type}",
+                                  "op_opid_false"_attr = op["opid"].toString(false),
+                                  "typeName_elem_type"_attr = typeName(elem.type()));
                     continue;
                 }
                 client = elem.str();

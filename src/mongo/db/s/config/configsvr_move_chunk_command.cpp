@@ -40,7 +40,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/request_types/balance_chunk_request_type.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -41,7 +41,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

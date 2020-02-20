@@ -36,7 +36,6 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
 namespace {

@@ -76,7 +76,6 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

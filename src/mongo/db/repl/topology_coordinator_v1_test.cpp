@@ -50,7 +50,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"

@@ -71,7 +71,6 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

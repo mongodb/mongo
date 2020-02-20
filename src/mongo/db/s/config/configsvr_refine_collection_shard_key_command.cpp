@@ -42,7 +42,6 @@
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

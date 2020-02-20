@@ -49,7 +49,6 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

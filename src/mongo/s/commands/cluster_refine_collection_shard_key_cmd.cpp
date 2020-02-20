@@ -37,7 +37,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

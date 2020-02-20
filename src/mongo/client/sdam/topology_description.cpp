@@ -31,7 +31,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/util/log.h"
 
 namespace mongo::sdam {
 ////////////////////////

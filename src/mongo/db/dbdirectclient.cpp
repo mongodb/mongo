@@ -43,7 +43,6 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

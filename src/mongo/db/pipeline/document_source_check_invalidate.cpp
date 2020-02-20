@@ -33,7 +33,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_check_invalidate.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

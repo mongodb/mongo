@@ -68,7 +68,6 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/log.h"
 
 
 namespace mongo {

@@ -38,7 +38,6 @@
 #include "mongo/db/commands/http_client_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 

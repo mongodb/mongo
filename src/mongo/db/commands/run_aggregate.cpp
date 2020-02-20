@@ -72,7 +72,6 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 

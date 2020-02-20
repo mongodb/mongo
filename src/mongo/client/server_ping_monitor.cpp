@@ -38,7 +38,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

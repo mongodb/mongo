@@ -44,7 +44,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/log.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"

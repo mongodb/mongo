@@ -36,7 +36,6 @@
 #include "mongo/db/commands/vote_commit_index_build_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

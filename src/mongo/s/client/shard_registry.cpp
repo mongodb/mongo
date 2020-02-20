@@ -59,7 +59,6 @@
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

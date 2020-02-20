@@ -38,7 +38,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/decoration_registry.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

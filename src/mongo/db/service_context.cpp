@@ -49,7 +49,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"

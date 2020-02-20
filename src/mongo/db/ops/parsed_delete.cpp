@@ -42,7 +42,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

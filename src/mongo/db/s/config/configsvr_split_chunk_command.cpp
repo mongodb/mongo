@@ -41,7 +41,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/split_chunk_request_type.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

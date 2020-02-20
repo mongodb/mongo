@@ -34,8 +34,8 @@
 #include "mongo/util/version.h"
 
 #include "mongo/base/init.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 #define MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
 #include "mongo/util/version_constants.h"
@@ -89,7 +89,7 @@ public:
 #error This targeted Windows version is not supported
 #endif  // NTDDI_VERSION
 #else
-        severe() << "VersionInfoInterface::targetMinOS is only available for Windows";
+        LOGV2_FATAL(23868, "VersionInfoInterface::targetMinOS is only available for Windows");
         fassertFailed(40277);
 #endif
     }

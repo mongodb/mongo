@@ -37,7 +37,6 @@
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/scripting_util_gen.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace mozjs {

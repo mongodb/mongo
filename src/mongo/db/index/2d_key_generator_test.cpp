@@ -42,7 +42,6 @@
 #include "mongo/db/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 using namespace mongo;
 

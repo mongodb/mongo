@@ -38,8 +38,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/log.h"
 
 
 namespace mongo::sdam {
@@ -206,7 +206,9 @@ void ServerDescription::parseTypeFromIsMaster(const BSONObj isMaster) {
     } else if (isMaster.getBoolField("isreplicaset")) {
         t = ServerType::kRSGhost;
     } else {
-        error() << "unknown server type from successful ismaster reply: " << isMaster.toString();
+        LOGV2_ERROR(23931,
+                    "unknown server type from successful ismaster reply: {isMaster}",
+                    "isMaster"_attr = isMaster.toString());
         t = ServerType::kUnknown;
     }
     _type = t;

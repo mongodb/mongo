@@ -46,7 +46,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_database_gen.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

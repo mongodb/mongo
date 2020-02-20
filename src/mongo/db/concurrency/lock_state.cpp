@@ -46,7 +46,6 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

@@ -59,7 +59,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -517,7 +516,9 @@ std::vector<UUID> IndexBuildsCoordinator::_abortCollectionIndexBuilds(stdx::uniq
         return {};
     }
 
-    log() << "About to abort all index builders on collection with UUID: " << collectionUUID;
+    LOGV2(23879,
+          "About to abort all index builders on collection with UUID: {collectionUUID}",
+          "collectionUUID"_attr = collectionUUID);
 
     std::vector<UUID> buildUUIDs = collIndexBuildsIt->second->getIndexBuildUUIDs(lk);
     collIndexBuildsIt->second->runOperationOnAllBuilds(
@@ -732,9 +733,12 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNamesNoWait(
             return;
         }
 
-        log() << "About to abort index builder: " << replState->buildUUID
-              << " on collection: " << collectionUUID
-              << ". First index: " << replState->indexNames.front();
+        LOGV2(23880,
+              "About to abort index builder: {replState_buildUUID} on collection: "
+              "{collectionUUID}. First index: {replState_indexNames_front}",
+              "replState_buildUUID"_attr = replState->buildUUID,
+              "collectionUUID"_attr = collectionUUID,
+              "replState_indexNames_front"_attr = replState->indexNames.front());
 
         if (this->abortIndexBuildByBuildUUIDNoWait(
                 opCtx, replState->buildUUID, abortTimestamp, reason)) {

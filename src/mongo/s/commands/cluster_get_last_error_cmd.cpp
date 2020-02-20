@@ -45,7 +45,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

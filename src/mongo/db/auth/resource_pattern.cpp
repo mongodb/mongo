@@ -35,7 +35,6 @@
 
 #include "mongo/db/auth/resource_pattern.h"
 
-#include "mongo/util/log.h"
 
 namespace mongo {
 

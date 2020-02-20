@@ -328,7 +328,9 @@ public:
 
             // If poll failed, it better be in EINTR
             if (rval < 0 && errno != EINTR) {
-                severe() << "error in poll: " << errnoWithDescription(errno);
+                LOGV2_FATAL(23921,
+                            "error in poll: {errnoWithDescription_errno}",
+                            "errnoWithDescription_errno"_attr = errnoWithDescription(errno));
                 fassertFailed(50834);
             }
         }

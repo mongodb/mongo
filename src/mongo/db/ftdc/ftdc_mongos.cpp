@@ -42,9 +42,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/log.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -108,8 +108,9 @@ void startMongoSFTDC() {
 
     if (directory.empty()) {
         if (serverGlobalParams.logpath.empty()) {
-            warning() << "FTDC is disabled because neither '--logpath' nor set parameter "
-                         "'diagnosticDataCollectionDirectoryPath' are specified.";
+            LOGV2_WARNING(23911,
+                          "FTDC is disabled because neither '--logpath' nor set parameter "
+                          "'diagnosticDataCollectionDirectoryPath' are specified.");
             startMode = FTDCStartMode::kSkipStart;
         } else {
             directory = boost::filesystem::absolute(

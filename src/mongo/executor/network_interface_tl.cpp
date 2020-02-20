@@ -40,7 +40,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
@@ -705,7 +704,10 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
-    LOG(kDiagnosticLogLevel) << "startCommand: " << redact(request.toString());
+    LOGV2_DEBUG(23909,
+                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                "startCommand: {request}",
+                "request"_attr = redact(request.toString()));
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));

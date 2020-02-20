@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 

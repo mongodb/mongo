@@ -43,7 +43,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

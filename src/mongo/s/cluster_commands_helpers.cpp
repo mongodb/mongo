@@ -56,7 +56,6 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

@@ -98,7 +98,6 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -39,7 +39,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

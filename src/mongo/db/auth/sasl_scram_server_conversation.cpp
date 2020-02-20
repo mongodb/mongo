@@ -47,7 +47,6 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"

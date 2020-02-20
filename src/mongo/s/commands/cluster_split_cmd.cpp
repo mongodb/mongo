@@ -45,7 +45,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

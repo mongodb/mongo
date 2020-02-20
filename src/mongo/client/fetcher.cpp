@@ -37,10 +37,11 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logger/redaction.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -391,20 +392,24 @@ void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
     if (id) {
         auto logKillCursorsResult = [](const RemoteCommandCallbackArgs& args) {
             if (!args.response.isOK()) {
-                warning() << "killCursors command task failed: " << redact(args.response.status);
+                LOGV2_WARNING(23918,
+                              "killCursors command task failed: {args_response_status}",
+                              "args_response_status"_attr = redact(args.response.status));
                 return;
             }
             auto status = getStatusFromCommandResult(args.response.data);
             if (!status.isOK()) {
-                warning() << "killCursors command failed: " << redact(status);
+                LOGV2_WARNING(
+                    23919, "killCursors command failed: {status}", "status"_attr = redact(status));
             }
         };
         auto cmdObj = BSON("killCursors" << nss.coll() << "cursors" << BSON_ARRAY(id));
         auto scheduleResult = _executor->scheduleRemoteCommand(
             RemoteCommandRequest(_source, _dbname, cmdObj, nullptr), logKillCursorsResult);
         if (!scheduleResult.isOK()) {
-            warning() << "failed to schedule killCursors command: "
-                      << redact(scheduleResult.getStatus());
+            LOGV2_WARNING(23920,
+                          "failed to schedule killCursors command: {scheduleResult_getStatus}",
+                          "scheduleResult_getStatus"_attr = redact(scheduleResult.getStatus()));
         }
     }
 }

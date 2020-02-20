@@ -70,7 +70,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

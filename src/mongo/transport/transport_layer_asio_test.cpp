@@ -38,7 +38,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 
 #include "asio.hpp"

@@ -57,7 +57,6 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace cluster_aggregation_planner {

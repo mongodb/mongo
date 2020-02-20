@@ -68,7 +68,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -50,7 +50,6 @@
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {

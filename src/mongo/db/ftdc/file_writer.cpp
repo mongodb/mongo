@@ -43,7 +43,6 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

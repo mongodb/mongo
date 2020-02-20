@@ -35,7 +35,6 @@
 
 #include "mongo/client/mongo_uri.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

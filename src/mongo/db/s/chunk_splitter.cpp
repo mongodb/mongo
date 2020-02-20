@@ -53,7 +53,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

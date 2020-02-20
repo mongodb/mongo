@@ -42,7 +42,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"

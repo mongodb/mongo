@@ -50,7 +50,6 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/embedded_builder.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 

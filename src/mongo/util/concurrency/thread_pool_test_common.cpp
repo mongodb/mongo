@@ -35,13 +35,13 @@
 
 #include <memory>
 
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -78,7 +78,9 @@ public:
     TptRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {
         auto& entry = threadPoolTestCaseRegistry()[name];
         if (entry) {
-            severe() << "Multiple attempts to register ThreadPoolTest named " << name;
+            LOGV2_FATAL(23922,
+                        "Multiple attempts to register ThreadPoolTest named {name}",
+                        "name"_attr = name);
             fassertFailed(34355);
         }
         entry = std::move(makeTest);
@@ -94,7 +96,9 @@ public:
     TptDeathRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {
         auto& entry = threadPoolTestCaseRegistry()[name];
         if (entry) {
-            severe() << "Multiple attempts to register ThreadPoolDeathTest named " << name;
+            LOGV2_FATAL(23923,
+                        "Multiple attempts to register ThreadPoolDeathTest named {name}",
+                        "name"_attr = name);
             fassertFailed(34356);
         }
         entry = [makeTest](ThreadPoolFactory makeThreadPool) {

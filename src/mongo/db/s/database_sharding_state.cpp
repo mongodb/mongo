@@ -39,7 +39,6 @@
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

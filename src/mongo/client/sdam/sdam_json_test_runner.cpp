@@ -46,7 +46,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"

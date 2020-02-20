@@ -45,7 +45,6 @@
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace {

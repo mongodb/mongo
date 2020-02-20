@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

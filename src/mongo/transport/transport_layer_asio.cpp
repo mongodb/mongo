@@ -51,7 +51,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"

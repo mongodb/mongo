@@ -39,7 +39,6 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"
 

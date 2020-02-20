@@ -39,7 +39,6 @@
 #include "mongo/db/operation_key_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -43,7 +43,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 

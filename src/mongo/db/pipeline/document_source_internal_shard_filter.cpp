@@ -34,7 +34,8 @@
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/util/log.h"
+#include "mongo/logger/redaction.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -58,10 +59,12 @@ DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
         }
 
         if (belongsRes == ShardFilterer::DocumentBelongsResult::kNoShardKey) {
-            warning() << "no shard key found in document " << redact(next.getDocument().toBson())
-                      << " "
-                      << "for shard key pattern " << _shardFilterer->getKeyPattern() << ", "
-                      << "document may have been inserted manually into shard";
+            LOGV2_WARNING(23870,
+                          "no shard key found in document {next_getDocument_toBson} for shard key "
+                          "pattern {shardFilterer_getKeyPattern}, document may have been inserted "
+                          "manually into shard",
+                          "next_getDocument_toBson"_attr = redact(next.getDocument().toBson()),
+                          "shardFilterer_getKeyPattern"_attr = _shardFilterer->getKeyPattern());
         }
 
         // For performance reasons, a streaming stage must not keep references to documents across

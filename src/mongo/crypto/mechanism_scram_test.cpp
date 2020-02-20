@@ -35,7 +35,6 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace scram {

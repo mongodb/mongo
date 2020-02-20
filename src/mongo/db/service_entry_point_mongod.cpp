@@ -54,7 +54,6 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

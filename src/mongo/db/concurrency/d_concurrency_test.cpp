@@ -49,7 +49,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"

@@ -48,7 +48,6 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 #include "third_party/s2/s2cell.h"

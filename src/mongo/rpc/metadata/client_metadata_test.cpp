@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

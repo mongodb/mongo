@@ -44,7 +44,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -53,7 +54,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -1102,9 +1102,12 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     if (matchingChunksVector.empty()) {
         // This can happen in a number of cases, such as that the collection has been dropped, its
         // shard key has been refined, the chunk has been split, or the chunk has been merged.
-        LOG(0) << "ensureChunkVersionIsGreaterThan did not find any chunks with minKey " << minKey
-               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
-               << ". Returning success.";
+        LOGV2(23884,
+              "ensureChunkVersionIsGreaterThan did not find any chunks with minKey {minKey}, "
+              "maxKey {maxKey}, and epoch {version_epoch}. Returning success.",
+              "minKey"_attr = minKey,
+              "maxKey"_attr = maxKey,
+              "version_epoch"_attr = version.epoch());
         return;
     }
 
@@ -1112,10 +1115,15 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         uassertStatusOK(ChunkType::fromConfigBSON(matchingChunksVector.front()));
 
     if (version.isOlderThan(currentChunk.getVersion())) {
-        LOG(0) << "ensureChunkVersionIsGreaterThan found that the chunk with minKey " << minKey
-               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
-               << " already has a higher version than " << version << ". Current chunk is "
-               << currentChunk.toConfigBSON() << ". Returning success.";
+        LOGV2(23885,
+              "ensureChunkVersionIsGreaterThan found that the chunk with minKey {minKey}, maxKey "
+              "{maxKey}, and epoch {version_epoch} already has a higher version than {version}. "
+              "Current chunk is {currentChunk_toConfigBSON}. Returning success.",
+              "minKey"_attr = minKey,
+              "maxKey"_attr = maxKey,
+              "version_epoch"_attr = version.epoch(),
+              "version"_attr = version,
+              "currentChunk_toConfigBSON"_attr = currentChunk.toConfigBSON());
         return;
     }
 
@@ -1131,10 +1139,11 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                 1 /* limit */))
             .docs;
     if (highestChunksVector.empty()) {
-        LOG(0) << "ensureChunkVersionIsGreaterThan did not find any chunks with epoch "
-               << version.epoch()
-               << " when attempting to find the collectionVersion. The collection must have been "
-                  "dropped concurrently. Returning success.";
+        LOGV2(23886,
+              "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {version_epoch} "
+              "when attempting to find the collectionVersion. The collection must have been "
+              "dropped concurrently. Returning success.",
+              "version_epoch"_attr = version.epoch());
         return;
     }
     const auto highestChunk =
@@ -1155,14 +1164,23 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                                 false /* upsert */,
                                                                 kNoWaitWriteConcern));
     if (didUpdate) {
-        LOG(0) << "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey "
-               << minKey << ", maxKey " << maxKey << ", and epoch " << version.epoch()
-               << ". Chunk is now " << newChunk.toConfigBSON();
+        LOGV2(
+            23887,
+            "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey {minKey}, "
+            "maxKey {maxKey}, and epoch {version_epoch}. Chunk is now {newChunk_toConfigBSON}",
+            "minKey"_attr = minKey,
+            "maxKey"_attr = maxKey,
+            "version_epoch"_attr = version.epoch(),
+            "newChunk_toConfigBSON"_attr = newChunk.toConfigBSON());
     } else {
-        LOG(0) << "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey " << minKey
-               << ", maxKey " << maxKey << ", and epoch " << version.epoch()
-               << " when trying to bump its version. The collection must have been dropped "
-                  "concurrently. Returning success.";
+        LOGV2(23888,
+              "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
+              "maxKey {maxKey}, and epoch {version_epoch} when trying to bump its version. The "
+              "collection must have been dropped "
+              "concurrently. Returning success.",
+              "minKey"_attr = minKey,
+              "maxKey"_attr = maxKey,
+              "version_epoch"_attr = version.epoch());
     }
 }
 

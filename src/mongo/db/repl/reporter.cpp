@@ -41,7 +41,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

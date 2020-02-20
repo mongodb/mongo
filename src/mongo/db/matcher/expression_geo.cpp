@@ -34,8 +34,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -79,7 +79,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
         BSONElement elt = geoIt.next();
         if (elt.fieldNameStringData() == "$uniqueDocs") {
             // Deprecated "$uniqueDocs" field
-            warning() << "deprecated $uniqueDocs option: " << redact(obj);
+            LOGV2_WARNING(23847, "deprecated $uniqueDocs option: {obj}", "obj"_attr = redact(obj));
         } else {
             // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
             geoContainer.reset(new GeometryContainer());
@@ -194,7 +194,7 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
             maxDistance = e.Number();
             uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
         } else if (fieldName == "$uniqueDocs") {
-            warning() << "ignoring deprecated option $uniqueDocs";
+            LOGV2_WARNING(23848, "ignoring deprecated option $uniqueDocs");
         } else {
             // In a query document, $near queries can have no non-geo sibling parameters.
             uasserted(34413,

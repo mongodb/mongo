@@ -55,7 +55,6 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
 namespace {

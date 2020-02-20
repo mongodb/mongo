@@ -50,7 +50,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -50,7 +50,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

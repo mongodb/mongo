@@ -43,7 +43,6 @@
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 #include <wiredtiger.h>

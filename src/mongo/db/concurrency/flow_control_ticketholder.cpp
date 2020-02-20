@@ -35,7 +35,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

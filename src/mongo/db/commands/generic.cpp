@@ -36,7 +36,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 

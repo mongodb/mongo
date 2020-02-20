@@ -55,7 +55,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/dh_openssl.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
@@ -1752,18 +1751,18 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
     if (serverCertificateExpirationDate != nullptr) {
         auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
         if (notBeforeMillis == Date_t()) {
-            error() << "date conversion failed";
+            LOGV2_ERROR(23873, "date conversion failed");
             return false;
         }
 
         auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509));
         if (notAfterMillis == Date_t()) {
-            error() << "date conversion failed";
+            LOGV2_ERROR(23874, "date conversion failed");
             return false;
         }
 
         if ((notBeforeMillis > Date_t::now()) || (Date_t::now() > notAfterMillis)) {
-            severe() << "The provided SSL certificate is expired or not yet valid.";
+            LOGV2_FATAL(23875, "The provided SSL certificate is expired or not yet valid.");
             fassertFailedNoTrace(28652);
         }
 

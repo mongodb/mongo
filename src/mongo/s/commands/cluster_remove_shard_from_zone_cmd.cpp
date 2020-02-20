@@ -42,7 +42,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/remove_shard_from_zone_request_type.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -40,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 

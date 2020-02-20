@@ -51,7 +51,6 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 

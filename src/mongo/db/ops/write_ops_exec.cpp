@@ -80,7 +80,6 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 

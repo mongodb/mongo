@@ -37,7 +37,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/s/request_types/clone_collection_options_from_primary_shard_gen.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -35,8 +35,9 @@
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_walker.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/logger/redaction.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
+
 
 namespace mongo {
 

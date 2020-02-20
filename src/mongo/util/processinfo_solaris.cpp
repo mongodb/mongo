@@ -47,7 +47,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

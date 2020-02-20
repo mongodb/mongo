@@ -48,7 +48,6 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

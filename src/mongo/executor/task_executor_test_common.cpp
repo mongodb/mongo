@@ -40,11 +40,11 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -85,7 +85,9 @@ public:
     CetRegistrationAgent(const std::string& name, ExecutorTestCaseFactory makeTest) {
         auto& entry = executorTestCaseRegistry()[name];
         if (entry) {
-            severe() << "Multiple attempts to register ExecutorTest named " << name;
+            LOGV2_FATAL(23924,
+                        "Multiple attempts to register ExecutorTest named {name}",
+                        "name"_attr = name);
             fassertFailed(28713);
         }
         entry = std::move(makeTest);

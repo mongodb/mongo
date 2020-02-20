@@ -38,7 +38,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

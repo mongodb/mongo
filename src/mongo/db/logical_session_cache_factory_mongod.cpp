@@ -42,7 +42,6 @@
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/sessions_collection_standalone.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

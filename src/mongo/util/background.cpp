@@ -46,7 +46,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 

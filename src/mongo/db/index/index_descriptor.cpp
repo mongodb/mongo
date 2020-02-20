@@ -38,7 +38,6 @@
 #include <algorithm>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

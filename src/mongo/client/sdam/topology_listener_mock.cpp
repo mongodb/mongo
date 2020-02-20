@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/util/log.h"
 
 namespace mongo::sdam {
 

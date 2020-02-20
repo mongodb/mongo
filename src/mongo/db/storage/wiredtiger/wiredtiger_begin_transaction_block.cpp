@@ -38,7 +38,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 using namespace fmt::literals;

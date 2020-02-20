@@ -50,7 +50,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

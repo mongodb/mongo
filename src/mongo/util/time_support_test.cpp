@@ -35,7 +35,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

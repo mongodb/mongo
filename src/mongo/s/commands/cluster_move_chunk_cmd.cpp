@@ -46,7 +46,6 @@
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

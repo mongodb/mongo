@@ -49,7 +49,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logger/redaction.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

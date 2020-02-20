@@ -43,7 +43,6 @@
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {

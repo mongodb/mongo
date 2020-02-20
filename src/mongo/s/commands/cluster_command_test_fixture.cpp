@@ -43,7 +43,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

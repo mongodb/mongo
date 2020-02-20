@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -115,7 +115,11 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         auto skippedRecord = collCursor->seekExact(skippedRecordId);
         if (skippedRecord) {
             const auto skippedDoc = skippedRecord->data.toBson();
-            LOG(2) << "reapplying skipped RecordID " << skippedRecordId << ": " << skippedDoc;
+            LOGV2_DEBUG(23882,
+                        2,
+                        "reapplying skipped RecordID {skippedRecordId}: {skippedDoc}",
+                        "skippedRecordId"_attr = skippedRecordId,
+                        "skippedDoc"_attr = skippedDoc);
 
             try {
                 // Because constraint enforcement is set, this will throw if there are any indexing
@@ -145,8 +149,13 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     progress->finished();
 
     int logLevel = (resolved > 0) ? 0 : 1;
-    LOG(logLevel) << "index build: reapplied " << resolved << " skipped records for index: "
-                  << _indexCatalogEntry->descriptor()->indexName();
+    LOGV2_DEBUG(23883,
+                logSeverityV1toV2(logLevel).toInt(),
+                "index build: reapplied {resolved} skipped records for index: "
+                "{indexCatalogEntry_descriptor_indexName}",
+                "resolved"_attr = resolved,
+                "indexCatalogEntry_descriptor_indexName"_attr =
+                    _indexCatalogEntry->descriptor()->indexName());
     return Status::OK();
 }
 

@@ -41,7 +41,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 using namespace fmt::literals;

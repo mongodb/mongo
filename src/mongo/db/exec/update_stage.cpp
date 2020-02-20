@@ -56,7 +56,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

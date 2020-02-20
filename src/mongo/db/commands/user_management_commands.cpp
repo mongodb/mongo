@@ -73,7 +73,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/icu.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/sequence_util.h"

@@ -35,7 +35,6 @@
 #include "mongo/db/commands/map_reduce_out_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

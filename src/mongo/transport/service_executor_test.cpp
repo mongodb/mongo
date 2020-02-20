@@ -39,7 +39,6 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 #include <asio.hpp>

@@ -40,7 +40,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

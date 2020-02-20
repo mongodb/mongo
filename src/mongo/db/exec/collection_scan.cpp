@@ -45,7 +45,6 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 #include "mongo/db/client.h"  // XXX-ERH
 

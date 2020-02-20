@@ -40,7 +40,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

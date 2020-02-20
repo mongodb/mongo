@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -172,7 +172,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         _pipeline =
             pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(ctx, _pipeline.release());
         _cursorAttached = true;
-        LOG(3) << "$unionWith attached cursor to pipeline";
+        LOGV2_DEBUG(23869, 3, "$unionWith attached cursor to pipeline");
     }
 
     if (auto res = _pipeline->getNext())

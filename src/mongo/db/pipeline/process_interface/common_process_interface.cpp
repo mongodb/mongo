@@ -46,7 +46,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/diagnostic_info.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {

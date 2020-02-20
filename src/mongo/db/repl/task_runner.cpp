@@ -44,7 +44,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

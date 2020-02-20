@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/drop_connections_gen.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

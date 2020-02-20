@@ -37,7 +37,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 #include <asio.hpp>

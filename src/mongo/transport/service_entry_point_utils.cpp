@@ -40,7 +40,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 
 #if !defined(_WIN32)
 #include <sys/resource.h>

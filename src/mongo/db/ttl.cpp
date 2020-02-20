@@ -58,7 +58,6 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

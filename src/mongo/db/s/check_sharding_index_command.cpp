@@ -37,7 +37,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

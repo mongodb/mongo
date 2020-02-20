@@ -41,7 +41,6 @@
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo::projection_executor {
 namespace {

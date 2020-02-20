@@ -39,7 +39,6 @@
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

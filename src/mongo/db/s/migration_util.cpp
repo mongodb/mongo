@@ -63,7 +63,6 @@
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace migrationutil {
@@ -182,8 +181,12 @@ void retryIdempotentWorkUntilSuccess(OperationContext* opCtx,
             break;
         } catch (DBException& ex) {
             if (attempt % kLogRetryAttemptThreshold == 1) {
-                warning() << "retrying " << taskDescription << " after " << attempt
-                          << " failed attempts, last seen error: " << ex;
+                LOGV2_WARNING(23937,
+                              "retrying {taskDescription} after {attempt} failed attempts, last "
+                              "seen error: {ex}",
+                              "taskDescription"_attr = taskDescription,
+                              "attempt"_attr = attempt,
+                              "ex"_attr = ex);
             }
         }
     }

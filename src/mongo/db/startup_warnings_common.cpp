@@ -40,7 +40,6 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"

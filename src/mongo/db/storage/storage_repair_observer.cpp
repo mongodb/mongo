@@ -51,7 +51,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -52,7 +52,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -48,7 +48,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/secure_zero_memory.h"

@@ -61,7 +61,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

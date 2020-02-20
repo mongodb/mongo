@@ -38,11 +38,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/transport/message_compressor_manager.h"
-#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
@@ -139,7 +139,7 @@ public:
             uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
             uassert(51759, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
 
-            LOG(3) << "Using maxAwaitTimeMS for awaitable isMaster protocol.";
+            LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
 
             if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId()) {
                 uassert(51761,
@@ -193,7 +193,7 @@ public:
         mongosTopologyVersion.serialize(&topologyVersionBuilder);
 
         if (opCtx->isExhaust()) {
-            LOG(3) << "Using exhaust for isMaster protocol";
+            LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster protocol");
 
             uassert(51763,
                     "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",

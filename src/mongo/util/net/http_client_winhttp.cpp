@@ -49,7 +49,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

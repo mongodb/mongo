@@ -35,7 +35,6 @@
 #include "mongo/idl/config_option_test_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cmdline_utils/censor_cmdline_test.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"

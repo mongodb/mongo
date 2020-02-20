@@ -54,7 +54,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
 

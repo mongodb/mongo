@@ -43,7 +43,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -39,7 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/client/sasl_sspi_options.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -210,12 +210,12 @@ int sspiClientMechNew(void* glob_context,
                 ss << fqdn << " ";
             }
             ss << "]";
-            warning() << ss.str();
+            LOGV2_WARNING(23933, "{ss_str}", "ss_str"_attr = ss.str());
         }
         canonName = std::move(fqdns.back());
         fqdns.pop_back();
     } else if (saslSSPIGlobalParams.canonicalization != HostnameCanonicalizationMode::kNone) {
-        warning() << "Was unable to acquire an FQDN";
+        LOGV2_WARNING(23934, "Was unable to acquire an FQDN");
     }
 
     pcctx->nameToken = toWideString(cparams->service) + L'/' + toWideString(canonName.c_str());

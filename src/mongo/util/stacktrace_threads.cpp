@@ -59,7 +59,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/log.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace_json.h"
 #include "mongo/util/stacktrace_somap.h"

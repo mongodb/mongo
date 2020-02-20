@@ -58,7 +58,6 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo::sharded_agg_helpers {
 

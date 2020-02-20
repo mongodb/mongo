@@ -66,9 +66,9 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -161,7 +161,10 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
     Collection* collection = autoColl.getCollection();
     std::vector<Document> indexStats;
     if (!collection) {
-        LOG(2) << "Collection not found on index stats retrieval: " << ns.ns();
+        LOGV2_DEBUG(23881,
+                    2,
+                    "Collection not found on index stats retrieval: {ns_ns}",
+                    "ns_ns"_attr = ns.ns());
         return indexStats;
     }
 

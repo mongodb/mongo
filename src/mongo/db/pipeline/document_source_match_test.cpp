@@ -45,7 +45,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

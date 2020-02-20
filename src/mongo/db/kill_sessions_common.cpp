@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

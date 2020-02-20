@@ -41,7 +41,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/version_manager.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

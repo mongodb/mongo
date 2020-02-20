@@ -34,7 +34,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/s/query/cluster_aggregate.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

@@ -38,7 +38,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

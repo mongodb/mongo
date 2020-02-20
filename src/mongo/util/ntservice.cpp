@@ -43,7 +43,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"

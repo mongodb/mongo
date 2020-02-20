@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -95,7 +95,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"

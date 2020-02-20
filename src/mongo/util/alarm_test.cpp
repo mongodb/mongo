@@ -36,7 +36,6 @@
 #include "mongo/util/alarm.h"
 #include "mongo/util/alarm_runner_background_thread.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

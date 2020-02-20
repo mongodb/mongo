@@ -70,7 +70,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"

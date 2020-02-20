@@ -38,7 +38,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

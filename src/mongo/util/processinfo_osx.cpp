@@ -49,7 +49,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {

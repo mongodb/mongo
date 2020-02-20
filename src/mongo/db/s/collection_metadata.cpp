@@ -39,7 +39,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

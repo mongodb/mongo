@@ -43,7 +43,6 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"

@@ -43,7 +43,6 @@
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace {
 

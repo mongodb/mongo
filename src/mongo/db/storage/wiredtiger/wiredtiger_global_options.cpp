@@ -34,7 +34,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 
 namespace moe = mongo::optionenvironment;
 

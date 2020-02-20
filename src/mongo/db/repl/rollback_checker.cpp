@@ -33,7 +33,6 @@
 
 #include "mongo/db/repl/rollback_checker.h"
 
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

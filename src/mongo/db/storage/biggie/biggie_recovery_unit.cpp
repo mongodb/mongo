@@ -35,7 +35,6 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace biggie {

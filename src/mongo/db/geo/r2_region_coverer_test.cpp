@@ -41,7 +41,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace {
 

@@ -39,7 +39,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

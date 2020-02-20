@@ -52,8 +52,8 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
@@ -147,20 +147,31 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
     std::string quotedFileName = "\"" + str::escape(info.dlpi_name) + "\"";
 
     if (memcmp(&eHeader.e_ident[0], ELFMAG, SELFMAG)) {
-        warning() << "Bad ELF magic number in image of " << quotedFileName;
+        LOGV2_WARNING(23842,
+                      "Bad ELF magic number in image of {quotedFileName}",
+                      "quotedFileName"_attr = quotedFileName);
         return;
     }
 
     static constexpr int kArchBits = ARCH_BITS;
     if (eHeader.e_ident[EI_CLASS] != ARCH_ELFCLASS) {
-        warning() << "Expected elf file class of " << quotedFileName << " to be " << ARCH_ELFCLASS
-                  << "(" << kArchBits << "-bit), but found " << int(eHeader.e_ident[4]);
+        LOGV2_WARNING(23843,
+                      "Expected elf file class of {quotedFileName} to be "
+                      "{ARCH_ELFCLASS}({kArchBits}-bit), but found {int_eHeader_e_ident_4}",
+                      "quotedFileName"_attr = quotedFileName,
+                      "ARCH_ELFCLASS"_attr = ARCH_ELFCLASS,
+                      "kArchBits"_attr = kArchBits,
+                      "int_eHeader_e_ident_4"_attr = int(eHeader.e_ident[4]));
         return;
     }
 
     if (eHeader.e_ident[EI_VERSION] != EV_CURRENT) {
-        warning() << "Wrong ELF version in " << quotedFileName << ".  Expected " << EV_CURRENT
-                  << " but found " << int(eHeader.e_ident[EI_VERSION]);
+        LOGV2_WARNING(23844,
+                      "Wrong ELF version in {quotedFileName}.  Expected {EV_CURRENT} but found "
+                      "{int_eHeader_e_ident_EI_VERSION}",
+                      "quotedFileName"_attr = quotedFileName,
+                      "EV_CURRENT"_attr = EV_CURRENT,
+                      "int_eHeader_e_ident_EI_VERSION"_attr = int(eHeader.e_ident[EI_VERSION]));
         return;
     }
 
@@ -172,8 +183,10 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         case ET_DYN:
             return;
         default:
-            warning() << "Surprised to find " << quotedFileName << " is ELF file of type "
-                      << eHeader.e_type;
+            LOGV2_WARNING(23845,
+                          "Surprised to find {quotedFileName} is ELF file of type {eHeader_e_type}",
+                          "quotedFileName"_attr = quotedFileName,
+                          "eHeader_e_type"_attr = eHeader.e_type);
             return;
     }
 

@@ -47,7 +47,6 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

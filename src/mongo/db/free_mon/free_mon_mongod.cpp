@@ -65,7 +65,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
 
 namespace mongo {

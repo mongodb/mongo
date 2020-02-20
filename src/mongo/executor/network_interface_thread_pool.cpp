@@ -36,7 +36,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

@@ -42,7 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -79,17 +79,30 @@ Status clear(OperationContext* opCtx,
         Status result = planCache->remove(*cq);
         if (!result.isOK()) {
             invariant(result.code() == ErrorCodes::NoSuchKey);
-            LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
-                   << redact(cq->getQueryObj()) << "(sort: " << cq->getQueryRequest().getSort()
-                   << "; projection: " << cq->getQueryRequest().getProj()
-                   << "; collation: " << cq->getQueryRequest().getCollation() << ")";
+            LOGV2_DEBUG(23906,
+                        1,
+                        "{ns}: query shape doesn't exist in PlanCache - {cq_getQueryObj}(sort: "
+                        "{cq_getQueryRequest_getSort}; projection: {cq_getQueryRequest_getProj}; "
+                        "collation: {cq_getQueryRequest_getCollation})",
+                        "ns"_attr = ns,
+                        "cq_getQueryObj"_attr = redact(cq->getQueryObj()),
+                        "cq_getQueryRequest_getSort"_attr = cq->getQueryRequest().getSort(),
+                        "cq_getQueryRequest_getProj"_attr = cq->getQueryRequest().getProj(),
+                        "cq_getQueryRequest_getCollation"_attr =
+                            cq->getQueryRequest().getCollation());
             return Status::OK();
         }
 
-        LOG(1) << ns << ": removed plan cache entry - " << redact(cq->getQueryObj())
-               << "(sort: " << cq->getQueryRequest().getSort()
-               << "; projection: " << cq->getQueryRequest().getProj()
-               << "; collation: " << cq->getQueryRequest().getCollation() << ")";
+        LOGV2_DEBUG(23907,
+                    1,
+                    "{ns}: removed plan cache entry - {cq_getQueryObj}(sort: "
+                    "{cq_getQueryRequest_getSort}; projection: {cq_getQueryRequest_getProj}; "
+                    "collation: {cq_getQueryRequest_getCollation})",
+                    "ns"_attr = ns,
+                    "cq_getQueryObj"_attr = redact(cq->getQueryObj()),
+                    "cq_getQueryRequest_getSort"_attr = cq->getQueryRequest().getSort(),
+                    "cq_getQueryRequest_getProj"_attr = cq->getQueryRequest().getProj(),
+                    "cq_getQueryRequest_getCollation"_attr = cq->getQueryRequest().getCollation());
 
         return Status::OK();
     }
@@ -104,7 +117,7 @@ Status clear(OperationContext* opCtx,
 
     planCache->clear();
 
-    LOG(1) << ns << ": cleared plan cache";
+    LOGV2_DEBUG(23908, 1, "{ns}: cleared plan cache", "ns"_attr = ns);
 
     return Status::OK();
 }

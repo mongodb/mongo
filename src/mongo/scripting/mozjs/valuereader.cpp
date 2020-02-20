@@ -44,7 +44,6 @@
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace mozjs {

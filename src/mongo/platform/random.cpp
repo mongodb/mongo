@@ -53,7 +53,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 #ifdef _WIN32
 #define SECURE_RANDOM_BCRYPT

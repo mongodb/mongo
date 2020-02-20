@@ -86,7 +86,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {

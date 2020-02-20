@@ -57,7 +57,6 @@
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

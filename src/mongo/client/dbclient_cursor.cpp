@@ -56,7 +56,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

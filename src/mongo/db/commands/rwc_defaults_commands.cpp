@@ -42,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
