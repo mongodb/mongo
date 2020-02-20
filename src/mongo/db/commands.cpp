@@ -483,8 +483,9 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     auto inTxnWhitelist = txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend();
     auto inTxnWhitelistFCV44 = txnCmdWhitelistFCV44.find(cmdName) != txnCmdWhitelistFCV44.cend();
     auto isFullyUpgradedTo44 =
-        (serverGlobalParams.featureCompatibility.getVersion() ==
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName
