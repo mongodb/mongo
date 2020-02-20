@@ -469,6 +469,17 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
         waitForDelete,
         migrateInfo.forceJumbo);
 
+    // In 4.4, commands sent to shards that accept writeConcern, must always have writeConcern.
+    // So if the MoveChunkRequest didn't add writeConcern (from secondaryThrottle), then we add
+    // the implicit server default writeConcern.
+    if (!builder.hasField(WriteConcernOptions::kWriteConcernField) &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        builder.append(WriteConcernOptions::kWriteConcernField,
+                       WriteConcernOptions::kImplicitDefault);
+    }
+
     stdx::lock_guard<Latch> lock(_mutex);
 
     if (_state != State::kEnabled && _state != State::kRecovering) {

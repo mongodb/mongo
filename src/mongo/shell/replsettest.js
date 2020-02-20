@@ -1672,17 +1672,6 @@ var ReplSetTest = function(opts) {
               "established on " + id);
     };
 
-    function _runInCommandReadMode(conn, fn) {
-        let origReadMode = conn.readMode();
-        conn.forceReadMode("commands");
-        try {
-            var res = fn();
-        } finally {
-            conn.forceReadMode(origReadMode);
-        }
-        return res;
-    }
-
     // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks
     // on all secondary nodes or just 'slaves', if specified. The timeout will reset if any of the
     // secondaries makes progress.
@@ -1747,13 +1736,13 @@ var ReplSetTest = function(opts) {
             var slaveName = slave.host;
 
             var slaveConfigVersion =
-                _runInCommandReadMode(slave,
-                                      () => slave.getDB("local")['system.replset']
-                                                .find()
-                                                .readConcern("local")
-                                                .limit(1)
-                                                .next()
-                                                .version);
+                slave._runWithForcedReadMode("commands",
+                                             () => slave.getDB("local")['system.replset']
+                                                       .find()
+                                                       .readConcern("local")
+                                                       .limit(1)
+                                                       .next()
+                                                       .version);
 
             if (masterConfigVersion != slaveConfigVersion) {
                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
@@ -1763,13 +1752,13 @@ var ReplSetTest = function(opts) {
                 if (slaveConfigVersion > masterConfigVersion) {
                     master = self.getPrimary();
                     masterConfigVersion =
-                        _runInCommandReadMode(master,
-                                              () => master.getDB("local")['system.replset']
-                                                        .find()
-                                                        .readConcern("local")
-                                                        .limit(1)
-                                                        .next()
-                                                        .version);
+                        master._runWithForcedReadMode("commands",
+                                                      () => master.getDB("local")['system.replset']
+                                                                .find()
+                                                                .readConcern("local")
+                                                                .limit(1)
+                                                                .next()
+                                                                .version);
                     masterName = master.host;
 
                     print("ReplSetTest awaitReplication: optime for primary, " + masterName +
@@ -2455,7 +2444,8 @@ var ReplSetTest = function(opts) {
                 }
 
                 try {
-                    return _runInCommandReadMode(this.mongo, () => operation(this.cursor));
+                    return this.mongo._runWithForcedReadMode("commands",
+                                                             () => operation(this.cursor));
                 } catch (err) {
                     print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
                     // Occasionally, the capped collection will get truncated while we are iterating
@@ -2491,20 +2481,21 @@ var ReplSetTest = function(opts) {
                 // changed "cursorTimeoutMillis" to a short time period.
                 this._cursorExhausted = false;
                 // Although this line sets the read concern, it does not need to be called via
-                // _runInCommandReadMode() because it only creates the client-side cursor.  It's not
-                // until next()/hasNext() are called that the find command gets sent to the server.
+                // _runWithForcedReadMode() because it only creates the client-side cursor.  It's
+                // not until next()/hasNext() are called that the find command gets sent to the
+                // server.
                 this.cursor =
                     coll.find(query).sort({$natural: -1}).noCursorTimeout().readConcern("local");
             };
 
             this.getFirstDoc = function() {
-                return _runInCommandReadMode(this.mongo,
-                                             () => this.getOplogColl()
-                                                       .find()
-                                                       .sort({$natural: 1})
-                                                       .readConcern("local")
-                                                       .limit(-1)
-                                                       .next());
+                return this.mongo._runWithForcedReadMode("commands",
+                                                         () => this.getOplogColl()
+                                                                   .find()
+                                                                   .sort({$natural: 1})
+                                                                   .readConcern("local")
+                                                                   .limit(-1)
+                                                                   .next());
             };
 
             this.getOplogColl = function() {

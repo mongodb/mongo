@@ -108,13 +108,16 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
     aggReq.setBatchSize(0);
-    auto configCursor =
-        establishCursors(expCtx->opCtx,
-                         expCtx->mongoProcessInterface->taskExecutor,
-                         aggReq.getNamespaceString(),
-                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                         {{configShard->getId(), aggReq.serializeToCommandObj().toBson()}},
-                         false);
+    auto cmdObjWithRWC = applyReadWriteConcern(expCtx->opCtx,
+                                               true,             /* appendRC */
+                                               !expCtx->explain, /* appendWC */
+                                               aggReq.serializeToCommandObj().toBson());
+    auto configCursor = establishCursors(expCtx->opCtx,
+                                         expCtx->mongoProcessInterface->taskExecutor,
+                                         aggReq.getNamespaceString(),
+                                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                         {{configShard->getId(), cmdObjWithRWC}},
+                                         false);
     invariant(configCursor.size() == 1);
     return std::move(*configCursor.begin());
 }

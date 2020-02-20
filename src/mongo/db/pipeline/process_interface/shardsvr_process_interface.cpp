@@ -59,18 +59,6 @@ using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
-namespace {
-
-// Attaches the write concern to the given batch request. If it looks like 'writeConcern' has
-// been default initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
-void attachWriteConcern(const WriteConcernOptions& writeConcern, BatchedCommandRequest* request) {
-    if (!writeConcern.wMode.empty() || writeConcern.wNumNodes > 0) {
-        request->setWriteConcern(writeConcern.toBSON());
-    }
-}
-
-}  // namespace
-
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
@@ -123,8 +111,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
     BatchedCommandRequest insertCommand(
         buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
-    // If applicable, attach a write concern to the batched command request.
-    attachWriteConcern(wc, &insertCommand);
+    insertCommand.setWriteConcern(wc.toBSON());
 
     ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
@@ -144,8 +131,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 
     BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
 
-    // If applicable, attach a write concern to the batched command request.
-    attachWriteConcern(wc, &updateCommand);
+    updateCommand.setWriteConcern(wc.toBSON());
 
     ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 
@@ -176,10 +162,8 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     auto newCmdObj = CommonMongodProcessInterface::_convertRenameToInternalRename(
         opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
     BSONObjBuilder newCmdWithWriteConcernBuilder(std::move(newCmdObj));
-    if (!opCtx->getWriteConcern().usedDefault) {
-        newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
-                                             opCtx->getWriteConcern().toBSON());
-    }
+    newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                         opCtx->getWriteConcern().toBSON());
     newCmdObj = newCmdWithWriteConcernBuilder.done();
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, destinationNs.db()));
@@ -226,12 +210,10 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                                    const BSONObj& cmdObj) {
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-    BSONObj finalCmdObj = cmdObj;
-    if (!opCtx->getWriteConcern().usedDefault) {
-        auto writeObj =
-            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON());
-        finalCmdObj = cmdObj.addField(writeObj.getField(WriteConcernOptions::kWriteConcernField));
-    }
+    BSONObjBuilder finalCmdBuilder(cmdObj);
+    finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                           opCtx->getWriteConcern().toBSON());
+    BSONObj finalCmdObj = finalCmdBuilder.obj();
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
                                              dbName,
@@ -256,10 +238,8 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     BSONObjBuilder newCmdBuilder;
     newCmdBuilder.append("createIndexes", ns.coll());
     newCmdBuilder.append("indexes", indexSpecs);
-    if (!opCtx->getWriteConcern().usedDefault) {
-        newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                             opCtx->getWriteConcern().toBSON());
-    }
+    newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                         opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
@@ -285,10 +265,8 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     BSONObjBuilder newCmdBuilder;
     newCmdBuilder.append("drop", ns.coll());
-    if (!opCtx->getWriteConcern().usedDefault) {
-        newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                             opCtx->getWriteConcern().toBSON());
-    }
+    newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                         opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,

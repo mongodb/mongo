@@ -500,15 +500,23 @@ JS::Value EncryptedDBClientBase::getCollection() const {
 }
 
 
-std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
-                                                             Query query,
-                                                             int nToReturn,
-                                                             int nToSkip,
-                                                             const BSONObj* fieldsToReturn,
-                                                             int queryOptions,
-                                                             int batchSize) {
-    return _conn->query(
-        nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query(
+    const NamespaceStringOrUUID& nsOrUuid,
+    Query query,
+    int nToReturn,
+    int nToSkip,
+    const BSONObj* fieldsToReturn,
+    int queryOptions,
+    int batchSize,
+    boost::optional<BSONObj> readConcernObj) {
+    return _conn->query(nsOrUuid,
+                        query,
+                        nToReturn,
+                        nToSkip,
+                        fieldsToReturn,
+                        queryOptions,
+                        batchSize,
+                        readConcernObj);
 }
 
 bool EncryptedDBClientBase::isFailed() const {

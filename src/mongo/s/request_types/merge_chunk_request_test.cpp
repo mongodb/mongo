@@ -61,13 +61,13 @@ TEST(MergeChunkRequest, ConfigCommandtoBSON) {
              << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10)) << "shard"
              << "shard0000"
              << "validAfter" << Timestamp{100});
-    BSONObj writeConcernObj = BSON("writeConcern" << BSON("w"
-                                                          << "majority"));
+    BSONObj writeConcernObj = BSON("w"
+                                   << "majority");
 
     BSONObjBuilder cmdBuilder;
     {
         cmdBuilder.appendElements(serializedRequest);
-        cmdBuilder.appendElements(writeConcernObj);
+        cmdBuilder.append("writeConcern", writeConcernObj);
     }
 
     auto request = assertGet(MergeChunkRequest::parseFromConfigCommand(serializedRequest));

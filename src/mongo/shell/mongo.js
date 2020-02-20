@@ -484,6 +484,22 @@ Mongo.prototype.readMode = function() {
     return this._readMode;
 };
 
+/**
+ * Run a function while forcing a certain readMode, and then return the readMode to its original
+ * setting afterwards. Passes this connection to the given function, and returns the function's
+ * result.
+ */
+Mongo.prototype._runWithForcedReadMode = function(forcedReadMode, fn) {
+    let origReadMode = this.readMode();
+    this.forceReadMode(forcedReadMode);
+    try {
+        var res = fn(this);
+    } finally {
+        this.forceReadMode(origReadMode);
+    }
+    return res;
+};
+
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless
 // overridden at the collection level.

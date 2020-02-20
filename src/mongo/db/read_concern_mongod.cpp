@@ -180,7 +180,9 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                     "admin",
                     BSON("appendOplogNote"
                          << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
-                         << BSON("noop write for afterClusterTime read concern" << 1)),
+                         << BSON("noop write for afterClusterTime read concern" << 1)
+                         << WriteConcernOptions::kWriteConcernField
+                         << WriteConcernOptions::kImplicitDefault),
                     Shard::RetryPolicy::kIdempotent);
                 status = swRes.getStatus();
                 std::get<1>(myWriteRequest)->set(status);

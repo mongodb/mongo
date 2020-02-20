@@ -77,13 +77,13 @@ TEST(SplitChunkRequest, ConfigCommandtoBSON) {
              << "collEpoch" << OID("7fffffff0000000000000001") << "min" << BSON("a" << 1) << "max"
              << BSON("a" << 10) << "splitPoints" << BSON_ARRAY(BSON("a" << 5)) << "shard"
              << "shard0000");
-    BSONObj writeConcernObj = BSON("writeConcern" << BSON("w"
-                                                          << "majority"));
+    BSONObj writeConcernObj = BSON("w"
+                                   << "majority");
 
     BSONObjBuilder cmdBuilder;
     {
         cmdBuilder.appendElements(serializedRequest);
-        cmdBuilder.appendElements(writeConcernObj);
+        cmdBuilder.append("writeConcern", writeConcernObj);
     }
 
     auto request = assertGet(SplitChunkRequest::parseFromConfigCommand(serializedRequest));

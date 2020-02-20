@@ -467,6 +467,30 @@ private:
                  BSONObjBuilder& result) const {
         BatchWriteExecStats stats;
         BatchedCommandResponse response;
+
+        // The batched request will only have WC if it was supplied by the client. Otherwise, the
+        // batched request should use the WC from the opCtx.
+        if (!batchedRequest.hasWriteConcern()) {
+            if (opCtx->getWriteConcern().usedDefault) {
+                // Pass writeConcern: {}, rather than {w: 1, wtimeout: 0}, so as to not override the
+                // configsvr w:majority upconvert.
+                batchedRequest.setWriteConcern(BSONObj());
+            } else {
+                batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
+            }
+        }
+
+        // Write ops are never allowed to have writeConcern inside transactions. Normally
+        // disallowing WC on non-terminal commands in a transaction is handled earlier, during
+        // command dispatch. However, if this is a regular write operation being automatically
+        // retried inside a transaction (such as changing a document's shard key across shards),
+        // then batchedRequest will have a writeConcern (added by the if() above) from when it was
+        // initially run outside a transaction. Thus it's necessary to unconditionally clear the
+        // writeConcern when in a transaction.
+        if (TransactionRouter::get(opCtx)) {
+            batchedRequest.unsetWriteConcern();
+        }
+
         ClusterWriter::write(opCtx, batchedRequest, &stats, &response);
 
         bool updatedShardKey = false;

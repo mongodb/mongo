@@ -319,10 +319,14 @@ bool DBClientBase::runPseudoCommand(StringData db,
     return success;
 }
 
-long long DBClientBase::count(
-    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
+long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
+                              const BSONObj& query,
+                              int options,
+                              int limit,
+                              int skip,
+                              boost::optional<BSONObj> readConcernObj) {
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
-    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip);
+    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj);
     BSONObj res;
     if (!runCommand(dbName, cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
@@ -332,8 +336,12 @@ long long DBClientBase::count(
     return res["n"].numberLong();
 }
 
-BSONObj DBClientBase::_countCmd(
-    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
+BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
+                                const BSONObj& query,
+                                int options,
+                                int limit,
+                                int skip,
+                                boost::optional<BSONObj> readConcernObj) {
     BSONObjBuilder b;
     if (nsOrUuid.uuid()) {
         const auto uuid = *nsOrUuid.uuid();
@@ -346,6 +354,9 @@ BSONObj DBClientBase::_countCmd(
         b.append("limit", limit);
     if (skip)
         b.append("skip", skip);
+    if (readConcernObj) {
+        b.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
+    }
     return b.obj();
 }
 
@@ -541,8 +552,12 @@ bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
     return ok;
 }
 
-bool DBClientBase::createCollection(
-    const string& ns, long long size, bool capped, int max, BSONObj* info) {
+bool DBClientBase::createCollection(const string& ns,
+                                    long long size,
+                                    bool capped,
+                                    int max,
+                                    BSONObj* info,
+                                    boost::optional<BSONObj> writeConcernObj) {
     verify(!capped || size);
     BSONObj o;
     if (info == nullptr)
@@ -556,6 +571,9 @@ bool DBClientBase::createCollection(
         b.append("capped", true);
     if (max)
         b.append("max", max);
+    if (writeConcernObj) {
+        b.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
     return runCommand(db.c_str(), b.done(), *info);
 }
 
@@ -644,11 +662,18 @@ void DBClientBase::findN(vector<BSONObj>& out,
                          int nToReturn,
                          int nToSkip,
                          const BSONObj* fieldsToReturn,
-                         int queryOptions) {
+                         int queryOptions,
+                         boost::optional<BSONObj> readConcernObj) {
     out.reserve(nToReturn);
 
-    unique_ptr<DBClientCursor> c =
-        this->query(NamespaceString(ns), query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+    unique_ptr<DBClientCursor> c = this->query(NamespaceString(ns),
+                                               query,
+                                               nToReturn,
+                                               nToSkip,
+                                               fieldsToReturn,
+                                               queryOptions,
+                                               0 /* batchSize */,
+                                               readConcernObj);
 
     // query() throws on network error so OK to uassert with numeric code here.
     uassert(10276,
@@ -672,15 +697,18 @@ void DBClientBase::findN(vector<BSONObj>& out,
 BSONObj DBClientBase::findOne(const string& ns,
                               const Query& query,
                               const BSONObj* fieldsToReturn,
-                              int queryOptions) {
+                              int queryOptions,
+                              boost::optional<BSONObj> readConcernObj) {
     vector<BSONObj> v;
-    findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions);
+    findN(v, ns, query, 1, 0, fieldsToReturn, queryOptions, readConcernObj);
     return v.empty() ? BSONObj() : v[0];
 }
 
-std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::string& db,
-                                                                UUID uuid,
-                                                                const BSONObj& filter) {
+std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
+    const std::string& db,
+    UUID uuid,
+    const BSONObj& filter,
+    boost::optional<BSONObj> readConcernObj) {
     list<BSONObj> results;
     BSONObj res;
 
@@ -689,6 +717,9 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::strin
     cmdBuilder.append("filter", filter);
     cmdBuilder.append("limit", 1);
     cmdBuilder.append("singleBatch", true);
+    if (readConcernObj) {
+        cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
+    }
 
     BSONObj cmd = cmdBuilder.obj();
 
@@ -721,9 +752,17 @@ unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOr
                                                int nToSkip,
                                                const BSONObj* fieldsToReturn,
                                                int queryOptions,
-                                               int batchSize) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(
-        this, nsOrUuid, query.obj, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
+                                               int batchSize,
+                                               boost::optional<BSONObj> readConcernObj) {
+    unique_ptr<DBClientCursor> c(new DBClientCursor(this,
+                                                    nsOrUuid,
+                                                    query.obj,
+                                                    nToReturn,
+                                                    nToSkip,
+                                                    fieldsToReturn,
+                                                    queryOptions,
+                                                    batchSize,
+                                                    readConcernObj));
     if (c->init())
         return c;
     return nullptr;
@@ -754,11 +793,13 @@ unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
                                        Query query,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions,
-                                       int batchSize) {
+                                       int batchSize,
+                                       boost::optional<BSONObj> readConcernObj) {
     DBClientFunConvertor fun;
     fun._f = f;
     std::function<void(DBClientCursorBatchIterator&)> ptr(fun);
-    return this->query(ptr, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
+    return this->query(
+        ptr, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize, readConcernObj);
 }
 
 unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIterator&)> f,
@@ -766,12 +807,13 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
                                        Query query,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions,
-                                       int batchSize) {
+                                       int batchSize,
+                                       boost::optional<BSONObj> readConcernObj) {
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
 
-    unique_ptr<DBClientCursor> c(
-        this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
+    unique_ptr<DBClientCursor> c(this->query(
+        nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize, readConcernObj));
     // query() throws on network error so OK to uassert with numeric code here.
     uassert(16090, "socket error for mapping query", c.get());
 
@@ -785,34 +827,63 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
     return n;
 }
 
-void DBClientBase::insert(const string& ns, BSONObj obj, int flags) {
-    insert(ns, std::vector<BSONObj>{obj}, flags);
+void DBClientBase::insert(const string& ns,
+                          BSONObj obj,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
+    insert(ns, std::vector<BSONObj>{obj}, flags, writeConcernObj);
 }
 
-void DBClientBase::insert(const string& ns, const vector<BSONObj>& v, int flags) {
+void DBClientBase::insert(const string& ns,
+                          const vector<BSONObj>& v,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
     bool ordered = !(flags & InsertOption_ContinueOnError);
     auto nss = NamespaceString(ns);
-    auto request =
-        OpMsgRequest::fromDBAndBody(nss.db(), BSON("insert" << nss.coll() << "ordered" << ordered));
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("insert", nss.coll());
+    cmdBuilder.append("ordered", ordered);
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
     request.sequences.push_back({"documents", v});
 
     runFireAndForgetCommand(std::move(request));
 }
 
-void DBClientBase::remove(const string& ns, Query obj, int flags) {
+void DBClientBase::remove(const string& ns,
+                          Query obj,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
     int limit = (flags & RemoveOption_JustOne) ? 1 : 0;
     auto nss = NamespaceString(ns);
 
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), BSON("delete" << nss.coll()));
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("delete", nss.coll());
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
     request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
 
     runFireAndForgetCommand(std::move(request));
 }
 
-void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upsert, bool multi) {
+void DBClientBase::update(const string& ns,
+                          Query query,
+                          BSONObj obj,
+                          bool upsert,
+                          bool multi,
+                          boost::optional<BSONObj> writeConcernObj) {
     auto nss = NamespaceString(ns);
 
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), BSON("update" << nss.coll()));
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("update", nss.coll());
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
     request.sequences.push_back(
         {"updates",
          {BSON("q" << query.obj << "u" << obj << "upsert" << upsert << "multi" << multi)}});
@@ -820,12 +891,17 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upser
     runFireAndForgetCommand(std::move(request));
 }
 
-void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags) {
+void DBClientBase::update(const string& ns,
+                          Query query,
+                          BSONObj obj,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
     update(ns,
            std::move(query),
            std::move(obj),
            flags & UpdateOption_Upsert,
-           flags & UpdateOption_Multi);
+           flags & UpdateOption_Multi,
+           writeConcernObj);
 }
 
 void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
@@ -914,16 +990,24 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 }
 
 
-void DBClientBase::dropIndex(const string& ns, BSONObj keys) {
-    dropIndex(ns, genIndexName(keys));
+void DBClientBase::dropIndex(const string& ns,
+                             BSONObj keys,
+                             boost::optional<BSONObj> writeConcernObj) {
+    dropIndex(ns, genIndexName(keys), writeConcernObj);
 }
 
 
-void DBClientBase::dropIndex(const string& ns, const string& indexName) {
+void DBClientBase::dropIndex(const string& ns,
+                             const string& indexName,
+                             boost::optional<BSONObj> writeConcernObj) {
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("index", indexName);
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
     BSONObj info;
-    if (!runCommand(nsToDatabase(ns),
-                    BSON("dropIndexes" << nsToCollectionSubstring(ns) << "index" << indexName),
-                    info)) {
+    if (!runCommand(nsToDatabase(ns), cmdBuilder.obj(), info)) {
         LOGV2_DEBUG(20118,
                     logSeverityV1toV2(_logLevel).toInt(),
                     "dropIndex failed: {info}",
@@ -932,14 +1016,15 @@ void DBClientBase::dropIndex(const string& ns, const string& indexName) {
     }
 }
 
-void DBClientBase::dropIndexes(const string& ns) {
+void DBClientBase::dropIndexes(const string& ns, boost::optional<BSONObj> writeConcernObj) {
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("index", "*");
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
     BSONObj info;
-    uassert(10008,
-            "dropIndexes failed",
-            runCommand(nsToDatabase(ns),
-                       BSON("dropIndexes" << nsToCollectionSubstring(ns) << "index"
-                                          << "*"),
-                       info));
+    uassert(10008, "dropIndexes failed", runCommand(nsToDatabase(ns), cmdBuilder.obj(), info));
 }
 
 void DBClientBase::reIndex(const string& ns) {
@@ -971,7 +1056,9 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientBase::createIndexes(StringData ns, const std::vector<const IndexSpec*>& descriptors) {
+void DBClientBase::createIndexes(StringData ns,
+                                 const std::vector<const IndexSpec*>& descriptors,
+                                 boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
     command.append("createIndexes", nsToCollectionSubstring(ns));
     {
@@ -979,6 +1066,9 @@ void DBClientBase::createIndexes(StringData ns, const std::vector<const IndexSpe
         for (const auto& desc : descriptors) {
             indexes.append(desc->toBSON());
         }
+    }
+    if (writeConcernObj) {
+        command.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
     const BSONObj commandObj = command.done();
 
@@ -990,7 +1080,9 @@ void DBClientBase::createIndexes(StringData ns, const std::vector<const IndexSpe
     }
 }
 
-void DBClientBase::createIndexes(StringData ns, const std::vector<BSONObj>& specs) {
+void DBClientBase::createIndexes(StringData ns,
+                                 const std::vector<BSONObj>& specs,
+                                 boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
     command.append("createIndexes", nsToCollectionSubstring(ns));
     {
@@ -998,6 +1090,9 @@ void DBClientBase::createIndexes(StringData ns, const std::vector<BSONObj>& spec
         for (const auto& spec : specs) {
             indexes.append(spec);
         }
+    }
+    if (writeConcernObj) {
+        command.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
     const BSONObj commandObj = command.done();
 

@@ -118,13 +118,15 @@ public:
     void trace(JSTracer* trc) final;
 
     using DBClientBase::query;
-    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
-                                          Query query,
-                                          int nToReturn,
-                                          int nToSkip,
-                                          const BSONObj* fieldsToReturn,
-                                          int queryOptions,
-                                          int batchSize) final;
+    std::unique_ptr<DBClientCursor> query(
+        const NamespaceStringOrUUID& nsOrUuid,
+        Query query,
+        int nToReturn,
+        int nToSkip,
+        const BSONObj* fieldsToReturn,
+        int queryOptions,
+        int batchSize,
+        boost::optional<BSONObj> readConcernObj = boost::none) final;
 
     bool isFailed() const final;
 

@@ -89,29 +89,45 @@ public:
     // ----------- simple functions --------------
 
     /** throws userassertion "no master found" */
-    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
-                                          Query query,
-                                          int nToReturn = 0,
-                                          int nToSkip = 0,
-                                          const BSONObj* fieldsToReturn = nullptr,
-                                          int queryOptions = 0,
-                                          int batchSize = 0) override;
+    std::unique_ptr<DBClientCursor> query(
+        const NamespaceStringOrUUID& nsOrUuid,
+        Query query,
+        int nToReturn = 0,
+        int nToSkip = 0,
+        const BSONObj* fieldsToReturn = nullptr,
+        int queryOptions = 0,
+        int batchSize = 0,
+        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     /** throws userassertion "no master found" */
     BSONObj findOne(const std::string& ns,
                     const Query& query,
                     const BSONObj* fieldsToReturn = nullptr,
-                    int queryOptions = 0) override;
+                    int queryOptions = 0,
+                    boost::optional<BSONObj> readConcernObj = boost::none) override;
 
-    void insert(const std::string& ns, BSONObj obj, int flags = 0) override;
+    void insert(const std::string& ns,
+                BSONObj obj,
+                int flags = 0,
+                boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     /** insert multiple objects.  Note that single object insert is asynchronous, so this version
         is only nominally faster and not worth a special effort to try to use.  */
-    void insert(const std::string& ns, const std::vector<BSONObj>& v, int flags = 0) override;
+    void insert(const std::string& ns,
+                const std::vector<BSONObj>& v,
+                int flags = 0,
+                boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    void remove(const std::string& ns, Query obj, int flags) override;
+    void remove(const std::string& ns,
+                Query obj,
+                int flags,
+                boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    void update(const std::string& ns, Query query, BSONObj obj, int flags) override;
+    void update(const std::string& ns,
+                Query query,
+                BSONObj obj,
+                int flags,
+                boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void killCursor(const NamespaceString& ns, long long cursorID) override;
 
