@@ -196,6 +196,13 @@ private:
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
 
     bool _everDetachedFromOperationContext = false;
+
+    // A pointer either to a ChangeStreamProxy or a CollectionScan stage, if present in the
+    // execution tree, or nullptr otherwise. We cache it to avoid the need to traverse the execution
+    // tree in runtime when the executor is requested to return the oplog tracking info. Since this
+    // info is provided by either of these stages, the executor will simply delegate the request to
+    // the cached stage.
+    const PlanStage* _oplogTrackingStage{nullptr};
 };
 
 }  // namespace mongo

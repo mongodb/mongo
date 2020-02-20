@@ -237,6 +237,16 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
+    // Both ChangeStreamProxy and CollectionScan stages can provide oplog tracking info, such as
+    // post batch resume token, or latest oplog timestamp. If either of these two stages is present
+    // in the execution tree, then cache it for fast retrieval of the oplog info, avoiding the need
+    // traverse the tree in runtime.
+    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY)) {
+        _oplogTrackingStage = static_cast<ChangeStreamProxyStage*>(changeStreamProxy);
+    } else if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
+        _oplogTrackingStage = static_cast<CollectionScan*>(collectionScan);
+    }
+
     // We may still need to initialize _nss from either collection or _cq.
     if (!_nss.isEmpty()) {
         return;  // We already have an _nss set, so there's nothing more to do.
@@ -736,22 +746,34 @@ bool PlanExecutorImpl::isDetached() const {
 }
 
 Timestamp PlanExecutorImpl::getLatestOplogTimestamp() const {
-    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY)) {
-        return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getLatestOplogTimestamp();
+    if (!_oplogTrackingStage) {
+        return {};
     }
-    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
-        return static_cast<CollectionScan*>(collectionScan)->getLatestOplogTimestamp();
+
+    const auto stageType = _oplogTrackingStage->stageType();
+    if (stageType == STAGE_COLLSCAN) {
+        return static_cast<const CollectionScan*>(_oplogTrackingStage)->getLatestOplogTimestamp();
+    } else {
+        invariant(stageType == STAGE_CHANGE_STREAM_PROXY);
+        return static_cast<const ChangeStreamProxyStage*>(_oplogTrackingStage)
+            ->getLatestOplogTimestamp();
     }
-    return Timestamp();
 }
 
 BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
-    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY))
-        return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getPostBatchResumeToken();
-    if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
-        return static_cast<CollectionScan*>(collectionScan)->getResumeToken();
+    static const BSONObj kEmptyPBRT;
+    if (!_oplogTrackingStage) {
+        return kEmptyPBRT;
     }
-    return {};
+
+    const auto stageType = _oplogTrackingStage->stageType();
+    if (stageType == STAGE_COLLSCAN) {
+        return static_cast<const CollectionScan*>(_oplogTrackingStage)->getPostBatchResumeToken();
+    } else {
+        invariant(stageType == STAGE_CHANGE_STREAM_PROXY);
+        return static_cast<const ChangeStreamProxyStage*>(_oplogTrackingStage)
+            ->getPostBatchResumeToken();
+    }
 }
 
 Status PlanExecutorImpl::getMemberObjectStatus(const Document& memberObj) const {

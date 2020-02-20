@@ -73,7 +73,7 @@ public:
         return _latestOplogEntryTimestamp;
     }
 
-    BSONObj getResumeToken() const {
+    BSONObj getPostBatchResumeToken() const {
         return _params.requestResumeToken ? BSON("$recordId" << _lastSeenId.repr()) : BSONObj();
     }
 
