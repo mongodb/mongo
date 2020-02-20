@@ -64,6 +64,9 @@ public:
     void getOplogStonesStats(BSONObjBuilder& builder) const {
         builder.append("totalTimeProcessingMicros", _totalTimeProcessing.load());
         builder.append("processingMethod", _processBySampling.load() ? "sampling" : "scanning");
+        if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
+            builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
+        }
     }
 
     boost::optional<OplogStones::Stone> peekOldestStoneIfNeeded() const;
