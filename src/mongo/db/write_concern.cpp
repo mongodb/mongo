@@ -65,6 +65,14 @@ static Counter64 gleWtimeouts;
 static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                               &gleWtimeouts);
 
+static Counter64 gleDefaultWtimeouts;
+static ServerStatusMetricField<Counter64> gleDefaultWtimeoutsDisplay(
+    "getLastError.default.wtimeouts", &gleDefaultWtimeouts);
+
+static Counter64 gleDefaultUnsatisfiable;
+static ServerStatusMetricField<Counter64> gleDefaultUnsatisfiableDisplay(
+    "getLastError.default.unsatisfiable", &gleDefaultUnsatisfiable);
+
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 
 bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
@@ -203,8 +211,7 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
     return Status::OK();
 }
 
-void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
-                                  BSONObjBuilder* result) const {
+void WriteConcernResult::appendTo(BSONObjBuilder* result) const {
     if (syncMillis >= 0)
         result->appendNumber("syncMillis", syncMillis);
 
@@ -229,6 +236,8 @@ void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
     } else {
         result->appendNull("writtenTo");
     }
+
+    result->append("writeConcern", wcUsed.toBSON());
 
     if (err.empty())
         result->appendNull("err");
@@ -312,12 +321,22 @@ Status waitForWriteConcern(OperationContext* opCtx,
         replCoord->awaitReplication(opCtx, replOpTime, writeConcernWithPopulatedSyncMode);
     if (replStatus.status == ErrorCodes::WriteConcernFailed) {
         gleWtimeouts.increment();
+        if (!writeConcern.getProvenance().isClientSupplied()) {
+            gleDefaultWtimeouts.increment();
+        }
         result->err = "timeout";
         result->wTimedOut = true;
+    }
+    if (replStatus.status == ErrorCodes::UnsatisfiableWriteConcern) {
+        if (!writeConcern.getProvenance().isClientSupplied()) {
+            gleDefaultUnsatisfiable.increment();
+        }
     }
 
     gleWtimeStats.recordMillis(durationCount<Milliseconds>(replStatus.duration));
     result->wTime = durationCount<Milliseconds>(replStatus.duration);
+
+    result->wcUsed = writeConcern;
 
     return replStatus.status;
 }

@@ -352,9 +352,12 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
     if (!awaitReplicationStatus.isOK() && !result.hasField("writeConcernError")) {
         WriteConcernErrorDetail wcError;
         wcError.setStatus(awaitReplicationStatus);
+        BSONObjBuilder errInfoBuilder;
         if (wcResult.wTimedOut) {
-            wcError.setErrInfo(BSON("wtimeout" << true));
+            errInfoBuilder.append("wtimeout", true);
         }
+        errInfoBuilder.append(kWriteConcernField, wcResult.wcUsed.toBSON());
+        wcError.setErrInfo(errInfoBuilder.obj());
         result.append("writeConcernError", wcError.toBSON());
     }
 }

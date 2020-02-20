@@ -199,6 +199,53 @@ assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 assert.writeError(testDB.a.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 50}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 
+// Test metrics related to writeConcern timeouts and default writeConcern.
+var startGLEMetrics = testDB.serverStatus().metrics.getLastError;
+
+// Set the default WC to timeout.
+assert.commandWorked(testDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 2, wtimeout: 1000}, writeConcern: {w: 1}}));
+var stopReplProducer = configureFailPoint(secondary, 'stopReplProducer');
+stopReplProducer.wait();
+
+// Explicit timeout - increments wtimeouts.
+var res = testDB.a.insert({x: 1}, {writeConcern: {w: 2, wtimeout: 1000}});
+assert.commandWorkedIgnoringWriteConcernErrors(res);
+checkWriteConcernTimedOut({writeConcernError: res.getWriteConcernError()});
+assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "clientSupplied");
+
+// Default timeout - increments wtimeouts and default.wtimeouts.
+var res = testDB.a.insert({x: 1});
+assert.commandWorkedIgnoringWriteConcernErrors(res);
+checkWriteConcernTimedOut({writeConcernError: res.getWriteConcernError()});
+assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "customDefault");
+
+// Set the default WC to unsatisfiable.
+stopReplProducer.off();
+assert.commandWorked(testDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 3}, writeConcern: {w: 1}}));
+
+// Explicit unsatisfiable - no counters incremented.
+var res = testDB.a.insert({x: 1}, {writeConcern: {w: 3}});
+assert.commandFailedWithCode(res, ErrorCodes.UnsatisfiableWriteConcern);
+assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "clientSupplied");
+
+// Default unsatisfiable - increments default.unsatisfiable.
+var res = testDB.a.insert({x: 1});
+assert.commandFailedWithCode(res, ErrorCodes.UnsatisfiableWriteConcern);
+assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "customDefault");
+
+// Unset the default WC.
+assert.commandWorked(
+    testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}, writeConcern: {w: 1}}));
+
+// Validate counters.
+var endGLEMetrics = testDB.serverStatus().metrics.getLastError;
+assert.eq(endGLEMetrics.wtimeouts.floatApprox, startGLEMetrics.wtimeouts + 2);
+assert.eq(endGLEMetrics.default.wtimeouts.floatApprox, startGLEMetrics.default.wtimeouts + 1);
+assert.eq(endGLEMetrics.default.unsatisfiable.floatApprox,
+          startGLEMetrics.default.unsatisfiable + 1);
+
 jsTestLog(
     `Primary ${primary.host} metrics #2: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
 

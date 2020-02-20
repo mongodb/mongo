@@ -299,7 +299,7 @@ public:
                 replCoord->populateUnsetWriteConcernOptionsSyncMode(writeConcern).syncMode ==
                     WriteConcernOptions::SyncMode::JOURNAL);
         }
-        wcResult.appendTo(writeConcern, &result);
+        wcResult.appendTo(&result);
 
         // For backward compatibility with 2.4, wtimeout returns ok : 1.0
         if (wcResult.wTimedOut) {
