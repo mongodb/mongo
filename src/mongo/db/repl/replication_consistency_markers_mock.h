@@ -62,8 +62,18 @@ public:
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
 
     void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) override;
+
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
+
+    void startUsingOplogTruncateAfterPointForPrimary() override;
+    void stopUsingOplogTruncateAfterPointForPrimary() override;
+    bool isOplogTruncateAfterPointBeingUsedForPrimary() const override;
+
+    void setOplogTruncateAfterPointToTopOfOplog(OperationContext* opCtx) override;
+
+    boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
+        OperationContext* opCtx) override;
 
     void setAppliedThrough(OperationContext* opCtx,
                            const OpTime& optime,

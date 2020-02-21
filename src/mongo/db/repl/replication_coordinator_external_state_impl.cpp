@@ -406,6 +406,17 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // _taskExecutor outside of _threadMutex because once _startedThreads is set to true, the
     // _taskExecutor pointer never changes.
     _taskExecutor->join();
+
+    // Clear the truncate point if we are still primary, so nothing gets truncated unnecessarily on
+    // startup. There are no oplog holes on clean primary shutdown. Stepdown is similarly safe and
+    // clears the truncate point. The other replication states do need truncation if the truncate
+    // point is set: e.g. interruption mid batch application can leave oplog holes.
+    if (!storageGlobalParams.readOnly &&
+        _replicationProcess->getConsistencyMarkers()
+            ->isOplogTruncateAfterPointBeingUsedForPrimary()) {
+        _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx,
+                                                                                 Timestamp());
+    }
 }
 
 executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor() const {
@@ -466,13 +477,30 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     MongoDSessionCatalog::onStepUp(opCtx);
 
+    invariant(
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
+
+    // A primary periodically updates the oplogTruncateAfterPoint to allow replication to proceed
+    // without danger of unidentifiable oplog holes on unclean shutdown due to parallel writes.
+    //
+    // Initialize the oplogTruncateAfterPoint so that user writes are safe on unclean shutdown
+    // between completion of transition to primary and the first async oplogTruncateAfterPoint
+    // update.
+    _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPointToTopOfOplog(opCtx);
+
+    // Tell the system to start updating the oplogTruncateAfterPoint asynchronously and to use the
+    // truncate point, rather than last applied, to update the repl durable timestamp.
+    //
+    // The truncate point must be used while primary for repl's durable timestamp because otherwise
+    // we could truncate last applied writes on startup recovery after an unclean shutdown that were
+    // previously majority confirmed to the user.
+    _replicationProcess->getConsistencyMarkers()->startUsingOplogTruncateAfterPointForPrimary();
+
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
     // We record this update at the 'lastAppliedOpTime'. If there are any outstanding
     // checkpoints being taken, they should only reflect this write if they see all writes up
     // to our 'lastAppliedOpTime'.
-    invariant(
-        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
     auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
         opCtx, lastAppliedOpTime.getTimestamp());
@@ -742,13 +770,29 @@ void ReplicationCoordinatorExternalStateImpl::clearOplogVisibilityStateForStepDo
     ON_BLOCK_EXIT([&] { opCtx->setShouldParticipateInFlowControl(originalFlowControlSetting); });
     opCtx->setShouldParticipateInFlowControl(false);
 
-    // We can clear the oplogTruncateAfterPoint because we know there are no concurrent user writes
-    // during stepdown and therefore presently no oplog holes.
+    // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go back to
+    // using last applied to update repl's durable timestamp instead of the truncate point.
+    _replicationProcess->getConsistencyMarkers()->stopUsingOplogTruncateAfterPointForPrimary();
+
+    // Interrupt the current JournalFlusher thread round, so it recognizes that it is no longer
+    // primary. Otherwise the asynchronously running thread could race with setting the truncate
+    // point to null below. This would leave the truncate point potentially stale in a non-PRIMARY
+    // state, where last applied would be used to update repl's durable timestamp and confirm
+    // majority writes. Startup recovery could truncate majority confirmed writes back to the stale
+    // truncate after point.
     //
-    // This value is updated periodically while in PRIMARY mode to protect against oplog holes on
-    // unclean shutdown. The value must then be cleared on stepdown because stepup expects the value
-    // to be unset. Batch application, in mode SECONDARY, also uses the value to protect against
-    // unclean shutdown, and will handle both setting AND unsetting the value.
+    // This makes sure the JournalFlusher is not stuck waiting for a lock that stepdown might hold
+    // before doing an update write to the truncate point.
+    _service->getStorageEngine()->interruptJournalFlusherForReplStateChange();
+
+    // Wait for another round of journal flushing. This will ensure that we wait for the current
+    // round to completely finish and have no chance of racing with unsetting the truncate point
+    // below. It is possible that the JournalFlusher will not check for the interrupt signaled
+    // above, if writing is imminent, so we must make sure that the code completes fully.
+    _service->getStorageEngine()->waitForJournalFlush(opCtx);
+
+    // We can clear the oplogTruncateAfterPoint because we know there are no user writes during
+    // stepdown and therefore presently no oplog holes.
     _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp());
 }
 
@@ -976,6 +1020,16 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(OperationContext* opCtx) {
+    // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp in
+    // order to avoid majority confirming any writes that could later be truncated.
+    auto truncatePoint = repl::ReplicationProcess::get(opCtx)
+                             ->getConsistencyMarkers()
+                             ->refreshOplogTruncateAfterPointIfPrimary(opCtx);
+    if (truncatePoint) {
+        return truncatePoint.get();
+    }
+
+    // All other repl states use the last applied.
     return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime();
 }
 

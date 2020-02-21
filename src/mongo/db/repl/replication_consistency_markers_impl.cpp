@@ -34,6 +34,7 @@
 
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/optime.h"
@@ -172,6 +173,8 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     // Make sure to clear the oplogTrucateAfterPoint in case it is stale. Otherwise, we risk the
     // possibility of deleting oplog entries that we want to keep. It is safe to clear this
     // here since we are consistent at the top of our oplog at this point.
+    invariant(!isOplogTruncateAfterPointBeingUsedForPrimary(),
+              "Clearing the truncate point while primary is unsafe: it is asynchronously updated.");
     setOplogTruncateAfterPoint(opCtx, Timestamp());
 
     if (getGlobalServiceContext()->getStorageEngine()->isDurable()) {
@@ -313,27 +316,6 @@ OpTime ReplicationConsistencyMarkersImpl::getAppliedThrough(OperationContext* op
     return appliedThrough.get();
 }
 
-boost::optional<OplogTruncateAfterPointDocument>
-ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
-    OperationContext* opCtx) const {
-    auto doc = _storageInterface->findById(
-        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"]);
-
-    if (!doc.isOK()) {
-        if (doc.getStatus() == ErrorCodes::NoSuchKey ||
-            doc.getStatus() == ErrorCodes::NamespaceNotFound) {
-            return boost::none;
-        } else {
-            // Fails if there is an error other than the collection being missing or being empty.
-            fassertFailedWithStatus(40510, doc.getStatus());
-        }
-    }
-
-    auto oplogTruncateAfterPoint = OplogTruncateAfterPointDocument::parse(
-        IDLParserErrorContext("OplogTruncateAfterPointDocument"), doc.getValue());
-    return oplogTruncateAfterPoint;
-}
-
 void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint(
     OperationContext* opCtx) {
     LOGV2_DEBUG(21295,
@@ -390,19 +372,130 @@ void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationCont
                             << timestamp)));
 }
 
-Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
+boost::optional<OplogTruncateAfterPointDocument>
+ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
     OperationContext* opCtx) const {
-    auto doc = _getOplogTruncateAfterPointDocument(opCtx);
-    if (!doc) {
-        LOGV2_DEBUG(
-            21297, 3, "Returning empty oplog truncate after point since document did not exist");
-        return {};
+    auto doc = _storageInterface->findById(
+        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"]);
+
+    if (!doc.isOK()) {
+        if (doc.getStatus() == ErrorCodes::NoSuchKey ||
+            doc.getStatus() == ErrorCodes::NamespaceNotFound) {
+            return boost::none;
+        } else {
+            // Fails if there is an error other than the collection being missing or being empty.
+            fassertFailedWithStatus(40510, doc.getStatus());
+        }
     }
 
-    Timestamp out = doc->getOplogTruncateAfterPoint();
+    auto oplogTruncateAfterPoint = OplogTruncateAfterPointDocument::parse(
+        IDLParserErrorContext("OplogTruncateAfterPointDocument"), doc.getValue());
+    return oplogTruncateAfterPoint;
+}
 
-    LOGV2_DEBUG(21298, 3, "returning oplog truncate after point: {out}", "out"_attr = out);
-    return out;
+Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
+    OperationContext* opCtx) const {
+    auto truncatePointDoc = _getOplogTruncateAfterPointDocument(opCtx);
+    if (!truncatePointDoc) {
+        LOGV2_DEBUG(
+            21297, 3, "Returning empty oplog truncate after point since document did not exist");
+        return Timestamp();
+    }
+    Timestamp truncatePointTimestamp = truncatePointDoc->getOplogTruncateAfterPoint();
+
+    LOGV2_DEBUG(21298,
+                3,
+                "Returning oplog truncate after point: {truncatePointTimestamp}",
+                "truncatePointTimestamp"_attr = truncatePointTimestamp);
+    return truncatePointTimestamp;
+}
+
+void ReplicationConsistencyMarkersImpl::startUsingOplogTruncateAfterPointForPrimary() {
+    stdx::lock_guard<Latch> lk(_truncatePointIsPrimaryMutex);
+    // There is only one path to stepup and it is not called redundantly.
+    invariant(!_isPrimary);
+    _isPrimary = true;
+}
+
+void ReplicationConsistencyMarkersImpl::stopUsingOplogTruncateAfterPointForPrimary() {
+    stdx::lock_guard<Latch> lk(_truncatePointIsPrimaryMutex);
+    _isPrimary = false;
+}
+
+bool ReplicationConsistencyMarkersImpl::isOplogTruncateAfterPointBeingUsedForPrimary() const {
+    stdx::lock_guard<Latch> lk(_truncatePointIsPrimaryMutex);
+    return _isPrimary;
+}
+
+void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPointToTopOfOplog(
+    OperationContext* opCtx) {
+    auto timestamp = _storageInterface->getLatestOplogTimestamp(opCtx);
+    LOGV2_DEBUG(21551,
+                3,
+                "Initializing oplog truncate after point: {timestamp}",
+                "timestamp"_attr = timestamp);
+    setOplogTruncateAfterPoint(opCtx, timestamp);
+}
+
+boost::optional<OpTimeAndWallTime>
+ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
+    OperationContext* opCtx) {
+
+    if (!isOplogTruncateAfterPointBeingUsedForPrimary()) {
+        // Stepdown clears the truncate point, after which the truncate point is set manually as
+        // needed, so nothing should be done here -- else we might truncate something we should not.
+        return boost::none;
+    }
+
+    // Temporarily allow writes if kIgnoreConflicts is set on the recovery unit so the truncate
+    // point can be updated. The kIgnoreConflicts setting only allows reads.
+    auto originalBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+    if (originalBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    }
+    ON_BLOCK_EXIT([&] { opCtx->recoveryUnit()->setPrepareConflictBehavior(originalBehavior); });
+
+    // The locks necessary to write to the oplog truncate after point's collection and read from the
+    // oplog collection must be taken up front so that the mutex can also be taken around both
+    // operations without causing deadlocks.
+    AutoGetCollection autoTruncateColl(opCtx, _oplogTruncateAfterPointNss, MODE_IX);
+    AutoGetCollection autoOplogColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+    stdx::lock_guard<Latch> lk(_refreshOplogTruncateAfterPointMutex);
+
+    // Update the oplogTruncateAfterPoint to the storage engine's reported oplog timestamp with no
+    // holes behind it in-memory (only, not on disk, despite the name).
+    auto truncateTimestamp = _storageInterface->getAllDurableTimestamp(opCtx->getServiceContext());
+
+    if (truncateTimestamp != Timestamp(StorageEngine::kMinimumTimestamp)) {
+        setOplogTruncateAfterPoint(opCtx, truncateTimestamp);
+    } else {
+        // The all_durable timestamp has not yet been set: there have been no oplog writes since
+        // this server instance started up. In this case, we will return the current
+        // oplogTruncateAfterPoint without updating it, since there's nothing to update.
+        truncateTimestamp = getOplogTruncateAfterPoint(opCtx);
+
+        // A primary cannot have an unset oplogTruncateAfterPoint because it is initialized on
+        // step-up.
+        invariant(!truncateTimestamp.isNull());
+    }
+
+    // Reset the snapshot so that it is ensured to see the latest oplog entries.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    // Fetch the oplog entry <= timestamp. all_durable may be set to a value between oplog entries.
+    // We need an oplog entry in order to return term and wallclock time for an OpTimeAndWallTime
+    // result.
+    auto truncateOplogEntryBSON = _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
+        opCtx, autoOplogColl.getCollection(), truncateTimestamp);
+
+    // The truncate point moves the Durable timestamp forward, so it should always exist in the
+    // oplog.
+    invariant(truncateOplogEntryBSON, "Found no oplog entry lte " + truncateTimestamp.toString());
+
+    return fassert(
+        44555001,
+        OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.get()));
 }
 
 Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationContext* opCtx) {
@@ -414,7 +507,6 @@ Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationCon
                                   << " Error: " << status.toString()};
         }
     }
-
     return Status::OK();
 }
 

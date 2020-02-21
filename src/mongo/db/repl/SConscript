@@ -260,6 +260,9 @@ env.Library(
         'repl_coordinator_interface',
         'replication_consistency_markers_idl',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog_raii',
+    ],
 )
 
 env.Library(

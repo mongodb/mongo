@@ -70,7 +70,7 @@ public:
     std::uint64_t getOplogReadTimestamp() const;
     void setOplogReadTimestamp(Timestamp ts);
 
-    // Triggers the oplogJournal thread to update its oplog read timestamp, by flushing the journal.
+    // Triggers the oplogJournal thread to update the oplog read timestamp.
     void triggerOplogVisibilityUpdate();
 
     // Waits until all committed writes at this point to become visible (that is, no holes exist in

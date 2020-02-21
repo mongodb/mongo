@@ -267,28 +267,34 @@ Status waitForWriteConcern(OperationContext* opCtx,
     WriteConcernOptions writeConcernWithPopulatedSyncMode =
         replCoord->populateUnsetWriteConcernOptionsSyncMode(writeConcern);
 
-    switch (writeConcernWithPopulatedSyncMode.syncMode) {
-        case WriteConcernOptions::SyncMode::UNSET:
-            LOGV2_FATAL(22550, "Attempting to wait on a WriteConcern with an unset sync option");
-            fassertFailed(34410);
-        case WriteConcernOptions::SyncMode::NONE:
-            break;
-        case WriteConcernOptions::SyncMode::FSYNC: {
-            if (!storageEngine->isDurable()) {
-                storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+    // Waiting for durability (flushing the journal or all files to disk) can throw on interruption.
+    try {
+        switch (writeConcernWithPopulatedSyncMode.syncMode) {
+            case WriteConcernOptions::SyncMode::UNSET:
+                LOGV2_FATAL(22550,
+                            "Attempting to wait on a WriteConcern with an unset sync option");
+                fassertFailed(34410);
+            case WriteConcernOptions::SyncMode::NONE:
+                break;
+            case WriteConcernOptions::SyncMode::FSYNC: {
+                if (!storageEngine->isDurable()) {
+                    storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
-                // This field has had a dummy value since MMAP went away. It is undocumented.
-                // Maintaining it so as not to cause unnecessary user pain across upgrades.
-                result->fsyncFiles = 1;
-            } else {
-                // We only need to commit the journal if we're durable
-                storageEngine->waitForJournalFlush(opCtx);
+                    // This field has had a dummy value since MMAP went away. It is undocumented.
+                    // Maintaining it so as not to cause unnecessary user pain across upgrades.
+                    result->fsyncFiles = 1;
+                } else {
+                    // We only need to commit the journal if we're durable
+                    storageEngine->waitForJournalFlush(opCtx);
+                }
+                break;
             }
-            break;
+            case WriteConcernOptions::SyncMode::JOURNAL:
+                storageEngine->waitForJournalFlush(opCtx);
+                break;
         }
-        case WriteConcernOptions::SyncMode::JOURNAL:
-            storageEngine->waitForJournalFlush(opCtx);
-            break;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     result->syncMillis = syncTimer.millis();

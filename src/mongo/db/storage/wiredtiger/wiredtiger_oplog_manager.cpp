@@ -43,11 +43,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-namespace {
-// This is the minimum valid timestamp; it can be used for reads that need to see all untimestamped
-// data but no timestamped data.  We cannot use 0 here because 0 means see all timestamped data.
-const uint64_t kMinimumTimestamp = 1;
-}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
 
@@ -72,7 +67,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                     "oplogVisibility"_attr = oplogVisibility);
     } else {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
-        setOplogReadTimestamp(Timestamp(kMinimumTimestamp));
+        setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
     }
 
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
@@ -177,17 +172,6 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
     // forward cursors.  The timestamp is used to hide oplog entries that might be committed but
     // have uncommitted entries ahead of them.
     while (true) {
-        auto opCtx = cc().makeOperationContext();
-
-        // This thread is started before we finish creating the StorageEngine and consequently
-        // makeOperationContext() returns an OperationContext with a LockerNoop. Rather than trying
-        // to refactor the code to start this thread after the StorageEngine is fully instantiated,
-        // we will use this temporary hack to give the opCtx a real Locker.
-        //
-        // TODO (SERVER-41392): the Replicate Before Journaling project will be removing the
-        // waitUntilDurable() call requiring an opCtx parameter.
-        cc().swapLockState(std::make_unique<LockerImpl>());
-
         stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
         {
             MONGO_IDLE_THREAD_BLOCK;
@@ -246,12 +230,6 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             continue;
         }
 
-        // In order to avoid oplog holes after an unclean shutdown, we must ensure this proposed
-        // oplog read timestamp's documents are durable before publishing that timestamp.
-        sessionCache->waitUntilDurable(opCtx.get(),
-                                       WiredTigerSessionCache::Fsync::kJournal,
-                                       WiredTigerSessionCache::UseJournalListener::kUpdate);
-
         lk.lock();
         // Publish the new timestamp value.  Avoid going backward.
         auto oldTimestamp = getOplogReadTimestamp();
@@ -291,7 +269,7 @@ uint64_t WiredTigerOplogManager::fetchAllDurableValue(WT_CONNECTION* conn) {
     if (wtstatus == WT_NOTFOUND) {
         // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
         // (timestamped) data.
-        return kMinimumTimestamp;
+        return StorageEngine::kMinimumTimestamp;
     } else {
         invariantWTOK(wtstatus);
     }

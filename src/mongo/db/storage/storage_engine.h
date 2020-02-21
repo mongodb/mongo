@@ -61,6 +61,13 @@ struct StorageGlobalParams;
 class StorageEngine {
 public:
     /**
+     * This is the minimum valid timestamp; it can be used for reads that need to see all
+     * untimestamped data but no timestamped data. We cannot use 0 here because 0 means see all
+     * timestamped data.
+     */
+    static const uint64_t kMinimumTimestamp = 1;
+
+    /**
      * When the storage engine needs to know how much oplog to preserve for the sake of active
      * transactions, it executes a callback that returns either the oldest active transaction
      * timestamp, or boost::none if there is no active transaction, or an error if it fails.
@@ -598,6 +605,8 @@ public:
      * commit_timestamp and prepared transactions that have been given a durable_timestamp.
      * Previously, the deprecated all_committed timestamp would also include prepared transactions
      * that were prepared but not committed which could make the stable timestamp briefly jump back.
+     *
+     * Returns kMinimumTimestamp if there have been no new writes since the storage engine started.
      */
     virtual Timestamp getAllDurableTimestamp() const = 0;
 

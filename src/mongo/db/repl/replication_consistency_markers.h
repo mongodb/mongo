@@ -152,21 +152,75 @@ public:
     virtual void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) = 0;
 
     /**
-     * The oplog truncate after point is set to the beginning of a batch of oplog entries before
-     * the oplog entries are written into the oplog, and reset before we begin applying the batch.
-     * On startup all oplog entries with a value >= the oplog truncate after point should be
-     * deleted. We write operations to the oplog in parallel so if we crash mid-batch there could
-     * be holes in the oplog. Deleting them at startup keeps us consistent.
+     * On startup all oplog entries with a ts field >= the oplog truncate after point will be
+     * deleted. If the truncate point is null, no oplog entries are truncated. A null truncate point
+     * can be found on startup if the server was certain at the time of shutdown that there were no
+     * parallel writes running.
      *
-     * If null, no documents should be deleted.
+     * Write operations are done in parallel, creating momentary oplog 'holes' where writes at an
+     * earlier timestamp are not yet committed. Secondaries can read an oplog entry from a
+     * sync-source as soon as there are no holes behind the oplog entry in-memory, but before there
+     * are no holes behind the oplog entry on disk. Therefore, after a crash, the oplog is truncated
+     * back to its on-disk no holes point that is guaranteed to be consistent with the rest of the
+     * replica set.
      *
-     * If we are in feature compatibility version 3.4 and there is no oplog truncate after point
-     * document, we fall back on the old oplog delete from point field in the minValid
-     * collection.
+     * A primary will update the oplog truncate after point before every journal flush to disk with
+     * the storage engine tracked in-memory no holes point.
+     *
+     * For other replication states than PRIMARY, the oplog truncate after point is updated
+     * directly. For batch application, the oplog truncate after point is set to the current
+     * lastApplied timestamp prior to writing a batch of oplog entries into the oplog, and reset to
+     * null once the parallel oplog entry writes are complete.
+     *
+     * Concurrency control and serialization is the responsibility of the caller.
      */
     virtual void setOplogTruncateAfterPoint(OperationContext* opCtx,
                                             const Timestamp& timestamp) = 0;
     virtual Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const = 0;
+
+    /**
+     * Turns updating the OplogTruncateAfterPoint in refreshOplogTruncateAfterPointIfPrimary on/off.
+     *
+     * Any already running calls to refreshOplogTruncateAfterPointIfPrimary must be interrupted to
+     * ensure that the updates to the truncate point via that function have stopped.
+     */
+    virtual void startUsingOplogTruncateAfterPointForPrimary() = 0;
+    virtual void stopUsingOplogTruncateAfterPointForPrimary() = 0;
+
+    /**
+     * Indicates whether the oplog truncate after point is currently in use (being periodically
+     * refreshed), which is only done while in state PRIMARY.
+     *
+     * This class stores its own relevant replication state knowledge to avoid potential deadlocks
+     * in accessing the replication coordinator's mutex to check; and will remain false for
+     * standalones that do not use timestamps.
+     */
+    virtual bool isOplogTruncateAfterPointBeingUsedForPrimary() const = 0;
+
+    /**
+     * Initializes the oplog truncate after point with the timestamp of the latest oplog entry.
+     *
+     * On stepup to primary, the truncate point must be initialized to protect the window of time
+     * between completion of stepup and the first periodic flush to disk that prompts a truncate
+     * point update. Otherwise, in-memory writes (with no holes) can replicate while the on-disk
+     * writes still have holes, at which point we could crash, leaving this node with unknown data
+     * holes that other nodes do not have (they have the data).
+     */
+    virtual void setOplogTruncateAfterPointToTopOfOplog(OperationContext* opCtx) = 0;
+
+    /**
+     * Updates the OplogTruncateAfterPoint with the latest no-holes oplog timestamp.
+     *
+     * If primary, returns the OpTime and WallTime of the oplog entry associated with the updated
+     * oplog truncate after point.
+     * Returns boost::none if isOplogTruncateAfterPointBeingUsedForPrimary returns false.
+     *
+     * stopUsingOplogTruncateAfterPointForPrimary() will cause new calls to this function to do
+     * nothing, but any already running callers of this function will need to be interrupted to
+     * ensure the state change is in effect (that an update will not racily go ahead).
+     */
+    virtual boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
+        OperationContext* opCtx) = 0;
 
     // -------- Applied Through ----------
 

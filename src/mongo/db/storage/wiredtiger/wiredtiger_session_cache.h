@@ -309,7 +309,8 @@ public:
      * Taking a checkpoint has the benefit of persisting unjournaled writes.
      *
      * 'useListener' controls whether or not the JournalListener is updated with the last durable
-     * value of the timestamp that it tracks.
+     * value of the timestamp that it tracks. The JournalListener's token is fetched before writing
+     * out to disk and set afterwards to update the repl layer durable timestamp.
      *
      * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */

@@ -338,6 +338,7 @@ public:
      * Signals an immediate journal flush and waits for it to complete before returning.
      *
      * Will throw ShutdownInProgress if the flusher thread is being stopped.
+     * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
      */
     void waitForJournalFlush() {
         auto myFuture = [&]() {
@@ -348,7 +349,7 @@ public:
             }
             return _nextSharedPromise->getFuture();
         }();
-        // Throws on error if the catalog is closed.
+        // Throws on error if the catalog is closed or the flusher round is interrupted by stepdown.
         myFuture.get();
     }
 

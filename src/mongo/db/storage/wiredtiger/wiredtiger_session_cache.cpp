@@ -250,9 +250,9 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         // Update the JournalListener before we return. As far as listeners are concerned, all
         // writes are as 'durable' as they are ever going to get on an inMemory storage engine.
         auto journalListener = [&]() -> JournalListener* {
-            // The JournalListener may not be set immediately, so we must check under a mutex so
-            // as not to access the variable while setting a JournalListener. A JournalListener
-            // is only allowed to be set once, so using the pointer outside of a mutex is safe.
+            // The JournalListener may not be set immediately, so we must check under a mutex so as
+            // not to access the variable while setting a JournalListener. A JournalListener is only
+            // allowed to be set once, so using the pointer outside of a mutex is safe.
             stdx::unique_lock<Latch> lk(_journalListenerMutex);
             return _journalListener;
         }();

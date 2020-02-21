@@ -70,8 +70,18 @@ public:
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
 
     void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) override;
+
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
+
+    void startUsingOplogTruncateAfterPointForPrimary() override;
+    void stopUsingOplogTruncateAfterPointForPrimary() override;
+    bool isOplogTruncateAfterPointBeingUsedForPrimary() const override;
+
+    void setOplogTruncateAfterPointToTopOfOplog(OperationContext* opCtx) override;
+
+    boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
+        OperationContext* opCtx) override;
 
     void setAppliedThrough(OperationContext* opCtx,
                            const OpTime& optime,
@@ -114,6 +124,21 @@ private:
     StorageInterface* _storageInterface;
     const NamespaceString _minValidNss;
     const NamespaceString _oplogTruncateAfterPointNss;
+
+    // Protects modifying and reading _isPrimary below.
+    mutable Mutex _truncatePointIsPrimaryMutex =
+        MONGO_MAKE_LATCH("ReplicationConsistencyMarkers::_truncatePointIsPrimaryMutex");
+
+    // Tracks whether or not the node is primary. Avoids potential deadlocks taking the replication
+    // coordinator's mutex to check replication state. Also remains false for standalones that do
+    // not use timestamps.
+    bool _isPrimary = false;
+
+    // Locks around fetching the 'all_durable' timestamp from the storage engine and updating the
+    // oplogTruncateAfterPoint. This prevents the oplogTruncateAfterPoint from going backwards in
+    // time in case of multiple callers to refreshOplogTruncateAfterPointIfPrimary.
+    mutable Mutex _refreshOplogTruncateAfterPointMutex =
+        MONGO_MAKE_LATCH("ReplicationConsistencyMarkers::_refreshOplogTruncateAfterPointMutex");
 };
 
 }  // namespace repl
