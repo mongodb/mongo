@@ -75,9 +75,16 @@ let smallCollName = 'd'.repeat(10000);
 assert.commandWorked(testDB.createCollection(smallCollName));
 let smallColl = testDB.getCollection(smallCollName);
 
-// The 'top' command should fail because the response would be too big to return.
-assert.commandFailedWithCode(largeColl.getDB().adminCommand('top'),
-                             [13548, ErrorCodes.BSONObjectTooLarge]);
+// The 'top' command should succeed even with a long collection name.
+assert.commandWorked(largeColl.getDB().adminCommand('top'));
+
+// We should be able to add another collection with a long name successfully. After doing so, then
+// the amount of data which Top needs to return will exceed the maximum BSON size, causing the
+// command to fail.
+const secondLargeCollName = 'e'.repeat(largeColl.getName().length);
+assert.commandWorked(testDB.createCollection(secondLargeCollName));
+const secondLargeColl = testDB.getCollection(secondLargeCollName);
+assert.commandFailedWithCode(testDB.adminCommand('top'), [13548, ErrorCodes.BSONObjectTooLarge]);
 
 // Adding indexes to the large collection should fail but not crash the server.
 assert.commandFailedWithCode(largeColl.createIndex({x: 1}), ErrorCodes.BSONObjectTooLarge);
@@ -100,7 +107,7 @@ assert.commandWorked(adminDB.runCommand(
 // Renaming the small collection should fail because it has one more index than the large
 // collection.
 let otherLargeCollName = 'modify_metadata_when_full.' +
-    'e'.repeat(largeColl.getName().length);
+    'f'.repeat(largeColl.getName().length);
 assert.commandFailedWithCode(
     adminDB.runCommand({renameCollection: smallColl.getFullName(), to: otherLargeCollName}),
     ErrorCodes.BSONObjectTooLarge);
@@ -108,4 +115,5 @@ assert.commandFailedWithCode(
 // Dropping both collections should work.
 assert.eq(true, largeColl.drop());
 assert.eq(true, smallColl.drop());
+assert.eq(true, secondLargeColl.drop());
 }());

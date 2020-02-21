@@ -68,12 +68,6 @@ Status _createView(OperationContext* opCtx,
 
         Database* db = autoDb.getDb();
 
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      db->getProfilingLevel());
-
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,
@@ -91,6 +85,19 @@ Status _createView(OperationContext* opCtx,
         wuow.commit();
 
         WriteUnitOfWork wunit(opCtx);
+
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      db->getProfilingLevel());
+
+        // If the view creation rolls back, ensure that the Top entry created for the view is
+        // deleted.
+        opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
+            Top::get(serviceContext).collectionDropped(nss);
+        });
+
         Status status = db->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
         if (!status.isOK()) {
             return status;
@@ -120,12 +127,6 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      autoDb.getDb()->getProfilingLevel());
-
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,
@@ -133,6 +134,19 @@ Status _createCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
+
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      autoDb.getDb()->getProfilingLevel());
+
+        // If the collection creation rolls back, ensure that the Top entry created for the
+        // collection is deleted.
+        opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
+            Top::get(serviceContext).collectionDropped(nss);
+        });
+
         Status status = autoDb.getDb()->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
         if (!status.isOK()) {
             return status;
