@@ -278,8 +278,16 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // multikey flag write and the parent transaction. We can do this write separately and commit it
     // before the parent transaction commits.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (opCtx->inMultiDocumentTransaction()) {
+    while (opCtx->inMultiDocumentTransaction()) {
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+        // If the index is not visible within the side transaction, the index may have been created,
+        // but not committed, in the parent transaction. Therefore, we abandon the side transaction
+        // and set the multikey flag in the parent transaction.
+        if (!_catalogIsPresent(opCtx)) {
+            break;
+        }
+
         writeConflictRetry(opCtx, "set index multikey", ns().ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
@@ -314,10 +322,12 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                 });
             wuow.commit();
         });
-    } else {
-        indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
-            opCtx, _descriptor->getCollection()->getCatalogId(), _descriptor->indexName(), paths);
+
+        return;
     }
+
+    indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
+        opCtx, _descriptor->getCollection()->getCatalogId(), _descriptor->indexName(), paths);
 
     opCtx->recoveryUnit()->onCommit(
         [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
