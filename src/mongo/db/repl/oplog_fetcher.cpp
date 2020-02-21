@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/oplog_fetcher.h"
 
 #include "mongo/base/counter.h"
@@ -634,26 +636,17 @@ Status OplogFetcher::_connect() {
 void OplogFetcher::_setMetadataWriterAndReader() {
     invariant(_conn);
 
-    _logicalTimeMetadataHook =
-        std::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext());
-
     _conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
         *metadataBob << rpc::kReplSetMetadataFieldName << 1;
         *metadataBob << rpc::kOplogQueryMetadataFieldName << 1;
         metadataBob->appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
-
-        // Run LogicalTimeMetadataHook on request metadata so this matches the behavior of the
-        // connections in the replication coordinator thread pool.
-        return _logicalTimeMetadataHook->writeRequestMetadata(opCtx, metadataBob);
+        return Status::OK();
     });
 
     _conn->setReplyMetadataReader(
         [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) {
             _metadataObj = metadataObj.getOwned();
-
-            // Run LogicalTimeMetadataHook on reply metadata so this matches the behavior of the
-            // connections in the replication coordinator thread pool.
-            return _logicalTimeMetadataHook->readReplyMetadata(opCtx, source, _metadataObj);
+            return Status::OK();
         });
 }
 

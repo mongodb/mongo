@@ -899,7 +899,6 @@ TEST_F(ReplCoordHBV1Test,
 
     // Update lastApplied, so commit point can be advanced.
     replCoordSetMyLastAppliedOpTime(opTime2, Date_t() + Seconds(100));
-    getExternalState()->setGlobalTimestamp(getGlobalServiceContext(), commitPoint.getTimestamp());
     {
         net->enterNetwork();
         net->runUntil(net->now() + config.getHeartbeatInterval());
@@ -977,7 +976,6 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
 
     // Set follower mode to SECONDARY so commit point can be advanced through heartbeats.
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getExternalState()->setGlobalTimestamp(getGlobalServiceContext(), commitPoint.getTimestamp());
     {
         net->enterNetwork();
         net->runUntil(net->now() + config.getHeartbeatInterval());
