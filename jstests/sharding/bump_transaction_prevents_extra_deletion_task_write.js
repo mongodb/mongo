@@ -107,12 +107,19 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
         return migrationDocColl.find().itcount() == 0;
     });
 
+    let recipientPrimary = st.rs1.getPrimary();
+
+    // Wait until the deletion task has been processed on recipient before sending the second
+    // recvChunkStart.
+    assert.soon(() => {
+        return recipientPrimary.getDB("config").rangeDeletions.find().itcount() == 0;
+    });
+
     // Simulate that the recipient received a delayed _recvChunkStart message by sending one
     // directly to the recipient, and ensure that the _recvChunkStart fails with TransactionTooOld
     // without inserting a new range deletion task.Since the business logic of
     //_recvChunkStart is executed asynchronously, use _recvChunkStatus to check the
     // result of the _recvChunkStart.
-    let recipientPrimary = st.rs1.getPrimary();
     assert.commandWorked(sendRecvChunkStart(recipientPrimary,
                                             ns,
                                             migrationDoc._id,
