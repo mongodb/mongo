@@ -753,8 +753,8 @@ bool runCommandImpl(OperationContext* opCtx,
         };
 
         try {
-            if (MONGO_unlikely(failWithErrorCodeInRunCommand.shouldFail())) {
-                auto scoped = failWithErrorCodeInRunCommand.scoped();
+            if (auto scoped = failWithErrorCodeInRunCommand.scoped();
+                MONGO_unlikely(scoped.isActive())) {
                 const auto errorCode = scoped.getData()["errorCode"].numberInt();
                 LOGV2(21960,
                       "failWithErrorCodeInRunCommand enabled - failing command with error "
