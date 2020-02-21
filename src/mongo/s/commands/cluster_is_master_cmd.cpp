@@ -78,7 +78,7 @@ public:
     }
 
     std::string help() const override {
-        return "test if this is master half of a replica pair";
+        return "Status information for clients negotiating a connection with this server";
     }
 
     void addRequiredPrivileges(const std::string& dbname,
