@@ -93,7 +93,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/transport/ismaster_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -111,10 +110,7 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
-// Signals that an isMaster request has started waiting.
 MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
-// Will cause an isMaster request to hang as it starts waiting.
-MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -2067,16 +2063,10 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
     lk.unlock();
 
-    IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
-
     if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
         // Used in tests that wait for this failpoint to be entered before triggering a topology
         // change.
-        LOGV2(31464, "waitForIsMasterResponse failpoint enabled.");
-    }
-    if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
-        LOGV2(21341, "Hanging due to hangWhileWaitingForIsMasterResponse failpoint.");
-        hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
+        LOGV2(21341, "waitForIsMasterResponse failpoint enabled.");
     }
 
     // Wait for a topology change with timeout set to deadline.
@@ -2094,7 +2084,6 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
         // Return an IsMasterResponse with the current topology version on timeout when waiting for
         // a topology change.
         stdx::lock_guard lk(_mutex);
-        IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
         return _makeIsMasterResponse(horizonString, lk);
     }
 
@@ -3253,8 +3242,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized()) {
             _fulfillTopologyChangePromise(opCtx, lk);
-            // Use the global ServiceContext here in case the current opCtx is null.
-            IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
         }
     });
 
@@ -3750,7 +3737,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         for (auto iter = _horizonToPromiseMap.begin(); iter != _horizonToPromiseMap.end(); iter++) {
             iter->second->setError({ErrorCodes::SplitHorizonChange,
                                     "Received a reconfig that changed the horizon parameters."});
-            IsMasterMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
         }
         if (_selfIndex >= 0) {
             // Only create a new horizon promise mapping if the node exists in the new config.

@@ -38,7 +38,6 @@
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/ismaster_metrics.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/log.h"
@@ -273,10 +272,6 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     bob->append("totalCreated", static_cast<int>(_createdConnections.load()));
     if (auto sc = getGlobalServiceContext()) {
         bob->append("active", static_cast<int>(sc->getActiveClientOperations()));
-        bob->append("exhaustIsMaster",
-                    static_cast<int>(IsMasterMetrics::get(sc)->getNumExhaustIsMaster()));
-        bob->append("awaitingTopologyChanges",
-                    static_cast<int>(IsMasterMetrics::get(sc)->getNumAwaitingTopologyChanges()));
     }
 
     if (_adminInternalPool) {

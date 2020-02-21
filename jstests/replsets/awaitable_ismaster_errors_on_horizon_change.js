@@ -56,14 +56,6 @@ const awaitIsMasterHorizonChangeOnSecondary = startParallelShell(
 primaryFailPoint.wait();
 secondaryFailPoint.wait();
 
-// Each node has one isMaster request waiting on a topology change.
-let numAwaitingTopologyChangeOnPrimary =
-    primaryDB.serverStatus().connections.awaitingTopologyChanges;
-let numAwaitingTopologyChangeOnSecondary =
-    secondaryDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(1, numAwaitingTopologyChangeOnPrimary);
-assert.eq(1, numAwaitingTopologyChangeOnSecondary);
-
 // Doing a reconfig that changes the horizon should respond to all waiting isMasters with an error.
 let rsConfig = primary.getDB("local").system.replset.findOne();
 let idx = 0;
@@ -77,13 +69,6 @@ jsTest.log('Calling replSetReconfig with config: ' + tojson(rsConfig));
 assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}));
 awaitIsMasterHorizonChangeOnPrimary();
 awaitIsMasterHorizonChangeOnSecondary();
-
-// All isMaster requests should have been responded to after the reconfig.
-numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(0, numAwaitingTopologyChangeOnPrimary);
-assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
 const primaryRespAfterHorizonChange = assert.commandWorked(primaryDB.runCommand({isMaster: 1}));
 const secondaryRespAfterHorizonChange = assert.commandWorked(secondaryDB.runCommand({isMaster: 1}));

@@ -83,8 +83,6 @@
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/transport/ismaster_metrics.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -1002,12 +1000,6 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         }();
 
         opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
-        const auto session = opCtx->getClient()->session();
-        if (session) {
-            if (!opCtx->isExhaust() || request.getCommandName() != "isMaster"_sd) {
-                InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
-            }
-        }
 
         // Execute.
         std::string db = request.getDatabase().toString();
