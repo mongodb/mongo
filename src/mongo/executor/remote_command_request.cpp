@@ -60,12 +60,14 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
                                                    Milliseconds timeoutMillis,
-                                                   boost::optional<HedgeOptions> hedgeOptions)
+                                                   boost::optional<HedgeOptions> hedgeOptions,
+                                                   FireAndForgetMode fireAndForgetMode)
     : id(requestId),
       dbname(theDbName),
       metadata(metadataObj),
       opCtx(opCtx),
-      hedgeOptions(hedgeOptions) {
+      hedgeOptions(hedgeOptions),
+      fireAndForgetMode(fireAndForgetMode) {
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
     //
@@ -103,25 +105,21 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
                                                       Milliseconds timeoutMillis,
-                                                      boost::optional<HedgeOptions> hedgeOptions)
-    : RemoteCommandRequestBase(
-          requestId, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis, hedgeOptions),
+                                                      boost::optional<HedgeOptions> hedgeOptions,
+                                                      FireAndForgetMode fireAndForgetMode)
+    : RemoteCommandRequestBase(requestId,
+                               theDbName,
+                               theCmdObj,
+                               metadataObj,
+                               opCtx,
+                               timeoutMillis,
+                               hedgeOptions,
+                               fireAndForgetMode),
       target(theTarget) {
     if constexpr (std::is_same_v<T, std::vector<HostAndPort>>) {
         invariant(!theTarget.empty());
     }
 }
-
-template <typename T>
-RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
-                                                      const T& theTarget,
-                                                      const std::string& theDbName,
-                                                      const BSONObj& theCmdObj,
-                                                      const BSONObj& metadataObj,
-                                                      OperationContext* opCtx,
-                                                      Milliseconds timeoutMillis)
-    : RemoteCommandRequestImpl(
-          requestId, theTarget, theDbName, theCmdObj, metadataObj, opCtx, timeoutMillis, {}) {}
 
 template <typename T>
 RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
@@ -130,7 +128,8 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
                                                       Milliseconds timeoutMillis,
-                                                      boost::optional<HedgeOptions> hedgeOptions)
+                                                      boost::optional<HedgeOptions> hedgeOptions,
+                                                      FireAndForgetMode fireAndForgetMode)
     : RemoteCommandRequestImpl(requestIdCounter.addAndFetch(1),
                                theTarget,
                                theDbName,
@@ -138,7 +137,8 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
                                metadataObj,
                                opCtx,
                                timeoutMillis,
-                               hedgeOptions) {}
+                               hedgeOptions,
+                               fireAndForgetMode) {}
 
 template <typename T>
 std::string RemoteCommandRequestImpl<T>::toString() const {

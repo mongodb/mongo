@@ -75,7 +75,9 @@ public:
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
-    Future<rpc::UniqueReply> runCommand(OpMsgRequest request, const BatonHandle& baton = nullptr);
+    Future<rpc::UniqueReply> runCommand(OpMsgRequest request,
+                                        const BatonHandle& baton = nullptr,
+                                        bool fireAndForget = false);
 
     Future<void> runExhaustCommandRequest(executor::RemoteCommandRequest request,
                                           RemoteCommandCallbackFn&& cb,

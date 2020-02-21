@@ -271,11 +271,30 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request, const BatonHandle& baton) {
+Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
+                                                   const BatonHandle& baton,
+                                                   bool fireAndForget) {
     invariant(_negotiatedProtocol);
     auto requestMsg = rpc::messageFromOpMsgRequest(*_negotiatedProtocol, std::move(request));
+    if (fireAndForget) {
+        OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
+    }
     auto msgId = nextMessageId();
-    return _call(std::move(requestMsg), msgId, baton)
+    auto future = _call(std::move(requestMsg), msgId, baton);
+
+    if (fireAndForget) {
+        return std::move(future).then([msgId, this]() -> Future<rpc::UniqueReply> {
+            // Return a mock status OK response since we do not expect a real response.
+            OpMsgBuilder builder;
+            builder.setBody(BSON("ok" << 1));
+            Message responseMsg = builder.finish();
+            responseMsg.header().setResponseToMsgId(msgId);
+            responseMsg.header().setId(msgId);
+            return rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
+        });
+    }
+
+    return std::move(future)
         .then([msgId, baton, this]() { return _waitForResponse(msgId, baton); })
         .then([this](Message response) -> Future<rpc::UniqueReply> {
             return rpc::UniqueReply(response, rpc::makeReply(&response));
@@ -288,7 +307,9 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     auto start = clkSource->now();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
-    return runCommand(std::move(opMsgRequest), baton)
+    auto fireAndForget =
+        request.fireAndForgetMode == executor::RemoteCommandRequest::FireAndForgetMode::kOn;
+    return runCommand(std::move(opMsgRequest), baton, fireAndForget)
         .then([start, clkSource, this](rpc::UniqueReply response) {
             auto duration = duration_cast<Milliseconds>(clkSource->now() - start);
             return executor::RemoteCommandResponse(*response, duration);

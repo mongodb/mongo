@@ -149,6 +149,9 @@ BSONObj objConcat(std::initializer_list<BSONObj> objs) {
 
 class NetworkInterfaceTest : public NetworkInterfaceIntegrationFixture {
 public:
+    constexpr static Milliseconds kNoTimeout = RemoteCommandRequest::kNoTimeout;
+    constexpr static Milliseconds kMaxWait = Milliseconds(Minutes(1));
+
     void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
         auto counters = net().getCounters();
         ASSERT_EQ(canceled, counters.canceled);
@@ -163,20 +166,28 @@ public:
     }
 
     RemoteCommandRequest makeTestCommand(
-        boost::optional<Milliseconds> timeout = boost::none,
-        BSONObj cmd = BSON("echo" << 1 << "foo"
-                                  << "bar"),
+        Milliseconds timeout,
+        BSONObj cmd,
         OperationContext* opCtx = nullptr,
-        boost::optional<RemoteCommandRequest::HedgeOptions> hedgeOptions = boost::none) {
+        boost::optional<RemoteCommandRequest::HedgeOptions> hedgeOptions = boost::none,
+        RemoteCommandRequest::FireAndForgetMode fireAndForgetMode =
+            RemoteCommandRequest::FireAndForgetMode::kOff) {
         auto cs = fixture();
         return RemoteCommandRequest(cs.getServers().front(),
                                     "admin",
                                     std::move(cmd),
                                     BSONObj(),
                                     opCtx,
-                                    timeout ? *timeout : RemoteCommandRequest::kNoTimeout,
-                                    hedgeOptions);
+                                    timeout,
+                                    hedgeOptions,
+                                    fireAndForgetMode);
     }
+
+    BSONObj makeEchoCmdObj() {
+        return BSON("echo" << 1 << "foo"
+                           << "bar");
+    }
+
 
     struct IsMasterData {
         BSONObj request;
@@ -231,8 +242,6 @@ TEST_F(NetworkInterfaceTest, CancelMissingOperation) {
     assertNumOps(0u, 0u, 0u, 0u);
 }
 
-constexpr auto kMaxWait = Milliseconds(Minutes(1));
-
 TEST_F(NetworkInterfaceTest, CancelOperation) {
     auto cbh = makeCallbackHandle();
 
@@ -240,7 +249,7 @@ TEST_F(NetworkInterfaceTest, CancelOperation) {
         // Kick off our operation
         FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
 
-        auto deferred = runCommand(cbh, makeTestCommand(kMaxWait));
+        auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
 
         waitForIsMaster();
 
@@ -269,7 +278,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
                          << "data"
                          << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
                                                    << "failCommands" << BSON_ARRAY("echo"))),
-                    RemoteCommandRequest::kNoTimeout);
+                    kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
@@ -278,7 +287,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
                              << "failCommand"
                              << "mode"
                              << "off"),
-                        RemoteCommandRequest::kNoTimeout);
+                        kNoTimeout);
     });
 
     auto cbh = makeCallbackHandle();
@@ -287,12 +296,11 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
         // the operation to be killed.
         FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
 
-        auto cmdObj = BSON("echo" << 1 << "foo"
-                                  << "bar");
-        auto deferred = runCommand(
-            cbh,
-            makeTestCommand(
-                boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+        auto deferred = runCommand(cbh,
+                                   makeTestCommand(kNoTimeout,
+                                                   makeEchoCmdObj(),
+                                                   nullptr /* opCtx */,
+                                                   RemoteCommandRequest::HedgeOptions()));
 
         fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
@@ -324,7 +332,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                                                    << "failCommands"
                                                    << BSON_ARRAY("echo"
                                                                  << "_killOperations"))),
-                    RemoteCommandRequest::kNoTimeout);
+                    kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
@@ -333,7 +341,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                              << "failCommand"
                              << "mode"
                              << "off"),
-                        RemoteCommandRequest::kNoTimeout);
+                        kNoTimeout);
     });
 
     auto cbh = makeCallbackHandle();
@@ -341,12 +349,11 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
         // Kick off a blocking "echo" operation.
         FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
 
-        auto cmdObj = BSON("echo" << 1 << "foo"
-                                  << "bar");
-        auto deferred = runCommand(
-            cbh,
-            makeTestCommand(
-                boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+        auto deferred = runCommand(cbh,
+                                   makeTestCommand(kNoTimeout,
+                                                   makeEchoCmdObj(),
+                                                   nullptr /* opCtx */,
+                                                   RemoteCommandRequest::HedgeOptions()));
 
         fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
@@ -374,7 +381,7 @@ TEST_F(NetworkInterfaceTest, ImmediateCancel) {
         // Kick off our operation
         FailPointEnableBlock fpb("networkInterfaceDiscardCommandsBeforeAcquireConn");
 
-        auto deferred = runCommand(cbh, makeTestCommand(kMaxWait));
+        auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
 
         fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
@@ -395,7 +402,7 @@ TEST_F(NetworkInterfaceTest, ImmediateCancel) {
 TEST_F(NetworkInterfaceTest, LateCancel) {
     auto cbh = makeCallbackHandle();
 
-    auto deferred = runCommand(cbh, makeTestCommand(kMaxWait));
+    auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
 
     // Wait for op to complete, assert that it was canceled.
     auto result = deferred.get();
@@ -409,7 +416,7 @@ TEST_F(NetworkInterfaceTest, LateCancel) {
 TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();
-    auto request = makeTestCommand(Milliseconds{1000});
+    auto request = makeTestCommand(Milliseconds{1000}, makeEchoCmdObj());
     request.cmdObj = BSON("sleep" << 1 << "lock"
                                   << "none"
                                   << "secs" << 1000000000);
@@ -504,11 +511,8 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 }
 
 TEST_F(NetworkInterfaceTest, StartCommand) {
-    auto commandRequest = BSON("echo" << 1 << "boop"
-                                      << "bop");
-
     auto request = makeTestCommand(
-        boost::none, commandRequest, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions());
+        kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions());
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
 
@@ -518,14 +522,63 @@ TEST_F(NetworkInterfaceTest, StartCommand) {
     uassertStatusOK(res.status);
 
     // This opmsg request expect the following reply, which is generated below
-    // { echo: { echo: 1, boop: "bop", clientOperationKey: uuid, $db: "admin" }, ok: 1.0 }
+    // { echo: { echo: 1, foo: "bar", clientOperationKey: uuid, $db: "admin" }, ok: 1.0 }
     auto cmdObj = res.data.getObjectField("echo");
     ASSERT_EQ(1, cmdObj.getIntField("echo"));
-    ASSERT_EQ("bop"_sd, cmdObj.getStringField("boop"));
+    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
     ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
     ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
     ASSERT_EQ(1, res.data.getIntField("ok"));
     assertNumOps(0u, 0u, 0u, 1u);
+}
+
+TEST_F(NetworkInterfaceTest, FireAndForget) {
+    assertCommandOK("admin",
+                    BSON("configureFailPoint"
+                         << "failCommand"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data"
+                         << BSON("errorCode" << ErrorCodes::CommandFailed << "failCommands"
+                                             << BSON_ARRAY("echo"))));
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK("admin",
+                        BSON("configureFailPoint"
+                             << "failCommand"
+                             << "mode"
+                             << "off"));
+    });
+
+    // Run fireAndForget commands and verify that we get status OK responses.
+    const int numFireAndForgetRequests = 3;
+    std::vector<Future<RemoteCommandResponse>> futures;
+
+    for (int i = 0; i < numFireAndForgetRequests; i++) {
+        auto cbh = makeCallbackHandle();
+        auto fireAndForgetRequest = makeTestCommand(kNoTimeout,
+                                                    makeEchoCmdObj(),
+                                                    nullptr /* opCtx */,
+                                                    boost::none /* hedgeOptions */,
+                                                    RemoteCommandRequest::FireAndForgetMode::kOn);
+        futures.push_back(runCommand(cbh, fireAndForgetRequest));
+    }
+
+    for (auto& future : futures) {
+        auto result = future.get();
+        ASSERT(result.elapsedMillis);
+        uassertStatusOK(result.status);
+        ASSERT_EQ(1, result.data.getIntField("ok"));
+    }
+
+    // Run a non-fireAndForget command and verify that we get a CommandFailed response.
+    auto nonFireAndForgetRequest = makeTestCommand(kNoTimeout, makeEchoCmdObj());
+    auto result = runCommandSync(nonFireAndForgetRequest);
+    ASSERT(result.elapsedMillis);
+    uassertStatusOK(result.status);
+    ASSERT_EQ(0, result.data.getIntField("ok"));
+    ASSERT_EQ(ErrorCodes::CommandFailed, result.data.getIntField("code"));
+    assertNumOps(0u, 0u, 0u, 5u);
 }
 
 TEST_F(NetworkInterfaceTest, SetAlarm) {
@@ -563,7 +616,7 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
 TEST_F(NetworkInterfaceTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
     WireSpec::instance().isInternalClient = true;
 
-    auto deferred = runCommand(makeCallbackHandle(), makeTestCommand());
+    auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
     auto isMasterHandshake = waitForIsMaster();
 
     // Verify that the isMaster reply has the expected internalClient data.
@@ -585,7 +638,7 @@ TEST_F(NetworkInterfaceTest, IsMasterRequestContainsOutgoingWireVersionInternalC
 TEST_F(NetworkInterfaceTest, IsMasterRequestMissingInternalClientInfoWhenNotInternalClient) {
     WireSpec::instance().isInternalClient = false;
 
-    auto deferred = runCommand(makeCallbackHandle(), makeTestCommand());
+    auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
     auto isMasterHandshake = waitForIsMaster();
 
     // Verify that the isMaster reply has the expected internalClient data.
@@ -647,7 +700,7 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldReceiveMultipleResponses) 
     auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                                        << TopologyVersion(OID::max(), 0).toBSON());
 
-    auto request = makeTestCommand(boost::none, isMasterCmd);
+    auto request = makeTestCommand(kNoTimeout, isMasterCmd);
     auto cbh = makeCallbackHandle();
     ExhaustRequestHandlerUtil exhaustRequestHandler;
 
@@ -710,7 +763,7 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
     auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                                        << TopologyVersion(OID::max(), 0).toBSON());
 
-    auto request = makeTestCommand(boost::none, isMasterCmd);
+    auto request = makeTestCommand(kNoTimeout, isMasterCmd);
     auto cbh = makeCallbackHandle();
     ExhaustRequestHandlerUtil exhaustRequestHandler;
 
