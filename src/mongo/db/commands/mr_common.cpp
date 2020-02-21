@@ -62,7 +62,6 @@
 namespace mongo::map_reduce_common {
 
 namespace {
-Rarely nonAtomicDeprecationSampler;  // Used to occasionally log deprecation messages.
 
 using namespace std::string_literals;
 
@@ -265,7 +264,7 @@ auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
 OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj) {
     OutputOptions outputOptions;
 
-    outputOptions.outNonAtomic = false;
+    outputOptions.outNonAtomic = true;
     if (cmdObj["out"].type() == String) {
         outputOptions.collectionName = cmdObj["out"].String();
         outputOptions.outType = OutputType::Replace;
@@ -303,15 +302,12 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
                           .isOnInternalDb()));
         }
         if (o.hasElement("nonAtomic")) {
-            outputOptions.outNonAtomic = o["nonAtomic"].Bool();
-            if (outputOptions.outNonAtomic) {
-                uassert(15895,
-                        "nonAtomic option cannot be used with this output type",
-                        (outputOptions.outType == OutputType::Reduce ||
-                         outputOptions.outType == OutputType::Merge));
-            } else if (nonAtomicDeprecationSampler.tick()) {
-                LOGV2_WARNING(23796, "Setting out.nonAtomic to false in MapReduce is deprecated.");
-            }
+            uassert(
+                15895,
+                str::stream()
+                    << "The nonAtomic:false option is no longer allowed in the mapReduce command. "
+                    << "Please omit or specify nonAtomic:true",
+                o["nonAtomic"].Bool());
         }
     } else {
         uasserted(13606, "'out' has to be a string or an object");

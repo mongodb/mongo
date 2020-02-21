@@ -139,32 +139,32 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
     // 'out' must be either string or object.
     ASSERT_THROWS(map_reduce_common::parseOutputOptions("mydb", fromjson("{out: 99}")),
                   AssertionException);
-    // 'out.nonAtomic' is not supported with normal, replace or inline.
+    // 'out.nonAtomic' false is not supported.
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: true}}")),
+                      "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: true}}")),
+                      "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: true}}")),
+                      "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
+
     // Unknown output specifer.
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
                       "mydb", fromjson("{out: {no_such_out_type: 'mycoll'}}")),
                   AssertionException);
 
-
     // 'out' is string.
     _testConfigParseOutputOptions(
-        "mydb", "{out: 'mycoll'}", "", "mycoll", "mydb.mycoll", false, OutputType::Replace);
+        "mydb", "{out: 'mycoll'}", "", "mycoll", "mydb.mycoll", true, OutputType::Replace);
     // 'out' is object.
     _testConfigParseOutputOptions("mydb",
                                   "{out: {normal: 'mycoll'}}",
                                   "",
                                   "mycoll",
                                   "mydb.mycoll",
-                                  false,
+                                  true,
                                   OutputType::Replace);
     // 'out.db' overrides dbname parameter
     _testConfigParseOutputOptions("mydb1",
@@ -172,7 +172,7 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "mydb2",
                                   "mycoll",
                                   "mydb2.mycoll",
-                                  false,
+                                  true,
                                   OutputType::Replace);
     // 'out.nonAtomic' is supported with merge and reduce.
     _testConfigParseOutputOptions("mydb",
@@ -195,7 +195,7 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "mydb2",
                                   "",
                                   "",
-                                  false,
+                                  true,
                                   OutputType::InMemory);
 
     // Order should not matter in fields of 'out' object.
@@ -204,14 +204,14 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "mydb2",
                                   "mycoll",
                                   "mydb2.mycoll",
-                                  false,
+                                  true,
                                   OutputType::Replace);
     _testConfigParseOutputOptions("mydb1",
                                   "{out: {db: 'mydb2', replace: 'mycoll'}}",
                                   "mydb2",
                                   "mycoll",
                                   "mydb2.mycoll",
-                                  false,
+                                  true,
                                   OutputType::Replace);
     _testConfigParseOutputOptions("mydb1",
                                   "{out: {nonAtomic: true, merge: 'mycoll'}}",
@@ -232,7 +232,7 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "mydb2",
                                   "",
                                   "",
-                                  false,
+                                  true,
                                   OutputType::InMemory);
 }
 
