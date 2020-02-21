@@ -94,6 +94,8 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/transport/ismaster_metrics.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -1282,6 +1284,13 @@ DbResponse receivedCommands(OperationContext* opCtx,
             }
 
             opCtx->setExhaust(OpMsg::isFlagSet(message, OpMsg::kExhaustSupported));
+
+            const auto session = opCtx->getClient()->session();
+            if (session) {
+                if (!opCtx->isExhaust() || c->getName() != "isMaster"_sd) {
+                    InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
+                }
+            }
 
             execCommandDatabase(opCtx, c, request, replyBuilder.get(), behaviors);
         } catch (const DBException& ex) {
