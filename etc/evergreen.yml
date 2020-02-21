@@ -10921,8 +10921,7 @@ buildvariants:
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
-    # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
     multiversion_platform: ubuntu1604
@@ -10944,8 +10943,7 @@ buildvariants:
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
-    # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
   tasks:
@@ -10958,8 +10956,7 @@ buildvariants:
    - ubuntu1604-test
   expansions:
     lang_environment: LANG=C
-    # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: --link-model=dynamic --allocator=system -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
     scons_cache_scope: shared
     scons_cache_mode: all
     multiversion_platform: ubuntu1604
@@ -12021,8 +12018,7 @@ buildvariants:
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
-    # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --allocator=system
+    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
   tasks:
