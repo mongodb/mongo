@@ -53,3 +53,9 @@ structs:
               type: object
               optional: true
               description: Optional scope variables accessible from internal javacsript expressions.
+          isMapReduce:
+              cpp_name: isMapReduce
+              type: bool
+              optional: true
+              description: When specified, signals that the aggregation pipeline originated from a
+                           mapReduce command.

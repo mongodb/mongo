@@ -42,18 +42,20 @@ const auto getExec = OperationContext::declareDecoration<std::unique_ptr<JsExecu
 JsExecution* JsExecution::get(OperationContext* opCtx,
                               const BSONObj& scope,
                               StringData database,
-                              bool inMongos,
+                              bool loadStoredProcedures,
                               boost::optional<int> jsHeapLimitMB) {
     auto& exec = getExec(opCtx);
     if (!exec) {
         exec = std::make_unique<JsExecution>(scope, jsHeapLimitMB);
         exec->getScope()->setLocalDB(database);
-
-        // TODO SERVER-45457: Remove this check and the "inMongos" argument to this method once we
-        // are no longer loading system.js for $function use outside of mapReduce and $where.
-        if (!inMongos) {
+        if (loadStoredProcedures) {
             exec->getScope()->loadStored(opCtx, true);
         }
+        exec->_storedProceduresLoaded = loadStoredProcedures;
+    } else {
+        uassert(31438,
+                "A single operation cannot use both JavaScript aggregation expressions and $where.",
+                loadStoredProcedures == exec->_storedProceduresLoaded);
     }
     return exec.get();
 }

@@ -44,7 +44,8 @@ const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootI
                                                                  {"REMOVE", kRemoveId},
                                                                  {"NOW", kNowId},
                                                                  {"CLUSTER_TIME", kClusterTimeId},
-                                                                 {"JS_SCOPE", kJsScopeId}};
+                                                                 {"JS_SCOPE", kJsScopeId},
+                                                                 {"IS_MR", kIsMapReduceId}};
 
 void Variables::uassertValidNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)
@@ -186,6 +187,9 @@ RuntimeConstants Variables::getRuntimeConstants() const {
     if (auto it = _runtimeConstants.find(kJsScopeId); it != _runtimeConstants.end()) {
         constants.setJsScope(it->second.getDocument().toBson());
     }
+    if (auto it = _runtimeConstants.find(kIsMapReduceId); it != _runtimeConstants.end()) {
+        constants.setIsMapReduce(it->second.getBool());
+    }
 
     return constants;
 }
@@ -201,6 +205,9 @@ void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
 
     if (constants.getJsScope()) {
         _runtimeConstants[kJsScopeId] = Value(constants.getJsScope().get());
+    }
+    if (constants.getIsMapReduce()) {
+        _runtimeConstants[kIsMapReduceId] = Value(constants.getIsMapReduce().get());
     }
 }
 

@@ -50,16 +50,15 @@ class JsExecution {
 public:
     /**
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
-     * and reading the return value. This will load all stored procedures from database unless
-     * 'disableLoadStored' is set on the global ScriptEngine. The JsExecution* returned is owned by
-     * 'opCtx'.
+     * and reading the return value. If `loadStoredProcedures` is true, this will load all stored
+     * procedures from database unless 'disableLoadStored' is set on the global ScriptEngine. The
+     * JsExecution* returned is owned by 'opCtx'.
      */
     static JsExecution* get(OperationContext* opCtx,
                             const BSONObj& scope,
                             StringData database,
-                            bool inMongos,
+                            bool loadStoredProcedures,
                             boost::optional<int> jsHeapLimitMB);
-
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */
@@ -111,6 +110,7 @@ private:
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
     bool _emitCreated = false;
+    bool _storedProceduresLoaded = false;
     int _fnCallTimeoutMillis;
 
     Value doCallFunction(ScriptingFunction func,

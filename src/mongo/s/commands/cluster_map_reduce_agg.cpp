@@ -86,6 +86,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     if (parsedMr.getScope()) {
         runtimeConstants.setJsScope(parsedMr.getScope()->getObj());
     }
+    runtimeConstants.setIsMapReduce(true);
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,

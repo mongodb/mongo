@@ -67,7 +67,7 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
 
     auto code = whereParams.getValue().code;
 
-    // Desugar $where to $expr. The $where function is invoked through an $_internalJs expression by
+    // Desugar $where to $expr. The $where function is invoked through a $function expression by
     // passing the document as $$CURRENT.
     auto fnExpression = ExpressionFunction::createForWhere(
         expCtx,

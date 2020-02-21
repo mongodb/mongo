@@ -108,7 +108,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(
 }
 
 Value ExpressionFunction::evaluate(const Document& root, Variables* variables) const {
-    auto jsExec = getExpressionContext()->getJsExecWithScope();
+    auto jsExec = getExpressionContext()->getJsExecWithScope(_assignFirstArgToThis);
     auto scope = jsExec->getScope();
 
     ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());

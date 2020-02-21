@@ -73,14 +73,6 @@ const findWithWhere = {
     filter: {$where: allocateLargeString}
 };
 
-const findWithJavaScriptFunctionAndWhere = {
-    find: "coll",
-    filter: {
-        $expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}},
-        $where: allocateLargeString,
-    }
-};
-
 /**
  * The following tests will execute JavaScript on the process represented by 'db' regardless of
  * whether it is a mongod or mongos. This is because the JavaScript expressions live in the merger
@@ -119,15 +111,12 @@ function runShardTests(db) {
     assert.commandWorked(db.runCommand(findWithJavaScriptFunction));
     // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
     // assert.commandWorked(db.runCommand(findWithWhere));
-    assert.commandWorked(db.runCommand(findWithJavaScriptFunctionAndWhere));
     assert.commandWorked(db.runCommand(mapReduce));
 
     // A find command with JavaScript agg expression is expected to fail when the query specific
     // heap size limit is too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunction),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunctionAndWhere),
                                  ErrorCodes.JSInterpreterFailure);
 
     // The mapReduce command and $where are not limited by the query heap size limit and will
@@ -144,8 +133,6 @@ function runShardTests(db) {
                                  ErrorCodes.JSInterpreterFailure);
     // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
     // assert.commandFailedWithCode(db.runCommand(findWithWhere), ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunctionAndWhere),
-                                 ErrorCodes.JSInterpreterFailure);
     assert.commandFailedWithCode(db.runCommand(mapReduce), ErrorCodes.JSInterpreterFailure);
 }
 
