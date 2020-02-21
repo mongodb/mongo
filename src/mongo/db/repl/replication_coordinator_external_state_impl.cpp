@@ -975,12 +975,7 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
     return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
-JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(
-    OperationContext* opCtx, stdx::unique_lock<Latch>& lk) {
-    // TODO (SERVER-44555): to take advantage of the mutex being passed here unlocked in order to
-    // enable taking collection locks first.
-    invariant(!lk.owns_lock());
-    lk.lock();
+JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(OperationContext* opCtx) {
     return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime();
 }
 

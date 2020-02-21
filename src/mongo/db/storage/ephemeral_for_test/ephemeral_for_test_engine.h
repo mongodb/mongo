@@ -130,6 +130,6 @@ private:
     DataMap _dataMap;  // All actual data is owned in here
 
     // Notified when we write as everything is considered "journalled" since repl depends on it.
-    JournalListener* _journalListener = &NoOpJournalListener::instance;
+    JournalListener* _journalListener = nullptr;
 };
 }  // namespace mongo

@@ -397,6 +397,8 @@ public:
     /**
      * Sets a new JournalListener, which is used by the storage engine to alert the rest of the
      * system about journaled write progress.
+     *
+     * This may only be set once.
      */
     virtual void setJournalListener(JournalListener* jl) = 0;
 

@@ -249,9 +249,15 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     if (isEphemeral()) {
         // Update the JournalListener before we return. As far as listeners are concerned, all
         // writes are as 'durable' as they are ever going to get on an inMemory storage engine.
-        stdx::unique_lock<Latch> lk(_journalListenerMutex, stdx::defer_lock);
-        if (useListener == UseJournalListener::kUpdate) {
-            auto token = _journalListener->getToken(opCtx, lk);
+        auto journalListener = [&]() -> JournalListener* {
+            // The JournalListener may not be set immediately, so we must check under a mutex so
+            // as not to access the variable while setting a JournalListener. A JournalListener
+            // is only allowed to be set once, so using the pointer outside of a mutex is safe.
+            stdx::unique_lock<Latch> lk(_journalListenerMutex);
+            return _journalListener;
+        }();
+        if (journalListener && useListener == UseJournalListener::kUpdate) {
+            auto token = _journalListener->getToken(opCtx);
             _journalListener->onDurable(token);
         }
         return;
@@ -283,12 +289,16 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             // Update a value that tracks the latest write that is safe across startup recovery (in
             // the repl layer) and then report the time of that write as durable after we flush
             // in-memory to disk.
-            // Defer locking the mutex so that it can be locked after any collection locks that
-            // may be acquired, which avoids deadlocks.
-            stdx::unique_lock<Latch> lk(_journalListenerMutex, stdx::defer_lock);
+            auto journalListener = [&]() -> JournalListener* {
+                // The JournalListener may not be set immediately, so we must check under a mutex so
+                // as not to access the variable while setting a JournalListener. A JournalListener
+                // is only allowed to be set once, so using the pointer outside of a mutex is safe.
+                stdx::unique_lock<Latch> lk(_journalListenerMutex);
+                return _journalListener;
+            }();
             boost::optional<JournalListener::Token> token;
-            if (useListener == UseJournalListener::kUpdate) {
-                token = _journalListener->getToken(opCtx, lk);
+            if (journalListener && useListener == UseJournalListener::kUpdate) {
+                token = _journalListener->getToken(opCtx);
             }
 
             auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
@@ -322,12 +332,16 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
 
     // Update a value that tracks the latest write that is safe across startup recovery (in the repl
     // layer) and then report the time of that write as durable after we flush in-memory to disk.
-    // Defer locking the mutex so that it can be locked after any collection locks that may be
-    // acquired, which avoids deadlocks.
-    stdx::unique_lock<Latch> jlk(_journalListenerMutex, stdx::defer_lock);
+    auto journalListener = [&]() -> JournalListener* {
+        // The JournalListener may not be set immediately, so we must check under a mutex so as not
+        // to access the variable while setting a JournalListener. A JournalListener is only allowed
+        // to be set once, so using the pointer outside of a mutex is safe.
+        stdx::unique_lock<Latch> lk(_journalListenerMutex);
+        return _journalListener;
+    }();
     boost::optional<JournalListener::Token> token;
-    if (useListener == UseJournalListener::kUpdate) {
-        token = _journalListener->getToken(opCtx, jlk);
+    if (journalListener && useListener == UseJournalListener::kUpdate) {
+        token = _journalListener->getToken(opCtx);
     }
 
     // Initialize on first use.
@@ -525,6 +539,11 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
 void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
     stdx::unique_lock<Latch> lk(_journalListenerMutex);
+
+    // A JournalListener can only be set once. Otherwise, accessing a copy of the _journalListener
+    // pointer without a mutex would be unsafe.
+    invariant(!_journalListener);
+
     _journalListener = jl;
 }
 
