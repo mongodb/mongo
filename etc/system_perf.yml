@@ -90,7 +90,7 @@ functions:
           fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
-          if [ "${is_patch|}" = "true" ]; then
+          if [ "${is_patch|false}" = "true" ]; then
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
@@ -319,7 +319,7 @@ functions:
       params:
         working_dir: work
         script: |
-          is_patch=${is_patch}
+          is_patch=${is_patch|false}
           task_id=${task_id}
           perf_jira_user=${perf_jira_user}
           perf_jira_pw=${perf_jira_pw}
