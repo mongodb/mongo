@@ -115,5 +115,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
 
-    ]
+    ],
+    # We don't want the shim_allocator hack to apply to this library, since
+    # otherwise we would create a loop.
+    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
 )
