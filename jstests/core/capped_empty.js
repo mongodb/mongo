@@ -3,6 +3,7 @@
 //   requires_fastcount,
 //   requires_non_retryable_commands,
 //   uses_testing_only_commands,
+//   requires_emptycapped,
 // ]
 
 t = db.capped_empty;
