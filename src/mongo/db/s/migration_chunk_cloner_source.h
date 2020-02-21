@@ -79,6 +79,9 @@ public:
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber) = 0;
 
+    // TODO (SERVER-44787): Remove this function after 4.4 is released.
+    virtual Status startClone(OperationContext* opCtx) = 0;
+
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate
      * for the donor shard to enter critical section.

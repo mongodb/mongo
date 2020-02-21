@@ -270,7 +270,6 @@ private:
     BSONObj _recipientCloneCounts;
 
     boost::optional<CollectionCriticalSection> _critSec;
-    LogicalSessionId _lsid;
 
     // Optional future that is populated if the migration succeeds and range deletion is scheduled
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was

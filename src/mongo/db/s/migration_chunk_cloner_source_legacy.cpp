@@ -44,7 +44,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
@@ -283,36 +282,90 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
     // Tell the recipient shard to start cloning
     BSONObjBuilder cmdBuilder;
 
-    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
-    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !disableResumableRangeDeleter.load()) {
-        StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
-                                                _args.getNss(),
-                                                migrationId,
-                                                lsid,
-                                                txnNumber,
-                                                _sessionId,
-                                                _donorConnStr,
-                                                _args.getFromShardId(),
-                                                _args.getToShardId(),
-                                                _args.getMinKey(),
-                                                _args.getMaxKey(),
-                                                _shardKeyPattern.toBSON(),
-                                                _args.getSecondaryThrottle());
-    } else {
-        // TODO (SERVER-44787): Remove this overload after 4.4 is released AND
-        // disableResumableRangeDeleter has been removed from server parameters.
-        StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
-                                                _args.getNss(),
-                                                _sessionId,
-                                                _donorConnStr,
-                                                _args.getFromShardId(),
-                                                _args.getToShardId(),
-                                                _args.getMinKey(),
-                                                _args.getMaxKey(),
-                                                _shardKeyPattern.toBSON(),
-                                                _args.getSecondaryThrottle());
+    StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
+                                            _args.getNss(),
+                                            migrationId,
+                                            lsid,
+                                            txnNumber,
+                                            _sessionId,
+                                            _donorConnStr,
+                                            _args.getFromShardId(),
+                                            _args.getToShardId(),
+                                            _args.getMinKey(),
+                                            _args.getMaxKey(),
+                                            _shardKeyPattern.toBSON(),
+                                            _args.getSecondaryThrottle());
+
+    auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
+    if (!startChunkCloneResponseStatus.isOK()) {
+        return startChunkCloneResponseStatus.getStatus();
     }
+
+    // TODO (Kal): Setting the state to kCloning below means that if cancelClone was called we will
+    // send a cancellation command to the recipient. The reason to limit the cases when we send
+    // cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
+    // between cancellations for different migration sessions. It is thus possible that a second
+    // migration from different donor, but the same recipient would certainly abort an already
+    // running migration.
+    stdx::lock_guard<Latch> sl(_mutex);
+    _state = kCloning;
+
+    return Status::OK();
+}
+
+// TODO (SERVER-44787): Remove this overload after 4.4 is released AND
+// disableResumableRangeDeleter has been removed from server parameters.
+Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
+    invariant(_state == kNew);
+    invariant(!opCtx->lockState()->isLocked());
+
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
+            opCtx,
+            _args.getNss(),
+            ChunkRange(_args.getMinKey(), _args.getMaxKey()),
+            _shardKeyPattern.getKeyPattern());
+
+        // Prime up the session migration source if there are oplog entries to migrate.
+        _sessionCatalogSource->fetchNextOplog(opCtx);
+    }
+
+    {
+        // Ignore prepare conflicts when we load ids of currently available documents. This is
+        // acceptable because we will track changes made by prepared transactions at transaction
+        // commit time.
+        auto originalPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+
+        ON_BLOCK_EXIT([&] {
+            opCtx->recoveryUnit()->setPrepareConflictBehavior(originalPrepareConflictBehavior);
+        });
+
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
+
+        auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
+        if (storeCurrentLocsStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
+            stdx::lock_guard<Latch> sl(_mutex);
+            _jumboChunkCloneState.emplace();
+        } else if (!storeCurrentLocsStatus.isOK()) {
+            return storeCurrentLocsStatus;
+        }
+    }
+
+    // Tell the recipient shard to start cloning
+    BSONObjBuilder cmdBuilder;
+
+    StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
+                                            _args.getNss(),
+                                            _sessionId,
+                                            _donorConnStr,
+                                            _args.getFromShardId(),
+                                            _args.getToShardId(),
+                                            _args.getMinKey(),
+                                            _args.getMaxKey(),
+                                            _shardKeyPattern.toBSON(),
+                                            _args.getSecondaryThrottle());
 
     auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
     if (!startChunkCloneResponseStatus.isOK()) {

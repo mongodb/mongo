@@ -611,7 +611,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
 void advanceTransactionOnRecipient(OperationContext* opCtx,
                                    const ShardId& recipientId,
                                    const LogicalSessionId& lsid,
-                                   TxnNumber txnNumber) {
+                                   TxnNumber currentTxnNumber) {
     write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
     auto queryFilter = BSON("_id"
                             << "migrationCoordinatorStats");
@@ -622,9 +622,9 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     updateEntry.setUpsert(true);
     updateOp.setUpdates({updateEntry});
 
-    auto passthroughFields =
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority << "lsid"
-                                                     << lsid.toBSON() << "txnNumber" << txnNumber);
+    auto passthroughFields = BSON(WriteConcernOptions::kWriteConcernField
+                                  << WriteConcernOptions::Majority << "lsid" << lsid.toBSON()
+                                  << "txnNumber" << currentTxnNumber + 1);
     sendToRecipient(opCtx, recipientId, updateOp, passthroughFields);
 }
 
@@ -770,16 +770,7 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
                 LOGV2(22039, "Recovering migration {doc}", "doc"_attr = doc.toBSON());
 
                 // Create a MigrationCoordinator to complete the coordination.
-                MigrationCoordinator coordinator(doc.getId(),
-                                                 doc.getMigrationSessionId(),
-                                                 doc.getLsid(),
-                                                 doc.getDonorShardId(),
-                                                 doc.getRecipientShardId(),
-                                                 doc.getNss(),
-                                                 doc.getCollectionUuid(),
-                                                 doc.getRange(),
-                                                 doc.getPreMigrationChunkVersion(),
-                                                 false /* waitForDelete */);
+                MigrationCoordinator coordinator(doc);
 
                 if (doc.getDecision()) {
                     // The decision is already known.

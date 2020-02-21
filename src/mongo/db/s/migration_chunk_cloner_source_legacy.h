@@ -95,6 +95,9 @@ public:
                       const LogicalSessionId& lsid,
                       TxnNumber txnNumber) override;
 
+    // TODO (SERVER-44787): Remove this function after 4.4 is released.
+    Status startClone(OperationContext* opCtx) override;
+
     Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                   Milliseconds maxTimeToWait) override;
 

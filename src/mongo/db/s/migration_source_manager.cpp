@@ -262,9 +262,6 @@ Status MigrationSourceManager::startClone() {
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
     auto replEnabled = replCoord->isReplEnabled();
 
-    UUID migrationId = UUID::gen();
-    _lsid = makeLogicalSessionId(_opCtx);
-
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch();
 
@@ -298,9 +295,7 @@ Status MigrationSourceManager::startClone() {
 
         if (_enableResumableRangeDeleter) {
             _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
-                migrationId,
                 _cloneDriver->getSessionId(),
-                _lsid,
                 _args.getFromShardId(),
                 _args.getToShardId(),
                 getNss(),
@@ -324,11 +319,19 @@ Status MigrationSourceManager::startClone() {
 
     if (_enableResumableRangeDeleter) {
         _coordinator->startMigration(_opCtx);
-    }
 
-    Status startCloneStatus = _cloneDriver->startClone(_opCtx, migrationId, _lsid, TxnNumber{0});
-    if (!startCloneStatus.isOK()) {
-        return startCloneStatus;
+        Status startCloneStatus = _cloneDriver->startClone(_opCtx,
+                                                           _coordinator->getMigrationId(),
+                                                           _coordinator->getLsid(),
+                                                           _coordinator->getTxnNumber());
+        if (!startCloneStatus.isOK()) {
+            return startCloneStatus;
+        }
+    } else {
+        Status startCloneStatus = _cloneDriver->startClone(_opCtx);
+        if (!startCloneStatus.isOK()) {
+            return startCloneStatus;
+        }
     }
 
     scopedGuard.dismiss();
@@ -765,6 +768,7 @@ void MigrationSourceManager::_cleanup() {
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
             _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
+            _coordinator.reset();
         }
     }
 

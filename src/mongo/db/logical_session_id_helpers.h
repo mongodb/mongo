@@ -56,6 +56,7 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof = {});
 LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
+LogicalSessionId makeSystemLogicalSessionId();
 
 /**
  * Factory functions to make logical session records. The overloads that

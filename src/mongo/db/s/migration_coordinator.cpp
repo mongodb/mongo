@@ -33,9 +33,11 @@
 
 #include "mongo/db/s/migration_coordinator.h"
 
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -49,11 +51,23 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSendingAbortDecision);
 MONGO_FAIL_POINT_DEFINE(hangBeforeForgettingMigrationAfterCommitDecision);
 MONGO_FAIL_POINT_DEFINE(hangBeforeForgettingMigrationAfterAbortDecision);
 
+namespace {
+
+LogicalSessionId getSystemLogicalSessionId() {
+    static auto lsid = makeSystemLogicalSessionId();
+    return lsid;
+}
+
+TxnNumber getNextTxnNumber() {
+    static AtomicWord<TxnNumber> nextTxnNumber{0};
+    return nextTxnNumber.fetchAndAdd(2);
+}
+
+}  // namespace
+
 namespace migrationutil {
 
-MigrationCoordinator::MigrationCoordinator(UUID migrationId,
-                                           MigrationSessionId sessionId,
-                                           LogicalSessionId lsid,
+MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
                                            ShardId donorShard,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
@@ -61,9 +75,10 @@ MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            ChunkRange range,
                                            ChunkVersion preMigrationChunkVersion,
                                            bool waitForDelete)
-    : _migrationInfo(migrationId,
+    : _migrationInfo(UUID::gen(),
                      std::move(sessionId),
-                     std::move(lsid),
+                     getSystemLogicalSessionId(),
+                     getNextTxnNumber(),
                      std::move(collectionNamespace),
                      collectionUuid,
                      std::move(donorShard),
@@ -72,7 +87,22 @@ MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                      std::move(preMigrationChunkVersion)),
       _waitForDelete(waitForDelete) {}
 
+MigrationCoordinator::MigrationCoordinator(const MigrationCoordinatorDocument& doc)
+    : _migrationInfo(doc) {}
+
 MigrationCoordinator::~MigrationCoordinator() = default;
+
+const UUID& MigrationCoordinator::getMigrationId() const {
+    return _migrationInfo.getId();
+}
+
+const LogicalSessionId& MigrationCoordinator::getLsid() const {
+    return _migrationInfo.getLsid();
+}
+
+TxnNumber MigrationCoordinator::getTxnNumber() const {
+    return _migrationInfo.getTxnNumber();
+}
 
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     LOGV2(
@@ -154,9 +184,11 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
           "logPrefix"_attr = _logPrefix(),
           "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
           "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
-          "TxnNumber_1"_attr = TxnNumber{1});
-    migrationutil::advanceTransactionOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
+          "TxnNumber"_attr = _migrationInfo.getTxnNumber());
+    migrationutil::advanceTransactionOnRecipient(opCtx,
+                                                 _migrationInfo.getRecipientShardId(),
+                                                 _migrationInfo.getLsid(),
+                                                 _migrationInfo.getTxnNumber());
 
     hangBeforeSendingCommitDecision.pauseWhileSet();
 
@@ -197,9 +229,11 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
           "logPrefix"_attr = _logPrefix(),
           "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
           "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
-          "TxnNumber_1"_attr = TxnNumber{1});
-    migrationutil::advanceTransactionOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getLsid(), TxnNumber{1});
+          "TxnNumber"_attr = _migrationInfo.getTxnNumber());
+    migrationutil::advanceTransactionOnRecipient(opCtx,
+                                                 _migrationInfo.getRecipientShardId(),
+                                                 _migrationInfo.getLsid(),
+                                                 _migrationInfo.getTxnNumber());
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
 

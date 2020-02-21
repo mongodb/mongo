@@ -75,6 +75,9 @@ structs:
             lsid:
                 type: LogicalSessionId
                 description: "The sessionId to use to communicate with the recipient"
+            txnNumber:
+                type: TxnNumber
+                description: "The last txnNumber used to communicate with the recipient"
             nss:
                 type: namespacestring
                 description: "The namespace of the collection that the chunk belongs to."

@@ -45,9 +45,7 @@ class MigrationCoordinator {
 public:
     enum class Decision { kAborted, kCommitted };
 
-    MigrationCoordinator(UUID migrationId,
-                         MigrationSessionId sessionId,
-                         LogicalSessionId lsid,
+    MigrationCoordinator(MigrationSessionId sessionId,
                          ShardId donorShard,
                          ShardId recipientShard,
                          NamespaceString collectionNamespace,
@@ -55,12 +53,17 @@ public:
                          ChunkRange range,
                          ChunkVersion preMigrationChunkVersion,
                          bool waitForDelete);
+    MigrationCoordinator(const MigrationCoordinatorDocument& doc);
     MigrationCoordinator(const MigrationCoordinator&) = delete;
     MigrationCoordinator& operator=(const MigrationCoordinator&) = delete;
     MigrationCoordinator(MigrationCoordinator&&) = delete;
     MigrationCoordinator& operator=(MigrationCoordinator&&) = delete;
 
     ~MigrationCoordinator();
+
+    const UUID& getMigrationId() const;
+    const LogicalSessionId& getLsid() const;
+    TxnNumber getTxnNumber() const;
 
     /**
      * Initializes persistent state required to ensure that orphaned ranges are properly handled,

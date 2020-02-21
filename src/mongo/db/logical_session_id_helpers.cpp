@@ -113,6 +113,15 @@ LogicalSessionId makeLogicalSessionId(OperationContext* opCtx) {
     return id;
 }
 
+LogicalSessionId makeSystemLogicalSessionId() {
+    LogicalSessionId id{};
+
+    id.setId(UUID::gen());
+    id.setUid(internalSecurity.user->getDigest());
+
+    return id;
+}
+
 LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t lastUse) {
     LogicalSessionId id{};
     LogicalSessionRecord lsr{};
