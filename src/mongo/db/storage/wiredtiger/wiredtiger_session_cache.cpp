@@ -247,6 +247,13 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
+        // Update the JournalListener before we return. As far as listeners are concerned, all
+        // writes are as 'durable' as they are ever going to get on an inMemory storage engine.
+        stdx::unique_lock<Latch> lk(_journalListenerMutex, stdx::defer_lock);
+        if (useListener == UseJournalListener::kUpdate) {
+            auto token = _journalListener->getToken(opCtx, lk);
+            _journalListener->onDurable(token);
+        }
         return;
     }
 
