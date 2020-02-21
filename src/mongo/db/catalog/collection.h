@@ -477,6 +477,16 @@ public:
 
     virtual void init(OperationContext* opCtx) {}
 
+    virtual bool isCommitted() const {
+        return true;
+    }
+
+    /**
+     * Update the visibility of this collection in the Collection Catalog. Updates to this value
+     * are not idempotent, as successive updates with the same `val` should not occur.
+     */
+    virtual void setCommitted(bool val) {}
+
     virtual bool isInitialized() const {
         return false;
     }

@@ -703,6 +703,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                               std::move(catalogIdRecordStorePair.second));
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
+    ownedCollection->setCommitted(false);
     UncommittedCollections::addToTxn(opCtx, std::move(ownedCollection), createTime);
     openCreateCollectionWindowFp.executeIf([&](const BSONObj& data) { sleepsecs(3); },
                                            [&](const BSONObj& data) {

@@ -170,7 +170,8 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
         // index was dropped (and we would not get here).
-        invariant(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it));
+        invariant(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it),
+                  coll->uuid().toString());
 
         _indexUsageTracker.recordIndexAccess(*it);
     }

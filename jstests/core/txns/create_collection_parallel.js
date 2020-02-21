@@ -61,10 +61,8 @@ function runParallelCollectionCreateTest(explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    /* TODO(SERVER-46285) Re-enable below test.
-    jsTest.log(
-        "Testing createCollection conflict during commit, where the conflict rolls back a previously
-    committed collection.");
+    jsTest.log("Testing createCollection conflict during commit, where the conflict rolls back a " +
+               "previously committed collection.");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
     createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate);
@@ -82,7 +80,6 @@ function runParallelCollectionCreateTest(explicitCreate) {
 
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
-    */
 
     jsTest.log("Testing distinct createCollections in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1

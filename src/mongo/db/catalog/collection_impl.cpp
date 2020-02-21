@@ -320,6 +320,15 @@ bool CollectionImpl::isInitialized() const {
     return _initialized;
 }
 
+bool CollectionImpl::isCommitted() const {
+    return _committed;
+}
+
+void CollectionImpl::setCommitted(bool val) {
+    invariant((!_committed && val) || (_committed && !val));
+    _committed = val;
+}
+
 bool CollectionImpl::requiresIdIndex() const {
     if (_ns.isOplog()) {
         // No indexes on the oplog.

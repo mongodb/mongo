@@ -72,6 +72,7 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
         [collListUnowned, uuid, createTime](OperationContext* opCtx) {
             UncommittedCollections::commit(opCtx, uuid, createTime, collListUnowned.lock().get());
         });
+
     opCtx->recoveryUnit()->onCommit(
         [collListUnowned, collPtr, createTime](boost::optional<Timestamp> commitTs) {
             // Verify that the collection was given a minVisibleTimestamp equal to the transactions
@@ -145,6 +146,9 @@ void UncommittedCollections::commit(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->onRollback([svcCtx, collListUnowned, uuid]() {
         UncommittedCollections::rollback(svcCtx, uuid, collListUnowned.lock().get());
+    });
+    opCtx->recoveryUnit()->onCommit([svcCtx, uuid](boost::optional<Timestamp> commitTs) {
+        CollectionCatalog::get(svcCtx).makeCollectionVisible(uuid);
     });
 }
 

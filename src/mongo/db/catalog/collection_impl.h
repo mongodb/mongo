@@ -354,6 +354,8 @@ public:
 
     void init(OperationContext* opCtx) final;
     bool isInitialized() const final;
+    bool isCommitted() const final;
+    void setCommitted(bool val) final;
 
 private:
     /**
@@ -378,6 +380,7 @@ private:
     NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
+    bool _committed = true;
 
     // The RecordStore may be null during a repair operation.
     std::unique_ptr<RecordStore> _recordStore;  // owned

@@ -143,6 +143,8 @@ public:
      */
     Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
 
+    void makeCollectionVisible(CollectionUUID uuid);
+
     /**
      * This function gets the Collection pointer that corresponds to the NamespaceString.
      * The required locks must be obtained prior to calling this function, or else the found
