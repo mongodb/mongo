@@ -1294,8 +1294,8 @@ truncate the oplog on the rollback node.
 During the last few steps of the data modification section, we clear the state of the
 `DropPendingCollectionReaper`, which manages collections that are marked as drop-pending by the Two
 Phase Drop algorithm, and make sure it aligns with what is currently on disk. After doing so, we can
-run through the oplog recovery process, which truncates the oplog after the `common point` (at the
-truncate point) and applies all oplog entries through the end of the sync source's oplog. See the
+run through the oplog recovery process, which truncates the oplog after the `common point` and
+applies all oplog entries through the end of the sync source's oplog. See the
 [Startup Recovery](#startup-recovery) section for more information on truncating the oplog and
 applying oplog entries.
 
@@ -1465,27 +1465,45 @@ recovers from a **stable checkpoint**, which is a durable view of the data at a 
 It should be noted that due to journaling, the oplog and many collections in the local database are
 an exception and are up-to-date at startup rather than reflecting the recovery timestamp.
 
-If a node went through an unclean shutdown, then it might have been in the middle of writing a batch
-of oplog entries to its oplog. Since this is done in parallel, it could mean that there are gaps in
-the oplog from entries in the batch that weren't written yet, called **oplog holes**. During startup,
-a node wouldn't be able to tell which oplog entries were successfully written into the oplog. To fix
-this, after getting the recovery timestamp, the node will truncate its oplog to a point that it can
-guarantee didn't have any oplog holes using the `oplogTruncateAfterPoint` document. This document is
-journaled and untimestamped so that it will reflect information more recent than the latest stable
-checkpoint even after a shutdown. During oplog application, before writing a batch of oplog entries
-to the oplog, the node will set the `oplogTruncateAfterPoint` to be the first entry in the batch. If
-the node shuts down before finishing writing the batch, then during startup recovery, the node will
-truncate the oplog to the point before the batch (meaning it will truncate inclusive of the
-`oplogTruncateAfterPoint`). If the node successfully finishes writing the batch to the oplog during
-oplog application, it will reset the `oplogTruncateAfterPoint` since there are no oplog holes and
-the oplog wouldn't need to be truncated if the node restarted.
+If a node went through an unclean shutdown, then it might have been in the middle of applying
+parallel writes. Each write is associated with an oplog entry. Primaries perform writes in parallel,
+and batch application applies oplog entries in parallel. Since these operations are done in
+parallel, they can cause temporary gaps in the oplog from entries that are not yet written, called
+**oplog holes**. A node can crash while there are still **oplog holes** on disk.
+
+During startup, a node will not be able to tell which oplog entries were successfully persisted in
+the oplog and which were uncommitted on disk and disappeared. A primary may be unknowingly missing
+oplog entries that the secondaries already replicated; or a secondary may lose oplog entries that it
+thought it had already replicated. This would make the recently crashed node inconsistent with the
+rest its replica set. To fix this, after getting the recovery timestamp, the node will truncate its
+oplog to a point that it can guarantee does not have any oplog holes using the
+[`oplogTruncateAfterPoint`](#replication-timestamp-glossary) document. This document is journaled
+and untimestamped so that it will reflect information more recent than the latest stable checkpoint
+even after a shutdown.
+
+The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during oplog batch
+application. Before writing a batch of oplog entries to the oplog, the node will set the
+`oplogTruncateAfterPoint` to the `lastApplied` timestamp. If the node shuts down before it finishes
+writing the batch, then during startup recovery the node will truncate the oplog back to the point
+saved before the batch application began. If the node successfully finishes writing the batch to the
+oplog, it will reset the `oplogTruncateAfterPoint` to null since there are no oplog holes and the
+oplog will not need to be truncated if the node restarts.
+
+The second scenario for setting the `oplogTruncateAfterPoint` is while primary. A primary allows
+secondaries to replicate one of its oplog entries as soon as there are no oplog holes in-memory
+behind the entry. However, secondaries do not have to wait for the oplog entry to make it to disk
+on the primary nor for there to be no holes behind it on disk on the primary. Therefore, some
+already replicated writes may disappear from the primary if the primary crashes. The primary will
+continually update the `oplogTruncateAfterPoint` in order to track and forward the no oplog holes
+point on disk, in case of an unclean shutdown. Then startup recovery can take care of any oplog
+inconsistency with the rest of the replica set.
 
 After truncating the oplog, the node will see if the recovery timestamp differs from the top of the
 newly truncated oplog. If it does, this means that there are oplog entries that must be applied to
 make the data consistent with the oplog. The node will apply all the operations starting at the
 recovery timestamp through the top of the oplog. The one exception is that it will not apply
 `prepareTransaction` oplog entries. Similar to how a node reconstructs prepared transactions during
-initial sync and rollback, the node will update the transactions table every time it see a
+initial sync and rollback, the node will update the transactions table every time it sees a
 `prepareTransaction` oplog entry. Once the node has finished applying all the oplog entries through
 the top of the oplog, it will [reconstruct](#recovering-prepared-transactions) all transactions
 still in the prepare state.
@@ -1580,13 +1598,20 @@ we update this optime, we also recalculate the `stable_timestamp`. Note that the
 most recent majority committed oplog entry. For more information about how the `lastCommittedOpTime`
 is updated and propagated, please see [Commit Point Propagation](#commit-point-propagation).
 
-**`lastDurable`**: Optime of the latest oplog entry that has been flushed to the journal. It is
-asynchronously updated by the storage engine as new writes become durable. Default journaling
-frequency is 100ms, so this could lag up to that amount behind lastApplied.
+**`lastDurable`**: Optime of either the latest oplog entry (non-primary) or the latest no oplog
+holes point (primary) that has been flushed to the journal. It is asynchronously updated by the
+storage engine as new writes become durable. Default journaling frequency is 100ms.
 
 **`oldest_timestamp`**: The earliest timestamp that the storage engine is guaranteed to have history
 for. New transactions can never start a timestamp earlier than this timestamp. Since we advance this
 as we advance the `stable_timestamp`, it will be less than or equal to the `stable_timestamp`.
+
+**`oplogTruncateAfterPoint`**: Tracks the latest no oplog holes point. On primaries, it is updated
+by the storage engine prior to flushing the journal to disk. During oplog batch application, it is
+set at the start of the batch and cleared at the end of batch application. Startup recovery will use
+the `oplogTruncateAfterPoint` to truncate the oplog back to an oplog point consistent with the rest
+of the replica set: other nodes may have replicated in-memory data that a crashed node no longer has
+and is unaware that it lacks.
 
 **`prepareTimestamp`**: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This
 is the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided
