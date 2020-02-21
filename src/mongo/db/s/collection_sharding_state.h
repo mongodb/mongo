@@ -104,8 +104,7 @@ public:
      * The returned object is safe to access even after the collection lock has been dropped.
      */
 
-    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
-                                                      bool isCollection) = 0;
+    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx) = 0;
 
     /**
      * See the comments for 'getOwnershipFilter' above for more information on this method.
@@ -128,13 +127,12 @@ public:
      * version of the collection and if not, throws StaleConfigException populated with the received
      * and wanted versions.
      */
-    virtual void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection) = 0;
+    virtual void checkShardVersionOrThrow(OperationContext* opCtx) = 0;
 
     /**
      * Similar to checkShardVersionOrThrow but returns a status instead of throwing.
      */
-    virtual Status checkShardVersionNoThrow(OperationContext* opCtx,
-                                            bool isCollection) noexcept = 0;
+    virtual Status checkShardVersionNoThrow(OperationContext* opCtx) noexcept = 0;
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called

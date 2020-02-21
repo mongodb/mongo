@@ -82,7 +82,7 @@ public:
                                const UUID& collectionUuid,
                                ChunkRange orphanRange);
 
-    ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx, bool isCollection) override;
+    ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx) override;
 
     ScopedCollectionMetadata getCurrentMetadata() override;
 
@@ -90,9 +90,9 @@ public:
 
     boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override;
 
-    void checkShardVersionOrThrow(OperationContext* opCtx, bool isCollection) override;
+    void checkShardVersionOrThrow(OperationContext* opCtx) override;
 
-    Status checkShardVersionNoThrow(OperationContext* opCtx, bool isCollection) noexcept override;
+    Status checkShardVersionNoThrow(OperationContext* opCtx) noexcept override;
 
     void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) override;
 
@@ -175,9 +175,7 @@ private:
      * operation context does not match the shard version on the active metadata object.
      */
     boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx,
-        const boost::optional<mongo::LogicalTime>& atClusterTime,
-        bool isCollection);
+        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

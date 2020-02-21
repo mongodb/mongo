@@ -204,12 +204,12 @@ private:
     repl::OpTime _opTimeAtLastOpStart;
 };
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns, bool isCollection) {
+void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while writing to " << ns.ns(),
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                 ->canAcceptWritesFor(opCtx, ns));
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx, isCollection);
+    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
@@ -230,8 +230,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
-        assertCanWrite_inlock(
-            opCtx, ns, CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns));
+        assertCanWrite_inlock(opCtx, ns);
         if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
                 opCtx,
                 ns)) {  // someone else may have beat us to it.
@@ -420,7 +419,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         }
 
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
-        assertCanWrite_inlock(opCtx, wholeOp.getNamespace(), collection->getCollection());
+        assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
@@ -667,7 +666,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
     }
 
-    assertCanWrite_inlock(opCtx, ns, collection->getCollection());
+    assertCanWrite_inlock(opCtx, ns);
 
     auto exec = uassertStatusOK(getExecutorUpdate(opCtx,
                                                   &curOp.debug(),
@@ -906,7 +905,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
     }
 
-    assertCanWrite_inlock(opCtx, ns, collection.getCollection());
+    assertCanWrite_inlock(opCtx, ns);
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");

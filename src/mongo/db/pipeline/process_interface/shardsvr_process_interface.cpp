@@ -176,9 +176,8 @@ unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::attachCursorS
 
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    const bool aggNsIsCollection = expCtx->uuid != boost::none;
-    auto collectionFilter = CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
-                                ->getOwnershipFilter(expCtx->opCtx, aggNsIsCollection);
+    auto collectionFilter =
+        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)->getOwnershipFilter(expCtx->opCtx);
     return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
 }
 

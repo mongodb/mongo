@@ -51,7 +51,7 @@ const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
 class CollectionShardingStateStandalone final : public CollectionShardingState {
 public:
-    ScopedCollectionFilter getOwnershipFilter(OperationContext*, bool) override {
+    ScopedCollectionFilter getOwnershipFilter(OperationContext*) override {
         return {kUnshardedCollection};
     }
     ScopedCollectionMetadata getCurrentMetadata() override {
@@ -63,8 +63,8 @@ public:
     boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() noexcept override {
         return boost::none;
     }
-    void checkShardVersionOrThrow(OperationContext*, bool) noexcept override {}
-    Status checkShardVersionNoThrow(OperationContext*, bool) noexcept override {
+    void checkShardVersionOrThrow(OperationContext*) noexcept override {}
+    Status checkShardVersionNoThrow(OperationContext*) noexcept override {
         return Status::OK();
     }
     void enterCriticalSectionCatchUpPhase(OperationContext*) noexcept override {}

@@ -375,7 +375,7 @@ void checkDatabaseShardingState(OperationContext* opCtx, StringData dbName) {
  * Checks collection sharding state. Throws exception on error.
  */
 void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString& ns) {
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx, true);
+    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 }
 
 /**

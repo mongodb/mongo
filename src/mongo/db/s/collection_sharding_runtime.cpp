@@ -122,10 +122,9 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
-ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationContext* opCtx,
-                                                                     bool isCollection) {
+ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationContext* opCtx) {
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime, isCollection);
+    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
 
     if (!optMetadata)
         return {kUnshardedCollection};
@@ -158,15 +157,13 @@ boost::optional<ChunkVersion> CollectionShardingRuntime::getCurrentShardVersionI
     MONGO_UNREACHABLE;
 }
 
-void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx,
-                                                         bool isCollection) {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, isCollection);
+void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) {
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
-Status CollectionShardingRuntime::checkShardVersionNoThrow(OperationContext* opCtx,
-                                                           bool isCollection) noexcept {
+Status CollectionShardingRuntime::checkShardVersionNoThrow(OperationContext* opCtx) noexcept {
     try {
-        checkShardVersionOrThrow(opCtx, isCollection);
+        checkShardVersionOrThrow(opCtx);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -321,9 +318,7 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getCurrent
 }
 
 boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
-    OperationContext* opCtx,
-    const boost::optional<mongo::LogicalTime>& atClusterTime,
-    bool isCollection) {
+    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion) {
         return boost::none;

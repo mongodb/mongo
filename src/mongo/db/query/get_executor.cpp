@@ -400,7 +400,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             root = std::make_unique<ShardFilterStage>(
                 opCtx,
                 CollectionShardingState::get(opCtx, canonicalQuery->nss())
-                    ->getOwnershipFilter(opCtx, collection),
+                    ->getOwnershipFilter(opCtx),
                 ws,
                 std::move(root));
         }

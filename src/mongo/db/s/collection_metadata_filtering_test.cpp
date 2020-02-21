@@ -139,7 +139,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext()));
     }
 
     {
@@ -176,7 +176,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext()));
     }
 
     {
@@ -221,7 +221,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFilterFn(css->getOwnershipFilter(operationContext(), true /* isCollection */));
+        testFilterFn(css->getOwnershipFilter(operationContext()));
     }
 
     {

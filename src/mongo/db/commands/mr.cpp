@@ -1429,8 +1429,7 @@ bool runMapReduce(OperationContext* opCtx,
 
     const auto collectionFilter = [&] {
         AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-        return CollectionShardingState::get(opCtx, config.nss)
-            ->getOwnershipFilter(opCtx, autoColl.getCollection());
+        return CollectionShardingState::get(opCtx, config.nss)->getOwnershipFilter(opCtx);
     }();
 
     bool shouldHaveData = false;
