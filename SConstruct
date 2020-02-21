@@ -3792,44 +3792,41 @@ env.Tool('icecream')
 if get_option('ninja') != 'disabled':
     if get_option('ninja') == 'stable':
         ninja_builder = Tool("ninja")
+        ninja_builder.generate(env)
+
+        # Explicitly add all generated sources to the DAG so NinjaBuilder can
+        # generate rules for them. SCons if the files don't exist will not wire up
+        # the dependencies in the DAG because it cannot scan them. The Ninja builder
+        # does not care about the actual edge here as all generated sources will be
+        # pushed to the "bottom" of it's DAG via the order_only dependency on
+        # _generated_sources (an internal phony target)
+        if get_option('install-mode') == 'hygienic':
+            env.Alias("install-common-base", env.Alias("generated-sources"))
+        else:
+            env.Alias("all", env.Alias("generated-sources"))
+            env.Alias("core", env.Alias("generated-sources"))
+
+        if get_option("install-mode") == "hygienic":
+            ninja_build = env.Ninja(
+                target="build.ninja",
+                source=[
+                    env.Alias("install-all-meta"),
+                    env.Alias("test-execution-aliases"),
+                ],
+            )
+        else:
+            ninja_build = env.Ninja(
+                target="build.ninja",
+                source=[
+                    env.Alias("all"),
+                    env.Alias("test-execution-aliases"),
+                ],
+            )
+
+        env.Alias("generate-ninja", ninja_build)
     else:
         ninja_builder = Tool("ninja_next")
-    ninja_builder.generate(env)
-
-    # Explicitly add all generated sources to the DAG so NinjaBuilder can
-    # generate rules for them. SCons if the files don't exist will not wire up
-    # the dependencies in the DAG because it cannot scan them. The Ninja builder
-    # does not care about the actual edge here as all generated sources will be
-    # pushed to the "bottom" of it's DAG via the order_only dependency on
-    # _generated_sources (an internal phony target)
-    if get_option('install-mode') == 'hygienic':
-        env.Alias("install-common-base", env.Alias("generated-sources"))
-    else:
-        env.Alias("all", env.Alias("generated-sources"))
-        env.Alias("core", env.Alias("generated-sources"))
-
-    ninja_suffix = env.get("NINJA_SUFFIX", "")
-    if ninja_suffix and ninja_suffix[0] != ".":
-        env["NINJA_SUFFIX"] = "." + ninja_suffix
-
-    if get_option("install-mode") == "hygienic":
-        ninja_build = env.Ninja(
-            target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
-            source=[
-                env.Alias("install-all-meta"),
-                env.Alias("test-execution-aliases"),
-            ],
-        )
-    else:
-        ninja_build = env.Ninja(
-            target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
-            source=[
-                env.Alias("all"),
-                env.Alias("test-execution-aliases"),
-            ],
-        )
-
-    env.Alias("generate-ninja", ninja_build)
+        ninja_builder.generate(env)
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4329,17 +4326,18 @@ if get_option("ninja") == "disabled":
 
 # TODO: maybe make these work like the other archive- hygienic aliases
 # even though they aren't piped through AIB?
-distSrc = env.DistSrc("distsrc.tar")
+distSrc = env.DistSrc("distsrc.tar", NINJA_SKIP=True)
 env.NoCache(distSrc)
 env.Alias("distsrc-tar", distSrc)
 
 distSrcGzip = env.GZip(
     target="distsrc.tgz",
-    source=[distSrc])
+    source=[distSrc],
+    NINJA_SKIP=True)
 env.NoCache(distSrcGzip)
 env.Alias("distsrc-tgz", distSrcGzip)
 
-distSrcZip = env.DistSrc("distsrc.zip")
+distSrcZip = env.DistSrc("distsrc.zip", NINJA_SKIP=True)
 env.NoCache(distSrcZip)
 env.Alias("distsrc-zip", distSrcZip)
 

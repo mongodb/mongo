@@ -837,7 +837,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
     def get_response_file_command(env, node, action, targets, sources, executor=None):
         if hasattr(action, "process"):
             cmd_list, _, _ = action.process(targets, sources, env, executor=executor)
-            cmd_list = [str(c) for c in cmd_list[0]]
+            cmd_list = [str(c).replace("$", "$$") for c in cmd_list[0]]
         else:
             command = generate_command(
                 env, node, action, targets, sources, executor=executor
@@ -862,11 +862,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
             )
 
         cmd, rsp_content = cmd_list[:tool_idx], cmd_list[tool_idx:]
-
-        # Some commands may have a need to pass a literal $ to a tool
-        # like ld (think $ORIGIN). We need to protect that $ from
-        # Ninja by using $$.
-        rsp_content = " ".join(rsp_content).replace('$', '$$')
+        rsp_content = " ".join(rsp_content)
 
         variables = {"rspc": rsp_content}
         variables[rule] = cmd

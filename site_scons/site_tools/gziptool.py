@@ -32,8 +32,8 @@ def generate(env, **kwargs):
         "GZIPTOOL_COMSTR", "Compressing $TARGET with gzip"
     )
 
-    def GZipTool(env, target, source):
-        result = env.__GZIPTOOL(target=target, source=source)
+    def GZipTool(env, target, source, **kwargs):
+        result = env.__GZIPTOOL(target=target, source=source, **kwargs)
         env.AlwaysBuild(result)
         return result
 

@@ -198,8 +198,8 @@ def generate(env, **kwargs):
         generator=distsrc_action_generator,
     )
 
-    def DistSrc(env, target):
-        result = env.__DISTSRC(target=target, source=[])
+    def DistSrc(env, target, **kwargs):
+        result = env.__DISTSRC(target=target, source=[], **kwargs)
         env.AlwaysBuild(result)
         env.NoCache(result)
         return result

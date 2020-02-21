@@ -3924,7 +3924,7 @@ tasks:
     - func: "scons compile"
       vars:
         task_compile_flags: >-
-          --ninja
+          --ninja=next
         targets:
           build.ninja
     - command: shell.exec
