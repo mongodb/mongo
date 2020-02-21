@@ -13,8 +13,8 @@
 
     const st = new ShardingTest({
         mongos: 2,
-        rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
-        rs1: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
+        rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0}}]},
+        rs1: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0}}]},
         verbose: 2
     });
 
