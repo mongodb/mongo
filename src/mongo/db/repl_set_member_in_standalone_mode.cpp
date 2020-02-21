@@ -35,17 +35,24 @@
 namespace mongo {
 namespace {
 
-const auto& replSetMemberInStandaloneMode = ServiceContext::declareDecoration<bool>();
+// The boost::optional<bool> decoration will be initialized to boost::none.
+const auto& replSetMemberInStandaloneMode =
+    ServiceContext::declareDecoration<boost::optional<bool>>();
 
 }  // namespace
 
 bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx) {
-    return replSetMemberInStandaloneMode(serviceCtx);
+    auto& replSetMemberInStandaloneModeBool = replSetMemberInStandaloneMode(serviceCtx);
+    invariant(replSetMemberInStandaloneModeBool);
+
+    return replSetMemberInStandaloneModeBool.get();
 }
 
 void setReplSetMemberInStandaloneMode(ServiceContext* serviceCtx,
                                       bool isReplSetMemberInStandaloneMode) {
     auto& replSetMemberInStandaloneModeBool = replSetMemberInStandaloneMode(serviceCtx);
+    invariant(!replSetMemberInStandaloneModeBool);
+
     replSetMemberInStandaloneModeBool = isReplSetMemberInStandaloneMode;
 }
 
