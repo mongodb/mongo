@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -59,6 +63,33 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
     return RWConcernDefault::parse(
         IDLParserErrorContext("ReadWriteConcernDefaultsCacheLookupMongoD"),
         getPersistedDefaultRWConcernDocument(opCtx));
+}
+
+void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        DBDirectClient client(opCtx);
+        const auto numPersistedDocuments =
+            client.count(NamespaceString::kConfigSettingsNamespace,
+                         BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
+        if (numPersistedDocuments != 0) {
+            LOGV2_OPTIONS(4615612, {logv2::LogTag::kStartupWarnings}, "");
+            LOGV2_OPTIONS(4615613,
+                          {logv2::LogTag::kStartupWarnings},
+                          "** WARNING: This node is running as a shard server, but persisted "
+                          "Read/Write Concern (RWC) defaults");
+            LOGV2_OPTIONS(4615614,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          are present in {configSettingsNamespace}. This node was "
+                          "likely previously in an unsharded",
+                          "configSettingsNamespace"_attr =
+                              NamespaceString::kConfigSettingsNamespace);
+            LOGV2_OPTIONS(4615615,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          replica set or a config server. The RWC defaults on this "
+                          "node will not be used.");
+            LOGV2_OPTIONS(4615616, {logv2::LogTag::kStartupWarnings}, "");
+        }
+    }
 }
 
 }  // namespace mongo

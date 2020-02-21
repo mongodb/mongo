@@ -570,6 +570,7 @@ ExitCode _initAndListen(int listenPort) {
             "Failed to load read and write concern defaults at startup{causedBy_ex_toStatus}",
             "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
     }
+    readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get());
 
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
