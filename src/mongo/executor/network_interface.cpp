@@ -39,7 +39,8 @@ NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}
 
 MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsAfterAcquireConn);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceHangCommandsAfterAcquireConn);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceAfterAcquireConn);
 
 }  // namespace executor
 }  // namespace mongo

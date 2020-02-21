@@ -238,7 +238,7 @@ TEST_F(NetworkInterfaceTest, CancelOperation) {
 
     auto deferred = [&] {
         // Kick off our operation
-        FailPointEnableBlock fpb("networkInterfaceDiscardCommandsAfterAcquireConn");
+        FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
 
         auto deferred = runCommand(cbh, makeTestCommand(kMaxWait));
 
@@ -260,32 +260,41 @@ TEST_F(NetworkInterfaceTest, CancelOperation) {
 }
 
 TEST_F(NetworkInterfaceTest, CancelRemotely) {
-    auto runCommandAssertStatusOK = [this](BSONObj cmdObj) {
-        auto request = makeTestCommand(RemoteCommandRequest::kNoTimeout, cmdObj);
-        auto result = runCommandSync(request);
-        ASSERT_OK(result.status);
-    };
-
     // Enable blockConnection for "echo".
-    runCommandAssertStatusOK(BSON("configureFailPoint"
-                                  << "failCommand"
-                                  << "mode"
-                                  << "alwaysOn"
-                                  << "data"
-                                  << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
-                                                            << "failCommands"
-                                                            << BSON_ARRAY("echo"))));
+    assertCommandOK("admin",
+                    BSON("configureFailPoint"
+                         << "failCommand"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data"
+                         << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
+                                                   << "failCommands" << BSON_ARRAY("echo"))),
+                    RemoteCommandRequest::kNoTimeout);
+
+    ON_BLOCK_EXIT([&] {
+        // Disable blockConnection.
+        assertCommandOK("admin",
+                        BSON("configureFailPoint"
+                             << "failCommand"
+                             << "mode"
+                             << "off"),
+                        RemoteCommandRequest::kNoTimeout);
+    });
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
+        FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
+
         auto cmdObj = BSON("echo" << 1 << "foo"
                                   << "bar");
         auto deferred = runCommand(
             cbh,
             makeTestCommand(
                 boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+
+        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
         // Run cancelCommand to kill the above operation.
         net().cancelCommand(cbh);
@@ -301,41 +310,45 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
     // We have one canceled operation (echo) and two succeeded operations (configureFailPoint
     // and _killOperations).
     assertNumOps(1u, 0u, 0u, 2u);
-
-    // Disable blockConnection.
-    runCommandAssertStatusOK(BSON("configureFailPoint"
-                                  << "failCommand"
-                                  << "mode"
-                                  << "off"));
 }
 
 TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
-    auto runCommandAssertStatusOK = [this](BSONObj cmdObj) {
-        auto request = makeTestCommand(RemoteCommandRequest::kNoTimeout, cmdObj);
-        auto result = runCommandSync(request);
-        ASSERT_OK(result.status);
-    };
-
     // Enable blockConnection for "echo" and "_killOperations".
-    runCommandAssertStatusOK(BSON("configureFailPoint"
-                                  << "failCommand"
-                                  << "mode"
-                                  << "alwaysOn"
-                                  << "data"
-                                  << BSON("blockConnection" << true << "blockTimeMS" << 5000
-                                                            << "failCommands"
-                                                            << BSON_ARRAY("echo"
-                                                                          << "_killOperations"))));
+    assertCommandOK("admin",
+                    BSON("configureFailPoint"
+                         << "failCommand"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data"
+                         << BSON("blockConnection" << true << "blockTimeMS" << 5000
+                                                   << "failCommands"
+                                                   << BSON_ARRAY("echo"
+                                                                 << "_killOperations"))),
+                    RemoteCommandRequest::kNoTimeout);
+
+    ON_BLOCK_EXIT([&] {
+        // Disable blockConnection.
+        assertCommandOK("admin",
+                        BSON("configureFailPoint"
+                             << "failCommand"
+                             << "mode"
+                             << "off"),
+                        RemoteCommandRequest::kNoTimeout);
+    });
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         // Kick off a blocking "echo" operation.
+        FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
+
         auto cmdObj = BSON("echo" << 1 << "foo"
                                   << "bar");
         auto deferred = runCommand(
             cbh,
             makeTestCommand(
                 boost::none, cmdObj, nullptr /* opCtx */, RemoteCommandRequest::HedgeOptions()));
+
+        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
         // Run cancelCommand to kill the above operation. _killOperations is expected to block and
         // time out, and the cancel timer is expected to cancel the operations.
@@ -352,12 +365,6 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     // We have two timedout operations (echo and _killOperations), and one succeeded operation
     // (configureFailPoint).
     assertNumOps(0u, 2u, 0u, 1u);
-
-    // Disable blockConnection.
-    runCommandAssertStatusOK(BSON("configureFailPoint"
-                                  << "failCommand"
-                                  << "mode"
-                                  << "off"));
 }
 
 TEST_F(NetworkInterfaceTest, ImmediateCancel) {

@@ -545,7 +545,13 @@ void NetworkInterfaceTL::RequestState::trySend(StatusWith<ConnectionPool::Connec
     host = request.get().target;
     conn = std::move(swConn.getValue());
 
-    networkInterfaceDiscardCommandsAfterAcquireConn.pauseWhileSet();
+    networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
+
+    if (MONGO_unlikely(networkInterfaceAfterAcquireConn.shouldFail())) {
+        LOGV2(4630601,
+              "Request {request_id} acquired a connection",
+              "request_id"_attr = request.get().id);
+    }
 
     if (auto counters = interface()->_counters) {
         counters->recordSent();

@@ -43,7 +43,8 @@ namespace mongo {
 namespace executor {
 
 extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
-extern FailPoint networkInterfaceDiscardCommandsAfterAcquireConn;
+extern FailPoint networkInterfaceHangCommandsAfterAcquireConn;
+extern FailPoint networkInterfaceAfterAcquireConn;
 
 /**
  * Interface to networking for use by TaskExecutor implementations.
