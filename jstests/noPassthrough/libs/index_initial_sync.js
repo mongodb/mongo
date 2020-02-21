@@ -45,8 +45,9 @@ var IndexInitialSyncTest = function(options) {
             startClean: true,
         });
 
-        // Wait for the secondary to complete initial sync.
+        // Wait for the secondary to complete initial sync and transition to SECONDARY state.
         rst.awaitReplication();
+        rst.awaitSecondaryNodes();
 
         // Ensure that the index on the secondary is in an unfinished state.
         const secondaryDB = secondary.getDB(testDB.getName());
