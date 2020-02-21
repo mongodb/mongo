@@ -5,6 +5,7 @@
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   requires_emptycapped,
 // ]
 
 /*

@@ -14,6 +14,9 @@ selector:
   # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop "
   # failpoint enabled.
   - jstests/core/geo_update_btree.js
+  exclude_with_any_tags:
+  # emptycapped is not supported with rollback using recover-to-timestamp.
+  - requires_emptycapped
 
 executor:
   archive:
