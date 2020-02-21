@@ -49,14 +49,15 @@ const awaitShell = stepDownPrimary(rst);
 rst.getPrimary();
 rst.awaitNodesAgreeOnPrimary();
 
-// DBClientRS will continue to send command requests to the node it believed to be primary even
-// after it stepped down so long as it hasn't closed its connection.
-assert.commandFailedWithCode(rsConn.getDB("test").runCommand({create: "mycoll"}),
-                             ErrorCodes.NotMaster);
-
-// However, once the server responds back with a ErrorCodes.NotMaster error, DBClientRS will
-// cause the ReplicaSetMonitor to attempt to discover the current primary.
-assert.commandWorked(rsConn.getDB("test").runCommand({create: "mycoll"}));
+// DBClientRS should discover the current primary eventually and get NotMaster errors in the
+// meantime.
+assert.soon(() => {
+    const res = rsConn.getDB("test").runCommand({create: "mycoll"});
+    if (!res.ok) {
+        assert(res.code == ErrorCodes.NotMaster);
+    }
+    return res.ok;
+});
 
 awaitShell();
 

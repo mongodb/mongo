@@ -26,9 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/client/sdam/server_description.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
@@ -115,14 +115,14 @@ void ServerDescription::storeHostListIfPresent(const std::string key,
         std::transform(hostsBsonArray.begin(),
                        hostsBsonArray.end(),
                        std::inserter(destination, destination.begin()),
-                       [](const BSONElement e) { return boost::to_lower_copy(e.String()); });
+                       [](const BSONElement e) { return e.String(); });
     }
 }
 
 void ServerDescription::saveHosts(const BSONObj response) {
     if (response.hasField("me")) {
         auto me = response.getField("me");
-        _me = boost::to_lower_copy(me.str());
+        _me = me.str();
     }
 
     storeHostListIfPresent("hosts", response, _hosts);
@@ -134,6 +134,14 @@ void ServerDescription::saveTags(BSONObj tagsObj) {
     const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
     for (const auto key : keys) {
         _tags[key] = tagsObj.getStringField(key);
+    }
+}
+
+void ServerDescription::appendBsonTags(BSONObjBuilder& builder) const {
+    for (const auto& pair : _tags) {
+        const auto& key = pair.first;
+        const auto& value = pair.second;
+        builder.append(key, value);
     }
 }
 
@@ -399,6 +407,11 @@ BSONObj ServerDescription::toBson() const {
     bson.append("arbiters", _arbiters);
     bson.append("passives", _passives);
 
+    if (getTags().size()) {
+        BSONObjBuilder tagsBuilder(bson.subobjStart("tags"));
+        appendBsonTags(tagsBuilder);
+    }
+
     return bson.obj();
 }
 
@@ -412,6 +425,22 @@ int ServerDescription::getMaxWireVersion() const {
 
 std::string ServerDescription::toString() const {
     return toBson().toString();
+}
+
+ServerDescriptionPtr ServerDescription::cloneWithRTT(IsMasterRTT rtt) {
+    auto newServerDescription = std::make_shared<ServerDescription>(*this);
+    newServerDescription->_rtt = rtt;
+    return newServerDescription;
+}
+
+const boost::optional<TopologyDescriptionPtr> ServerDescription::getTopologyDescription() {
+    if (_topologyDescription) {
+        const auto result = _topologyDescription->lock();
+        invariant(result);
+        return boost::optional<TopologyDescriptionPtr>(result);
+    } else {
+        return boost::none;
+    }
 }
 
 

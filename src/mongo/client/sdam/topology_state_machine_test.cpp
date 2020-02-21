@@ -71,8 +71,8 @@ protected:
         TopologyStateMachine stateMachine(testCase.initialConfig);
 
         // setup the initial state
-        TopologyDescription topologyDescription(testCase.initialConfig);
-        topologyDescription.setType(testCase.starting);
+        auto topologyDescription = std::make_shared<TopologyDescription>(testCase.initialConfig);
+        topologyDescription->setType(testCase.starting);
 
         // create new ServerDescription and
         auto serverDescriptionBuilder =
@@ -102,9 +102,9 @@ protected:
         const auto serverDescription = serverDescriptionBuilder.instance();
 
         // simulate the ServerDescription being received
-        stateMachine.onServerDescription(topologyDescription, serverDescription);
+        stateMachine.onServerDescription(*topologyDescription, serverDescription);
 
-        ASSERT_EQUALS(topologyDescription.getType(), testCase.ending);
+        ASSERT_EQUALS(topologyDescription->getType(), testCase.ending);
     }
 
     std::vector<ServerType> allServerTypesExceptPrimary() {
@@ -124,7 +124,7 @@ protected:
 
 TEST_F(TopologyStateMachineTestFixture, ShouldInstallServerDescriptionInSingleTopology) {
     TopologyStateMachine stateMachine(kSingleConfig);
-    TopologyDescription topologyDescription(kSingleConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kSingleConfig);
 
     auto updatedMeAddress = "foo:1234";
     auto serverDescription = ServerDescriptionBuilder()
@@ -133,10 +133,10 @@ TEST_F(TopologyStateMachineTestFixture, ShouldInstallServerDescriptionInSingleTo
                                  .withType(ServerType::kStandalone)
                                  .instance();
 
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription.getServers().size());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription->getServers().size());
 
-    auto result = topologyDescription.findServerByAddress(kLocalServer);
+    auto result = topologyDescription->findServerByAddress(kLocalServer);
     ASSERT(result);
     ASSERT_EQUALS(serverDescription, *result);
 }
@@ -146,7 +146,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfNotInHost
     const auto expectedRemovedServer = (*kTwoSeedConfig.getSeedList()).back();
 
     TopologyStateMachine stateMachine(kTwoSeedConfig);
-    TopologyDescription topologyDescription(kTwoSeedConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withAddress(primary)
@@ -155,10 +155,10 @@ TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfNotInHost
                                  .withHost(primary)
                                  .instance();
 
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription.getServers().size());
-    ASSERT_EQUALS(serverDescription, topologyDescription.getServers().front());
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription->getServers().size());
+    ASSERT_EQUALS(serverDescription, topologyDescription->getServers().front());
 }
 
 
@@ -167,21 +167,22 @@ TEST_F(TopologyStateMachineTestFixture,
     const auto serverAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
 
     TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
-    TopologyDescription topologyDescription(kTwoSeedReplicaSetNoPrimaryConfig);
+    auto topologyDescription =
+        std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withAddress(serverAddress)
                                  .withType(ServerType::kRSSecondary)
-                                 .withSetName(*topologyDescription.getSetName())
+                                 .withSetName(*topologyDescription->getSetName())
                                  .instance();
 
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription->getServers(),
                                                                   getServerDescriptionAddress);
 
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
 
-    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
+    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription->getServers(),
                                                                  getServerDescriptionAddress);
     ASSERT_EQUALS(serversBefore, serversAfter);
 }
@@ -192,35 +193,36 @@ TEST_F(TopologyStateMachineTestFixture,
     const auto primaryAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).back();
 
     TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
-    TopologyDescription topologyDescription(kTwoSeedReplicaSetNoPrimaryConfig);
+    auto topologyDescription =
+        std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
 
     auto primaryDescription = ServerDescriptionBuilder()
                                   .withAddress(primaryAddress)
                                   .withMe(primaryAddress)
                                   .withHost(primaryAddress)
                                   .withHost(serverAddress)
-                                  .withSetName(*topologyDescription.getSetName())
+                                  .withSetName(*topologyDescription->getSetName())
                                   .withType(ServerType::kRSPrimary)
                                   .instance();
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withAddress(serverAddress)
                                  .withType(ServerType::kRSSecondary)
-                                 .withSetName(*topologyDescription.getSetName())
+                                 .withSetName(*topologyDescription->getSetName())
                                  .instance();
 
     // change topology type to ReplicaSetWithPrimary
-    stateMachine.onServerDescription(topologyDescription, primaryDescription);
-    ASSERT_EQUALS(topologyDescription.getType(), TopologyType::kReplicaSetWithPrimary);
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
+    stateMachine.onServerDescription(*topologyDescription, primaryDescription);
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
 
-    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
+    auto serversBefore = map<ServerDescriptionPtr, ServerAddress>(topologyDescription->getServers(),
                                                                   getServerDescriptionAddress);
 
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(topologyDescription.getType(), TopologyType::kReplicaSetWithPrimary);
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
 
-    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription.getServers(),
+    auto serversAfter = map<ServerDescriptionPtr, ServerAddress>(topologyDescription->getServers(),
                                                                  getServerDescriptionAddress);
     ASSERT_EQUALS(serversBefore, serversAfter);
 }
@@ -233,7 +235,8 @@ TEST_F(TopologyStateMachineTestFixture,
     const auto me = std::string("foo") + serverAddress;
 
     TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
-    TopologyDescription topologyDescription(kTwoSeedReplicaSetNoPrimaryConfig);
+    auto topologyDescription =
+        std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withAddress(serverAddress)
@@ -241,11 +244,11 @@ TEST_F(TopologyStateMachineTestFixture,
                                  .withType(ServerType::kRSSecondary)
                                  .instance();
 
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription.getServers().size());
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription->getServers().size());
     ASSERT_EQUALS(expectedRemainingServerAddress,
-                  topologyDescription.getServers().front()->getAddress());
+                  topologyDescription->getServers().front()->getAddress());
 }
 
 TEST_F(TopologyStateMachineTestFixture,
@@ -255,7 +258,7 @@ TEST_F(TopologyStateMachineTestFixture,
     const auto newHost = ServerAddress("newhost:123");
 
     TopologyStateMachine stateMachine(kTwoSeedConfig);
-    TopologyDescription topologyDescription(kTwoSeedConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withAddress(primary)
@@ -266,11 +269,11 @@ TEST_F(TopologyStateMachineTestFixture,
                                  .withHost(newHost)
                                  .instance();
 
-    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription.getServers().size());
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(static_cast<size_t>(3), topologyDescription.getServers().size());
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(static_cast<size_t>(3), topologyDescription->getServers().size());
 
-    auto newHostResult = topologyDescription.findServerByAddress(newHost);
+    auto newHostResult = topologyDescription->findServerByAddress(newHost);
     ASSERT(newHostResult);
     ASSERT_EQUALS(newHost, (*newHostResult)->getAddress());
     ASSERT_EQUALS(ServerType::kUnknown, (*newHostResult)->getType());
@@ -279,8 +282,8 @@ TEST_F(TopologyStateMachineTestFixture,
 TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
     const auto primary = (*kTwoSeedConfig.getSeedList()).front();
 
-    TopologyDescription topologyDescription(kTwoSeedConfig);
     TopologyStateMachine stateMachine(kTwoSeedConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
 
     auto serverDescription = ServerDescriptionBuilder()
                                  .withType(ServerType::kRSPrimary)
@@ -291,8 +294,8 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                  .withSetVersion(100)
                                  .instance();
 
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(100, topologyDescription.getMaxSetVersion());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(100, topologyDescription->getMaxSetVersion());
 
     auto serverDescriptionEvenBiggerSetVersion = ServerDescriptionBuilder()
                                                      .withType(ServerType::kRSPrimary)
@@ -303,13 +306,13 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                                      .withSetVersion(200)
                                                      .instance();
 
-    stateMachine.onServerDescription(topologyDescription, serverDescriptionEvenBiggerSetVersion);
-    ASSERT_EQUALS(200, topologyDescription.getMaxSetVersion());
+    stateMachine.onServerDescription(*topologyDescription, serverDescriptionEvenBiggerSetVersion);
+    ASSERT_EQUALS(200, topologyDescription->getMaxSetVersion());
 }
 
 TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
     const auto primary = (*kTwoSeedConfig.getSeedList()).front();
-    TopologyDescription topologyDescription(kTwoSeedConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
     TopologyStateMachine stateMachine(kTwoSeedConfig);
 
     const OID oidOne(std::string("000000000000000000000001"));
@@ -325,8 +328,8 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                  .withElectionId(oidOne)
                                  .instance();
 
-    stateMachine.onServerDescription(topologyDescription, serverDescription);
-    ASSERT_EQUALS(oidOne, topologyDescription.getMaxElectionId());
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(oidOne, topologyDescription->getMaxElectionId());
 
     auto serverDescriptionEvenBiggerElectionId = ServerDescriptionBuilder()
                                                      .withType(ServerType::kRSPrimary)
@@ -338,8 +341,8 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                                      .withElectionId(oidTwo)
                                                      .instance();
 
-    stateMachine.onServerDescription(topologyDescription, serverDescriptionEvenBiggerElectionId);
-    ASSERT_EQUALS(oidTwo, topologyDescription.getMaxElectionId());
+    stateMachine.onServerDescription(*topologyDescription, serverDescriptionEvenBiggerElectionId);
+    ASSERT_EQUALS(oidTwo, topologyDescription->getMaxElectionId());
 }
 
 // The following two tests (ShouldNotUpdateToplogyType, ShouldUpdateToCorrectToplogyType) assert

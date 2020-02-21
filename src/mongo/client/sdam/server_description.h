@@ -51,9 +51,7 @@ public:
      * Construct an unknown ServerDescription with default values except the server's address.
      */
     ServerDescription(ServerAddress address)
-        : _address(std::move(address)), _type(ServerType::kUnknown) {
-        boost::to_lower(_address);
-    }
+        : _address(std::move(address)), _type(ServerType::kUnknown) {}
 
     /**
      * Build a new ServerDescription according to the rules of the SDAM spec based on the
@@ -78,6 +76,7 @@ public:
     const boost::optional<ServerAddress>& getMe() const;
     const boost::optional<std::string>& getSetName() const;
     const std::map<std::string, std::string>& getTags() const;
+    void appendBsonTags(BSONObjBuilder& builder) const;
 
     // network attributes
     const boost::optional<std::string>& getError() const;
@@ -104,9 +103,11 @@ public:
     const boost::optional<int>& getSetVersion() const;
     const boost::optional<OID>& getElectionId() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
+    const boost::optional<TopologyDescriptionPtr> getTopologyDescription();
 
     BSONObj toBson() const;
     std::string toString() const;
+    ServerDescriptionPtr cloneWithRTT(IsMasterRTT rtt);
 
 private:
     /**
@@ -202,6 +203,13 @@ private:
     // pool for server. Incremented on network error or timeout.
     int _poolResetCounter = 0;
 
+    // The topology description of that we are a part of. Since this is a weak_ptr, code that
+    // accesses this variable should ensure that the TopologyDescription cannot be destroyed by
+    // holding a copy of it's shared_ptr. The SdamServerSelector uses this variable when calculating
+    // staleness.
+    boost::optional<std::weak_ptr<TopologyDescription>> _topologyDescription;
+
+    friend class TopologyDescription;
     friend class ServerDescriptionBuilder;
 };
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
@@ -99,7 +100,7 @@ void ReplicaSetMonitorManager::_setupTaskExecutorInLock() {
     auto net = executor::makeNetworkInterface(
         "ReplicaSetMonitor-TaskExecutor", nullptr, std::move(hookList));
     auto pool = std::make_unique<NetworkInterfaceThreadPool>(net.get());
-    _taskExecutor = std::make_unique<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    _taskExecutor = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
     _taskExecutor->startup();
 }
 
@@ -116,7 +117,6 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const MongoURI& uri) {
     invariant(uri.type() == ConnectionString::SET);
-
     stdx::lock_guard<Latch> lk(_mutex);
     uassert(ErrorCodes::ShutdownInProgress,
             str::stream() << "Unable to get monitor for '" << uri << "' due to shutdown",
@@ -130,14 +130,14 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
         return monitor;
     }
 
-    LOGV2(20186, "Starting new replica set monitor for {uri}", "uri"_attr = uri.toString());
-
     std::shared_ptr<ReplicaSetMonitor> newMonitor;
     if (gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kScanning) {
+        LOGV2(4333204, "Starting Scanning ReplicaSetMonitor", "uri"_attr = uri.toString());
         newMonitor = std::make_shared<ScanningReplicaSetMonitor>(uri);
         newMonitor->init();
     } else {
-        newMonitor = std::make_shared<StreamableReplicaSetMonitor>(uri);
+        LOGV2(4333205, "Starting Streamable ReplicaSetMonitor", "uri"_attr = uri.toString());
+        newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor());
     }
     _monitors[setName] = newMonitor;
     return newMonitor;
@@ -181,24 +181,17 @@ void ReplicaSetMonitorManager::shutdown() {
         taskExecutor = std::exchange(_taskExecutor, {});
     }
 
-    if (taskExecutor) {
-        LOGV2_DEBUG(20188, 1, "Shutting down task executor used for monitoring replica sets");
-        taskExecutor->shutdown();
-    }
-
-    if (monitors.size()) {
-        LOGV2(20189, "Dropping all ongoing scans against replica sets");
-    }
     for (auto& [name, monitor] : monitors) {
         auto anchor = monitor.lock();
         if (!anchor) {
             continue;
         }
-
         anchor->drop();
     }
 
     if (taskExecutor) {
+        LOGV2_DEBUG(20188, 1, "Shutting down task executor used for monitoring replica sets");
+        taskExecutor->shutdown();
         taskExecutor->join();
     }
 }
@@ -215,8 +208,8 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
 void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     // Don't hold _mutex the whole time to avoid ever taking a monitor's mutex while holding the
     // manager's mutex.  Otherwise we could get a deadlock between the manager's, monitor's, and
-    // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook potentially
-    // calling ShardRegistry::updateConfigServerConnectionString.
+    // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook
+    // potentially calling ShardRegistry::updateConfigServerConnectionString.
     auto setNames = getAllSetNames();
 
     BSONObjBuilder setStats(
@@ -231,9 +224,9 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     }
 }
 
-TaskExecutor* ReplicaSetMonitorManager::getExecutor() {
+std::shared_ptr<executor::TaskExecutor> ReplicaSetMonitorManager::getExecutor() {
     invariant(_taskExecutor);
-    return _taskExecutor.get();
+    return _taskExecutor;
 }
 
 ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
@@ -244,5 +237,4 @@ bool ReplicaSetMonitorManager::isShutdown() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _isShutdown;
 }
-
 }  // namespace mongo

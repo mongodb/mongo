@@ -173,7 +173,7 @@ ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri)
     : ScanningReplicaSetMonitor(
           std::make_shared<SetState>(uri,
                                      &ReplicaSetMonitorManager::get()->getNotifier(),
-                                     ReplicaSetMonitorManager::get()->getExecutor())) {}
+                                     ReplicaSetMonitorManager::get()->getExecutor().get())) {}
 
 void ScanningReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest()) {

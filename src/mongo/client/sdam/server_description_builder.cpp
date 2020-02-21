@@ -73,7 +73,7 @@ ServerDescriptionBuilder& ServerDescriptionBuilder::withMaxWireVersion(int maxVe
 }
 
 ServerDescriptionBuilder& ServerDescriptionBuilder::withMe(const ServerAddress& me) {
-    _instance->_me = boost::to_lower_copy(me);
+    _instance->_me = std::string(me);
     return *this;
 }
 

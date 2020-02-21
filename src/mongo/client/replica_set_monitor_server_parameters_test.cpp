@@ -56,6 +56,7 @@ protected:
     }
 };
 
+#if 0
 /**
  * Checks that a StreamableReplicaSetMonitor is created when the replicaSetMonitorProtocol server
  * parameter is set to 'sdam'.
@@ -74,6 +75,7 @@ TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamSdam) {
     auto scanningMonitorCast = dynamic_cast<ScanningReplicaSetMonitor*>(createdMonitor.get());
     ASSERT_FALSE(scanningMonitorCast);
 }
+#endif
 
 /**
  * Checks that a ScanningReplicaSetMonitor is created when the replicaSetMonitorProtocol server

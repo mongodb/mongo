@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,6 +31,7 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/sdam/topology_state_machine.h"
 
 namespace mongo::sdam {
@@ -44,7 +45,9 @@ class TopologyManager {
     TopologyManager(const TopologyManager&) = delete;
 
 public:
-    TopologyManager(SdamConfiguration config, ClockSource* clockSource);
+    explicit TopologyManager(SdamConfiguration config,
+                             ClockSource* clockSource,
+                             TopologyEventsPublisherPtr eventsPublisher = nullptr);
 
     /**
      * This function atomically:
@@ -57,7 +60,19 @@ public:
      * IsMasterOutcomes serially, as required by:
      *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#process-one-ismaster-outcome-at-a-time
      */
-    void onServerDescription(const IsMasterOutcome& isMasterOutcome);
+    bool onServerDescription(const IsMasterOutcome& isMasterOutcome);
+
+
+    /**
+     * This function updates the RTT value for a server without executing any state machine actions.
+     * It atomically:
+     *   1. Clones the current TopologyDescription
+     *   2. Clones the ServerDescription corresponding to hostAndPort such that it contains the new
+     * RTT value.
+     *   3. Installs the cloned ServerDescription into the TopologyDescription from step 1
+     *   4. Installs the cloned TopologyDescription as the current one.
+     */
+    void onServerRTTUpdated(ServerAddress hostAndPort, IsMasterRTT rtt);
 
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.
@@ -65,10 +80,15 @@ public:
     const TopologyDescriptionPtr getTopologyDescription() const;
 
 private:
+    void _publishTopologyDescriptionChanged(
+        const TopologyDescriptionPtr& oldTopologyDescription,
+        const TopologyDescriptionPtr& newTopologyDescription) const;
+
     mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("TopologyManager");
     const SdamConfiguration _config;
     ClockSource* _clockSource;
-    std::shared_ptr<TopologyDescription> _topologyDescription;
-    std::unique_ptr<TopologyStateMachine> _topologyStateMachine;
+    TopologyDescriptionPtr _topologyDescription;
+    TopologyStateMachinePtr _topologyStateMachine;
+    TopologyEventsPublisherPtr _topologyEventsPublisher;
 };
 }  // namespace mongo::sdam

@@ -101,4 +101,5 @@ private:
 
     static inline auto kLogPrefix = "sdam : ";
 };
+using TopologyStateMachinePtr = std::unique_ptr<TopologyStateMachine>;
 }  // namespace mongo::sdam
