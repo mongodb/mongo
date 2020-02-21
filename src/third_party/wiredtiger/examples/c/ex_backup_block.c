@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2019 MongoDB, Inc.
+ * Public Domain 2014-2020 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -33,6 +33,10 @@
 static const char *const home = "WT_BLOCK";
 static const char *const home_full = "WT_BLOCK_LOG_FULL";
 static const char *const home_incr = "WT_BLOCK_LOG_INCR";
+static const char *const logpath = "logpath";
+
+#define WTLOG "WiredTigerLog"
+#define WTLOGLEN strlen(WTLOG)
 
 static const char *const full_out = "./backup_block_full";
 static const char *const incr_out = "./backup_block_incr";
@@ -50,7 +54,7 @@ static size_t filelist_count = 0;
 
 #define FLIST_INIT 16
 
-#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,file_max=100K)"
+#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,path=logpath,file_max=100K)"
 #define MAX_ITERATIONS 5
 #define MAX_KEYS 10000
 
@@ -123,14 +127,16 @@ setup_directories(void)
          * For incremental backups we need 0-N. The 0 incremental directory will compare with the
          * original at the end.
          */
-        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d", home_incr, i, home_incr, i);
+        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir -p %s.%d/%s", home_incr, i,
+          home_incr, i, logpath);
         error_check(system(buf));
         if (i == 0)
             continue;
         /*
          * For full backups we need 1-N.
          */
-        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d", home_full, i, home_full, i);
+        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir -p %s.%d/%s", home_full, i,
+          home_full, i, logpath);
         error_check(system(buf));
     }
 }
@@ -185,7 +191,9 @@ finalize_files(FILELIST *flistp, size_t count)
         if (last_flist[i].name == NULL)
             break;
         if (!last_flist[i].exist) {
-            (void)snprintf(buf, sizeof(buf), "rm WT_BLOCK_LOG_*/%s", last_flist[i].name);
+            (void)snprintf(buf, sizeof(buf), "rm WT_BLOCK_LOG_*/%s%s",
+              strncmp(last_flist[i].name, WTLOG, WTLOGLEN) == 0 ? "logpath/" : "",
+              last_flist[i].name);
             error_check(system(buf));
         }
         free((void *)last_flist[i].name);
@@ -247,7 +255,7 @@ take_full_backup(WT_SESSION *session, int i)
     WT_CURSOR *cursor;
     size_t alloc, count;
     int j, ret;
-    char buf[1024], h[256];
+    char buf[1024], f[256], h[256];
     const char *filename, *hdir;
 
     /*
@@ -273,21 +281,32 @@ take_full_backup(WT_SESSION *session, int i)
     while ((ret = cursor->next(cursor)) == 0) {
         error_check(cursor->get_key(cursor, &filename));
         error_check(process_file(&flist, &count, &alloc, filename));
+
+        /*
+         * If it is a log file, prepend the path for cp.
+         */
+        if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+            (void)snprintf(f, sizeof(f), "%s/%s", logpath, filename);
+        else
+            (void)snprintf(f, sizeof(f), "%s", filename);
+
         if (i == 0)
             /*
              * Take a full backup into each incremental directory.
              */
             for (j = 0; j < MAX_ITERATIONS; j++) {
                 (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
-                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, f, h, f);
 #if 0
                 printf("FULL: Copy: %s\n", buf);
 #endif
                 error_check(system(buf));
             }
         else {
+#if 0
             (void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
-            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, hdir, filename);
+#endif
+            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, f, hdir, f);
 #if 0
             printf("FULL %d: Copy: %s\n", i, buf);
 #endif
@@ -328,7 +347,11 @@ take_incr_backup(WT_SESSION *session, int i)
         error_check(backup_cur->get_key(backup_cur, &filename));
         error_check(process_file(&flist, &count, &alloc, filename));
         (void)snprintf(h, sizeof(h), "%s.0", home_incr);
-        (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+        if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+            (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h,
+              logpath, filename);
+        else
+            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
 #if 0
         printf("Copying backup: %s\n", buf);
 #endif
@@ -375,7 +398,11 @@ take_incr_backup(WT_SESSION *session, int i)
                 /* Whole file, so close both files and just copy the whole thing. */
                 testutil_assert(first == true);
                 rfd = wfd = -1;
-                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+                if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+                    (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath,
+                      filename, h, logpath, filename);
+                else
+                    (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
 #if 0
                 printf("Incremental: Whole file copy: %s\n", buf);
 #endif
@@ -398,7 +425,11 @@ take_incr_backup(WT_SESSION *session, int i)
          */
         for (j = i; j < MAX_ITERATIONS; j++) {
             (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
-            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+            if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
+                (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h,
+                  logpath, filename);
+            else
+                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
             error_check(system(buf));
         }
     }
@@ -424,7 +455,7 @@ main(int argc, char *argv[])
     (void)argc; /* Unused variable */
     (void)testutil_set_progname(argv);
 
-    (void)snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir %s", home, home);
+    (void)snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir -p %s/%s", home, home, logpath);
     error_check(system(cmd_buf));
     error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
 

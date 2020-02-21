@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
+# Public Domain 2014-2020 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -154,6 +154,7 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         # - We cannot duplicate the duplicate backup cursor.
         # - We cannot mix block incremental with a log target on the same duplicate.
         # - Incremental ids must be on primary, not duplicate.
+        # - Incremental must be opened on a primary with a source identifier.
         # - Force stop must be on primary, not duplicate.
 
         # - Incremental filename must be on duplicate, not primary.
@@ -236,6 +237,22 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         #    lambda:self.assertEquals(self.session.open_cursor(None,
         #    bkup_c, config), 0), msg)
 
+        bkup_c.close()
+
+        # - Incremental must be opened on a primary with a source identifier.
+        # Open a top level backup cursor without a source id.
+        # Try to open an incremental cursor off this backup cursor.
+        self.pr("Test incremental without source identifier on primary")
+        self.pr("=========")
+        config = 'incremental=(enabled,this_id="ID3")'
+        bkup_c = self.session.open_cursor('backup:', None, config)
+        ret = bkup_c.next()
+        self.assertTrue(ret == 0)
+        newfile = bkup_c.get_key()
+        config = 'incremental=(file=' + newfile + ')'
+        msg = '/known source identifier/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(None, bkup_c, config), msg)
         bkup_c.close()
 
         # After the full backup, open and recover the backup database.

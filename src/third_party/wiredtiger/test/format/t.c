@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2019 MongoDB, Inc.
+ * Public Domain 2014-2020 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -267,15 +267,15 @@ main(int argc, char *argv[])
 
         track("starting up", 0ULL, NULL);
 
+        /* Load and verify initial records */
         wts_open(g.home, true, &g.wts_conn);
         wts_init();
-
-        /* Load and verify initial records */
         TIMED_MAJOR_OP(wts_load());
         TIMED_MAJOR_OP(wts_verify("post-bulk verify"));
         TIMED_MAJOR_OP(wts_read_scan());
 
         /* Operations. */
+        wts_checkpoints();
         for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps)
             wts_ops(ops_seconds, reps == FORMAT_OPERATION_REPS);
 

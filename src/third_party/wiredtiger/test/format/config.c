@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2019 MongoDB, Inc.
+ * Public Domain 2014-2020 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -834,17 +834,35 @@ void
 config_file(const char *name)
 {
     FILE *fp;
-    char buf[256], *p;
+    char buf[256], *p, *t;
 
     if ((fp = fopen(name, "r")) == NULL)
         testutil_die(errno, "fopen: %s", name);
+
+    /*
+     * Skip leading Evergreen timestamps by skipping up to a closing brace and following whitespace.
+     * This is a little fragile: we're in trouble if Evergreen changes its timestamp format or if
+     * this program includes closing braces in its commands.
+     */
     while (fgets(buf, sizeof(buf), fp) != NULL) {
-        for (p = buf; *p != '\0' && *p != '\n'; ++p)
-            ;
-        *p = '\0';
-        if (buf[0] == '\0' || buf[0] == '#')
+        for (p = t = buf; *p != '\0'; ++p) {
+            if (*p == '\n') { /* Configuration end. */
+                *p = '\0';
+                break;
+            }
+            if (*p == '#') { /* Comment, skip the line */
+                t = p;
+                break;
+            }
+            if (t == buf && *p == ']') { /* Closing brace, configuration starts after it. */
+                while (isblank(*++p))
+                    ;
+                t = p--;
+            }
+        }
+        if (*t == '\0' || *t == '#')
             continue;
-        config_single(buf, true);
+        config_single(t, true);
     }
     fclose_and_clear(&fp);
 }

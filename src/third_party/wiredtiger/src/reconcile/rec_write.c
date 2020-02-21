@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-2020 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1834,6 +1834,13 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
 #ifdef HAVE_DIAGNOSTIC
     verify_image = true;
 #endif
+
+    /*
+     * If reconciliation requires multiple blocks and checkpoint is running we'll eventually fail,
+     * unless we're the checkpoint thread. Big pages take a lot of writes, avoid wasting work.
+     */
+    if (!last_block && WT_BTREE_SYNCING(btree) && !WT_SESSION_BTREE_SYNC(session))
+        return (__wt_set_return(session, EBUSY));
 
     /* Make sure there's enough room for another write. */
     WT_RET(__wt_realloc_def(session, &r->multi_allocated, r->multi_next + 1, &r->multi));

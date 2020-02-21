@@ -1940,8 +1940,8 @@ tasks:
       - func: "format test script"
         vars:
           test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-          # run for 24 hours ( 24 * 60 = 1440 minutes), don't stop at failed tests, use default config
-          format_test_script_args: -t 1440
+          # run for 24 hours ( 24 * 60 = 1440 minutes), skip known errors, don't stop at failed tests, use default config
+          format_test_script_args: -E -t 1440
   
   - name: format-stress-sanitizer-lsm-test
     commands:
@@ -1961,10 +1961,10 @@ tasks:
       - func: "compile wiredtiger address sanitizer"
       - func: "format test script"
         # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
-        # run smoke tests, don't stop at failed tests, use default config
+        # run smoke tests, skip known errors, don't stop at failed tests, use default config
         vars:
           test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-          format_test_script_args: -S
+          format_test_script_args: -E -S
           times: 16
 
   - name: race-condition-stress-sanitizer-test
@@ -1978,8 +1978,8 @@ tasks:
           posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
-          # set a format.sh timeout of 24 hours
-          format_test_script_args: -R -t 1440
+          # set a format.sh timeout of 24 hours, skip known errors, don't stop at failed tests, use default config
+          format_test_script_args: -E -R -t 1440
           test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
 
   - name: recovery-stress-test
@@ -2242,6 +2242,8 @@ buildvariants:
     - name: wtperf-test
     - name: ftruncate-test
     - name: long-test
+    - name: configure-combinations
+    - name: coverage-report
 
 - name: large-scale-test
   display_name: Large scale testing
