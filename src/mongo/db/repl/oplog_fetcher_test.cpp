@@ -29,6 +29,7 @@
 
 #include <memory>
 
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -37,6 +38,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/death_test.h"
@@ -358,6 +360,11 @@ void OplogFetcherTest::setUp() {
     // Always enable oplogFetcherUsesExhaust at the beginning of each unittest in case some
     // unittests disable it in the test.
     oplogFetcherUsesExhaust = true;
+
+    // Set up a logical clock.
+    auto service = getGlobalServiceContext();
+    auto logicalClock = std::make_unique<LogicalClock>(service);
+    LogicalClock::set(service, std::move(logicalClock));
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher() {
@@ -2113,5 +2120,28 @@ TEST_F(OplogFetcherTest, GetMoreEmptyBatch) {
     oplogFetcher->join();
 
     ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(OplogFetcherTest, HandleLogicalTimeMetaDataAndAdvanceClusterTime) {
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+
+    auto oldClusterTime = LogicalClock::get(getGlobalServiceContext())->getClusterTime();
+
+    auto logicalTime = LogicalTime(Timestamp(123456, 78));
+    auto logicalTimeMetadata =
+        rpc::LogicalTimeMetadata(SignedLogicalTime(logicalTime, TimeProofService::TimeProof(), 0));
+
+    BSONObjBuilder bob;
+    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
+    logicalTimeMetadata.writeToMetadata(&bob);
+    auto metadataObj = bob.obj();
+
+    // Process one batch with the logical time metadata.
+    ASSERT_OK(processSingleBatch(makeFirstBatch(0LL, {firstEntry}, metadataObj))->getStatus());
+
+    // Test that the cluster time is updated to the cluster time in the metadata.
+    auto currentClusterTime = LogicalClock::get(getGlobalServiceContext())->getClusterTime();
+    ASSERT_EQ(currentClusterTime, logicalTime);
+    ASSERT_NE(oldClusterTime, logicalTime);
 }
 }  // namespace
