@@ -408,9 +408,11 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         for (const auto& dbName : dbNames) {
             LOGV2_DEBUG(21007, 1, "    Repairing database: {dbName}", "dbName"_attr = dbName);
             fassertNoTrace(18506, repairDatabase(opCtx, storageEngine, dbName));
-        }
 
-        setReplSetMemberInStandaloneMode(opCtx);
+            if (dbName == NamespaceString::kLocalDb) {
+                setReplSetMemberInStandaloneMode(opCtx);
+            }
+        }
 
         // All collections must have UUIDs before restoring the FCV document to a version that
         // requires UUIDs.
