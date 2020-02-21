@@ -107,7 +107,7 @@ def _generate_evg_build_variant(shrub_config, build_variant, run_build_variant,
     new_variant_display_name = f"! {base_variant_config.display_name}"
     new_variant_run_on = base_variant_config.run_on[0]
 
-    task_spec = TaskSpec("compile_TG")
+    task_spec = TaskSpec("compile_without_package_TG")
 
     new_variant = shrub_config.variant(run_build_variant).expansion("burn_in_bypass",
                                                                     burn_in_tags_gen_variant)

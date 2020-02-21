@@ -8342,6 +8342,10 @@ tasks:
 #######################################
 task_groups:
 - <<: *compile_task_group_template
+  name: compile_without_package_TG
+  tasks:
+  - compile
+- <<: *compile_task_group_template
   name: compile_TG
   tasks:
   - compile
