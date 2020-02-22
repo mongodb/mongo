@@ -257,6 +257,17 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         requestWithFixedLsid ? *requestWithFixedLsid : request, shardingCb, baton);
 }
 
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleExhaustRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
+    const BatonHandle& baton) {
+    MONGO_UNREACHABLE;
+}
+
+bool ShardingTaskExecutor::hasTasks() {
+    MONGO_UNREACHABLE;
+}
+
 void ShardingTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     _executor->cancel(cbHandle);
 }

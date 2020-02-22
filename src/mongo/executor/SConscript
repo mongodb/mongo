@@ -275,6 +275,7 @@ env.CppIntegrationTest(
         'network_interface_integration_test.cpp',
         'task_executor_cursor_integration_test.cpp',
         'non_auth_task_executor_integration_test.cpp',
+        'thread_pool_task_executor_integration_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',

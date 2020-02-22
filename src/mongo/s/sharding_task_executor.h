@@ -72,6 +72,11 @@ public:
         const RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
+        const RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr) override;
+    bool hasTasks() override;
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;

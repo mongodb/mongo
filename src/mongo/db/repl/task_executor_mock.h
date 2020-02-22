@@ -52,6 +52,11 @@ public:
         const executor::RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
+        const executor::RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr) override;
+    bool hasTasks() override;
 
     // Override to make scheduleWork() fail during testing.
     ShouldFailScheduleWorkRequestFn shouldFailScheduleWorkRequest = []() { return false; };

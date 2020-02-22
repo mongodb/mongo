@@ -142,6 +142,21 @@ public:
             cb);
     }
 
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
+        const RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr) override {
+        return _wrapCallback(
+            [&](auto&& x) {
+                return _executor->scheduleExhaustRemoteCommandOnAny(request, std::move(x), baton);
+            },
+            cb);
+    }
+
+    bool hasTasks() {
+        return _executor->hasTasks();
+    }
+
     void cancel(const CallbackHandle& cbHandle) override {
         return _executor->cancel(cbHandle);
     }

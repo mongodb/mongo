@@ -106,6 +106,18 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRe
     return _executor->scheduleRemoteCommandOnAny(request, cb, baton);
 }
 
+StatusWith<executor::TaskExecutor::CallbackHandle>
+TaskExecutorProxy::scheduleExhaustRemoteCommandOnAny(
+    const executor::RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
+    const BatonHandle& baton) {
+    return _executor->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+}
+
+bool TaskExecutorProxy::hasTasks() {
+    return _executor->hasTasks();
+}
+
 void TaskExecutorProxy::cancel(const CallbackHandle& cbHandle) {
     _executor->cancel(cbHandle);
 }

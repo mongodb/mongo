@@ -94,6 +94,7 @@ public:
     CallbackFn callback;
     AtomicWord<unsigned> canceled{0U};
     WorkQueue::iterator iter;
+    boost::optional<WorkQueue::iterator> exhaustIter;  // Used only in the exhaust path
     Date_t readyDate;
     bool isNetworkOperation = false;
     bool isTimerOperation = false;
@@ -178,8 +179,8 @@ void ThreadPoolTaskExecutor::join() {
 
 stdx::unique_lock<Latch> ThreadPoolTaskExecutor::_join(stdx::unique_lock<Latch> lk) {
     _stateChange.wait(lk, [this] {
-        // All tasks are spliced into the _poolInProgressQueue immediately after we accept them.
-        // This occurs in scheduleIntoPool_inlock.
+        // All non-exhaust tasks are spliced into the _poolInProgressQueue immediately after we
+        // accept them. This occurs in scheduleIntoPool_inlock.
         //
         // On the other side, all tasks are spliced out of the _poolInProgressQueue in runCallback,
         // which removes them from this list after executing the users callback.
@@ -595,7 +596,11 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
                     return;
                 }
 
-                cbState->canceled.store(1);
+                {
+                    stdx::lock_guard<Latch> lk(_mutex);
+                    cbState->canceled.store(1);
+                }
+
                 _pool->schedule([this, cbState](auto status) {
                     invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
 
@@ -646,6 +651,157 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
     if (_inShutdown_inlock() && _poolInProgressQueue.empty()) {
         _stateChange.notify_all();
     }
+}
+
+StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaustRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
+    const BatonHandle& baton) {
+    RemoteCommandRequestOnAny scheduledRequest = request;
+    if (request.timeout == RemoteCommandRequest::kNoTimeout) {
+        scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
+    } else {
+        scheduledRequest.expirationDate = _net->now() + scheduledRequest.timeout;
+    }
+
+    // In case the request fails to even get a connection from the pool,
+    // we wrap the callback in a method that prepares its input parameters.
+    auto wq = makeSingletonWorkQueue(
+        [scheduledRequest, cb](const CallbackArgs& cbData) {
+            remoteCommandFailedEarly(cbData, cb, scheduledRequest);
+        },
+        baton);
+    wq.front()->isNetworkOperation = true;
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto swCbHandle = enqueueCallbackState_inlock(&_networkInProgressQueue, &wq);
+    if (!swCbHandle.isOK())
+        return swCbHandle;
+    std::shared_ptr<CallbackState> cbState = _networkInProgressQueue.back();
+    lk.unlock();
+    LOGV2_DEBUG(4495133,
+                3,
+                "Scheduling exhaust remote command request: {scheduledRequest}",
+                "scheduledRequest"_attr = redact(scheduledRequest.toString()));
+
+    auto commandStatus = _net->startExhaustCommand(
+        swCbHandle.getValue(),
+        scheduledRequest,
+        [this, scheduledRequest, cbState, cb, baton](const ResponseOnAnyStatus& response,
+                                                     bool isMoreToComeSet) {
+            using std::swap;
+
+            LOGV2_DEBUG(
+                4495134,
+                3,
+                "Received remote response: {response_isOK_response_response_status_toString}",
+                "response_isOK_response_response_status_toString"_attr =
+                    redact(response.isOK() ? response.toString() : response.status.toString()));
+
+            stdx::unique_lock<Latch> lk(_mutex);
+            if (_inShutdown_inlock()) {
+                return;
+            }
+
+            // Swap the callback function with the new one
+            CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
+                remoteCommandFinished(cbData, cb, scheduledRequest, response);
+            };
+            swap(cbState->callback, newCb);
+
+            // If this is the last response, invoke the non-exhaust path. This will mark cbState as
+            // finished and remove the task from _networkInProgressQueue
+            if (!isMoreToComeSet) {
+                scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
+                return;
+            }
+
+            scheduleExhaustIntoPool_inlock(cbState, std::move(lk));
+        },
+        baton);
+
+    if (!commandStatus.isOK())
+        return commandStatus;
+
+    return swCbHandle;
+}
+
+void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<CallbackState> cbState,
+                                                            stdx::unique_lock<Latch> lk) {
+    _poolInProgressQueue.push_back(cbState);
+    cbState->exhaustIter = --_poolInProgressQueue.end();
+    lk.unlock();
+
+    if (cbState->baton) {
+        cbState->baton->schedule([this, cbState](Status status) {
+            if (status.isOK()) {
+                runCallbackExhaust(cbState);
+                return;
+            }
+
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                cbState->canceled.store(1);
+            }
+
+            _pool->schedule([this, cbState](auto status) {
+                invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
+
+                runCallbackExhaust(cbState);
+            });
+        });
+    } else {
+        _pool->schedule([this, cbState](auto status) {
+            if (ErrorCodes::isCancelationError(status.code())) {
+                stdx::lock_guard<Latch> lk(_mutex);
+
+                cbState->canceled.store(1);
+            } else {
+                fassert(4615617, status);
+            }
+
+            runCallbackExhaust(cbState);
+        });
+    }
+
+    _net->signalWorkAvailable();
+}
+
+void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> cbState) {
+    CallbackHandle cbHandle;
+    setCallbackForHandle(&cbHandle, cbState);
+    CallbackArgs args(this,
+                      std::move(cbHandle),
+                      cbState->canceled.load()
+                          ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
+                          : Status::OK());
+    invariant(!cbState->isFinished.load());
+    {
+        // After running callback function, clear 'cbStateArg->callback' to release any resources
+        // that might be held by this function object.
+        // Swap 'cbStateArg->callback' with temporary copy before running callback for exception
+        // safety.
+        TaskExecutor::CallbackFn callback;
+        std::swap(cbState->callback, callback);
+        callback(std::move(args));
+    }
+
+    // Do not mark cbState as finished. It will be marked as finished on the last reply.
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(cbState->exhaustIter);
+    _poolInProgressQueue.erase(cbState->exhaustIter.get());
+    if (_inShutdown_inlock() && _poolInProgressQueue.empty()) {
+        _stateChange.notify_all();
+    }
+}
+
+bool ThreadPoolTaskExecutor::hasTasks() {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (!_poolInProgressQueue.empty() || !_networkInProgressQueue.empty() ||
+        !_sleepersQueue.empty()) {
+        return true;
+    }
+
+    return false;
 }
 
 bool ThreadPoolTaskExecutor::_inShutdown_inlock() const {

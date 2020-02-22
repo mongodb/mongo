@@ -68,5 +68,20 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRem
     return getExecutor()->scheduleRemoteCommandOnAny(request, cb, baton);
 }
 
+StatusWith<executor::TaskExecutor::CallbackHandle>
+TaskExecutorMock::scheduleExhaustRemoteCommandOnAny(
+    const executor::RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
+    const BatonHandle& baton) {
+    if (shouldFailScheduleRemoteCommandRequest(request)) {
+        return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
+    }
+    return getExecutor()->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+}
+
+bool TaskExecutorMock::hasTasks() {
+    return getExecutor()->hasTasks();
+}
+
 }  // namespace repl
 }  // namespace mongo

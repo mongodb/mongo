@@ -115,9 +115,22 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    return scheduleRemoteCommandOnAny(request, [cb](const RemoteCommandOnAnyCallbackArgs& args) {
-        cb({args, 0});
-    });
+    return scheduleRemoteCommandOnAny(request,
+                                      [cb](const RemoteCommandOnAnyCallbackArgs& args) {
+                                          cb({args, 0});
+                                      },
+                                      baton);
+}
+
+StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
+    const BatonHandle& baton) {
+    return scheduleExhaustRemoteCommandOnAny(request,
+                                             [cb](const RemoteCommandOnAnyCallbackArgs& args) {
+                                                 cb({args, 0});
+                                             },
+                                             baton);
 }
 
 }  // namespace executor

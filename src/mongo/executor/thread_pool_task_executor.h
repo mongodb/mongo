@@ -87,6 +87,10 @@ public:
         const RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
+        const RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const BatonHandle& baton = nullptr);
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;
@@ -97,6 +101,12 @@ public:
      * Drops all connections to the given host on the network interface.
      */
     void dropConnections(const HostAndPort& hostAndPort);
+
+    /**
+     * Returns true if there are any tasks in any of _poolInProgressQueue, _networkInProgressQueue,
+     * or _sleepersQueue.
+     */
+    bool hasTasks();
 
 private:
     class CallbackState;
@@ -174,9 +184,20 @@ private:
                                  stdx::unique_lock<Latch> lk);
 
     /**
+     * Schedules cbState into the thread pool and places it into _poolInProgressQueue. Does not
+     * remove the entry from the original queue.
+     */
+    void scheduleExhaustIntoPool_inlock(std::shared_ptr<CallbackState> cbState,
+                                        stdx::unique_lock<Latch> lk);
+    /**
      * Executes the callback specified by "cbState".
      */
     void runCallback(std::shared_ptr<CallbackState> cbState);
+
+    /**
+     * Executes the callback specified by "cbState". Will not mark cbState as finished.
+     */
+    void runCallbackExhaust(std::shared_ptr<CallbackState> cbState);
 
     bool _inShutdown_inlock() const;
     void _setState_inlock(State newState);
