@@ -240,37 +240,6 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         return;
     }
 
-    // It's possible that the index type (e.g. ascending/descending index) supports tracking
-    // path-level multikey information, but this particular index doesn't.
-    // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
-    // multikey information in order to avoid unintentionally setting path-level multikey
-    // information on an index created before 3.4.
-    bool indexMetadataHasChanged;
-
-    // The commit handler for a transaction that sets the multikey flag. When the recovery unit
-    // commits, update the multikey paths if needed and clear the plan cache if the index metadata
-    // has changed.
-    auto onMultikeyCommitFn = [this, multikeyPaths](bool indexMetadataHasChanged) {
-        _isMultikey.store(true);
-
-        if (_indexTracksPathLevelMultikeyInfo) {
-            stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
-            }
-        }
-
-        if (indexMetadataHasChanged && _queryInfo) {
-            LOGV2_DEBUG(
-                20351,
-                1,
-                "{ns}: clearing plan cache - index {descriptor_keyPattern} set to multi key.",
-                "ns"_attr = ns(),
-                "descriptor_keyPattern"_attr = _descriptor->keyPattern());
-            _queryInfo->clearQueryCache();
-        }
-    };
-
     // If we are inside a multi-document transaction, we write the on-disk multikey update in a
     // separate transaction so that it will not generate prepare conflicts with other operations
     // that try to set the multikey flag. In general, it should always be safe to update the
@@ -311,28 +280,16 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                 throw WriteConflictException();
             }
             fassert(31164, status);
-            indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
-                opCtx,
-                _descriptor->getCollection()->getCatalogId(),
-                _descriptor->indexName(),
-                paths);
-            opCtx->recoveryUnit()->onCommit(
-                [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
-                    onMultikeyCommitFn(indexMetadataHasChanged);
-                });
+
+            _catalogSetMultikey(opCtx, paths);
+
             wuow.commit();
         });
 
         return;
     }
 
-    indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
-        opCtx, _descriptor->getCollection()->getCatalogId(), _descriptor->indexName(), paths);
-
-    opCtx->recoveryUnit()->onCommit(
-        [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
-            onMultikeyCommitFn(indexMetadataHasChanged);
-        });
+    _catalogSetMultikey(opCtx, paths);
 }
 
 // ----
@@ -353,6 +310,45 @@ bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                        _descriptor->getCollection()->getCatalogId(),
                                                        _descriptor->indexName(),
                                                        multikeyPaths);
+}
+
+void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
+                                                const MultikeyPaths& multikeyPaths) {
+    // It's possible that the index type (e.g. ascending/descending index) supports tracking
+    // path-level multikey information, but this particular index doesn't.
+    // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
+    // multikey information in order to avoid unintentionally setting path-level multikey
+    // information on an index created before 3.4.
+    auto indexMetadataHasChanged =
+        DurableCatalog::get(opCtx)->setIndexIsMultikey(opCtx,
+                                                       _descriptor->getCollection()->getCatalogId(),
+                                                       _descriptor->indexName(),
+                                                       multikeyPaths);
+
+    // The commit handler for a transaction that sets the multikey flag. When the recovery unit
+    // commits, update the multikey paths if needed and clear the plan cache if the index metadata
+    // has changed.
+    opCtx->recoveryUnit()->onCommit(
+        [this, multikeyPaths, indexMetadataHasChanged](boost::optional<Timestamp>) {
+            _isMultikey.store(true);
+
+            if (_indexTracksPathLevelMultikeyInfo) {
+                stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+                for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                    _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+                }
+            }
+
+            if (indexMetadataHasChanged && _queryInfo) {
+                LOGV2_DEBUG(
+                    20351,
+                    1,
+                    "{ns}: clearing plan cache - index {descriptor_keyPattern} set to multi key.",
+                    "ns"_attr = ns(),
+                    "descriptor_keyPattern"_attr = _descriptor->keyPattern());
+                _queryInfo->clearQueryCache();
+            }
+        });
 }
 
 KVPrefix IndexCatalogEntryImpl::_catalogGetPrefix(OperationContext* opCtx) const {

@@ -186,8 +186,6 @@ public:
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
 private:
-    class SetMultikeyChange;
-
     bool _catalogIsReady(OperationContext* opCtx) const;
     bool _catalogIsPresent(OperationContext* opCtx) const;
 
@@ -197,6 +195,11 @@ private:
      * See CollectionCatalogEntry::isIndexMultikey() for more details.
      */
     bool _catalogIsMultikey(OperationContext* opCtx, MultikeyPaths* multikeyPaths) const;
+
+    /**
+     * Sets on-disk multikey flag for this index.
+     */
+    void _catalogSetMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths);
 
     KVPrefix _catalogGetPrefix(OperationContext* opCtx) const;
 
