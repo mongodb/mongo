@@ -186,6 +186,13 @@ public:
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
 private:
+    /**
+     * Sets this index to be multikey when we are running inside a multi-document transaction.
+     * Used by setMultikey() only.
+     */
+    Status _setMultikeyInMultiDocumentTransaction(OperationContext* opCtx,
+                                                  const MultikeyPaths& multikeyPaths);
+
     bool _catalogIsReady(OperationContext* opCtx) const;
     bool _catalogIsPresent(OperationContext* opCtx) const;
 

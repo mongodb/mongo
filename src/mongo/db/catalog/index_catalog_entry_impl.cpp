@@ -240,6 +240,19 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         return;
     }
 
+    if (opCtx->inMultiDocumentTransaction()) {
+        auto status = _setMultikeyInMultiDocumentTransaction(opCtx, paths);
+        // Retry without side transaction.
+        if (!status.isOK()) {
+            _catalogSetMultikey(opCtx, paths);
+        }
+    } else {
+        _catalogSetMultikey(opCtx, paths);
+    }
+}
+
+Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
+    OperationContext* opCtx, const MultikeyPaths& multikeyPaths) {
     // If we are inside a multi-document transaction, we write the on-disk multikey update in a
     // separate transaction so that it will not generate prepare conflicts with other operations
     // that try to set the multikey flag. In general, it should always be safe to update the
@@ -247,49 +260,46 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // multikey flag write and the parent transaction. We can do this write separately and commit it
     // before the parent transaction commits.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    while (opCtx->inMultiDocumentTransaction()) {
-        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-        // If the index is not visible within the side transaction, the index may have been created,
-        // but not committed, in the parent transaction. Therefore, we abandon the side transaction
-        // and set the multikey flag in the parent transaction.
-        if (!_catalogIsPresent(opCtx)) {
-            break;
-        }
+    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-        writeConflictRetry(opCtx, "set index multikey", ns().ns(), [&] {
-            WriteUnitOfWork wuow(opCtx);
-
-            // If we have a prepare optime for recovery, then we always use that. During recovery of
-            // prepared transactions, the logical clock may not yet be initialized, so we use the
-            // prepare timestamp of the transaction for this write. This is safe since the prepare
-            // timestamp is always <= the commit timestamp of a transaction, which satisfies the
-            // correctness requirement for multikey writes i.e. they must occur at or before the
-            // first write that set the multikey flag.
-            auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
-            Timestamp writeTs = recoveryPrepareOpTime.isNull()
-                ? LogicalClock::get(opCtx)->getClusterTime().asTimestamp()
-                : recoveryPrepareOpTime.getTimestamp();
-
-            auto status = opCtx->recoveryUnit()->setTimestamp(writeTs);
-            if (status.code() == ErrorCodes::BadValue) {
-                LOGV2(20352,
-                      "Temporarily could not timestamp the multikey catalog write, retrying. "
-                      "{status_reason}",
-                      "status_reason"_attr = status.reason());
-                throw WriteConflictException();
-            }
-            fassert(31164, status);
-
-            _catalogSetMultikey(opCtx, paths);
-
-            wuow.commit();
-        });
-
-        return;
+    // If the index is not visible within the side transaction, the index may have been created,
+    // but not committed, in the parent transaction. Therefore, we abandon the side transaction
+    // and set the multikey flag in the parent transaction.
+    if (!_catalogIsPresent(opCtx)) {
+        return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
-    _catalogSetMultikey(opCtx, paths);
+    writeConflictRetry(opCtx, "set index multikey", ns().ns(), [&] {
+        WriteUnitOfWork wuow(opCtx);
+
+        // If we have a prepare optime for recovery, then we always use that. During recovery of
+        // prepared transactions, the logical clock may not yet be initialized, so we use the
+        // prepare timestamp of the transaction for this write. This is safe since the prepare
+        // timestamp is always <= the commit timestamp of a transaction, which satisfies the
+        // correctness requirement for multikey writes i.e. they must occur at or before the
+        // first write that set the multikey flag.
+        auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
+        Timestamp writeTs = recoveryPrepareOpTime.isNull()
+            ? LogicalClock::get(opCtx)->getClusterTime().asTimestamp()
+            : recoveryPrepareOpTime.getTimestamp();
+
+        auto status = opCtx->recoveryUnit()->setTimestamp(writeTs);
+        if (status.code() == ErrorCodes::BadValue) {
+            LOGV2(20352,
+                  "Temporarily could not timestamp the multikey catalog write, retrying. "
+                  "{status_reason}",
+                  "status_reason"_attr = status.reason());
+            throw WriteConflictException();
+        }
+        fassert(31164, status);
+
+        _catalogSetMultikey(opCtx, multikeyPaths);
+
+        wuow.commit();
+    });
+
+    return Status::OK();
 }
 
 // ----
