@@ -28,7 +28,14 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);
+    sessionColl.drop({writeConcern: {w: "majority"}});
 
+    jsTest.log("Testing multikey createIndexes in a transaction");
+    session.startTransaction({writeConcern: {w: "majority"}});
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, true);
+    session.commitTransaction();
+    assert.eq(sessionColl.find({}).itcount(), 1);
+    assert.eq(sessionColl.getIndexes().length, 2);
     sessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing multiple createIndexess in a transaction");
