@@ -51,7 +51,7 @@ const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism
     adminDB.logout();
     const matches = tojson(log.log).match(regexMechanism);
     assert(matches);
-    assert.eq(2, matches.length);
+    assert.gte(matches.length, 2);
 
     MongoRunner.stopMongod(conn);
 };
