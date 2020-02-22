@@ -2922,7 +2922,6 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
-    auto topCoordTerm = _topCoord->getTerm();
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -2936,7 +2935,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
     // When initializing a new config through the replSetReconfig command, ignore the term
     // field passed in through its args. Instead, use this node's term.
-    Status status = newConfig.initialize(newConfigObj, topCoordTerm, oldConfig.getReplicaSetId());
+    // If it is a force reconfig, explicitly set the term to -1.
+
+    auto term = !args.force ? _topCoord->getTerm() : OpTime::kUninitializedTerm;
+    Status status = newConfig.initialize(newConfigObj, term, oldConfig.getReplicaSetId());
     if (!status.isOK()) {
         LOGV2_ERROR(21418,
                     "replSetReconfig got {status} while parsing {newConfigObj}",

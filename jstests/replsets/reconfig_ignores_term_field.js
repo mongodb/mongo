@@ -26,5 +26,20 @@ replTest.awaitReplication();
 
 config = primary.getDB("local").system.replset.findOne();
 assert.eq(config.term, 1);
+
+jsTestLog("Force reconfig ignores user provided term");
+config.term = 55;
+config.version++;
+assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config, force: true}));
+config = primary.getDB("local").system.replset.findOne();
+assert.eq(config.term, -1);
+
+jsTestLog("Force reconfig with missing term results in term -1");
+delete config.term;
+config.version++;
+assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config, force: true}));
+config = primary.getDB("local").system.replset.findOne();
+assert.eq(config.term, -1);
+
 replTest.stopSet();
 }());
