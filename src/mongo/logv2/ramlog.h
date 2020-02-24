@@ -29,29 +29,33 @@
 
 #pragma once
 
-#include <boost/version.hpp>
-#include <sstream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 namespace logv2 {
 
 /**
- * Fixed-capacity log of line-oriented messages.
+ * Variable-capacity circular log of line-oriented messages.
  *
- * Holds up to RamLog::N lines of up to RamLog::C bytes, each.
+ * Holds up to RamLog::kMaxLines lines and caps total space to RamLog::kMaxSizeBytes [1]. There is
+ * no limit on the length of the line. RamLog expects the caller to truncate lines to a reasonable
+ * length.
  *
  * RamLogs are stored in a global registry, accessed via RamLog::get() and
  * RamLog::getIfExists().
  *
  * RamLogs and their registry are self-synchronizing.  See documentary comments.
  * To read a RamLog, instantiate a RamLog::LineIterator, documented below.
+ *
+ * Note:
+ * 1. In the degenerate case of a single log line being above RamLog::kMaxSizeBytes, it may
+ *    keep up to two log lines and exceed the size cap.
  */
 class RamLog {
     RamLog(const RamLog&) = delete;
@@ -84,8 +88,7 @@ public:
 
     /**
      * Writes "str" as a line into the RamLog.  If "str" is longer than the maximum
-     * line size, RamLog::C, truncates the line to the first C bytes.  If "str"
-     * is shorter than RamLog::C and has a terminal '\n', it omits that character.
+     * line size of the log, it keeps two lines.
      *
      * Synchronized on the instance's own mutex, _mutex.
      */
@@ -97,31 +100,42 @@ public:
     void clear();
 
 private:
-    static int repeats(const std::vector<const char*>& v, int i);
-    static std::string clean(const std::vector<const char*>& v, int i, std::string line = "");
-
-    /* turn http:... into an anchor */
-    static std::string linkify(const char* s);
-
-    explicit RamLog(const std::string& name);
+    explicit RamLog(StringData name);
     ~RamLog();  // want this private as we want to leak so we can use them till the very end
 
-    enum {
-        N = 1024,  // number of lines
-        C = 3072   // max size of line
-    };
+    StringData getLine(size_t lineNumber, WithLock lock) const;
 
-    const char* getLine_inlock(unsigned lineNumber) const;
+    size_t getLineCount(WithLock) const;
+
+    void trimIfNeeded(size_t newStr, WithLock lock);
+
+private:
+    // Maximum number of lines
+    static constexpr size_t kMaxLines = 1024;
+
+    // Maximum capacity of RamLog of string data
+    static constexpr size_t kMaxSizeBytes = 1024 * 1024;
 
     // Guards all non-static data.
     stdx::mutex _mutex;  // NOLINT
-    char lines[N][C];
-    unsigned h;  // current position
-    unsigned n;  // number of lines stores 0 o N
-    std::string _name;
-    long long _totalLinesWritten;
 
-    time_t _lastWrite;
+    // Array of lines
+    std::array<std::string, kMaxLines> _lines;
+
+    // First line of ram log
+    size_t _firstLinePosition;
+
+    // Last line of ram log
+    size_t _lastLinePosition;
+
+    // Total size of bytes written
+    size_t _totalSizeBytes;
+
+    // Name of Ram Log
+    std::string _name;
+
+    // Total lines written since last clear, can be > kMaxLines
+    size_t _totalLinesWritten;
 };
 
 /**
@@ -143,30 +157,28 @@ public:
      * Returns true if there are more lines available to return by calls to next().
      */
     bool more() const {
-        return _nextLineIndex < _ramlog->n;
+        return _nextLineIndex < _ramlog->getLineCount(_lock);
     }
 
     /**
      * Returns the next line and advances the iterator.
      */
-    const char* next() {
-        return _ramlog->getLine_inlock(_nextLineIndex++);  // Postfix increment.
+    StringData next() {
+        return _ramlog->getLine(_nextLineIndex++, _lock);  // Postfix increment.
     }
-
-    /**
-     * Returns the time of the last write to the ramlog.
-     */
-    time_t lastWrite();
 
     /**
      * Returns the total number of lines ever written to the ramlog.
      */
-    long long getTotalLinesWritten();
+    size_t getTotalLinesWritten();
 
 private:
     const RamLog* _ramlog;
+
+    // Holds RamLog's mutex
     stdx::lock_guard<stdx::mutex> _lock;
-    unsigned _nextLineIndex;
+
+    size_t _nextLineIndex;
 };
 
 }  // namespace logv2

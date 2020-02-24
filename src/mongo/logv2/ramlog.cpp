@@ -48,106 +48,101 @@ RM* _named = NULL;
 
 }  // namespace
 
-RamLog::RamLog(const std::string& name) : _name(name), _totalLinesWritten(0), _lastWrite(0) {
+RamLog::RamLog(StringData name) : _name(name) {
     clear();
-    for (int i = 0; i < N; i++)
-        lines[i][C - 1] = 0;
 }
 
 RamLog::~RamLog() {}
 
 void RamLog::write(const std::string& str) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _lastWrite = time(0);
     _totalLinesWritten++;
 
-    char* p = lines[(h + n) % N];
-
-    unsigned sz = str.size() + 1;
-    if (1 == sz)
+    if (0 == str.size()) {
         return;
-    if (sz < C) {
-        memcpy(p, str.c_str(), sz);
-    } else {
-        memcpy(p, str.c_str(), C - 1);
-        *(p + C - 1) = '\0';
     }
 
-    if (n < N)
-        n++;
-    else
-        h = (h + 1) % N;
+    // Trim if we are going to go above the threshold
+    trimIfNeeded(str.size(), lk);
+
+    // Add the new line and adjust the space accounting
+    _totalSizeBytes -= _lines[_lastLinePosition].size();
+    _lines[_lastLinePosition] = str;
+    _totalSizeBytes += str.size();
+
+    // Advance the last line position to the next entry
+    _lastLinePosition = (_lastLinePosition + 1) % kMaxLines;
+
+    // If _lastLinePosition is == _firstLinePosition, it means we wrapped around so advance
+    // firstLinePosition
+    if (_lastLinePosition == _firstLinePosition) {
+        _firstLinePosition = (_firstLinePosition + 1) % kMaxLines;
+    }
+}
+
+void RamLog::trimIfNeeded(size_t newStr, WithLock lock) {
+    // Check if we are going to go past the size limit
+    if ((_totalSizeBytes + newStr) < kMaxSizeBytes) {
+        return;
+    }
+
+    // Worst case, if the user adds a really large line, we will keep just one line
+    if (getLineCount(lock) == 0) {
+        return;
+    }
+
+    // The buffer has grown large, so trim back enough to fit our new string
+    size_t trimmedSpace = 0;
+
+    // Trim down until we make enough space, keep at least one line though
+    // This means with the line we are about to have, the log will actually have 2 lines
+    while (getLineCount(lock) > 1 && trimmedSpace < newStr) {
+        size_t size = _lines[_firstLinePosition].size();
+        trimmedSpace += size;
+        _totalSizeBytes -= size;
+
+        _lines[_firstLinePosition].clear();
+        _lines[_firstLinePosition].shrink_to_fit();
+
+        _firstLinePosition = (_firstLinePosition + 1) % kMaxLines;
+    }
 }
 
 void RamLog::clear() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _totalLinesWritten = 0;
-    _lastWrite = 0;
-    h = 0;
-    n = 0;
-    for (int i = 0; i < N; i++)
-        lines[i][0] = 0;
-}
+    _firstLinePosition = 0;
+    _lastLinePosition = 0;
+    _totalSizeBytes = 0;
 
-time_t RamLog::LineIterator::lastWrite() {
-    return _ramlog->_lastWrite;
-}
-
-long long RamLog::LineIterator::getTotalLinesWritten() {
-    return _ramlog->_totalLinesWritten;
-}
-
-const char* RamLog::getLine_inlock(unsigned lineNumber) const {
-    if (lineNumber >= n)
-        return "";
-    return lines[(lineNumber + h) % N];  // h = 0 unless n == N, hence modulo N.
-}
-
-int RamLog::repeats(const std::vector<const char*>& v, int i) {
-    for (int j = i - 1; j >= 0 && j + 8 > i; j--) {
-        if (strcmp(v[i] + 24, v[j] + 24) == 0) {
-            for (int x = 1;; x++) {
-                if (j + x == i)
-                    return j;
-                if (i + x >= (int)v.size())
-                    return -1;
-                if (strcmp(v[i + x] + 24, v[j + x] + 24))
-                    return -1;
-            }
-            return -1;
-        }
+    for (size_t i = 0; i < kMaxLines; i++) {
+        _lines[i].clear();
+        _lines[i].shrink_to_fit();
     }
-    return -1;
 }
 
+StringData RamLog::getLine(size_t lineNumber, WithLock lock) const {
+    if (lineNumber >= getLineCount(lock)) {
+        return "";
+    }
 
-string RamLog::clean(const std::vector<const char*>& v, int i, string line) {
-    if (line.empty())
-        line = v[i];
-    if (i > 0 && strncmp(v[i], v[i - 1], 11) == 0)
-        return string("           ") + line.substr(11);
-    return v[i];
+    return _lines[(lineNumber + _firstLinePosition) % kMaxLines].c_str();
 }
 
-/* turn http:... into an anchor */
-string RamLog::linkify(const char* s) {
-    const char* p = s;
-    const char* h = strstr(p, "http://");
-    if (h == 0)
-        return s;
+size_t RamLog::getLineCount(WithLock) const {
+    if (_lastLinePosition < _firstLinePosition) {
+        return (kMaxLines - _firstLinePosition) + _lastLinePosition;
+    }
 
-    const char* sp = h + 7;
-    while (*sp && *sp != ' ')
-        sp++;
-
-    string url(h, sp - h);
-    std::stringstream ss;
-    ss << string(s, h - s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
-    return ss.str();
+    return _lastLinePosition - _firstLinePosition;
 }
 
 RamLog::LineIterator::LineIterator(RamLog* ramlog)
     : _ramlog(ramlog), _lock(ramlog->_mutex), _nextLineIndex(0) {}
+
+size_t RamLog::LineIterator::getTotalLinesWritten() {
+    return _ramlog->_totalLinesWritten;
+}
 
 // ---------------
 // static things
@@ -170,24 +165,28 @@ RamLog* RamLog::get(const std::string& name) {
         result = new RamLog(name);
         (*_named)[name] = result;
     }
+
     return result;
 }
 
 RamLog* RamLog::getIfExists(const std::string& name) {
-    if (!_named)
+    if (!_named) {
         return NULL;
+    }
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
     return mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
 }
 
 void RamLog::getNames(std::vector<string>& names) {
-    if (!_named)
+    if (!_named) {
         return;
+    }
 
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
     for (RM::iterator i = _named->begin(); i != _named->end(); ++i) {
-        if (i->second->n)
+        if (i->second->getLineCount(lk)) {
             names.push_back(i->first);
+        }
     }
 }
 
@@ -201,6 +200,7 @@ MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
             return Status(ErrorCodes::InternalError,
                           "Inconsistent intiailization of RamLogCatalog.");
         }
+
         _namedLock = new stdx::mutex();  // NOLINT
         _named = new RM();
     }

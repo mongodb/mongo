@@ -1314,6 +1314,103 @@ TEST_F(LogTestV2, Ramlog) {
     ASSERT(verifyRamLog());
 }
 
+// Positive: Test that the ram log is properly circular
+TEST_F(LogTestV2, Ramlog_CircularBuffer) {
+    RamLog* ramlog = RamLog::get("test_ramlog2");
+
+    std::vector<std::string> lines;
+
+    constexpr size_t maxLines = 1024;
+    constexpr size_t testLines = 5000;
+
+    // Write enough lines to trigger wrapping
+    for (size_t i = 0; i < testLines; ++i) {
+        auto s = std::to_string(i);
+        lines.push_back(s);
+        ramlog->write(s);
+    }
+
+    lines.erase(lines.begin(), lines.begin() + (testLines - maxLines) + 1);
+
+    // Verify we circled correctly through the buffer
+    {
+        RamLog::LineIterator iter(ramlog);
+        ASSERT_EQ(iter.getTotalLinesWritten(), 5000UL);
+        for (const auto& line : lines) {
+            ASSERT_EQ(line, iter.next());
+        }
+    }
+
+    ramlog->clear();
+}
+
+// Positive: Test that the ram log has a max size cap
+TEST_F(LogTestV2, Ramlog_MaxSize) {
+    RamLog* ramlog = RamLog::get("test_ramlog3");
+
+    std::vector<std::string> lines;
+
+    constexpr size_t testLines = 2000;
+    constexpr size_t longStringLength = 2048;
+
+    std::string longStr(longStringLength, 'a');
+
+    // Write enough lines to trigger wrapping and trimming
+    for (size_t i = 0; i < testLines; ++i) {
+        auto s = std::to_string(10000 + i) + longStr;
+        lines.push_back(s);
+        ramlog->write(s);
+    }
+
+    constexpr size_t linesToFit = (1024 * 1024) / (5 + longStringLength);
+
+    lines.erase(lines.begin(), lines.begin() + (testLines - linesToFit));
+
+    // Verify we keep just enough lines that fit
+    {
+        RamLog::LineIterator iter(ramlog);
+        ASSERT_EQ(iter.getTotalLinesWritten(), 2000UL);
+        for (const auto& line : lines) {
+            ASSERT_EQ(line, iter.next());
+        }
+    }
+
+    ramlog->clear();
+}
+
+// Positive: Test that the ram log handles really large lines
+TEST_F(LogTestV2, Ramlog_GiantLine) {
+    RamLog* ramlog = RamLog::get("test_ramlog4");
+
+    std::vector<std::string> lines;
+
+    constexpr size_t testLines = 5000;
+
+    // Write enough lines to trigger wrapping
+    for (size_t i = 0; i < testLines; ++i) {
+        ramlog->write(std::to_string(i));
+    }
+
+    auto s = std::to_string(testLines);
+    lines.push_back(s);
+    ramlog->write(s);
+
+    std::string bigStr(2048 * 1024, 'a');
+    lines.push_back(bigStr);
+    ramlog->write(bigStr);
+
+    // Verify we keep 2 lines
+    {
+        RamLog::LineIterator iter(ramlog);
+        ASSERT_EQ(iter.getTotalLinesWritten(), testLines + 2);
+        for (const auto& line : lines) {
+            ASSERT_EQ(line, iter.next());
+        }
+    }
+
+    ramlog->clear();
+}
+
 TEST_F(LogTestV2, MultipleDomains) {
     std::vector<std::string> global_lines;
     auto sink = LogCaptureBackend::create(global_lines);
