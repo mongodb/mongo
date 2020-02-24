@@ -163,10 +163,10 @@ BSONObj toBSON(const TypeWithNonMemberFormatting&) {
     return builder.obj();
 }
 
-class LogDuringInitTester {
+class LogDuringInitShutdownTester {
 public:
-    LogDuringInitTester() {
-        std::vector<std::string> lines;
+    LogDuringInitShutdownTester() {
+
         auto sink = LogCaptureBackend::create(lines);
         sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
                                                  LogManager::global().getGlobalSettings()));
@@ -174,13 +174,17 @@ public:
         boost::log::core::get()->add_sink(sink);
 
         LOGV2(20001, "log during init");
-        ASSERT(lines.back() == "log during init");
-
-        boost::log::core::get()->remove_sink(sink);
+        ASSERT_EQUALS(lines.back(), "log during init");
     }
+    ~LogDuringInitShutdownTester() {
+        LOGV2(4600800, "log during shutdown");
+        ASSERT_EQUALS(lines.back(), "log during shutdown");
+    }
+
+    std::vector<std::string> lines;
 };
 
-LogDuringInitTester logDuringInit;
+LogDuringInitShutdownTester logDuringInitAndShutdown;
 
 TEST_F(LogTestV2, Basic) {
     std::vector<std::string> lines;

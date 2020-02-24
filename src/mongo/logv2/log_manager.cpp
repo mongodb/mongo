@@ -51,8 +51,8 @@ LogManager::LogManager() {
 LogManager::~LogManager() {}
 
 LogManager& LogManager::global() {
-    static LogManager globalLogManager;
-    return globalLogManager;
+    static LogManager* globalLogManager = new LogManager();
+    return *globalLogManager;
 }
 
 LogDomain& LogManager::getGlobalDomain() {

@@ -68,6 +68,8 @@ struct LogDomainGlobal::Impl {
 
     const ConfigurationOptions& config() const;
 
+    LogSource& source();
+
     LogDomainGlobal& _parent;
     LogComponentSettings _settings;
     ConfigurationOptions _config;
@@ -76,6 +78,9 @@ struct LogDomainGlobal::Impl {
 #ifndef _WIN32
     boost::shared_ptr<boost::log::sinks::unlocked_sink<SyslogBackend>> _syslogSink;
 #endif
+    AtomicWord<int32_t> activeSourceThreadLocals{0};
+    LogSource shutdownLogSource{&_parent, true};
+    bool isInShutdown{false};
 };
 
 LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
@@ -96,6 +101,10 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
 
     // Set default configuration
     invariant(configure({}).isOK());
+
+    // Make a call to source() to make sure the internal thread_local is created as early as
+    // possible and thus destroyed as late as possible.
+    source();
 }
 
 Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions const& options) {
@@ -214,6 +223,36 @@ Status LogDomainGlobal::Impl::rotate(bool rename, StringData renameSuffix) {
     return Status::OK();
 }
 
+LogSource& LogDomainGlobal::Impl::source() {
+    // Use a thread_local logger so we don't need to have locking. thread_locals are destroyed
+    // before statics so keep track of number of thread_locals we have active and if this code
+    // is hit when it is zero then we are in shutdown and can use a global LogSource that does
+    // not provide synchronization instead.
+    class SourceCache {
+    public:
+        SourceCache(Impl* domain) : _domain(domain), _source(&domain->_parent) {
+            _domain->activeSourceThreadLocals.addAndFetch(1);
+        }
+        ~SourceCache() {
+            if (_domain->activeSourceThreadLocals.subtractAndFetch(1) == 0) {
+                _domain->isInShutdown = true;
+            }
+        }
+
+        LogSource& source() {
+            return _source;
+        }
+
+    private:
+        Impl* _domain;
+        LogSource _source;
+    };
+    thread_local SourceCache cache(this);
+    if (isInShutdown)
+        return shutdownLogSource;
+    return cache.source();
+}
+
 LogDomainGlobal::LogDomainGlobal() {
     _impl = std::make_unique<Impl>(*this);
 }
@@ -221,9 +260,7 @@ LogDomainGlobal::LogDomainGlobal() {
 LogDomainGlobal::~LogDomainGlobal() {}
 
 LogSource& LogDomainGlobal::source() {
-    // Use a thread_local logger so we don't need to have locking
-    thread_local LogSource lg(this);
-    return lg;
+    return _impl->source();
 }
 
 

@@ -57,7 +57,7 @@ private:
         basic_logger<char, LogSource, boost::log::sources::single_thread_model>;
 
 public:
-    LogSource(const LogDomain::Internal* domain)
+    explicit LogSource(const LogDomain::Internal* domain, bool isShutdown)
         : _domain(domain),
           _severity(LogSeverity::Log()),
           _component(LogComponent::kDefault),
@@ -73,10 +73,13 @@ public:
         add_attribute_unlocked(attributes::timeStamp(), boost::log::attributes::make_function([]() {
                                    return Date_t::now();
                                }));
-        add_attribute_unlocked(
-            attributes::threadName(),
-            boost::log::attributes::make_function([]() { return getThreadName(); }));
+        add_attribute_unlocked(attributes::threadName(),
+                               boost::log::attributes::make_function([isShutdown]() {
+                                   return isShutdown ? "shutdown"_sd : getThreadName();
+                               }));
     }
+
+    explicit LogSource(const LogDomain::Internal* domain) : LogSource(domain, false) {}
 
     boost::log::record open_record(int32_t id,
                                    LogSeverity severity,
