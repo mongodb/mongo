@@ -416,6 +416,7 @@ function findMatchingLogLine(logLines, fields, ignoreFields) {
         return (typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, '\\$&')
                                           : input);
     }
+
     function lineMatches(line, fields, ignoreFields) {
         const fieldNames =
             Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
@@ -423,9 +424,37 @@ function findMatchingLogLine(logLines, fields, ignoreFields) {
             const fieldValue = fields[fieldName];
             let regex;
             if (isJsonLogNoConn()) {
-                regex = "\"" + escapeRegex(fieldName) + "\":? ?(" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+                const booleanFields = [
+                    'cursorExhausted',
+                    'upsert',
+                    'hasSortStage',
+                    'usedDisk',
+                    'cursorExhausted',
+                    'cursorExhausted'
+                ];
+
+                // Command is a special case since it is the first arg of the message, not a
+                // separate field
+                if (fieldName === "command") {
+                    let commandName = fieldValue;
+
+                    // These commands can be sent camelCase or lower case but shell sends them lower
+                    // case
+                    if (fieldValue === "findAndModify" || fieldValue === "mapReduce") {
+                        commandName = fieldValue.toLowerCase();
+                    }
+
+                    regex = `"command":{"${commandName}`;
+                } else if (fieldName === "insert" && fieldValue.indexOf("|") != -1) {
+                    // Match new and legacy insert
+                    regex = `("insert","ns":"(${fieldValue})"|("insert":"(${fieldValue})"))`;
+                } else if (booleanFields.find(f => f === fieldName) && fieldValue == 1) {
+                    regex = `"${fieldName}":true`;
+                } else {
+                    regex = "\"" + escapeRegex(fieldName) + "\":(" +
+                        escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
+                        escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+                }
             } else {
                 regex = escapeRegex(fieldName) + ":? ?(" +
                     escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +

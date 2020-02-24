@@ -465,13 +465,10 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         LOGV2_DEBUG(20937,
                     1,
                     "Creating inactive cache entry for query shape {query_Short} queryHash "
-                    "{unsignedIntToFixedLengthHex_queryHash} planCacheKey "
-                    "{unsignedIntToFixedLengthHex_planCacheKey} with works value {newWorks}",
+                    "{queryHash} planCacheKey {planCacheKey} with works value {newWorks}",
                     "query_Short"_attr = redact(query.toStringShort()),
-                    "unsignedIntToFixedLengthHex_queryHash"_attr =
-                        unsignedIntToFixedLengthHex(queryHash),
-                    "unsignedIntToFixedLengthHex_planCacheKey"_attr =
-                        unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
+                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
                     "newWorks"_attr = newWorks);
         res.shouldBeCreated = true;
         res.shouldBeActive = false;
@@ -484,15 +481,12 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
 
         LOGV2_DEBUG(20938,
                     1,
-                    "Replacing active cache entry for query {query_Short} queryHash "
-                    "{unsignedIntToFixedLengthHex_queryHash} planCacheKey "
-                    "{unsignedIntToFixedLengthHex_planCacheKey} with works {oldEntry_works} with a "
-                    "plan with works {newWorks}",
+                    "Replacing active cache entry for query {query_Short} queryHash {queryHash} "
+                    "planCacheKey {planCacheKey} with works {oldEntry_works} with a plan with "
+                    "works {newWorks}",
                     "query_Short"_attr = redact(query.toStringShort()),
-                    "unsignedIntToFixedLengthHex_queryHash"_attr =
-                        unsignedIntToFixedLengthHex(queryHash),
-                    "unsignedIntToFixedLengthHex_planCacheKey"_attr =
-                        unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
+                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
                     "oldEntry_works"_attr = oldEntry->works,
                     "newWorks"_attr = newWorks);
         res.shouldBeCreated = true;
@@ -501,14 +495,11 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         LOGV2_DEBUG(20939,
                     1,
                     "Attempt to write to the planCache for query {query_Short} queryHash "
-                    "{unsignedIntToFixedLengthHex_queryHash} planCacheKey "
-                    "{unsignedIntToFixedLengthHex_planCacheKey} with a plan with works {newWorks} "
-                    "is a noop, since there's already a plan with works value {oldEntry_works}",
+                    "{queryHash} planCacheKey {planCacheKey} with a plan with works {newWorks} is "
+                    "a noop, since there's already a plan with works value {oldEntry_works}",
                     "query_Short"_attr = redact(query.toStringShort()),
-                    "unsignedIntToFixedLengthHex_queryHash"_attr =
-                        unsignedIntToFixedLengthHex(queryHash),
-                    "unsignedIntToFixedLengthHex_planCacheKey"_attr =
-                        unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
+                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
                     "newWorks"_attr = newWorks,
                     "oldEntry_works"_attr = oldEntry->works);
         // There is already an active cache entry with a higher works value.
@@ -530,12 +521,10 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
             20940,
             1,
             "Increasing work value associated with cache entry for query {query_Short} queryHash "
-            "{unsignedIntToFixedLengthHex_queryHash} planCacheKey "
-            "{unsignedIntToFixedLengthHex_planCacheKey} from {oldEntry_works} to {increasedWorks}",
+            "{queryHash} planCacheKey {planCacheKey} from {oldEntry_works} to {increasedWorks}",
             "query_Short"_attr = redact(query.toStringShort()),
-            "unsignedIntToFixedLengthHex_queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-            "unsignedIntToFixedLengthHex_planCacheKey"_attr =
-                unsignedIntToFixedLengthHex(planCacheKey),
+            "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
+            "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
             "oldEntry_works"_attr = oldEntry->works,
             "increasedWorks"_attr = increasedWorks);
         oldEntry->works = increasedWorks;
@@ -548,15 +537,12 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         // cache (as an active entry) the plan this query used for the future.
         LOGV2_DEBUG(20941,
                     1,
-                    "Inactive cache entry for query {query_Short} queryHash "
-                    "{unsignedIntToFixedLengthHex_queryHash} planCacheKey "
-                    "{unsignedIntToFixedLengthHex_planCacheKey} with works {oldEntry_works} is "
-                    "being promoted to active entry with works value {newWorks}",
+                    "Inactive cache entry for query {query_Short} queryHash {queryHash} "
+                    "planCacheKey {planCacheKey} with works {oldEntry_works} is being promoted to "
+                    "active entry with works value {newWorks}",
                     "query_Short"_attr = redact(query.toStringShort()),
-                    "unsignedIntToFixedLengthHex_queryHash"_attr =
-                        unsignedIntToFixedLengthHex(queryHash),
-                    "unsignedIntToFixedLengthHex_planCacheKey"_attr =
-                        unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
+                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
                     "oldEntry_works"_attr = oldEntry->works,
                     "newWorks"_attr = newWorks);
         // We'll replace the old inactive entry with an active entry.

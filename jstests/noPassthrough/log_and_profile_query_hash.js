@@ -6,6 +6,7 @@
 
 // For getLatestProfilerEntry().
 load("jstests/libs/profiler.js");
+load("jstests/libs/logv2_helpers.js");
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -29,7 +30,8 @@ assert.commandWorked(testDB.setLogLevel(0, "query"));
 // Returns true if the logLine command components correspond to the profile entry. This is
 // sufficient for the purpose of testing query hashes.
 function logMatchesEntry(logLine, profileEntry) {
-    if (logLine.indexOf("command: find { find: \"test\"") >= 0 &&
+    if ((!isJsonLogNoConn() ? logLine.indexOf("command: find { find: \"test\"") >= 0
+                            : logLine.indexOf('command":{"find":"test"') >= 0) &&
         logLine.indexOf(profileEntry["command"]["comment"]) >= 0) {
         return true;
     }
@@ -153,9 +155,13 @@ const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 // Fetch the line that logs when an inactive cache entry is created for the query with
 // 'planCacheKey' and 'queryHash'. Confirm only one line does this.
 const creationLogList = log.filter(
-    logLine => (logLine.indexOf("Creating inactive cache entry for query shape") != -1 &&
-                logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
-                logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1));
+    logLine => (
+        logLine.indexOf("Creating inactive cache entry for query shape") != -1 &&
+        (!isJsonLog(conn)
+             ? (logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
+                logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1)
+             : (logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
+                logLine.indexOf('"queryHash":"' + String(onCreationHashes.queryHash)) != -1))));
 assert.eq(1, creationLogList.length);
 
 MongoRunner.stopMongod(conn);
