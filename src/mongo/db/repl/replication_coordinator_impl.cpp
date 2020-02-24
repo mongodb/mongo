@@ -2922,6 +2922,13 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
+    // Only explicitly set configTerm for reconfig to this node's term if we're in FCV 4.4.
+    // Otherwise, use -1.
+    // Make sure we get the term from the topCoord under the replCoord mutex.
+    auto topCoordTerm = serverGlobalParams.featureCompatibility.isVersion(
+                            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)
+        ? _topCoord->getTerm()
+        : OpTime::kUninitializedTerm;
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -2936,8 +2943,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     // When initializing a new config through the replSetReconfig command, ignore the term
     // field passed in through its args. Instead, use this node's term.
     // If it is a force reconfig, explicitly set the term to -1.
-
-    auto term = !args.force ? _topCoord->getTerm() : OpTime::kUninitializedTerm;
+    auto term = !args.force ? topCoordTerm : OpTime::kUninitializedTerm;
     Status status = newConfig.initialize(newConfigObj, term, oldConfig.getReplicaSetId());
     if (!status.isOK()) {
         LOGV2_ERROR(21418,
