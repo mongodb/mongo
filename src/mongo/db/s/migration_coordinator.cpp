@@ -180,7 +180,7 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     LOGV2(23895,
           "{logPrefix}Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
-          "{migrationInfo_getLsid} txn: {TxnNumber_1}",
+          "{migrationInfo_getLsid} txn: {TxnNumber}",
           "logPrefix"_attr = _logPrefix(),
           "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
           "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
@@ -225,7 +225,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
 
     LOGV2(23900,
           "{logPrefix}Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
-          "{migrationInfo_getLsid} txn: {TxnNumber_1}",
+          "{migrationInfo_getLsid} txn: {TxnNumber}",
           "logPrefix"_attr = _logPrefix(),
           "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
           "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
