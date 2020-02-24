@@ -126,14 +126,14 @@ function checkForIndexRebuild(mongod, indexName, shouldExist) {
      *     Rebuilding index. Collection: `collNss` Index: `indexName`
      *     Dropping unfinished index. Collection: `collNss` Index: `indexName`
      */
-    let rebuildIndexLine =
-        "Rebuilding index. Collection: " + dbName + "." + collName + " Index: " + indexName;
-    let dropIndexLine = "Dropping unfinished index. Collection: " + dbName + "." + collName +
-        " Index: " + indexName;
+    let rebuildIndexRegExp =
+        new RegExp("Rebuilding index. Collection:.*" + dbName + "." + collName + ".*" + indexName);
+    let dropIndexRegExp = new RegExp("Dropping unfinished index. Collection: .*" + dbName + "." +
+                                     collName + ".*" + indexName);
     for (let line = 0; line < logs.log.length; line++) {
-        if (logs.log[line].includes(rebuildIndexLine))
+        if (logs.log[line].search(rebuildIndexRegExp) != -1)
             rebuildIndexLogEntry = true;
-        else if (logs.log[line].includes(dropIndexLine))
+        else if (logs.log[line].search(dropIndexRegExp) != -1)
             dropIndexLogEntry = true;
     }
 
