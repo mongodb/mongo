@@ -410,7 +410,8 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
         StringData sd(message);
         error() << "WiredTiger error (" << errorCode << ") " << redact(message)
                 << " Raw: " << message;
-        if (sd.find("this build requires a maximum version of 2, and the file is version 3")) {
+        if (sd.find("this build requires a maximum version of 2, and the file is version 3") !=
+            std::string::npos) {
             error()
                 << "An unsupported journal format detected - If you are trying to rollback from "
                    "version 4.0 to 3.6, please re-start a 4.0 binary and cleanly shut it down so "
