@@ -2792,9 +2792,9 @@ var ReplSetTest = function(opts) {
         if (_useBridge && (options.binVersion === undefined || options.binVersion === "latest")) {
             options.setParameter.oplogFetcherUsesExhaust =
                 options.setParameter.oplogFetcherUsesExhaust || false;
-        } else if (_useBridge && restart && options.binVersion === "last-stable") {
-            // On restart with a 4.2 binary, make sure we do not set oplogFetcherUsesExhaust
-            // because oplogFetcherUsesExhaust is an unknown parameter in 4.2.
+        } else if (_useBridge && options.binVersion === "last-stable") {
+            // On a 4.2 binary, make sure we do not set oplogFetcherUsesExhaust since it is an
+            // unknown parameter in 4.2.
             delete options.setParameter.oplogFetcherUsesExhaust;
         }
 
