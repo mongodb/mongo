@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -112,6 +113,13 @@ public:
                                            const NamespaceString& outputNs) const final;
 
 protected:
+    /**
+     * Attaches the write concern to the given batch request. If 'writeConcern' has been default
+     * initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
+     */
+    static void attachWriteConcern(BatchedCommandRequest* request,
+                                   const WriteConcernOptions& writeConcern);
+
     /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */

@@ -60,18 +60,6 @@ using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
-namespace {
-
-// Attaches the write concern to the given batch request. If it looks like 'writeConcern' has
-// been default initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
-void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOptions& writeConcern) {
-    if (!writeConcern.wMode.empty() || writeConcern.wNumNodes > 0) {
-        request->setWriteConcern(writeConcern.toBSON());
-    }
-}
-
-}  // namespace
-
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
@@ -126,7 +114,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
         buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
     // If applicable, attach a write concern to the batched command request.
-    attachWriteConcern(&insertCommand, wc);
+    CommonMongodProcessInterface::attachWriteConcern(&insertCommand, wc);
 
     ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
@@ -147,7 +135,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
 
     // If applicable, attach a write concern to the batched command request.
-    attachWriteConcern(&updateCommand, wc);
+    CommonMongodProcessInterface::attachWriteConcern(&updateCommand, wc);
 
     ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 

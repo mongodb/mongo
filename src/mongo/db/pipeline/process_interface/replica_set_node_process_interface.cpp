@@ -38,8 +38,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -69,16 +71,17 @@ Status ReplicaSetNodeProcessInterface::insert(const boost::intrusive_ptr<Express
                                               std::vector<BSONObj>&& objs,
                                               const WriteConcernOptions& wc,
                                               boost::optional<OID> targetEpoch) {
-    auto writeResults = performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
-
-    // Need to check each result in the batch since the writes are unordered.
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
+    auto&& opCtx = expCtx->opCtx;
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::insert(expCtx, ns, std::move(objs), wc, targetEpoch);
     }
-    return Status::OK();
+
+    BatchedCommandRequest insertCommand(
+        buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+
+    return _executeCommandOnPrimary(
+               opCtx, ns, _buildCommandObject(opCtx, std::move(insertCommand), wc))
+        .getStatus();
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::update(
@@ -89,20 +92,24 @@ StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults =
-        performUpdates(expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-
-    // Need to check each result in the batch since the writes are unordered.
-    UpdateResult updateResult;
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
-
-        updateResult.nMatched += result.getValue().getN();
-        updateResult.nModified += result.getValue().getNModified();
+    auto&& opCtx = expCtx->opCtx;
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::update(
+            expCtx, ns, std::move(batch), wc, upsert, multi, targetEpoch);
     }
-    return updateResult;
+
+    BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    auto result = _executeCommandOnPrimary(
+        opCtx, ns, _buildCommandObject(opCtx, std::move(updateCommand), wc));
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    std::string errMsg;
+    BatchedCommandResponse response;
+    uassert(31450, errMsg, response.parseBSON(result.getValue(), &errMsg));
+
+    return UpdateResult{response.getN(), response.getNModified()};
 }
 
 std::list<BSONObj> ReplicaSetNodeProcessInterface::getIndexSpecs(OperationContext* opCtx,
@@ -191,7 +198,7 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
         std::move(promise));
     auto scheduleResult = _executor->scheduleRemoteCommand(
         std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
-    if (!scheduleResult.getStatus().isOK()) {
+    if (!scheduleResult.isOK()) {
         // Since the command failed to be scheduled, the callback above did not and will not run.
         // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
         // with the executor's thread.
@@ -224,6 +231,21 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     }
 
     return rcr.response.data;
+}
+
+BSONObj ReplicaSetNodeProcessInterface::_buildCommandObject(OperationContext* opCtx,
+                                                            BatchedCommandRequest bcr,
+                                                            const WriteConcernOptions& wc) const {
+    CommonMongodProcessInterface::attachWriteConcern(&bcr, wc);
+    BSONObjBuilder cmdObjBuilder;
+    bcr.serialize(&cmdObjBuilder);
+    return cmdObjBuilder.obj();
+}
+
+bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,
+                                                      const NamespaceString& ns) const {
+    Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
 }
 
 }  // namespace mongo

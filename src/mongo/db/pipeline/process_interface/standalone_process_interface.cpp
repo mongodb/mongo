@@ -42,47 +42,6 @@
 
 namespace mongo {
 
-Status StandaloneProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          const NamespaceString& ns,
-                                          std::vector<BSONObj>&& objs,
-                                          const WriteConcernOptions& wc,
-                                          boost::optional<OID> targetEpoch) {
-    auto writeResults = performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
-
-    // Need to check each result in the batch since the writes are unordered.
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
-    }
-    return Status::OK();
-}
-
-StatusWith<MongoProcessInterface::UpdateResult> StandaloneProcessInterface::update(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& ns,
-    BatchedObjects&& batch,
-    const WriteConcernOptions& wc,
-    UpsertType upsert,
-    bool multi,
-    boost::optional<OID> targetEpoch) {
-    auto writeResults =
-        performUpdates(expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-
-    // Need to check each result in the batch since the writes are unordered.
-    UpdateResult updateResult;
-    for (const auto& result : writeResults.results) {
-        if (result.getStatus() != Status::OK()) {
-            return result.getStatus();
-        }
-
-        updateResult.nMatched += result.getValue().getN();
-        updateResult.nModified += result.getValue().getNModified();
-    }
-    return updateResult;
-}
-
 std::list<BSONObj> StandaloneProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                              const NamespaceString& ns,
                                                              bool includeBuildUUIDs) {

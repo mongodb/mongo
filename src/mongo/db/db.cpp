@@ -642,6 +642,8 @@ ExitCode _initAndListen(int listenPort) {
 
             LogicalTimeValidator::set(startupOpCtx->getServiceContext(),
                                       std::make_unique<LogicalTimeValidator>(keyManager));
+
+            ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
         replCoord->startup(startupOpCtx.get());
@@ -1089,6 +1091,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // Periodic Runner is shut down (see SERVER-41751).
     if (auto flowControlTicketholder = FlowControlTicketholder::get(serviceContext)) {
         flowControlTicketholder->setInShutdown();
+    }
+
+    if (auto exec = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)) {
+        exec->shutdown();
+        exec->join();
     }
 
     if (auto storageEngine = serviceContext->getStorageEngine()) {

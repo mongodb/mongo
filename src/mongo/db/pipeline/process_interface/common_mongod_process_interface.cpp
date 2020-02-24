@@ -619,4 +619,11 @@ Update CommonMongodProcessInterface::buildUpdateOp(
     return updateOp;
 }
 
+void CommonMongodProcessInterface::attachWriteConcern(BatchedCommandRequest* request,
+                                                      const WriteConcernOptions& writeConcern) {
+    if (!writeConcern.usedDefault) {
+        request->setWriteConcern(writeConcern.toBSON());
+    }
+}
+
 }  // namespace mongo

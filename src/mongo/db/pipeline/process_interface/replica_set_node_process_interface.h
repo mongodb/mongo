@@ -32,6 +32,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -97,6 +98,20 @@ private:
     StatusWith<BSONObj> _executeCommandOnPrimary(OperationContext* opCtx,
                                                  const NamespaceString& ns,
                                                  const BSONObj& cmdObj) const;
+
+    /**
+     * Attaches the given write concern to the command and returns the serialized BSONObj
+     * representation of the command.
+     */
+    BSONObj _buildCommandObject(OperationContext* opCtx,
+                                BatchedCommandRequest bcr,
+                                const WriteConcernOptions& wc) const;
+
+    /**
+     * Returns whether we are the primary and can therefore perform writes locally. Result may be
+     * immediately stale upon return.
+     */
+    bool _canWriteLocally(OperationContext* opCtx, const NamespaceString& ns) const;
 
     executor::TaskExecutor* _executor;
 };
