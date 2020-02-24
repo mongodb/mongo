@@ -525,10 +525,12 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                      str::stream()
                          << "Index: {name: " << desc->indexName() << ", ns: " << desc->parentNS()
                          << "} has incompatible format version: " << _dataFormatVersion
-                         << ". MongoDB 4.2 onwards, WT secondary unique indexes use "
+                         << ". In MongoDB 4.2 onwards, WT secondary unique indexes use "
                             "either format version 11 or 12. See "
                             "https://dochub.mongodb.org/core/upgrade-4.2-procedures for "
-                            "detailed instructions on upgrading the index format.");
+                            "detailed instructions on upgrading the index format. If this node is "
+                            "already upgraded to FCV 4.2, try restarting with a 4.2.4 binary to "
+                            "correct the unique index format version.");
         fassertNoTrace(31179, versionStatus);
     }
 
