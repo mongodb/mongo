@@ -148,13 +148,10 @@ def generate(env):
         env.Command(
             target="$ICECC_VERSION",
             source=["$CC", "$CXX"],
-            action=SCons.Action.ListAction(
-                [
-                    SCons.Defaults.Mkdir("${ICECC_VERSION.Dir('').abspath}"),
-                    cmdstr + " -o $TARGET $ICECC_VERSION_URL",
-                ],
-                "Downloading environment: $TARGET from $ICECC_VERSION_URL",
-            ),
+            action=[
+                SCons.Defaults.Mkdir("${ICECC_VERSION.Dir('').abspath}"),
+                cmdstr + " -o $TARGET $ICECC_VERSION_URL",
+            ],
         )
     else:
         env["ICECC_VERSION"] = env.File("$ICECC_VERSION")
