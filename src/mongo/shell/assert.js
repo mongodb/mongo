@@ -324,14 +324,14 @@ assert = (function() {
 
         var start = new Date();
 
-        if (TestData.inEvergreen) {
+        if (TestData && TestData.inEvergreen) {
             timeout = timeout || 10 * 60 * 1000;
         } else {
             timeout = timeout || 60 * 1000;
         }
 
         interval = interval || 200;
-        var last;
+
         while (1) {
             if (typeof (func) == "string") {
                 if (eval(func))
