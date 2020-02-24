@@ -61,7 +61,7 @@ TaskExecutorCursor::~TaskExecutorCursor() {
             _executor->cancel(*_cbHandle);
         }
 
-        if (_cursorId > 0) {
+        if (_cursorId >= kLiveMinCursorId) {
             // We deliberately ignore failures to kill the cursor.  This "best effort" is acceptable
             // because some timeout mechanism on the remote host can be expected to reap it later.
             //
@@ -78,7 +78,7 @@ TaskExecutorCursor::~TaskExecutorCursor() {
 }
 
 boost::optional<BSONObj> TaskExecutorCursor::getNext(OperationContext* opCtx) {
-    if (_batchIter == _batch.end()) {
+    while (_batchIter == _batch.end() && _cursorId != kDoneCursorId) {
         _getNextBatch(opCtx);
     }
 
@@ -130,9 +130,8 @@ void TaskExecutorCursor::_runRemoteCommand(const RemoteCommandRequest& rcr) {
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
-    if (_cursorId == 0) {
-        return;
-    }
+    invariant(_cbHandle, "_getNextBatch() requires an async request to have already been sent.");
+    invariant(_cursorId != kDoneCursorId);
 
     auto clock = opCtx->getServiceContext()->getPreciseClockSource();
     auto dateStart = clock->now();
@@ -143,10 +142,10 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     _millisecondsWaiting += std::max(Milliseconds(0), dateEnd - dateStart);
     uassertStatusOK(out);
 
-    // If we had a cursor id, set it to 0 so that we don't attempt to kill the cursor if there was
-    // an error
-    if (_cursorId > 0) {
-        _cursorId = 0;
+    // If we had a cursor id, set it to kDoneCursorId so that we don't attempt to kill the cursor
+    // if there was an error.
+    if (_cursorId >= kLiveMinCursorId) {
+        _cursorId = kDoneCursorId;
     }
 
     // if we've received a response from our last request (initial or getmore), our remote operation
@@ -156,7 +155,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     auto cr = uassertStatusOK(CursorResponse::parseFromBSON(out.getValue()));
 
     // If this was our first batch
-    if (_cursorId == -1) {
+    if (_cursorId == kInitialCursorId) {
         _ns = cr.getNSS();
         _rcr.dbname = _ns.db().toString();
     }

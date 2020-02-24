@@ -219,7 +219,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
                        ErrorCodes::ExceededTimeLimit);
 
     // We can pick up after that interruption though
-    ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
                                      << "test"
                                      << "batchSize" << 3),
                       scheduleSuccessfulCursorResponse("nextBatch", 3, 5, 1));
@@ -236,6 +236,95 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 6);
 
     ASSERT_FALSE(tec.getNext(opCtx.get()));
+}
+
+/**
+ * Ensure we allow empty firstBatch.
+ */
+TEST_F(TaskExecutorCursorFixture, EmptyFirstBatch) {
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+    const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
+                                           << "test"
+                                           << "batchSize" << 3);
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+
+    TaskExecutorCursor tec(&getExecutor(), rcr, [] {
+        TaskExecutorCursor::Options opts;
+        opts.batchSize = 3;
+        return opts;
+    }());
+
+    // Schedule a cursor response with an empty "firstBatch". Use end < start so we don't
+    // append any doc to "firstBatch".
+    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 0, 1));
+
+    stdx::thread th([&] {
+        // Wait for the getMore run by the getNext() below to be ready, and schedule a
+        // cursor response with a non-empty "nextBatch".
+        while (!hasReadyRequests()) {
+            sleepmillis(10);
+        }
+
+        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 1, 1));
+    });
+
+    // Verify that the first doc is the doc from the second batch.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+
+    th.join();
+}
+
+/**
+ * Ensure we allow any empty non-initial batch.
+ */
+TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+    const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
+                                           << "test"
+                                           << "batchSize" << 3);
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+
+    TaskExecutorCursor tec(&getExecutor(), rcr, [] {
+        TaskExecutorCursor::Options opts;
+        opts.batchSize = 3;
+        return opts;
+    }());
+
+    // Schedule a cursor response with a non-empty "firstBatch".
+    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, 1));
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+
+    // Schedule two consecutive cursor responses with empty "nextBatch". Use end < start so
+    // we don't append any doc to "nextBatch".
+    ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 0, 1));
+
+    stdx::thread th([&] {
+        // Wait for the first getMore run by the getNext() below to be ready, and schedule a
+        // cursor response with a non-empty "nextBatch".
+        while (!hasReadyRequests()) {
+            sleepmillis(10);
+        }
+
+        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 0, 1));
+
+        // Wait for the second getMore run by the getNext() below to be ready, and schedule a
+        // cursor response with a non-empty "nextBatch".
+        while (!hasReadyRequests()) {
+            sleepmillis(10);
+        }
+
+        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 2, 2, 1));
+    });
+
+    // Verify that the next doc is the doc from the fourth batch.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+
+    th.join();
 }
 
 /**
@@ -267,7 +356,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     ASSERT_EQUALS(tec->getNext(opCtx.get()).get()["x"].Int(), 1);
 
     // lsid in the getmore
-    ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
                                      << "test"
                                      << "batchSize" << 1 << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulCursorResponse("nextBatch", 2, 2, 1));
