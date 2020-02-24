@@ -57,6 +57,14 @@ namespace executor {
  */
 class TaskExecutorCursor {
 public:
+    // Cursor id has 1 of 3 states.
+    // <0 - We haven't yet received a response for our initial request
+    // 0  - Cursor is done (errored or consumed)
+    // >=1 - Cursor is live on the remote
+    constexpr static CursorId kUnitializedCursorId = -1;
+    constexpr static CursorId kClosedCursorId = 0;
+    constexpr static CursorId kMinLegalCursorId = 1;
+
     struct Options {
         boost::optional<int64_t> batchSize;
     };
@@ -128,12 +136,7 @@ private:
     // Stash the callbackhandle for the current outstanding operation
     boost::optional<TaskExecutor::CallbackHandle> _cbHandle;
 
-    // cursor id has 1 of 3 states.
-    //
-    // <1 - We haven't yet received a response for our initial request
-    // 0  - Cursor is done (errored or consumed)
-    // >1 - Cursor is live on the remote
-    CursorId _cursorId = -1;
+    CursorId _cursorId = kUnitializedCursorId;
 
     // This is a sum of the time spent waiting on remote calls.
     Milliseconds _millisecondsWaiting = Milliseconds(0);
