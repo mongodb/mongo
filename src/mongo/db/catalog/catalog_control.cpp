@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -177,7 +178,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
-        LOG_FOR_RECOVERY(1) << "openCatalog: dbholder reopening database " << dbName;
+        LOGV2_FOR_RECOVERY(
+            23992, 1, "openCatalog: dbholder reopening database {dbName}", "dbName"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
         for (auto&& collNss :

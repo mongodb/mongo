@@ -28,8 +28,9 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -884,9 +885,13 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
         //
         // We mark a RecordStore as needing size adjustment iff its size is accurate at the current
         // time but not as of the top of the oplog.
-        LOG_FOR_RECOVERY(2) << "Record store was empty; setting count metadata to zero but marking "
-                               "record store as needing size adjustment during recovery. ns: "
-                            << (isTemp() ? "(temp)" : ns()) << ", ident: " << _ident;
+        LOGV2_FOR_RECOVERY(23983,
+                           2,
+                           "Record store was empty; setting count metadata to zero but marking "
+                           "record store as needing size adjustment during recovery. ns: "
+                           "{isTemp_temp_ns}, ident: {ident}",
+                           "isTemp_temp_ns"_attr = (isTemp() ? "(temp)" : ns()),
+                           "ident"_attr = _ident);
         sizeRecoveryState(getGlobalServiceContext())
             .markCollectionAsAlwaysNeedsSizeAdjustment(_ident);
         _sizeInfo->dataSize.store(0);

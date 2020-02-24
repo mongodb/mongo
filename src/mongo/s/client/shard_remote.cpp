@@ -170,8 +170,11 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
             if (!TrackingMetadata::get(opCtx).getOperId()) {
                 TrackingMetadata::get(opCtx).initWithOperName("NotSet");
             }
-            MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
-                << TrackingMetadata::get(opCtx).toString();
+            LOGV2_DEBUG_OPTIONS(20164,
+                                1,
+                                logv2::LogOptions{logv2::LogComponent::kTracking},
+                                "{trackingMetadata}",
+                                "trackingMetadata"_attr = TrackingMetadata::get(opCtx));
             TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 

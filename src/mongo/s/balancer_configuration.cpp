@@ -403,9 +403,13 @@ bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptim
         ss << time;
         return ss.str();
     };
-    LOG(1) << "inBalancingWindow: "
-           << " now: " << timeToString(now) << " startTime: " << timeToString(*_activeWindowStart)
-           << " stopTime: " << timeToString(*_activeWindowStop);
+    LOGV2_DEBUG(24094,
+                1,
+                "inBalancingWindow:  now: {timeToString_now} startTime: "
+                "{timeToString_activeWindowStart} stopTime: {timeToString_activeWindowStop}",
+                "timeToString_now"_attr = timeToString(now),
+                "timeToString_activeWindowStart"_attr = timeToString(*_activeWindowStart),
+                "timeToString_activeWindowStop"_attr = timeToString(*_activeWindowStop));
 
     if (*_activeWindowStop > *_activeWindowStart) {
         if ((now >= *_activeWindowStart) && (now <= *_activeWindowStop)) {

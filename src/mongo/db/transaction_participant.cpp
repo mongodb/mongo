@@ -29,8 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#define LOG_FOR_TRANSACTION(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kTransaction)
+#define LOGV2_FOR_TRANSACTION(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kTransaction}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -2012,7 +2012,7 @@ void TransactionParticipant::Participant::_logSlowTransaction(
             // TODO SERVER-46219: Log also with old log system to not break unit tests
             {
                 LOGV2_OPTIONS(22523,
-                              {logComponentV1toV2(logger::LogComponent::kTransaction)},
+                              {logv2::LogComponent::kTransaction},
                               "transaction "
                               "{transactionInfo}",
                               "transactionInfo"_attr = _transactionInfoForLog(
@@ -2028,8 +2028,13 @@ void TransactionParticipant::Participant::_setNewTxnNumber(OperationContext* opC
             "Cannot change transaction number while the session has a prepared transaction",
             !o().txnState.isInSet(TransactionState::kPrepared));
 
-    LOG_FOR_TRANSACTION(4) << "New transaction started with txnNumber: " << txnNumber
-                           << " on session with lsid " << _sessionId().getId();
+    LOGV2_FOR_TRANSACTION(
+        23984,
+        4,
+        "New transaction started with txnNumber: {txnNumber} on session with lsid "
+        "{sessionId_getId}",
+        "txnNumber"_attr = txnNumber,
+        "sessionId_getId"_attr = _sessionId().getId());
 
     // Abort the existing transaction if it's not prepared, committed, or aborted.
     if (o().txnState.isInProgress()) {

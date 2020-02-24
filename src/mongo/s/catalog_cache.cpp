@@ -29,6 +29,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#define LOGV2_FOR_CATALOG_REFRESH(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                                    \
+        ID, DLEVEL, {logv2::LogComponent::kShardingCatalogRefresh}, MESSAGE, ##__VA_ARGS__)
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/catalog_cache.h"
@@ -561,8 +565,13 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
                                         const StatusWith<DatabaseType>& swDbt) {
         // TODO (SERVER-34164): Track and increment stats for database refreshes.
         if (!swDbt.isOK()) {
-            LOG_CATALOG_REFRESH(0) << "Refresh for database " << dbName << " took " << t.millis()
-                                   << " ms and failed" << causedBy(redact(swDbt.getStatus()));
+            LOGV2_OPTIONS(24100,
+                          {logv2::LogComponent::kShardingCatalogRefresh},
+                          "Refresh for database {dbName} took {t_millis} ms and "
+                          "failed{causedBy_swDbt_getStatus}",
+                          "dbName"_attr = dbName,
+                          "t_millis"_attr = t.millis(),
+                          "causedBy_swDbt_getStatus"_attr = causedBy(redact(swDbt.getStatus())));
             return;
         }
 
@@ -573,10 +582,17 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
               !databaseVersion::equal(dbVersionAfterRefresh, dbEntry->dbt->getVersion())))
             ? 0
             : 1;
-        LOG_CATALOG_REFRESH(logLevel)
-            << "Refresh for database " << dbName << " from version "
-            << (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()) << " to version "
-            << dbVersionAfterRefresh.toBSON() << " took " << t.millis() << " ms";
+        LOGV2_FOR_CATALOG_REFRESH(
+            24101,
+            logSeverityV1toV2(logLevel).toInt(),
+            "Refresh for database {dbName} from version "
+            "{dbEntry_dbt_dbEntry_dbt_getVersion_BSONObj} to version {dbVersionAfterRefresh} "
+            "took {t_millis} ms",
+            "dbName"_attr = dbName,
+            "dbEntry_dbt_dbEntry_dbt_getVersion_BSONObj"_attr =
+                (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
+            "dbVersionAfterRefresh"_attr = dbVersionAfterRefresh.toBSON(),
+            "t_millis"_attr = t.millis());
     };
 
     // Invoked if getDatabase resulted in error or threw and exception
@@ -614,9 +630,14 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
         dbEntry->dbt = std::move(swDbt.getValue());
     };
 
-    LOG_CATALOG_REFRESH(1) << "Refreshing cached database entry for " << dbName
-                           << "; current cached database info is "
-                           << (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj());
+    LOGV2_FOR_CATALOG_REFRESH(
+        24102,
+        1,
+        "Refreshing cached database entry for {dbName}; current cached database info is "
+        "{dbEntry_dbt_dbEntry_dbt_BSONObj}",
+        "dbName"_attr = dbName,
+        "dbEntry_dbt_dbEntry_dbt_BSONObj"_attr =
+            (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj()));
 
     try {
         _cacheLoader.getDatabase(dbName, refreshCallback);
@@ -658,8 +679,13 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         if (!status.isOK()) {
             _stats.countFailedRefreshes.addAndFetch(1);
 
-            LOG_CATALOG_REFRESH(0) << "Refresh for collection " << nss << " took " << t.millis()
-                                   << " ms and failed" << causedBy(redact(status));
+            LOGV2_OPTIONS(
+                24103,
+                {logv2::LogComponent::kShardingCatalogRefresh},
+                "Refresh for collection {nss} took {t_millis} ms and failed{causedBy_status}",
+                "nss"_attr = nss,
+                "t_millis"_attr = t.millis(),
+                "causedBy_status"_attr = causedBy(redact(status)));
         } else if (routingInfoAfterRefresh) {
             const int logLevel =
                 (!existingRoutingInfo ||
@@ -667,16 +693,28 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
                   routingInfoAfterRefresh->getVersion() != existingRoutingInfo->getVersion()))
                 ? 0
                 : 1;
-            LOG_CATALOG_REFRESH(logLevel)
-                << "Refresh for collection " << nss.toString()
-                << (existingRoutingInfo
-                        ? (" from version " + existingRoutingInfo->getVersion().toString())
-                        : "")
-                << " to version " << routingInfoAfterRefresh->getVersion().toString() << " took "
-                << t.millis() << " ms";
+            LOGV2_FOR_CATALOG_REFRESH(
+                24104,
+                logSeverityV1toV2(logLevel).toInt(),
+                "Refresh for collection "
+                "{nss}{existingRoutingInfo_from_version_existingRoutingInfo_getVersion} to version "
+                "{routingInfoAfterRefresh_getVersion} took {t_millis} ms",
+                "nss"_attr = nss.toString(),
+                "existingRoutingInfo_from_version_existingRoutingInfo_getVersion"_attr =
+                    (existingRoutingInfo
+                         ? (" from version " + existingRoutingInfo->getVersion().toString())
+                         : ""),
+                "routingInfoAfterRefresh_getVersion"_attr =
+                    routingInfoAfterRefresh->getVersion().toString(),
+                "t_millis"_attr = t.millis());
         } else {
-            LOG_CATALOG_REFRESH(0) << "Refresh for collection " << nss << " took " << t.millis()
-                                   << " ms and found the collection is not sharded";
+            LOGV2_OPTIONS(
+                24105,
+                {logv2::LogComponent::kShardingCatalogRefresh},
+                "Refresh for collection {nss} took {t_millis} ms and found the collection is not "
+                "sharded",
+                "nss"_attr = nss,
+                "t_millis"_attr = t.millis());
         }
     };
 
@@ -736,8 +774,13 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     const ChunkVersion startingCollectionVersion =
         (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
 
-    LOG_CATALOG_REFRESH(1) << "Refreshing chunks for collection " << nss
-                           << "; current collection version is " << startingCollectionVersion;
+    LOGV2_FOR_CATALOG_REFRESH(
+        24106,
+        1,
+        "Refreshing chunks for collection {nss}; current collection version is "
+        "{startingCollectionVersion}",
+        "nss"_attr = nss,
+        "startingCollectionVersion"_attr = startingCollectionVersion);
 
     try {
         _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);

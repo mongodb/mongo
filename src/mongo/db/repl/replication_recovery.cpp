@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-#define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
+
 
 #include "mongo/platform/basic.h"
 
@@ -71,11 +72,16 @@ class RecoveryOplogApplierStats : public OplogApplier::Observer {
 public:
     void onBatchBegin(const std::vector<OplogEntry>& batch) final {
         _numBatches++;
-        LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
-            << "Applying operations in batch: " << _numBatches << "(" << batch.size()
-            << " operations from " << batch.front().getOpTime() << " (inclusive) to "
-            << batch.back().getOpTime()
-            << " (inclusive)). Operations applied so far: " << _numOpsApplied;
+        LOGV2_FOR_RECOVERY(24098,
+                           logSeverityV1toV2(kRecoveryBatchLogLevel).toInt(),
+                           "Applying operations in batch: {numBatches}({batch_size} operations "
+                           "from {batch_front_getOpTime} (inclusive) to {batch_back_getOpTime} "
+                           "(inclusive)). Operations applied so far: {numOpsApplied}",
+                           "numBatches"_attr = _numBatches,
+                           "batch_size"_attr = batch.size(),
+                           "batch_front_getOpTime"_attr = batch.front().getOpTime(),
+                           "batch_back_getOpTime"_attr = batch.back().getOpTime(),
+                           "numOpsApplied"_attr = _numOpsApplied);
 
         _numOpsApplied += batch.size();
         if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery,
@@ -83,9 +89,15 @@ public:
             std::size_t i = 0;
             for (const auto& entry : batch) {
                 i++;
-                LOG_FOR_RECOVERY(kRecoveryOperationLogLevel)
-                    << "Applying op " << i << " of " << batch.size() << " (in batch " << _numBatches
-                    << ") during replication recovery: " << redact(entry.getRaw());
+                LOGV2_FOR_RECOVERY(
+                    24099,
+                    logSeverityV1toV2(kRecoveryOperationLogLevel).toInt(),
+                    "Applying op {i} of {batch_size} (in batch {numBatches}) during replication "
+                    "recovery: {entry_getRaw}",
+                    "i"_attr = i,
+                    "batch_size"_attr = batch.size(),
+                    "numBatches"_attr = _numBatches,
+                    "entry_getRaw"_attr = redact(entry.getRaw()));
             }
         }
     }

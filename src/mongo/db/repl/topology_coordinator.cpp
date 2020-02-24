@@ -28,10 +28,13 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-#define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
-#define LOG_FOR_HEARTBEATS(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationHeartbeats)
+
+#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                             \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -828,9 +831,14 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     }
 
     if (hbStats.failed()) {
-        LOG_FOR_HEARTBEATS(0) << "Heartbeat to " << target << " failed after "
-                              << kMaxHeartbeatRetries
-                              << " retries, response status: " << hbResponse.getStatus();
+        LOGV2_FOR_HEARTBEATS(
+            23974,
+            0,
+            "Heartbeat to {target} failed after {kMaxHeartbeatRetries} retries, response "
+            "status: {hbResponse_getStatus}",
+            "target"_attr = target,
+            "kMaxHeartbeatRetries"_attr = kMaxHeartbeatRetries,
+            "hbResponse_getStatus"_attr = hbResponse.getStatus());
     }
 
     if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
@@ -1342,24 +1350,38 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
         if (!catchupTakeoverDisabled &&
             (_memberData.at(primaryIndex).getLastAppliedOpTime() <
              _memberData.at(_selfIndex).getLastAppliedOpTime())) {
-            LOG_FOR_ELECTION(2) << "I can take over the primary due to fresher data."
-                                << " Current primary index: " << primaryIndex << " in term "
-                                << _memberData.at(primaryIndex).getTerm() << "."
-                                << " Current primary optime: "
-                                << _memberData.at(primaryIndex).getLastAppliedOpTime()
-                                << " My optime: "
-                                << _memberData.at(_selfIndex).getLastAppliedOpTime();
-            LOG_FOR_ELECTION(4) << _getReplSetStatusString();
+            LOGV2_FOR_ELECTION(
+                23975,
+                2,
+                "I can take over the primary due to fresher data. Current primary index: "
+                "{primaryIndex} in term {primaryTerm}. Current primary "
+                "optime: {primaryOpTime} My optime: "
+                "{myOpTime}",
+                "primaryIndex"_attr = primaryIndex,
+                "primaryTerm"_attr = _memberData.at(primaryIndex).getTerm(),
+                "primaryOpTime"_attr = _memberData.at(primaryIndex).getLastAppliedOpTime(),
+                "myOpTime"_attr = _memberData.at(_selfIndex).getLastAppliedOpTime());
+            LOGV2_FOR_ELECTION(23976,
+                               4,
+                               "{getReplSetStatusString}",
+                               "getReplSetStatusString"_attr = _getReplSetStatusString());
 
             scheduleCatchupTakeover = true;
         }
 
         if (_rsConfig.getMemberAt(primaryIndex).getPriority() <
             _rsConfig.getMemberAt(_selfIndex).getPriority()) {
-            LOG_FOR_ELECTION(2) << "I can take over the primary due to higher priority."
-                                << " Current primary index: " << primaryIndex << " in term "
-                                << _memberData.at(primaryIndex).getTerm();
-            LOG_FOR_ELECTION(4) << _getReplSetStatusString();
+            LOGV2_FOR_ELECTION(
+                23977,
+                2,
+                "I can take over the primary due to higher priority. Current primary index: "
+                "{primaryIndex} in term {primaryTerm}",
+                "primaryIndex"_attr = primaryIndex,
+                "primaryTerm"_attr = _memberData.at(primaryIndex).getTerm());
+            LOGV2_FOR_ELECTION(23978,
+                               4,
+                               "{getReplSetStatusString}",
+                               "getReplSetStatusString"_attr = _getReplSetStatusString());
 
             schedulePriorityTakeover = true;
         }
@@ -1373,11 +1395,14 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
         // Otherwise, prefer to schedule a catchup takeover over a priority takeover
         if (scheduleCatchupTakeover && schedulePriorityTakeover &&
             _rsConfig.calculatePriorityRank(currentNodePriority) == 0) {
-            LOG_FOR_ELECTION(2)
-                << "I can take over the primary because I have a higher priority, the highest "
-                << "priority in the replica set, and fresher data."
-                << " Current primary index: " << primaryIndex << " in term "
-                << _memberData.at(primaryIndex).getTerm();
+            LOGV2_FOR_ELECTION(
+                23979,
+                2,
+                "I can take over the primary because I have a higher priority, the highest "
+                "priority in the replica set, and fresher data. Current primary index: "
+                "{primaryIndex} in term {primaryTerm}",
+                "primaryIndex"_attr = primaryIndex,
+                "primaryTerm"_attr = _memberData.at(primaryIndex).getTerm());
             return HeartbeatResponseAction::makePriorityTakeoverAction();
         }
         if (scheduleCatchupTakeover) {
@@ -3032,9 +3057,13 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         }
     }
 
-    LOG_FOR_ELECTION(0) << "Received vote request: " << args.toString();
-    LOG_FOR_ELECTION(0) << "Sending vote response: " << response->toString();
-    LOG_FOR_ELECTION(4) << _getReplSetStatusString();
+    LOGV2_FOR_ELECTION(23980, 0, "Received vote request: {args}", "args"_attr = args.toString());
+    LOGV2_FOR_ELECTION(
+        23981, 0, "Sending vote response: {response}", "response"_attr = response->toString());
+    LOGV2_FOR_ELECTION(23982,
+                       4,
+                       "{getReplSetStatusString}",
+                       "getReplSetStatusString"_attr = _getReplSetStatusString());
 }
 
 void TopologyCoordinator::loadLastVote(const LastVote& lastVote) {

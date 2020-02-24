@@ -28,10 +28,12 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
-#define LOG_FOR_ROLLBACK(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationRollback)
+
+#define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_ROLLBACK(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                             \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationRollback}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -515,17 +517,24 @@ public:
                     _wiredTigerKVEngine->clearIndividuallyCheckpointedIndexesList();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
                 } else if (stableTimestamp < initialDataTimestamp) {
-                    LOG_FOR_RECOVERY(2)
-                        << "Stable timestamp is behind the initial data timestamp, skipping "
-                           "a checkpoint. StableTimestamp: "
-                        << stableTimestamp.toString()
-                        << " InitialDataTimestamp: " << initialDataTimestamp.toString();
+                    LOGV2_FOR_RECOVERY(
+                        23985,
+                        2,
+                        "Stable timestamp is behind the initial data timestamp, skipping "
+                        "a checkpoint. StableTimestamp: {stableTimestamp} InitialDataTimestamp: "
+                        "{initialDataTimestamp}",
+                        "stableTimestamp"_attr = stableTimestamp.toString(),
+                        "initialDataTimestamp"_attr = initialDataTimestamp.toString());
                 } else {
                     auto oplogNeededForRollback = _wiredTigerKVEngine->getOplogNeededForRollback();
 
-                    LOG_FOR_RECOVERY(2)
-                        << "Performing stable checkpoint. StableTimestamp: " << stableTimestamp
-                        << ", OplogNeededForRollback: " << toString(oplogNeededForRollback);
+                    LOGV2_FOR_RECOVERY(
+                        23986,
+                        2,
+                        "Performing stable checkpoint. StableTimestamp: {stableTimestamp}, "
+                        "OplogNeededForRollback: {oplogNeededForRollback}",
+                        "stableTimestamp"_attr = stableTimestamp,
+                        "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
 
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
@@ -908,7 +917,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         std::uint64_t tmp;
         fassert(50758, NumberParser().base(16)(buf, &tmp));
         _recoveryTimestamp = Timestamp(tmp);
-        LOG_FOR_RECOVERY(0) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
+        LOGV2_FOR_RECOVERY(23987,
+                           0,
+                           "WiredTiger recoveryTimestamp. Ts: {recoveryTimestamp}",
+                           "recoveryTimestamp"_attr = _recoveryTimestamp);
     }
 
     _sessionCache.reset(new WiredTigerSessionCache(this));
@@ -1092,8 +1104,12 @@ void WiredTigerKVEngine::cleanShutdown() {
         _checkpointThread->shutdown();
         LOGV2(22323, "Finished shutting down checkpoint thread");
     }
-    LOG_FOR_RECOVERY(2) << "Shutdown timestamps. StableTimestamp: " << _stableTimestamp.load()
-                        << " Initial data timestamp: " << _initialDataTimestamp.load();
+    LOGV2_FOR_RECOVERY(23988,
+                       2,
+                       "Shutdown timestamps. StableTimestamp: {stableTimestamp_load} Initial data "
+                       "timestamp: {initialDataTimestamp_load}",
+                       "stableTimestamp_load"_attr = _stableTimestamp.load(),
+                       "initialDataTimestamp_load"_attr = _initialDataTimestamp.load());
 
     _sizeStorer.reset();
     _sessionCache->shuttingDown();
@@ -2146,12 +2162,15 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                           << ", Stable timestamp: " << stableTS.toString());
     }
 
-    LOG_FOR_ROLLBACK(2) << "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.";
+    LOGV2_FOR_ROLLBACK(
+        23989, 2, "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.");
     syncSizeInfo(true);
 
     if (!_ephemeral) {
-        LOG_FOR_ROLLBACK(2)
-            << "WiredTiger::RecoverToStableTimestamp shutting down journal and checkpoint threads.";
+        LOGV2_FOR_ROLLBACK(
+            23990,
+            2,
+            "WiredTiger::RecoverToStableTimestamp shutting down journal and checkpoint threads.");
         // Shutdown WiredTigerKVEngine owned accesses into the storage engine.
         if (_durable) {
             _journalFlusher->shutdown();
@@ -2162,8 +2181,12 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     const Timestamp stableTimestamp(_stableTimestamp.load());
     const Timestamp initialDataTimestamp(_initialDataTimestamp.load());
 
-    LOG_FOR_ROLLBACK(0) << "Rolling back to the stable timestamp. StableTimestamp: "
-                        << stableTimestamp << " Initial Data Timestamp: " << initialDataTimestamp;
+    LOGV2_FOR_ROLLBACK(23991,
+                       0,
+                       "Rolling back to the stable timestamp. StableTimestamp: {stableTimestamp} "
+                       "Initial Data Timestamp: {initialDataTimestamp}",
+                       "stableTimestamp"_attr = stableTimestamp,
+                       "initialDataTimestamp"_attr = initialDataTimestamp);
     int ret = _conn->rollback_to_stable(_conn, nullptr);
     if (ret) {
         return {ErrorCodes::UnrecoverableRollbackError,
