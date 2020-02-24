@@ -571,12 +571,6 @@ void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
         });
 }
 
-void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
-                                                  const UUID& collectionUuid) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
-    store.remove(opCtx, QUERY(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid));
-}
-
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
                                              const UUID& migrationId) {

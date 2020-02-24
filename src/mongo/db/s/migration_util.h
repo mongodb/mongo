@@ -146,13 +146,6 @@ void deleteRangeDeletionTaskLocally(
     const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern);
 
 /**
- * Deletes all range deletion task documents with the specified collection UUID from
- * config.rangeDeletions and waits for majority write concern.
- */
-void deleteRangeDeletionTasksForCollectionLocally(OperationContext* opCtx,
-                                                  const UUID& collectionUuid);
-
-/**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
  * specified shard and waits for majority write concern.
  */
