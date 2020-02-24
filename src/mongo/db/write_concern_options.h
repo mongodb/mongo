@@ -42,6 +42,10 @@ struct WriteConcernOptions {
 public:
     enum class SyncMode { UNSET, NONE, FSYNC, JOURNAL };
 
+    // This specifies the condition to check to satisfy given tags.
+    // Users can only provide OpTime condition, the others are used internally.
+    enum class CheckCondition { OpTime, Config };
+
     static constexpr int kNoTimeout = 0;
     static constexpr int kNoWaiting = -1;
 
@@ -52,8 +56,7 @@ public:
     static const BSONObj ConfigMajority;
 
     static constexpr StringData kWriteConcernField = "writeConcern"_sd;
-    static const char kMajority[];        // = "majority"
-    static const char kConfigMajority[];  // = "configMajority"
+    static const char kMajority[];  // = "majority"
 
     static constexpr Seconds kWriteConcernTimeoutSystem{15};
     static constexpr Seconds kWriteConcernTimeoutMigration{30};
@@ -129,6 +132,8 @@ public:
 
     // True if the default 'w' value of w:1 was used.
     bool usedDefaultW = false;
+
+    CheckCondition checkCondition = CheckCondition::OpTime;
 
 private:
     ReadWriteConcernProvenance _provenance;

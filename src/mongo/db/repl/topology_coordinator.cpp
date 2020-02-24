@@ -945,29 +945,6 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     return nextAction;
 }
 
-bool TopologyCoordinator::haveMajorityReplicatedConfig() {
-    auto configWriteMaj = _rsConfig.getWriteMajority();
-    auto numNodesWithReplicatedConfig = 0;
-    for (auto&& memberData : _memberData) {
-        // If this member is not in our new config, do not count it in the majority
-        if (_rsConfig.findMemberByID(memberData.getMemberId().getData()) == NULL) {
-            continue;
-        }
-
-        if (memberData.getConfigVersionAndTerm() == _rsConfig.getConfigVersionAndTerm()) {
-            // configVersionAndTerm comparison will compare config versions alone and ignore terms
-            // if the config term is -1, which makes this compatible with 4.2 heartbeat responses.
-            numNodesWithReplicatedConfig++;
-        }
-
-        // Once we know a majority of the nodes have replicated the config return.
-        if (numNodesWithReplicatedConfig >= configWriteMaj)
-            return true;
-    }
-
-    return false;
-}
-
 bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
                                                     int numNodes,
                                                     bool durablyWritten) {
@@ -1016,16 +993,20 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
 bool TopologyCoordinator::haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                                        const ReplSetTagPattern& tagPattern,
                                                        bool durablyWritten) {
-    ReplSetTagMatch matcher(tagPattern);
+    auto pred = makeOpTimePredicate(opTime, durablyWritten);
+    return haveTaggedNodesSatisfiedCondition(pred, tagPattern);
+}
 
+TopologyCoordinator::MemberPredicate TopologyCoordinator::makeOpTimePredicate(const OpTime& opTime,
+                                                                              bool durablyWritten) {
     // Invariants that we only wait for an OpTime in the term that this node is currently writing
     // to. In other words, we do not support waiting for an OpTime written by a previous primary
     // because comparing members' lastApplied/lastDurable alone is not sufficient to tell if the
     // OpTime has been replicated.
     invariant(opTime.getTerm() == getMyLastAppliedOpTime().getTerm());
 
-    for (auto&& memberData : _memberData) {
-        const OpTime& memberOpTime =
+    return [=](const MemberData& memberData) {
+        auto memberOpTime =
             durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
 
         // In addition to checking if a member has a greater/equal timestamp field we also need to
@@ -1034,16 +1015,29 @@ bool TopologyCoordinator::haveTaggedNodesReachedOpTime(const OpTime& opTime,
         // thus we do not know if the target OpTime in our previous term has been replicated to the
         // member because the memberOpTime in a higher term could correspond to an operation in a
         // divergent branch of history regardless of its timestamp.
-        if (memberOpTime.getTerm() == opTime.getTerm() &&
-            memberOpTime.getTimestamp() >= opTime.getTimestamp()) {
-            // This node has reached the desired optime, now we need to check if it is a part
+        return memberOpTime.getTerm() == opTime.getTerm() &&
+            memberOpTime.getTimestamp() >= opTime.getTimestamp();
+    };
+}
+
+TopologyCoordinator::MemberPredicate TopologyCoordinator::makeConfigPredicate() {
+    return [&](const MemberData& memberData) {
+        return memberData.getConfigVersionAndTerm() == _rsConfig.getConfigVersionAndTerm();
+    };
+}
+
+bool TopologyCoordinator::haveTaggedNodesSatisfiedCondition(
+    std::function<bool(const MemberData&)> pred, const ReplSetTagPattern& tagPattern) {
+    ReplSetTagMatch matcher(tagPattern);
+
+    for (auto&& memberData : _memberData) {
+        if (pred(memberData)) {
+            // This node has satisfied the predicate, now we need to check if it is a part
             // of the tagPattern.
             int memberIndex = memberData.getConfigIndex();
             invariant(memberIndex >= 0);
             const MemberConfig& memberConfig = _rsConfig.getMemberAt(memberIndex);
-            for (MemberConfig::TagIterator it = memberConfig.tagsBegin();
-                 it != memberConfig.tagsEnd();
-                 ++it) {
+            for (auto&& it = memberConfig.tagsBegin(); it != memberConfig.tagsEnd(); ++it) {
                 if (matcher.update(*it)) {
                     return true;
                 }

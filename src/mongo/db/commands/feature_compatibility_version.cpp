@@ -165,17 +165,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
                 FeatureCompatibilityVersionParser::toString(newVersion));
     }
 
-    // Remove term field of config document on downgrade.
-    if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42 &&
-        repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet) {
-        auto storageInterface = repl::StorageInterface::get(opCtx);
-        repl::UnreplicatedWritesBlock uwb(opCtx);
-        repl::TimestampedBSONObj update{BSON("$unset" << BSON("term" << 1)), Timestamp()};
-        uassertStatusOK(storageInterface->updateSingleton(
-            opCtx, NamespaceString::kSystemReplSetNamespace, {}, update));
-    }
-
     opCtx->recoveryUnit()->onCommit([opCtx, newVersion](boost::optional<Timestamp>) {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();

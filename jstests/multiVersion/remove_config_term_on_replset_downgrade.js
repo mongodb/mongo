@@ -52,7 +52,11 @@ rst.nodes.forEach(function(node) {
     jsTestLog("Checking the config term on node " + tojson(node.host) + " after FCV downgrade.");
     let config = node.getDB("local").getCollection("system.replset").findOne();
     assert(!config.hasOwnProperty("term"), tojson(config));
+    // The configs can only differ in config versions and terms.
     config.term = configInNewVersion.term;
+    // The versions differ because of the force reconfig on downgrade.
+    assert.eq(config.version, configInNewVersion.version + 1);
+    config.version = configInNewVersion.version;
     assert.docEq(configInNewVersion, config);
 });
 
@@ -66,7 +70,11 @@ rst.nodes.forEach(function(node) {
     jsTestLog("Checking the config term on node " + tojson(node.host) + " after binary downgrade.");
     let config = node.getDB("local").getCollection("system.replset").findOne();
     assert(!config.hasOwnProperty("term"), tojson(config));
+    // The configs can only differ in config versions and terms.
     config.term = configInNewVersion.term;
+    // The versions differ because of the force reconfig on downgrade.
+    assert.eq(config.version, configInNewVersion.version + 1);
+    config.version = configInNewVersion.version;
     assert.docEq(configInNewVersion, config);
 });
 rst.stopSet();

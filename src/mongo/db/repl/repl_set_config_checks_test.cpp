@@ -244,21 +244,11 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
                   validateConfigForReconfig(
                       &externalState, oldConfig, oldConfig, getGlobalServiceContext(), false)
                       .getStatus());
-    // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, oldConfig, getGlobalServiceContext(), true)
-                      .getStatus());
 
     // Cannot reconfig from new to old (versions must increase).
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForReconfig(
                       &externalState, newConfig, oldConfig, getGlobalServiceContext(), false)
-                      .getStatus());
-    // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, newConfig, oldConfig, getGlobalServiceContext(), true)
                       .getStatus());
 }
 

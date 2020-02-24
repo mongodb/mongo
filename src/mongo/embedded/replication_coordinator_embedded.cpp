@@ -346,6 +346,12 @@ Status ReplicationCoordinatorEmbedded::processReplSetReconfig(OperationContext*,
     UASSERT_NOT_IMPLEMENTED;
 }
 
+Status ReplicationCoordinatorEmbedded::doReplSetReconfig(OperationContext* opCtx,
+                                                         GetNewConfigFn getNewConfig,
+                                                         bool force) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::processReplSetInitiate(OperationContext*,
                                                               const BSONObj&,
                                                               BSONObjBuilder*) {

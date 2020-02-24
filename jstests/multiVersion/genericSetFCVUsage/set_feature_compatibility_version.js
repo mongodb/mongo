@@ -309,8 +309,9 @@ assert.commandFailed(
 st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
 jsTestLog(
     "EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be set because the shard primary is not reachable");
+// Downgrading from 4.4 needs to wait for all nodes to reconfig, so we specify a higher timeout.
 assert.commandFailed(
-    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000}));
+    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 10000}));
 checkFCV(configPrimaryAdminDB, lastStableFCV, lastStableFCV /* indicates downgrade in progress */);
 st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 

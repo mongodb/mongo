@@ -195,19 +195,23 @@ Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetCon
  * primary under "oldConfig" and is electable under "newConfig".  Such checks that
  * require knowledge of which node is executing the configuration are out of scope
  * for this function.
+ *
+ * When "force" is true, skips config version check, since the version is guaranteed
+ * to be valid either by "force" reconfig command or by internal use.
  */
 Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
                                           const ReplSetConfig& newConfig) {
     invariant(newConfig.isInitialized());
     invariant(oldConfig.isInitialized());
 
-    if (oldConfig.getConfigVersion() >= newConfig.getConfigVersion()) {
-        return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      str::stream()
-                          << "New replica set configuration version must be greater than old, but "
-                          << newConfig.getConfigVersion() << " is not greater than "
-                          << oldConfig.getConfigVersion() << " for replica set "
-                          << newConfig.getReplSetName());
+    if (oldConfig.getConfigVersionAndTerm() >= newConfig.getConfigVersionAndTerm()) {
+        return Status(
+            ErrorCodes::NewReplicaSetConfigurationIncompatible,
+            str::stream()
+                << "New replica set configuration version and term must be greater than old, but "
+                << newConfig.getConfigVersionAndTerm().toString() << " is not greater than "
+                << oldConfig.getConfigVersionAndTerm().toString() << " for replica set "
+                << newConfig.getReplSetName());
     }
 
     if (oldConfig.getReplSetName() != newConfig.getReplSetName()) {

@@ -54,6 +54,7 @@ const std::string MemberConfig::kHorizonsFieldName = "horizons";
 const std::string MemberConfig::kInternalVoterTagName = "$voter";
 const std::string MemberConfig::kInternalElectableTagName = "$electable";
 const std::string MemberConfig::kInternalAllTagName = "$all";
+const std::string MemberConfig::kConfigAllTagName = "$configAll";
 
 namespace {
 const std::string kLegalMemberConfigFieldNames[] = {MemberConfig::kIdFieldName,
@@ -217,6 +218,9 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     if (!_arbiterOnly) {
         _tags.push_back(tagConfig->makeTag(kInternalAllTagName, id));
     }
+
+    // Add a tag for every node, including arbiters.
+    _tags.push_back(tagConfig->makeTag(kConfigAllTagName, id));
 }
 
 Status MemberConfig::validate() const {
@@ -231,7 +235,8 @@ Status MemberConfig::validate() const {
                                     << " but must be 0 or 1");
     }
     if (_arbiterOnly) {
-        if (!_tags.empty()) {
+        // Arbiters only have one internal tag.
+        if (_tags.size() != 1) {
             return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
         }
         if (!isVoter()) {

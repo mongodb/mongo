@@ -183,6 +183,10 @@ public:
                                   const ReplSetReconfigArgs&,
                                   BSONObjBuilder*) final;
 
+    Status doReplSetReconfig(OperationContext* opCtx,
+                             GetNewConfigFn getNewConfig,
+                             bool force) final;
+
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;
 
     Status processReplSetUpdatePosition(const UpdatePositionArgs&, long long*) final;

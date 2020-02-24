@@ -67,7 +67,6 @@ constexpr int WriteConcernOptions::kNoWaiting;
 
 constexpr StringData WriteConcernOptions::kWriteConcernField;
 const char WriteConcernOptions::kMajority[] = "majority";
-const char WriteConcernOptions::kConfigMajority[] = "configMajority";
 
 const BSONObj WriteConcernOptions::Default = BSONObj();
 const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));

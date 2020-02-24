@@ -413,15 +413,6 @@ public:
         const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
 
     /**
-     * Returns whether or not at least a majority of voting, data-bearing nodes in the current
-     * replica set config have replicated the config.
-     * This loops through _memberData and checks if:
-     * (1) The member is in the current config
-     * (2) The member's config (term, version) match the current config's (term, version)
-     */
-    bool haveMajorityReplicatedConfig();
-
-    /**
      *  Returns whether or not at least 'numNodes' have reached the given opTime with the same term.
      * "durablyWritten" indicates whether the operation has to be durably applied.
      */
@@ -435,6 +426,25 @@ public:
     bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                       const ReplSetTagPattern& tagPattern,
                                       bool durablyWritten);
+
+    using MemberPredicate = std::function<bool(const MemberData&)>;
+
+    /**
+     * Return the predicate that tests if a member has reached the target OpTime.
+     */
+    MemberPredicate makeOpTimePredicate(const OpTime& opTime, bool durablyWritten);
+
+    /**
+     * Return the predicate that tests if a member has replicated the given config.
+     */
+    MemberPredicate makeConfigPredicate();
+
+    /**
+     * Returns whether or not at least one node matching the tagPattern has satisfied the given
+     * condition.
+     */
+    bool haveTaggedNodesSatisfiedCondition(MemberPredicate pred,
+                                           const ReplSetTagPattern& tagPattern);
 
     /**
      * Returns a vector of members that have applied the operation with OpTime 'op'.

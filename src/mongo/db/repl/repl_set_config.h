@@ -117,7 +117,9 @@ public:
     static const std::string kConfigServerFieldName;
     static const std::string kVersionFieldName;
     static const std::string kTermFieldName;
-    static const std::string kMajorityWriteConcernModeName;
+    static constexpr char kMajorityWriteConcernModeName[] = "$majority";
+    static constexpr char kConfigMajorityWriteConcernModeName[] = "$configMajority";
+    static constexpr char kConfigAllWriteConcernName[] = "$configAll";
 
     // If this field is present, a repair operation potentially modified replicated data. This
     // should never be included in a valid configuration document.
@@ -181,7 +183,7 @@ public:
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 
     /**
-     * Gets the version of this configuration.
+     * Gets and sets the version of this configuration.
      *
      * The version number sequences configurations of the replica set, so that
      * nodes may distinguish between "older" and "newer" configurations.
@@ -190,14 +192,22 @@ public:
         return _version;
     }
 
+    void setConfigVersion(long long version) {
+        _version = version;
+    }
+
     /**
-     * Gets the term of this configuration.
+     * Gets and sets the term of this configuration.
      *
      * The configuration term is the term of the primary that originally created this configuration.
      * Configurations in a replica set are totally ordered by their term and configuration version.
      */
     long long getConfigTerm() const {
         return _term;
+    }
+
+    void setConfigTerm(long long term) {
+        _term = term;
     }
 
     /**

@@ -241,6 +241,10 @@ public:
                                           const ReplSetReconfigArgs& args,
                                           BSONObjBuilder* resultObj) override;
 
+    virtual Status doReplSetReconfig(OperationContext* opCtx,
+                                     GetNewConfigFn getNewConfig,
+                                     bool force) override;
+
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) override;

@@ -209,6 +209,10 @@ public:
                                           const ReplSetReconfigArgs& args,
                                           BSONObjBuilder* resultObj);
 
+    virtual Status doReplSetReconfig(OperationContext* opCtx,
+                                     GetNewConfigFn getNewConfig,
+                                     bool force);
+
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj);

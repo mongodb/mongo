@@ -161,8 +161,9 @@ public:
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                WriteConcernOptions(
-                    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout),
+                WriteConcernOptions(repl::ReplSetConfig::kMajorityWriteConcernModeName,
+                                    WriteConcernOptions::SyncMode::UNSET,
+                                    timeout),
                 &res);
             CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
         });
@@ -305,6 +306,44 @@ public:
 
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
+            // Safe reconfig introduces a new "term" field in the config document. If the user tries
+            // to downgrade the replset to FCV42, the primary will initiate a reconfig without the
+            // term and wait for it to be replicated on all nodes.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            const bool isReplSet =
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+            if (isReplSet &&
+                replCoord->getConfig().getConfigTerm() != repl::OpTime::kUninitializedTerm) {
+                // Force reconfig with term -1 to remove the 4.2 incompatible "term" field.
+                auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
+                    auto newConfig = oldConfig;
+                    newConfig.setConfigTerm(repl::OpTime::kUninitializedTerm);
+                    newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
+                    return newConfig;
+                };
+
+                // "force" reconfig in order to skip safety checks. This is safe since the content
+                // of config is the same.
+                LOGV2(4628800, "Downgrading replica set config.");
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                uassertStatusOKWithContext(status, "Failed to downgrade the replica set config");
+
+                LOGV2(4628801,
+                      "Waiting for the downgraded replica set config to propagate to all nodes");
+                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
+                WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                                                 WriteConcernOptions::SyncMode::NONE,
+                                                 opCtx->getWriteConcern().wTimeout);
+                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
+                uassertStatusOKWithContext(
+                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
+                    "Failed to wait for the downgraded replica set config to propagate to all "
+                    "nodes");
+                LOGV2(4628802,
+                      "The downgraded replica set config has been propagated to all nodes");
+            }
+
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
                 // global IX or X locks. This ensures that either
@@ -318,9 +357,6 @@ public:
 
             if (failDowngrading.shouldFail())
                 return false;
-
-            const bool isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");

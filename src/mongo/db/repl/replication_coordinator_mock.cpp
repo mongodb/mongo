@@ -379,6 +379,12 @@ Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* opCt
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::doReplSetReconfig(OperationContext* opCtx,
+                                                     GetNewConfigFn getNewConfig,
+                                                     bool force) {
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* opCtx,
                                                           const BSONObj& configObj,
                                                           BSONObjBuilder* resultObj) {

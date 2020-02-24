@@ -1199,6 +1199,8 @@ var ReplSetTest = function(opts) {
                 assert.commandWorked(
                     self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
                 checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
+                print("Fetch the config version from primay since 4.4 downgrade runs a reconfig.");
+                config.version = self.getReplSetConfigFromNode().version;
             });
         }
 
@@ -1221,7 +1223,7 @@ var ReplSetTest = function(opts) {
             if (originalSettings) {
                 config.settings = originalSettings;
             }
-            config.version = 2;
+            config.version = config.version ? config.version + 1 : 2;
 
             // Nodes started with the --configsvr flag must have configsvr = true in their config.
             if (this.nodes[0].hasOwnProperty("fullOptions") &&

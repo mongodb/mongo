@@ -55,7 +55,6 @@ const Milliseconds ReplSetConfig::kCatchUpTakeoverDisabled(-1);
 const std::string ReplSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplSetConfig::kVersionFieldName = "version";
 const std::string ReplSetConfig::kTermFieldName = "term";
-const std::string ReplSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
@@ -686,8 +685,7 @@ Status ReplSetConfig::validate() const {
 
 Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
-    if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority &&
-        writeConcern.wMode != WriteConcernOptions::kConfigMajority) {
+    if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority) {
         StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
         if (!tagPatternStatus.isOK()) {
             return tagPatternStatus.getStatus();
@@ -840,6 +838,30 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
         // NoSuchKey means we have no $electable-tagged nodes in this config;
         // other errors are unexpected
         fassert(28694, status);
+    }
+
+    // $majorityConfig: the majority of all members including arbiters.
+    pattern = _tagConfig.makePattern();
+    status = _tagConfig.addTagCountConstraintToPattern(
+        &pattern, MemberConfig::kConfigAllTagName, _members.size() / 2 + 1);
+    if (status.isOK()) {
+        _customWriteConcernModes[kConfigMajorityWriteConcernModeName] = pattern;
+    } else if (status != ErrorCodes::NoSuchKey) {
+        // NoSuchKey means we have no $configAll-tagged nodes in this config;
+        // other errors are unexpected
+        fassert(31472, status);
+    }
+
+    // $configAll: all members including arbiters.
+    pattern = _tagConfig.makePattern();
+    status = _tagConfig.addTagCountConstraintToPattern(
+        &pattern, MemberConfig::kConfigAllTagName, _members.size());
+    if (status.isOK()) {
+        _customWriteConcernModes[kConfigAllWriteConcernName] = pattern;
+    } else if (status != ErrorCodes::NoSuchKey) {
+        // NoSuchKey means we have no $all-tagged nodes in this config;
+        // other errors are unexpected
+        fassert(31473, status);
     }
 }
 
