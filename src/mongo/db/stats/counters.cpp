@@ -182,28 +182,66 @@ void NetworkCounter::append(BSONObjBuilder& b) {
 void AuthCounter::initializeMechanismMap(const std::vector<std::string>& mechanisms) {
     invariant(_mechanisms.empty());
 
-    for (const auto& mech : mechanisms) {
+    const auto addMechanism = [this](const auto& mech) {
         _mechanisms.emplace(
             std::piecewise_construct, std::forward_as_tuple(mech), std::forward_as_tuple());
+    };
+
+    for (const auto& mech : mechanisms) {
+        addMechanism(mech);
     }
+
+    // When clusterAuthMode == `x509` or `sendX509`, we'll use MONGODB-X509 for intra-cluster auth
+    // even if it's not explicitly enabled by authenticationMechanisms.
+    // Ensure it's always included in counts.
+    addMechanism(auth::kMechanismMongoX509.toString());
+
+    // SERVER-46399 Use only configured SASL mechanisms for intra-cluster auth.
+    // It's possible for intracluster auth to use a default fallback mechanism of SCRAM-SHA-1/256
+    // even if it's not configured to do so.
+    // Explicitly add these to the map for now so that they can be incremented if this happens.
+    addMechanism(auth::kMechanismScramSha1.toString());
+    addMechanism(auth::kMechanismScramSha256.toString());
 }
 
-void AuthCounter::incSpeculativeAuthenticateReceived(const std::string& mechanism) try {
+Status AuthCounter::incSpeculativeAuthenticateReceived(const std::string& mechanism) try {
     _mechanisms.at(mechanism).speculativeAuthenticate.received.fetchAndAddRelaxed(1);
+    return Status::OK();
 } catch (const std::out_of_range&) {
-    uasserted(51767,
-              str::stream() << "Received " << auth::kSpeculativeAuthenticate << " for mechanism "
-                            << mechanism << " which is unknown or not enabled");
+    return {ErrorCodes::BadValue,
+            str::stream() << "Received " << auth::kSpeculativeAuthenticate << " for mechanism "
+                          << mechanism << " which is unknown or not enabled"};
 }
 
-void AuthCounter::incSpeculativeAuthenticateSuccessful(const std::string& mechanism) try {
+Status AuthCounter::incSpeculativeAuthenticateSuccessful(const std::string& mechanism) try {
     _mechanisms.at(mechanism).speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+    return Status::OK();
 } catch (const std::out_of_range&) {
     // Should never actually occur since it'd mean we succeeded at a mechanism
     // we're not configured for.
-    uasserted(51768,
-              str::stream() << "Unexpectedly succeeded at " << auth::kSpeculativeAuthenticate
-                            << " for " << mechanism << " which is not enabled");
+    return {ErrorCodes::BadValue,
+            str::stream() << "Unexpectedly succeeded at " << auth::kSpeculativeAuthenticate
+                          << " for " << mechanism << " which is not enabled"};
+}
+
+Status AuthCounter::incAuthenticateReceived(const std::string& mechanism) try {
+    _mechanisms.at(mechanism).authenticate.received.fetchAndAddRelaxed(1);
+    return Status::OK();
+} catch (const std::out_of_range&) {
+    return {ErrorCodes::BadValue,
+            str::stream() << "Received authentication for mechanism " << mechanism
+                          << " which is unknown or not enabled"};
+}
+
+Status AuthCounter::incAuthenticateSuccessful(const std::string& mechanism) try {
+    _mechanisms.at(mechanism).authenticate.successful.fetchAndAddRelaxed(1);
+    return Status::OK();
+} catch (const std::out_of_range&) {
+    // Should never actually occur since it'd mean we succeeded at a mechanism
+    // we're not configured for.
+    return {ErrorCodes::BadValue,
+            str::stream() << "Unexpectedly succeeded at authentication for " << mechanism
+                          << " which is not enabled"};
 }
 
 /**
@@ -211,9 +249,11 @@ void AuthCounter::incSpeculativeAuthenticateSuccessful(const std::string& mechan
  *   "mechanisms": {
  *     "SCRAM-SHA-256": {
  *       "speculativeAuthenticate": { received: ###, successful: ### },
+ *       "authenticate": { received: ###, successful: ### },
  *     },
  *     "MONGODB-X509": {
  *       "speculativeAuthenticate": { received: ###, successful: ### },
+ *       "authenticate": { received: ###, successful: ### },
  *     },
  *   },
  * }
@@ -222,14 +262,28 @@ void AuthCounter::append(BSONObjBuilder* b) {
     BSONObjBuilder mechsBuilder(b->subobjStart("mechanisms"));
 
     for (const auto& it : _mechanisms) {
-        const auto received = it.second.speculativeAuthenticate.received.load();
-        const auto successful = it.second.speculativeAuthenticate.successful.load();
-
         BSONObjBuilder mechBuilder(mechsBuilder.subobjStart(it.first));
-        BSONObjBuilder specAuthBuilder(mechBuilder.subobjStart(auth::kSpeculativeAuthenticate));
-        specAuthBuilder.append("received", received);
-        specAuthBuilder.append("successful", successful);
-        specAuthBuilder.done();
+
+        {
+            const auto received = it.second.speculativeAuthenticate.received.load();
+            const auto successful = it.second.speculativeAuthenticate.successful.load();
+
+            BSONObjBuilder specAuthBuilder(mechBuilder.subobjStart(auth::kSpeculativeAuthenticate));
+            specAuthBuilder.append("received", received);
+            specAuthBuilder.append("successful", successful);
+            specAuthBuilder.done();
+        }
+
+        {
+            const auto received = it.second.authenticate.received.load();
+            const auto successful = it.second.authenticate.successful.load();
+
+            BSONObjBuilder authBuilder(mechBuilder.subobjStart(auth::kAuthenticateCommand));
+            authBuilder.append("received", received);
+            authBuilder.append("successful", successful);
+            authBuilder.done();
+        }
+
         mechBuilder.done();
     }
 

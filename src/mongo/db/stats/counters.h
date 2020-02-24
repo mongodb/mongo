@@ -181,8 +181,11 @@ extern NetworkCounter networkCounter;
 
 class AuthCounter {
 public:
-    void incSpeculativeAuthenticateReceived(const std::string& mechanism);
-    void incSpeculativeAuthenticateSuccessful(const std::string& mechanism);
+    Status incSpeculativeAuthenticateReceived(const std::string& mechanism);
+    Status incSpeculativeAuthenticateSuccessful(const std::string& mechanism);
+
+    Status incAuthenticateReceived(const std::string& mechanism);
+    Status incAuthenticateSuccessful(const std::string& mechanism);
 
     void append(BSONObjBuilder*);
 
@@ -194,6 +197,10 @@ private:
             AtomicWord<long long> received;
             AtomicWord<long long> successful;
         } speculativeAuthenticate;
+        struct {
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } authenticate;
     };
     using MechanismMap = std::map<std::string, MechanismData>;
 

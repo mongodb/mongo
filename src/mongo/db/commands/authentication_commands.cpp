@@ -284,8 +284,12 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         user = internalSecurity.user->getName();
     }
 
-    Status status = _authenticate(opCtx, mechanism, user, cmdObj);
+    Status status = authCounter.incAuthenticateReceived(mechanism);
+    if (status.isOK()) {
+        status = _authenticate(opCtx, mechanism, user, cmdObj);
+    }
     audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
+
     if (!status.isOK()) {
         if (!serverGlobalParams.quiet.load()) {
             auto const client = opCtx->getClient();
@@ -317,6 +321,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
               "client"_attr = opCtx->getClient()->session()->remote());
     }
 
+    uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanism));
     result.append("dbname", user.getDB());
     result.append("user", user.getUser());
     return true;
@@ -384,11 +389,13 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
     }
 
     auto mechanism = mechElem.String();
-    authCounter.incSpeculativeAuthenticateReceived(mechanism);
+
+    // Run will make sure an audit entry happens. Let it reach that point.
+    authCounter.incSpeculativeAuthenticateReceived(mechanism).ignore();
 
     BSONObjBuilder authResult;
     if (cmdAuthenticate.run(opCtx, "$external", cmdObj, authResult)) {
-        authCounter.incSpeculativeAuthenticateSuccessful(mechanism);
+        uassertStatusOK(authCounter.incSpeculativeAuthenticateSuccessful(mechanism));
         result->append(auth::kSpeculativeAuthenticate, authResult.obj());
     }
 } catch (...) {

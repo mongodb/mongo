@@ -225,10 +225,11 @@ Status doSaslStep(OperationContext* opCtx,
                   "client"_attr = opCtx->getClient()->session()->remote());
         }
         if (session->isSpeculative()) {
-            authCounter.incSpeculativeAuthenticateSuccessful(mechanism.mechanismName().toString());
+            status = authCounter.incSpeculativeAuthenticateSuccessful(
+                mechanism.mechanismName().toString());
         }
     }
-    return Status::OK();
+    return status;
 }
 
 StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext* opCtx,
@@ -319,6 +320,12 @@ bool runSaslStart(OperationContext* opCtx,
         return false;
     }
 
+    auto status = authCounter.incAuthenticateReceived(mechanismName);
+    if (!status.isOK()) {
+        audit::logAuthentication(client, mechanismName, UserName("", db), status.code());
+        return false;
+    }
+
     std::string principalName;
     auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName, speculative);
 
@@ -326,6 +333,9 @@ bool runSaslStart(OperationContext* opCtx,
         audit::logAuthentication(
             client, mechanismName, UserName(principalName, db), swSession.getStatus().code());
         uassertStatusOK(swSession.getStatus());
+        if (swSession.getValue()->getMechanism().isSuccess()) {
+            uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanismName));
+        }
     } else {
         auto session = std::move(swSession.getValue());
         AuthenticationSession::swap(client, session);
@@ -387,6 +397,10 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
             mechanism.mechanismName(),
             UserName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase()),
             status.code());
+        if (mechanism.isSuccess()) {
+            uassertStatusOK(
+                authCounter.incAuthenticateSuccessful(mechanism.mechanismName().toString()));
+        }
     } else {
         AuthenticationSession::swap(client, sessionGuard);
     }
@@ -411,7 +425,8 @@ void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuil
         return;
     }
 
-    authCounter.incSpeculativeAuthenticateReceived(mechElem.String());
+    // Run will make sure an audit entry happens. Let it reach that point.
+    authCounter.incSpeculativeAuthenticateReceived(mechElem.String()).ignore();
 
     auto dbElement = cmdObj["db"];
     if (dbElement.type() != String) {
