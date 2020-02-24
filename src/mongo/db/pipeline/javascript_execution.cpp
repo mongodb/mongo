@@ -28,10 +28,13 @@
  */
 
 #include "mongo/platform/basic.h"
+
+#include "mongo/db/pipeline/javascript_execution.h"
+
 #include <iostream>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/pipeline/javascript_execution.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -60,15 +63,13 @@ JsExecution* JsExecution::get(OperationContext* opCtx,
     return exec.get();
 }
 
-Value JsExecution::doCallFunction(ScriptingFunction func,
-                                  const BSONObj& params,
-                                  const BSONObj& thisObj,
-                                  bool noReturnVal) {
+Value JsExecution::callFunction(ScriptingFunction func,
+                                const BSONObj& params,
+                                const BSONObj& thisObj) {
     _scope->registerOperation(Client::getCurrent()->getOperationContext());
     const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
 
-    int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, noReturnVal);
-
+    int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, false);
     uassert(
         31439, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
 
@@ -77,4 +78,16 @@ Value JsExecution::doCallFunction(ScriptingFunction func,
     return Value(returnValue.done().firstElement());
 }
 
+void JsExecution::callFunctionWithoutReturn(ScriptingFunction func,
+                                            const BSONObj& params,
+                                            const BSONObj& thisObj) {
+    _scope->registerOperation(Client::getCurrent()->getOperationContext());
+    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
+
+    int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, true);
+    uassert(
+        31470, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
+
+    return;
+}
 }  // namespace mongo

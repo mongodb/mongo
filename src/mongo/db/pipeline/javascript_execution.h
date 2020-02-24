@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -77,9 +76,7 @@ public:
      */
     void callFunctionWithoutReturn(ScriptingFunction func,
                                    const BSONObj& params,
-                                   const BSONObj& thisObj) {
-        doCallFunction(func, params, thisObj, true);
-    }
+                                   const BSONObj& thisObj);
 
     /**
      * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
@@ -87,9 +84,7 @@ public:
      *
      * Returns the value returned by the function.
      */
-    Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj) {
-        return doCallFunction(func, params, thisObj, false);
-    }
+    Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj);
 
     /**
      * Injects the given function 'emitFn' as a native JS function named 'emit', callable from
