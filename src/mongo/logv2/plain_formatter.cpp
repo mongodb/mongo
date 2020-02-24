@@ -157,7 +157,10 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
         else
             attributeMaxSize = constants::kDefaultMaxAttributeOutputSizeKB * 1024;
     }
-    strm.write(buffer.data(), std::min(attributeMaxSize, buffer.size()));
+    StringData dataToWrite(buffer.data(), std::min(attributeMaxSize, buffer.size()));
+    if (dataToWrite.endsWith("\n"_sd))
+        dataToWrite = StringData(dataToWrite.rawData(), dataToWrite.size() - 1);
+    strm.write(dataToWrite.rawData(), dataToWrite.size());
 }
 
 }  // namespace mongo::logv2
