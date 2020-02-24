@@ -15,6 +15,7 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/logv2_helpers.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 const replTest = new ReplSetTest({nodes: 2});
@@ -102,7 +103,6 @@ session.startTransaction();
 assert.commandWorked(sessionColl.update({_id: 1, a: 1}, {_id: 1, a: 2}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 
-clearRawMongoProgramOutput();
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
@@ -112,12 +112,13 @@ assert.commandWorked(secondary.adminCommand(
 // Unblock index build.
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Wait for log message.
-    assert.soon(
-        () => rawMongoProgramOutput().indexOf(
-                  "blocking replication until index builds are finished on " +
-                  "test.reconstruct_prepared_transactions_initial_sync_index_build, due to " +
-                  "prepared transaction") >= 0,
-        "replication not hanging");
+    if (isJsonLog(secondary)) {
+        checkLog.containsJson(secondary, 21849, {ns: testColl.getFullName()});
+    } else {
+        checkLog.contains(secondary,
+                          "blocking replication until index builds are finished on " +
+                              testColl.getFullName() + ", due to prepared transaction");
+    }
 
     // Let the secondary finish its index build.
     IndexBuildTest.resumeIndexBuilds(secondary);
