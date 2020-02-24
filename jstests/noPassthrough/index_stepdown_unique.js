@@ -49,7 +49,7 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 
 // Wait for the IndexBuildCoordinator thread, not the command thread, to report the index build
 // as failed.
-checkLog.contains(primary, /\[IndexBuildsCoordinatorMongod-0\].*Index build failed: /);
+checkLog.contains(primary, /IndexBuildsCoordinatorMongod-0.*Index build failed: /);
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
 rst.stopSet();

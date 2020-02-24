@@ -11,7 +11,6 @@ selector:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
   # Disable incompatible with json logging per SERVER-46235
-  - jstests/noPassthrough/index_stepdown_unique.js
   - jstests/noPassthrough/loglong.js
   - jstests/noPassthrough/hybrid_index_with_updates.js
 
