@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 
 #include "mongo/db/repair_database.h"
 
@@ -56,12 +57,16 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/rebuild_indexes.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
@@ -82,6 +87,31 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 }
 
 namespace {
+Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
+    std::vector<std::string> indexNames;
+    auto durableCatalog = DurableCatalog::get(opCtx);
+    durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);
+    for (const auto& indexName : indexNames) {
+        if (!durableCatalog->isIndexReady(opCtx, collection->getCatalogId(), indexName)) {
+            LOGV2(3871400,
+                  "Dropping unfinished index '{name}' after collection was modified by "
+                  "repair",
+                  "name"_attr = indexName);
+            WriteUnitOfWork wuow(opCtx);
+            auto status = durableCatalog->removeIndex(opCtx, collection->getCatalogId(), indexName);
+            if (!status.isOK()) {
+                return status;
+            }
+            wuow.commit();
+            StorageRepairObserver::get(opCtx->getServiceContext())
+                ->invalidatingModification(str::stream()
+                                           << "Dropped unfinished index '" << indexName << "' on "
+                                           << collection->ns());
+        }
+    }
+    return Status::OK();
+}
+
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
                          const std::string& dbName) {
@@ -95,9 +125,27 @@ Status repairCollections(OperationContext* opCtx,
         auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
 
+        // Need to lookup from catalog again because the old collection object was invalidated by
+        // repairRecordStore.
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+
         // If data was modified during repairRecordStore, we know to rebuild indexes without needing
         // to run an expensive collection validation.
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
+            invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
+                      "Collection '{}' ({})"_format(collection->ns().toString(),
+                                                    collection->uuid().toString()));
+
+            // If we are a replica set member in standalone mode and we have unfinished indexes,
+            // drop them before rebuilding any completed indexes. Since we have already made
+            // invalidating modifications to our data, it is safe to just drop the indexes entirely
+            // to avoid the risk of the index rebuild failing.
+            if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
+                if (auto status = dropUnfinishedIndexes(opCtx, collection); !status.isOK()) {
+                    return status;
+                }
+            }
+
             Status status = rebuildIndexesForNamespace(opCtx, nss, engine);
             if (!status.isOK()) {
                 return status;
@@ -108,10 +156,7 @@ Status repairCollections(OperationContext* opCtx,
         }
 
         // Run collection validation to avoid unecessarily rebuilding indexes on valid collections
-        // with consistent indexes. Initialize the collection prior to validation. Need to lookup
-        // from catalog again because the old collection object was invalidated by
-        // repairRecordStore.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        // with consistent indexes. Initialize the collection prior to validation.
         collection->init(opCtx);
 
         ValidateResults validateResults;
