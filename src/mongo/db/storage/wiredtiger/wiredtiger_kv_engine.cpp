@@ -716,6 +716,11 @@ StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCurso
         StorageEngine::BackupFile backupFile(fileSize);
         backupInformation.insert({filePath.string(), backupFile});
 
+        // For the first full incremental backup, include the offset and length.
+        if (incrementalBackup && fullBackup) {
+            backupInformation.at(filePath.string()).blocksToCopy.push_back({0, fileSize});
+        }
+
         // Full backups cannot open an incremental cursor, even if they are the first full backup
         // for incremental.
         if (!incrementalBackup || fullBackup) {
