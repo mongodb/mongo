@@ -75,8 +75,9 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
                               // This is the only way to do this in a debug build.
     auto&& parser = AccumulationStatement::getParser("$sum");
     auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement countStatement{"count", accExpr};
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement countStatement{"count", expression, factory};
     auto group = DocumentSourceGroup::create(
         expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement});
     auto mock =
@@ -112,8 +113,9 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     auto&& parser = AccumulationStatement::getParser("$push");
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement pushStatement{"spaceHog", accExpr};
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
@@ -154,8 +156,9 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     auto&& parser = AccumulationStatement::getParser("$push");
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement pushStatement{"spaceHog", accExpr};
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
@@ -178,8 +181,9 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto&& parser = AccumulationStatement::getParser("$push");
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement pushStatement{"spaceHog", accExpr};
+    auto [expression, factory] =
+        parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement pushStatement{"spaceHog", expression, factory};
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(

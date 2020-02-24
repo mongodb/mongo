@@ -49,7 +49,6 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     const char* getSourceName() const final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,
@@ -115,7 +114,7 @@ private:
                const std::vector<AccumulationStatement>& accumulationStatements);
         Value _min;
         Value _max;
-        std::vector<boost::intrusive_ptr<AccumulatorState>> _accums;
+        std::vector<boost::intrusive_ptr<Accumulator>> _accums;
     };
 
     /**

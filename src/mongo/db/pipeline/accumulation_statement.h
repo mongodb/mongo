@@ -38,8 +38,8 @@
 namespace mongo {
 
 /**
- * Registers an AccumulatorState to have the name 'key'. When an accumulator with name '$key' is
- * found during parsing, 'factory' will be called to construct the AccumulatorState.
+ * Registers an Accumulator to have the name 'key'. When an accumulator with name '$key' is found
+ * during parsing, 'factory' will be called to construct the Accumulator.
  *
  * As an example, if your accumulator looks like {"$foo": <args>}, with a factory method 'create',
  * you would add this line:
@@ -52,102 +52,26 @@ namespace mongo {
     }
 
 /**
- * AccumulatorExpression represents the right-hand side of an AccumulationStatement. Note this is
- * different from Expression; they are different nonterminals in the grammar.
- *
- * For example, in
- *     {$group: {
- *         _id: 1,
- *         count: {$sum: {$size: "$tags"}}
- *     }}
- *
- * we would say:
- *     The AccumulationStatement is      count: {$sum: {$size: "$tags"}}
- *     The AccumulationExpression is     {$sum: {$size: "$tags"}}
- *     The AccumulatorState::Factory is  $sum
- *     The argument Expression is        {$size: "$tags"}
- *     There is no initializer Expression.
- *
- * "$sum" corresponds to an AccumulatorState::Factory rather than AccumulatorState because
- * AccumulatorState is an execution concept, not an AST concept: each instance of AccumulatorState
- * contains intermediate values being accumulated.
- *
- * Like most accumulators, $sum does not require or accept an initializer Expression. At time of
- * writing, only user-defined accumulators accept an initializer.
- *
- * For example, in:
- *     {$group: {
- *         _id: {cc: "$country_code"},
- *         top_stories: {$accumulator: {
- *             init: function(cc) { ... },
- *             initArgs: ["$cc"],
- *             accumulate: function(state, title, upvotes) { ... },
- *             accumulateArgs: ["$title", "$upvotes"],
- *             merge: function(state1, state2) { ... },
- *             lang: "js",
- *         }}
- *     }}
- *
- * we would say:
- *     The AccumulationStatement is      top_stories: {$accumulator: ... }
- *     The AccumulationExpression is     {$accumulator: ... }
- *     The argument Expression is        ["$cc"]
- *     The initializer Expression is     ["$title", "$upvotes"]
- *     The AccumulatorState::Factory holds all the other arguments to $accumulator.
- *
- */
-struct AccumulationExpression {
-    AccumulationExpression(boost::intrusive_ptr<Expression> initializer,
-                           boost::intrusive_ptr<Expression> argument,
-                           AccumulatorState::Factory factory)
-        : initializer(initializer), argument(argument), factory(factory) {
-        invariant(this->initializer);
-        invariant(this->argument);
-    }
-
-    // The expression to use to obtain the input to the accumulator.
-    boost::intrusive_ptr<Expression> initializer;
-
-    // An expression evaluated once per input document, and passed to AccumulatorState::process.
-    boost::intrusive_ptr<Expression> argument;
-
-    // Constructs an AccumulatorState to do actual accumulation.
-    boost::intrusive_ptr<AccumulatorState> makeAccumulator() const;
-
-    // A no argument function object that can be called to create an AccumulatorState.
-    const AccumulatorState::Factory factory;
-};
-
-/**
- * A default parser for any accumulator that only takes a single expression as an argument. Returns
- * the expression to be evaluated by the accumulator and an AccumulatorState::Factory.
- */
-template <class AccName>
-AccumulationExpression genericParseSingleExpressionAccumulator(
-    boost::intrusive_ptr<ExpressionContext> expCtx, BSONElement elem, VariablesParseState vps) {
-    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }};
-}
-
-/**
  * A class representing a user-specified accumulation, including the field name to put the
  * accumulated result in, which accumulator to use, and the expression used to obtain the input to
- * the AccumulatorState.
+ * the Accumulator.
  */
 class AccumulationStatement {
 public:
-    using Parser = std::function<AccumulationExpression(
+    using Parser = std::function<std::pair<boost::intrusive_ptr<Expression>, Accumulator::Factory>(
         boost::intrusive_ptr<ExpressionContext>, BSONElement, VariablesParseState)>;
-
-    AccumulationStatement(std::string fieldName, AccumulationExpression expr)
-        : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
+    AccumulationStatement(std::string fieldName,
+                          boost::intrusive_ptr<Expression> expression,
+                          Accumulator::Factory factory)
+        : fieldName(std::move(fieldName)),
+          expression(std::move(expression)),
+          _factory(std::move(factory)) {}
 
     /**
      * Parses a BSONElement that is an accumulated field, and returns an AccumulationStatement for
      * that accumulated field.
      *
-     * Throws an AssertionException if parsing fails.
+     * Throws a AssertionException if parsing fails.
      */
     static AccumulationStatement parseAccumulationStatement(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -155,9 +79,9 @@ public:
         const VariablesParseState& vps);
 
     /**
-     * Registers an AccumulatorState with a parsing function, so that when an accumulator with the
-     * given name is encountered during parsing, we will know to call 'factory' to construct that
-     * AccumulatorState.
+     * Registers an Accumulator with a parsing function, so that when an accumulator with the given
+     * name is encountered during parsing, we will know to call 'factory' to construct that
+     * Accumulator.
      *
      * DO NOT call this method directly. Instead, use the REGISTER_ACCUMULATOR macro defined in this
      * file.
@@ -166,17 +90,22 @@ public:
 
     /**
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if
-     * there is no such AccumulatorState registered.
+     * there is no such Accumulator registered.
      */
     static Parser& getParser(StringData name);
 
     // The field name is used to store the results of the accumulation in a result document.
     std::string fieldName;
 
-    AccumulationExpression expr;
+    // The expression to use to obtain the input to the accumulator.
+    boost::intrusive_ptr<Expression> expression;
 
-    // Constructs an AccumulatorState to do actual accumulation.
-    boost::intrusive_ptr<AccumulatorState> makeAccumulator() const;
+    // Constructs an Accumulator to do actual accumulation.
+    boost::intrusive_ptr<Accumulator> makeAccumulator() const;
+
+private:
+    // A no argument function object that can be called to create an Accumulator.
+    const Accumulator::Factory _factory;
 };
 
 
