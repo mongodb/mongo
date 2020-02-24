@@ -86,7 +86,7 @@ private:
     /**
      * Stores the total amount of time spent blocked on prepare read conflicts.
      */
-    Microseconds _prepareConflictDuration{0};
+    AtomicWord<Microseconds> _prepareConflictDuration{Microseconds(0)};
 };
 
 }  // namespace mongo

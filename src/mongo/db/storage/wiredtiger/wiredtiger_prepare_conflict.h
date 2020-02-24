@@ -66,17 +66,17 @@ template <typename F>
 int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     invariant(opCtx);
 
-    auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
-    int attempts = 1;
-    // If we return from this function, we have either returned successfully or we've returned an
-    // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
-    ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(opCtx); });
     // If the failpoint is enabled, don't call the function, just simulate a conflict.
     int ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
                                                                      : WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
+    auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
+    int attempts = 1;
+    // If we return from this function, we have either returned successfully or we've returned an
+    // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
+    ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(opCtx); });
     PrepareConflictTracker::get(opCtx).beginPrepareConflict(opCtx);
 
     auto client = opCtx->getClient();
