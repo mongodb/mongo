@@ -251,7 +251,10 @@ void ProgramOutputMultiplexer::appendLine(int port,
     std::ostringstream ss;
     sinkProgramOutput(_buffer);
     sinkProgramOutput(ss);
-    LOGV2_OPTIONS(4615640, {logv2::LogTag::kPlainShell}, "{message}", "message"_attr = ss.str());
+    LOGV2_OPTIONS(4615640,
+                  logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+                  "{message}",
+                  "message"_attr = ss.str());
 }
 
 string ProgramOutputMultiplexer::str() const {
