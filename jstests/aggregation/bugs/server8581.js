@@ -123,11 +123,11 @@ a5result = [
     }
 ];
 
-assert.eq(a1.toArray(), a1result);
-assert.eq(a2.toArray(), a2result);
-assert.eq(a3.toArray(), a3result);
-assert.eq(a4.toArray(), a4result);
-assert.eq(a5.toArray(), a5result);
+assert(anyEq(a1.toArray(), a1result));
+assert(anyEq(a2.toArray(), a2result));
+assert(anyEq(a3.toArray(), a3result));
+assert(anyEq(a4.toArray(), a4result));
+assert(anyEq(a5.toArray(), a5result));
 
 // Test redacts that are just a variable access (this can happen as a result of optimizations)
 assert.eq(t.aggregate({$redact: "$$PRUNE"}).toArray(), []);

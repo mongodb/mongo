@@ -2,7 +2,7 @@
  * Tests to verify that the aggregation pipeline passthrough behaviour works as expected for stages
  * which have sub-pipelines, whose stages may have differing passthrough constraints. This test
  * exercises the fix for SERVER-41290.
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_profiling]
  */
 (function() {
 'use strict';

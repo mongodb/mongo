@@ -641,13 +641,13 @@ assert.commandWorked(coll.insert([
     {_id: 2, format: undefined},
 ]));
 
-assert.eq(
+assert(anyEq(
     [{_id: 0, date: null}, {_id: 1, date: null}, {_id: 2, date: null}],
     coll.aggregate({
             $project:
                 {date: {$dateFromString: {dateString: "2017-07-11T17:05:19Z", format: "$format"}}}
         })
-        .toArray());
+        .toArray()));
 
 /* --------------------------------------------------------------------------------------- */
 /* Parse errors. */

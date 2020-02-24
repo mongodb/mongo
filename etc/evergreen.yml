@@ -5399,6 +5399,17 @@ tasks:
       resmoke_args: --suites=aggregation_read_concern_majority_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: aggregation_secondary_reads
+  tags: ["aggregation", "secondary_reads"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_secondary_reads --storageEngine=wiredTiger
+
+- <<: *task_template
   name: aggregation_sharded_collections_passthrough
   tags: ["aggregation", "common"]
   depends_on:

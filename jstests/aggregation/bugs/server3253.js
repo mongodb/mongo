@@ -33,8 +33,8 @@ function test(input, pipeline, expected) {
 
     var cursor = input.aggregate(pipeline);
 
-    assert.eq(cursor.itcount(), 0);                // empty cursor returned
-    assert.eq(output.find().toArray(), expected);  // correct results
+    assert.eq(cursor.itcount(), 0);                    // empty cursor returned
+    assert(anyEq(output.find().toArray(), expected));  // correct results
     var outputIndexes = getOutputIndexes();
     assert.eq(outputIndexes.length, indexes.length);  // number of indexes maintained
     for (var i = 0; i < outputIndexes.length; i++) {

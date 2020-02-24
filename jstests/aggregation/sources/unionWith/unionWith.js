@@ -26,7 +26,7 @@ for (let i = 0; i < docsPerCollection; i++) {
 
 function checkResults(resObj, expectedResult) {
     assert.commandWorked(resObj);
-    assert(arrayEq(resObj.cursor.firstBatch, expectedResult),
+    assert(anyEq(resObj.cursor.firstBatch, expectedResult),
            "Expected:\n" + tojson(expectedResult) + "Got:\n" + tojson(resObj.cursor.firstBatch));
 }
 

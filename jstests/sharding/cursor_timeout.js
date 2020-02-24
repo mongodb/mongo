@@ -8,6 +8,7 @@
 //
 // After a period of inactivity, the test asserts that cursors #1 and #2 are still alive, and that
 // #3 and #4 have been killed.
+// @tags: [requires_sharding]
 (function() {
 'use strict';
 
