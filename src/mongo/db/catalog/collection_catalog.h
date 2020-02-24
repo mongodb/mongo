@@ -254,6 +254,7 @@ private:
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<Latch>&);
+
     mutable mongo::Mutex _catalogLock;
 
     /**

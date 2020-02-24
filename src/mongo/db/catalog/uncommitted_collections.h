@@ -55,8 +55,10 @@ public:
             _collections.erase(uuid);
             _nssIndex.erase(nss);
         }
+
         std::map<UUID, std::unique_ptr<Collection>> _collections;
         std::map<NamespaceString, UUID> _nssIndex;
+        std::vector<UUID> _registeredUUIDs;
     };
 
     UncommittedCollections() {
@@ -97,6 +99,15 @@ public:
                        UncommittedCollectionsMap* map);
 
     /**
+     * If the collection with uuid `uuid` was previously registered with the CollectionCatalog as
+     * part of the current multi-document transaction, this handler deregisters it.
+     */
+    static void rollback(ServiceContext* svcCtx,
+                         CollectionUUID uuid,
+                         UncommittedCollectionsMap* map);
+
+
+    /**
      * Erases the UUID/NamespaceString entries corresponding to `uuid` and `nss` from `map`.
      */
     static void erase(UUID uuid, NamespaceString nss, UncommittedCollectionsMap* map);
@@ -109,6 +120,7 @@ public:
     static void clear(UncommittedCollectionsMap* map) {
         map->_collections.clear();
         map->_nssIndex.clear();
+        map->_registeredUUIDs.clear();
     }
 
 private:

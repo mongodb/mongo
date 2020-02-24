@@ -61,6 +61,29 @@ function runParallelCollectionCreateTest(explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
+    /* TODO(SERVER-46285) Re-enable below test.
+    jsTest.log(
+        "Testing createCollection conflict during commit, where the conflict rolls back a previously
+    committed collection.");
+
+    secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate);
+
+    session.startTransaction({writeConcern: {w: "majority"}});            // txn 1
+    createCollAndCRUDInTxn(sessionDB, distinctCollName, explicitCreate);  // does not conflict
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);          // conflicts
+
+    jsTest.log("Committing transaction 2");
+    secondSession.commitTransaction();
+    jsTest.log("Committing transaction 1 (SHOULD FAIL)");
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+    assert.eq(sessionColl.find({}).itcount(), 1);
+    assert.eq(distinctSessionColl.find({}).itcount(), 0);
+
+    sessionColl.drop({writeConcern: {w: "majority"}});
+    distinctSessionColl.drop({writeConcern: {w: "majority"}});
+    */
+
     jsTest.log("Testing distinct createCollections in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
     createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);
