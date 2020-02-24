@@ -262,7 +262,8 @@ public:
      * subclass, please provide the switch on that subclass to noop its functions. It is only safe
      * to add a WaitListener during a MONGO_INITIALIZER.
      */
-    static void addWaitListener(WaitListener* listnener);
+    template <typename WaitListenerT>
+    static void installWaitListener();
 
     /**
      * Returns a statically allocated instance that cannot be interrupted.  Useful as a default
@@ -543,9 +544,11 @@ public:
     virtual void onWake(const StringData& name, WakeReason reason, WakeSpeed speed) = 0;
 };
 
-inline void Interruptible::addWaitListener(WaitListener* listener) {
+template <typename WaitListenerT>
+inline void Interruptible::installWaitListener() {
     auto& state = _getListenerState();
 
+    static auto* listener = new WaitListenerT();  // Intentionally leaked!
     state.list.push_back(listener);
 }
 

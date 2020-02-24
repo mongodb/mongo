@@ -1,4 +1,8 @@
 # Client objects are leaked in threads that are never terminated
 leak:mongo::Client::Client
 
+# DiagnosticListeners and WaitListeners need to be available in detached threads
+leak:mongo::latch_detail::installDiagnosticListener
+leak:mongo::Interruptible::installWaitListener
+
 leak:glob64

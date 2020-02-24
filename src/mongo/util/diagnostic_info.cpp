@@ -257,9 +257,7 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
         }
     };
 
-    // Intentionally leaked, people can use in detached threads
-    static auto& listener = *new WaitListener();
-    Interruptible::addWaitListener(&listener);
+    Interruptible::installWaitListener<WaitListener>();
 
     return Status::OK();
 }

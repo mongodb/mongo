@@ -54,6 +54,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
 
@@ -157,6 +158,12 @@ TEST(StackTrace, PosixFormat) {
     if (kIsWindows) {
         return;
     }
+
+    if (kDebugBuild) {
+        // TODO SERVER-46403 will make the regex below work with opt=off dbg=on
+        return;
+    }
+
     std::string trace;
     stack_trace_test_detail::RecursionParam param{3, [&] {
                                                       StringStackTraceSink sink{trace};

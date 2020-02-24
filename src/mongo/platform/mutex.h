@@ -194,8 +194,8 @@ REQUIRES(std::is_base_of_v<DiagnosticListener, ListenerT>)
 void installDiagnosticListener() {
     auto& state = getDiagnosticListenerState();
 
-    static auto listener = ListenerT();
-    state.listeners.push_back(&listener);
+    static auto* const listener = new ListenerT();  // Intentionally leaked!
+    state.listeners.push_back(listener);
     invariant(!state.isFinalized.load());
 }
 
