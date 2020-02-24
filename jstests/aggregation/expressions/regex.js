@@ -3,7 +3,7 @@
  */
 (function() {
 'use strict';
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode().
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and anyEq().
 const coll = db.regex_find_expr;
 coll.drop();
 
@@ -531,7 +531,7 @@ function testRegexAggException(inputObj, exceptionCode) {
                 }
             }])
             .toArray();
-    assert.eq(resultFindAll, expectedResults);
+    assert(anyEq(resultFindAll, expectedResults));
     // For $regexMatch.
     const resultMatch = coll.aggregate([{
                                 "$project": {
@@ -561,7 +561,7 @@ function testRegexAggException(inputObj, exceptionCode) {
             .toArray();
     // Validate that {$ne : [{$regexFind: ...}, null]} produces same result as
     // {$regexMatch: ...}.
-    assert.eq(resultFind, resultMatch);
-    assert.eq(resultFind, expectedResults);
+    assert(anyEq(resultFind, resultMatch));
+    assert(anyEq(resultFind, expectedResults));
 })();
 }());

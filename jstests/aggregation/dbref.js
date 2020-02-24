@@ -6,7 +6,10 @@
  * DBRef fields aren't supported in agg pre 4.4.
  * @tags: [assumes_unsharded_collection, requires_fcv_44]
  */
+
 (function() {
+"use strict";
+load("jstests/aggregation/extras/utils.js");  // For anyEq.
 const coll = db.dbref_in_expression;
 const otherColl = db.dbref_in_expression_2;
 
@@ -110,8 +113,8 @@ const lookupSubPipePipeline = [{$lookup: {from: otherColl.getName(),
                                           pipeline: [{$match: {$expr: {$in: ["$_id", "$$idsWanted"]}}}],
                                           as: "joinedField"}},
                         {$project: {link: 0, linkArray: 0}}];
-assert.eq(coll.aggregate(lookupSubPipePipeline).toArray(),
-          [{_id: 0, joinedField: [{_id: "id0", x: 1}, {_id: "id1", x: 2}]}]);
+assert(anyEq(coll.aggregate(lookupSubPipePipeline).toArray(),
+             [{_id: 0, joinedField: [{_id: "id0", x: 1}, {_id: "id1", x: 2}]}]));
 
 (function testGraphLookup() {
     // $graphLookup using DBRef.

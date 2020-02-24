@@ -48,7 +48,7 @@ assert.commandWorked(coll.insert([
     },
 ]));
 
-assert.eq(
+assert(anyEq(
     [
         {_id: 1, date: ISODate("2016-12-31T23:00:00Z")},
         {_id: 2, date: ISODate("2016-12-31T15:00:00Z")},
@@ -59,7 +59,7 @@ assert.eq(
             },
             {$project: {date: {'$dateFromParts': {year: "$year", "timezone": "$timezone"}}}}
         ])
-        .toArray());
+        .toArray()));
 
 assert.eq(
     [

@@ -3,7 +3,7 @@
 // Run only when pipeline optimization is enabled, otherwise the type of sorter being used can be
 // different (NoLimitSort vs TopKSort) causing an aggregation request to fail with different error
 // codes.
-// @tags: [requires_pipeline_optimization]
+// @tags: [requires_pipeline_optimization, requires_collstats]
 (function() {
 'use strict';
 

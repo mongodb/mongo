@@ -9,7 +9,7 @@
 // This test makes assumptions about how the explain output will be formatted, so cannot be run when
 // pipeline optimization is disabled.
 // @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection,
-//         requires_pipeline_optimization]
+//         requires_pipeline_optimization, requires_profiling]
 (function() {
 "use strict";
 

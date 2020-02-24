@@ -4,6 +4,8 @@
  * the fix for SERVER-43350.
  * @tags: [assumes_unsharded_collection]
  */
+load("jstests/aggregation/extras/utils.js");  // For anyEq.
+
 (function() {
 
 "use strict";
@@ -48,13 +50,13 @@ for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
     // Verify that a $lookup whose local collection has no default collation uses the simple
     // collation for comparisons on a foreign collection with a non-simple default collation.
     let results = noCollationColl.aggregate([lookupInto(caseInsensitiveColl)]).toArray();
-    assert.docEq(results, [
+    assert(anyEq(results, [
         {_id: "a", foreignMatch: [{_id: "a"}]},
         {_id: "b", foreignMatch: []},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "d", foreignMatch: []},
         {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]);
+    ]));
 
     // Verify that a $lookup whose local collection has no default collation but which is running in
     // a pipeline with a non-simple user-specified collation uses the latter for comparisons on the
@@ -63,24 +65,24 @@ for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
         noCollationColl
             .aggregate([lookupInto(caseInsensitiveColl)], {collation: caseInsensitiveCollation})
             .toArray();
-    assert.docEq(results, [
+    assert(anyEq(results, [
         {_id: "a", foreignMatch: [{_id: "a"}]},
         {_id: "b", foreignMatch: [{_id: "B"}]},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "d", foreignMatch: [{_id: "D"}]},
         {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]);
+    ]));
 
     // Verify that a $lookup whose local collection has a non-simple collation uses the latter for
     // comparisons on a foreign collection with no default collation.
     results = caseInsensitiveColl.aggregate([lookupInto(noCollationColl)]).toArray();
-    assert.docEq(results, [
+    assert(anyEq(results, [
         {_id: "a", foreignMatch: [{_id: "a"}]},
         {_id: "B", foreignMatch: [{_id: "b"}]},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "D", foreignMatch: [{_id: "d"}]},
         {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]);
+    ]));
 
     // Verify that a $lookup whose local collection has a non-simple collation but which is running
     // in a pipeline with a user-specified simple collation uses the latter for comparisons on the
@@ -88,12 +90,12 @@ for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
     results =
         caseInsensitiveColl.aggregate([lookupInto(noCollationColl)], {collation: simpleCollation})
             .toArray();
-    assert.docEq(results, [
+    assert(anyEq(results, [
         {_id: "a", foreignMatch: [{_id: "a"}]},
         {_id: "B", foreignMatch: []},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "D", foreignMatch: []},
         {_id: "e", foreignMatch: [{_id: "e"}]}
-    ]);
+    ]));
 }
 })();

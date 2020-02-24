@@ -1,0 +1,75 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/aggregation/**/*.js
+  exclude_files:
+  # The files in these directories contain utilities for use in other tests, not tests.
+  - jstests/aggregation/extras/*.js
+  - jstests/aggregation/data/*.js
+  # TODO SERVER-46544: Investigate whether these tests should remain blacklisted or not.
+  - jstests/aggregation/sources/out/replace_collection.js
+  - jstests/aggregation/group_conversion_to_distinct_scan.js
+  - jstests/aggregation/sources/unionWith/unionWith_collation.js
+  - jstests/aggregation/sources/unionWith/unionWith.js
+  - jstests/aggregation/expressions/collation_expressions.js
+  - jstests/aggregation/bugs/server5932.js
+  - jstests/aggregation/sources/lookup/lookup_subpipeline.js
+  - jstests/aggregation/bugs/server21632.js
+  - jstests/aggregation/sources/graphLookup/error.js
+
+  exclude_with_any_tags:
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  #
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  # collStats and dbStats are not causally consistent.
+  - requires_collstats
+  - requires_dbstats
+  # These tests attempt to read from the "system.profile" collection, which may be missing entries
+  # if a write was performed on the primary of the replica set instead.
+  - requires_profiling
+  # These tests start their own ShardingTest, ReplicaSetTest, or mongods, respectively.
+  - requires_sharding
+  - requires_replication
+  - requires_spawning_own_processes
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_preference_secondary.js');
+        load('jstests/libs/override_methods/enable_causal_consistency.js');
+        load('jstests/libs/override_methods/detect_spawning_own_mongod.js');
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        numInitialSyncAttempts: 10000000
+    linear_chain: true
+    num_nodes: 5
+    use_replica_set_connection_string: true

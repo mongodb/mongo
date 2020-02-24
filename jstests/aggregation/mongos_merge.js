@@ -14,6 +14,7 @@
  *   do_not_wrap_aggregations_in_facets,
  *   requires_sharding,
  *   requires_spawning_own_processes,
+ *   requires_profiling,
  * ]
  */
 

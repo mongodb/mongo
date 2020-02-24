@@ -75,6 +75,9 @@ FixtureHelpers.runCommandOnEachPrimary({
 });
 join();
 
+// Verify that index build has stopped before checking for the 'building' field.
+IndexBuildTest.waitForIndexBuildToStop(db, coll.getName(), indexName);
+
 // Verify that there is no 'building' field in the $indexStats output for our created index once the
 // index build is complete.
 let finishedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexName}}]).toArray();
