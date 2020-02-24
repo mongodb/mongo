@@ -72,12 +72,15 @@ var currentCheckNum = 0;
 function hasConnPoolStats(args) {
     const checkNum = currentCheckNum++;
     jsTestLog("Check #" + checkNum + ": " + tojson(args));
-    var {ready, pending, active, hosts, isAbsent} = args;
+    var {ready, pending, active, hosts, isAbsent, checkStatsFunc} = args;
 
     ready = ready ? ready : 0;
     pending = pending ? pending : 0;
     active = active ? active : 0;
     hosts = hosts ? hosts : allHosts;
+    checkStatsFunc = checkStatsFunc ? checkStatsFunc : function(stats) {
+        return stats.available == ready && stats.refreshing == pending && stats.inUse == active;
+    };
 
     function checkStats(res, host) {
         var stats = res.hosts[host];
@@ -87,7 +90,7 @@ function hasConnPoolStats(args) {
         }
 
         jsTestLog("Connection stats for " + host + ": " + tojson(stats));
-        return stats.available == ready && stats.refreshing == pending && stats.inUse == active;
+        return checkStatsFunc(stats);
     }
 
     function checkAllStats() {
@@ -203,7 +206,12 @@ runSubTest("MaxConnecting", function() {
 
     // Release our pending and walk away
     configureReplSetFailpoint("waitInIsMaster", "off");
-    hasConnPoolStats({active: conns});
+    hasConnPoolStats({
+        // Expects the number of pending connections to be zero.
+        checkStatsFunc: function(stats) {
+            return stats.refreshing == 0;
+        }
+    });
     configureReplSetFailpoint("waitInFindBeforeMakingBatch", "off");
 });
 
