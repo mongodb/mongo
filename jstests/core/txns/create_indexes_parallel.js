@@ -10,7 +10,7 @@
 
 load("jstests/libs/create_index_txn_helpers.js");
 
-let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
+let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const dbName = "test";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
@@ -32,7 +32,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -51,7 +51,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
     assert.eq(secondSessionColl.find({}).itcount(), 1);
@@ -72,10 +72,10 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
         "Testing duplicate createIndexes in parallel, both attempt to commit, second to commit fails");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -93,10 +93,11 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
 
     jsTest.log("Testing distinct createIndexes in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createIndexAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(
+        secondSessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
 
     session.commitTransaction();
     secondSession.commitTransaction();
@@ -105,6 +106,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate) {
     session.endSession();
 };
 
-doParallelCreateIndexesTest(false /*explicitCollectionCreate*/);
-doParallelCreateIndexesTest(true /*explicitCollectionCreate*/);
+doParallelCreateIndexesTest(false /*explicitCollectionCreate*/, false /*multikeyIndex*/);
+doParallelCreateIndexesTest(true /*explicitCollectionCreate*/, false /*multikeyIndex*/);
+doParallelCreateIndexesTest(false /*explicitCollectionCreate*/, true /*multikeyIndex*/);
+doParallelCreateIndexesTest(true /*explicitCollectionCreate*/, true /*multikeyIndex*/);
 }());

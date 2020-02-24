@@ -12,6 +12,12 @@ const conflictingIndexSpecs = {
 };
 
 const createIndexAndCRUDInTxn = function(sessionDB, collName, explicitCollCreate, multikeyIndex) {
+    if (undefined === explicitCollCreate) {
+        doassert('createIndexAndCRUDInTxn called with undefined explicitCollCreate');
+    }
+    if (undefined === multikeyIndex) {
+        doassert('createIndexAndCRUDInTxn called with undefined multikeyIndex');
+    }
     if (explicitCollCreate) {
         assert.commandWorked(sessionDB.runCommand({create: collName}));
     }

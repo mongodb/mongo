@@ -11,7 +11,7 @@
 
 load("jstests/libs/create_index_txn_helpers.js");
 
-let doCreateIndexesTest = function(explicitCollectionCreate) {
+let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const session = db.getMongo().startSession({causalConsistency: false});
     const collName = "create_new_indexes";
     const secondCollName = collName + "_second";
@@ -24,15 +24,7 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
 
     jsTest.log("Testing createIndexes in a transaction");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
-    session.commitTransaction();
-    assert.eq(sessionColl.find({}).itcount(), 1);
-    assert.eq(sessionColl.getIndexes().length, 2);
-    sessionColl.drop({writeConcern: {w: "majority"}});
-
-    jsTest.log("Testing multikey createIndexes in a transaction");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, true);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);
@@ -40,8 +32,8 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
 
     jsTest.log("Testing multiple createIndexess in a transaction");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
-    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.find({}).itcount(), 1);
@@ -53,7 +45,7 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
 
     jsTest.log("Testing createIndexes in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
     assert.commandWorked(session.abortTransaction_forTesting());
 
     assert.eq(sessionColl.find({}).itcount(), 0);
@@ -61,8 +53,8 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
 
     jsTest.log("Testing multiple createIndexes in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
-    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
     session.abortTransaction();
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
@@ -74,7 +66,7 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
     jsTest.log(
         "Testing createIndexes with conflicting index specs in a transaction that aborts (SHOULD FAIL)");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate);
+    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
     assert.commandFailedWithCode(
         sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
         ErrorCodes.IndexKeySpecsConflict);
@@ -103,6 +95,8 @@ let doCreateIndexesTest = function(explicitCollectionCreate) {
     session.endSession();
 };
 
-doCreateIndexesTest(false /*explicitCollectionCreate*/);
-doCreateIndexesTest(true /*explicitCollectionCreate*/);
+doCreateIndexesTest(false /*explicitCollectionCreate*/, false /*multikeyIndex*/);
+doCreateIndexesTest(true /*explicitCollectionCreate*/, false /*multikeyIndex*/);
+doCreateIndexesTest(false /*explicitCollectionCreate*/, true /*multikeyIndex*/);
+doCreateIndexesTest(true /*explicitCollectionCreate*/, true /*multikeyIndex*/);
 }());
