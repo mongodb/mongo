@@ -133,7 +133,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
 
     // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
     BSONObj newProjection = qr.getProj();
-    if (!qr.getSort().isEmpty() && !qr.getSort()["$natural"]) {
+    if (!qr.getSort().isEmpty() && !qr.getSort()[QueryRequest::kNaturalSortField]) {
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(qr.getProj());
         projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kSortKeyMetaProjection);
@@ -274,7 +274,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
     BSONObj sortComparatorObj;
-    if (query.getSortPattern() && !query.getQueryRequest().getSort().hasField("$natural")) {
+    if (query.getSortPattern() &&
+        !query.getQueryRequest().getSort()[QueryRequest::kNaturalSortField]) {
         // We have already validated the input sort object. Serialize the raw sort spec into one
         // suitable for use as the ordering specification in BSONObj::woCompare(). In particular, we
         // want to eliminate sorts using expressions (like $meta) and replace them with a
@@ -288,7 +289,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     bool appendGeoNearDistanceProjection = false;
     bool compareWholeSortKeyOnRouter = false;
-    if (query.getQueryRequest().getSort().isEmpty() &&
+    if (!query.getSortPattern() &&
         QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
         // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
         // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the

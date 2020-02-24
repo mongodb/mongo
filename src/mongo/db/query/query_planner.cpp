@@ -586,10 +586,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any $natural
     // sort to have been normalized to a $natural hint upstream.
     if (!query.getQueryRequest().getHint().isEmpty()) {
-        BSONObj hintObj = query.getQueryRequest().getHint();
-        BSONElement naturalHint = dps::extractElementAtPath(hintObj, "$natural");
-
-        if (naturalHint) {
+        const BSONObj& hintObj = query.getQueryRequest().getHint();
+        if (hintObj[QueryRequest::kNaturalSortField]) {
             LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
             if (!canTableScan) {
                 return Status(ErrorCodes::NoQueryExecutionPlans,
@@ -926,7 +924,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // If a sort order is requested, there may be an index that provides it, even if that
     // index is not over any predicates in the query.
     //
-    if (!query.getQueryRequest().getSort().isEmpty() &&
+    if (query.getSortPattern() &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
         // See if we have a sort provided from an index already.

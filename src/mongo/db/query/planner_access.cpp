@@ -222,10 +222,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
-    if (!query.getQueryRequest().getHint().isEmpty()) {
-        BSONElement natural =
-            dps::extractElementAtPath(query.getQueryRequest().getHint(), "$natural");
-        if (!natural.eoo()) {
+    const BSONObj& hint = query.getQueryRequest().getHint();
+    if (!hint.isEmpty()) {
+        BSONElement natural = hint[QueryRequest::kNaturalSortField];
+        if (natural) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
         }
     }
@@ -1201,7 +1201,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     } else {
         std::vector<bool> shouldReverseScan;
 
-        if (!query.getQueryRequest().getSort().isEmpty()) {
+        if (query.getSortPattern()) {
             // If all ixscanNodes can provide the sort, shouldReverseScan is populated with which
             // scans to reverse.
             shouldReverseScan =

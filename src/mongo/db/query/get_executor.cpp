@@ -1512,7 +1512,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     // plannerParams.indices may be suitable. Refer to getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
     if (!parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() ||
-        !parsedDistinct->getQuery()->getQueryRequest().getSort().isEmpty() ||
+        parsedDistinct->getQuery()->getSortPattern() ||
         !getDistinctNodeIndex(
             plannerParams.indices, parsedDistinct->getKey(), collator, &distinctNodeIndex)) {
         // Not a "simple" DISTINCT_SCAN or no suitable index was found.

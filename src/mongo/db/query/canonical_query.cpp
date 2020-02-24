@@ -289,7 +289,7 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
     // We have already validated that if there is a $natural sort and a hint, that the hint
     // also specifies $natural with the same direction. Therefore, it is safe to clear the $natural
     // sort and rewrite it as a $natural hint.
-    if (_qr->getSort()["$natural"]) {
+    if (_qr->getSort()[QueryRequest::kNaturalSortField]) {
         _qr->setHint(_qr->getSort());
         _qr->setSort(BSONObj{});
     }

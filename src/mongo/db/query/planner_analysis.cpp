@@ -693,8 +693,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 
     // If the sort is $natural, we ignore it, assuming that the caller has detected that and
     // outputted a collscan to satisfy the desired order.
-    BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
-    if (!natural.eoo()) {
+    if (sortObj[QueryRequest::kNaturalSortField]) {
         return solnRoot;
     }
 

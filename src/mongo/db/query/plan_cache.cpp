@@ -125,7 +125,7 @@ bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
 
     // Collection scan
     // No sort order requested
-    if (qr.getSort().isEmpty() && expr->matchType() == MatchExpression::AND &&
+    if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
         expr->numChildren() == 0) {
         return false;
     }
