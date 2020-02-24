@@ -44,6 +44,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -233,6 +234,14 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
             return parseError("Reserved field name in base object: $binary");
         }
         Status ret = binaryObject(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+    } else if (firstField == "$uuid") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $uuid");
+        }
+        Status ret = uuidObject(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -478,6 +487,28 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
 
     builder.appendBinData(
         fieldName, binData.length(), BinDataType(binDataTypeNumeric), binData.data());
+    return Status::OK();
+}
+
+Status JParse::uuidObject(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expected ':'");
+    }
+    std::string uuidString;
+    uuidString.reserve(40);
+
+    Status dataRet = quotedString(&uuidString);
+    if (dataRet != Status::OK()) {
+        return dataRet;
+    }
+
+    auto uuid = UUID::parse(uuidString);
+    if (!uuid.isOK()) {
+        return uuid.getStatus();
+    }
+
+    uuid.getValue().appendToBuilder(&builder, fieldName);
+
     return Status::OK();
 }
 

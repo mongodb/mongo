@@ -104,8 +104,7 @@ function finishTest({failPoint, expectedLog, expectedLogId, waitForDrop, createN
             let attrValues = {
                 "ns": nss,
                 "uuid": function(attr) {
-                    return BinData(parseInt(attr.uuid.$binary.subType), attr.uuid.$binary.base64)
-                               .toString() === uuid.toString();
+                    return UUID(attr.uuid.$uuid).toString() === uuid.toString();
                 }
             };
 

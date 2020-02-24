@@ -189,6 +189,12 @@ private:
     Status binaryObject(StringData fieldName, BSONObjBuilder&);
 
     /*
+     * UUIDOBJECT :
+     *     { FIELD("$uuid") : <string representation of UUID, in hexadecimal per RFC 4122> }
+     */
+    Status uuidObject(StringData fieldName, BSONObjBuilder&);
+
+    /*
      * DATEOBJECT :
      *     { FIELD("$date") : <64 bit signed integer for milliseconds since epoch> }
      */

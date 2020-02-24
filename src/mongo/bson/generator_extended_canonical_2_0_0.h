@@ -121,9 +121,31 @@ public:
     }
 
     void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
-        appendTo(buffer, R"({"$binary":{"base64":")"_sd);
-        base64::encode(buffer, data);
-        fmt::format_to(buffer, R"(","subType":"{:x}"}}}})", type);
+        if (type == newUUID && data.size() == 16) {
+            fmt::format_to(
+                buffer,
+                R"({{"$uuid":"{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})",
+                static_cast<uint8_t>(data[0]),
+                static_cast<uint8_t>(data[1]),
+                static_cast<uint8_t>(data[2]),
+                static_cast<uint8_t>(data[3]),
+                static_cast<uint8_t>(data[4]),
+                static_cast<uint8_t>(data[5]),
+                static_cast<uint8_t>(data[6]),
+                static_cast<uint8_t>(data[7]),
+                static_cast<uint8_t>(data[8]),
+                static_cast<uint8_t>(data[9]),
+                static_cast<uint8_t>(data[10]),
+                static_cast<uint8_t>(data[11]),
+                static_cast<uint8_t>(data[12]),
+                static_cast<uint8_t>(data[13]),
+                static_cast<uint8_t>(data[14]),
+                static_cast<uint8_t>(data[15]));
+        } else {
+            appendTo(buffer, R"({"$binary":{"base64":")"_sd);
+            base64::encode(buffer, data);
+            fmt::format_to(buffer, R"(","subType":"{:x}"}}}})", type);
+        }
     }
 
     void writeRegex(fmt::memory_buffer& buffer, StringData pattern, StringData options) const {

@@ -75,7 +75,6 @@ function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
     // Get the uuid for use in checking the log line.
     const uuid_obj = getUUIDFromListCollections(primaryDB, collName);
     const uuid = extractUUIDFromObject(uuid_obj);
-    const uuid_base64 = uuid_obj.base64();
     const target = (renameAcrossDBs ? pCrossDBRenameColl : pRenameColl);
 
     jsTestLog("Renaming collection on primary: " + target.getFullName());
@@ -180,7 +179,7 @@ let expectedLogFor6and8 =
 if (isJsonLogNoConn()) {
     // Double escape the backslash as eval will do unescaping
     expectedLogFor6and8 =
-        '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$binary":{"base64":"${uuid_base64}","subType":"4"}}}}}`';
+        '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`';
 }
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
