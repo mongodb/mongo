@@ -65,6 +65,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
@@ -325,6 +326,13 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             if (_ignoreUnique) {
                 index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
             }
+
+            // Two-phase index builds (with a build UUID) always relax constraints and check for
+            // violations at commit-time.
+            if (_buildUUID) {
+                index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+            }
+
             index.options.fromIndexBuilder = true;
 
             LOGV2(20384,
@@ -421,6 +429,23 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         LOGV2(20387, "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'");
         hangAfterSettingUpIndexBuild.pauseWhileSet();
     }
+
+    if (MONGO_unlikely(hangAfterSettingUpIndexBuildUnlocked.shouldFail())) {
+        uassert(4585200, "failpoint may not be set on foreground indexes", isBackgroundBuilding());
+
+        // Unlock before hanging so replication recognizes we've completed.
+        Locker::LockSnapshot lockInfo;
+        invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
+
+        LOGV2(4585201,
+              "Hanging index build with no locks due to "
+              "'hangAfterSettingUpIndexBuildUnlocked' failpoint");
+        hangAfterSettingUpIndexBuildUnlocked.pauseWhileSet();
+
+        opCtx->lockState()->restoreLockState(opCtx, lockInfo);
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+
 
     if (MONGO_unlikely(hangAndThenFailIndexBuild.shouldFail())) {
         // Hang the build after the BackgroundOperation and curOP info is set up.

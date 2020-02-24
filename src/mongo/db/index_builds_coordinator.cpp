@@ -1799,34 +1799,10 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
     const IndexBuildOptions& indexBuildOptions,
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
 
-    auto preAbortStatus = Status::OK();
-    try {
-        _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
-        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
-    } catch (DBException& ex) {
-        // Locks may no longer be held when we are interrupted. We should return immediately and, in
-        // the case of a primary index build, signal downstream nodes to abort via the
-        // abortIndexBuild oplog entry. On secondaries, a server shutdown is the only way an index
-        // build can be interrupted (InterruptedAtShutdown).
-        if (ex.isA<ErrorCategory::Interruption>()) {
-            throw;
-        }
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        auto replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
-            !replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
-        if (!replSetAndNotPrimary) {
-            throw;
-        }
-        LOGV2(20664,
-              "Index build failed before final phase during oplog application. "
-              "Waiting for abort: {replState_buildUUID}: {ex}",
-              "replState_buildUUID"_attr = replState->buildUUID,
-              "ex"_attr = ex);
-        preAbortStatus = ex.toStatus();
-    }
+    _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
+    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
 
-    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, replState, preAbortStatus);
+    auto commitIndexBuildTimestamp = _waitForCommitOrAbort(opCtx, replState);
     _insertKeysFromSideTablesAndCommit(
         opCtx, replState, indexBuildOptions, exclusiveCollectionLock, commitIndexBuildTimestamp);
 }
@@ -1923,9 +1899,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
  * Waits for commit or abort signal from primary.
  */
 Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
-    OperationContext* opCtx,
-    std::shared_ptr<ReplIndexBuildState> replState,
-    const Status& preAbortStatus) {
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     Timestamp commitIndexBuildTimestamp;
     if (shouldWaitForCommitOrAbort(opCtx, *replState)) {
         LOGV2(20668,
@@ -1947,27 +1921,19 @@ Timestamp IndexBuildsCoordinator::_waitForCommitOrAbort(
 
         if (replState->isCommitReady) {
             LOGV2(20669,
-                  "Committing index build: {replState_buildUUID}, timestamp: "
-                  "{replState_commitTimestamp}, collection UUID: {replState_collectionUUID}",
-                  "replState_buildUUID"_attr = replState->buildUUID,
-                  "replState_commitTimestamp"_attr = replState->commitTimestamp,
-                  "replState_collectionUUID"_attr = replState->collectionUUID);
+                  "Committing index build",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "commitTimestamp"_attr = replState->commitTimestamp,
+                  "collectionUUID"_attr = replState->collectionUUID);
             commitIndexBuildTimestamp = replState->commitTimestamp;
             invariant(!replState->aborted, replState->buildUUID.toString());
-            uassertStatusOK(preAbortStatus.withContext(
-                str::stream() << "index build failed on this node but we received a "
-                                 "commitIndexBuild oplog entry from the primary with timestamp: "
-                              << replState->commitTimestamp.toString()));
         } else if (replState->aborted) {
             LOGV2(20670,
-                  "Aborting index build: {replState_buildUUID}, timestamp: "
-                  "{replState_abortTimestamp}, reason: {replState_abortReason}, collection UUID: "
-                  "{replState_collectionUUID}, local index error (if any): {preAbortStatus}",
-                  "replState_buildUUID"_attr = replState->buildUUID,
-                  "replState_abortTimestamp"_attr = replState->abortTimestamp,
-                  "replState_abortReason"_attr = replState->abortReason,
-                  "replState_collectionUUID"_attr = replState->collectionUUID,
-                  "preAbortStatus"_attr = preAbortStatus);
+                  "Aborting index build",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "abortTimestamp"_attr = replState->abortTimestamp,
+                  "abortReason"_attr = replState->abortReason,
+                  "collectionUUID"_attr = replState->collectionUUID);
             invariant(!replState->isCommitReady, replState->buildUUID.toString());
         }
     }

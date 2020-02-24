@@ -575,9 +575,6 @@ protected:
 
     /**
      * Waits for commit or abort signal from primary.
-     * 'preAbortStatus' holds any indexing errors from the prior phases during oplog application.
-     * If 'preAbortStatus' is not OK, we need to ensure that we get a abortIndexBuild oplog entry
-     * from the primary, not commitIndexBuild.
      *
      * On completion, this function returns a timestamp, which may be null, that may be used to
      * update the mdb catalog as we commit the index build. The commit index build timestamp is
@@ -587,8 +584,7 @@ protected:
      * the index build.
      */
     Timestamp _waitForCommitOrAbort(OperationContext* opCtx,
-                                    std::shared_ptr<ReplIndexBuildState> replState,
-                                    const Status& preAbortStatus);
+                                    std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
      * Third phase is catching up on all the writes that occurred during the first two phases.
