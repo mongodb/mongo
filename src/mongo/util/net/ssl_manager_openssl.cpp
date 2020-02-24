@@ -499,15 +499,23 @@ struct OCSPFetchResponse {
                       boost::optional<Date_t> refreshTime)
         : statusOfResponse(statusOfResponse),
           response(std::move(response)),
-          refreshTime(refreshTime) {}
+          refreshTime(refreshTime.value_or(Date_t::now() + 2 * kOCSPUnknownStatusRefreshRate)) {}
 
     Status statusOfResponse;
     UniqueOCSPResponse response;
-    boost::optional<Date_t> refreshTime;
+    Date_t refreshTime;
 
-    const Milliseconds nextUpdateDuration() {
-        return refreshTime ? (refreshTime.get() - Date_t::now()) / 2
-                           : kOCSPUnknownStatusRefreshRate;
+    const Milliseconds fetchNewResponseDuration() {
+        Milliseconds timeBeforeNextUpdate = refreshTime - Date_t::now();
+        if (timeBeforeNextUpdate < Milliseconds(0)) {
+            return Milliseconds(0);
+        }
+
+        return timeBeforeNextUpdate / 2;
+    }
+
+    const Date_t nextStapleRefresh() {
+        return refreshTime;
     }
 };
 
@@ -1410,20 +1418,34 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     return status;
 }
 
-std::shared_ptr<OCSP_RESPONSE> sharedResponseForServer;
+struct OCSPStaplingContext {
+    OCSPStaplingContext(UniqueOCSPResponse response, Date_t nextUpdate)
+        : sharedResponseForServer(std::move(response)), sharedResponseNextUpdate(nextUpdate) {}
+
+    OCSPStaplingContext() = default;
+
+    std::shared_ptr<OCSP_RESPONSE> sharedResponseForServer;
+    Date_t sharedResponseNextUpdate;
+};
+
 mongo::Mutex sharedResponseMutex;
+std::shared_ptr<OCSPStaplingContext> ocspStaplingContext;
 
 int ocspServerCallback(SSL* ssl, void* arg) {
     {
-        stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
-        auto response = static_cast<std::shared_ptr<OCSP_RESPONSE>*>(arg);
+        std::shared_ptr<OCSPStaplingContext> context;
 
-        if (!response) {
+        {
+            stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
+            context = ocspStaplingContext;
+        }
+
+        if (!context->sharedResponseForServer) {
             return SSL_TLSEXT_ERR_NOACK;
         }
 
         unsigned char* ocspResponseBuffer = NULL;
-        int length = i2d_OCSP_RESPONSE(response->get(), &ocspResponseBuffer);
+        int length = i2d_OCSP_RESPONSE(context->sharedResponseForServer.get(), &ocspResponseBuffer);
 
         if (length == 0) {
             return SSL_TLSEXT_ERR_NOACK;
@@ -1670,14 +1692,30 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
             .onCompletion([](StatusWith<OCSPFetchResponse> swResponse) -> Milliseconds {
                 if (!swResponse.isOK()) {
                     LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+
+                    stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
+
+                    if (ocspStaplingContext->sharedResponseForServer != nullptr &&
+                        ocspStaplingContext->sharedResponseNextUpdate <
+                            (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
+
+                        ocspStaplingContext = std::make_shared<OCSPStaplingContext>();
+
+                        LOGV2_WARNING(
+                            4633601,
+                            "Server will remove and not staple the expiring OCSP Response.");
+                    }
+
                     return kOCSPUnknownStatusRefreshRate;
                 }
 
                 stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
-                sharedResponseForServer =
-                    std::shared_ptr<OCSP_RESPONSE>(std::move(swResponse.getValue().response));
 
-                return swResponse.getValue().nextUpdateDuration();
+                ocspStaplingContext = std::make_shared<OCSPStaplingContext>(
+                    std::move(swResponse.getValue().response),
+                    swResponse.getValue().nextStapleRefresh());
+
+                return swResponse.getValue().fetchNewResponseDuration();
             });
     };
 
@@ -1729,7 +1767,7 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
         });
 
     SSL_CTX_set_tlsext_status_cb(context, ocspServerCallback);
-    SSL_CTX_set_tlsext_status_arg(context, &sharedResponseForServer);
+    SSL_CTX_set_tlsext_status_arg(context, nullptr);
 
     return Status::OK();
 }

@@ -1510,7 +1510,7 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         ipv6 = true;
     }
 
-    if (sslOCSPEnabled && !remoteHost.empty()) {
+    if (tlsOCSPEnabled && !remoteHost.empty()) {
         CFArrayRef policies = nullptr;
         ::SecTrustCopyPolicies(cftrust.get(), &policies);
         CFUniquePtr<::CFArrayRef> cfpolicies(policies);

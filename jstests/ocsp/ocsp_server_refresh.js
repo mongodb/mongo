@@ -80,4 +80,26 @@ MongoRunner.stopMongod(conn);
 // sleep to make sure that the threads don't interfere with each other.
 sleep(1000);
 mock_ocsp.stop();
+
+// Next, we're going to test that the server deletes its OCSP response before the
+// response expires.
+const NEXT_UPDATE = 10;
+
+mock_ocsp = new MockOCSPServer("", NEXT_UPDATE);
+mock_ocsp.start();
+
+assert.doesNotThrow(() => {
+    conn = MongoRunner.runMongod(ocsp_options);
+});
+
+mock_ocsp.stop();
+
+// If the server stapled an expired response, then the client would refuse to connect.
+// We now check that the server has not stapled a response.
+sleep(NEXT_UPDATE * 1000);
+assert.doesNotThrow(() => {
+    new Mongo(conn.host);
+});
+
+MongoRunner.stopMongod(conn);
 }());
