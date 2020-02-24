@@ -37,9 +37,7 @@ assert.commandWorked(primary.adminCommand(
 // Use a custom index name because we are going to reuse it later with a different key pattern.
 const createIdx =
     IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {name: 'myidx'});
-
-checkLog.contains(
-    primary, 'index build: starting on ' + coll.getFullName() + ' properties: { v: 2, key: { a:');
+checkLog.contains(primary, new RegExp('index build: starting.*' + coll.getFullName() + '.*myidx'));
 
 const newPrimary = rst.getSecondary();
 
@@ -61,7 +59,7 @@ assert.eq({b: 1}, indexSpecMap['myidx'].key, 'unexpected key pattern: ' + tojson
 // an aborted index build, left over from before the node stepped down, is still running.
 assert.soon(() => {
     return rawMongoProgramOutput().match(
-        'Fatal assertion 34437 IndexBuildAborted: Index build conflict:');
+        new RegExp('Fatal assertion.*34437.*IndexBuildAborted: Index build conflict:'));
 }, 'Index build should have aborted on step down.');
 rst.stop(primary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 
