@@ -4514,7 +4514,6 @@ cachePrune = env.Command(
 )
 
 env.AlwaysBuild(cachePrune)
-env.Alias('cache-prune', cachePrune)
 
 if get_option('install-mode') == 'hygienic':
     env.FinalizeInstallDependencies()

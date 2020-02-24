@@ -57,6 +57,20 @@ def _install_action_function(_env, node):
     }
 
 
+def _mkdir_action_function(_env, node):
+    return {
+        "outputs": get_outputs(node),
+        "rule": "CMD",
+        "implicit": get_dependencies(node),
+        "variables": {
+            # On Windows mkdir "-p" is always on
+            "cmd": "{mkdir} $out".format(
+                mkdir="mkdir" if env["PLATFORM"] == "win32" else "mkdir -p",
+            ),
+        },
+    }
+
+
 def _lib_symlink_action_function(_env, node):
     """Create shared object symlinks if any need to be created"""
     symlinks = getattr(getattr(node, "attributes", None), "shliblinks", None)
@@ -160,6 +174,7 @@ class SConsToNinjaTranslator:
             "SharedFlagChecker": ninja_noop,
             # The install builder is implemented as a function action.
             "installFunc": _install_action_function,
+            "MkdirFunc": _mkdir_action_function,
             "LibSymlinksActionFunction": _lib_symlink_action_function,
         }
 
@@ -1272,6 +1287,7 @@ def generate(env):
     SCons.Executor.Executor.prepare = ninja_noop
     SCons.Taskmaster.Task.prepare = ninja_noop
     SCons.Node.FS.File.built = ninja_noop
+    SCons.Node.Node.visited = ninja_noop
 
     # We make lstat a no-op because it is only used for SONAME
     # symlinks which we're not producing.
@@ -1350,14 +1366,24 @@ def generate(env):
         env.Depends(ninja_file, target)
         return target, source
 
+    # The "Alias Builder" isn't in the BUILDERS map so we have to
+    # modify it directly.
+    SCons.Environment.AliasBuilder.emitter = ninja_file_depends_on_all
+
     for _, builder in env["BUILDERS"].items():
-        emitter = builder.emitter
-        if emitter is not None:
-            builder.emitter = SCons.Builder.ListEmitter(
-                [emitter, ninja_file_depends_on_all]
-            )
-        else:
-            builder.emitter = ninja_file_depends_on_all
+        try:
+            emitter = builder.emitter
+            if emitter is not None:
+                builder.emitter = SCons.Builder.ListEmitter(
+                    [emitter, ninja_file_depends_on_all]
+                )
+            else:
+                builder.emitter = ninja_file_depends_on_all
+        # Users can inject whatever they want into the BUILDERS
+        # dictionary so if the thing doesn't have an emitter we'll
+        # just ignore it.
+        except AttributeError:
+            pass
 
     # Here we monkey patch the Task.execute method to not do a bunch of
     # unnecessary work. If a build is a regular builder (i.e not a conftest and
@@ -1383,7 +1409,7 @@ def generate(env):
 
     # Make needs_execute always return true instead of determining out of
     # date-ness.
-    # SCons.Script.Main.BuildTask.needs_execute = lambda x: True
+    SCons.Script.Main.BuildTask.needs_execute = lambda x: True
 
     # We will eventually need to overwrite TempFileMunge to make it
     # handle persistent tempfiles or get an upstreamed change to add
