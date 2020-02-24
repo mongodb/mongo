@@ -487,7 +487,8 @@ TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {
                                            Document{{"a", 2}},
                                            Document{{"a", 2}},
                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"a", 1}}});
+                                           Document{{"a", 1}}},
+                                          getExpCtx());
     match->setSource(mock.get());
 
     ASSERT_TRUE(match->getNext().isPaused());
@@ -511,7 +512,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     const auto mock = DocumentSourceMock::createForTest({Document{{"a", 1}, {"b", 1}},
                                                          Document{{"a", 2}, {"b", 1}},
                                                          Document{{"a", 1}, {"b", 2}},
-                                                         Document{{"a", 2}, {"b", 2}}});
+                                                         Document{{"a", 2}, {"b", 2}}},
+                                                        getExpCtx());
 
     match->setSource(mock.get());
 
@@ -573,8 +575,8 @@ TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
         {Document{{"b", 1}, {"c", 1}, {"d", 1}},
          Document{{"b", 1}, {"a", Document{{"c", 1}}}, {"d", 1}},
          Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"d", 1}},
-         Document{
-             {"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"a", Document{{"d", 1}}}}});
+         Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"a", Document{{"d", 1}}}}},
+        getExpCtx());
     descendedMatch->setSource(mock.get());
 
     auto next = descendedMatch->getNext();
@@ -593,7 +595,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
     const std::vector<Document> matchingVector = {Document{{"b", 0}}, Document{{"b", 1}}};
     const std::vector<Document> nonMatchingVector = {Document{{"b", 0}}, Document{{"b", 2}}};
     const auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", matchingVector}}, Document{{"a", nonMatchingVector}}, Document{{"a", 1}}});
+        {Document{{"a", matchingVector}}, Document{{"a", nonMatchingVector}}, Document{{"a", 1}}},
+        getExpCtx());
 
     match->setSource(mock.get());
 
@@ -613,7 +616,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
         fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
 
     const auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{nullptr, 1}}}}}});
+        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{nullptr, 1}}}}}},
+        getExpCtx());
 
     match->setSource(mock.get());
 

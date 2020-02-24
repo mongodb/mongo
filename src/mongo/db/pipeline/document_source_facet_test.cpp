@@ -221,7 +221,8 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcros
  */
 class DocumentSourcePassthrough : public DocumentSourceMock {
 public:
-    DocumentSourcePassthrough() : DocumentSourceMock({}) {}
+    DocumentSourcePassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceMock({}, expCtx) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return {StreamType::kStreaming,
@@ -238,14 +239,15 @@ public:
         return pSource->getNext();
     }
 
-    static boost::intrusive_ptr<DocumentSourcePassthrough> create() {
-        return new DocumentSourcePassthrough();
+    static boost::intrusive_ptr<DocumentSourcePassthrough> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourcePassthrough(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) {
     auto ctx = getExpCtx();
-    auto passthrough = DocumentSourcePassthrough::create();
+    auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto passthroughPipe = Pipeline::create({passthrough}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -263,6 +265,8 @@ TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) 
  */
 class DocumentSourceWritesPersistentData final : public DocumentSourcePassthrough {
 public:
+    DocumentSourceWritesPersistentData(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     StageConstraints constraints(Pipeline::SplitState) const final {
         return {
             StreamType::kStreaming,
@@ -276,14 +280,15 @@ public:
         };
     }
 
-    static boost::intrusive_ptr<DocumentSourceWritesPersistentData> create() {
-        return new DocumentSourceWritesPersistentData();
+    static boost::intrusive_ptr<DocumentSourceWritesPersistentData> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceWritesPersistentData(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, FacetWithChildThatWritesDataAlsoReportsWritingData) {
     auto ctx = getExpCtx();
-    auto writesDataStage = DocumentSourceWritesPersistentData::create();
+    auto writesDataStage = DocumentSourceWritesPersistentData::create(ctx);
     auto pipeline = Pipeline::create({writesDataStage}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -301,9 +306,9 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
 
-    auto dummy = DocumentSourcePassthrough::create();
+    auto dummy = DocumentSourcePassthrough::create(ctx);
 
     auto pipeline = Pipeline::create({dummy}, ctx);
 
@@ -328,12 +333,12 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
 
-    auto firstDummy = DocumentSourcePassthrough::create();
+    auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
 
-    auto secondDummy = DocumentSourcePassthrough::create();
+    auto secondDummy = DocumentSourcePassthrough::create(ctx);
     auto secondPipeline = Pipeline::create({secondDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -367,7 +372,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs, ctx);
 
     auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
     facetStage->setSource(mock.get());
@@ -395,9 +400,9 @@ TEST_F(DocumentSourceFacetTest,
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
-    auto mock = DocumentSourceMock::createForTest(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
 
-    auto passthrough = DocumentSourcePassthrough::create();
+    auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto passthroughPipe = Pipeline::create({passthrough}, ctx);
 
     auto limit = DocumentSourceLimit::create(ctx, 1);
@@ -433,10 +438,10 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
     auto ctx = getExpCtx();
 
     deque<DocumentSource::GetNextResult> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
-    auto mock = DocumentSourceMock::createForTest(inputs);
+    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
 
-    auto firstDummy = DocumentSourcePassthrough::create();
-    auto secondDummy = DocumentSourcePassthrough::create();
+    auto firstDummy = DocumentSourcePassthrough::create(ctx);
+    auto secondDummy = DocumentSourcePassthrough::create(ctx);
     auto pipeline = Pipeline::create({firstDummy, secondDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -453,11 +458,11 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     auto ctx = getExpCtx();
 
-    auto mockSource = DocumentSourceMock::createForTest();
+    auto mockSource = DocumentSourceMock::createForTest(getExpCtx());
 
-    auto firstDummy = DocumentSourcePassthrough::create();
+    auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipe = Pipeline::create({firstDummy}, ctx);
-    auto secondDummy = DocumentSourcePassthrough::create();
+    auto secondDummy = DocumentSourcePassthrough::create(ctx);
     auto secondPipe = Pipeline::create({secondDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -476,10 +481,10 @@ DEATH_TEST_REGEX_F(DocumentSourceFacetTest,
                    ShouldFailIfGivenPausedInput,
                    R"#(Invariant failure.*!input.isPaused\(\))#") {
     auto ctx = getExpCtx();
-    auto mock =
-        DocumentSourceMock::createForTest(DocumentSource::GetNextResult::makePauseExecution());
+    auto mock = DocumentSourceMock::createForTest(
+        DocumentSource::GetNextResult::makePauseExecution(), getExpCtx());
 
-    auto firstDummy = DocumentSourcePassthrough::create();
+    auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto pipeline = Pipeline::create({firstDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -546,7 +551,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
 TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     auto ctx = getExpCtx();
 
-    auto dummy = DocumentSourcePassthrough::create();
+    auto dummy = DocumentSourcePassthrough::create(ctx);
     auto pipeline = Pipeline::create({dummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -564,10 +569,10 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     // that won't throw when we do so.
     ctx->mongoProcessInterface = std::make_unique<StubMongoProcessInterface>();
 
-    auto firstDummy = DocumentSourcePassthrough::create();
+    auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
 
-    auto secondDummy = DocumentSourcePassthrough::create();
+    auto secondDummy = DocumentSourcePassthrough::create(ctx);
     auto secondPipeline = Pipeline::create({secondDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -593,13 +598,17 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
  */
 class DocumentSourceNeedsA : public DocumentSourcePassthrough {
 public:
+    DocumentSourceNeedsA(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("a");
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
-    static boost::intrusive_ptr<DocumentSource> create() {
-        return new DocumentSourceNeedsA();
+    static boost::intrusive_ptr<DocumentSource> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceNeedsA(expCtx);
     }
 };
 
@@ -608,20 +617,24 @@ public:
  */
 class DocumentSourceNeedsB : public DocumentSourcePassthrough {
 public:
+    DocumentSourceNeedsB(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("b");
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
-    static boost::intrusive_ptr<DocumentSource> create() {
-        return new DocumentSourceNeedsB();
+    static boost::intrusive_ptr<DocumentSource> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceNeedsB(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     auto ctx = getExpCtx();
 
-    auto needsA = DocumentSourceNeedsA::create();
+    auto needsA = DocumentSourceNeedsA::create(ctx);
     auto firstPipeline = Pipeline::create({needsA}, ctx);
 
     auto firstPipelineDeps = firstPipeline->getDependencies(DepsTracker::kNoMetadata);
@@ -629,7 +642,7 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     ASSERT_EQ(firstPipelineDeps.fields.size(), 1UL);
     ASSERT_EQ(firstPipelineDeps.fields.count("a"), 1UL);
 
-    auto needsB = DocumentSourceNeedsB::create();
+    auto needsB = DocumentSourceNeedsB::create(ctx);
     auto secondPipeline = Pipeline::create({needsB}, ctx);
 
     auto secondPipelineDeps = secondPipeline->getDependencies(DepsTracker::kNoMetadata);
@@ -656,22 +669,25 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
  */
 class DocumentSourceNeedsWholeDocument : public DocumentSourcePassthrough {
 public:
+    DocumentSourceNeedsWholeDocument(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
-    static boost::intrusive_ptr<DocumentSourceNeedsWholeDocument> create() {
-        return new DocumentSourceNeedsWholeDocument();
+    static boost::intrusive_ptr<DocumentSourceNeedsWholeDocument> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceNeedsWholeDocument(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresWholeDocument) {
     auto ctx = getExpCtx();
 
-    auto needsA = DocumentSourceNeedsA::create();
+    auto needsA = DocumentSourceNeedsA::create(ctx);
     auto firstPipeline = Pipeline::create({needsA}, ctx);
 
-    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create();
+    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create(ctx);
     auto secondPipeline = Pipeline::create({needsWholeDocument}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -690,25 +706,28 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresW
  */
 class DocumentSourceNeedsOnlyTextScore : public DocumentSourcePassthrough {
 public:
+    DocumentSourceNeedsOnlyTextScore(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
-    static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create() {
-        return new DocumentSourceNeedsOnlyTextScore();
+    static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceNeedsOnlyTextScore(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextScore) {
     auto ctx = getExpCtx();
 
-    auto needsA = DocumentSourceNeedsA::create();
+    auto needsA = DocumentSourceNeedsA::create(ctx);
     auto firstPipeline = Pipeline::create({needsA}, ctx);
 
-    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create();
+    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create(ctx);
     auto secondPipeline = Pipeline::create({needsWholeDocument}, ctx);
 
-    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create();
+    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create(ctx);
     auto thirdPipeline = Pipeline::create({needsTextScore}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -726,10 +745,10 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
 TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIsNotAvailable) {
     auto ctx = getExpCtx();
 
-    auto needsA = DocumentSourceNeedsA::create();
+    auto needsA = DocumentSourceNeedsA::create(ctx);
     auto firstPipeline = Pipeline::create({needsA}, ctx);
 
-    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create();
+    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create(ctx);
     auto secondPipeline = Pipeline::create({needsTextScore}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -746,6 +765,8 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
  */
 class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
 public:
+    DocumentSourceNeedsPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
@@ -757,18 +778,19 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {
-        return new DocumentSourceNeedsPrimaryShard();
+    static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceNeedsPrimaryShard(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrimaryShard) {
     auto ctx = getExpCtx();
 
-    auto passthrough = DocumentSourcePassthrough::create();
+    auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({passthrough}, ctx);
 
-    auto needsPrimaryShard = DocumentSourceNeedsPrimaryShard::create();
+    auto needsPrimaryShard = DocumentSourceNeedsPrimaryShard::create(ctx);
     auto secondPipeline = Pipeline::create({needsPrimaryShard}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -787,10 +809,10 @@ TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrima
 TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
     auto ctx = getExpCtx();
 
-    auto firstPassthrough = DocumentSourcePassthrough::create();
+    auto firstPassthrough = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstPassthrough}, ctx);
 
-    auto secondPassthrough = DocumentSourcePassthrough::create();
+    auto secondPassthrough = DocumentSourcePassthrough::create(ctx);
     auto secondPipeline = Pipeline::create({secondPassthrough}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -812,6 +834,8 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
  */
 class DocumentSourcePrimaryShardTmpDataNoTxn final : public DocumentSourcePassthrough {
 public:
+    DocumentSourcePrimaryShardTmpDataNoTxn(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
@@ -823,8 +847,9 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourcePrimaryShardTmpDataNoTxn> create() {
-        return new DocumentSourcePrimaryShardTmpDataNoTxn();
+    static boost::intrusive_ptr<DocumentSourcePrimaryShardTmpDataNoTxn> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourcePrimaryShardTmpDataNoTxn(expCtx);
     }
 };
 
@@ -833,6 +858,8 @@ public:
  */
 class DocumentSourceBannedInLookup final : public DocumentSourcePassthrough {
 public:
+    DocumentSourceBannedInLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourcePassthrough(expCtx) {}
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
@@ -844,21 +871,22 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourceBannedInLookup> create() {
-        return new DocumentSourceBannedInLookup();
+    static boost::intrusive_ptr<DocumentSourceBannedInLookup> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return new DocumentSourceBannedInLookup(expCtx);
     }
 };
 
 TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstraint) {
     auto ctx = getExpCtx();
 
-    auto firstPassthrough = DocumentSourcePassthrough::create();
+    auto firstPassthrough = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstPassthrough}, ctx);
 
-    auto secondPassthrough = DocumentSourcePrimaryShardTmpDataNoTxn::create();
+    auto secondPassthrough = DocumentSourcePrimaryShardTmpDataNoTxn::create(ctx);
     auto secondPipeline = Pipeline::create({secondPassthrough}, ctx);
 
-    auto thirdPassthrough = DocumentSourceBannedInLookup::create();
+    auto thirdPassthrough = DocumentSourceBannedInLookup::create(ctx);
     auto thirdPipeline = Pipeline::create({thirdPassthrough}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;

@@ -69,7 +69,8 @@ TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
         DocumentSourceMock::createForTest({Document{{"_id", 0}},
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document{{"_id", 1}},
-                                           DocumentSource::GetNextResult::makePauseExecution()});
+                                           DocumentSource::GetNextResult::makePauseExecution()},
+                                          getExpCtx());
     redact->setSource(mock.get());
 
     // The $redact is keeping everything, so we should see everything from the mock, then EOF.

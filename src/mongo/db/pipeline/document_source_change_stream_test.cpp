@@ -256,7 +256,7 @@ public:
         ASSERT_EQ(string(transform->getSourceName()), DSChangeStream::kStageName);
 
         // Create mock stage and insert at the front of the stages.
-        auto mock = DocumentSourceMock::createForTest(D(entry));
+        auto mock = DocumentSourceMock::createForTest(D(entry), getExpCtx());
         stages.insert(stages.begin(), mock);
 
         // Wire up the stages by setting the source stage.
@@ -451,7 +451,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::unique_ptr<Collection> collection = std::make_unique<CollectionMock>(nss);
-    CollectionCatalog::get(getExpCtx()->opCtx).registerCollection(testUuid(), &collection);
+    CollectionCatalog::get(expCtx->opCtx).registerCollection(testUuid(), &collection);
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -1686,7 +1686,7 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::unique_ptr<Collection> collection = std::make_unique<CollectionMock>(nss);
-    CollectionCatalog::get(getExpCtx()->opCtx).registerCollection(testUuid(), &collection);
+    CollectionCatalog::get(expCtx->opCtx).registerCollection(testUuid(), &collection);
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,
@@ -2455,7 +2455,7 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::unique_ptr<Collection> collection = std::make_unique<CollectionMock>(nss);
-    CollectionCatalog::get(getExpCtx()->opCtx).registerCollection(testUuid(), &collection);
+    CollectionCatalog::get(expCtx->opCtx).registerCollection(testUuid(), &collection);
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,

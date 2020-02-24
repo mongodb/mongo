@@ -43,7 +43,8 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRe
     Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
-    pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
+    pipeline->addInitialSource(
+        DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
     return pipeline;
 }
 

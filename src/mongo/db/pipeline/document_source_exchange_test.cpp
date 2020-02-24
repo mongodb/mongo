@@ -110,7 +110,7 @@ protected:
     }
 
     auto getMockSource(int cnt) {
-        auto source = DocumentSourceMock::createForTest();
+        auto source = DocumentSourceMock::createForTest(getExpCtx());
 
         for (int i = 0; i < cnt; ++i)
             source->emplace_back(Document{{"a", i}, {"b", "aaaaaaaaaaaaaaaaaaaaaaaaaaa"_sd}});
@@ -128,7 +128,7 @@ protected:
     auto getRandomMockSource(size_t cnt, int64_t seed) {
         PseudoRandom prng(seed);
 
-        auto source = DocumentSourceMock::createForTest();
+        auto source = DocumentSourceMock::createForTest(getExpCtx());
 
         for (size_t i = 0; i < cnt; ++i)
             source->emplace_back(Document{{"a", static_cast<int>(prng.nextInt32() % cnt)},
@@ -171,12 +171,16 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchange1Consumer) {
     spec.setConsumers(1);
     spec.setBufferSize(1024);
 
+    // Upon creation, the Exchange object detaches the pipeline from the operation context, and, as
+    // a result, the optCtx on the ExpressionContext is reset to nullptr. So, we need to preserve
+    // the opCtx in order to pass it to the getNext call below, which will re-attach the pipeline to
+    // the provided opCtx.
+    auto opCtx = getOpCtx();
     boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
-
-    auto input = ex->getNext(getExpCtx()->opCtx, 0, nullptr);
+    auto input = ex->getNext(opCtx, 0, nullptr);
 
     size_t docs = 0;
-    for (; input.isAdvanced(); input = ex->getNext(getExpCtx()->opCtx, 0, nullptr)) {
+    for (; input.isAdvanced(); input = ex->getNext(opCtx, 0, nullptr)) {
         ++docs;
     }
 

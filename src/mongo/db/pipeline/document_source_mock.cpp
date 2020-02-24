@@ -37,12 +37,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-using std::deque;
-
-DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results)
-    : DocumentSourceMock(std::move(results), new ExpressionContextForTest()) {}
-
 DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSourceQueue(std::move(results), expCtx),
@@ -61,33 +55,39 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(Document doc) {
-    return new DocumentSourceMock({std::move(doc)});
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    Document doc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceMock({std::move(doc)}, expCtx);
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(deque<GetNextResult> results) {
-    return new DocumentSourceMock(std::move(results));
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    std::deque<GetNextResult> results, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceMock(std::move(results), expCtx);
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest() {
-    return new DocumentSourceMock(deque<GetNextResult>());
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceMock(std::deque<GetNextResult>(), expCtx);
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(const GetNextResult& result) {
-    deque<GetNextResult> results = {result};
-    return new DocumentSourceMock(std::move(results));
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    const GetNextResult& result, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::deque<GetNextResult> results = {result};
+    return new DocumentSourceMock(std::move(results), expCtx);
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(const char* json) {
-    return createForTest(Document(fromjson(json)));
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    const char* json, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return createForTest(Document(fromjson(json)), expCtx);
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
-    const std::initializer_list<const char*>& jsons) {
-    deque<GetNextResult> results;
+boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
+    const std::initializer_list<const char*>& jsons,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::deque<GetNextResult> results;
     for (auto&& json : jsons) {
         results.emplace_back(Document(fromjson(json)));
     }
-    return new DocumentSourceMock(std::move(results));
+    return new DocumentSourceMock(std::move(results), expCtx);
 }
 }  // namespace mongo

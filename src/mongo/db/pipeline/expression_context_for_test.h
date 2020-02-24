@@ -48,9 +48,21 @@ class ExpressionContextForTest : public ExpressionContext {
 public:
     static constexpr TimeZoneDatabase* kNullTimeZoneDatabase = nullptr;
 
+    /**
+     * If there is a global ServiceContext available, this constructor will adopt it. Otherwise, it
+     * will internally create an owned QueryTestServiceContext. Similarly, if an OperationContext
+     * already exists on the current client then it will be adopted, otherwise an owned OpCtx will
+     * be created using the ServiceContext. The OpCtx will be set on the ExpressionContextForTest.
+     * Defaults to using a namespace of "test.namespace".
+     */
     ExpressionContextForTest()
         : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
-
+    /**
+     * If there is a global ServiceContext available, this constructor will adopt it. Otherwise, it
+     * will internally create an owned QueryTestServiceContext. Similarly, if an OperationContext
+     * already exists on the current client then it will be adopted, otherwise an owned OpCtx will
+     * be created using the ServiceContext. The OpCtx will be set on the ExpressionContextForTest.
+     */
     ExpressionContextForTest(NamespaceString nss)
         : ExpressionContext(nullptr,      // opCtx, nullptr while base class is constructed.
                             boost::none,  // explain
@@ -65,21 +77,43 @@ public:
                             std::make_shared<StubMongoProcessInterface>(),
                             {},  // resolvedNamespaces
                             {}   // collUUID
-                            ),
-          _testOpCtx(_serviceContext.makeOperationContext()) {
-        TimeZoneDatabase::set(_serviceContext.getServiceContext(),
-                              std::make_unique<TimeZoneDatabase>());
+          ) {
+        // If there is an existing global ServiceContext, adopt it. Otherwise, create a new context.
+        // Similarly, we create a new OperationContext or adopt an existing context as appropriate.
+        if (hasGlobalServiceContext()) {
+            _serviceContext = getGlobalServiceContext();
+            if (!Client::getCurrent()->getOperationContext()) {
+                _testOpCtx = getGlobalServiceContext()->makeOperationContext(Client::getCurrent());
+            }
+        } else {
+            _serviceContext = std::make_unique<QueryTestServiceContext>();
+            _testOpCtx = stdx::get<std::unique_ptr<QueryTestServiceContext>>(_serviceContext)
+                             ->makeOperationContext();
+        }
+
+        // Resolve the active OperationContext and set it on the ExpressionContextForTest.
+        opCtx = _testOpCtx ? _testOpCtx.get() : Client::getCurrent()->getOperationContext();
+
         // As we don't have an OperationContext or TimeZoneDatabase prior to base class
         // ExpressionContext construction, we must initialize with a nullptr and set
         // post-construction.
-        timeZoneDatabase = TimeZoneDatabase::get(_serviceContext.getServiceContext());
+        timeZoneDatabase = TimeZoneDatabase::get(getServiceContext());
+        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
         opCtx = _testOpCtx.get();
     }
 
-    ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
-        : ExpressionContext(
-              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}) {}
+    /**
+     * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
+     * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
+     * Defaults to using a namespace of "test.namespace".
+     */
+    ExpressionContextForTest(OperationContext* opCtx)
+        : ExpressionContextForTest(opCtx, NamespaceString{"test"_sd, "namespace"_sd}) {}
 
+    /**
+     * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
+     * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
+     */
     ExpressionContextForTest(OperationContext* opCtx, NamespaceString nss)
         : ExpressionContext(opCtx,
                             boost::none,  // explain
@@ -94,7 +128,18 @@ public:
                             std::make_shared<StubMongoProcessInterface>(),
                             {},  // resolvedNamespaces
                             {}   // collUUID
-          ) {}
+                            ),
+          _serviceContext(opCtx->getServiceContext()) {}
+
+    /**
+     * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
+     * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
+     */
+    ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
+        : ExpressionContext(
+              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}),
+          _serviceContext(opCtx->getServiceContext()) {}
+
     /**
      * Sets the resolved definition for an involved namespace.
      */
@@ -102,8 +147,20 @@ public:
         _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
     }
 
+    ServiceContext* getServiceContext() {
+        struct Visitor {
+            auto operator()(ServiceContext* ctx) {
+                return ctx;
+            }
+            auto operator()(const std::unique_ptr<QueryTestServiceContext>& ctx) {
+                return ctx->getServiceContext();
+            }
+        };
+        return stdx::visit(Visitor{}, _serviceContext);
+    }
+
 private:
-    QueryTestServiceContext _serviceContext;
+    stdx::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;
     ServiceContext::UniqueOperationContext _testOpCtx;
 };
 

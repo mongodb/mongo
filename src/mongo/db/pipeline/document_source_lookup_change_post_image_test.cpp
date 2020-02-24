@@ -89,7 +89,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
         Document{{"_id", makeResumeToken(0)},
                  {"operationType", "update"_sd},
                  {"fullDocument", Document{{"_id", 0}}},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
+                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -111,7 +112,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"fullDocument", Document{{"_id", 0}}},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
+                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -129,11 +131,13 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
-    auto mockLocalSource = DocumentSourceMock::createForTest(Document{
-        {"_id", makeResumeToken(0)},
-        {"documentKey", Document{{"_id", 0}}},
-        {"operationType", "update"_sd},
-    });
+    auto mockLocalSource = DocumentSourceMock::createForTest(
+        Document{
+            {"_id", makeResumeToken(0)},
+            {"documentKey", Document{{"_id", 0}}},
+            {"operationType", "update"_sd},
+        },
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -155,7 +159,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
         DocumentSourceMock::createForTest(Document{{"_id", makeResumeToken(0)},
                                                    {"documentKey", Document{{"_id", 0}}},
                                                    {"operationType", "update"_sd},
-                                                   {"ns", 4}});
+                                                   {"ns", 4}},
+                                          expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -177,7 +182,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->ns.coll()}}}});
+                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->ns.coll()}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -201,7 +207,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDatabaseMismatchOnC
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}});
+                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -228,7 +235,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPassIfDatabaseMatchesOnCol
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}}});
+                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -254,7 +262,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}});
+                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 
@@ -286,7 +295,8 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
                   {"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
                   {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
-         DocumentSource::GetNextResult::makePauseExecution()});
+         DocumentSource::GetNextResult::makePauseExecution()},
+        expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
 

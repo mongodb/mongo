@@ -58,8 +58,8 @@ using AddFieldsTest = AggregationContextFixture;
 TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewFields) {
     auto addFields =
         DocumentSourceAddFields::create(BSON("e" << 2 << "b" << BSON("c" << 3)), getExpCtx());
-    auto mock =
-        DocumentSourceMock::createForTest(Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}});
+    auto mock = DocumentSourceMock::createForTest(
+        Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
@@ -124,7 +124,7 @@ TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
 TEST_F(AddFieldsTest, ShouldBeAbleToProcessMultipleDocuments) {
     auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", 1}, {"b", 2}}, Document{{"c", 3}, {"d", 4}}});
+        {Document{{"a", 1}, {"b", 2}}, Document{{"c", 3}, {"d", 4}}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
@@ -172,7 +172,8 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
         DocumentSourceMock::createForTest({Document(),
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution()});
+                                           DocumentSource::GetNextResult::makePauseExecution()},
+                                          getExpCtx());
     addFields->setSource(mock.get());
 
     ASSERT_TRUE(addFields->getNext().isAdvanced());
@@ -189,7 +190,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
     auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd"
                                                           << "$$REMOVE"),
                                                      getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"existingField", 1}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"existingField", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
@@ -203,7 +204,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b"
                                                           << "$$ROOT"),
                                                      getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
@@ -217,7 +218,7 @@ TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b"
                                                           << "$$CURRENT"),
                                                      getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
@@ -244,7 +245,7 @@ BSONObj makeAddFieldsForNestedDocument(size_t depth) {
 TEST_F(AddFieldsTest, CanAddNestedDocumentExactlyAtDepthLimit) {
     auto addFields = DocumentSourceAddFields::create(
         makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
-    auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}});
+    auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}}, getExpCtx());
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();

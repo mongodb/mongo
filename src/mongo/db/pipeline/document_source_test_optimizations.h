@@ -40,9 +40,8 @@ namespace mongo {
 class DocumentSourceTestOptimizations : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalTestOptimizations"_sd;
-    DocumentSourceTestOptimizations()
-        : DocumentSource(DocumentSourceTestOptimizations::kStageName,
-                         new ExpressionContextForTest()) {}
+    DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     virtual ~DocumentSourceTestOptimizations() = default;
     virtual GetNextResult doGetNext() override {
         MONGO_UNREACHABLE;

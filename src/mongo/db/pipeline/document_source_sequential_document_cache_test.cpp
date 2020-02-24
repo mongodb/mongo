@@ -51,7 +51,7 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAft
     SequentialDocumentCache cache(kDefaultMaxCacheSize);
     auto documentCache = DocumentSourceSequentialDocumentCache::create(getExpCtx(), &cache);
 
-    auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"});
+    auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
     documentCache->setSource(source.get());
 
     ASSERT(documentCache->getNext().isAdvanced());

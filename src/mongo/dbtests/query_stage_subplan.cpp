@@ -97,11 +97,10 @@ protected:
         bool isExplain = false;
         auto qr = unittest::assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain));
 
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         auto cq = unittest::assertGet(
             CanonicalQuery::canonicalize(opCtx(),
                                          std::move(qr),
-                                         expCtx,
+                                         expCtx(),
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures));
         return cq;

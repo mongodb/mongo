@@ -57,7 +57,7 @@ static constexpr StringData kTestNs = "test.ns"_sd;
 
 class CheckResumeTokenTest : public AggregationContextFixture {
 public:
-    CheckResumeTokenTest() : _mock(DocumentSourceMock::createForTest()) {}
+    CheckResumeTokenTest() : _mock(DocumentSourceMock::createForTest(getExpCtx())) {}
 
 protected:
     /**
@@ -605,7 +605,8 @@ public:
         Pipeline* ownedPipeline, bool localCursorOnly) final {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
-        pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
+        pipeline->addInitialSource(
+            DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
         return pipeline;
     }
 

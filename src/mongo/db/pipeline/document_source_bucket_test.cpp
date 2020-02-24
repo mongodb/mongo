@@ -280,7 +280,7 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     ASSERT(sortStage);
 
     auto doc = Document{{"x", 4}};
-    auto source = DocumentSourceMock::createForTest(doc);
+    auto source = DocumentSourceMock::createForTest(doc, getExpCtx());
     groupStage->setSource(source.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }

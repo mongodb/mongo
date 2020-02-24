@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
@@ -44,9 +45,12 @@ namespace {
 
 using namespace semantic_analysis;
 
+using SemanticAnalysisRenamedPaths = AggregationContextFixture;
+
 class RenamesAToB : public DocumentSourceTestOptimizations {
 public:
-    RenamesAToB() : DocumentSourceTestOptimizations() {}
+    RenamesAToB(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
     GetModPathsReturn getModifiedPaths() const final {
         // Pretend this stage simply renames the "a" field to be "b", leaving the value of "a" the
         // same. This would be the equivalent of an {$addFields: {b: "$a"}}.
@@ -54,8 +58,8 @@ public:
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromFiniteSetRename) {
-    RenamesAToB renamesAToB;
+TEST_F(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromFiniteSetRename) {
+    RenamesAToB renamesAToB(getExpCtx());
     {
         auto renames = renamedPaths({"a"}, renamesAToB, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -72,8 +76,8 @@ TEST(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromFiniteSetRename) {
     }
 }
 
-TEST(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromFiniteSetRename) {
-    RenamesAToB renamesAToB;
+TEST_F(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromFiniteSetRename) {
+    RenamesAToB renamesAToB(getExpCtx());
     {
         auto renames = renamedPaths({"c"}, renamesAToB, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -124,7 +128,8 @@ TEST(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromFinite
 
 class RenameCToDPreserveEFG : public DocumentSourceTestOptimizations {
 public:
-    RenameCToDPreserveEFG() : DocumentSourceTestOptimizations() {}
+    RenameCToDPreserveEFG(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kAllExcept,
@@ -133,8 +138,8 @@ public:
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromAllExceptRename) {
-    RenameCToDPreserveEFG renameCToDPreserveEFG;
+TEST_F(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromAllExceptRename) {
+    RenameCToDPreserveEFG renameCToDPreserveEFG(getExpCtx());
     {
         auto renames = renamedPaths({"c"}, renameCToDPreserveEFG, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -151,8 +156,8 @@ TEST(SemanticAnalysisRenamedPaths, DoesReturnSimpleRenameFromAllExceptRename) {
     }
 }
 
-TEST(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromAllExceptRename) {
-    RenameCToDPreserveEFG renameCToDPreserveEFG;
+TEST_F(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromAllExceptRename) {
+    RenameCToDPreserveEFG renameCToDPreserveEFG(getExpCtx());
     {
         auto renames = renamedPaths({"e"}, renameCToDPreserveEFG, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -187,15 +192,16 @@ TEST(SemanticAnalysisRenamedPaths, ReturnsSimpleMapForUnaffectedFieldsFromAllExc
 
 class RenameCDotDToEPreserveFDotG : public DocumentSourceTestOptimizations {
 public:
-    RenameCDotDToEPreserveFDotG() : DocumentSourceTestOptimizations() {}
+    RenameCDotDToEPreserveFDotG(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kAllExcept, std::set<std::string>{"f.g"}, {{"e", "c.d"}}};
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromAllExceptRename) {
-    RenameCDotDToEPreserveFDotG renameCDotDToEPreserveFDotG;
+TEST_F(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromAllExceptRename) {
+    RenameCDotDToEPreserveFDotG renameCDotDToEPreserveFDotG(getExpCtx());
     {
         auto renames = renamedPaths({"c.d"}, renameCDotDToEPreserveFDotG, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -230,9 +236,9 @@ TEST(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromAllExceptRen
     }
 }
 
-TEST(SemanticAnalysisRenamedPaths,
-     DoesNotTreatPrefixAsUnmodifiedWhenSuffixIsModifiedFromAllExcept) {
-    RenameCDotDToEPreserveFDotG renameCDotDToEPreserveFDotG;
+TEST_F(SemanticAnalysisRenamedPaths,
+       DoesNotTreatPrefixAsUnmodifiedWhenSuffixIsModifiedFromAllExcept) {
+    RenameCDotDToEPreserveFDotG renameCDotDToEPreserveFDotG(getExpCtx());
     {
         auto renames = renamedPaths({"f"}, renameCDotDToEPreserveFDotG, Direction::kForward);
         ASSERT_FALSE(static_cast<bool>(renames));
@@ -285,15 +291,16 @@ TEST(SemanticAnalysisRenamedPaths,
 
 class RenameAToXDotYModifyCDotD : public DocumentSourceTestOptimizations {
 public:
-    RenameAToXDotYModifyCDotD() : DocumentSourceTestOptimizations() {}
+    RenameAToXDotYModifyCDotD(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
 
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{"c.d"}, {{"x.y", "a"}}};
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromFiniteSetRename) {
-    RenameAToXDotYModifyCDotD renameAToXDotYModifyCDotD;
+TEST_F(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromFiniteSetRename) {
+    RenameAToXDotYModifyCDotD renameAToXDotYModifyCDotD(getExpCtx());
     {
         auto renames = renamedPaths({"a"}, renameAToXDotYModifyCDotD, Direction::kForward);
         ASSERT(static_cast<bool>(renames));
@@ -328,8 +335,8 @@ TEST(SemanticAnalysisRenamedPaths, DoesReturnRenameToDottedFieldFromFiniteSetRen
     }
 }
 
-TEST(SemanticAnalysisRenamedPaths, DoesNotTreatPrefixAsUnmodifiedWhenSuffixIsPartOfModifiedSet) {
-    RenameAToXDotYModifyCDotD renameAToXDotYModifyCDotD;
+TEST_F(SemanticAnalysisRenamedPaths, DoesNotTreatPrefixAsUnmodifiedWhenSuffixIsPartOfModifiedSet) {
+    RenameAToXDotYModifyCDotD renameAToXDotYModifyCDotD(getExpCtx());
     {
         auto renames = renamedPaths({"c"}, renameAToXDotYModifyCDotD, Direction::kForward);
         ASSERT_FALSE(static_cast<bool>(renames));
@@ -376,14 +383,15 @@ TEST(SemanticAnalysisRenamedPaths, DoesNotTreatPrefixAsUnmodifiedWhenSuffixIsPar
 
 class ModifiesAllPaths : public DocumentSourceTestOptimizations {
 public:
-    ModifiesAllPaths() : DocumentSourceTestOptimizations() {}
+    ModifiesAllPaths(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, ReturnsNoneWhenAllPathsAreModified) {
-    ModifiesAllPaths modifiesAllPaths;
+TEST_F(SemanticAnalysisRenamedPaths, ReturnsNoneWhenAllPathsAreModified) {
+    ModifiesAllPaths modifiesAllPaths(getExpCtx());
     {
         auto renames = renamedPaths({"a"}, modifiesAllPaths, Direction::kForward);
         ASSERT_FALSE(static_cast<bool>(renames));
@@ -404,14 +412,15 @@ TEST(SemanticAnalysisRenamedPaths, ReturnsNoneWhenAllPathsAreModified) {
 
 class ModificationsUnknown : public DocumentSourceTestOptimizations {
 public:
-    ModificationsUnknown() : DocumentSourceTestOptimizations() {}
+    ModificationsUnknown(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
     }
 };
 
-TEST(SemanticAnalysisRenamedPaths, ReturnsNoneWhenModificationsAreNotKnown) {
-    ModificationsUnknown modificationsUnknown;
+TEST_F(SemanticAnalysisRenamedPaths, ReturnsNoneWhenModificationsAreNotKnown) {
+    ModificationsUnknown modificationsUnknown(getExpCtx());
     {
         auto renames = renamedPaths({"a"}, modificationsUnknown, Direction::kForward);
         ASSERT_FALSE(static_cast<bool>(renames));

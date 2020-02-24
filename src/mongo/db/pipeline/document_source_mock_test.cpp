@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -38,51 +39,56 @@
 namespace mongo {
 namespace {
 
-TEST(DocumentSourceMockTest, OneDoc) {
+// This provides access to getExpCtx(), but we'll use a different name for this test suite.
+using DocumentSourceMockTest = AggregationContextFixture;
+
+TEST_F(DocumentSourceMockTest, OneDoc) {
     auto doc = Document{{"a", 1}};
-    auto source = DocumentSourceMock::createForTest(doc);
+    auto source = DocumentSourceMock::createForTest(doc, getExpCtx());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), doc);
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
-    auto source = DocumentSourceMock::createForTest({Document{{"a", 1}}, Document{{"a", 2}}});
+TEST_F(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
+    auto source =
+        DocumentSourceMock::createForTest({Document{{"a", 1}}, Document{{"a", 2}}}, getExpCtx());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
+TEST_F(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
     auto source =
         DocumentSourceMock::createForTest({Document{{"a", 1}},
                                            DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"a", 2}}});
+                                           Document{{"a", 2}}},
+                                          getExpCtx());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_TRUE(source->getNext().isPaused());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, StringJSON) {
-    auto source = DocumentSourceMock::createForTest("{a : 1}");
+TEST_F(DocumentSourceMockTest, StringJSON) {
+    auto source = DocumentSourceMock::createForTest("{a : 1}", getExpCtx());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, DequeStringJSONs) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"});
+TEST_F(DocumentSourceMockTest, DequeStringJSONs) {
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, Empty) {
-    auto source = DocumentSourceMock::createForTest();
+TEST_F(DocumentSourceMockTest, Empty) {
+    auto source = DocumentSourceMock::createForTest(getExpCtx());
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, NonTestConstructor) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+TEST_F(DocumentSourceMockTest, NonTestConstructor) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(getExpCtx());
 
     auto source = DocumentSourceMock::create(expCtx);
     ASSERT(source->getNext().isEOF());
