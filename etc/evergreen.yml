@@ -6270,6 +6270,7 @@ tasks:
     vars:
       suite: no_passthrough
       resmoke_args: --storageEngine=wiredTiger
+      use_large_distro: "true"
       fallback_num_sub_suites: 12
 
 - name: noPassthroughWithMongod_gen
@@ -6278,6 +6279,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: no_passthrough_with_mongod
+      use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
