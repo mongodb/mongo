@@ -17,18 +17,26 @@ try {
     return;
 }
 
-const tcpFastOpen = db.serverStatus().network.tcpFastOpen;
-printjson(tcpFastOpen);
+const initial = db.serverStatus().network.tcpFastOpen;
+printjson(initial);
 
 const confused = "proc file suggests this kernel is capable, but setsockopt failed";
-assert.eq(true, tcpFastOpen.serverSupported, confused);
-assert.eq(true, tcpFastOpen.clientSupported, confused);
+assert.eq(true, initial.serverSupported, confused);
+assert.eq(true, initial.clientSupported, confused);
 
-const countBefore = tcpFastOpen.accepted;
+// Initial connect to be sure a TFO cookie is requested and received.
+const netConn1 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
+assert.eq(0, netConn1);
 
-const netConn = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
-assert.eq(0, netConn);
+const first = db.serverStatus().network.tcpFastOpen;
+printjson(first);
 
-const countAfter = db.serverStatus().network.tcpFastOpen.accepted;
-assert.gt(countAfter, countBefore, "Second connection did not trigger TFO");
+// Second connect using the TFO cookie.
+const netConn2 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
+assert.eq(0, netConn2);
+
+const second = db.serverStatus().network.tcpFastOpen;
+printjson(second);
+
+assert.gt(second.accepted, first.accepted, "Second connection did not trigger TFO");
 })();
