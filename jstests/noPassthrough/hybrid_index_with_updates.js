@@ -4,6 +4,8 @@
  *
  * @tags: [requires_document_locking]
  */
+load("jstests/libs/logv2_helpers.js");
+
 (function() {
 "use strict";
 
@@ -62,7 +64,11 @@ let bgBuild = startParallelShell(function() {
     assert.commandWorked(db.hybrid.createIndex({i: 1}, {background: true}));
 }, conn.port);
 
-checkLog.contains(conn, "Hanging before index build of i=1");
+if (isJsonLog(conn)) {
+    checkLog.contains(conn, /"id":20386,.*"attr":{"where":"before","i":1}/);
+} else {
+    checkLog.contains(conn, "Hanging before index build of i=1");
+}
 
 // Phase 1: Collection scan and external sort
 // Insert documents while doing the bulk build.
