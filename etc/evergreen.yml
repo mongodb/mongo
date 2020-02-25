@@ -6255,7 +6255,6 @@ tasks:
       fallback_num_sub_suites: 1
 
 - name: unittest_shell_hang_analyzer_gen
-  tags: ["misc_js", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
