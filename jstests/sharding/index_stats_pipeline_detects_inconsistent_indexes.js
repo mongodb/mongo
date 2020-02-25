@@ -7,14 +7,14 @@
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");  // For documentEq.
+
 // This test deliberately creates indexes in an inconsistent state.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 const testName = "detect_inconsistent_indexes";
 const st = new ShardingTest({shards: 3});
 const dbName = "test";
-const testDB = st.s.getDB(dbName);
-const coll = testDB[testName];
 
 // Pipeline used to detect inconsistent indexes.
 const pipeline = [
@@ -29,169 +29,315 @@ const pipeline = [
         $group: {
             "_id": "$indexDoc.name",
             "shards": {$push: "$indexDoc.shard"},
-            // This constructs an array of unique index specs, independent of field ordering.
-            //
-            // Since $setUnion uses a sorted set internally, each spec can be reordered to
-            // have its keys ordered. These ordered index specs can now be compared for
-            // equality, so $addToSet will return an array of distinct index specs.
-            "specs": {$addToSet: {$arrayToObject: {$setUnion: {$objectToArray: "$indexDoc.spec"}}}},
+            // Index specs are stored as BSON objects and may have fields in any order, but there is
+            // currently no way to cleanly compare objects ignoring field order in an aggregation,
+            // so convert each spec into an array of its properties instead.
+            "specs": {$push: {$objectToArray: {$ifNull: ["$indexDoc.spec", {}]}}},
             "allShards": {$first: "$allShards"}
         }
     },
-    // Compute set difference of shard names.
-    {$addFields: {"missingFromShards": {$setDifference: ["$allShards", "$shards"]}}},
-    // Only report indexes which either are missing from certain shards or have multiple specs
-    // defined for the same index name.
+    // Compute which indexes are not present on all targeted shards and which index spec properties
+    // aren't the same across all shards.
+    {
+        $project: {
+            missingFromShards: {$setDifference: ["$allShards", "$shards"]},
+            inconsistentProperties: {
+                 $setDifference: [
+                     {$reduce: {
+                         input: "$specs",
+                         initialValue: {$arrayElemAt: ["$specs", 0]},
+                         in: {$setUnion: ["$$value", "$$this"]}}},
+                     {$reduce: {
+                         input: "$specs",
+                         initialValue: {$arrayElemAt: ["$specs", 0]},
+                         in: {$setIntersection: ["$$value", "$$this"]}}}
+                 ]
+             }
+        }
+    },
+    // Only return output that indicates an index was inconsistent, i.e. either a shard was missing
+    // an index or a property on at least one shard was not the same on all others.
     {
         $match: {
-            $expr: {$or: [{$gt: [{$size: "$missingFromShards"}, 0]}, {$gt: [{$size: "$specs"}, 1]}]}
+            $expr:
+                {$or: [
+                    {$gt: [{$size: "$missingFromShards"}, 0]},
+                    {$gt: [{$size: "$inconsistentProperties"}, 0]},
+                ]
+            }
         }
     },
     // Output relevant fields.
-    {$project: {_id: 0, indexName: "$$ROOT._id", specs: 1, missingFromShards: 1}}
+    {$project: {_id: 0, indexName: "$$ROOT._id", inconsistentProperties: 1, missingFromShards: 1}}
 ];
 
-assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
-
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-
-// Split collection and moveChunks such that each shard will have exactly one chunk.
-assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 25}}));
-assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 50}}));
-
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
-
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard2.shardName}));
-
-const bulkOp = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < 100; i++) {
-    bulkOp.insert({_id: i, a: i, b: i * 2, c: i / 2, d: i, e: i * 3});
-}
-assert.commandWorked(bulkOp.execute());
-
-// Index we expect to be on all shards
-const sharedIndex = {
-    a: 1
-};
-
-// Index we expect to missing on exactly one shard (shard0).
-const indexMissingFromOneShard = {
-    b: 1
-};
-
-// Index we expect to missing on exactly two shards (shard1 and shard2).
-const indexMissingFromTwoShards = {
-    c: 1
-};
-
-// Index we expect to be on all shards, but with options ordered differently.
-const indexWithOptionsOrderedDifferently = {
-    d: 1
-};
-
-// Index we expect to be on all shards with the same name and key pattern, but with different
-// options.
-const indexWithDifferentOptions = {
-    e: -1
-};
-
-// Filter expression to use over indexWithDifferentOptions.
-const filterExpr = {
-    d: {$gt: 50}
-};
-
-// Expiration time in seconds specified to expireAfterSeconds index option.
-const expiration = 1000000;
-
-// Create shared index on all shards.
-assert.commandWorked(testDB[testName].createIndex(sharedIndex, {name: "sharedIndex"}));
-
-// Create first missing index on every shard except the first.
-assert.commandWorked(st.shard1.getDB(testDB)[testName].createIndex(
-    indexMissingFromOneShard, {name: "indexMissingFromOneShard"}));
-assert.commandWorked(st.shard2.getDB(testDB)[testName].createIndex(
-    indexMissingFromOneShard, {name: "indexMissingFromOneShard"}));
-
-// Create second missing index on only the first shard.
-assert.commandWorked(st.shard0.getDB(testDB)[testName].createIndex(
-    indexMissingFromTwoShards, {name: "indexMissingFromTwoShards", sparse: true}));
-
-// Create index with same name and key pattern on all shards manually, but pass options ordered
-// differently.
-// In this case, we expect pipeline to recognize that these indexes are the same and NOT flag
-// them as inconsistent.
-assert.commandWorked(
-    st.shard0.getDB(testDB)[testName].createIndex(indexWithOptionsOrderedDifferently, {
-        name: "indexWithOptionsOrderedDifferently",
-        partialFilterExpression: filterExpr,
-        expireAfterSeconds: expiration
-    }));
-assert.commandWorked(
-    st.shard1.getDB(testDB)[testName].createIndex(indexWithOptionsOrderedDifferently, {
-        name: "indexWithOptionsOrderedDifferently",
-        expireAfterSeconds: expiration,
-        partialFilterExpression: filterExpr
-    }));
-assert.commandWorked(
-    st.shard2.getDB(testDB)[testName].createIndex(indexWithOptionsOrderedDifferently, {
-        partialFilterExpression: filterExpr,
-        expireAfterSeconds: expiration,
-        name: "indexWithOptionsOrderedDifferently"
-    }));
-
-// Create index with same name and key pattern on all shards manually, but with different options.
-// In this case, we expect the pipeline to flag these as inconsistent.
-assert.commandWorked(st.shard0.getDB(testDB)[testName].createIndex(indexWithDifferentOptions, {
-    name: "indexWithDifferentOptions",
-    partialFilterExpression: filterExpr,
-    expireAfterSeconds: expiration
-}));
-assert.commandWorked(st.shard1.getDB(testDB)[testName].createIndex(
-    indexWithDifferentOptions,
-    {name: "indexWithDifferentOptions", expireAfterSeconds: expiration}));
-assert.commandWorked(st.shard2.getDB(testDB)[testName].createIndex(
-    indexWithDifferentOptions, {name: "indexWithDifferentOptions"}));
-
-const result = testDB[testName].aggregate(pipeline).toArray();
-
-// There are exactly 3 inconsistent indexes: two inconsistent across shards, and one with the
-// same name, but different options.
-let numInconsistentIndexes = 3;
-assert.eq(result.length, numInconsistentIndexes);
-for (const indexDoc of result) {
-    assert.hasFields(indexDoc, ["indexName", "specs", "missingFromShards"]);
-    const idxName = indexDoc["indexName"];
-    const specList = indexDoc["specs"];
-    const missingList = indexDoc["missingFromShards"];
-    if (idxName === "indexWithDifferentOptions") {
-        // All three shards have an index with the same name, but different options.
-        assert.eq(specList.length, 3);
-        // Not missing from any shard.
-        assert.eq(missingList.length, 0);
-        numInconsistentIndexes--;
-    } else if (idxName === "indexMissingFromOneShard") {
-        // Only missing from one shard: shard0
-        assert.sameMembers(missingList, [st.shard0.shardName]);
-        // Exactly one spec.
-        assert.eq(specList.length, 1);
-        assert.eq(specList[0]["key"], indexMissingFromOneShard);
-        numInconsistentIndexes--;
-    } else if (idxName === "indexMissingFromTwoShards") {
-        // Missing from two shards: shard1 and shard2.
-        assert.sameMembers(missingList, [st.shard1.shardName, st.shard2.shardName]);
-        // Exactly one spec.
-        assert.eq(specList.length, 1);
-        assert.eq(specList[0]["key"], indexMissingFromTwoShards);
-        numInconsistentIndexes--;
-    }
+function shardCollectionWithChunkOnEachShard(collName) {
+    const ns = dbName + "." + collName;
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 100}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 100}, to: st.shard2.shardName}));
 }
 
-// Verify that we've seen all 3 inconsistent indexes.
-assert.eq(numInconsistentIndexes, 0);
+//
+// Cases with consistent indexes.
+//
+
+(() => {
+    jsTestLog("No indexes on any shard...");
+
+    const collName = "noIndexes";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+(() => {
+    jsTestLog("Index on each shard...");
+
+    const collName = "indexOnEachShard";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+(() => {
+    jsTestLog("Index on each shard with chunks...");
+
+    const collName = "indexOnEachShardWithChunks";
+    shardCollectionWithChunkOnEachShard(collName);
+    // Move the chunk off shard2.
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: dbName + "." + collName, find: {_id: 100}, to: st.shard1.shardName}));
+
+    assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+(() => {
+    jsTestLog("Index on each shard with chunks not on primary shard...");
+
+    const collName = "indexOnEachShardWithChunksNotPrimary";
+    shardCollectionWithChunkOnEachShard(collName);
+    // Move the chunk off the primary shard.
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: dbName + "." + collName, find: {_id: -1}, to: st.shard1.shardName}));
+
+    assert.commandWorked(st.s.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+(() => {
+    jsTestLog("Index on each shard with expireAfterSeconds...");
+
+    const collName = "indexOnEachShardWithTTL";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(
+        st.s.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 101}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+(() => {
+    jsTestLog("Same options but in different orders...");
+
+    const collName = "sameOptionsDiffOrders";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex(
+        {_id: 1, x: 1},
+        {collation: {locale: "fr"}, partialFilterExpression: {x: {$gt: 50}}, unique: true}));
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex(
+        {_id: 1, x: 1},
+        {partialFilterExpression: {x: {$gt: 50}}, unique: true, collation: {locale: "fr"}}));
+    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex(
+        {_id: 1, x: 1},
+        {unique: true, partialFilterExpression: {x: {$gt: 50}}, collation: {locale: "fr"}}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 0, tojson(res));
+})();
+
+//
+// Cases with inconsistent indexes.
+//
+
+(() => {
+    jsTestLog("Not on one shard...");
+
+    const collName = "notOnOneShard";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}));
+    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [st.shard0.shardName],
+               inconsistentProperties: [],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Not on two shards...");
+
+    const collName = "notOnTwoShards";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [st.shard0.shardName, st.shard2.shardName],
+               inconsistentProperties: [],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Different keys...");
+
+    const collName = "differentKeys";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {name: "diffKeys"}));
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({y: 1}, {name: "diffKeys"}));
+    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex({z: 1}, {name: "diffKeys"}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "diffKeys",
+               missingFromShards: [],
+               inconsistentProperties:
+                   [{k: "key", v: {x: 1}}, {k: "key", v: {y: 1}}, {k: "key", v: {z: 1}}],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Different property...");
+
+    const collName = "differentTTL";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(
+        st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}));
+    assert.commandWorked(
+        st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 106}));
+    assert.commandWorked(
+        st.shard2.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 107}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [],
+               inconsistentProperties: [
+                   {k: "expireAfterSeconds", v: 105},
+                   {k: "expireAfterSeconds", v: 106},
+                   {k: "expireAfterSeconds", v: 107}
+               ],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Missing property...");
+
+    const collName = "missingTTL";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(
+        st.shard0.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 105}));
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex({x: 1}));
+    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex({x: 1}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [],
+               inconsistentProperties: [{k: "expireAfterSeconds", v: 105}],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Multiple different parameters...");
+
+    const collName = "multipleDifferent";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex(
+        {x: 1}, {expireAfterSeconds: 100, partialFilterExpression: {x: {$gt: 50}}}));
+    assert.commandWorked(st.shard1.getDB(dbName)[collName].createIndex(
+        {x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 51}}}));
+    assert.commandWorked(st.shard2.getDB(dbName)[collName].createIndex(
+        {x: 1}, {expireAfterSeconds: 102, partialFilterExpression: {x: {$gt: 52}}}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [],
+               inconsistentProperties: [
+                   {k: "expireAfterSeconds", v: 100},
+                   {k: "expireAfterSeconds", v: 101},
+                   {k: "expireAfterSeconds", v: 102},
+                   {k: "partialFilterExpression", v: {x: {$gt: 50}}},
+                   {k: "partialFilterExpression", v: {x: {$gt: 51}}},
+                   {k: "partialFilterExpression", v: {x: {$gt: 52}}}
+               ],
+           }),
+           tojson(res));
+})();
+
+(() => {
+    jsTestLog("Missing and different parameters and missing from one shard...");
+
+    const collName = "missingDifferentParametersAndMissingFromShard";
+    shardCollectionWithChunkOnEachShard(collName);
+
+    assert.commandWorked(st.shard0.getDB(dbName)[collName].createIndex(
+        {x: 1}, {expireAfterSeconds: 101, partialFilterExpression: {x: {$gt: 50}}}));
+    assert.commandWorked(
+        st.shard1.getDB(dbName)[collName].createIndex({x: 1}, {expireAfterSeconds: 100}));
+
+    const res = st.s.getDB(dbName)[collName].aggregate(pipeline).toArray();
+    assert.eq(res.length, 1, tojson(res));
+    assert(documentEq(res[0], {
+               indexName: "x_1",
+               missingFromShards: [st.shard2.shardName],
+               inconsistentProperties: [
+                   {k: "expireAfterSeconds", v: 100},
+                   {k: "expireAfterSeconds", v: 101},
+                   {k: "partialFilterExpression", v: {x: {$gt: 50}}},
+               ],
+           }),
+           tojson(res));
+})();
 
 st.stop();
 })();

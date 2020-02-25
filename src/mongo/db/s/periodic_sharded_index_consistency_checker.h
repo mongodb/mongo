@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -36,6 +37,11 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 
+/**
+ * Owns a periodic background job that tracks the number of sharded collections that have
+ * inconsistent indexes across shards. The job only runs on the primary node in the config server
+ * replica set.
+ */
 class PeriodicShardedIndexConsistencyChecker final {
     PeriodicShardedIndexConsistencyChecker(const PeriodicShardedIndexConsistencyChecker&) = delete;
     PeriodicShardedIndexConsistencyChecker& operator=(
@@ -82,14 +88,19 @@ private:
     /**
      * Initializes and starts the periodic job.
      */
-    void _launchShardedIndexConsistencyChecker(ServiceContext* serviceContext);
+    void _launchShardedIndexConsistencyChecker(WithLock, ServiceContext* serviceContext);
 
-    bool _isPrimary{false};
+    // Protects the variables below. Uses acquisition level 1 because it will be held while starting
+    // a periodic job, which resolves a future.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
+                                            "PeriodicShardedIndexConsistencyChecker::_mutex");
 
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedIndexConsistencyChecker;
 
     // The latest count of sharded collections with inconsistent indexes.
-    AtomicWord<long long> _numShardedCollsWithInconsistentIndexes{0};
+    long long _numShardedCollsWithInconsistentIndexes{0};
+
+    bool _isPrimary{false};
 };
 }  // namespace mongo

@@ -35,6 +35,7 @@
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -62,11 +63,12 @@ PeriodicShardedIndexConsistencyChecker& PeriodicShardedIndexConsistencyChecker::
 
 long long PeriodicShardedIndexConsistencyChecker::getNumShardedCollsWithInconsistentIndexes()
     const {
-    return _numShardedCollsWithInconsistentIndexes.load();
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _numShardedCollsWithInconsistentIndexes;
 }
 
 void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyChecker(
-    ServiceContext* serviceContext) {
+    WithLock, ServiceContext* serviceContext) {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
@@ -77,24 +79,58 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 return;
             }
 
+            if (serverGlobalParams.featureCompatibility.getVersion() !=
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+                // Short circuit when not fully FCV upgraded because in v4.4
+                // ClusterAggregate::runAggregate() attaches fields that can't be parsed by a 4.2
+                // mongod. This is not a problem for aggregations run through mongos, because mongos
+                // won't connect to a 4.2 mongod, but this aggregation is run by the config server
+                // and will fail in a mixed version cluster. A config server can only be in FCV 4.4
+                // if all shards are running a 4.4 binary, which avoids this problem at the expense
+                // of not detecting inconsistent indexes when FCV < 4.4.
+                LOGV2(4608400,
+                      "Skipping sharded index consistency check because feature compatibility "
+                      "version is not fully upgraded");
+                stdx::lock_guard<Latch> lk(_mutex);
+                _numShardedCollsWithInconsistentIndexes = 0;
+                return;
+            }
+
             LOGV2(22049, "Checking consistency of sharded collection indexes across the cluster");
 
             const auto aggRequestBSON = fromjson(
                 "{pipeline: [{$indexStats: {}},"
-                "{$group: {_id: null, indexDoc: {$push: \"$$ROOT\"}, allShards: {$addToSet: "
-                "\"$shard\"}}}, "
-                "{$unwind: \"$indexDoc\"}, "
-                "{$group: {\"_id\": \"$indexDoc.name\", \"shards\": {$push: "
-                "\"$indexDoc.shard\"}, "
-                "\"specs\": {$addToSet: {$arrayToObject: {$setUnion: {$objectToArray: "
-                "\"$indexDoc.spec\"}}}}, "
+
+                "{$group:"
+                "{_id: null, indexDoc: {$push: \"$$ROOT\"}, allShards: {$addToSet: \"$shard\"}}},"
+
+                "{$unwind: \"$indexDoc\"},"
+
+                "{$group: "
+                "{\"_id\": \"$indexDoc.name\","
+                "\"shards\": {$push: \"$indexDoc.shard\"},"
+                "\"specs\": {$push: {$objectToArray: {$ifNull: [\"$indexDoc.spec\", {}]}}},"
                 "\"allShards\": {$first: \"$allShards\"}}},"
-                "{$addFields: {\"missingFromShards\": {$setDifference: [\"$allShards\", "
-                "\"$shards\"]}}},"
-                "{$match: {$expr: {$or: [{$gt: [{$size: \"$missingFromShards\"}, 0]}, {$gt: "
-                "[{$size: \"$specs\"}, 1]}]}}},"
-                "{$project: {_id: 0, indexName: \"$$ROOT._id\", specs: 1, missingFromShards: "
-                "1}}, {$limit: 1}], cursor: {}}");
+
+                "{$project:"
+                " {missingFromShards: {$setDifference: [\"$allShards\", \"$shards\"]},"
+                " inconsistentProperties: {"
+                "  $setDifference: ["
+                "   {$reduce: {input: \"$specs\", initialValue: {$arrayElemAt: [\"$specs\", 0]},"
+                "in: {$setUnion: [\"$$value\", \"$$this\"]}}},"
+                "   {$reduce: {input: \"$specs\", initialValue: {$arrayElemAt: [\"$specs\", 0]},"
+                "in: {$setIntersection: [\"$$value\", \"$$this\"]}}}]}}},"
+
+                "{$match:"
+                "{$expr: {$or: ["
+                " {$gt: [{$size: \"$missingFromShards\"}, 0]},"
+                " {$gt: [{$size: \"$inconsistentProperties\"}, 0]}]}}},"
+
+                "{$project:"
+                "{_id: 0, indexName: \"$$ROOT._id\", inconsistentProperties: 1, missingFromShards:"
+                "1}},"
+
+                "{$limit: 1}], cursor: {}}");
 
             auto uniqueOpCtx = client->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
@@ -119,10 +155,13 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     auto request =
                         uassertStatusOK(AggregationRequest::parseFromBSON(nss, aggRequestBSON));
 
-                    for (int tries = 0;; ++tries) {
-                        const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
-
-                        try {
+                    auto catalogCache = Grid::get(opCtx)->catalogCache();
+                    sharded_agg_helpers::shardVersionRetry(
+                        opCtx,
+                        catalogCache,
+                        nss,
+                        "pipeline to detect inconsistent sharded indexes"_sd,
+                        [&] {
                             BSONObjBuilder responseBuilder;
                             auto status = ClusterAggregate::runAggregate(
                                 opCtx,
@@ -139,34 +178,26 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                             if (!responseBuilder.obj()["cursor"]["firstBatch"].Array().empty()) {
                                 numShardedCollsWithInconsistentIndexes++;
                             }
-                            break;
-                        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-                            LOGV2(22050,
-                                  "Attempt {tries} to check index consistency for {nss} received "
-                                  "StaleShardVersion error{causedBy_ex}",
-                                  "tries"_attr = tries,
-                                  "nss"_attr = nss,
-                                  "causedBy_ex"_attr = causedBy(ex));
-                            if (canRetry) {
-                                continue;
-                            }
-                            throw;
-                        }
-                    }
+                        });
                 }
 
                 LOGV2(22051,
-                      "Found {numShardedCollsWithInconsistentIndexes} collections with "
+                      "Found {numShardedCollsWithInconsistentIndexes} sharded collection(s) with "
                       "inconsistent indexes",
                       "numShardedCollsWithInconsistentIndexes"_attr =
                           numShardedCollsWithInconsistentIndexes);
 
-                // Update the count.
-                _numShardedCollsWithInconsistentIndexes.store(
-                    numShardedCollsWithInconsistentIndexes);
+                // Update the count if this node is still primary. This is necessary because a
+                // stepdown may complete while this job is running and the count should always be
+                // zero on a non-primary node.
+                stdx::lock_guard<Latch> lk(_mutex);
+                if (_isPrimary) {
+                    _numShardedCollsWithInconsistentIndexes =
+                        numShardedCollsWithInconsistentIndexes;
+                }
             } catch (DBException& ex) {
                 LOGV2(22052,
-                      "Failed to check index consistency {causedBy_ex_toStatus}",
+                      "Failed to check sharded index consistency {causedBy_ex_toStatus}",
                       "causedBy_ex_toStatus"_attr = causedBy(ex.toStatus()));
             }
         },
@@ -176,12 +207,13 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
+    stdx::lock_guard<Latch> lk(_mutex);
     if (!_isPrimary) {
         _isPrimary = true;
         if (!_shardedIndexConsistencyChecker.isValid()) {
             // If this is the first time we're stepping up, start a thread to periodically check
             // index consistency.
-            _launchShardedIndexConsistencyChecker(serviceContext);
+            _launchShardedIndexConsistencyChecker(lk, serviceContext);
         } else {
             // If we're stepping up again after having stepped down, just resume the existing task.
             _shardedIndexConsistencyChecker.resume();
@@ -190,13 +222,16 @@ void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceCon
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepDown() {
+    stdx::lock_guard<Latch> lk(_mutex);
     if (_isPrimary) {
         _isPrimary = false;
         invariant(_shardedIndexConsistencyChecker.isValid());
-        // We don't need to be checking index consistency unless we're primary.
+        // Note pausing a periodic job does not wait for the job to complete if it is concurrently
+        // running, otherwise this would deadlock when the index check tries to lock _mutex when
+        // updating the inconsistent index count.
         _shardedIndexConsistencyChecker.pause();
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
-        _numShardedCollsWithInconsistentIndexes.store(0);
+        _numShardedCollsWithInconsistentIndexes = 0;
     }
 }
 
