@@ -4,19 +4,7 @@
 (function() {
 "use strict";
 
-let ensureIndexExists = function(testDB, collName, indexName, expectedNumIndexes) {
-    let cmd = {listIndexes: collName};
-    let res = testDB.runCommand(cmd);
-    assert.commandWorked(res, "could not run " + tojson(cmd));
-    let indexes = testDB[collName].getIndexes();
-
-    assert.eq(indexes.length, expectedNumIndexes);
-
-    let foundIndex = indexes.some(index => index.name === indexName);
-    assert(foundIndex,
-           "did not find the index '" + indexName +
-               "' amongst the collection indexes: " + tojson(indexes));
-};
+load('jstests/noPassthrough/libs/index_build.js');
 
 let rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -25,7 +13,8 @@ rst.initiate();
 let collName = "col";
 let dbName = "nested_apply_ops_create_indexes";
 
-let primaryTestDB = rst.getPrimary().getDB(dbName);
+let primary = rst.getPrimary();
+let primaryTestDB = primary.getDB(dbName);
 let cmd = {"create": collName};
 let res = primaryTestDB.runCommand(cmd);
 assert.commandWorked(res, "could not run " + tojson(cmd));
@@ -49,9 +38,20 @@ cmd = {
     }]
 };
 res = primaryTestDB.runCommand(cmd);
+
+// It is not possible to test createIndexes in applyOps with two-phase-index-builds support because
+// that command is not accepted by applyOps in that mode.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+    rst.stopSet();
+    return;
+}
+
 assert.commandWorked(res, "could not run " + tojson(cmd));
 rst.awaitReplication();
-ensureIndexExists(primaryTestDB, collName, cmdFormatIndexNameA, 2);
+
+const coll = primaryTestDB.getCollection(collName);
+IndexBuildTest.assertIndexes(coll, 2, ['_id_', cmdFormatIndexNameA]);
 
 rst.stopSet();
 })();

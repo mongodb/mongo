@@ -31,8 +31,6 @@ const coll = testDB.getCollection('test');
 
 assert.commandWorked(coll.insert({a: 1}));
 
-IndexBuildTest.pauseIndexBuilds(primary);
-
 const applyOpsCmd = {
     applyOps: [
         {
@@ -48,6 +46,17 @@ const applyOpsCmd = {
         },
     ]
 };
+
+// It is not possible to test createIndexes in applyOps with two-phase-index-builds support because
+// that command is not accepted by applyOps in that mode.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    assert.commandFailedWithCode(testDB.adminCommand(applyOpsCmd), ErrorCodes.CommandNotSupported);
+    rst.stopSet();
+    return;
+}
+
+IndexBuildTest.pauseIndexBuilds(primary);
+
 const createIdx = startParallelShell(
     'assert.commandWorked(db.adminCommand(' + tojson(applyOpsCmd) + '))', primary.port);
 

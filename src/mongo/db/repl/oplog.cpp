@@ -703,6 +703,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"createIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
+          if (OplogApplication::Mode::kApplyOpsCmd == mode &&
+              IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+              return {ErrorCodes::CommandNotSupported,
+                      "The createIndexes operation is not supported in applyOps mode"};
+          }
+
           const NamespaceString nss(
               extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
           BSONElement first = cmd.firstElement();

@@ -1,5 +1,8 @@
 (function() {
 'use strict';
+
+load('jstests/noPassthrough/libs/index_build.js');
+
 const debug = 0;
 
 let rst = new ReplSetTest({name: "applyOpsIdempotency", nodes: 1});
@@ -195,7 +198,14 @@ var tests = {
  *  additional databases, it should return an array with all databases to check.
  */
 function testIdempotency(primary, testFun, testName) {
+    // It is not possible to test createIndexes in applyOps with two-phase-index-builds support
+    // because that command is not accepted by applyOps in that mode.
+    if ('createIndex' === testName && IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+        return;
+    }
+
     jsTestLog(`Execute ${testName}`);
+
     // Create a new database name, so it's easier to filter out our oplog records later.
     let dbname = (new Date()).toISOString().match(/[-0-9T]/g).join('');  // 2017-05-30T155055713
     let mydb = primary.getDB(dbname);

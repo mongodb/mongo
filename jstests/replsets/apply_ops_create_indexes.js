@@ -69,7 +69,8 @@ rst.initiate();
 let collName = "create_indexes_col";
 let dbName = "create_indexes_db";
 
-let primaryTestDB = rst.getPrimary().getDB(dbName);
+let primary = rst.getPrimary();
+let primaryTestDB = primary.getDB(dbName);
 let cmd = {"create": collName};
 let res = primaryTestDB.runCommand(cmd);
 assert.commandWorked(res, "could not run " + tojson(cmd));
@@ -88,6 +89,15 @@ cmd = {
     }]
 };
 res = primaryTestDB.runCommand(cmd);
+
+// It is not possible to test createIndexes in applyOps with two-phase-index-builds support because
+// that command is not accepted by applyOps in that mode.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+    rst.stopSet();
+    return;
+}
+
 assert.commandWorked(res, "could not run " + tojson(cmd));
 rst.awaitReplication();
 ensureIndexExists(primaryTestDB, collName, cmdFormatIndexNameA, 2);
@@ -120,7 +130,7 @@ assert.commandWorked(primaryTestDB.runCommand(cmd));
 rst.awaitReplication();
 ensureIndexExists(primaryTestDB, collName, cmdFormatIndexNameC, 4);
 
-let localDB = rst.getPrimary().getDB("local");
+let localDB = primary.getDB("local");
 ensureOplogEntryExists(localDB, cmdFormatIndexNameA);
 ensureOplogEntryExists(localDB, cmdFormatIndexNameB);
 ensureOplogEntryExists(localDB, cmdFormatIndexNameC);

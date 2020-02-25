@@ -17,6 +17,7 @@
 
 load("jstests/libs/get_index_helpers.js");
 load('jstests/libs/uuid_util.js');
+load('jstests/noPassthrough/libs/index_build.js');
 
 const coll = db.apply_ops_index_collation;
 coll.drop();
@@ -25,7 +26,7 @@ const uuid = getUUIDFromListCollections(db, coll.getName());
 
 // An index created using a createIndexes-style oplog entry with a non-simple collation does not
 // inherit the collection default collation.
-let res = assert.commandWorked(db.adminCommand({
+let res = db.adminCommand({
     applyOps: [{
         op: "c",
         ns: coll.getFullName(),
@@ -49,7 +50,17 @@ let res = assert.commandWorked(db.adminCommand({
             }
         }
     }]
-}));
+});
+
+// It is not possible to test createIndexes in applyOps with two-phase-index-builds support because
+// that command is not accepted by applyOps in that mode.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(db.getMongo())) {
+    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+    return;
+}
+
+assert.commandWorked(res);
+
 let allIndexes = coll.getIndexes();
 let spec = GetIndexHelpers.findByName(allIndexes, "a_1_en");
 assert.neq(null, spec, "Index 'a_1_en' not found: " + tojson(allIndexes));
