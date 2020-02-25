@@ -139,6 +139,55 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     return status;
 }
 
+namespace {
+// Ensures that index entries are in increasing or decreasing order.
+void _validateKeyOrder(OperationContext* opCtx,
+                       const IndexCatalogEntry* index,
+                       const KeyString::Value& currKey,
+                       const KeyString::Value& prevKey,
+                       ValidateResults* results) {
+    auto descriptor = index->descriptor();
+    bool unique = descriptor->unique();
+
+    // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
+    // the format (Key, RID), and all RecordIDs are unique.
+    if (currKey.compare(prevKey) <= 0) {
+        if (results && results->valid) {
+            results->errors.push_back(str::stream()
+                                      << "index '" << descriptor->indexName()
+                                      << "' is not in strictly ascending or descending order");
+        }
+        if (results) {
+            results->valid = false;
+        }
+        return;
+    }
+
+    if (unique) {
+        // Unique indexes must not have duplicate keys.
+        int cmp = currKey.compareWithoutRecordId(prevKey);
+        if (cmp != 0) {
+            return;
+        }
+
+        if (results && results->valid) {
+            auto bsonKey = KeyString::toBson(currKey, Ordering::make(descriptor->keyPattern()));
+            auto firstRecordId =
+                KeyString::decodeRecordIdAtEnd(prevKey.getBuffer(), prevKey.getSize());
+            auto secondRecordId =
+                KeyString::decodeRecordIdAtEnd(currKey.getBuffer(), currKey.getSize());
+            results->errors.push_back(str::stream() << "Unique index '" << descriptor->indexName()
+                                                    << "' has duplicate key: " << bsonKey
+                                                    << ", first record: " << firstRecordId
+                                                    << ", second record: " << secondRecordId);
+        }
+        if (results) {
+            results->valid = false;
+        }
+    }
+}
+}  // namespace
+
 void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                                     const IndexCatalogEntry* index,
                                     int64_t* numTraversedKeys,
@@ -173,16 +222,10 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.getValueCopy());
          indexEntry;
          indexEntry = indexCursor->nextKeyString(opCtx)) {
-        // Ensure that the index entries are in increasing or decreasing order.
-        if (!isFirstEntry && indexEntry->keyString < prevIndexKeyStringValue) {
-            if (results && results->valid) {
-                results->errors.push_back(
-                    "one or more indexes are not in strictly ascending or descending order");
-            }
 
-            if (results) {
-                results->valid = false;
-            }
+        if (!isFirstEntry) {
+            _validateKeyOrder(
+                opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, results);
         }
 
         const RecordId kWildcardMultikeyMetadataRecordId{
