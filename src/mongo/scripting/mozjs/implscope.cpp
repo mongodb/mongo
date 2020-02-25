@@ -924,7 +924,10 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     }
 
     if (reportError)
-        error() << redact(_error);
+        LOGV2_OPTIONS(4635900,
+                      logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+                      "{message}",
+                      "message"_attr = redact(_error));
 
     // Clear the status state
     auto status = std::move(_status);
