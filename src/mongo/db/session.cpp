@@ -901,11 +901,6 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     invariant(!_txnResourceStash);
-    if (_txnState != MultiDocumentTransactionState::kInProgress) {
-        return;
-    }
-
-    _abortTransaction(lock);
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
         // Abort the WUOW. We should be able to abort empty transactions that don't have WUOW.
@@ -918,6 +913,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         opCtx->lockState()->unsetMaxLockTimeout();
     }
+    if (_txnState != MultiDocumentTransactionState::kInProgress) {
+        return;
+    }
+
+    _abortTransaction(lock);
     {
         stdx::lock_guard<stdx::mutex> ls(_statsMutex);
         // Add the latest operation stats to the aggregate OpDebug object stored in the

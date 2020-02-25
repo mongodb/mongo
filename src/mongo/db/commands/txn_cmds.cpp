@@ -42,6 +42,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
+
+// Do a sleep right before calling commitTransaction on the session.
+MONGO_FAIL_POINT_DEFINE(sleepBeforeCommitTransaction);
 
 namespace mongo {
 namespace {
@@ -79,6 +83,15 @@ public:
         auto session = OperationContextSession::get(opCtx);
         uassert(
             ErrorCodes::CommandFailed, "commitTransaction must be run within a session", session);
+
+        MONGO_FAIL_POINT_BLOCK(sleepBeforeCommitTransaction, options) {
+            const BSONObj& data = options.getData();
+            const auto sleepMillis = data["sleepMillis"].Int();
+            log() << "sleepBeforeCommitTransaction failpoint enabled - sleeping for " << sleepMillis
+                  << " milliseconds.";
+            // Make sure we are interruptible.
+            opCtx->sleepFor(Milliseconds(sleepMillis));
+        }
 
         // commitTransaction is retryable.
         if (session->transactionIsCommitted()) {
