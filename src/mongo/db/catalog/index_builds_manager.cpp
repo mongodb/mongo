@@ -93,10 +93,13 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         builder->setTwoPhaseBuildUUID(buildUUID);
     }
 
-    // Ignore uniqueness constraint violations when relaxed (on secondaries). Secondaries can
-    // complete index builds in the middle of batches, which creates the potential for finding
-    // duplicate key violations where there otherwise would be none at consistent states.
-    if (options.indexConstraints == IndexConstraints::kRelax) {
+    // Ignore uniqueness constraint violations when relaxed, for single-phase builds on
+    // secondaries. Secondaries can complete index builds in the middle of batches, which creates
+    // the potential for finding duplicate key violations where there otherwise would be none at
+    // consistent states.
+    // Two-phase builds will defer any unique key violations until commit-time.
+    if (options.indexConstraints == IndexConstraints::kRelax &&
+        options.protocol == IndexBuildProtocol::kSinglePhase) {
         builder->ignoreUniqueConstraint();
     }
 

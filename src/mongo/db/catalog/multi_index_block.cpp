@@ -321,16 +321,14 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
             // Allow duplicates when explicitly allowed or when using hybrid builds, which will
             // perform duplicate checking itself.
-            index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique ||
-                index.block->getEntry()->isHybridBuilding();
-            if (_ignoreUnique) {
-                index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
-            }
+            index.options.dupsAllowed =
+                index.options.dupsAllowed || index.block->getEntry()->isHybridBuilding();
 
             // Two-phase index builds (with a build UUID) always relax constraints and check for
             // violations at commit-time.
             if (_buildUUID) {
                 index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+                index.options.dupsAllowed = true;
             }
 
             index.options.fromIndexBuilder = true;
@@ -721,8 +719,17 @@ Status MultiIndexBlock::drainBackgroundWrites(
         if (!interceptor)
             continue;
 
+        // Track duplicates for later constraint checking for two-phase builds (with a buildUUID),
+        // whenever key constraints are being enforced (i.e. single-phase builds on primaries), and
+        // never when _ignoreUnique is set explicitly.
+        auto trackDups = !_ignoreUnique &&
+                (_buildUUID ||
+                 IndexAccessMethod::GetKeysMode::kEnforceConstraints ==
+                     _indexes[i].options.getKeysMode)
+            ? IndexBuildInterceptor::TrackDuplicates::kTrack
+            : IndexBuildInterceptor::TrackDuplicates::kNoTrack;
         auto status = interceptor->drainWritesIntoIndex(
-            opCtx, _indexes[i].options, readSource, drainYieldPolicy);
+            opCtx, _indexes[i].options, trackDups, readSource, drainYieldPolicy);
         if (!status.isOK()) {
             return status;
         }
