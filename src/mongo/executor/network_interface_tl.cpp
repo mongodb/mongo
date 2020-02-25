@@ -438,6 +438,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                    StatusWith<RemoteCommandOnAnyResponse> swr) {
         invariant(swr.isOK());
         auto rs = std::move(swr.getValue());
+        // The TransportLayer has, for historical reasons returned
+        // SocketException for network errors, but sharding assumes
+        // HostUnreachable on network errors.
+        if (rs.status == ErrorCodes::SocketException) {
+            rs.status = Status(ErrorCodes::HostUnreachable, rs.status.reason());
+        }
 
         LOGV2_DEBUG(22597,
                     2,
@@ -482,7 +488,6 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest() {
 
     return makeReadyFutureWith([this, requestState] {
                setTimer();
-
                return requestState->client()->runCommandRequest(*requestState->request, baton);
            })
         .then([this, requestState](RemoteCommandResponse response) {
@@ -573,14 +578,6 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
             })
             .onError([this, anchor = shared_from_this()](Status error) {
                 // The RCRq failed, wrap the error into a RCRsp with the host and duration
-
-                // The TransportLayer has, for historical reasons returned
-                // SocketException for network errors, but sharding assumes
-                // HostUnreachable on network errors.
-                if (error == ErrorCodes::SocketException) {
-                    error = Status(ErrorCodes::HostUnreachable, error.reason());
-                }
-
                 return RemoteCommandOnAnyResponse(host, std::move(error), stopwatch.elapsed());
             });
 
