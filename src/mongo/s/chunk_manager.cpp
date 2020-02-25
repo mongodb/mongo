@@ -43,6 +43,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 
 namespace mongo {
@@ -93,15 +94,19 @@ RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
       _shardVersions(_constructShardVersionMap()) {}
 
 void RoutingTableHistory::setShardStale(const ShardId& shardId) {
-    auto it = _shardVersions.find(shardId);
-    if (it != _shardVersions.end()) {
-        it->second.isStale.store(true);
+    if (gEnableFinerGrainedCatalogCacheRefresh) {
+        auto it = _shardVersions.find(shardId);
+        if (it != _shardVersions.end()) {
+            it->second.isStale.store(true);
+        }
     }
 }
 
 void RoutingTableHistory::setAllShardsRefreshed() {
-    for (auto& [shard, targetingInfo] : _shardVersions) {
-        targetingInfo.isStale.store(false);
+    if (gEnableFinerGrainedCatalogCacheRefresh) {
+        for (auto& [shard, targetingInfo] : _shardVersions) {
+            targetingInfo.isStale.store(false);
+        }
     }
 }
 
@@ -411,9 +416,11 @@ ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
         return ChunkVersion(0, 0, _collectionVersion.epoch());
     }
 
-    uassert(ShardInvalidatedForTargetingInfo(_nss),
-            "shard has been marked stale",
-            !it->second.isStale.load());
+    if (gEnableFinerGrainedCatalogCacheRefresh) {
+        uassert(ShardInvalidatedForTargetingInfo(_nss),
+                "shard has been marked stale",
+                !it->second.isStale.load());
+    }
 
     return it->second.shardVersion;
 }

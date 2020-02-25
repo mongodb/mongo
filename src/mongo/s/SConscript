@@ -123,7 +123,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
         'coreshard',
-        'mongos_server_parameters',
         'sharding_task_executor',
     ],
 )
@@ -204,6 +203,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'mongos_server_parameters',
     ]
 )
 

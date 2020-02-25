@@ -76,3 +76,11 @@ server_parameters:
     validator:
         gte: 0
     default: 10
+
+  enableFinerGrainedCatalogCacheRefresh:
+    description: >-
+        Enables the finer grained catalog cache refresh behavior.
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
+    default: true
