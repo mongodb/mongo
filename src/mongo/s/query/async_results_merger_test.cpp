@@ -1333,10 +1333,10 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     scheduleNetworkResponses(std::move(responses));
 }
 
-DEATH_TEST_F(AsyncResultsMergerTest,
-             SortedTailableInvariantsIfInitialBatchHasNoPostBatchResumeToken,
-             "Invariant failure _promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == "
-             "_remotes.size()") {
+DEATH_TEST_REGEX_F(
+    AsyncResultsMergerTest,
+    SortedTailableInvariantsIfInitialBatchHasNoPostBatchResumeToken,
+    R"#(Invariant failure.*_promisedMinSortKeys.empty\(\) || _promisedMinSortKeys.size\(\) == _remotes.size\(\))#") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();
@@ -1368,9 +1368,9 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     MONGO_UNREACHABLE;
 }
 
-DEATH_TEST_F(AsyncResultsMergerTest,
-             SortedTailableCursorInvariantsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
-             "Invariant failure !response.getPostBatchResumeToken()->isEmpty()") {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+                   SortedTailableCursorInvariantsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
+                   R"#(Invariant failure.*!response.getPostBatchResumeToken\(\)->isEmpty\(\))#") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();
@@ -1830,9 +1830,9 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
     });
 }
 
-DEATH_TEST_F(AsyncResultsMergerTest,
-             ConstructingARMWithTxnNumAndNoLSIDShouldCrash,
-             "Invariant failure params.getSessionId()") {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+                   ConstructingARMWithTxnNumAndNoLSIDShouldCrash,
+                   R"#(Invariant failure.*params.getSessionId\(\))#") {
     AsyncResultsMergerParams params;
 
     OperationSessionInfoFromClient sessionInfo;

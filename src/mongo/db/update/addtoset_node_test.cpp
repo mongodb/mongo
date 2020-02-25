@@ -47,7 +47,9 @@ using AddToSetNodeTest = UpdateNodeTest;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
-DEATH_TEST(AddToSetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+DEATH_TEST_REGEX(AddToSetNodeTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok())#") {
     auto update = fromjson("{$addToSet: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
@@ -379,7 +381,9 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
-DEATH_TEST(AddToSetNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant failure !_collator") {
+DEATH_TEST_REGEX(AddToSetNodeTest,
+                 CannotSetCollatorIfCollatorIsNonNull,
+                 "Invariant failure.*!_collator") {
     auto update = fromjson("{$addToSet: {a: 1}}");
     CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -389,7 +393,7 @@ DEATH_TEST(AddToSetNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant fa
     node.setCollator(&caseInsensitiveCollator);
 }
 
-DEATH_TEST(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure !_collator") {
+DEATH_TEST_REGEX(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
     auto update = fromjson("{$addToSet: {a: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;

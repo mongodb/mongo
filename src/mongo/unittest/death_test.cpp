@@ -102,9 +102,12 @@ void DeathTestBase::_doTest() {
             }
         }
         if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
-            // Exited with a signal or non-zero code.  Should check the pattern, here,
-            // but haven't figured out how, so just return.
-            ASSERT_STRING_CONTAINS(os.str(), _doGetPattern());
+            // Exited with a signal or non-zero code. Validate the expected message.
+            if (_isRegex()) {
+                ASSERT_STRING_SEARCH_REGEX(os.str(), _doGetPattern());
+            } else {
+                ASSERT_STRING_CONTAINS(os.str(), _doGetPattern());
+            }
             return;
         } else {
             invariant(!WIFSTOPPED(stat));

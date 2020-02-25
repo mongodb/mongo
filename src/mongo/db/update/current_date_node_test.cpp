@@ -46,7 +46,9 @@ using CurrentDateNodeTest = UpdateNodeTest;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
-DEATH_TEST(CurrentDateNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+DEATH_TEST_REGEX(CurrentDateNodeTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$currentDate: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CurrentDateNode node;

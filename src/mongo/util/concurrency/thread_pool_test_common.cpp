@@ -130,6 +130,9 @@ public:
         static std::string getPattern() {                                            \
             return MATCH_EXPR;                                                       \
         }                                                                            \
+        static bool isRegex() {                                                      \
+            return false;                                                            \
+        }                                                                            \
                                                                                      \
     private:                                                                         \
         void _doTest() override;                                                     \

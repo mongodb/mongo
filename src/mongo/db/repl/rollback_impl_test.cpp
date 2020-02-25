@@ -663,9 +663,9 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     ASSERT_EQUALS(stableTimestamp, _stableTimestamp);
 }
 
-DEATH_TEST_F(RollbackImplTest,
-             RollbackFassertsIfRecoverToStableTimestampFails,
-             "Fatal assertion 31049") {
+DEATH_TEST_REGEX_F(RollbackImplTest,
+                   RollbackFassertsIfRecoverToStableTimestampFails,
+                   "Fatal assertion.*31049") {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
@@ -871,10 +871,10 @@ TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
     ASSERT_EQUALS(_truncatePoint, Timestamp(1, 1));
 }
 
-DEATH_TEST_F(RollbackImplTest,
-             RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondary,
-             "Failed to transition into SECONDARY; expected to be in state ROLLBACK; found self in "
-             "ROLLBACK") {
+DEATH_TEST_REGEX_F(RollbackImplTest,
+                   RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondary,
+                   "Failed to transition into .*; expected to be in state .*; found self in "
+                   ".*.*SECONDARY.*ROLLBACK.*ROLLBACK") {
     _coordinator->failSettingFollowerMode(MemberState::RS_SECONDARY, ErrorCodes::IllegalOperation);
 
     auto op = makeOpAndRecordId(1);

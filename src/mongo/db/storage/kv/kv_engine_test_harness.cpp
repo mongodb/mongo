@@ -636,7 +636,9 @@ TEST_F(DurableCatalogImplTest, BackupImplemented) {
     }
 }
 
-DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50942") {
+DEATH_TEST_REGEX_F(DurableCatalogImplTest,
+                   TerminateOnNonNumericIndexVersion,
+                   "Fatal Assertion.*50942") {
     setGlobalServiceContext(ServiceContext::make());
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();

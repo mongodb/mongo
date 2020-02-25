@@ -172,9 +172,9 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
         "Cannot use the part (b) of (a.b) to traverse the element ({a: \"foo\"})");
 }
 
-DEATH_TEST_F(PopNodeTest,
-             NonOkElementWhenPathExistsIsFatal,
-             "Invariant failure applyParams.element.ok()") {
+DEATH_TEST_REGEX_F(PopNodeTest,
+                   NonOkElementWhenPathExistsIsFatal,
+                   R"#(Invariant failure.*applyParams.element.ok\(\))#") {
     auto update = fromjson("{$pop: {'a.b': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PopNode popNode;

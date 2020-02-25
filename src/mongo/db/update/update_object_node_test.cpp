@@ -1535,9 +1535,9 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
         "Update created a conflict at 'root.a.$'");
 }
 
-DEATH_TEST(UpdateObjectNodeTest,
-           MergingArrayNodesWithDifferentArrayFiltersFails,
-           "Invariant failure &leftNode._arrayFilters == &rightNode._arrayFilters") {
+DEATH_TEST_REGEX(UpdateObjectNodeTest,
+                 MergingArrayNodesWithDifferentArrayFiltersFails,
+                 "Invariant failure.*leftNode._arrayFilters == &rightNode._arrayFilters") {
     auto setUpdate1 = fromjson("{$set: {'a.$[i]': 5}}");
     auto setUpdate2 = fromjson("{$set: {'a.$[j]': 6}}");
     FieldRef fakeFieldRef("root");

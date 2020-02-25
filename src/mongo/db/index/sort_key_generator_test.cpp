@@ -336,9 +336,9 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateSortKeyFromWSMInIndexKeyStateW
     ASSERT_VALUE_EQ(Value("1gnirts"_sd), sortKey);
 }
 
-DEATH_TEST_F(SortKeyGeneratorWorkingSetTest,
-             DeathOnAttemptToGetSortKeyFromIndexKeyWithMetadata,
-             "Invariant failure !_sortHasMeta") {
+DEATH_TEST_REGEX_F(SortKeyGeneratorWorkingSetTest,
+                   DeathOnAttemptToGetSortKeyFromIndexKeyWithMetadata,
+                   "Invariant failure.*!_sortHasMeta") {
     BSONObj pattern = fromjson("{z: {$meta: 'textScore'}}");
     auto sortKeyGen = makeSortKeyGen(pattern, nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));

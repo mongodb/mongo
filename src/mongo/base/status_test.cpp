@@ -280,12 +280,12 @@ TEST(Transformers, ExceptionToStatus) {
     ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
 }
 
-DEATH_TEST(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure parsers::") {
+DEATH_TEST_REGEX(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure.*parsers::") {
     ErrorExtraInfo::invariantHaveAllParsers();
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-DEATH_TEST(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal Assertion 40680") {
+DEATH_TEST_REGEX(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal Assertion.*40680") {
     Status(ErrorCodes::ForTestingErrorExtraInfo, "");
 }
 #else

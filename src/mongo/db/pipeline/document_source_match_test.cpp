@@ -526,9 +526,9 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     ASSERT_TRUE(match->getNext().isEOF());
 }
 
-DEATH_TEST_F(DocumentSourceMatchTest,
-             ShouldFailToDescendExpressionOnPathThatIsNotACommonPrefix,
-             "Invariant failure expression::isPathPrefixOf") {
+DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+                   ShouldFailToDescendExpressionOnPathThatIsNotACommonPrefix,
+                   "Invariant failure.*expression::isPathPrefixOf") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "b.c" << 1);
     const auto matchExpression =
@@ -536,9 +536,9 @@ DEATH_TEST_F(DocumentSourceMatchTest,
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-DEATH_TEST_F(DocumentSourceMatchTest,
-             ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
-             "Invariant failure node->matchType()") {
+DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+                   ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
+                   R"#(Invariant failure.*node->matchType\(\))#") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
     const auto matchExpression =

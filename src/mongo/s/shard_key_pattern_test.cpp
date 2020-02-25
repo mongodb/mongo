@@ -640,9 +640,9 @@ TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_HashedIndexAndShardKey) {
                            << "c.d" << 123 << "p.q" << BSONNULL));
 }
 
-DEATH_TEST(ShardKeyPattern,
-           ExtractShardKeyFromIndexKeyData_WithMissingFieldsInIndex,
-           "Invariant failure matchEl") {
+DEATH_TEST_REGEX(ShardKeyPattern,
+                 ExtractShardKeyFromIndexKeyData_WithMissingFieldsInIndex,
+                 "Invariant failure.*matchEl") {
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d"
                                        << "hashed"
                                        << "p.q.0" << 1));
@@ -713,9 +713,9 @@ TEST(ShardKeyPattern, ExtractShardKeyFromIndexKeyData_NonHashedIndexAndHashedSha
                                  << "e.null" << BSONNULL));
 }
 
-DEATH_TEST(ShardKeyPattern,
-           ExtractShardKeyFromIndexKeyData_HashedIndexAndNonHashedShardKey,
-           "Invariant failure isHashedPatternEl") {
+DEATH_TEST_REGEX(ShardKeyPattern,
+                 ExtractShardKeyFromIndexKeyData_HashedIndexAndNonHashedShardKey,
+                 "Invariant failure.*isHashedPatternEl") {
     ShardKeyPattern pattern(BSON("a.b" << 1 << "c.d" << 1.0));
     auto indexPattern = BSON("c.d"
                              << "hashed"

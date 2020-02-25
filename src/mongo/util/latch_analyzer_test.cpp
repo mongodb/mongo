@@ -53,7 +53,7 @@ class LatchAnalyzerTest : public ServiceContextTest {
     }
 };
 
-DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion 31360") {
+DEATH_TEST_REGEX_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion.*31360") {
 
     Mutex lowerLevel = MONGO_MAKE_LATCH(Level(1), "AddInvalidWasAbsent::lowerLevel");
     Mutex higherLevel = MONGO_MAKE_LATCH(Level(2), "AddInvalidWasAbsent::higherLevel");
@@ -62,7 +62,7 @@ DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion 31360") {
     higherLevel.lock();
 }
 
-DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasPresent, "Fatal assertion 31360") {
+DEATH_TEST_REGEX_F(LatchAnalyzerTest, AddInvalidWasPresent, "Fatal assertion.*31360") {
     Mutex m1 = MONGO_MAKE_LATCH(Level(1), "AddInvalidWasPresent::m1");
     Mutex m2 = MONGO_MAKE_LATCH(Level(1), "AddInvalidWasPresent::m2");
 
@@ -70,13 +70,13 @@ DEATH_TEST_F(LatchAnalyzerTest, AddInvalidWasPresent, "Fatal assertion 31360") {
     m2.lock();
 }
 
-DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasAbsent, "Fatal assertion 31361") {
+DEATH_TEST_REGEX_F(LatchAnalyzerTest, RemoveInvalidWasAbsent, "Fatal assertion.*31361") {
     Mutex m = MONGO_MAKE_LATCH(Level(1), "RemoveInvalidWasAbsent::m");
 
     m.unlock();
 }
 
-DEATH_TEST_F(LatchAnalyzerTest, RemoveInvalidWasPresent, "Fatal assertion 31361") {
+DEATH_TEST_REGEX_F(LatchAnalyzerTest, RemoveInvalidWasPresent, "Fatal assertion.*31361") {
     Mutex higherLevel = MONGO_MAKE_LATCH(Level(2), "RemoveInvalidWasPresent::higherLevel");
     Mutex lowerLevel = MONGO_MAKE_LATCH(Level(1), "RemoveInvalidWasPresent::lowerLevel");
 

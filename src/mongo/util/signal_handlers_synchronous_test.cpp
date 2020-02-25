@@ -81,7 +81,7 @@ DEATH_TEST(FatalTerminateTest,
 
 DEATH_TEST(FatalTerminateTest,
            TerminateIsFatalWithDBException,
-           " terminate() called. An exception is active") {
+           "terminate() called. An exception is active") {
     try {
         uasserted(28720, "Fatal DBException occurrence");
     } catch (...) {

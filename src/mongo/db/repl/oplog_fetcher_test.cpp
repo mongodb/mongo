@@ -824,9 +824,9 @@ TEST_F(OplogFetcherTest, InvalidOplogQueryMetadataInResponseStopsTheOplogFetcher
                   processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
 }
 
-DEATH_TEST_F(OplogFetcherTest,
-             ValidMetadataInResponseWithoutOplogMetadataInvariants,
-             "Invariant failure oqMetadata") {
+DEATH_TEST_REGEX_F(OplogFetcherTest,
+                   ValidMetadataInResponseWithoutOplogMetadataInvariants,
+                   "Invariant failure.*oqMetadata") {
     CursorId cursorId = 22LL;
     auto entry = makeNoopOplogEntry(lastFetched);
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, boost::none);

@@ -267,18 +267,18 @@ TEST_F(DurableCatalogTest, CanSetMultipleFieldsAndComponentsAsMultikey) {
     }
 }
 
-DEATH_TEST_F(DurableCatalogTest,
-             CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
-             "Invariant failure !multikeyPaths.empty()") {
+DEATH_TEST_REGEX_F(DurableCatalogTest,
+                   CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
+                   R"#(Invariant failure.*!multikeyPaths.empty\(\))#") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
     catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, MultikeyPaths{});
 }
 
-DEATH_TEST_F(DurableCatalogTest,
-             AtLeastOnePathComponentMustCauseIndexToBeMultikey,
-             "Invariant failure somePathIsMultikey") {
+DEATH_TEST_REGEX_F(DurableCatalogTest,
+                   AtLeastOnePathComponentMustCauseIndexToBeMultikey,
+                   R"#(Invariant failure.*somePathIsMultikey)#") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -379,9 +379,9 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
 }
 
-DEATH_TEST_F(DurableCatalogTest,
-             CannotSetIndividualPathComponentsOfTextIndexAsMultikey,
-             "Invariant failure multikeyPaths.empty()") {
+DEATH_TEST_REGEX_F(DurableCatalogTest,
+                   CannotSetIndividualPathComponentsOfTextIndexAsMultikey,
+                   R"#(Invariant failure.*multikeyPaths.empty\(\))#") {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
     auto opCtx = newOperationContext();

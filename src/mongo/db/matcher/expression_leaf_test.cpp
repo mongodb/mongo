@@ -97,7 +97,7 @@ TEST(EqOp, MatchesElement) {
     ASSERT(eq.equivalent(&eq));
 }
 
-DEATH_TEST(EqOp, InvalidEooOperand, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "Invariant failure.*_rhs") {
     BSONObj operand;
     EqualityMatchExpression eq("", operand.firstElement());
 }
@@ -265,7 +265,7 @@ TEST(LtOp, MatchesElement) {
     ASSERT(!lt.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST(LtOp, InvalidEooOperand, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
     BSONObj operand;
     LTMatchExpression lt("", operand.firstElement());
 }
@@ -386,7 +386,7 @@ TEST(LteOp, MatchesElement) {
     ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST(LteOp, InvalidEooOperand, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
     BSONObj operand;
     LTEMatchExpression lte("", operand.firstElement());
 }
@@ -487,7 +487,7 @@ TEST(LteOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
-DEATH_TEST(GtOp, InvalidEooOperand, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
     BSONObj operand;
     GTMatchExpression gt("", operand.firstElement());
 }
@@ -603,7 +603,7 @@ TEST(GteOp, MatchesElement) {
     ASSERT(!gte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST(GteOp, InvalidEooOperand, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
     BSONObj operand;
     GTEMatchExpression gte("", operand.firstElement());
 }

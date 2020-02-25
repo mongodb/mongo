@@ -300,23 +300,23 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
     ASSERT_TRUE(eq.getMatchExpression()->equivalent(clone.get()));
 }
 
-DEATH_TEST(InternalExprEqMatchExpression,
-           CannotCompareToArray,
-           "Invariant failure _rhs.type() != BSONType::Array") {
+DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+                 CannotCompareToArray,
+                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::Array)#") {
     auto operand = BSON("a" << BSON_ARRAY(1 << 2));
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
 }
 
-DEATH_TEST(InternalExprEqMatchExpression,
-           CannotCompareToUndefined,
-           "Invariant failure _rhs.type() != BSONType::Undefined") {
+DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+                 CannotCompareToUndefined,
+                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::Undefined)#") {
     auto operand = BSON("a" << BSONUndefined);
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
 }
 
-DEATH_TEST(InternalExprEqMatchExpression, CannotCompareToMissing, "Invariant failure _rhs") {
+DEATH_TEST_REGEX(InternalExprEqMatchExpression, CannotCompareToMissing, "Invariant failure.*_rhs") {
     InternalExprEqMatchExpression eq("a"_sd, BSONElement());
 }
 }  // namespace

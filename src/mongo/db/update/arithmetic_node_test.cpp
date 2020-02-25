@@ -46,7 +46,9 @@ using ArithmeticNodeTest = UpdateNodeTest;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
-DEATH_TEST(ArithmeticNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+DEATH_TEST_REGEX(ArithmeticNodeTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$inc: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);

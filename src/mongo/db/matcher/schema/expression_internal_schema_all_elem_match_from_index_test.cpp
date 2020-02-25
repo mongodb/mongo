@@ -109,9 +109,9 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, HasSingleChild) {
     ASSERT(objMatch.getValue()->getChild(0));
 }
 
-DEATH_TEST(InternalSchemaAllElemMatchFromIndexMatchExpression,
-           GetChildFailsIndexGreaterThanOne,
-           "Invariant failure i == 0") {
+DEATH_TEST_REGEX(InternalSchemaAllElemMatchFromIndexMatchExpression,
+                 GetChildFailsIndexGreaterThanOne,
+                 "Invariant failure.*i == 0") {
     auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);

@@ -319,7 +319,7 @@ DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted
 }
 
 // invariant and its friends
-DEATH_TEST(InvariantTerminationTest, invariant, "Invariant failure false " __FILE__) {
+DEATH_TEST_REGEX(InvariantTerminationTest, invariant, "Invariant failure.*false.*" __FILE__) {
     invariant(false);
 }
 
@@ -408,7 +408,7 @@ DEATH_TEST(InvariantTerminationTest,
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 // dassert and its friends
-DEATH_TEST(DassertTerminationTest, invariant, "Invariant failure false " __FILE__) {
+DEATH_TEST_REGEX(DassertTerminationTest, invariant, "Invariant failure.*false.*" __FILE__) {
     dassert(false);
 }
 

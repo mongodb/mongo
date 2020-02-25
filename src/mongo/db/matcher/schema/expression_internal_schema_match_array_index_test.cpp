@@ -128,9 +128,9 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, HasSingleChild) {
     ASSERT(objMatch.getValue()->getChild(0));
 }
 
-DEATH_TEST(InternalSchemaMatchArrayIndexMatchExpression,
-           GetChildFailsIndexGreaterThanZero,
-           "Invariant failure i == 0") {
+DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Invariant failure.*i == 0") {
     auto query = fromjson(
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");

@@ -216,9 +216,9 @@ TEST(InternalSchemaObjectMatchExpression, HasSingleChild) {
     ASSERT(objMatch.getValue()->getChild(0));
 }
 
-DEATH_TEST(InternalSchemaObjectMatchExpression,
-           GetChildFailsIndexGreaterThanZero,
-           "Invariant failure i == 0") {
+DEATH_TEST_REGEX(InternalSchemaObjectMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Invariant failure.*i == 0") {
     auto query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        c: {$eq: 3}"

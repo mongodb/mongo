@@ -149,9 +149,9 @@ void OplogBufferProxyTest::tearDown() {
     _mock = nullptr;
 }
 
-DEATH_TEST_F(OplogBufferProxyTest,
-             NullTargetOplogBufferAtConstructionTriggersInvariant,
-             "Invariant failure _target") {
+DEATH_TEST_REGEX_F(OplogBufferProxyTest,
+                   NullTargetOplogBufferAtConstructionTriggersInvariant,
+                   "Invariant failure.*_target") {
     OplogBufferProxy(nullptr);
 }
 

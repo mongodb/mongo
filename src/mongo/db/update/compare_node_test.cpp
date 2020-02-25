@@ -47,7 +47,9 @@ using CompareNodeTest = UpdateNodeTest;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
-DEATH_TEST(CompareNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+DEATH_TEST_REGEX(CompareNodeTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$max: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);
@@ -353,7 +355,9 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(fromjson("{$set: {a: 'abd'}}"), getLogDoc());
 }
 
-DEATH_TEST(CompareNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant failure !_collator") {
+DEATH_TEST_REGEX(CompareNodeTest,
+                 CannotSetCollatorIfCollatorIsNonNull,
+                 "Invariant failure.*!_collator") {
     auto update = fromjson("{$max: {a: 1}}");
     CollatorInterfaceMock caseInsensitiveCollator(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -363,7 +367,7 @@ DEATH_TEST(CompareNodeTest, CannotSetCollatorIfCollatorIsNonNull, "Invariant fai
     node.setCollator(&caseInsensitiveCollator);
 }
 
-DEATH_TEST(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure !_collator") {
+DEATH_TEST_REGEX(CompareNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
     auto update = fromjson("{$max: {a: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     CompareNode node(CompareNode::CompareMode::kMax);

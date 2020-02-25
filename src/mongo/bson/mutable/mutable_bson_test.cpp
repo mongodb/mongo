@@ -545,9 +545,9 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_FALSE(e1[1].ok());
 }
 
-DEATH_TEST(ArrayAPI,
-           FindFirstChildNamedOnDeserializedArray,
-           "Invariant failure getType() != BSONType::Array") {
+DEATH_TEST_REGEX(ArrayAPI,
+                 FindFirstChildNamedOnDeserializedArray,
+                 R"#(Invariant failure.*getType\(\) != BSONType::Array)#") {
     mmb::Document doc;
     auto array = doc.makeElementArray("a");
     auto elem0 = doc.makeElementInt("", 0);
@@ -555,9 +555,9 @@ DEATH_TEST(ArrayAPI,
     array.findFirstChildNamed("0");
 }
 
-DEATH_TEST(ArrayAPI,
-           FindFirstChildNamedOnSerializedArray,
-           "Invariant failure getType() != BSONType::Array") {
+DEATH_TEST_REGEX(ArrayAPI,
+                 FindFirstChildNamedOnSerializedArray,
+                 R"#(Invariant failure.*getType\(\) != BSONType::Array)#") {
     auto obj = fromjson("{a: [0, 1]}");
     mmb::Document doc(obj);
     auto rootElem = doc.root();

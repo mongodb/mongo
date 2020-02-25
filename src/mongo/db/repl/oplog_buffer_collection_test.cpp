@@ -155,9 +155,10 @@ TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollect
     testStartupCreatesCollection(_opCtx.get(), _storageInterface, makeNamespace(_agent));
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             StartupWithOplogNamespaceTriggersFatalAssertion,
-             "Fatal assertion 40154 Location28838: cannot create a non-capped oplog collection") {
+DEATH_TEST_REGEX_F(
+    OplogBufferCollectionTest,
+    StartupWithOplogNamespaceTriggersFatalAssertion,
+    "Fatal assertion.*40154.*Location28838: cannot create a non-capped oplog collection") {
     testStartupCreatesCollection(_opCtx.get(), _storageInterface, NamespaceString("local.oplog.Z"));
 }
 
@@ -235,9 +236,9 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentGeneratesIdForSentinelFromLastP
         ts2, 3U, OplogBufferCollection::addIdToDocument({}, ts2, 2U));
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             addIdToDocumentWithMissingTimestampFieldTriggersInvariantFailure,
-             "Invariant failure !ts.isNull()") {
+DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+                   addIdToDocumentWithMissingTimestampFieldTriggersInvariantFailure,
+                   R"#(Invariant failure.*!ts.isNull\(\))#") {
     OplogBufferCollection::addIdToDocument(BSON("x" << 1), {}, 0);
 }
 
@@ -361,11 +362,11 @@ TEST_F(OplogBufferCollectionTest, ShutdownWithDropCollectionAtShutdownFalseDoesN
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             StartupWithExistingCollectionFailsWhenEntryHasNoId,
-             "Fatal assertion 40348 IndexNotFound: Index not found, "
-             "ns:local.OplogBufferCollectionTest_"
-             "StartupWithExistingCollectionFailsWhenEntryHasNoId, index: _id_") {
+DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+                   StartupWithExistingCollectionFailsWhenEntryHasNoId,
+                   "Fatal assertion.*40348.*IndexNotFound: Index not found, "
+                   "ns:local.OplogBufferCollectionTest_"
+                   "StartupWithExistingCollectionFailsWhenEntryHasNoId, index: _id_") {
     auto nss = makeNamespace(_agent);
     CollectionOptions collOpts;
     collOpts.setNoIdIndex();
@@ -381,9 +382,9 @@ DEATH_TEST_F(OplogBufferCollectionTest,
     oplogBuffer.startup(_opCtx.get());
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             StartupWithExistingCollectionFailsWhenEntryHasNoTimestamp,
-             "Fatal assertion 40405 NoSuchKey: Missing expected field \"ts\"") {
+DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+                   StartupWithExistingCollectionFailsWhenEntryHasNoTimestamp,
+                   R"#(Fatal assertion.*40405.*NoSuchKey: Missing expected field \\"ts\\")#") {
     auto nss = makeNamespace(_agent);
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(_opCtx.get(),
@@ -397,9 +398,9 @@ DEATH_TEST_F(OplogBufferCollectionTest,
     oplogBuffer.startup(_opCtx.get());
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             StartupWithExistingCollectionFailsWhenEntryHasNoSentinelCount,
-             "Fatal assertion 40406 NoSuchKey: Missing expected field \"s\"") {
+DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
+                   StartupWithExistingCollectionFailsWhenEntryHasNoSentinelCount,
+                   R"#(Fatal assertion.*40406.*NoSuchKey: Missing expected field \\"s\\")#") {
     auto nss = makeNamespace(_agent);
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(_storageInterface->insertDocument(
@@ -936,10 +937,10 @@ TEST_F(OplogBufferCollectionTest, PushAllNonBlockingPushesOnSentinelsProperly) {
                                });
 }
 
-DEATH_TEST_F(
+DEATH_TEST_REGEX_F(
     OplogBufferCollectionTest,
     PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
-    "Invariant failure value.isEmpty() ? ts == previousTimestamp : ts > previousTimestamp") {
+    R"#(Invariant failure.*value.isEmpty\(\) \? ts == previousTimestamp : ts > previousTimestamp)#") {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 

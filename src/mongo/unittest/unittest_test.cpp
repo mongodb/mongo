@@ -262,7 +262,7 @@ TEST(UnitTestSelfTest, BSONElementGTE) {
     ASSERT_BSONELT_GTE(obj2.firstElement(), obj1.firstElement());
 }
 
-DEATH_TEST(DeathTestSelfTest, TestDeath, "Invariant failure false") {
+DEATH_TEST_REGEX(DeathTestSelfTest, TestDeath, "Invariant failure.*false") {
     invariant(false);
 }
 

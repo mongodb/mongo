@@ -39,6 +39,7 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <functional>
+#include <pcrecpp.h>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -276,6 +277,20 @@
                           #BIG_STRING,                                             \
                           haystack);                                               \
         }()))
+
+#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                           \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(REGEX));                    \
+        pcrecpp::RE(std::get<1>(tup_)).PartialMatch(std::get<0>(tup_))) {                       \
+    } else                                                                                      \
+        FAIL(([&] {                                                                             \
+            const auto& [haystack, sub] = tup_;                                                 \
+            return format(FMT_STRING("Expected to find regular expression {} /{}/ in {} ({})"), \
+                          #REGEX,                                                               \
+                          sub,                                                                  \
+                          #BIG_STRING,                                                          \
+                          haystack);                                                            \
+        }()))
+
 
 /**
  * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.

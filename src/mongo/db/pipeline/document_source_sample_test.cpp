@@ -390,9 +390,9 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     ASSERT_LTE(secondTotal / nTrials, 0.52);
 }
 
-DEATH_TEST_F(SampleFromRandomCursorBasics,
-             ShouldFailIfGivenPausedInput,
-             "Invariant failure Hit a MONGO_UNREACHABLE!") {
+DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
+                   ShouldFailIfGivenPausedInput,
+                   "Invariant failure.*Hit a MONGO_UNREACHABLE!") {
     createSample(2);
     source()->push_back(Document{{"_id", 1}});
     source()->push_back(DocumentSource::GetNextResult::makePauseExecution());

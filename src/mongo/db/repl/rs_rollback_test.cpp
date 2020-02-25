@@ -2772,10 +2772,10 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY), _coordinator->getMemberState());
 }
 
-DEATH_TEST_F(
+DEATH_TEST_REGEX_F(
     RSRollbackTest,
     RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
-    "Unable to complete rollback. A full resync may be needed: "
+    "Unable to complete rollback. A full resync may be needed:.*"
     "UnrecoverableRollbackError: need to rollback, but unable to determine common point "
     "between local and remote oplog: InvalidSyncSource: remote oplog empty or unreadable") {
     // rollback() should abort on getting UnrecoverableRollbackError from syncRollback(). An empty
@@ -2837,11 +2837,11 @@ DEATH_TEST_F(RSRollbackTest,
         _opCtx.get(), localOplog, rollbackSource, {}, {}, _coordinator, _replicationProcess.get());
 }
 
-DEATH_TEST_F(
+DEATH_TEST_REGEX_F(
     RSRollbackTest,
     RollbackTriggersFatalAssertionOnFailingToTransitionToRecoveringAfterSyncRollbackReturns,
-    "Failed to transition into RECOVERING; expected to be in state ROLLBACK; found self in "
-    "ROLLBACK") {
+    "Failed to transition into.*; expected to be in state.*; found self "
+    "in.*RECOVERING.*ROLLBACK.*ROLLBACK") {
     auto commonOperation = makeNoopOplogEntryAndRecordId(Seconds(1));
     OplogInterfaceMock localOplog({commonOperation});
     RollbackSourceMock rollbackSource(

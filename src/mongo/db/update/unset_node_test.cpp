@@ -46,16 +46,18 @@ using UnsetNodeTest = UpdateNodeTest;
 using mongo::mutablebson::countChildren;
 using mongo::mutablebson::Element;
 
-DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+DEATH_TEST_REGEX(UnsetNodeTest,
+                 InitFailsForEmptyElement,
+                 R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$unset: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
     node.init(update["$unset"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-DEATH_TEST_F(UnsetNodeTest,
-             ApplyToRootFails,
-             "Invariant failure !updateNodeApplyParams.pathTaken->empty()") {
+DEATH_TEST_REGEX_F(UnsetNodeTest,
+                   ApplyToRootFails,
+                   R"#(Invariant failure.*!updateNodeApplyParams.pathTaken->empty\(\))#") {
     auto update = fromjson("{$unset: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;

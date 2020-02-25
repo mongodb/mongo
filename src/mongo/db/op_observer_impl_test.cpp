@@ -555,9 +555,9 @@ DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     opObserver.onDelete(opCtx.get(), nss, {}, kUninitializedStmtId, false, boost::none);
 }
 
-DEATH_TEST_F(OpObserverTest,
-             NodeCrashesIfShardIdentityDocumentRolledBack,
-             "Fatal Assertion 50712") {
+DEATH_TEST_REGEX_F(OpObserverTest,
+                   NodeCrashesIfShardIdentityDocumentRolledBack,
+                   "Fatal Assertion.*50712") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
 

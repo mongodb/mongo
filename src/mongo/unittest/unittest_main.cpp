@@ -54,19 +54,9 @@ int main(int argc, char** argv, char** envp) {
 
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
-    auto& logManager = ::mongo::logv2::LogManager::global();
-    ::mongo::logv2::LogDomainGlobal::ConfigurationOptions logConfig;
-    logConfig.format = ::mongo::logv2::LogFormat::kText;
-
-    Status status = logManager.getGlobalDomainInternal().configure(logConfig);
-    if (!status.isOK()) {
-        std::cerr << status;
-        return EXIT_FAILURE;
-    }
-
     moe::OptionSection options;
 
-    status = mongo::unittest::addUnitTestOptions(&options);
+    Status status = mongo::unittest::addUnitTestOptions(&options);
     if (!status.isOK()) {
         std::cerr << status;
         return EXIT_FAILURE;

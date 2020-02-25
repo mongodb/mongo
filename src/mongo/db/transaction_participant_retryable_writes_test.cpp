@@ -474,17 +474,18 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
     ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(2000));
 }
 
-DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
-             CheckStatementExecutedForInvalidatedTransactionInvariants,
-             "Invariant failure p().isValid") {
+DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
+                   CheckStatementExecutedForInvalidatedTransactionInvariants,
+                   R"#(Invariant failure.*p\(\).isValid)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
     txnParticipant.checkStatementExecuted(opCtx(), 0);
 }
 
-DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
-             WriteOpCompletedOnPrimaryForOldTransactionInvariants,
-             "Invariant failure sessionTxnRecord.getTxnNum() == o().activeTxnNumber") {
+DEATH_TEST_REGEX_F(
+    TransactionParticipantRetryableWritesTest,
+    WriteOpCompletedOnPrimaryForOldTransactionInvariants,
+    R"#(Invariant failure.*sessionTxnRecord.getTxnNum\(\) == o\(\).activeTxnNumber)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
@@ -522,9 +523,10 @@ DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
     }
 }
 
-DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
-             WriteOpCompletedOnPrimaryForInvalidatedTransactionInvariants,
-             "Invariant failure sessionTxnRecord.getTxnNum() == o().activeTxnNumber") {
+DEATH_TEST_REGEX_F(
+    TransactionParticipantRetryableWritesTest,
+    WriteOpCompletedOnPrimaryForInvalidatedTransactionInvariants,
+    R"#(Invariant failure.*sessionTxnRecord.getTxnNum\(\) == o\(\).activeTxnNumber)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 

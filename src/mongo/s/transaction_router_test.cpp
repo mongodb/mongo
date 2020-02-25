@@ -4269,21 +4269,21 @@ TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForUnstartedTxn) {
 // The following three tests verify that the methods that end metrics tracking for a transaction
 // can't be called for an unstarted one.
 
-DEATH_TEST_F(TransactionRouterMetricsTest,
-             ImplicitlyAbortingUnstartedTxnCrashes,
-             "Invariant failure isInitialized()") {
+DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
+                   ImplicitlyAbortingUnstartedTxnCrashes,
+                   R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
 }
 
-DEATH_TEST_F(TransactionRouterMetricsTest,
-             AbortingUnstartedTxnCrashes,
-             "Invariant failure isInitialized()") {
+DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
+                   AbortingUnstartedTxnCrashes,
+                   R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().abortTransaction(operationContext());
 }
 
-DEATH_TEST_F(TransactionRouterMetricsTest,
-             CommittingUnstartedTxnCrashes,
-             "Invariant failure isInitialized()") {
+DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
+                   CommittingUnstartedTxnCrashes,
+                   R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().commitTransaction(operationContext(), boost::none);
 }
 

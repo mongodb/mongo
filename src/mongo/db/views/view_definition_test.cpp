@@ -89,9 +89,9 @@ TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
                                              copiedView.defaultCollator()));
 }
 
-DEATH_TEST(ViewDefinitionTest,
-           SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
-           "Invariant failure _viewNss.db() == viewOnNss.db()") {
+DEATH_TEST_REGEX(ViewDefinitionTest,
+                 SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
+                 R"#(Invariant failure.*_viewNss.db\(\) == viewOnNss.db\(\))#") {
     ViewDefinition viewDef(
         viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     NamespaceString badViewOn("someOtherDb.someOtherCollection");
@@ -108,9 +108,9 @@ TEST(ViewDefinitionTest, SetViewOnSucceedsIfNewViewOnIsInSameDatabaseAsView) {
     ASSERT_EQ(newViewOn, viewDef.viewOn());
 }
 
-DEATH_TEST(ViewDefinitionTest,
-           SetPiplineFailsIfPipelineTypeIsNotArray,
-           "Invariant failure pipeline.type() == Array") {
+DEATH_TEST_REGEX(ViewDefinitionTest,
+                 SetPiplineFailsIfPipelineTypeIsNotArray,
+                 R"#(Invariant failure.*pipeline.type\(\) == Array)#") {
     ViewDefinition viewDef(
         viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
 

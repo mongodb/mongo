@@ -455,9 +455,9 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
 }
 
 // TODO: DocumentSourceFacet will have to propagate pauses if we ever allow nested $facets.
-DEATH_TEST_F(DocumentSourceFacetTest,
-             ShouldFailIfGivenPausedInput,
-             "Invariant failure !input.isPaused()") {
+DEATH_TEST_REGEX_F(DocumentSourceFacetTest,
+                   ShouldFailIfGivenPausedInput,
+                   R"#(Invariant failure.*!input.isPaused\(\))#") {
     auto ctx = getExpCtx();
     auto mock =
         DocumentSourceMock::createForTest(DocumentSource::GetNextResult::makePauseExecution());
