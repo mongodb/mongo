@@ -319,6 +319,7 @@ env.Library(
         'kill_common',
         'list_collections_filter',
         'list_databases_command',
+        'rename_collection_idl',
         'test_commands_enabled',
         'write_commands_common',
     ],
@@ -347,6 +348,16 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='rename_collection_idl',
+    source=[
+        env.Idlc('rename_collection.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

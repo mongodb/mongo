@@ -39,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/commands/rename_collection_gen.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -228,14 +229,11 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString fromNss(parseNs(dbName, cmdObj));
-        const NamespaceString toNss([&cmdObj] {
-            const auto fullnsToElt = cmdObj["to"];
-            uassert(ErrorCodes::InvalidNamespace,
-                    "'to' must be of type String",
-                    fullnsToElt.type() == BSONType::String);
-            return fullnsToElt.valueStringData();
-        }());
+        auto renameRequest =
+            RenameCollectionCommand::parse(IDLParserErrorContext("renameCollection"), cmdObj);
+        auto fromNss = renameRequest.getCommandParameter();
+        auto toNss = renameRequest.getTo();
+
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid target namespace: " << toNss.ns(),
                 toNss.isValid());
