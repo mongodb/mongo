@@ -422,7 +422,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     }
     return DispatchShardPipelineResults{false,
                                         std::move(ownedCursors),
-                                        {} /*TODO SERVER-36279*/,
+                                        {},
                                         std::move(splitPipeline),
                                         nullptr,
                                         BSONObj(),
