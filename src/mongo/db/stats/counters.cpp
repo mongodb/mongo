@@ -148,6 +148,14 @@ void NetworkCounter::hitLogicalOut(long long bytes) {
     }
 }
 
+void NetworkCounter::incrementNumSlowDNSOperations() {
+    _numSlowDNSOperations.fetchAndAdd(1);
+}
+
+void NetworkCounter::incrementNumSlowSSLOperations() {
+    _numSlowSSLOperations.fetchAndAdd(1);
+}
+
 void NetworkCounter::acceptedTFOIngress() {
     _tfo.accepted.fetchAndAddRelaxed(1);
 }
@@ -157,6 +165,8 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     b.append("bytesOut", static_cast<long long>(_logicalBytesOut.loadRelaxed()));
     b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn.loadRelaxed()));
     b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut.loadRelaxed()));
+    b.append("numSlowDNSOperations", static_cast<long long>(_numSlowDNSOperations.loadRelaxed()));
+    b.append("numSlowSSLOperations", static_cast<long long>(_numSlowSSLOperations.loadRelaxed()));
     b.append("numRequests", static_cast<long long>(_together.requests.loadRelaxed()));
 
     BSONObjBuilder tfo;

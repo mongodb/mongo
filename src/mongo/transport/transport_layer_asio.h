@@ -84,6 +84,8 @@ class TransportLayerASIO final : public TransportLayer {
     TransportLayerASIO& operator=(const TransportLayerASIO&) = delete;
 
 public:
+    constexpr static auto kSlowOperationThreshold = Seconds(1);
+
     struct Options {
         constexpr static auto kIngress = 0x1;
         constexpr static auto kEgress = 0x10;

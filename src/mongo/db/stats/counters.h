@@ -123,6 +123,12 @@ public:
     void hitLogicalIn(long long bytes);
     void hitLogicalOut(long long bytes);
 
+    // Increment the counter for the number of slow dns resolution operations.
+    void incrementNumSlowDNSOperations();
+
+    // Increment the counter for the number of slow ssl handshake operations.
+    void incrementNumSlowSSLOperations();
+
     // TFO Counters and Status;
     void acceptedTFOIngress();
 
@@ -155,6 +161,9 @@ private:
                   "cache line spill");
 
     CacheAligned<AtomicWord<long long>> _logicalBytesOut{0};
+
+    CacheAligned<AtomicWord<long long>> _numSlowDNSOperations{0};
+    CacheAligned<AtomicWord<long long>> _numSlowSSLOperations{0};
 
     struct TFO {
         // Counter of inbound connections at runtime.

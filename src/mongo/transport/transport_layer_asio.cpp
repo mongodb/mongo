@@ -454,7 +454,13 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
     GenericSocket sock(*_egressReactor);
     WrappedResolver resolver(*_egressReactor);
 
+    Date_t timeBefore = Date_t::now();
     auto swEndpoints = resolver.resolve(peer, _listenerOptions.enableIPv6);
+    Date_t timeAfter = Date_t::now();
+    if (timeAfter - timeBefore > kSlowOperationThreshold) {
+        networkCounter.incrementNumSlowDNSOperations();
+    }
+
     if (!swEndpoints.isOK()) {
         return swEndpoints.getStatus();
     }
@@ -484,7 +490,13 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
         (sslMode == kGlobalSSLMode &&
          ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
           (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+        Date_t timeBefore = Date_t::now();
         auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
+        Date_t timeAfter = Date_t::now();
+        if (timeAfter - timeBefore > kSlowOperationThreshold) {
+            networkCounter.incrementNumSlowSSLOperations();
+        }
+
         if (!sslStatus.isOK()) {
             return sslStatus;
         }
@@ -616,12 +628,13 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
         .then([connector, timeBefore](WrappedResolver::EndpointVector results) {
             try {
                 Date_t timeAfter = Date_t::now();
-                if (timeAfter - timeBefore > Seconds(1)) {
+                if (timeAfter - timeBefore > kSlowOperationThreshold) {
                     LOGV2_WARNING(23019,
                                   "DNS resolution while connecting to {connector_peer} took "
                                   "{timeAfter_timeBefore}",
                                   "connector_peer"_attr = connector->peer,
                                   "timeAfter_timeBefore"_attr = timeAfter - timeBefore);
+                    networkCounter.incrementNumSlowDNSOperations();
                 }
 
                 stdx::lock_guard<Latch> lk(connector->mutex);
@@ -658,9 +671,16 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                 (sslMode == kGlobalSSLMode &&
                  ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
                   (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+                Date_t timeBefore = Date_t::now();
                 return connector->session
                     ->handshakeSSLForEgressWithLock(std::move(lk), connector->peer)
-                    .then([connector] { return Status::OK(); });
+                    .then([connector, timeBefore] {
+                        Date_t timeAfter = Date_t::now();
+                        if (timeAfter - timeBefore > kSlowOperationThreshold) {
+                            networkCounter.incrementNumSlowSSLOperations();
+                        }
+                        return Status::OK();
+                    });
             }
 #endif
             return Status::OK();
