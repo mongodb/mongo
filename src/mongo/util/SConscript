@@ -213,6 +213,16 @@ env.Library(
     ]
 )
 
+env.CppUnitTest(
+    target='thread_safety_context_test',
+    source=[
+        'thread_safety_context_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
     tcmspEnv = env.Clone()
 

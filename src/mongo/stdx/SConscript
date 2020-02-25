@@ -10,6 +10,7 @@ env.Benchmark(
         'condition_variable_bm.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -44,7 +45,7 @@ env.CppUnitTest(
         'sigaltstack_location_test.cpp',
     ],
     LIBDEPS=[
-        'stdx',
+        '$BUILD_DIR/mongo/base',
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
 )
@@ -64,7 +65,7 @@ env.CppUnitTest(
         'set_terminate_dispatch_test.cpp',
     ],
     LIBDEPS=[
-        'stdx',
+        '$BUILD_DIR/mongo/base',
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
 )
@@ -76,7 +77,7 @@ env.CppUnitTest(
         'set_terminate_from_main_die_in_thread_test.cpp',
     ],
     LIBDEPS=[
-        'stdx',
+        '$BUILD_DIR/mongo/base',
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
 )
@@ -88,7 +89,7 @@ env.CppUnitTest(
         'set_terminate_from_thread_die_in_main_test.cpp',
     ],
     LIBDEPS=[
-        'stdx',
+        '$BUILD_DIR/mongo/base',
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
 )
@@ -100,7 +101,7 @@ env.CppUnitTest(
         'set_terminate_from_thread_die_in_thread_test.cpp',
     ],
     LIBDEPS=[
-        'stdx',
+        '$BUILD_DIR/mongo/base',
     ],
     UNITTEST_HAS_CUSTOM_MAINLINE=True,
 )

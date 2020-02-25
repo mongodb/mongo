@@ -1228,6 +1228,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 }
 
 int mongoDbMain(int argc, char* argv[], char** envp) {
+    ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
+
     registerShutdownTask(shutdownTask);
 
     setupSignalHandlers();
@@ -1276,6 +1278,9 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
 
     if (!initializeServerSecurityGlobalState(service))
         quickExit(EXIT_FAILURE);
+
+    // There is no single-threaded guarantee beyond this point.
+    ThreadSafetyContext::getThreadSafetyContext()->allowMultiThreading();
 
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
     // initializeServerGlobalState) and before the creation of any other threads

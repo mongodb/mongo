@@ -164,6 +164,7 @@ baseEnv.Library(
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
         'util/text.cpp',
+        'util/thread_safety_context.cpp',
         'util/time_support.cpp',
         'util/timer.cpp',
         'util/uuid.cpp',

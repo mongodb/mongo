@@ -40,6 +40,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/thread_safety_context.h"
 
 #if !defined(_WIN32)
 #include <sys/resource.h>
@@ -101,6 +102,7 @@ Status launchServiceWorkerThread(std::function<void()> task) {
 
         pthread_t thread;
         auto ctx = std::make_unique<std::function<void()>>(std::move(task));
+        ThreadSafetyContext::getThreadSafetyContext()->onThreadCreate();
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
         pthread_attr_destroy(&attrs);

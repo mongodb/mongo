@@ -39,6 +39,7 @@
 #include <type_traits>
 
 #include "mongo/stdx/exception.h"
+#include "mongo/util/thread_safety_context.h"
 
 #if defined(__linux__) || defined(__FreeBSD__)
 #define MONGO_HAS_SIGALTSTACK 1
@@ -180,6 +181,7 @@ public:
                   ::std::set_terminate(  // NOLINT
                       ::mongo::stdx::TerminateHandlerDetailsInterface::dispatch);
 #endif
+                  ThreadSafetyContext::getThreadSafetyContext()->onThreadCreate();
                   auto sigAltStackGuard = sigAltStackController.makeInstallGuard();
                   return std::apply(std::move(f), std::move(pack));
               }) {
