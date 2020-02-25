@@ -516,6 +516,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     } else {
         _state.store(State::Source);
         _inMessage.reset();
+        _inExhaust = false;
         return _scheduleNextWithGuard(std::move(guard),
                                       ServiceExecutor::kDeferredTask,
                                       transport::ServiceExecutorTaskName::kSSMSourceMessage);

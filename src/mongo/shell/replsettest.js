@@ -2792,16 +2792,6 @@ var ReplSetTest = function(opts) {
         options.setParameter.numInitialSyncConnectAttempts =
             options.setParameter.numInitialSyncConnectAttempts || 60;
 
-        // TODO SERVER-46223: Support exhaust in mongobridge.
-        if (_useBridge && (options.binVersion === undefined || options.binVersion === "latest")) {
-            options.setParameter.oplogFetcherUsesExhaust =
-                options.setParameter.oplogFetcherUsesExhaust || false;
-        } else if (_useBridge && options.binVersion === "last-stable") {
-            // On a 4.2 binary, make sure we do not set oplogFetcherUsesExhaust since it is an
-            // unknown parameter in 4.2.
-            delete options.setParameter.oplogFetcherUsesExhaust;
-        }
-
         if (tojson(options) != tojson({}))
             printjson(options);
 
