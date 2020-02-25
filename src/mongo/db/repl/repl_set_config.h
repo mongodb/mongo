@@ -488,6 +488,11 @@ public:
      */
     bool containsArbiter() const;
 
+    /**
+     * Sets the `newlyAdded` field of the MemberConfig at memberIndex to the value passed in.
+     */
+    void setNewlyAddedFieldForMemberAtIndex(int memberIndex, bool newlyAdded);
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.

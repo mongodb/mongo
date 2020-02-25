@@ -3039,7 +3039,9 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
         // When initializing a new config through the replSetReconfig command, ignore the term
         // field passed in through its args. Instead, use this node's term.
-        Status status = newConfig.initialize(args.newConfigObj, term, oldConfig.getReplicaSetId());
+        const Status status =
+            newConfig.initialize(args.newConfigObj, term, oldConfig.getReplicaSetId());
+
         if (!status.isOK()) {
             LOGV2_ERROR(21418,
                         "replSetReconfig got {status} while parsing {newConfigObj}",
@@ -3047,6 +3049,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                         "newConfigObj"_attr = args.newConfigObj);
             return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
         }
+
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
             errmsg << "Attempting to reconfigure a replica set with name "
@@ -3055,6 +3058,31 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             LOGV2_ERROR(
                 21419, "{std_string_errmsg}", "std_string_errmsg"_attr = std::string(errmsg));
             return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+        }
+
+        if (enableAutomaticReconfig) {
+            bool addedNewlyAddedField = false;
+
+            // Set the `newlyAdded` field to true for all new voting nodes.
+            for (int i = 0; i < newConfig.getNumMembers(); i++) {
+                const auto newMem = newConfig.getMemberAt(i);
+                const int newMemId = newMem.getId().getData();
+                const bool newMemberIdNotInOldConfig =
+                    (oldConfig.findMemberByID(newMemId) == nullptr);
+
+                if (newMemberIdNotInOldConfig && newMem.isVoter()) {
+                    newConfig.setNewlyAddedFieldForMemberAtIndex(i, true);
+                    addedNewlyAddedField = true;
+                }
+            }
+
+            if (addedNewlyAddedField) {
+                LOGV2(4634400,
+                      "Rewrote the config to add `newlyAdded` field. Nodes with the `newlyAdded` "
+                      "field will be considered to have `votes:0`. Upon transition to SECONDARY, "
+                      "this field will be automatically removed.",
+                      "newConfigObj"_attr = newConfig.toBSON());
+            }
         }
 
         // Increase the config version for force reconfig.

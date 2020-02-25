@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -925,6 +926,172 @@ TEST_F(ReplCoordReconfigTest,
 
     reconfigThread.join();
     ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    init();
+    auto configVersion = 1;
+    assertStartSuccess(
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // `newlyAdded` should only be set to true if the repl set goes through reconfig.
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a reconfig that adds new nodes to the repl set.
+    args.newConfigObj = configWithMembers(
+        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    startCapturingLogMessages();
+    Status status(ErrorCodes::InternalError, "Not Set");
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_OK(status);
+    stopCapturingLogMessages();
+
+    rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+    // Verify that the newly added node has the flag set to true.
+    ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded().get());
+
+    // Verify that a log message was created for adding the `newlyAdded` field.
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("Rewrote the config to add `newlyAdded` field"));
+}
+
+TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsFalseForNodesWithModifiedHostName) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    init();
+    auto configVersion = 1;
+    assertStartSuccess(
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // `newlyAdded` should only be set to true if the repl set goes through reconfig.
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a reconfig that renames the host and port for the second node.
+    args.newConfigObj =
+        configWithMembers(2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345")));
+
+    startCapturingLogMessages();
+    Status status(ErrorCodes::InternalError, "Not Set");
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_OK(status);
+    stopCapturingLogMessages();
+
+    rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    // Verify that the renamed node is not considered newly added, since the _id field remained the
+    // same.
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Verify that a log message was not created, since we did not add a`newlyAdded` field.
+    ASSERT_EQUALS(
+        0, countTextFormatLogLinesContaining("Rewrote the config to add `newlyAdded` field"));
+}
+
+TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsFalseForNodesWithDifferentIndexButSameID) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    init();
+    auto configVersion = 1;
+    assertStartSuccess(
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // `newlyAdded` should only be set to true if the repl set goes through reconfig.
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a reconfig that changes the order but not the ids of the members.
+    args.newConfigObj = configWithMembers(2, 0, BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1")));
+
+    startCapturingLogMessages();
+    Status status(ErrorCodes::InternalError, "Not Set");
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_OK(status);
+    stopCapturingLogMessages();
+
+    rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // Verify that neither of the nodes are considered newly added.
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Verify that a log message was not created, since we did not add a`newlyAdded` field.
+    ASSERT_EQUALS(
+        0, countTextFormatLogLinesContaining("Rewrote the config to add `newlyAdded` field"));
 }
 
 }  // anonymous namespace
