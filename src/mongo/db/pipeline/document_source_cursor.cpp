@@ -50,19 +50,57 @@ const char* DocumentSourceCursor::getSourceName() const {
     return "$cursor";
 }
 
+bool DocumentSourceCursor::Batch::isEmpty() const {
+    if (shouldProduceEmptyDocs) {
+        return !_count;
+    } else {
+        return _batchOfDocs.empty();
+    }
+    MONGO_UNREACHABLE;
+}
+
+void DocumentSourceCursor::Batch::enqueue(Document&& doc) {
+    if (shouldProduceEmptyDocs) {
+        ++_count;
+    } else {
+        _batchOfDocs.push_back(doc.getOwned());
+        _memUsageBytes += _batchOfDocs.back().getApproximateSize();
+    }
+}
+
+Document DocumentSourceCursor::Batch::dequeue() {
+    invariant(!isEmpty());
+    if (shouldProduceEmptyDocs) {
+        --_count;
+        return Document{};
+    } else {
+        Document out = std::move(_batchOfDocs.front());
+        _batchOfDocs.pop_front();
+        if (_batchOfDocs.empty()) {
+            _memUsageBytes = 0;
+        }
+        return out;
+    }
+    MONGO_UNREACHABLE;
+}
+
+void DocumentSourceCursor::Batch::clear() {
+    _batchOfDocs.clear();
+    _count = 0;
+    _memUsageBytes = 0;
+}
+
 DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (_currentBatch.empty()) {
+    if (_currentBatch.isEmpty()) {
         loadBatch();
 
-        if (_currentBatch.empty())
+        if (_currentBatch.isEmpty())
             return GetNextResult::makeEOF();
     }
 
-    Document out = std::move(_currentBatch.front());
-    _currentBatch.pop_front();
-    return std::move(out);
+    return _currentBatch.dequeue();
 }
 
 void DocumentSourceCursor::loadBatch() {
@@ -81,17 +119,16 @@ void DocumentSourceCursor::loadBatch() {
 
         uassertStatusOK(_exec->restoreState());
 
-        int memUsageBytes = 0;
         {
             ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
 
             while ((state = _exec->getNext(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
-                if (_shouldProduceEmptyDocs) {
-                    _currentBatch.push_back(Document());
+                if (_currentBatch.shouldProduceEmptyDocs) {
+                    _currentBatch.enqueue(Document());
                 } else if (_dependencies) {
-                    _currentBatch.push_back(_dependencies->extractFields(resultObj));
+                    _currentBatch.enqueue(_dependencies->extractFields(resultObj));
                 } else {
-                    _currentBatch.push_back(Document::fromBsonWithMetaData(resultObj));
+                    _currentBatch.enqueue(Document::fromBsonWithMetaData(resultObj));
                 }
 
                 if (_limit) {
@@ -101,15 +138,14 @@ void DocumentSourceCursor::loadBatch() {
                     verify(_docsAddedToBatches < _limit->getLimit());
                 }
 
-                memUsageBytes += _currentBatch.back().getApproximateSize();
-
                 // As long as we're waiting for inserts, we shouldn't do any batching at this level
                 // we need the whole pipeline to see each document to see if we should stop waiting.
                 // Furthermore, if we need to return the latest oplog time (in the tailable and
                 // needs-merge case), batching will result in a wrong time.
                 if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
                     (pExpCtx->isTailableAwaitData() && pExpCtx->needsMerge) ||
-                    memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
+                    static_cast<long long>(_currentBatch.memUsageBytes()) >
+                        internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
                     _exec->saveState();
                     return;
@@ -302,4 +338,4 @@ intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
         collection, std::move(exec), pExpCtx, failsForExecutionLevelExplain));
     return source;
 }
-}
+}  // namespace mongo

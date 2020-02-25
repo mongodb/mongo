@@ -132,7 +132,7 @@ public:
      * documents, avoiding the overhead of converting BSONObjs to Documents.
      */
     void shouldProduceEmptyDocs() {
-        _shouldProduceEmptyDocs = true;
+        _currentBatch.shouldProduceEmptyDocs = true;
     }
 
     Timestamp getLatestOplogTimestamp() const {
@@ -171,6 +171,60 @@ private:
     ~DocumentSourceCursor();
 
     /**
+     * A $cursor stage loads documents from the underlying PlanExecutor in batches. An object of
+     * this class represents one such batch. Acts like a queue into which documents can be queued
+     * and dequeued in FIFO order.
+     */
+    class Batch {
+    public:
+        /**
+         * Adds a new document to the batch.
+         */
+        void enqueue(Document&& doc);
+
+        /**
+         * Removes the first document from the batch.
+         */
+        Document dequeue();
+
+        void clear();
+
+        bool isEmpty() const;
+
+        /**
+         * Returns the approximate memory footprint of this batch, measured in bytes. Even after
+         * documents are dequeued from the batch, continues to indicate the batch's peak memory
+         * footprint. Resets to zero once the final document in the batch is dequeued.
+         */
+        size_t memUsageBytes() const {
+            return _memUsageBytes;
+        }
+
+        /**
+         * Illegal to call if 'shouldProduceEmptyDocs' is true.
+         */
+        const Document& peekFront() const {
+            invariant(!shouldProduceEmptyDocs);
+            return _batchOfDocs.front();
+        }
+
+        bool shouldProduceEmptyDocs = false;
+
+    private:
+        // Used only if 'shouldProduceEmptyDocs' is false. A deque of the documents comprising the
+        // batch.
+        std::deque<Document> _batchOfDocs;
+
+        // Used only if 'shouldProduceEmptyDocs' is true. In this case, we don't need to keep the
+        // documents themselves, only a count of the number of documents in the batch.
+        size_t _count = 0;
+
+        // The approximate memory footprint of the batch in bytes. Always kept at zero when
+        // 'shouldProduceEmptyDocs' is true.
+        size_t _memUsageBytes = 0;
+    };
+
+    /**
      * Acquires the appropriate locks, then destroys and de-registers '_exec'. '_exec' must be
      * non-null.
      */
@@ -188,13 +242,13 @@ private:
 
     void recordPlanSummaryStats();
 
-    std::deque<Document> _currentBatch;
+    // Batches results returned from the underlying PlanExecutor.
+    Batch _currentBatch;
 
     // BSONObj members must outlive _projection and cursor.
     BSONObj _query;
     BSONObj _sort;
     BSONObj _projection;
-    bool _shouldProduceEmptyDocs = false;
     boost::optional<ParsedDeps> _dependencies;
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement
