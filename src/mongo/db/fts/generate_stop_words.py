@@ -26,6 +26,7 @@ namespace fts {
 
   void loadStopWordMap( StringMap< std::set< std::string > >* m ) {
 
+    m->insert({
 """ )
 
     for l_file in language_files:
@@ -33,16 +34,13 @@ namespace fts {
 
         out.write( '  // %s\n' % l_file )
         out.write( '  {\n' )
-        out.write( '   const char* const words[] = {\n' )
+        out.write( '    "%s", {\n' % l )
         for word in open( l_file, "rb" ):
             out.write( '       "%s",\n' % word.decode('utf-8').strip() )
-        out.write( '   };\n' )
-        out.write( '   const size_t wordcnt = sizeof(words) / sizeof(words[0]);\n' )
-        out.write( '   std::set< std::string >& l = (*m)["%s"];\n' % l )
-        out.write( '   l.insert(&words[0], &words[wordcnt]);\n' )
-        out.write( '  }\n' )
+        out.write( '  }},\n' )
 
     out.write( """
+    });
   }
 } // namespace fts
 } // namespace mongo
