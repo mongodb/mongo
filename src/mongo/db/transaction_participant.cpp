@@ -1093,9 +1093,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             // instead.
             LOGV2_FATAL(22525,
                         "Caught exception during abort of prepared transaction "
-                        "{opCtx_getTxnNumber} on {sessionId}: {exceptionToStatus}",
-                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                        "sessionId"_attr = _sessionId().toBSON(),
+                        "{txnNumber} on {lsid}: {exceptionToStatus}",
+                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "lsid"_attr = _sessionId().toBSON(),
                         "exceptionToStatus"_attr = exceptionToStatus());
             std::terminate();
         }
@@ -1161,8 +1161,8 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             LOGV2(22521,
                   "transaction - hangAfterReservingPrepareTimestamp fail point "
                   "enabled. Blocking until fail point is disabled. Prepare OpTime: "
-                  "{prepareOplogSlot}",
-                  "prepareOplogSlot"_attr = prepareOplogSlot);
+                  "{prepareOpTime}",
+                  "prepareOpTime"_attr = prepareOplogSlot);
             hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
@@ -1417,10 +1417,10 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // It is illegal for committing a prepared transaction to fail for any reason, other than an
         // invalid command, so we crash instead.
         LOGV2_FATAL(22526,
-                    "Caught exception during commit of prepared transaction {opCtx_getTxnNumber} "
-                    "on {sessionId}: {exceptionToStatus}",
-                    "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                    "sessionId"_attr = _sessionId().toBSON(),
+                    "Caught exception during commit of prepared transaction {txnNumber} "
+                    "on {lsid}: {exceptionToStatus}",
+                    "txnNumber"_attr = opCtx->getTxnNumber(),
+                    "lsid"_attr = _sessionId().toBSON(),
                     "exceptionToStatus"_attr = exceptionToStatus());
         std::terminate();
     }
@@ -1549,9 +1549,9 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
             // after aborting the storage transaction, so we crash instead.
             LOGV2_FATAL(22527,
                         "Caught exception during abort of transaction that must write abort oplog "
-                        "entry {opCtx_getTxnNumber} on {sessionId}: {exceptionToStatus}",
-                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                        "sessionId"_attr = _sessionId().toBSON(),
+                        "entry {txnNumber} on {lsid}: {exceptionToStatus}",
+                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "lsid"_attr = _sessionId().toBSON(),
                         "exceptionToStatus"_attr = exceptionToStatus());
             std::terminate();
         }
@@ -2011,14 +2011,12 @@ void TransactionParticipant::Participant::_logSlowTransaction(
             }
             // TODO SERVER-46219: Log also with old log system to not break unit tests
             {
-                LOGV2_OPTIONS(
-                    22523,
-                    {logComponentV1toV2(logger::LogComponent::kTransaction)},
-                    "transaction "
-                    "{transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs}",
-                    "transactionInfoForLog_opCtx_lockStats_terminationCause_readConcernArgs"_attr =
-                        _transactionInfoForLog(
-                            opCtx, lockStats, terminationCause, readConcernArgs));
+                LOGV2_OPTIONS(22523,
+                              {logComponentV1toV2(logger::LogComponent::kTransaction)},
+                              "transaction "
+                              "{transactionInfo}",
+                              "transactionInfo"_attr = _transactionInfoForLog(
+                                  opCtx, lockStats, terminationCause, readConcernArgs));
             }
         }
     }
