@@ -116,37 +116,6 @@ Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
 }
 
 /**
- * Returns getMore command object suitable for tailing remote oplog.
- */
-BSONObj makeGetMoreCommandObject(const NamespaceString& nss,
-                                 CursorId cursorId,
-                                 OpTimeWithTerm lastCommittedWithCurrentTerm,
-                                 Milliseconds fetcherMaxTimeMS,
-                                 int batchSize) {
-    BSONObjBuilder cmdBob;
-    cmdBob.append("getMore", cursorId);
-    cmdBob.append("collection", nss.coll());
-    cmdBob.append("batchSize", batchSize);
-    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
-    if (lastCommittedWithCurrentTerm.value != OpTime::kUninitializedTerm) {
-        cmdBob.append("term", lastCommittedWithCurrentTerm.value);
-        lastCommittedWithCurrentTerm.opTime.append(&cmdBob, "lastKnownCommittedOpTime");
-    }
-    return cmdBob.obj();
-}
-
-/**
- * Returns command metadata object suitable for tailing remote oplog.
- */
-BSONObj makeMetadataObject() {
-    BSONObjBuilder metaBuilder;
-    metaBuilder << rpc::kReplSetMetadataFieldName << 1;
-    metaBuilder << rpc::kOplogQueryMetadataFieldName << 1;
-    metaBuilder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
-    return metaBuilder.obj();
-}
-
-/**
  * Checks the first batch of results from query.
  * 'documents' are the first batch of results returned from tailing the remote oplog.
  * 'lastFetched' optime should be consistent with the predicate in the query.
@@ -165,7 +134,7 @@ BSONObj makeMetadataObject() {
  * Returns OplogStartMissing if we cannot find the optime of the last fetched operation in
  * the remote oplog.
  */
-Status checkRemoteOplogStart(const Fetcher::Documents& documents,
+Status checkRemoteOplogStart(const OplogFetcher::Documents& documents,
                              OpTime lastFetched,
                              boost::optional<OpTime> remoteLastOpApplied,
                              int requiredRBID,
@@ -248,31 +217,6 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
 }
 
 /**
- * Parses a QueryResponse for the OplogQueryMetadata. If there is an error it returns it. If
- * no OplogQueryMetadata is provided then it returns boost::none.
- *
- * OplogQueryMetadata is made optional for backwards compatibility.
- * TODO (SERVER-27668): Make this non-optional in mongodb 3.8. When this stops being optional
- * we can remove the duplicated fields in both metadata types and begin to always use
- * OplogQueryMetadata's data.
- */
-StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
-    Fetcher::QueryResponse queryResponse) {
-    boost::optional<rpc::OplogQueryMetadata> oqMetadata = boost::none;
-    bool receivedOplogQueryMetadata =
-        queryResponse.otherFields.metadata.hasElement(rpc::kOplogQueryMetadataFieldName);
-    if (receivedOplogQueryMetadata) {
-        const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult = rpc::OplogQueryMetadata::readFromMetadata(metadataObj);
-        if (!metadataResult.isOK()) {
-            return metadataResult.getStatus();
-        }
-        oqMetadata = boost::make_optional(metadataResult.getValue());
-    }
-    return oqMetadata;
-}
-
-/**
  * Parses the cursor's metadata response for the OplogQueryMetadata. If there is an error it returns
  * it. If no OplogQueryMetadata is provided then it returns boost::none.
  *
@@ -300,7 +244,7 @@ StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
 
 
 StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
-    const Fetcher::Documents& documents,
+    const OplogFetcher::Documents& documents,
     bool first,
     Timestamp lastTS,
     StartingPoint startingPoint) {
@@ -374,7 +318,6 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(lastFetched),
-      _metadataObj(makeMetadataObject()),
       _createClientFn(
           [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
       _requireFresherSyncSource(requireFresherSyncSource),

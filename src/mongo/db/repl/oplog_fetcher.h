@@ -36,7 +36,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/client/fetcher.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/abstract_async_component.h"

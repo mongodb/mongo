@@ -78,7 +78,7 @@ OplogFetcherMock::~OplogFetcherMock() {
     }
 }
 
-void OplogFetcherMock::receiveBatch(CursorId cursorId, Fetcher::Documents documents) {
+void OplogFetcherMock::receiveBatch(CursorId cursorId, OplogFetcher::Documents documents) {
     {
         stdx::lock_guard<Latch> lock(_mutex);
         if (!_isActive_inlock()) {

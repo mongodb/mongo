@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 
 namespace mongo {
@@ -56,7 +57,7 @@ public:
      * the enqueueDocumentsFn.
      * This is not thread-safe.
      */
-    void receiveBatch(CursorId cursorId, Fetcher::Documents documents);
+    void receiveBatch(CursorId cursorId, OplogFetcher::Documents documents);
 
     /**
      * Simulate an response error received by the OplogFetcher.
