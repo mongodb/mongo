@@ -346,7 +346,8 @@ unsigned long long | int64 (0x12)
 ### Message and Format string
 
 * Prefer pithy noun phrases or short sentence describing what is being logged
-* Prefer providing both message without replacement fields and format string with replacement fields when writing new log messages. That will help the transition to good JSON logs.
+* Prefer a message without replacement fields for new log messages.
+* When updating existing messages, try to include both a replacement-free message and format string with replacement fields. That will help the transition to good JSON logs.
 * Avoid ending with punctuation (.)
 
 ### Attribute names
@@ -379,3 +380,4 @@ LOGV2(1042, "Slow query", "duration"_attr = getDurationMillis());
 { ..., "id": 1042, "msg": "Slow query", "attr": { "durationMillis": 1000 } }
 
 ```
+
