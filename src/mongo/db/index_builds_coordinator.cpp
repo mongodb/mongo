@@ -958,23 +958,6 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
     return true;
 }
 
-/**
- * Returns true if index specs include any unique indexes. Due to uniqueness constraints set up at
- * the start of the index build, we are not able to support failing over a two phase index build on
- * a unique index to a new primary on stepdown.
- */
-namespace {
-// TODO(SERVER-44654): remove when unique indexes support failover
-bool containsUniqueIndexes(const std::vector<BSONObj>& specs) {
-    for (const auto& spec : specs) {
-        if (spec["unique"].trueValue()) {
-            return true;
-        }
-    }
-    return false;
-}
-}  // namespace
-
 std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* opCtx) {
     auto indexBuilds = _getIndexBuilds();
     // We use forEachIndexBuild() to log basic details on the current index builds and don't intend
@@ -995,26 +978,6 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     auto indexBuilds = _getIndexBuilds();
     auto onIndexBuild = [this, opCtx](std::shared_ptr<ReplIndexBuildState> replState) {
         if (IndexBuildProtocol::kTwoPhase != replState->protocol) {
-            return;
-        }
-
-        // TODO(SERVER-44654): re-enable failover support for unique indexes.
-        if (containsUniqueIndexes(replState->indexSpecs)) {
-            // We abort unique index builds on step-up on the new primary, as opposed to on
-            // step-down on the old primary. This is because the old primary cannot generate any new
-            // oplog entries, and consequently does not have a timestamp to delete the index from
-            // the durable catalog. This abort will replicate to the old primary, now secondary, to
-            // abort the build.
-            // Use a null timestamp because the primary will generate its own timestamp with an
-            // oplog entry.
-            // Do not wait for the index build to exit, because it may reacquire locks that are not
-            // available until stepUp completes.
-            std::string abortReason("unique indexes do not support failover");
-            abortIndexBuildByBuildUUIDNoWait(opCtx,
-                                             replState->buildUUID,
-                                             IndexBuildAction::kPrimaryAbort,
-                                             boost::none,
-                                             abortReason);
             return;
         }
 

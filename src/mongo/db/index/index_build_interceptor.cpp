@@ -123,17 +123,9 @@ bool IndexBuildInterceptor::areAllConstraintsChecked(OperationContext* opCtx) co
     return _duplicateKeyTracker->areAllConstraintsChecked(opCtx);
 }
 
-const std::string& IndexBuildInterceptor::getSideWritesTableIdent() const {
-    return _sideWritesTable->rs()->getIdent();
-}
-
-const std::string& IndexBuildInterceptor::getConstraintViolationsTableIdent() const {
-    return _duplicateKeyTracker->getConstraintsTableIdent();
-}
-
-
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
+                                                   TrackDuplicates trackDuplicates,
                                                    RecoveryUnit::ReadSource readSource,
                                                    DrainYieldPolicy drainYieldPolicy) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
@@ -213,8 +205,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             batchSize += 1;
             batchSizeBytes += objSize;
 
-            if (auto status =
-                    _applyWrite(opCtx, unownedDoc, options, &totalInserted, &totalDeleted);
+            if (auto status = _applyWrite(
+                    opCtx, unownedDoc, options, trackDuplicates, &totalInserted, &totalDeleted);
                 !status.isOK()) {
                 return status;
             }
@@ -270,15 +262,12 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     int logLevel = (_numApplied - appliedAtStart > 0) ? 0 : 1;
     LOGV2_DEBUG(20689,
                 logSeverityV1toV2(logLevel).toInt(),
-                "index build: drain applied {numApplied_appliedAtStart} side writes (inserted: "
-                "{totalInserted}, deleted: {totalDeleted}) for "
-                "'{indexCatalogEntry_descriptor_indexName}' in {timer_millis} ms",
-                "numApplied_appliedAtStart"_attr = (_numApplied - appliedAtStart),
+                "index build: drained side writes",
+                "numApplied"_attr = (_numApplied - appliedAtStart),
                 "totalInserted"_attr = totalInserted,
                 "totalDeleted"_attr = totalDeleted,
-                "indexCatalogEntry_descriptor_indexName"_attr =
-                    _indexCatalogEntry->descriptor()->indexName(),
-                "timer_millis"_attr = timer.millis());
+                "indexName"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                "durationMillis"_attr = timer.millis());
 
     return Status::OK();
 }
@@ -286,6 +275,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                           const BSONObj& operation,
                                           const InsertDeleteOptions& options,
+                                          TrackDuplicates trackDups,
                                           int64_t* const keysInserted,
                                           int64_t* const keysDeleted) {
     // Deserialize the encoded KeyString::Value.
@@ -317,8 +307,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             return status;
         }
 
-        if (result.dupsInserted.size() &&
-            options.getKeysMode == IndexAccessMethod::GetKeysMode::kEnforceConstraints) {
+        if (result.dupsInserted.size() && TrackDuplicates::kTrack == trackDups) {
             status = recordDuplicateKeys(opCtx, result.dupsInserted);
             if (!status.isOK()) {
                 return status;

@@ -60,6 +60,13 @@ public:
      */
     enum class TrackSkippedRecords { kNoTrack, kTrack };
 
+    /**
+     * Indicates whether to record duplicate keys that have been inserted into the index. When set
+     * to 'kNoTrack', inserted duplicate keys will be ignored. When set to 'kTrack', a subsequent
+     * call to checkDuplicateKeyConstraints is required.
+     */
+    enum class TrackDuplicates { kNoTrack, kTrack };
+
     static bool typeCanFastpathMultikeyUpdates(IndexType type);
 
     /**
@@ -126,6 +133,7 @@ public:
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const InsertDeleteOptions& options,
+                                TrackDuplicates trackDups,
                                 RecoveryUnit::ReadSource readSource,
                                 DrainYieldPolicy drainYieldPolicy);
 
@@ -162,16 +170,13 @@ public:
      */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
-    const std::string& getSideWritesTableIdent() const;
-
-    const std::string& getConstraintViolationsTableIdent() const;
-
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     Status _applyWrite(OperationContext* opCtx,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
+                       TrackDuplicates trackDups,
                        int64_t* const keysInserted,
                        int64_t* const keysDeleted);
 

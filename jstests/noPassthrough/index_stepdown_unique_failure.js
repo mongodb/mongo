@@ -1,6 +1,6 @@
 /**
- * Confirms that unique index builds are committed when a primary steps down during the collection
- * scan phase. This applies to both two phase and single phase index builds.
+ * Confirms that unique index builds fail after a primary steps down during the collection
+ * scan phase. The new primary will discover a duplicate key violation and abort the build.
  * @tags: [
  *   requires_replication,
  * ]
@@ -26,11 +26,7 @@ const collName = 'coll';
 const testDB = primary.getDB(dbName);
 const coll = testDB.getCollection(collName);
 
-const doc1 = {
-    _id: 1,
-    a: 1
-};
-assert.commandWorked(coll.insert(doc1));
+assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 IndexBuildTest.pauseIndexBuilds(rst.getSecondary());
@@ -50,14 +46,8 @@ assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 const newPrimary = rst.getPrimary();
 assert.neq(primary.port, newPrimary.port);
 
-// Insert a duplicate and then delete it. The index build should succeed.
-const doc2 = {
-    _id: 2,
-    a: 1
-};
-assert.commandWorked(newPrimary.getDB(dbName).getCollection(collName).insert(doc2));
-let res = assert.commandWorked(newPrimary.getDB(dbName).getCollection(collName).remove(doc2));
-assert.eq(1, res.nRemoved);
+// Insert a duplicate, which should succeed. This will cause the index build to fail later on.
+assert.commandWorked(newPrimary.getDB(dbName).getCollection(collName).insert({a: 1}));
 
 // Wait for the index build to stop.
 IndexBuildTest.resumeIndexBuilds(primary);
@@ -68,23 +58,18 @@ IndexBuildTest.waitForIndexBuildToStop(newPrimary.getDB(dbName));
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being interrupted');
 
-// The index build should have succeeded.
+// The index build should have failed because of the duplicate key violation.
 rst.awaitReplication();
 const primaryColl = rst.getPrimary().getDB(dbName).getCollection(collName);
-res = assert.commandWorked(primaryColl.validate());
+let res = assert.commandWorked(primaryColl.validate());
 assert(res.valid, 'expected validation to succeed: ' + tojson(res));
 
 const secondaryColl = rst.getSecondary().getDB(dbName).getCollection(collName);
 res = assert.commandWorked(secondaryColl.validate());
 assert(res.valid, 'expected validation to succeed: ' + tojson(res));
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(rst.getPrimary())) {
-    IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
-} else {
-    IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-    IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
-}
+IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
 
 rst.stopSet();
 })();
