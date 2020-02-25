@@ -48,12 +48,6 @@ class ReadThroughCacheBase {
     ReadThroughCacheBase(const ReadThroughCacheBase&) = delete;
     ReadThroughCacheBase& operator=(const ReadThroughCacheBase&) = delete;
 
-public:
-    /**
-     * Returns the cache generation identifier.
-     */
-    OID getCacheGeneration() const;
-
 protected:
     ReadThroughCacheBase(Mutex& mutex, ServiceContext* service, ThreadPoolInterface& threadPool);
 
@@ -380,13 +374,11 @@ public:
     void invalidateIf(const Pred& predicate) {
         CacheGuard guard(this);
         _updateCacheGeneration(guard);
-        _cache.invalidateIf([&](const Key& key, const StoredValue* storedValue) {
-            return predicate(key, &storedValue->value);
-        });
+        _cache.invalidateIf([&](const Key& key, const StoredValue*) { return predicate(key); });
     }
 
     void invalidateAll() {
-        invalidateIf([](const Key&, const Value*) { return true; });
+        invalidateIf([](const Key&) { return true; });
     }
 
     /**

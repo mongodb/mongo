@@ -37,7 +37,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/user_management_commands.h"
+#include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/type_shard.h"

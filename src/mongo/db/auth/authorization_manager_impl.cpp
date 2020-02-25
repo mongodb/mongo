@@ -364,7 +364,8 @@ Status AuthorizationManagerImpl::getAuthorizationVersion(OperationContext* opCtx
 }
 
 OID AuthorizationManagerImpl::getCacheGeneration() {
-    return _userCache.getCacheGeneration();
+    stdx::lock_guard lg(_cacheGenerationMutex);
+    return _cacheGeneration;
 }
 
 void AuthorizationManagerImpl::setAuthEnabled(bool enabled) {
@@ -472,6 +473,11 @@ void AuthorizationManagerImpl::updatePinnedUsersList(std::vector<UserName> names
     });
 }
 
+void AuthorizationManagerImpl::_updateCacheGeneration() {
+    stdx::lock_guard lg(_cacheGenerationMutex);
+    _cacheGeneration = OID::gen();
+}
+
 void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
     Client::initThread("PinnedUsersTracker");
     std::list<UserHandle> pinnedUsers;
@@ -561,19 +567,21 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
 void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
                                                     const UserName& userName) {
     LOGV2_DEBUG(20235, 2, "Invalidating user {userName}", "userName"_attr = userName);
+    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidate(userName);
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database {dbname}", "dbname"_attr = dbname);
+    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    _userCache.invalidateIf(
-        [&](const UserName& user, const User*) { return user.getDB() == dbname; });
+    _userCache.invalidateIf([&](const UserName& user) { return user.getDB() == dbname; });
 }
 
 void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
     LOGV2_DEBUG(20237, 2, "Invalidating user cache");
+    _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateAll();
 }

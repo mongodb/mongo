@@ -121,16 +121,7 @@ public:
     std::vector<CachedUserInfo> getUserCacheInfo() const override;
 
 private:
-    /**
-     * Given the objects describing an oplog entry that affects authorization data, invalidates
-     * the portion of the user cache that is affected by that operation.  Should only be called
-     * with oplog entries that have been pre-verified to actually affect authorization data.
-     */
-    void _invalidateRelevantCacheData(OperationContext* opCtx,
-                                      const char* op,
-                                      const NamespaceString& ns,
-                                      const BSONObj& o,
-                                      const BSONObj* o2);
+    void _updateCacheGeneration();
 
     void _pinnedUsersThreadRoutine() noexcept;
 
@@ -150,6 +141,12 @@ private:
     // Thread pool on which to perform the blocking activities that load the user credentials from
     // storage
     ThreadPool _threadPool;
+
+    // Serves as a source for the return value of getCacheGeneration(). Refer to this method for
+    // more details.
+    Mutex _cacheGenerationMutex =
+        MONGO_MAKE_LATCH("AuthorizationManagerImpl::_cacheGenerationMutex");
+    OID _cacheGeneration{OID::gen()};
 
     /**
      * Cache which contains at most a single entry (which has key 0), whose value is the version of

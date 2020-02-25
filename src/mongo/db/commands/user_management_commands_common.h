@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-class AuthorizationManager;
 class AuthorizationSession;
 struct BSONArray;
 class BSONObj;

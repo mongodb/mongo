@@ -31,8 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
-
 #include <functional>
 #include <string>
 #include <vector>
@@ -50,7 +48,6 @@
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -60,6 +57,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
@@ -81,12 +79,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-using std::endl;
-using std::string;
-using std::stringstream;
-using std::vector;
-
 namespace {
 
 Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
@@ -766,9 +758,6 @@ Status trimCredentials(OperationContext* opCtx,
     return Status::OK();
 }
 
-}  // namespace
-
-
 class CmdCreateUser : public BasicCommand {
 public:
     CmdCreateUser() : BasicCommand("createUser") {}
@@ -777,7 +766,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -785,16 +774,16 @@ public:
         return "Adds a user to the system";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::CreateOrUpdateUserArgs args;
         Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, "createUser", dbname, &args);
         uassertStatusOK(status);
@@ -899,7 +888,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -907,16 +896,16 @@ public:
         return "Used to update a user, for example to change its password";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::CreateOrUpdateUserArgs args;
         Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, "updateUser", dbname, &args);
         uassertStatusOK(status);
@@ -1012,6 +1001,7 @@ public:
     StringData sensitiveFieldName() const final {
         return "pwd"_sd;
     }
+
 } cmdUpdateUser;
 
 class CmdDropUser : public BasicCommand {
@@ -1022,7 +1012,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1030,16 +1020,16 @@ public:
         return "Drops a single user.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         UserName userName;
         Status status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName);
         uassertStatusOK(status);
@@ -1080,7 +1070,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1088,16 +1078,16 @@ public:
         return "Drops all users for a single database.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         Status status = auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj, dbname);
         uassertStatusOK(status);
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1128,7 +1118,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1136,16 +1126,16 @@ public:
         return "Grants roles to a user.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         std::string userNameString;
         std::vector<RoleName> roles;
         Status status = auth::parseRolePossessionManipulationCommands(
@@ -1162,7 +1152,7 @@ public:
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         uassertStatusOK(status);
 
-        for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
+        for (std::vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
@@ -1191,7 +1181,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1199,16 +1189,16 @@ public:
         return "Revokes roles from a user.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         std::string userNameString;
         std::vector<RoleName> roles;
         Status status = auth::parseRolePossessionManipulationCommands(
@@ -1225,7 +1215,7 @@ public:
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         uassertStatusOK(status);
 
-        for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
+        for (std::vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
@@ -1248,30 +1238,30 @@ public:
 
 class CmdUsersInfo : public BasicCommand {
 public:
+    CmdUsersInfo() : BasicCommand("usersInfo") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-
-    CmdUsersInfo() : BasicCommand("usersInfo") {}
 
     std::string help() const override {
         return "Returns information about users.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::UsersInfoArgs args;
         Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
         uassertStatusOK(status);
@@ -1410,7 +1400,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1418,16 +1408,16 @@ public:
         return "Adds a role to the system";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::CreateOrUpdateRoleArgs args;
         Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj, "createRole", dbname, &args);
         uassertStatusOK(status);
@@ -1510,7 +1500,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1518,16 +1508,16 @@ public:
         return "Used to update a role";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::CreateOrUpdateRoleArgs args;
         Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj, "updateRole", dbname, &args);
         uassertStatusOK(status);
@@ -1602,6 +1592,7 @@ public:
         uassertStatusOK(status);
         return true;
     }
+
 } cmdUpdateRole;
 
 class CmdGrantPrivilegesToRole : public BasicCommand {
@@ -1612,7 +1603,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1620,17 +1611,16 @@ public:
         return "Grants privileges to a role";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-
+             BSONObjBuilder& result) override {
         RoleName roleName;
         PrivilegeVector privilegesToAdd;
         Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
@@ -1703,7 +1693,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1711,16 +1701,16 @@ public:
         return "Revokes privileges from a role";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         RoleName roleName;
         PrivilegeVector privilegesToRemove;
         Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
@@ -1797,7 +1787,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1805,16 +1795,16 @@ public:
         return "Grants roles to another role.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         std::string roleNameString;
         std::vector<RoleName> rolesToAdd;
         Status status = auth::parseRolePossessionManipulationCommands(
@@ -1847,7 +1837,7 @@ public:
         status = auth::parseRoleNamesFromBSONArray(
             BSONArray(roleDoc["roles"].Obj()), roleName.getDB(), &directRoles);
         uassertStatusOK(status);
-        for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
+        for (auto it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
             const RoleName& roleToAdd = *it;
             if (!sequenceContains(directRoles, roleToAdd))  // Don't double-add role
                 directRoles.push_back(*it);
@@ -1873,7 +1863,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1881,16 +1871,16 @@ public:
         return "Revokes roles from another role.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         std::string roleNameString;
         std::vector<RoleName> rolesToRemove;
         Status status = auth::parseRolePossessionManipulationCommands(
@@ -1918,9 +1908,10 @@ public:
             BSONArray(roleDoc["roles"].Obj()), roleName.getDB(), &roles);
         uassertStatusOK(status);
 
-        for (vector<RoleName>::const_iterator it = rolesToRemove.begin(); it != rolesToRemove.end();
+        for (std::vector<RoleName>::const_iterator it = rolesToRemove.begin();
+             it != rolesToRemove.end();
              ++it) {
-            vector<RoleName>::iterator itToRm = std::find(roles.begin(), roles.end(), *it);
+            std::vector<RoleName>::iterator itToRm = std::find(roles.begin(), roles.end(), *it);
             if (itToRm != roles.end()) {
                 roles.erase(itToRm);
             }
@@ -1946,7 +1937,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -1957,16 +1948,16 @@ public:
                "removed from some user/roles but otherwise still exists.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         RoleName roleName;
         Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName);
         uassertStatusOK(status);
@@ -2078,7 +2069,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -2090,16 +2081,16 @@ public:
                "exist.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         Status status = auth::parseDropAllRolesFromDatabaseCommand(cmdObj, dbname);
         uassertStatusOK(status);
 
@@ -2195,33 +2186,32 @@ public:
  *                    these roles. This format may change over time with changes to the auth
  *                    schema.
  */
-
 class CmdRolesInfo : public BasicCommand {
 public:
+    CmdRolesInfo() : BasicCommand("rolesInfo") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-
-    CmdRolesInfo() : BasicCommand("rolesInfo") {}
 
     std::string help() const override {
         return "Returns information about roles.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::RolesInfoArgs args;
         Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
         uassertStatusOK(status);
@@ -2271,34 +2261,34 @@ public:
 
 class CmdInvalidateUserCache : public BasicCommand {
 public:
+    CmdInvalidateUserCache() : BasicCommand("invalidateUserCache") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-
-    CmdInvalidateUserCache() : BasicCommand("invalidateUserCache") {}
 
     std::string help() const override {
         return "Invalidates the in-memory cache of user information";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForInvalidateUserCacheCommand(client);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
         authzManager->invalidateUserCache(opCtx);
@@ -2309,40 +2299,40 @@ public:
 
 class CmdGetCacheGeneration : public BasicCommand {
 public:
+    CmdGetCacheGeneration() : BasicCommand("_getUserCacheGeneration") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-
-    CmdGetCacheGeneration() : BasicCommand("_getUserCacheGeneration") {}
 
     std::string help() const override {
         return "internal";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForGetUserCacheGenerationCommand(client);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         result.append("cacheGeneration", authzManager->getCacheGeneration());
         return true;
     }
 
-} CmdGetCacheGeneration;
+} cmdGetCacheGeneration;
 
 /**
  * This command is used only by mongorestore to handle restoring users/roles.  We do this so
@@ -2362,11 +2352,11 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const {
         return true;
     }
 
@@ -2374,9 +2364,9 @@ public:
         return "Internal command used by mongorestore for updating user/role data";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
     }
 
@@ -2563,11 +2553,11 @@ public:
      * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
      * removes any users that were in admin.system.users but not in usersCollName.
      */
-    Status processUsers(OperationContext* opCtx,
-                        AuthorizationManager* authzManager,
-                        StringData usersCollName,
-                        StringData db,
-                        bool drop) {
+    static Status processUsers(OperationContext* opCtx,
+                               AuthorizationManager* authzManager,
+                               StringData usersCollName,
+                               StringData db,
+                               bool drop) {
         // When the "drop" argument has been provided, we use this set to store the users
         // that are currently in the system, and remove from it as we encounter
         // same-named users in the collection we are restoring from.  Once we've fully
@@ -2635,11 +2625,11 @@ public:
      * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
      * removes any users that were in admin.system.users but not in usersCollName.
      */
-    Status processRoles(OperationContext* opCtx,
-                        AuthorizationManager* authzManager,
-                        StringData rolesCollName,
-                        StringData db,
-                        bool drop) {
+    static Status processRoles(OperationContext* opCtx,
+                               AuthorizationManager* authzManager,
+                               StringData rolesCollName,
+                               StringData db,
+                               bool drop) {
         // When the "drop" argument has been provided, we use this set to store the roles
         // that are currently in the system, and remove from it as we encounter
         // same-named roles in the collection we are restoring from.  Once we've fully
@@ -2706,9 +2696,9 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auth::MergeAuthzCollectionsArgs args;
         Status status = auth::parseMergeAuthzCollectionsCommand(cmdObj, &args);
         uassertStatusOK(status);
@@ -2752,4 +2742,5 @@ public:
 
 } cmdMergeAuthzCollections;
 
+}  // namespace
 }  // namespace mongo

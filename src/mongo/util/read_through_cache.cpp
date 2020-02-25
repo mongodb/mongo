@@ -42,11 +42,6 @@ ReadThroughCacheBase::ReadThroughCacheBase(Mutex& mutex,
 
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
-OID ReadThroughCacheBase::getCacheGeneration() const {
-    stdx::lock_guard<Latch> lk(_cacheWriteMutex);
-    return _fetchGeneration;
-}
-
 void ReadThroughCacheBase::_asyncWork(WorkWithOpContext work) {
     _threadPool.schedule([this, work = std::move(work)](Status status) {
         ThreadClient tc(_serviceContext);

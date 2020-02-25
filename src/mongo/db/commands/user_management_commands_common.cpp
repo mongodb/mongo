@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
+#include "mongo/db/commands/user_management_commands_common.h"
 
 #include <string>
 #include <vector>

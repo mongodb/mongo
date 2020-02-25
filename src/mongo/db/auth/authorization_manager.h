@@ -186,7 +186,12 @@ public:
     virtual Status getAuthorizationVersion(OperationContext* opCtx, int* version) = 0;
 
     /**
-     * Returns the user cache generation identifier.
+     * The value reported by this method must change every time some persisted authorization rule
+     * gets modified. It serves as a means for consumers of authorization data to discover that
+     * something changed and that they need to re-cache.
+     *
+     * The most prominent consumer of this value is MongoS, which uses it to determine whether it
+     * needs to re-fetch the authentication info from the config server.
      */
     virtual OID getCacheGeneration() = 0;
 
