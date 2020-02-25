@@ -174,7 +174,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     }
 
     ConnectionPool::Options connPoolOptions;
-    connPoolOptions.controller = std::make_shared<ShardingTaskExecutorPoolController>();
+    connPoolOptions.controllerFactory = []() noexcept {
+        return std::make_shared<ShardingTaskExecutorPoolController>();
+    };
 
     auto network = executor::makeNetworkInterface(
         "ShardRegistry", std::make_unique<ShardingNetworkConnectionHook>(), hookBuilder());

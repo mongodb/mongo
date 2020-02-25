@@ -90,6 +90,11 @@ public:
 
     static const Status kConnectionStateUnknown;
 
+    /**
+     * Make a vanilla LimitController as a decent default option
+     */
+    static std::shared_ptr<ControllerInterface> makeLimitController() noexcept;
+
     struct Options {
         Options() {}
 
@@ -144,7 +149,8 @@ public:
          */
         bool skipAuthentication = false;
 
-        std::shared_ptr<ControllerInterface> controller;
+        std::function<std::shared_ptr<ControllerInterface>(void)> controllerFactory =
+            &ConnectionPool::makeLimitController;
     };
 
     /**

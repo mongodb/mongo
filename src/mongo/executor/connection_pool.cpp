@@ -195,6 +195,11 @@ protected:
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 
+
+auto ConnectionPool::makeLimitController() noexcept -> std::shared_ptr<ControllerInterface> {
+    return std::make_shared<LimitController>();
+}
+
 /**
  * A pool for a specific HostAndPort
  *
@@ -439,15 +444,13 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
     : _name(std::move(name)),
       _factory(std::move(impl)),
       _options(std::move(options)),
-      _controller(std::move(_options.controller)),
+      _controller(_options.controllerFactory()),
       _manager(options.egressTagCloserManager) {
     if (_manager) {
         _manager->add(this);
     }
 
-    if (!_controller) {
-        _controller = std::make_shared<LimitController>();
-    }
+    invariant(_controller);
     _controller->init(this);
 }
 
