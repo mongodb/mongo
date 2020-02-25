@@ -49,9 +49,11 @@ public:
     static const BSONObj Acknowledged;
     static const BSONObj Unacknowledged;
     static const BSONObj Majority;
+    static const BSONObj ConfigMajority;
 
     static constexpr StringData kWriteConcernField = "writeConcern"_sd;
-    static const char kMajority[];  // = "majority"
+    static const char kMajority[];        // = "majority"
+    static const char kConfigMajority[];  // = "configMajority"
 
     static constexpr Seconds kWriteConcernTimeoutSystem{15};
     static constexpr Seconds kWriteConcernTimeoutMigration{30};

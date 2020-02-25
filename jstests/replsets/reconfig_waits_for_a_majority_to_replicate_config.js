@@ -1,0 +1,44 @@
+/*
+ * Test that replSetReconfig waits for a majority of nodes to replicate the config
+ * before starting another reconfig.
+ *
+ * @tags: [requires_fcv_44]
+ */
+
+(function() {
+"use strict";
+
+load("jstests/replsets/rslib.js");
+
+var replTest = new ReplSetTest({nodes: 2, useBridge: true});
+var nodes = replTest.startSet();
+// Initiating with a high election timeout prevents unnecessary elections and also prevents
+// the primary from stepping down if it cannot communicate with the secondary.
+replTest.initiateWithHighElectionTimeout();
+var primary = replTest.getPrimary();
+var secondary = replTest.getSecondary();
+
+// Disconnect the secondary from the primary.
+secondary.disconnect(primary);
+
+// Run a reconfig with a timeout of 5 seconds, this should fail with a maxTimeMSExpired error.
+var config = primary.getDB("local").system.replset.findOne();
+config.version++;
+assert.commandFailedWithCode(
+    primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
+    ErrorCodes.MaxTimeMSExpired);
+
+// Try to run another reconfig, which should also fail immediately because the previous config is
+// not committed.
+config = primary.getDB("local").system.replset.findOne();
+config.version++;
+assert.commandFailedWithCode(
+    primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
+    ErrorCodes.ConfigurationInProgress);
+
+// Reconnect the secondary to the primary.
+secondary.reconnect(primary);
+// TODO SERVER-44812: test commitment status of reconfig.
+
+replTest.stopSet();
+}());

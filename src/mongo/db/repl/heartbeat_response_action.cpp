@@ -69,8 +69,8 @@ void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
     _nextHeartbeatStartDate = when;
 }
 
-void HeartbeatResponseAction::setAdvancedOpTime(bool advanced) {
-    _advancedOpTime = advanced;
+void HeartbeatResponseAction::setAdvancedOpTimeOrUpdatedConfig(bool advancedOrUpdated) {
+    _advancedOpTimeOrUpdatedConfig = advancedOrUpdated;
 }
 
 }  // namespace repl

@@ -88,9 +88,10 @@ public:
     void setNextHeartbeatStartDate(Date_t when);
 
     /**
-     * Sets whether or not the heartbeat response advanced the member's opTime.
+     * Sets whether or not the member's opTime has advanced or config has changed since the
+     * last heartbeat response.
      */
-    void setAdvancedOpTime(bool advanced);
+    void setAdvancedOpTimeOrUpdatedConfig(bool advancedOrUpdated);
 
     /**
      * Gets the action type of this action.
@@ -116,18 +117,18 @@ public:
     }
 
     /*
-     * Returns true if the heartbeat response resulting in our conception of the
-     * member's optime moving forward, so we need to recalculate lastCommittedOpTime.
+     * Returns true if the heartbeat response results in the conception of the
+     * member's optime moving forward or the member's config being newer.
      */
-    bool getAdvancedOpTime() const {
-        return _advancedOpTime;
+    bool getAdvancedOpTimeOrUpdatedConfig() const {
+        return _advancedOpTimeOrUpdatedConfig;
     }
 
 private:
     Action _action;
     int _primaryIndex;
     Date_t _nextHeartbeatStartDate;
-    bool _advancedOpTime = false;
+    bool _advancedOpTimeOrUpdatedConfig = false;
 };
 
 }  // namespace repl

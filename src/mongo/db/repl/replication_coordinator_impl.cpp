@@ -1694,11 +1694,20 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
 
+    // When waiting for the config to be replicated to a majority, we do not wait on a specific
+    // OpTime. We specifically populate waiters with a null OpTime.
+    invariant(writeConcern.wMode != WriteConcernOptions::kConfigMajority || opTime.isNull());
+
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
 
     if (writeConcern.wMode.empty()) {
         return _topCoord->haveNumNodesReachedOpTime(
             opTime, writeConcern.wNumNodes, useDurableOpTime);
+    }
+
+    // Check that the nodes in the new config have replicated the config.
+    if (writeConcern.wMode == WriteConcernOptions::kConfigMajority) {
+        return _topCoord->haveMajorityReplicatedConfig();
     }
 
     StringData patternName;
@@ -1829,6 +1838,9 @@ BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
 
 SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
     WithLock wl, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    // When waiting for the config to be replicated to a majority, we do not wait on a specific
+    // OpTime. We specifically populate waiters with a null OpTime.
+    invariant(writeConcern.wMode != WriteConcernOptions::kConfigMajority || opTime.isNull());
 
     const Mode replMode = getReplicationMode();
     if (replMode == modeNone) {
@@ -1836,8 +1848,9 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
         return Future<void>::makeReady();
     }
 
-    if (opTime.isNull()) {
-        // If waiting for the empty optime, always say it's been replicated.
+    if (opTime.isNull() && writeConcern.wMode != WriteConcernOptions::kConfigMajority) {
+        // If waiting for the empty optime, always say it's been replicated unless we're trying to
+        // replicate a new config.
         return Future<void>::makeReady();
     }
 
@@ -1852,7 +1865,11 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
                     "Primary stepped down while waiting for replication"};
         }
 
-        if (opTime.getTerm() != _topCoord->getTerm()) {
+        // Checking for a config majority does not rely on waiting for a specific OpTime. So, we
+        // pass a null OpTime to awaitReplication, which means the term here will always be -1.
+        // Make sure we don't unnecessarily step down in this case.
+        if (writeConcern.wMode != WriteConcernOptions::kConfigMajority &&
+            opTime.getTerm() != _topCoord->getTerm()) {
             return {
                 ErrorCodes::PrimarySteppedDown,
                 str::stream() << "Term changed from " << opTime.getTerm() << " to "
@@ -2917,6 +2934,22 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                           << "; use the \"force\" argument to override");
     }
 
+    if (serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
+        !args.force) {
+        WriteConcernOptions writeConcern(
+            WriteConcernOptions::kConfigMajority,
+            WriteConcernOptions::SyncMode::NONE,
+            // The timeout isn't used by _doneWaitingForReplication_inlock.
+            WriteConcernOptions::kNoTimeout);
+
+        if (!_doneWaitingForReplication_inlock(OpTime(), writeConcern)) {
+            return Status(
+                ErrorCodes::ConfigurationInProgress,
+                "Cannot run replSetReconfig because the current config is not majority committed");
+        }
+    }
+
     _setConfigState_inlock(kConfigReconfiguring);
     auto configStateGuard =
         makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
@@ -2975,7 +3008,9 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
           "replSetReconfig config object with {newConfig_getNumMembers} members parses ok",
           "newConfig_getNumMembers"_attr = newConfig.getNumMembers());
 
-    if (!args.force) {
+    if (!args.force &&
+        !serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
         status = checkQuorumForReconfig(
             _replExecutor.get(), newConfig, myIndex.getValue(), _topCoord->getTerm());
         if (!status.isOK()) {
@@ -2994,6 +3029,19 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
     configStateGuard.dismiss();
     _finishReplSetReconfig(opCtx, newConfig, args.force, myIndex.getValue());
+
+    WriteConcernOptions writeConcern(WriteConcernOptions::kConfigMajority,
+                                     WriteConcernOptions::SyncMode::NONE,
+                                     WriteConcernOptions::kNoTimeout);
+
+    if (!args.force &&
+        serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        // Wait for the config document to be replicated to a majority of nodes in the new
+        // config.
+        uassertStatusOK(awaitReplication(opCtx, OpTime(), writeConcern).status);
+    }
+
     return Status::OK();
 }
 

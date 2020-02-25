@@ -77,7 +77,16 @@ public:
         return _lastResponse.hasDurableOpTime() ? _lastResponse.getDurableOpTime() : OpTime();
     }
     int getConfigVersion() const {
-        return _lastResponse.getConfigVersion();
+        return _configVersion;
+    }
+    long long getConfigTerm() const {
+        return _configTerm;
+    }
+    /**
+     * Gets the ReplSetConfig (version, term) pair from the last heartbeatResponse.
+     */
+    ConfigVersionAndTerm getConfigVersionAndTerm() const {
+        return ConfigVersionAndTerm(_configVersion, _configTerm);
     }
     bool hasAuthIssue() const {
         return _authIssue;
@@ -144,7 +153,8 @@ public:
 
     /**
      * Sets values in this object from the results of a successful heartbeat command.
-     * Returns whether or not the optimes advanced as a result of this heartbeat response.
+     * Returns true if the lastApplied/lastDurable values advanced or we've received a newer
+     * config since the last heartbeat response.
      */
     bool setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse);
 
@@ -233,6 +243,14 @@ public:
         _memberId = memberId;
     }
 
+    void setConfigVersion(int version) {
+        _configVersion = version;
+    }
+
+    void setConfigTerm(long long term) {
+        _configTerm = term;
+    }
+
 private:
     bool _checkAndSetLastDurableOpTime(OpTime opTime, Date_t now);
     // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
@@ -272,6 +290,12 @@ private:
     // Last known OpTime that the replica has applied, whether journaled or unjournaled.
     OpTime _lastAppliedOpTime;
     Date_t _lastAppliedWallTime = Date_t();
+
+    // Last known configVersion.
+    int _configVersion = -1;
+
+    // Last known configTerm.
+    long long _configTerm = OpTime::kUninitializedTerm;
 
     // TODO(russotto): Since memberData is kept in config order, _configIndex
     // and _isSelf may not be necessary.

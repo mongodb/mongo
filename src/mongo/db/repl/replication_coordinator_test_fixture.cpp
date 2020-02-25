@@ -186,6 +186,8 @@ void ReplCoordTest::start() {
     const auto opCtx = makeOperationContext();
     _repl->startup(opCtx.get());
     _repl->waitForStartUpComplete_forTest();
+    // _rsConfig should be written down at this point, so populate _memberData accordingly.
+    _topo->populateAllMembersConfigVersionAndTerm_forTest();
     _callShutdown = true;
 }
 
@@ -462,6 +464,7 @@ bool ReplCoordTest::consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperat
     hbResp.setSetName(rsConfig.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
     hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
     hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
     BSONObjBuilder respObj;

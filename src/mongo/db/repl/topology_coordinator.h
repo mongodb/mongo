@@ -414,6 +414,15 @@ public:
         const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
 
     /**
+     * Returns whether or not at least a majority of voting, data-bearing nodes in the current
+     * replica set config have replicated the config.
+     * This loops through _memberData and checks if:
+     * (1) The member is in the current config
+     * (2) The member's config (term, version) match the current config's (term, version)
+     */
+    bool haveMajorityReplicatedConfig();
+
+    /**
      *  Returns whether or not at least 'numNodes' have reached the given opTime with the same term.
      * "durablyWritten" indicates whether the operation has to be durably applied.
      */
@@ -742,6 +751,12 @@ public:
     // set the current primary.
     void setCurrentPrimary_forTest(int primaryIndex,
                                    const Timestamp& electionTime = Timestamp(0, 0));
+
+    /**
+     * Change config (version, term) of each member in the initial test config so that
+     * it will be majority replicated without having to mock heartbeats.
+     */
+    void populateAllMembersConfigVersionAndTerm_forTest();
 
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;

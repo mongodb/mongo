@@ -896,7 +896,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
 
     MemberData& hbData = _memberData.at(memberIndex);
     const MemberConfig member = _rsConfig.getMemberAt(memberIndex);
-    bool advancedOpTime = false;
+    bool advancedOpTimeOrUpdatedConfig = false;
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
             hbData.setAuthIssue(now);
@@ -920,15 +920,38 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
                     3,
                     "setUpValues: heartbeat response good for member _id:{member_getId}",
                     "member_getId"_attr = member.getId());
-        advancedOpTime = hbData.setUpValues(now, std::move(hbr));
+        advancedOpTimeOrUpdatedConfig = hbData.setUpValues(now, std::move(hbr));
     }
 
     HeartbeatResponseAction nextAction;
     nextAction = _updatePrimaryFromHBDataV1(memberIndex, originalState, now);
 
     nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
-    nextAction.setAdvancedOpTime(advancedOpTime);
+    nextAction.setAdvancedOpTimeOrUpdatedConfig(advancedOpTimeOrUpdatedConfig);
     return nextAction;
+}
+
+bool TopologyCoordinator::haveMajorityReplicatedConfig() {
+    auto configWriteMaj = _rsConfig.getWriteMajority();
+    auto numNodesWithReplicatedConfig = 0;
+    for (auto&& memberData : _memberData) {
+        // If this member is not in our new config, do not count it in the majority
+        if (_rsConfig.findMemberByID(memberData.getMemberId().getData()) == NULL) {
+            continue;
+        }
+
+        if (memberData.getConfigVersionAndTerm() == _rsConfig.getConfigVersionAndTerm()) {
+            // configVersionAndTerm comparison will compare config versions alone and ignore terms
+            // if the config term is -1, which makes this compatible with 4.2 heartbeat responses.
+            numNodesWithReplicatedConfig++;
+        }
+
+        // Once we know a majority of the nodes have replicated the config return.
+        if (numNodesWithReplicatedConfig >= configWriteMaj)
+            return true;
+    }
+
+    return false;
 }
 
 bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
@@ -1562,6 +1585,18 @@ const MemberConfig* TopologyCoordinator::getCurrentPrimaryMember() const {
     return &(_rsConfig.getMemberAt(_currentPrimaryIndex));
 }
 
+void TopologyCoordinator::populateAllMembersConfigVersionAndTerm_forTest() {
+    for (auto i = 0; i < _rsConfig.getNumMembers(); i++) {
+        auto memberConfig = _rsConfig.getMemberAt(i);
+        if (i < static_cast<int>(_memberData.size())) {
+            MemberData& member = _memberData.at(i);
+            member.setConfigVersion(_rsConfig.getConfigVersion());
+            member.setConfigTerm(_rsConfig.getConfigTerm());
+            member.setMemberId(memberConfig.getId());
+        }
+    }
+}
+
 std::string TopologyCoordinator::_getReplSetStatusString() {
     // Construct a ReplSetStatusArgs using default parameters. Missing parameters will not be
     // included in the status string.
@@ -2059,6 +2094,12 @@ void TopologyCoordinator::updateConfig(const ReplSetConfig& newConfig, int selfI
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
     _rsConfig = newConfig;
     _selfIndex = selfIndex;
+    if (_selfIndex >= 0) {
+        // If selfIndex is -1, we are removed from the current config and clear our _memberData.
+        // Do not repopulate it.
+        _memberData.at(_selfIndex).setConfigVersion(_rsConfig.getConfigVersion());
+        _memberData.at(_selfIndex).setConfigTerm(_rsConfig.getConfigTerm());
+    }
     _forceSyncSourceIndex = -1;
 
     if (_role == Role::kLeader) {

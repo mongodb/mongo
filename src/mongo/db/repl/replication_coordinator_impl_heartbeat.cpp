@@ -245,9 +245,12 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState() &&
         hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
-        action.getAdvancedOpTime()) {
+        action.getAdvancedOpTimeOrUpdatedConfig()) {
+        // If a member's opTime has moved forward or config is newer, try to update the
+        // lastCommitted. Even if we've only updated the config, this is still safe.
         _updateLastCommittedOpTimeAndWallTime(lk);
-        // Wait up replication waiters on optime changes.
+
+        // Wake up replication waiters on optime changes or updated configs.
         _wakeReadyWaiters(lk);
     }
 

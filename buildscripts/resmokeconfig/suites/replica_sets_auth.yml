@@ -15,6 +15,8 @@ selector:
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
+  # Relies on the currently disabled config quorum checker for replSetReconfig.
+  - jstests/replsets/disallow_adding_initialized_node1.js
 
 executor:
   config:

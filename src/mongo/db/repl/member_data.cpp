@@ -83,8 +83,14 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
         : OpTimeAndWallTime();
     opTimeAdvanced =
         advanceLastDurableOpTimeAndWallTime(durableOpTimeAndWallTime, now) || opTimeAdvanced;
+
+    bool configChanged = (getConfigVersionAndTerm() < hbResponse.getConfigVersionAndTerm());
+    _configTerm = hbResponse.getConfigTerm();
+    _configVersion = hbResponse.getConfigVersion();
+
     _lastResponse = std::move(hbResponse);
-    return opTimeAdvanced;
+
+    return (opTimeAdvanced || configChanged);
 }
 
 void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) {

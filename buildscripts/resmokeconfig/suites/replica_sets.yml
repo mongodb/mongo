@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/replsets/*.js
+  exclude_files:
+  # Relies on the currently disabled config quorum checker for replSetReconfig.
+  - jstests/replsets/disallow_adding_initialized_node1.js
 
 executor:
   config:
