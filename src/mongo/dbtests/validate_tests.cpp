@@ -1507,6 +1507,162 @@ public:
     }
 };
 
+template <bool background>
+class ValidateDuplicateKeysUniqueIndex : public ValidateBase {
+public:
+    ValidateDuplicateKeysUniqueIndex() : ValidateBase(false /* full */, background) {}
+
+    void run() {
+        // Cannot run validate with {background:true} if either
+        //  - the RecordStore cursor does not retrieve documents in RecordId order
+        //  - or the storage engine does not support checkpoints.
+        if (_background && (!_isInRecordIdOrder)) {
+            return;
+        }
+
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Create a unique index.
+        const auto indexName = "a";
+        {
+            const auto indexKey = BSON("a" << 1);
+            auto status = dbtests::createIndexFromSpec(
+                &_opCtx,
+                coll->ns().ns(),
+                BSON("name" << indexName << "key" << indexKey << "v"
+                            << static_cast<int>(kIndexVersion) << "background" << false << "unique"
+                            << true));
+            ASSERT_OK(status);
+        }
+
+        // Insert a document.
+        OpDebug* const nullOpDebug = nullptr;
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            wunit.commit();
+        }
+
+        // Confirm that inserting a document with the same value for "a" fails, verifying the
+        // uniqueness constraint.
+        BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_NOT_OK(
+                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+        }
+        releaseDb();
+        checkValid();
+
+        // Insert a document with a duplicate key for "a".
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+
+            WriteUnitOfWork wunit(&_opCtx);
+            InsertDeleteOptions options;
+            options.logIfError = true;
+            options.dupsAllowed = true;
+
+            // Insert a record and its keys separately. We do this to bypass duplicate constraint
+            // checking. Inserting a record and all of its keys ensures that validation fails
+            // because there are duplicate keys, and not just because there are keys without
+            // corresponding records.
+            auto swRecordId = coll->getRecordStore()->insertRecord(
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+            ASSERT_OK(swRecordId);
+
+            // Insert the key on _id.
+            {
+                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
+                auto iam = const_cast<IndexAccessMethod*>(
+                    indexCatalog->getEntry(descriptor)->accessMethod());
+                BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+                iam->getKeys(dupObj,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
+                             IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                             &keys,
+                             nullptr,
+                             nullptr);
+                ASSERT_EQ(1ul, keys.size());
+
+                InsertResult result;
+                auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    {keys.begin(), keys.end()},
+                                                    {},
+                                                    MultikeyPaths{},
+                                                    swRecordId.getValue(),
+                                                    options,
+                                                    &result);
+
+                ASSERT_EQUALS(result.dupsInserted.size(), 0ul);
+                ASSERT_EQUALS(result.numInserted, 1);
+                ASSERT_OK(insertStatus);
+            }
+
+            // Insert the key on "a".
+            {
+                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+                auto iam = const_cast<IndexAccessMethod*>(
+                    indexCatalog->getEntry(descriptor)->accessMethod());
+
+                BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+                InsertResult result;
+                iam->getKeys(dupObj,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
+                             IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                             &keys,
+                             nullptr,
+                             nullptr);
+                ASSERT_EQ(1ul, keys.size());
+                auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    {keys.begin(), keys.end()},
+                                                    {},
+                                                    MultikeyPaths{},
+                                                    swRecordId.getValue(),
+                                                    options,
+                                                    &result);
+
+                ASSERT_EQUALS(result.dupsInserted.size(), 1ul);
+                ASSERT_EQUALS(result.numInserted, 1);
+                ASSERT_OK(insertStatus);
+            }
+            wunit.commit();
+
+            releaseDb();
+        }
+
+        ValidateResults results;
+        BSONObjBuilder output;
+
+        lockDb(MODE_IX);
+        std::unique_ptr<Lock::CollectionLock> lock =
+            stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+
+        Database* db = _autoDb.get()->getDb();
+        ASSERT_OK(db->getCollection(&_opCtx, _nss)
+                      ->validate(&_opCtx, kValidateFull, _background, &results, &output));
+
+
+        ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
+        ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+    }
+};
+
 class ValidateTests : public Suite {
 public:
     ValidateTests() : Suite("validate_tests") {}
@@ -1551,6 +1707,9 @@ public:
         add<ValidateExtraIndexEntryResults<false, false>>();
 
         add<ValidateDuplicateDocumentIndexKeySet>();
+
+        add<ValidateDuplicateKeysUniqueIndex<false>>();
+        add<ValidateDuplicateKeysUniqueIndex<true>>();
     }
 } validateTests;
 }  // namespace ValidateTests

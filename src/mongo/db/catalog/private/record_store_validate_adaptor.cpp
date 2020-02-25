@@ -143,6 +143,61 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
     return status;
 }
 
+namespace {
+// Ensures that index entries are in increasing or decreasing order.
+void _validateKeyOrder(const IndexDescriptor* descriptor,
+                       const KeyString& currKey,
+                       const KeyString& prevKey,
+                       ValidateResults* results) {
+    bool unique = descriptor->unique();
+
+    // KeyStrings will be in strictly increasing order because all keys are sorted and they are in
+    // the format (Key, RID), and all RecordIDs are unique.
+    if (currKey.compare(prevKey) <= 0) {
+        if (results && results->valid) {
+            results->errors.push_back(str::stream()
+                                      << "index '" << descriptor->indexName()
+                                      << "' is not in strictly ascending or descending order");
+        }
+        if (results) {
+            results->valid = false;
+        }
+        return;
+    }
+
+    if (unique) {
+        // Unique indexes must not have duplicate keys.
+        int cmp = KeyString::compare(
+            currKey.getBuffer(),
+            prevKey.getBuffer(),
+            KeyString::sizeWithoutRecordIdAtEnd(currKey.getBuffer(), currKey.getSize()),
+            KeyString::sizeWithoutRecordIdAtEnd(prevKey.getBuffer(), prevKey.getSize()));
+        if (cmp > 0) {
+            return;
+        }
+        invariant(!cmp);
+
+        if (results && results->valid) {
+            auto bsonKey = KeyString::toBson(currKey.getBuffer(),
+                                             currKey.getSize(),
+                                             Ordering::make(descriptor->keyPattern()),
+                                             currKey.getTypeBits());
+            auto firstRecordId =
+                KeyString::decodeRecordIdAtEnd(prevKey.getBuffer(), prevKey.getSize());
+            auto secondRecordId =
+                KeyString::decodeRecordIdAtEnd(currKey.getBuffer(), currKey.getSize());
+            results->errors.push_back(str::stream() << "Unique index '" << descriptor->indexName()
+                                                    << "' has duplicate key: " << bsonKey
+                                                    << ", first record: " << firstRecordId
+                                                    << ", second record: " << secondRecordId);
+        }
+        if (results) {
+            results->valid = false;
+        }
+    }
+}
+}  // namespace
+
 void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
                                                const IndexDescriptor* descriptor,
                                                ValidateResults* results,
@@ -164,6 +219,10 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
     for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry; indexEntry = cursor->next()) {
         indexKeyString->resetToKey(indexEntry->key, ord, indexEntry->loc);
+
+        if (!isFirstEntry) {
+            _validateKeyOrder(descriptor, *indexKeyString, *prevIndexKeyString, results);
+        }
 
         // Ensure that the index entries are in increasing or decreasing order.
         if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {

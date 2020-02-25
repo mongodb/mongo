@@ -389,7 +389,14 @@ public:
         return _typeBits;
     }
 
-    int compare(const KeyString& other) const;
+    static int compare(const char* leftBuf,
+                       const char* rightBuf,
+                       size_t leftSize,
+                       size_t rightSize);
+
+    int compare(const KeyString& other) const {
+        return compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
+    }
 
     /**
      * @return a hex encoding of this key

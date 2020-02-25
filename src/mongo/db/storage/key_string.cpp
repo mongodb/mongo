@@ -2138,13 +2138,16 @@ std::string KeyString::toString() const {
     return toHex(getBuffer(), getSize());
 }
 
-int KeyString::compare(const KeyString& other) const {
-    int a = getSize();
-    int b = other.getSize();
+int KeyString::compare(const char* leftBuf,
+                       const char* rightBuf,
+                       size_t leftSize,
+                       size_t rightSize) {
+    int a = leftSize;
+    int b = rightSize;
 
     int min = std::min(a, b);
 
-    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
+    int cmp = memcmp(leftBuf, rightBuf, min);
 
     if (cmp) {
         if (cmp < 0)
