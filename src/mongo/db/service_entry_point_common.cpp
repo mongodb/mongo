@@ -393,11 +393,6 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     invariant(isReplSet);
 
-    if (startOperationTime == LogicalTime::kUninitialized) {
-        LOGV2_DEBUG(21956, 5, "startOperationTime is uninitialized");
-        return LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
-    }
-
     auto operationTime = getClientOperationTime(opCtx);
     invariant(operationTime >= startOperationTime);
 
