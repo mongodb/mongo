@@ -67,7 +67,6 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
         UncommittedCollections::erase(uuid, nss, collListUnowned.lock().get());
     });
 
-    auto svcCtx = opCtx->getServiceContext();
 
     opCtx->recoveryUnit()->registerPreCommitHook(
         [collListUnowned, uuid, createTime](OperationContext* opCtx) {
@@ -80,9 +79,6 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
             invariant(collPtr->getMinimumVisibleSnapshot() == createTime);
             UncommittedCollections::clear(collListUnowned.lock().get());
         });
-    opCtx->recoveryUnit()->onRollback([svcCtx, collListUnowned, uuid, nss]() {
-        UncommittedCollections::rollback(svcCtx, uuid, collListUnowned.lock().get());
-    });
 }
 
 Collection* UncommittedCollections::getForTxn(OperationContext* opCtx,
@@ -121,13 +117,10 @@ void UncommittedCollections::erase(UUID uuid, NamespaceString nss, UncommittedCo
 void UncommittedCollections::rollback(ServiceContext* svcCtx,
                                       CollectionUUID uuid,
                                       UncommittedCollectionsMap* map) {
-    auto it = std::find(map->_registeredUUIDs.begin(), map->_registeredUUIDs.end(), uuid);
-    if (it != map->_registeredUUIDs.end()) {
-        auto collPtr = CollectionCatalog::get(svcCtx).deregisterCollection(uuid);
-        auto nss = collPtr.get()->ns();
-        map->_collections[uuid] = std::move(collPtr);
-        map->_nssIndex.insert({nss, uuid});
-    }
+    auto collPtr = CollectionCatalog::get(svcCtx).deregisterCollection(uuid);
+    auto nss = collPtr.get()->ns();
+    map->_collections[uuid] = std::move(collPtr);
+    map->_nssIndex.insert({nss, uuid});
 }
 
 void UncommittedCollections::commit(OperationContext* opCtx,
@@ -147,7 +140,12 @@ void UncommittedCollections::commit(OperationContext* opCtx,
     CollectionCatalog::get(opCtx).registerCollection(uuid, &(it->second));
     map->_collections.erase(it);
     map->_nssIndex.erase(nss);
-    map->_registeredUUIDs.push_back(uuid);
+    auto svcCtx = opCtx->getServiceContext();
+    auto collListUnowned = getUncommittedCollections(opCtx).getResources();
+
+    opCtx->recoveryUnit()->onRollback([svcCtx, collListUnowned, uuid]() {
+        UncommittedCollections::rollback(svcCtx, uuid, collListUnowned.lock().get());
+    });
 }
 
 bool UncommittedCollections::isUncommittedCollection(OperationContext* opCtx,

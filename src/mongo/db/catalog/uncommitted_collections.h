@@ -58,7 +58,6 @@ public:
 
         std::map<UUID, std::unique_ptr<Collection>> _collections;
         std::map<NamespaceString, UUID> _nssIndex;
-        std::vector<UUID> _registeredUUIDs;
     };
 
     UncommittedCollections() {
@@ -92,6 +91,8 @@ public:
     /**
      * Registers any uncommitted collections with the CollectionCatalog. If registering a collection
      * name conflicts with an existing entry, this method will throw a `WriteConflictException`.
+     * This method also clears the entries for the collection identified by `uuid` from
+     * UncommittedCollections.
      */
     static void commit(OperationContext* opCtx,
                        UUID uuid,
@@ -99,8 +100,9 @@ public:
                        UncommittedCollectionsMap* map);
 
     /**
-     * If the collection with uuid `uuid` was previously registered with the CollectionCatalog as
-     * part of the current multi-document transaction, this handler deregisters it.
+     * Deregisters the collection with uuid `uuid` from the CollectionCatalog, and re-adds the
+     * entries for the collection identified by `uuid` to UncommittedCollections. This function
+     * assumes `commit` has previously been called for `uuid`.
      */
     static void rollback(ServiceContext* svcCtx,
                          CollectionUUID uuid,
@@ -120,7 +122,6 @@ public:
     static void clear(UncommittedCollectionsMap* map) {
         map->_collections.clear();
         map->_nssIndex.clear();
-        map->_registeredUUIDs.clear();
     }
 
 private:
