@@ -51,9 +51,10 @@ struct CursorInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(next);
         MONGO_DECLARE_JS_FUNCTION(objsLeftInBatch);
         MONGO_DECLARE_JS_FUNCTION(readOnly);
+        MONGO_DECLARE_JS_FUNCTION(getId);
     };
 
-    static const JSFunctionSpec methods[7];
+    static const JSFunctionSpec methods[8];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

@@ -328,6 +328,11 @@ DBQuery.prototype.readOnly = function() {
     return this;
 };
 
+DBQuery.prototype.getId = function() {
+    this._exec();
+    return this._cursor.getId();
+};
+
 DBQuery.prototype.toArray = function() {
     if (this._arr)
         return this._arr;
@@ -875,6 +880,9 @@ DBCommandCursor.prototype.objsLeftInBatch = function() {
     } else {
         return this._cursor.objsLeftInBatch();
     }
+};
+DBCommandCursor.prototype.getId = function() {
+    return this._cursorid;
 };
 DBCommandCursor.prototype.getResumeToken = function() {
     // Return the most recent recorded resume token, if such a token exists.

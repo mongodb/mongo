@@ -41,11 +41,12 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec CursorInfo::methods[7] = {
+const JSFunctionSpec CursorInfo::methods[8] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hasNext, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(next, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(objsLeftInBatch, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getId, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(readOnly, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isClosed, CursorInfo),
     JS_FS_END,
@@ -117,6 +118,17 @@ void CursorInfo::Functions::readOnly::call(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper(cx, args.thisv()).setBoolean(InternedString::_ro, true);
 
     args.rval().set(args.thisv());
+}
+
+void CursorInfo::Functions::getId::call(JSContext* cx, JS::CallArgs args) {
+    auto cursor = getCursor(args);
+
+    if (!cursor) {
+        ValueReader(cx, args.rval()).fromInt64(0);
+        return;
+    }
+
+    ValueReader(cx, args.rval()).fromInt64(cursor->getCursorId());
 }
 
 void CursorInfo::Functions::close::call(JSContext* cx, JS::CallArgs args) {

@@ -359,13 +359,11 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
         // cursor id no longer valid at the server.
         invariant(qr.getCursorId() == 0);
 
-        if (!(opts & QueryOption_CursorTailable)) {
-            uasserted(ErrorCodes::CursorNotFound,
-                      str::stream() << "cursor id " << cursorId << " didn't exist on server.");
-        }
-
-        // 0 indicates no longer valid (dead)
+        // 0 indicates no longer valid (dead).
         cursorId = 0;
+
+        uasserted(ErrorCodes::CursorNotFound,
+                  str::stream() << "cursor id " << cursorId << " didn't exist on server.");
     }
 
     if (cursorId == 0 || !(opts & QueryOption_CursorTailable)) {
