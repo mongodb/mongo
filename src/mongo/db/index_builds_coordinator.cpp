@@ -340,8 +340,6 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* operationC
 
 IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_databaseIndexBuilds.empty());
-    invariant(_disallowedDbs.empty());
-    invariant(_disallowedCollections.empty());
     invariant(_collectionIndexBuilds.empty());
 }
 
@@ -549,23 +547,41 @@ std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuildsNoWait(
     return _abortCollectionIndexBuilds(lk, collectionUUID, reason, shouldWait);
 }
 
-void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::string& reason) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    // Ensure the caller correctly stopped any new index builds on the database.
-    auto it = _disallowedDbs.find(db);
-    invariant(it != _disallowedDbs.end());
-
+void IndexBuildsCoordinator::_abortDatabaseIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                                       const StringData& db,
+                                                       const std::string& reason,
+                                                       bool shouldWait) {
     auto dbIndexBuilds = _databaseIndexBuilds[db];
     if (!dbIndexBuilds) {
         return;
     }
 
+    LOGV2(4612302,
+          "About to abort all index builders running for collections in the given database",
+          "database"_attr = db);
+
     dbIndexBuilds->runOperationOnAllBuilds(lk, &_indexBuildsManager, abortIndexBuild, reason);
+
+    if (!shouldWait) {
+        return;
+    }
 
     // 'dbIndexBuilds' is a shared ptr, so it can be safely waited upon without destructing before
     // waitUntilNoIndexBuildsRemain() returns, which would cause a use-after-free memory error.
     dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
+}
+
+void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::string& reason) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    const bool shouldWait = true;
+    _abortDatabaseIndexBuilds(lk, db, reason, shouldWait);
+}
+
+void IndexBuildsCoordinator::abortDatabaseIndexBuildsNoWait(StringData db,
+                                                            const std::string& reason) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    const bool shouldWait = false;
+    _abortDatabaseIndexBuilds(lk, db, reason, shouldWait);
 }
 
 namespace {
@@ -1133,8 +1149,6 @@ void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
 
 void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() {
     invariant(_databaseIndexBuilds.empty());
-    invariant(_disallowedDbs.empty());
-    invariant(_disallowedCollections.empty());
     invariant(_collectionIndexBuilds.empty());
 }
 
@@ -1170,16 +1184,6 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
 
 Status IndexBuildsCoordinator::_registerIndexBuild(
     WithLock lk, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
-
-    auto itns = _disallowedCollections.find(replIndexBuildState->collectionUUID);
-    auto itdb = _disallowedDbs.find(replIndexBuildState->dbName);
-    if (itns != _disallowedCollections.end() || itdb != _disallowedDbs.end()) {
-        return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "Collection ( " << replIndexBuildState->collectionUUID
-                                    << " ) is in the process of being dropped. New index builds "
-                                       "are not currently allowed.");
-    }
-
     // Check whether any indexes are already being built with the same index name(s). (Duplicate
     // specs will be discovered by the index builder.)
     auto collIndexBuildsIt = _collectionIndexBuilds.find(replIndexBuildState->collectionUUID);
@@ -2159,50 +2163,6 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     return status;
 }
 
-void IndexBuildsCoordinator::_stopIndexBuildsOnDatabase(StringData dbName) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    auto it = _disallowedDbs.find(dbName);
-    if (it != _disallowedDbs.end()) {
-        ++(it->second);
-        return;
-    }
-    _disallowedDbs[dbName] = 1;
-}
-
-void IndexBuildsCoordinator::_stopIndexBuildsOnCollection(const UUID& collectionUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    auto it = _disallowedCollections.find(collectionUUID);
-    if (it != _disallowedCollections.end()) {
-        ++(it->second);
-        return;
-    }
-    _disallowedCollections[collectionUUID] = 1;
-}
-
-void IndexBuildsCoordinator::_allowIndexBuildsOnDatabase(StringData dbName) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    auto it = _disallowedDbs.find(dbName);
-    invariant(it != _disallowedDbs.end());
-    invariant(it->second);
-    if (--(it->second) == 0) {
-        _disallowedDbs.erase(it);
-    }
-}
-
-void IndexBuildsCoordinator::_allowIndexBuildsOnCollection(const UUID& collectionUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    auto it = _disallowedCollections.find(collectionUUID);
-    invariant(it != _disallowedCollections.end());
-    invariant(it->second > 0);
-    if (--(it->second) == 0) {
-        _disallowedCollections.erase(it);
-    }
-}
-
 StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuild(
     const UUID& buildUUID) const {
     stdx::unique_lock<Latch> lk(_mutex);
@@ -2222,26 +2182,6 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIn
         }
     }
     return indexBuilds;
-}
-
-ScopedStopNewDatabaseIndexBuilds::ScopedStopNewDatabaseIndexBuilds(
-    IndexBuildsCoordinator* indexBuildsCoordinator, StringData dbName)
-    : _indexBuildsCoordinatorPtr(indexBuildsCoordinator), _dbName(dbName.toString()) {
-    _indexBuildsCoordinatorPtr->_stopIndexBuildsOnDatabase(_dbName);
-}
-
-ScopedStopNewDatabaseIndexBuilds::~ScopedStopNewDatabaseIndexBuilds() {
-    _indexBuildsCoordinatorPtr->_allowIndexBuildsOnDatabase(_dbName);
-}
-
-ScopedStopNewCollectionIndexBuilds::ScopedStopNewCollectionIndexBuilds(
-    IndexBuildsCoordinator* indexBuildsCoordinator, const UUID& collectionUUID)
-    : _indexBuildsCoordinatorPtr(indexBuildsCoordinator), _collectionUUID(collectionUUID) {
-    _indexBuildsCoordinatorPtr->_stopIndexBuildsOnCollection(_collectionUUID);
-}
-
-ScopedStopNewCollectionIndexBuilds::~ScopedStopNewCollectionIndexBuilds() {
-    _indexBuildsCoordinatorPtr->_allowIndexBuildsOnCollection(_collectionUUID);
 }
 
 int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx, Collection* collection) {

@@ -197,16 +197,6 @@ public:
      * must continue to operate on the collection by UUID to protect against rename collection. The
      * provided 'reason' will be used in the error message that the index builders return to their
      * callers.
-     *
-     * First create a ScopedStopNewCollectionIndexBuilds to block further index builds on the
-     * collection before calling this and for the duration of the drop collection operation.
-     *
-     * {
-     *     ScopedStopNewCollectionIndexBuilds scopedStop(collectionUUID);
-     *     indexBuildsCoord->abortCollectionIndexBuilds(collectionUUID, "...");
-     *     AutoGetCollection autoColl(..., collectionUUID, ...);
-     *     autoColl->dropCollection(...);
-     * }
      */
     void abortCollectionIndexBuilds(const UUID& collectionUUID, const std::string& reason);
 
@@ -223,19 +213,14 @@ public:
      * Signals all of the index builds on the specified 'db' to abort and then waits until the index
      * builds are no longer running. The provided 'reason' will be used in the error message that
      * the index builders return to their callers.
-     *
-     * First create a ScopedStopNewDatabaseIndexBuilds to block further index builds on the
-     * specified
-     * database before calling this and for the duration of the drop database operation.
-     *
-     * {
-     *     ScopedStopNewDatabaseIndexBuilds scopedStop(dbName);
-     *     indexBuildsCoord->abortDatabaseIndexBuilds(dbName, "...");
-     *     AutoGetDb autoDb(...);
-     *     autoDb->dropDatabase(...);
-     * }
      */
     void abortDatabaseIndexBuilds(StringData db, const std::string& reason);
+
+    /**
+     * Signals all of the index builds on the specified database to abort. The provided 'reason'
+     * will be used in the error message that the index builders return to their callers.
+     */
+    void abortDatabaseIndexBuildsNoWait(StringData db, const std::string& reason);
 
     /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
@@ -437,28 +422,6 @@ public:
 
 
 private:
-    // Friend classes in order to be the only allowed callers of
-    //_stopIndexBuildsOnCollection/Database and _allowIndexBuildsOnCollection/Database.
-    friend class ScopedStopNewDatabaseIndexBuilds;
-    friend class ScopedStopNewCollectionIndexBuilds;
-
-    /**
-     * Prevents new index builds being registered on the provided collection or database.
-     *
-     * It is safe to call this on the same collection/database concurrently in different threads. It
-     * will still behave correctly.
-     */
-    void _stopIndexBuildsOnDatabase(StringData dbName);
-    void _stopIndexBuildsOnCollection(const UUID& collectionUUID);
-
-    /**
-     * Allows new index builds to again be registered on the provided collection or database. Should
-     * only be called after calling stopIndexBuildsOnCollection or stopIndexBuildsOnDatabase on the
-     * same collection or database, respectively.
-     */
-    void _allowIndexBuildsOnDatabase(StringData dbName);
-    void _allowIndexBuildsOnCollection(const UUID& collectionUUID);
-
     /**
      * Registers an index build so that the rest of the system can discover it.
      *
@@ -673,15 +636,16 @@ protected:
                                                   const std::string& reason,
                                                   bool shouldWait);
 
+    /**
+     * Helper for 'abortDatabaseIndexBuilds' and 'abortDatabaseIndexBuildsNoWait'.
+     */
+    void _abortDatabaseIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                   const StringData& db,
+                                   const std::string& reason,
+                                   bool shouldWait);
+
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
-
-    // New index builds are not allowed on a collection or database if the collection or database is
-    // in either of these maps. These are used when concurrent operations need to abort index builds
-    // on a collection or database and must wait for the index builds to drain, without further
-    // index builds being allowed to begin.
-    StringMap<int> _disallowedDbs;
-    stdx::unordered_map<UUID, int, UUID::Hash> _disallowedCollections;
 
     // Maps database name to database information. Tracks and accesses index builds on a database
     // level. Can be used to abort and wait upon the completion of all index builds for a database.
@@ -707,68 +671,6 @@ protected:
     IndexBuildsManager _indexBuildsManager;
 
     bool _sleepForTest = false;
-};
-
-/**
- * For this object's lifetime no new index builds will be allowed on the specified database. An
- * error will be returned by the IndexBuildsCoordinator to any caller attempting to register a new
- * index build on the blocked collection or database.
- *
- * This should be used by operations like drop database, where the active index builds must be
- * signaled to abort, but it takes time for them to wrap up, during which time no further index
- * builds should be scheduled.
- */
-class ScopedStopNewDatabaseIndexBuilds {
-    ScopedStopNewDatabaseIndexBuilds(const ScopedStopNewDatabaseIndexBuilds&) = delete;
-    ScopedStopNewDatabaseIndexBuilds& operator=(const ScopedStopNewDatabaseIndexBuilds&) = delete;
-
-public:
-    /**
-     * Takes either the full collection namespace or a database name and will block further index
-     * builds on that collection or database.
-     */
-    ScopedStopNewDatabaseIndexBuilds(IndexBuildsCoordinator* indexBuildsCoordinator,
-                                     StringData dbName);
-
-    /**
-     * Allows new index builds on the collection or database that were previously disallowed.
-     */
-    ~ScopedStopNewDatabaseIndexBuilds();
-
-private:
-    IndexBuildsCoordinator* _indexBuildsCoordinatorPtr;
-    std::string _dbName;
-};
-
-/**
- * For this object's lifetime no new index builds will be allowed on the specified collection. An
- * error will be returned by the IndexBuildsCoordinator to any caller attempting to register a new
- * index build on the blocked collection.
- *
- * This should be used by operations like drop collection, where the active index builds must be
- * signaled to abort, but it takes time for them to wrap up, during which time no further index
- * builds should be scheduled.
- */
-class ScopedStopNewCollectionIndexBuilds {
-    ScopedStopNewCollectionIndexBuilds(const ScopedStopNewCollectionIndexBuilds&) = delete;
-    ScopedStopNewCollectionIndexBuilds& operator=(const ScopedStopNewCollectionIndexBuilds&) =
-        delete;
-
-public:
-    /**
-     * Blocks further index builds on the specified collection.
-     */
-    ScopedStopNewCollectionIndexBuilds(IndexBuildsCoordinator* indexBuildsCoordinator,
-                                       const UUID& collectionUUID);
-
-    /**
-     * Allows new index builds on the collection that were previously disallowed.
-     */
-    ~ScopedStopNewCollectionIndexBuilds();
-
-private:
-    IndexBuildsCoordinator* _indexBuildsCoordinatorPtr;
-    UUID _collectionUUID;
 };
 
 // These fail points are used to control index build progress. Declared here to be shared
