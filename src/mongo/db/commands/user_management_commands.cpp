@@ -550,18 +550,17 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
     return status;
 }
 
-auto getUMCMutex = ServiceContext::declareDecoration<Mutex>();
-
 class AuthzLockGuard {
     AuthzLockGuard(AuthzLockGuard&) = delete;
     AuthzLockGuard& operator=(AuthzLockGuard&) = delete;
 
 public:
     enum InvalidationMode { kInvalidate, kReadOnly };
+
     AuthzLockGuard(OperationContext* opCtx, InvalidationMode mode)
         : _opCtx(opCtx),
           _authzManager(AuthorizationManager::get(_opCtx->getServiceContext())),
-          _lock(getUMCMutex(opCtx->getServiceContext())),
+          _lock(_UMCMutexDecoration(opCtx->getServiceContext())),
           _mode(mode),
           _cacheGeneration(_authzManager->getCacheGeneration()) {}
 
@@ -580,12 +579,17 @@ public:
     AuthzLockGuard& operator=(AuthzLockGuard&&) = default;
 
 private:
+    static Decorable<ServiceContext>::Decoration<Mutex> _UMCMutexDecoration;
+
     OperationContext* _opCtx;
     AuthorizationManager* _authzManager;
     stdx::unique_lock<Latch> _lock;
     InvalidationMode _mode;
     OID _cacheGeneration;
 };
+
+Decorable<ServiceContext>::Decoration<Mutex> AuthzLockGuard::_UMCMutexDecoration =
+    ServiceContext::declareDecoration<Mutex>();
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
@@ -2327,6 +2331,9 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        uassert(ErrorCodes::IllegalOperation,
+                "_getUserCacheGeneration can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
         AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         result.append("cacheGeneration", authzManager->getCacheGeneration());
         return true;
