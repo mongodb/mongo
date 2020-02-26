@@ -32,6 +32,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         '$indexStats',
         '$merge',
         '$out',
+        '$internalOutToDifferentDB'
     ];
     for (let stageSpec of originalPipeline) {
         // Skip wrapping the pipeline in a $facet stage if it has an invalid stage
