@@ -168,7 +168,6 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     bool isRemove = false;
     bool bypassDocumentValidation = false;
     bool arrayFiltersSet = false;
-    bool hintSet = false;
     std::vector<BSONObj> arrayFilters;
     boost::optional<RuntimeConstants> runtimeConstants;
     bool writeConcernOptionsSet = false;
@@ -195,7 +194,6 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             sort = sortElement.embeddedObject();
         } else if (field == kHintField) {
             hint = parseHint(cmdObj[kHintField]);
-            hintSet = true;
         } else if (field == kRemoveField) {
             isRemove = cmdObj[kRemoveField].trueValue();
         } else if (field == kUpdateField) {
@@ -285,10 +283,6 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             return {ErrorCodes::FailedToParse,
                     "Cannot specify both new=true and remove=true;"
                     " 'remove' always returns the deleted document"};
-        }
-
-        if (hintSet) {
-            return {ErrorCodes::FailedToParse, "Cannot specify a hint with remove=true"};
         }
 
         if (arrayFiltersSet) {

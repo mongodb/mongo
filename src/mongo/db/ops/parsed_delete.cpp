@@ -78,6 +78,7 @@ Status ParsedDelete::parseQueryToCQ() {
     qr->setSort(_request->getSort());
     qr->setCollation(_request->getCollation());
     qr->setExplain(_request->isExplain());
+    qr->setHint(_request->getHint());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the

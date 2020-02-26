@@ -116,6 +116,12 @@ public:
     bool isExplain() const {
         return _isExplain;
     }
+    void setHint(const BSONObj& hint) {
+        _hint = hint;
+    }
+    BSONObj getHint() const {
+        return _hint;
+    }
     bool shouldReturnDeleted() const {
         return _returnDeleted;
     }
@@ -133,6 +139,7 @@ public:
 
 private:
     const NamespaceString& _nsString;
+    BSONObj _hint;
     BSONObj _query;
     BSONObj _proj;
     BSONObj _sort;

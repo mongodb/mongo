@@ -20,7 +20,6 @@ function assertCommandUsesIndex(command, expectedHintKeyPattern) {
 }
 
 const coll = db.jstests_update_hint;
-let updateCmd = {update: coll.getName(), updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}]};
 
 function normalIndexTest() {
     // Hint using a key pattern.
@@ -30,6 +29,10 @@ function normalIndexTest() {
     assert.commandWorked(coll.createIndex({y: -1}));
 
     // Hint using index key pattern.
+    let updateCmd = {
+        update: coll.getName(),
+        updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}]
+    };
     assertCommandUsesIndex(updateCmd, {x: 1});
 
     // Hint using an index name.
@@ -44,15 +47,15 @@ function normalIndexTest() {
 function sparseIndexTest() {
     // Create a sparse index with 2 documents.
     coll.drop();
-    assert.commandWorked(coll.insert({x: 1}));
-    assert.commandWorked(coll.insert({x: 1}));
-    assert.commandWorked(coll.insert({x: 1, s: 0}));
-    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.insert([{x: 1}, {x: 1}, {x: 1, s: 0}, {x: 1, s: 0}]));
     assert.commandWorked(coll.createIndex({x: 1}));
     assert.commandWorked(coll.createIndex({s: 1}, {sparse: true}));
 
     // Hint should be respected, even on incomplete indexes.
-    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {s: 1}}]};
+    let updateCmd = {
+        update: coll.getName(),
+        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {s: 1}}]
+    };
     assertCommandUsesIndex(updateCmd, {s: 1});
 
     // Update hinting a sparse index updates only the document in the sparse index.
@@ -76,9 +79,7 @@ function sparseIndexTest() {
 
 function shellHelpersTest() {
     coll.drop();
-    assert.commandWorked(coll.insert({x: 1}));
-    assert.commandWorked(coll.insert({x: 1, s: 0}));
-    assert.commandWorked(coll.insert({x: 1, s: 0}));
+    assert.commandWorked(coll.insert([{x: 1}, {x: 1, s: 0}, {x: 1, s: 0}]));
     assert.commandWorked(coll.createIndex({x: 1}));
     assert.commandWorked(coll.createIndex({s: 1}, {sparse: true}));
 
@@ -145,7 +146,7 @@ function failedHintTest() {
     assert.commandWorked(coll.createIndex({x: 1}));
 
     // Command should fail with incorrectly formatted hints.
-    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: 1}]};
+    let updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: 1}]};
     assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);
     updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: true}]};
     assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.FailedToParse);

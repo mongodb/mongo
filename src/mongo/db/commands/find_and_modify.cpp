@@ -146,6 +146,7 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setRuntimeConstants(
         args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setSort(args.getSort());
+    requestOut->setHint(args.getHint());
     requestOut->setCollation(args.getCollation());
     requestOut->setMulti(false);
     requestOut->setReturnDeleted(true);  // Always return the old value.
