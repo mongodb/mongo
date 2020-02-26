@@ -14,42 +14,73 @@ const dbpath = MongoRunner.dataPath + testName;
 
 // The 'testCases' array should be populated with
 //
-//      { validator: { ... }, nonMatchingDocument: { ... } }
+//      { validator: { ... }, nonMatchingDocument: { ... }, lastStableErrCode }
 //
 // objects that use query features new in the latest version of mongod. Note that this also
 // includes new aggregation expressions able to be used with the $expr match expression. This
 // test ensures that a collection validator accepts the new query feature when the feature
 // compatibility version is the latest version, and rejects it when the feature compatibility
 // version is the last-stable version.
+// The 'lastStableErrCode' field indicates what error the last stable version would throw when
+// parsing the validator.
 const testCases = [
-    {validator: {$expr: {$eq: [{$meta: "indexKey"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$meta: "sortKey"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$meta: "recordId"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$meta: "geoNearPoint"}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {
+        validator: {$expr: {$eq: [{$meta: "indexKey"}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17308
+    },
+    {
+        validator: {$expr: {$eq: [{$meta: "sortKey"}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17308
+    },
+    {
+        validator: {$expr: {$eq: [{$meta: "recordId"}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17308
+    },
+    {
+        validator: {$expr: {$eq: [{$meta: "geoNearPoint"}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17308
+    },
     {
         validator: {$expr: {$eq: [{$meta: "geoNearDistance"}, 'foobar']}},
-        nonMatchingDocument: {a: 1}
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 17308
     },
-    {validator: {$expr: {$isNumber: {}}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$bsonSize: {}}, 'foobar']}}, nonMatchingDocument: {a: 1}},
-    {validator: {$expr: {$eq: [{$binarySize: ''}, 'foobar']}}, nonMatchingDocument: {a: 1}},
+    {validator: {$expr: {$isNumber: {}}}, nonMatchingDocument: {a: 1}, lastStableErrCode: 168},
+    {
+        validator: {$expr: {$eq: [{$bsonSize: {}}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
+    },
+    {
+        validator: {$expr: {$eq: [{$binarySize: ''}, 'foobar']}},
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
+    },
     {
         validator:
             {$expr: {$eq: [{$replaceOne: {input: '', find: '', replacement: ''}}, 'foobar']}},
-        nonMatchingDocument: {a: 1}
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
     },
     {
         validator:
             {$expr: {$eq: [{$replaceAll: {input: '', find: '', replacement: ''}}, 'foobar']}},
-        nonMatchingDocument: {a: 1}
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
     },
     {
         validator: {$expr: {$eq: [{$first: {$literal: ['a']}}, 'foobar']}},
-        nonMatchingDocument: {a: 1}
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
     },
     {
         validator: {$expr: {$eq: [{$last: {$literal: ['a']}}, 'foobar']}},
-        nonMatchingDocument: {a: 1}
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
     },
 ];
 
@@ -131,13 +162,19 @@ testCases.forEach(function(test, i) {
 MongoRunner.stopMongod(conn);
 
 if (testCases.length > 0) {
-    // If we try to start up the last-stable version of mongod, it will fail, because it will
-    // not be able to parse the validator using new query features.
+    // Versions of mongod 4.2 and later are able to start up with a collection validator that's
+    // considered invalid. However, any writes to the collection will fail.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "last-stable", noCleanData: true});
-    assert.eq(null,
-              conn,
-              `version ${MongoRunner.getBinVersionFor("last-stable")} of mongod started, even` +
-                  " with a validator using new query features in place.");
+    assert.neq(null, conn, "last stable mongod was unable to start up with invalid validator");
+    const testDB = conn.getDB(testName);
+
+    // Check that writes fail to all collections with validators using new query features.
+    testCases.forEach(function(test, i) {
+        const coll = testDB["coll" + i];
+        assert.commandFailedWithCode(coll.insert({foo: 1}), test.lastStableErrCode);
+    });
+
+    MongoRunner.stopMongod(conn);
 }
 
 // Starting up the latest version of mongod, however, should succeed, even though the feature
