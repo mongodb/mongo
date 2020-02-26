@@ -14,12 +14,16 @@ const collA = testDB.A;
 collA.drop();
 const nDocs = 5;
 for (let i = 0; i < nDocs; i++) {
-    assert.commandWorked(collA.insert({a: i, val: i, groupKey: i}));
+    assert.commandWorked(collA.insert({_id: i + 10, a: i, val: i, groupKey: i}));
 }
-const collAResults = collA.find().toArray();
+const collAResults = collA.find().sort({_id: 1}).toArray();
+
+function buildErrorString(expected, found) {
+    return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
+}
 function checkResults(resObj, expectedResult) {
     assert(arrayEq(resObj.cursor.firstBatch, expectedResult),
-           "Expected:\n" + tojson(expectedResult) + "Got:\n" + tojson(resObj.cursor.firstBatch));
+           buildErrorString(expectedResult, resObj.cursor.firstBatch));
 }
 
 // Test that $unionWith works with $text and $search
@@ -33,7 +37,11 @@ let resSet = collAResults.concat([{_id: 1, str: "random"}]);
 checkResults(testDB.runCommand({
     aggregate: collA.getName(),
     pipeline: [
-        {$unionWith: {coll: textColl.getName(), pipeline: [{$match: {$text: {$search: "random"}}}]}}
+        {
+            $unionWith:
+                {coll: textColl.getName(), pipeline: [{$match: {$text: {$search: "random"}}}]}
+        },
+        {$sort: {_id: 1}}
     ],
     cursor: {}
 }),
@@ -86,24 +94,44 @@ geoColl.drop();
 assert.commandWorked(geoColl.createIndex({"locs": "2dsphere"}));
 assert.commandWorked(
     geoColl.insert([{_id: 0, locs: [0, 0]}, {_id: 1, locs: [10, 10]}, {_id: 2, locs: [20, 20]}]));
-resSet = collAResults.concat([{_id: 1, locs: [10, 10], dist: 0}]);
-checkResults(testDB.runCommand({
+resSet = [{_id: 1, locs: [10, 10], dist: 0}].concat(collAResults);
+const geoNearResults = testDB.runCommand({
     aggregate: collA.getName(),
-    pipeline: [{
-        $unionWith: {
-            coll: geoColl.getName(),
-            pipeline: [{
-                $geoNear: {
-                    near: {type: "Point", coordinates: [10, 10]},
-                    distanceField: "dist",
-                    maxDistance: 2
-                }
-            }]
-        }
-    }],
+    pipeline: [
+        {
+            $unionWith: {
+                coll: geoColl.getName(),
+                pipeline: [{
+                    $geoNear: {
+                        near: {type: "Point", coordinates: [10, 10]},
+                        distanceField: "dist",
+                        maxDistance: 2
+                    }
+                }]
+            },
+        },
+        {$sort: {_id: 1}}
+    ],
     cursor: {}
-}),
-             resSet);
+});
+assert.commandWorked(geoNearResults);
+const geoNearArray = geoNearResults.cursor.firstBatch;
+assert.eq(geoNearArray.length, resSet.length);
+
+// First check the geo object.
+const geoObj = geoNearArray[0];
+const expectedGeoObj = resSet[0];
+assert.eq(geoObj._id, expectedGeoObj._id, buildErrorString(expectedGeoObj, geoObj));
+assert(arrayEq(geoObj.locs, expectedGeoObj.locs), buildErrorString(expectedGeoObj, geoObj));
+// There is some room for error in geoNear, it can return results off by small amounts.
+assert.close(geoObj.dist, expectedGeoObj.dist, 9);
+
+for (let i = 1; i < geoNearArray.length; i++) {
+    const queryObj = geoNearArray[i];
+    const expectedObj = resSet[i];
+    assert(documentEq(queryObj, expectedObj), buildErrorString(expectedObj, queryObj));
+}
+
 // Test that $unionWith fails if $geoNear is not first stage in the sub-pipeline.
 resObj = testDB.runCommand({
     aggregate: collA.getName(),
