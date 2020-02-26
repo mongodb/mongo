@@ -64,9 +64,6 @@ runWriteConcernRetryabilityTest(priConn,
                                     }));
                                 });
 
-// Explicitly abort transaction 39 because we cannot shut down the replica set when there
-// is a prepared transaction in progress.
-// TODO: SERVER-35817 Allow shutdowns when a prepared transaction is in progress.
 assert.commandWorked(priConn.getDB('admin').runCommand({
     abortTransaction: 1,
     lsid: {id: lsid},
