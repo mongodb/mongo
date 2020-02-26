@@ -11195,7 +11195,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse15
-    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=suse15 --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true
