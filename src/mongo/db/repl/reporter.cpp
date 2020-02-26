@@ -215,11 +215,10 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
 
     // If there was an error in preparing the command, abort and return that error.
     if (!prepareResult.isOK()) {
-        LOGV2_DEBUG(
-            21586,
-            2,
-            "Reporter failed to prepare update command with status: {prepareResult_getStatus}",
-            "prepareResult_getStatus"_attr = prepareResult.getStatus());
+        LOGV2_DEBUG(21586,
+                    2,
+                    "Reporter failed to prepare update command with status: {status}",
+                    "status"_attr = prepareResult.getStatus());
         _status = prepareResult.getStatus();
         return _status;
     }
@@ -228,12 +227,11 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
 }
 
 void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeout) {
-    LOGV2_DEBUG(
-        21587,
-        2,
-        "Reporter sending slave oplog progress to upstream updater {target}: {commandRequest}",
-        "target"_attr = _target,
-        "commandRequest"_attr = commandRequest);
+    LOGV2_DEBUG(21587,
+                2,
+                "Reporter sending oplog progress to upstream updater {target}: {commandRequest}",
+                "target"_attr = _target,
+                "commandRequest"_attr = commandRequest);
 
     auto scheduleResult = _executor->scheduleRemoteCommand(
         executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr, netTimeout),

@@ -93,8 +93,8 @@ Status BaseCloner::run() {
     if (!_sharedData->getInitialSyncStatus(lk).isOK()) {
         LOGV2(21065,
               "Failing data clone because initial sync failed outside data clone: "
-              "{sharedData_getInitialSyncStatus_lk}",
-              "sharedData_getInitialSyncStatus_lk"_attr = _sharedData->getInitialSyncStatus(lk));
+              "{status}",
+              "status"_attr = _sharedData->getInitialSyncStatus(lk));
     }
     return _sharedData->getInitialSyncStatus(lk);
 }
@@ -119,8 +119,8 @@ void BaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
             // initial_sync_test_fixture_test.js, so if you change it here you will need to change
             // it there.
             LOGV2(21066,
-                  "Collection Cloner scheduled a remote command on the {describeForFuzzer_stage}",
-                  "describeForFuzzer_stage"_attr = describeForFuzzer(stage));
+                  "Collection Cloner scheduled a remote command on the {stage}",
+                  "stage"_attr = describeForFuzzer(stage));
             LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled.");
             initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
 
@@ -135,9 +135,9 @@ void BaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
 BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     LOGV2_DEBUG(21069,
                 1,
-                "Cloner {getClonerName} running stage {stage_getName}",
-                "getClonerName"_attr = getClonerName(),
-                "stage_getName"_attr = stage->getName());
+                "Cloner {cloner} running stage {stage}",
+                "cloner"_attr = getClonerName(),
+                "stage"_attr = stage->getName());
     pauseForFuzzer(stage);
     auto isThisStageFailPoint = [this, stage](const BSONObj& data) {
         return data["stage"].str() == stage->getName() && isMyFailPoint(data);
@@ -145,9 +145,9 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     hangBeforeClonerStage.executeIf(
         [&](const BSONObj& data) {
             LOGV2(21070,
-                  "Cloner {getClonerName} hanging before running stage {stage_getName}",
-                  "getClonerName"_attr = getClonerName(),
-                  "stage_getName"_attr = stage->getName());
+                  "Cloner {cloner} hanging before running stage {stage}",
+                  "cloner"_attr = getClonerName(),
+                  "stage"_attr = stage->getName());
             while (!mustExit() && hangBeforeClonerStage.shouldFail(isThisStageFailPoint)) {
                 sleepmillis(100);
             }
@@ -157,9 +157,9 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     hangAfterClonerStage.executeIf(
         [&](const BSONObj& data) {
             LOGV2(21071,
-                  "Cloner {getClonerName} hanging after running stage {stage_getName}",
-                  "getClonerName"_attr = getClonerName(),
-                  "stage_getName"_attr = stage->getName());
+                  "Cloner {cloner} hanging after running stage {stage}",
+                  "cloner"_attr = getClonerName(),
+                  "stage"_attr = stage->getName());
             while (!mustExit() && hangAfterClonerStage.shouldFail(isThisStageFailPoint)) {
                 sleepmillis(100);
             }
@@ -167,9 +167,9 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
         isThisStageFailPoint);
     LOGV2_DEBUG(21072,
                 1,
-                "Cloner {getClonerName} finished running stage {stage_getName}",
-                "getClonerName"_attr = getClonerName(),
-                "stage_getName"_attr = stage->getName());
+                "Cloner {cloner} finished running stage {stage}",
+                "cloner"_attr = getClonerName(),
+                "stage"_attr = stage->getName());
     return afterStageBehavior;
 }
 

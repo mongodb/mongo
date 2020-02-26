@@ -127,8 +127,8 @@ void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringInterrupt(OperationConte
         // OperationContext to wait for writeConcern anyways.
         LOGV2_DEBUG(21281,
                     2,
-                    "Ignoring set last op interruption error: {e_toStatus}",
-                    "e_toStatus"_attr = e.toStatus());
+                    "Ignoring set last op interruption error: {exception}",
+                    "exception"_attr = e.toStatus());
     }
 }
 

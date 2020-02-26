@@ -71,9 +71,9 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
     if (_lastResponse.getState() != hbResponse.getState()) {
         LOGV2_OPTIONS(21215,
                       {logv2::LogTag::kRS},
-                      "Member {hostAndPort} is now in state {hbResponse_getState}",
+                      "Member {hostAndPort} is now in state {state}",
                       "hostAndPort"_attr = _hostAndPort.toString(),
-                      "hbResponse_getState"_attr = hbResponse.getState().toString());
+                      "state"_attr = hbResponse.getState().toString());
     }
 
     bool opTimeAdvanced =
@@ -158,11 +158,11 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
         // TODO(russotto): We think this should never happen, rollback or no rollback.  Make this an
         // invariant and see what happens.
         LOGV2(21218,
-              "Durable progress ({opTime_opTime}) is ahead of the applied progress "
+              "Durable progress ({durableOpTime}) is ahead of the applied progress "
               "({lastAppliedOpTime}. This is likely due to a "
               "rollback. memberid: {memberId}{hostAndPort} previous durable progress: "
               "{lastDurableOpTime}",
-              "opTime_opTime"_attr = opTime.opTime,
+              "durableOpTime"_attr = opTime.opTime,
               "lastAppliedOpTime"_attr = _lastAppliedOpTime,
               "memberId"_attr = _memberId,
               "hostAndPort"_attr = _hostAndPort.toString(),

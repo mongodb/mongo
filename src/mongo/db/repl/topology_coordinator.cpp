@@ -2297,8 +2297,8 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
     }
     if (!hasWrittenToStream) {
         LOGV2_FATAL(21842,
-                    "Invalid UnelectableReasonMask value 0x{integerToHex_ur}",
-                    "integerToHex_ur"_attr = integerToHex(ur));
+                    "Invalid UnelectableReasonMask value 0x{value}",
+                    "value"_attr = integerToHex(ur));
         fassertFailed(26011);
     }
     ss << " (mask 0x" << integerToHex(ur) << ")";
@@ -2686,8 +2686,8 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
         LOGV2_DEBUG(21823,
                     1,
                     "Ignoring older committed snapshot from before I became primary, optime: "
-                    "{committedOpTime_opTime}, firstOpTimeOfMyTerm: {firstOpTimeOfMyTerm}",
-                    "committedOpTime_opTime"_attr = committedOpTime.opTime,
+                    "{committedOpTime}, firstOpTimeOfMyTerm: {firstOpTimeOfMyTerm}",
+                    "committedOpTime"_attr = committedOpTime.opTime,
                     "firstOpTimeOfMyTerm"_attr = _firstOpTimeOfMyTerm);
         return false;
     }
@@ -2703,9 +2703,9 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
                         "Ignoring commit point with different term than my lastApplied, since it "
                         "may "
                         "not be on the same oplog branch as mine. optime: {committedOpTime}, my "
-                        "last applied: {getMyLastAppliedOpTimeAndWallTime}",
+                        "last applied: {myLastAppliedOpTimeAndWallTime}",
                         "committedOpTime"_attr = committedOpTime,
-                        "getMyLastAppliedOpTimeAndWallTime"_attr =
+                        "myLastAppliedOpTimeAndWallTime"_attr =
                             getMyLastAppliedOpTimeAndWallTime());
             return false;
         }
@@ -2790,8 +2790,11 @@ TopologyCoordinator::UpdateTermResult TopologyCoordinator::updateTerm(long long 
     if (_iAmPrimary()) {
         return TopologyCoordinator::UpdateTermResult::kTriggerStepDown;
     }
-    LOGV2_DEBUG(
-        21827, 1, "Updating term from {term} to {term2}", "term"_attr = _term, "term2"_attr = term);
+    LOGV2_DEBUG(21827,
+                1,
+                "Updating term from {oldTerm} to {newTerm}",
+                "oldTerm"_attr = _term,
+                "newTerm"_attr = term);
     _term = term;
     return TopologyCoordinator::UpdateTermResult::kUpdatedTerm;
 }
@@ -2824,9 +2827,8 @@ bool TopologyCoordinator::shouldChangeSyncSource(
     if (_forceSyncSourceIndex != -1) {
         LOGV2(21829,
               "Choosing new sync source because the user has requested to use "
-              "{rsConfig_getMemberAt_forceSyncSourceIndex_getHostAndPort} as a sync source",
-              "rsConfig_getMemberAt_forceSyncSourceIndex_getHostAndPort"_attr =
-                  _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort());
+              "{source} as a sync source",
+              "source"_attr = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort());
         return true;
     }
 
@@ -2838,10 +2840,10 @@ bool TopologyCoordinator::shouldChangeSyncSource(
             LOGV2(
                 21830,
                 "Choosing new sync source because the config version supplied by {currentSource}, "
-                "{replMetadata_getConfigVersion}, does not match ours, {rsConfig_getConfigVersion}",
+                "{sourceConfigVersion}, does not match ours, {configVersion}",
                 "currentSource"_attr = currentSource,
-                "replMetadata_getConfigVersion"_attr = replMetadata.getConfigVersion(),
-                "rsConfig_getConfigVersion"_attr = _rsConfig.getConfigVersion());
+                "sourceConfigVersion"_attr = replMetadata.getConfigVersion(),
+                "configVersion"_attr = _rsConfig.getConfigVersion());
             return true;
         }
     }
@@ -2901,7 +2903,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(
         } else {
             logMessage << " (sync source does not know the primary)";
         }
-        LOGV2(21832, "{logMessage_str}", "logMessage_str"_attr = logMessage.str());
+        LOGV2(21832, "{msg}", "msg"_attr = logMessage.str());
         return true;
     }
 
@@ -2925,19 +2927,17 @@ bool TopologyCoordinator::shouldChangeSyncSource(
                 (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
                 it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
                 goalSecs < it->getHeartbeatAppliedOpTime().getSecs()) {
-                LOGV2(
-                    21834,
-                    "Choosing new sync source because the most recent OpTime of our sync "
-                    "source, {currentSource}, is {currentSourceOpTime} which is more than "
-                    "{options_maxSyncSourceLagSecs} behind member {candidateConfig_getHostAndPort} "
-                    "whose most recent OpTime is {it_getHeartbeatAppliedOpTime}",
-                    "currentSource"_attr = currentSource,
-                    "currentSourceOpTime"_attr = currentSourceOpTime.toString(),
-                    "options_maxSyncSourceLagSecs"_attr = _options.maxSyncSourceLagSecs,
-                    "candidateConfig_getHostAndPort"_attr =
-                        candidateConfig.getHostAndPort().toString(),
-                    "it_getHeartbeatAppliedOpTime"_attr =
-                        it->getHeartbeatAppliedOpTime().toString());
+                LOGV2(21834,
+                      "Choosing new sync source because the most recent OpTime of our sync "
+                      "source, {currentSource}, is {currentSourceOpTime} which is more than "
+                      "{maxSyncSourceLagSecs} behind member {member} "
+                      "whose most recent OpTime is {memberHearbeatAppliedOpTime}",
+                      "currentSource"_attr = currentSource,
+                      "currentSourceOpTime"_attr = currentSourceOpTime.toString(),
+                      "maxSyncSourceLagSecs"_attr = _options.maxSyncSourceLagSecs,
+                      "member"_attr = candidateConfig.getHostAndPort().toString(),
+                      "memberHearbeatAppliedOpTime"_attr =
+                          it->getHeartbeatAppliedOpTime().toString());
                 invariant(itIndex != _selfIndex);
                 return true;
             }

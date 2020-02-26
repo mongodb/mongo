@@ -320,8 +320,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             if (isDraining && _oplogBuffer->isEmpty()) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);
                 LOGV2(21239,
-                      "Oplog buffer has been drained in term {termWhenBufferIsEmpty}",
-                      "termWhenBufferIsEmpty"_attr = termWhenBufferIsEmpty);
+                      "Oplog buffer has been drained in term {term}",
+                      "term"_attr = termWhenBufferIsEmpty);
             } else {
                 // Don't emit empty batches.
                 continue;

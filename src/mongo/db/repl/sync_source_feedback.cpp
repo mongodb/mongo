@@ -104,11 +104,10 @@ void SyncSourceFeedback::forwardSlaveProgress() {
         if (_reporter) {
             auto triggerStatus = _reporter->trigger();
             if (!triggerStatus.isOK()) {
-                LOGV2_WARNING(
-                    21764,
-                    "unable to forward slave progress to {reporter_getTarget}: {triggerStatus}",
-                    "reporter_getTarget"_attr = _reporter->getTarget(),
-                    "triggerStatus"_attr = triggerStatus);
+                LOGV2_WARNING(21764,
+                              "unable to forward progress to {target}: {triggerStatus}",
+                              "target"_attr = _reporter->getTarget(),
+                              "triggerStatus"_attr = triggerStatus);
             }
         }
     }

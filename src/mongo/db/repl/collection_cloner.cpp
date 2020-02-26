@@ -157,11 +157,10 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
         ? getClient()->getReadyIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk)
         : getClient()->getIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk);
     if (indexSpecs.empty()) {
-        LOGV2_WARNING(
-            21143,
-            "No indexes found for collection {sourceNss_ns} while cloning from {getSource}",
-            "sourceNss_ns"_attr = _sourceNss.ns(),
-            "getSource"_attr = getSource());
+        LOGV2_WARNING(21143,
+                      "No indexes found for collection {collection} while cloning from {source}",
+                      "collection"_attr = _sourceNss.ns(),
+                      "source"_attr = getSource());
     }
     for (auto&& spec : indexSpecs) {
         if (spec["name"].str() == "_id_"_sd) {
@@ -178,8 +177,8 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(21144,
                       "Found the _id_ index spec but the collection specified autoIndexId of false "
-                      "on ns:{this_sourceNss}",
-                      "this_sourceNss"_attr = this->_sourceNss);
+                      "on ns:{ns}",
+                      "ns"_attr = this->_sourceNss);
     }
     return kContinueNormally;
 }
@@ -330,8 +329,8 @@ void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {
                    !mustExit()) {
                 LOGV2(21137,
                       "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
-                      "enabled for {sourceNss}. Blocking until fail point is disabled.",
-                      "sourceNss"_attr = _sourceNss.toString());
+                      "enabled for {namespace}. Blocking until fail point is disabled.",
+                      "namespace"_attr = _sourceNss.toString());
                 mongo::sleepsecs(1);
             }
         },
@@ -350,8 +349,8 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         std::vector<BSONObj> docs;
         if (_documentsToInsert.size() == 0) {
             LOGV2_WARNING(21145,
-                          "insertDocumentsCallback, but no documents to insert for ns:{sourceNss}",
-                          "sourceNss"_attr = _sourceNss);
+                          "insertDocumentsCallback, but no documents to insert for ns:{ns}",
+                          "ns"_attr = _sourceNss);
             return;
         }
         _documentsToInsert.swap(docs);

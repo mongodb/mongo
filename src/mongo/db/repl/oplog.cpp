@@ -423,12 +423,12 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
         auto numMillis = data["waitForMillis"].numberInt();
         LOGV2(21244,
-              "Sleeping for {numMillis}ms after receiving {count} optimes from {opTimes_front} to "
-              "{opTimes_back}",
+              "Sleeping for {numMillis}ms after receiving {count} optimes from {first} to "
+              "{last}",
               "numMillis"_attr = numMillis,
               "count"_attr = count,
-              "opTimes_front"_attr = opTimes.front(),
-              "opTimes_back"_attr = opTimes.back());
+              "first"_attr = opTimes.front(),
+              "last"_attr = opTimes.back());
         sleepmillis(numMillis);
     });
 
@@ -549,7 +549,7 @@ void createOplog(OperationContext* opCtx,
                 stringstream ss;
                 ss << "cmdline oplogsize (" << n << ") different than existing (" << o
                    << ") see: http://dochub.mongodb.org/core/increase-oplog";
-                LOGV2(21249, "{ss_str}", "ss_str"_attr = ss.str());
+                LOGV2(21249, "{msg}", "msg"_attr = ss.str());
                 uasserted(13257, ss.str());
             }
         }
@@ -564,8 +564,8 @@ void createOplog(OperationContext* opCtx,
 
     LOGV2(21250, "******");
     LOGV2(21251,
-          "creating replication oplog of size: {int_sz_1024_1024}MB...",
-          "int_sz_1024_1024"_attr = (int)(sz / (1024 * 1024)));
+          "creating replication oplog of size: {size}MB...",
+          "size"_attr = (int)(sz / (1024 * 1024)));
 
     CollectionOptions options;
     options.capped = true;
@@ -804,9 +804,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto nss = extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd);
           if (nss.isDropPendingNamespace()) {
               LOGV2(21253,
-                    "applyCommand: {nss} : collection is already in a drop-pending state: ignoring "
+                    "applyCommand: {ns} : collection is already in a drop-pending state: ignoring "
                     "collection drop: {cmd}",
-                    "nss"_attr = nss,
+                    "ns"_attr = nss,
                     "cmd"_attr = redact(cmd));
               return Status::OK();
           }
@@ -945,10 +945,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
     auto op = opOrGroupedInserts.getOp();
     LOGV2_DEBUG(21254,
                 3,
-                "applying op (or grouped inserts): {opOrGroupedInserts}, oplog application mode: "
-                "{OplogApplication_modeToString_mode}",
-                "opOrGroupedInserts"_attr = redact(opOrGroupedInserts.toBSON()),
-                "OplogApplication_modeToString_mode"_attr = OplogApplication::modeToString(mode));
+                "applying op (or grouped inserts): {op}, oplog application mode: "
+                "{mode}",
+                "op"_attr = redact(opOrGroupedInserts.toBSON()),
+                "mode"_attr = OplogApplication::modeToString(mode));
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated. Atomic applyOps command is an exception, which runs
@@ -1355,9 +1355,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
     LOGV2_DEBUG(21255,
                 3,
                 "applying command op: {entry}, oplog application mode: "
-                "{OplogApplication_modeToString_mode}",
+                "{mode}",
                 "entry"_attr = redact(entry.toBSON()),
-                "OplogApplication_modeToString_mode"_attr = OplogApplication::modeToString(mode));
+                "mode"_attr = OplogApplication::modeToString(mode));
 
     // Only commands are processed here.
     invariant(entry.getOpType() == OpTypeEnum::kCommand);
@@ -1525,10 +1525,10 @@ Status applyCommand_inlock(OperationContext* opCtx,
             default: {
                 if (!curOpToApply.acceptableErrors.count(status.code())) {
                     LOGV2_ERROR(21262,
-                                "Failed command {o} on {nss_db} with status {status} during oplog "
+                                "Failed command {o} on {db} with status {status} during oplog "
                                 "application",
                                 "o"_attr = redact(o),
-                                "nss_db"_attr = nss.db(),
+                                "db"_attr = nss.db(),
                                 "status"_attr = status);
                     return status;
                 }

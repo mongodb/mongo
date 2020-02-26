@@ -92,14 +92,12 @@ Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
     }
 
     if (kUninitializedRollbackId == _rbid) {
-        LOGV2(21529,
-              "Rollback ID is {rbidResult_getValue}",
-              "rbidResult_getValue"_attr = rbidResult.getValue());
+        LOGV2(21529, "Rollback ID is {rbid}", "rbid"_attr = rbidResult.getValue());
     } else {
         LOGV2(21530,
-              "Rollback ID is {rbidResult_getValue} (previously {rbid})",
-              "rbidResult_getValue"_attr = rbidResult.getValue(),
-              "rbid"_attr = _rbid);
+              "Rollback ID is {rbid} (previously {previousRBID})",
+              "rbid"_attr = rbidResult.getValue(),
+              "previousRBID"_attr = _rbid);
     }
     _rbid = rbidResult.getValue();
 
@@ -127,15 +125,13 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
 
     auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
     if (initRbidSW.isOK()) {
-        LOGV2(21531,
-              "Initialized the rollback ID to {initRbidSW_getValue}",
-              "initRbidSW_getValue"_attr = initRbidSW.getValue());
+        LOGV2(21531, "Initialized the rollback ID to {rbid}", "rbid"_attr = initRbidSW.getValue());
         _rbid = initRbidSW.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
         LOGV2_WARNING(21534,
-                      "Failed to initialize the rollback ID: {initRbidSW_getStatus_reason}",
-                      "initRbidSW_getStatus_reason"_attr = initRbidSW.getStatus().reason());
+                      "Failed to initialize the rollback ID: {status}",
+                      "status"_attr = initRbidSW.getStatus().reason());
     }
     return initRbidSW.getStatus();
 }
@@ -148,15 +144,13 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     // If the rollback ID was incremented successfully, cache the new value in _rbid to be returned
     // the next time getRollbackID() is called.
     if (status.isOK()) {
-        LOGV2(21532,
-              "Incremented the rollback ID to {status_getValue}",
-              "status_getValue"_attr = status.getValue());
+        LOGV2(21532, "Incremented the rollback ID to {rbid}", "rbid"_attr = status.getValue());
         _rbid = status.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
         LOGV2_WARNING(21535,
-                      "Failed to increment the rollback ID: {status_getStatus_reason}",
-                      "status_getStatus_reason"_attr = status.getStatus().reason());
+                      "Failed to increment the rollback ID: {status}",
+                      "status"_attr = status.getStatus().reason());
     }
 
     return status.getStatus();

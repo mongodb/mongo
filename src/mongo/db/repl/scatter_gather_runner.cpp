@@ -106,9 +106,9 @@ StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {
         LOGV2(21752,
-              "Scheduling remote command request for {logMessage}: {requests_i}",
-              "logMessage"_attr = _logMessage,
-              "requests_i"_attr = requests[i].toString());
+              "Scheduling remote command request for {message}: {request}",
+              "message"_attr = _logMessage,
+              "request"_attr = requests[i].toString());
         const StatusWith<CallbackHandle> cbh =
             _executor->scheduleRemoteCommand(requests[i], processResponseCB);
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {

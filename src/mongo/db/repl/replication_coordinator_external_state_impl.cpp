@@ -879,7 +879,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         // replica set members.
         if (*it == "local")
             continue;
-        LOGV2_DEBUG(21309, 2, "Removing temporary collections from {it}", "it"_attr = *it);
+        LOGV2_DEBUG(21309, 2, "Removing temporary collections from {db}", "db"_attr = *it);
         AutoGetDb autoDb(opCtx, *it, MODE_IX);
         invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
         autoDb.getDb()->clearTmpCollections(opCtx);

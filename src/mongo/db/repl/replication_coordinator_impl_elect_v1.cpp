@@ -56,8 +56,8 @@ public:
             return;
         }
         LOGV2(21434,
-              "Lost {isDryRun_dry_run}election due to internal error",
-              "isDryRun_dry_run"_attr = (_isDryRun ? "dry run " : ""));
+              "Lost {isDryRun}election due to internal error",
+              "isDryRun"_attr = (_isDryRun ? "dry run " : ""));
         _replCoord->_topCoord->processLoseElection();
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
@@ -114,8 +114,8 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnu
         default:
             LOGV2_FATAL(21452,
                         "Entered replica set election code while in illegal config state "
-                        "{int_rsConfigState}",
-                        "int_rsConfigState"_attr = int(_rsConfigState));
+                        "{rsConfigState}",
+                        "rsConfigState"_attr = int(_rsConfigState));
             fassertFailed(28641);
     }
 
@@ -197,9 +197,9 @@ void ReplicationCoordinatorImpl::_processDryRunResult(long long originalTerm,
     if (_topCoord->getTerm() != originalTerm) {
         LOGV2(21439,
               "not running for primary, we have been superseded already during dry run. original "
-              "term: {originalTerm}, current term: {topCoord_getTerm}",
+              "term: {originalTerm}, current term: {term}",
               "originalTerm"_attr = originalTerm,
-              "topCoord_getTerm"_attr = _topCoord->getTerm());
+              "term"_attr = _topCoord->getTerm());
         return;
     }
 
@@ -314,9 +314,9 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     if (_topCoord->getTerm() != lastVote.getTerm()) {
         LOGV2(21446,
               "not running for primary, we have been superseded already while writing our last "
-              "vote. election term: {lastVote_getTerm}, current term: {topCoord_getTerm}",
-              "lastVote_getTerm"_attr = lastVote.getTerm(),
-              "topCoord_getTerm"_attr = _topCoord->getTerm());
+              "vote. election term: {electionTerm}, current term: {term}",
+              "electionTerm"_attr = lastVote.getTerm(),
+              "term"_attr = _topCoord->getTerm());
         return;
     }
     _startVoteRequester_inlock(lastVote.getTerm(), reason);
@@ -356,9 +356,9 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm,
     if (_topCoord->getTerm() != newTerm) {
         LOGV2(21447,
               "not becoming primary, we have been superseded already during election. election "
-              "term: {newTerm}, current term: {topCoord_getTerm}",
+              "term: {newTerm}, current term: {term}",
               "newTerm"_attr = newTerm,
-              "topCoord_getTerm"_attr = _topCoord->getTerm());
+              "term"_attr = _topCoord->getTerm());
         return;
     }
 
@@ -374,8 +374,8 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm,
             return;
         case VoteRequester::Result::kSuccessfullyElected:
             LOGV2(21450,
-                  "election succeeded, assuming primary role in term {topCoord_getTerm}",
-                  "topCoord_getTerm"_attr = _topCoord->getTerm());
+                  "election succeeded, assuming primary role in term {term}",
+                  "term"_attr = _topCoord->getTerm());
             ReplicationMetrics::get(getServiceContext())
                 .incrementNumElectionsSuccessfulForReason(reason);
             break;

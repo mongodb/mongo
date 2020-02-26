@@ -216,8 +216,9 @@ void BackgroundSync::_run() {
             sleepmillis(100);  // sleep a bit to keep from hammering this thread with temp. errors.
         } catch (const std::exception& e2) {
             // redact(std::exception&) doesn't work
-            LOGV2_FATAL(
-                21127, "sync producer exception: {e2_what}", "e2_what"_attr = redact(e2.what()));
+            LOGV2_FATAL(21127,
+                        "sync producer exception: {exception}",
+                        "exception"_attr = redact(e2.what()));
             fassertFailed(28546);
         }
     }
@@ -337,10 +338,10 @@ void BackgroundSync::_produce() {
                   "Our newest OpTime : {lastOpTimeFetched}",
                   "lastOpTimeFetched"_attr = lastOpTimeFetched);
             LOGV2(21082,
-                  "Earliest OpTime available is {syncSourceResp_earliestOpTimeSeen} from "
-                  "{syncSourceResp_getSyncSource}",
-                  "syncSourceResp_earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen,
-                  "syncSourceResp_getSyncSource"_attr = syncSourceResp.getSyncSource());
+                  "Earliest OpTime available is {earliestOpTimeSeen} from "
+                  "{syncSource}",
+                  "earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen,
+                  "syncSource"_attr = syncSourceResp.getSyncSource());
             auto status = _replCoord->abortCatchupIfNeeded(
                 ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
             if (!status.isOK()) {
@@ -366,8 +367,8 @@ void BackgroundSync::_produce() {
               "Our newest OpTime : {lastOpTimeFetched}",
               "lastOpTimeFetched"_attr = lastOpTimeFetched);
         LOGV2(21085,
-              "Earliest OpTime available is {syncSourceResp_earliestOpTimeSeen}",
-              "syncSourceResp_earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen);
+              "Earliest OpTime available is {earliestOpTimeSeen}",
+              "earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen);
         LOGV2(21086, "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
 
         // Activate maintenance mode and transition to RECOVERING.
@@ -382,12 +383,11 @@ void BackgroundSync::_produce() {
         status = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
         if (!status.isOK()) {
             LOGV2_WARNING(21117,
-                          "Failed to transition into {MemberState_MemberState_RS_RECOVERING}. "
-                          "Current state: {replCoord_getMemberState}{causedBy_status}",
-                          "MemberState_MemberState_RS_RECOVERING"_attr =
-                              MemberState(MemberState::RS_RECOVERING),
-                          "replCoord_getMemberState"_attr = _replCoord->getMemberState(),
-                          "causedBy_status"_attr = causedBy(status));
+                          "Failed to transition into {state}. "
+                          "Current state: {currentState}{status}",
+                          "state"_attr = MemberState(MemberState::RS_RECOVERING),
+                          "currentState"_attr = _replCoord->getMemberState(),
+                          "status"_attr = causedBy(status));
             // Do not mark ourselves too stale on errors so we can try again next time.
             return;
         }
@@ -417,21 +417,19 @@ void BackgroundSync::_produce() {
             numTimesChoseSameSyncSource.increment(1);
             mongo::sleepmillis(sleepMS);
         } else {
-            LOGV2(
-                21088,
-                "Changed sync source from {oldSource_empty_std_string_empty_oldSource} to {source}",
-                "oldSource_empty_std_string_empty_oldSource"_attr =
-                    (oldSource.empty() ? std::string("empty") : oldSource.toString()),
-                "source"_attr = source);
+            LOGV2(21088,
+                  "Changed sync source from {oldSource} to {source}",
+                  "oldSource"_attr =
+                      (oldSource.empty() ? std::string("empty") : oldSource.toString()),
+                  "source"_attr = source);
             numTimesChoseDifferentSyncSource.increment(1);
         }
     } else {
         if (!syncSourceResp.isOK()) {
             LOGV2(21089,
                   "failed to find sync source, received error "
-                  "{syncSourceResp_syncSourceStatus_getStatus}",
-                  "syncSourceResp_syncSourceStatus_getStatus"_attr =
-                      syncSourceResp.syncSourceStatus.getStatus());
+                  "{status}",
+                  "status"_attr = syncSourceResp.syncSourceStatus.getStatus());
         }
 
         long long sleepMS = 1000;
@@ -523,10 +521,9 @@ void BackgroundSync::_produce() {
     LOGV2_DEBUG(21092,
                 logSeverityV1toV2(logLevel).toInt(),
                 "scheduling fetcher to read remote oplog on {source} starting at "
-                "{oplogFetcher_getLastOpTimeFetched_forTest}",
+                "{lastOpTimeFetched}",
                 "source"_attr = source,
-                "oplogFetcher_getLastOpTimeFetched_forTest"_attr =
-                    oplogFetcher->getLastOpTimeFetched_forTest());
+                "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched_forTest());
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         LOGV2_WARNING(
@@ -672,8 +669,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
           "Starting rollback due to {fetcherReturnStatus}",
           "fetcherReturnStatus"_attr = redact(fetcherReturnStatus));
     LOGV2(21099,
-          "Replication commit point: {replCoord_getLastCommittedOpTime}",
-          "replCoord_getLastCommittedOpTime"_attr = _replCoord->getLastCommittedOpTime());
+          "Replication commit point: {lastCommittedOpTime}",
+          "lastCommittedOpTime"_attr = _replCoord->getLastCommittedOpTime());
 
     // TODO: change this to call into the Applier directly to block until the applier is
     // drained.
@@ -890,10 +887,9 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
         throw;
     } catch (const DBException& ex) {
         LOGV2_FATAL(21129,
-                    "Problem reading {NamespaceString_kRsOplogNamespace_ns}: {ex}",
-                    "NamespaceString_kRsOplogNamespace_ns"_attr =
-                        NamespaceString::kRsOplogNamespace.ns(),
-                    "ex"_attr = redact(ex));
+                    "Problem reading {namespace}: {exception}",
+                    "namespace"_attr = NamespaceString::kRsOplogNamespace.ns(),
+                    "exception"_attr = redact(ex));
         fassertFailed(18904);
     }
 

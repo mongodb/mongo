@@ -141,8 +141,8 @@ public:
 
             LOGV2_FATAL(
                 21559,
-                "Couldn't find any entries in the oplog{ss_str}, which should be impossible.",
-                "ss_str"_attr = ss.str());
+                "Couldn't find any entries in the oplog{oplog}, which should be impossible.",
+                "oplog"_attr = ss.str());
             fassertFailedNoTrace(40293);
         }
 
@@ -266,8 +266,8 @@ void ReplicationRecoveryImpl::_assertNoRecoveryNeededOnUnstableCheckpoint(Operat
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     if (!topOfOplogSW.isOK()) {
         LOGV2_FATAL(21565,
-                    "Recovery not possible, no oplog found: {topOfOplogSW_getStatus}",
-                    "topOfOplogSW_getStatus"_attr = topOfOplogSW.getStatus());
+                    "Recovery not possible, no oplog found: {status}",
+                    "status"_attr = topOfOplogSW.getStatus());
         fassertFailedNoTrace(31364);
     }
     const auto topOfOplog = topOfOplogSW.getValue();
@@ -437,8 +437,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     }
 } catch (...) {
     LOGV2_FATAL(21570,
-                "Caught exception during replication recovery: {exceptionToStatus}",
-                "exceptionToStatus"_attr = exceptionToStatus());
+                "Caught exception during replication recovery: {exception}",
+                "exception"_attr = exceptionToStatus());
     std::terminate();
 }
 
@@ -673,16 +673,16 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
 
     // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.
     LOGV2(21553,
-          "Truncating oplog from {truncateAfterOplogEntry_timestamp} (non-inclusive). Truncate "
+          "Truncating oplog from {timestamp} (non-inclusive). Truncate "
           "after point is {truncateAfterTimestamp}",
-          "truncateAfterOplogEntry_timestamp"_attr = truncateAfterOplogEntry.getTimestamp(),
+          "timestamp"_attr = truncateAfterOplogEntry.getTimestamp(),
           "truncateAfterTimestamp"_attr = truncateAfterTimestamp);
 
     oplogCollection->cappedTruncateAfter(opCtx, truncateAfterRecordId, /*inclusive*/ false);
 
     LOGV2(21554,
-          "Replication recovery oplog truncation finished in: {timer_millis}ms",
-          "timer_millis"_attr = timer.millis());
+          "Replication recovery oplog truncation finished in: {ms}ms",
+          "ms"_attr = timer.millis());
 }
 
 void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
@@ -701,9 +701,9 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
 
         LOGV2(21556,
               "The oplog truncation point ({truncatePoint}) is equal to or earlier than the stable "
-              "timestamp ({stableTimestamp_get}), so truncating after the stable timestamp instead",
+              "timestamp ({stableTimestamp}), so truncating after the stable timestamp instead",
               "truncatePoint"_attr = truncatePoint,
-              "stableTimestamp_get"_attr = stableTimestamp.get());
+              "stableTimestamp"_attr = stableTimestamp.get());
 
         truncatePoint = stableTimestamp.get();
     }

@@ -359,16 +359,15 @@ void remoteStepdownCallback(const executor::TaskExecutor::RemoteCommandCallbackA
     if (status.isOK()) {
         LOGV2_DEBUG(21477,
                     1,
-                    "stepdown of primary({cbData_request_target}) succeeded with response -- "
-                    "{cbData_response_data}",
-                    "cbData_request_target"_attr = cbData.request.target,
-                    "cbData_response_data"_attr = cbData.response.data);
+                    "stepdown of primary({primary}) succeeded with response -- "
+                    "{response}",
+                    "primary"_attr = cbData.request.target,
+                    "response"_attr = cbData.response.data);
     } else {
-        LOGV2_WARNING(
-            21486,
-            "stepdown of primary({cbData_request_target}) failed due to {cbData_response_status}",
-            "cbData_request_target"_attr = cbData.request.target,
-            "cbData_response_status"_attr = cbData.response.status);
+        LOGV2_WARNING(21486,
+                      "stepdown of primary({primary}) failed due to {status}",
+                      "primary"_attr = cbData.request.target,
+                      "status"_attr = cbData.response.status);
     }
 }
 }  // namespace
@@ -506,8 +505,8 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
         case kConfigReplicationDisabled:
             LOGV2_FATAL(21491,
                         "Reconfiguration request occurred while _rsConfigState == "
-                        "{int_rsConfigState}; aborting.",
-                        "int_rsConfigState"_attr = int(_rsConfigState));
+                        "{_rsConfigState}; aborting.",
+                        "_rsConfigState"_attr = int(_rsConfigState));
             fassertFailed(18807);
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
@@ -570,8 +569,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     if (!myIndex.getStatus().isOK() && myIndex.getStatus() != ErrorCodes::NodeNotFound) {
         LOGV2_WARNING(21487,
                       "Not persisting new configuration in heartbeat response to disk because "
-                      "it is invalid: {myIndex_getStatus}",
-                      "myIndex_getStatus"_attr = myIndex.getStatus());
+                      "it is invalid: {status}",
+                      "status"_attr = myIndex.getStatus());
     } else {
         LOGV2_FOR_HEARTBEATS(4615626,
                              2,
@@ -728,22 +727,20 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             case ErrorCodes::NodeNotFound:
                 LOGV2(21482,
                       "Cannot find self in new replica set configuration; I must be removed; "
-                      "{myIndex_getStatus}",
-                      "myIndex_getStatus"_attr = myIndex.getStatus());
+                      "{status}",
+                      "status"_attr = myIndex.getStatus());
                 break;
             case ErrorCodes::InvalidReplicaSetConfig:
-                LOGV2_ERROR(
-                    21489,
-                    "Several entries in new config represent this node; "
-                    "Removing self until an acceptable configuration arrives; {myIndex_getStatus}",
-                    "myIndex_getStatus"_attr = myIndex.getStatus());
+                LOGV2_ERROR(21489,
+                            "Several entries in new config represent this node; "
+                            "Removing self until an acceptable configuration arrives; {status}",
+                            "status"_attr = myIndex.getStatus());
                 break;
             default:
-                LOGV2_ERROR(
-                    21490,
-                    "Could not validate configuration received from remote node; "
-                    "Removing self until an acceptable configuration arrives; {myIndex_getStatus}",
-                    "myIndex_getStatus"_attr = myIndex.getStatus());
+                LOGV2_ERROR(21490,
+                            "Could not validate configuration received from remote node; "
+                            "Removing self until an acceptable configuration arrives; {status}",
+                            "status"_attr = myIndex.getStatus());
                 break;
         }
         myIndex = StatusWith<int>(-1);

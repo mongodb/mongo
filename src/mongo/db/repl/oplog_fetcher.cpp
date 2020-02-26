@@ -734,7 +734,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             [&](auto&&) {
                 status = {ErrorCodes::FailPointEnabled,
                           "stopReplProducerOnDocument fail point is enabled."};
-                LOGV2(21269, "{status_reason}", "status_reason"_attr = status.reason());
+                LOGV2(21269, "{status}", "status"_attr = status.reason());
             },
             [&](const BSONObj& data) {
                 auto opCtx = cc().makeOperationContext();
@@ -758,11 +758,11 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     if (!documents.empty()) {
         LOGV2_DEBUG(21270,
                     2,
-                    "oplog fetcher read {documents_size} operations from remote oplog starting at "
-                    "{documents_front_ts} and ending at {documents_back_ts}",
-                    "documents_size"_attr = documents.size(),
-                    "documents_front_ts"_attr = documents.front()["ts"],
-                    "documents_back_ts"_attr = documents.back()["ts"]);
+                    "oplog fetcher read {operations} operations from remote oplog starting at "
+                    "{first} and ending at {last}",
+                    "operations"_attr = documents.size(),
+                    "first"_attr = documents.front()["ts"],
+                    "last"_attr = documents.back()["ts"]);
     } else {
         LOGV2_DEBUG(21271, 2, "oplog fetcher read 0 operations from remote oplog");
     }
@@ -771,10 +771,10 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     if (!oqMetadataResult.isOK()) {
         LOGV2_ERROR(21278,
                     "invalid oplog query metadata from sync source {source}: "
-                    "{oqMetadataResult_getStatus}: {metadataObj}",
+                    "{status}: {metadata}",
                     "source"_attr = _source,
-                    "oqMetadataResult_getStatus"_attr = oqMetadataResult.getStatus(),
-                    "metadataObj"_attr = _metadataObj);
+                    "status"_attr = oqMetadataResult.getStatus(),
+                    "metadata"_attr = _metadataObj);
         return oqMetadataResult.getStatus();
     }
     auto oqMetadata = oqMetadataResult.getValue();
@@ -832,10 +832,10 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         if (!metadataResult.isOK()) {
             LOGV2_ERROR(21279,
                         "invalid replication metadata from sync source {source}: "
-                        "{metadataResult_getStatus}: {metadataObj}",
+                        "{status}: {metadata}",
                         "source"_attr = _source,
-                        "metadataResult_getStatus"_attr = metadataResult.getStatus(),
-                        "metadataObj"_attr = _metadataObj);
+                        "status"_attr = metadataResult.getStatus(),
+                        "metadata"_attr = _metadataObj);
             return metadataResult.getStatus();
         }
         replSetMetadata = metadataResult.getValue();
@@ -911,10 +911,10 @@ bool OplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(OplogFetch
     }
     LOGV2(21275,
           "Recreating cursor for oplog fetcher due to error: {status}. Last fetched optime: "
-          "{fetcher_getLastOpTimeFetched}. Attempts remaining: {maxRestarts_numRestarts}",
+          "{lastOpTimeFetched}. Attempts remaining: {attemptsRemaining}",
           "status"_attr = redact(status),
-          "fetcher_getLastOpTimeFetched"_attr = fetcher->_getLastOpTimeFetched(),
-          "maxRestarts_numRestarts"_attr = (_maxRestarts - _numRestarts));
+          "lastOpTimeFetched"_attr = fetcher->_getLastOpTimeFetched(),
+          "attemptsRemaining"_attr = (_maxRestarts - _numRestarts));
     _numRestarts++;
     return true;
 }

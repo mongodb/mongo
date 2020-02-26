@@ -739,9 +739,7 @@ public:
         status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible(skipDryRun);
 
         if (!status.isOK()) {
-            LOGV2(21582,
-                  "replSetStepUp request failed{causedBy_status}",
-                  "causedBy_status"_attr = causedBy(status));
+            LOGV2(21582, "replSetStepUp request failed{status}", "status"_attr = causedBy(status));
         }
 
         uassertStatusOK(status);
@@ -777,8 +775,8 @@ public:
                 kFailedWithReplSetAbortPrimaryCatchUpCmd);
         if (!status.isOK()) {
             LOGV2(21584,
-                  "replSetAbortPrimaryCatchUp request failed{causedBy_status}",
-                  "causedBy_status"_attr = causedBy(status));
+                  "replSetAbortPrimaryCatchUp request failed{status}",
+                  "status"_attr = causedBy(status));
         }
         uassertStatusOK(status);
         return true;

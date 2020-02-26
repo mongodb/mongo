@@ -144,7 +144,7 @@ Status finishAndLogApply(OperationContext* opCtx,
                 s << redact(entryOrGroupedInserts.toBSON());
                 s << ", took " << opDuration << "ms";
 
-                LOGV2(21228, "{s_str}", "s_str"_attr = s.str());
+                LOGV2(21228, "{msg}", "msg"_attr = s.str());
             }
         }
     }
@@ -623,7 +623,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                                       std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
 
-    LOGV2_DEBUG(21230, 2, "replication batch size is {ops_size}", "ops_size"_attr = ops.size());
+    LOGV2_DEBUG(21230, 2, "replication batch size is {size}", "size"_attr = ops.size());
 
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
     // entries from the oplog until we finish writing.
@@ -723,14 +723,13 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 if (!status.isOK()) {
                     LOGV2_FATAL(21235,
                                 "Failed to apply batch of operations. Number of operations in "
-                                "batch: {ops_size}. First operation: {ops_front}. Last operation: "
-                                "{ops_back}. Oplog application failed in writer thread "
-                                "{std_distance_statusVector_cbegin_it}: {status}",
-                                "ops_size"_attr = ops.size(),
-                                "ops_front"_attr = redact(ops.front().toBSON()),
-                                "ops_back"_attr = redact(ops.back().toBSON()),
-                                "std_distance_statusVector_cbegin_it"_attr =
-                                    std::distance(statusVector.cbegin(), it),
+                                "batch: {size}. First operation: {first}. Last operation: "
+                                "{last}. Oplog application failed in writer thread "
+                                "{thread}: {status}",
+                                "size"_attr = ops.size(),
+                                "first"_attr = redact(ops.front().toBSON()),
+                                "last"_attr = redact(ops.back().toBSON()),
+                                "thread"_attr = std::distance(statusVector.cbegin(), it),
                                 "status"_attr = redact(status));
                     return status;
                 }
@@ -1076,9 +1075,9 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                     }
 
                     LOGV2_FATAL(21237,
-                                "Error applying operation ({entry}): {causedBy_status}",
+                                "Error applying operation ({entry}): {status}",
                                 "entry"_attr = redact(entry.toBSON()),
-                                "causedBy_status"_attr = causedBy(redact(status)));
+                                "status"_attr = causedBy(redact(status)));
                     return status;
                 }
             } catch (const DBException& e) {

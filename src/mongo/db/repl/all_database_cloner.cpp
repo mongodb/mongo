@@ -107,16 +107,16 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
             LOGV2_DEBUG(21055,
                         1,
                         "Excluding database due to the 'listDatabases' response not containing a "
-                        "'name' field for this entry: {dbBSON}",
-                        "dbBSON"_attr = dbBSON);
+                        "'name' field for this entry: {db}",
+                        "db"_attr = dbBSON);
             continue;
         }
         const auto& dbName = dbBSON["name"].str();
         if (dbName == "local") {
             LOGV2_DEBUG(21056,
                         1,
-                        "Excluding database from the 'listDatabases' response: {dbBSON}",
-                        "dbBSON"_attr = dbBSON);
+                        "Excluding database from the 'listDatabases' response: {db}",
+                        "db"_attr = dbBSON);
             continue;
         } else {
             _databases.emplace_back(dbName);
@@ -153,17 +153,17 @@ void AllDatabaseCloner::postStage() {
         if (dbStatus.isOK()) {
             LOGV2_DEBUG(21057,
                         1,
-                        "Database clone for '{dbName}' finished: {dbStatus}",
+                        "Database clone for '{dbName}' finished: {status}",
                         "dbName"_attr = dbName,
-                        "dbStatus"_attr = dbStatus);
+                        "status"_attr = dbStatus);
         } else {
             LOGV2_WARNING(21060,
-                          "database '{dbName}' ({stats_databasesCloned_1} of {databases_size}) "
-                          "clone failed due to {dbStatus}",
+                          "database '{dbName}' ({number} of {total}) "
+                          "clone failed due to {status}",
                           "dbName"_attr = dbName,
-                          "stats_databasesCloned_1"_attr = (_stats.databasesCloned + 1),
-                          "databases_size"_attr = _databases.size(),
-                          "dbStatus"_attr = dbStatus.toString());
+                          "number"_attr = (_stats.databasesCloned + 1),
+                          "total"_attr = _databases.size(),
+                          "status"_attr = dbStatus.toString());
             setInitialSyncFailedStatus(dbStatus);
             return;
         }

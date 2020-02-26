@@ -192,8 +192,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
     LOGV2_DEBUG(21753,
                 2,
-                "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {nss_ns}",
-                "nss_ns"_attr = nss.ns());
+                "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {ns}",
+                "ns"_attr = nss.ns());
 
     class StashClient {
     public:
@@ -387,9 +387,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     std::vector<std::string> dbNames =
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
     invariant(!dbNames.empty());
-    LOGV2(21754,
-          "dropReplicatedDatabases - dropping {dbNames_size} databases",
-          "dbNames_size"_attr = dbNames.size());
+    LOGV2(21754, "dropReplicatedDatabases - dropping {num} databases", "num"_attr = dbNames.size());
 
     ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
 
@@ -414,9 +412,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
         });
     }
     invariant(hasLocalDatabase, "local database missing");
-    LOGV2(21756,
-          "dropReplicatedDatabases - dropped {dbNames_size} databases",
-          "dbNames_size"_attr = dbNames.size());
+    LOGV2(21756, "dropReplicatedDatabases - dropped {num} databases", "num"_attr = dbNames.size());
 
     return Status::OK();
 }

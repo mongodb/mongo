@@ -1019,8 +1019,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
         // recently upgraded to enableMajorityReadConcern=true.
         LOGV2_FATAL(21644,
                     "Common point must be at least stable timestamp, common point: "
-                    "{commonPointOpTime_getTimestamp}, stable timestamp: {stableTimestamp}",
-                    "commonPointOpTime_getTimestamp"_attr = commonPointOpTime.getTimestamp(),
+                    "{commonPoint}, stable timestamp: {stableTimestamp}",
+                    "commonPoint"_attr = commonPointOpTime.getTimestamp(),
                     "stableTimestamp"_attr = *stableTimestamp);
         fassertFailedNoTrace(51121);
     }
@@ -1090,12 +1090,12 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
         return boost::none;
     } else {
         LOGV2_FATAL(21645,
-                    "Rollback failed to read document with {id} in namespace {nss_ns} with uuid "
-                    "{uuid}{causedBy_document_getStatus}",
+                    "Rollback failed to read document with {id} in namespace {ns} with uuid "
+                    "{uuid}{status}",
                     "id"_attr = redact(id),
-                    "nss_ns"_attr = nss.ns(),
+                    "ns"_attr = nss.ns(),
                     "uuid"_attr = uuid.toString(),
-                    "causedBy_document_getStatus"_attr = causedBy(document.getStatus()));
+                    "status"_attr = causedBy(document.getStatus()));
         fassert(50751, document.getStatus());
     }
 
@@ -1115,9 +1115,8 @@ Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
             LOGV2(21608,
                   "The collection with UUID {uuid} is missing in the CollectionCatalog. This could "
                   "be due to a dropped "
-                  " collection. Not writing rollback file for uuid {uuid2}",
-                  "uuid"_attr = uuid,
-                  "uuid2"_attr = uuid);
+                  " collection. Not writing rollback file for uuid",
+                  "uuid"_attr = uuid);
             continue;
         }
 
@@ -1137,11 +1136,11 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
                                                   const SimpleBSONObjUnorderedSet& idSet) {
     RemoveSaver removeSaver(kRollbackRemoveSaverType, uuid.toString(), kRollbackRemoveSaverWhy);
     LOGV2(21609,
-          "Preparing to write deleted documents to a rollback file for collection {nss_ns} with "
-          "uuid {uuid} to {removeSaver_file_generic_string}",
-          "nss_ns"_attr = nss.ns(),
+          "Preparing to write deleted documents to a rollback file for collection {ns} with "
+          "uuid {uuid} to {file}",
+          "ns"_attr = nss.ns(),
           "uuid"_attr = uuid.toString(),
-          "removeSaver_file_generic_string"_attr = removeSaver.file().generic_string());
+          "file"_attr = removeSaver.file().generic_string());
 
     // The RemoveSaver will save the data files in a directory structure similar to the following:
     //
@@ -1205,16 +1204,14 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 
     auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {
-        LOGV2_FATAL(
-            21646,
-            "Failed to transition into {MemberState_MemberState_RS_SECONDARY}; expected to be in "
-            "state {MemberState_MemberState_RS_ROLLBACK}; found self in "
-            "{replicationCoordinator_getMemberState}{causedBy_status}",
-            "MemberState_MemberState_RS_SECONDARY"_attr = MemberState(MemberState::RS_SECONDARY),
-            "MemberState_MemberState_RS_ROLLBACK"_attr = MemberState(MemberState::RS_ROLLBACK),
-            "replicationCoordinator_getMemberState"_attr =
-                _replicationCoordinator->getMemberState(),
-            "causedBy_status"_attr = causedBy(status));
+        LOGV2_FATAL(21646,
+                    "Failed to transition into {targetState}; expected to be in "
+                    "state {expectedState}; found self in "
+                    "{actualState}{status}",
+                    "targetState"_attr = MemberState(MemberState::RS_SECONDARY),
+                    "expectedState"_attr = MemberState(MemberState::RS_ROLLBACK),
+                    "actualState"_attr = _replicationCoordinator->getMemberState(),
+                    "status"_attr = causedBy(status));
         fassertFailedNoTrace(40408);
     }
 }
@@ -1241,35 +1238,30 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
 
 void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     LOGV2(21612, "Rollback summary:");
-    LOGV2(21613,
-          "\tstart time: {rollbackStats_startTime}",
-          "rollbackStats_startTime"_attr = _rollbackStats.startTime);
+    LOGV2(21613, "\tstart time: {startTime}", "startTime"_attr = _rollbackStats.startTime);
     LOGV2(21614,
-          "\tend time: {opCtx_getServiceContext_getFastClockSource_now}",
-          "opCtx_getServiceContext_getFastClockSource_now"_attr =
-              opCtx->getServiceContext()->getFastClockSource()->now());
+          "\tend time: {endTime}",
+          "endTime"_attr = opCtx->getServiceContext()->getFastClockSource()->now());
     LOGV2(21615,
-          "\tsync source: {remoteOplog_hostAndPort}",
-          "remoteOplog_hostAndPort"_attr = _remoteOplog->hostAndPort().toString());
+          "\tsync source: {syncSource}",
+          "syncSource"_attr = _remoteOplog->hostAndPort().toString());
     LOGV2(21616,
           "\trollback data file directory: "
-          "{rollbackStats_rollbackDataFileDirectory_value_or_none_no_files_written}",
-          "rollbackStats_rollbackDataFileDirectory_value_or_none_no_files_written"_attr =
+          "{directory}",
+          "directory"_attr =
               _rollbackStats.rollbackDataFileDirectory.value_or("none; no files written"));
     if (_rollbackStats.rollbackId) {
-        LOGV2(21617,
-              "\trollback id: {rollbackStats_rollbackId}",
-              "rollbackStats_rollbackId"_attr = *_rollbackStats.rollbackId);
+        LOGV2(21617, "\trollback id: {rbid}", "rbid"_attr = *_rollbackStats.rollbackId);
     }
     if (_rollbackStats.lastLocalOptime) {
         LOGV2(21618,
-              "\tlast optime on branch of history rolled back: {rollbackStats_lastLocalOptime}",
-              "rollbackStats_lastLocalOptime"_attr = *_rollbackStats.lastLocalOptime);
+              "\tlast optime on branch of history rolled back: {lastLocalOptime}",
+              "lastLocalOptime"_attr = *_rollbackStats.lastLocalOptime);
     }
     if (_rollbackStats.commonPoint) {
         LOGV2(21619,
-              "\tcommon point optime: {rollbackStats_commonPoint}",
-              "rollbackStats_commonPoint"_attr = *_rollbackStats.commonPoint);
+              "\tcommon point optime: {commonPoint}",
+              "commonPoint"_attr = *_rollbackStats.commonPoint);
     }
     if (_rollbackStats.lastLocalWallClockTime &&
         _rollbackStats.firstOpWallClockTimeAfterCommonPoint) {
@@ -1291,51 +1283,49 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     }
     if (_rollbackStats.truncateTimestamp) {
         LOGV2(21623,
-              "\ttruncate timestamp: {rollbackStats_truncateTimestamp}",
-              "rollbackStats_truncateTimestamp"_attr = *_rollbackStats.truncateTimestamp);
+              "\ttruncate timestamp: {truncateTimestamp}",
+              "truncateTimestamp"_attr = *_rollbackStats.truncateTimestamp);
     }
     if (_rollbackStats.stableTimestamp) {
         LOGV2(21624,
-              "\tstable timestamp: {rollbackStats_stableTimestamp}",
-              "rollbackStats_stableTimestamp"_attr = *_rollbackStats.stableTimestamp);
+              "\tstable timestamp: {stableTimestamp}",
+              "stableTimestamp"_attr = *_rollbackStats.stableTimestamp);
     }
     LOGV2(21625,
-          "\tshard identity document rolled back: {observerInfo_shardIdentityRolledBack}",
-          "observerInfo_shardIdentityRolledBack"_attr = _observerInfo.shardIdentityRolledBack);
+          "\tshard identity document rolled back: {shardIdentityRolledBack}",
+          "shardIdentityRolledBack"_attr = _observerInfo.shardIdentityRolledBack);
     LOGV2(21626,
           "\tconfig server config version document rolled back: "
-          "{observerInfo_configServerConfigVersionRolledBack}",
-          "observerInfo_configServerConfigVersionRolledBack"_attr =
+          "{configServerConfigVersionRolledBack}",
+          "configServerConfigVersionRolledBack"_attr =
               _observerInfo.configServerConfigVersionRolledBack);
     LOGV2(21627,
-          "\taffected sessions: {observerInfo_rollbackSessionIds_empty_none}",
-          "observerInfo_rollbackSessionIds_empty_none"_attr =
-              (_observerInfo.rollbackSessionIds.empty() ? "none" : ""));
+          "\taffected sessions: {rollbackSessionIds}",
+          "rollbackSessionIds"_attr = (_observerInfo.rollbackSessionIds.empty() ? "none" : ""));
     for (const auto& sessionId : _observerInfo.rollbackSessionIds) {
         LOGV2(21628, "\t\t{sessionId}", "sessionId"_attr = sessionId);
     }
     LOGV2(21629,
-          "\taffected namespaces: {observerInfo_rollbackNamespaces_empty_none}",
-          "observerInfo_rollbackNamespaces_empty_none"_attr =
-              (_observerInfo.rollbackNamespaces.empty() ? "none" : ""));
+          "\taffected namespaces: {rollbackNamespaces}",
+          "rollbackNamespaces"_attr = (_observerInfo.rollbackNamespaces.empty() ? "none" : ""));
     for (const auto& nss : _observerInfo.rollbackNamespaces) {
-        LOGV2(21630, "\t\t{nss_ns}", "nss_ns"_attr = nss.ns());
+        LOGV2(21630, "\t\t{ns}", "ns"_attr = nss.ns());
     }
     LOGV2(21631,
           "\tcounts of interesting commands rolled back: "
-          "{observerInfo_rollbackCommandCounts_empty_none}",
-          "observerInfo_rollbackCommandCounts_empty_none"_attr =
+          "{rollbackCommandCounts}",
+          "rollbackCommandCounts"_attr =
               (_observerInfo.rollbackCommandCounts.empty() ? "none" : ""));
     for (const auto& entry : _observerInfo.rollbackCommandCounts) {
         LOGV2(21632,
-              "\t\t{entry_first}: {entry_second}",
-              "entry_first"_attr = entry.first,
-              "entry_second"_attr = entry.second);
+              "\t\t{command}: {count}",
+              "command"_attr = entry.first,
+              "count"_attr = entry.second);
     }
     LOGV2(21633,
           "\ttotal number of entries rolled back (including no-ops): "
-          "{observerInfo_numberOfEntriesObserved}",
-          "observerInfo_numberOfEntriesObserved"_attr = _observerInfo.numberOfEntriesObserved);
+          "{numberOfEntriesObserved}",
+          "numberOfEntriesObserved"_attr = _observerInfo.numberOfEntriesObserved);
 }
 
 }  // namespace repl

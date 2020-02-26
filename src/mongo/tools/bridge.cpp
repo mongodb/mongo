@@ -282,10 +282,10 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
 
         LOGV2_DEBUG(22917,
                     1,
-                    "Received \"{cmdRequest_getCommandName}\" command with arguments "
-                    "{cmdRequest_body} from {dest}",
-                    "cmdRequest_getCommandName"_attr = cmdRequest->getCommandName(),
-                    "cmdRequest_body"_attr = cmdRequest->body,
+                    "Received \"{commandName}\" command with arguments "
+                    "{arguments} from {dest}",
+                    "commandName"_attr = cmdRequest->getCommandName(),
+                    "arguments"_attr = cmdRequest->body,
                     "dest"_attr = dest);
     }
 
@@ -313,9 +313,9 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         // Close the connection to 'dest'.
         case HostSettings::State::kHangUp:
             LOGV2(22918,
-                  "Rejecting connection from {dest}, end connection {source_remote}",
+                  "Rejecting connection from {dest}, end connection {source}",
                   "dest"_attr = dest,
-                  "source_remote"_attr = source->remote().toString());
+                  "source"_attr = source->remote().toString());
             source->end();
             return {Message()};
         // Forward the message to 'dest' with probability '1 - hostSettings.loss'.
@@ -324,16 +324,15 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
                 std::string hostName = dest.toString();
                 if (cmdRequest) {
                     LOGV2(22919,
-                          "Discarding \"{cmdRequest_getCommandName}\" command with arguments "
-                          "{cmdRequest_body} from {hostName}",
-                          "cmdRequest_getCommandName"_attr = cmdRequest->getCommandName(),
-                          "cmdRequest_body"_attr = cmdRequest->body,
+                          "Discarding \"{commandName}\" command with arguments "
+                          "{arguments} from {hostName}",
+                          "commandName"_attr = cmdRequest->getCommandName(),
+                          "arguments"_attr = cmdRequest->body,
                           "hostName"_attr = hostName);
                 } else {
                     LOGV2(22920,
-                          "Discarding {networkOpToString_request_operation} from {hostName}",
-                          "networkOpToString_request_operation"_attr =
-                              networkOpToString(request.operation()),
+                          "Discarding {operation} from {hostName}",
+                          "operation"_attr = networkOpToString(request.operation()),
                           "hostName"_attr = hostName);
                 }
                 return {Message()};
@@ -368,9 +367,9 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         // connections from 'host', then do so now.
         if (hostSettings.state == HostSettings::State::kHangUp) {
             LOGV2(22921,
-                  "Closing connection from {dest}, end connection {source_remote}",
+                  "Closing connection from {dest}, end connection {source}",
                   "dest"_attr = dest,
-                  "source_remote"_attr = source->remote());
+                  "source"_attr = source->remote());
             source->end();
             return {Message()};
         }

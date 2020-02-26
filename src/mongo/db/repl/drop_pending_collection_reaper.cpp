@@ -151,10 +151,10 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
     }
 
     LOGV2(21152,
-          "Rolling back collection drop for {pendingNss} with drop OpTime {opTime} to namespace "
+          "Rolling back collection drop for {pendingNs} with drop OpTime {dropOpTime} to namespace "
           "{collectionNamespace}",
-          "pendingNss"_attr = pendingNss,
-          "opTime"_attr = opTime,
+          "pendingNs"_attr = pendingNss,
+          "dropOpTime"_attr = opTime,
           "collectionNamespace"_attr = collectionNamespace);
 
     return true;
@@ -185,9 +185,9 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
             const auto& dropOpTime = opTimeAndNamespace.first;
             const auto& nss = opTimeAndNamespace.second;
             LOGV2(21153,
-                  "Completing collection drop for {nss} with drop optime {dropOpTime} "
+                  "Completing collection drop for {ns} with drop optime {dropOpTime} "
                   "(notification optime: {opTime})",
-                  "nss"_attr = nss,
+                  "ns"_attr = nss,
                   "dropOpTime"_attr = dropOpTime,
                   "opTime"_attr = opTime);
             Status status = Status::OK();
@@ -199,9 +199,9 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
             }
             if (!status.isOK()) {
                 LOGV2_WARNING(21155,
-                              "Failed to remove drop-pending collection {nss} with drop optime "
+                              "Failed to remove drop-pending collection {ns} with drop optime "
                               "{dropOpTime} (notification optime: {opTime}): {status}",
-                              "nss"_attr = nss,
+                              "ns"_attr = nss,
                               "dropOpTime"_attr = dropOpTime,
                               "opTime"_attr = opTime,
                               "status"_attr = status);

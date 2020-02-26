@@ -733,9 +733,9 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     // truncate oplog; drop user databases.
     LOGV2_DEBUG(21171,
                 1,
-                "About to truncate the oplog, if it exists, ns:{opts_localOplogNS}, and drop all "
+                "About to truncate the oplog, if it exists, ns:{ns}, and drop all "
                 "user databases (so that we can clone them).",
-                "opts_localOplogNS"_attr = _opts.localOplogNS);
+                "ns"_attr = _opts.localOplogNS);
 
     auto opCtx = makeOpCtx();
 
@@ -743,21 +743,15 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());
 
     // 1.) Truncate the oplog.
-    LOGV2_DEBUG(21172,
-                2,
-                "Truncating the existing oplog: {opts_localOplogNS}",
-                "opts_localOplogNS"_attr = _opts.localOplogNS);
+    LOGV2_DEBUG(21172, 2, "Truncating the existing oplog: {ns}", "ns"_attr = _opts.localOplogNS);
     Timer timer;
     auto status = _storage->truncateCollection(opCtx.get(), _opts.localOplogNS);
     LOGV2(21173,
-          "Initial syncer oplog truncation finished in: {timer_millis}ms",
-          "timer_millis"_attr = timer.millis());
+          "Initial syncer oplog truncation finished in: {truncationDuration}ms",
+          "truncationDuration"_attr = timer.millis());
     if (!status.isOK()) {
         // 1a.) Create the oplog.
-        LOGV2_DEBUG(21174,
-                    2,
-                    "Creating the oplog: {opts_localOplogNS}",
-                    "opts_localOplogNS"_attr = _opts.localOplogNS);
+        LOGV2_DEBUG(21174, 2, "Creating the oplog: {ns}", "ns"_attr = _opts.localOplogNS);
         status = _storage->createOplog(opCtx.get(), _opts.localOplogNS);
         if (!status.isOK()) {
             return status;
@@ -1092,16 +1086,15 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                             << _initialSyncState->beginFetchingTimestamp.toBSON());
 
     invariant(!result.getValue().documents.empty());
-    LOGV2_DEBUG(
-        21177,
-        2,
-        "Setting begin applying timestamp to {initialSyncState_beginApplyingTimestamp} using last "
-        "oplog entry: {result_getValue_documents_front}, ns: {opts_localOplogNS} and the begin "
-        "fetching timestamp to {initialSyncState_beginFetchingTimestamp}",
-        "initialSyncState_beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp,
-        "result_getValue_documents_front"_attr = redact(result.getValue().documents.front()),
-        "opts_localOplogNS"_attr = _opts.localOplogNS,
-        "initialSyncState_beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp);
+    LOGV2_DEBUG(21177,
+                2,
+                "Setting begin applying timestamp to {beginApplyingTimestamp} using last "
+                "oplog entry: {lastOplogEntry}, ns: {ns} and the begin "
+                "fetching timestamp to {beginFetchingTimestamp}",
+                "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp,
+                "lastOplogEntry"_attr = redact(result.getValue().documents.front()),
+                "ns"_attr = _opts.localOplogNS,
+                "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp);
 
     const auto configResult = _dataReplicatorExternalState->getCurrentConfig();
     status = configResult.getStatus();
@@ -1161,9 +1154,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     LOGV2_DEBUG(21180,
                 2,
-                "Starting AllDatabaseCloner: {initialSyncState_allDatabaseCloner}",
-                "initialSyncState_allDatabaseCloner"_attr =
-                    _initialSyncState->allDatabaseCloner->toString());
+                "Starting AllDatabaseCloner: {allDatabaseCloner}",
+                "allDatabaseCloner"_attr = _initialSyncState->allDatabaseCloner->toString());
 
     auto [startClonerFuture, startCloner] =
         _initialSyncState->allDatabaseCloner->runOnExecutorEvent(_clonerExec);
@@ -1384,8 +1376,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     stdx::lock_guard<Latch> lock(_mutex);
     _lastApplied = resultOpTimeAndWallTime;
     LOGV2(21186,
-          "No need to apply operations. (currently at {initialSyncState_stopTimestamp})",
-          "initialSyncState_stopTimestamp"_attr = _initialSyncState->stopTimestamp.toBSON());
+          "No need to apply operations. (currently at {stopTimestamp})",
+          "stopTimestamp"_attr = _initialSyncState->stopTimestamp.toBSON());
 
     // This sets the error in 'onCompletionGuard' and shuts down the OplogFetcher on error.
     _scheduleRollbackCheckerCheckForRollback_inlock(lock, onCompletionGuard);
@@ -1405,8 +1397,8 @@ void InitialSyncer::_getNextApplierBatchCallback(
     auto batchResult = _getNextApplierBatch_inlock();
     if (!batchResult.isOK()) {
         LOGV2_WARNING(21196,
-                      "Failure creating next apply batch: {batchResult_getStatus}",
-                      "batchResult_getStatus"_attr = redact(batchResult.getStatus()));
+                      "Failure creating next apply batch: {status}",
+                      "status"_attr = redact(batchResult.getStatus()));
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, batchResult.getStatus());
         return;
     }
@@ -1579,8 +1571,8 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
         if (!scheduleResult.isOK()) {
             LOGV2_WARNING(21197,
                           "Unable to schedule initial syncer completion task due to "
-                          "{scheduleResult_getStatus}. Running callback on current thread.",
-                          "scheduleResult_getStatus"_attr = redact(scheduleResult.getStatus()));
+                          "{status}. Running callback on current thread.",
+                          "status"_attr = redact(scheduleResult.getStatus()));
             _finishCallback(result);
         }
     });
@@ -1589,8 +1581,8 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
 
     stdx::lock_guard<Latch> lock(_mutex);
     LOGV2(21192,
-          "Initial Sync Attempt Statistics: {getInitialSyncProgress_inlock}",
-          "getInitialSyncProgress_inlock"_attr = redact(_getInitialSyncProgress_inlock()));
+          "Initial Sync Attempt Statistics: {statistics}",
+          "statistics"_attr = redact(_getInitialSyncProgress_inlock()));
 
     auto runTime = _initialSyncState ? _initialSyncState->timer.millis() : 0;
     int rollBackId = -1;
@@ -1633,11 +1625,11 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
 
     LOGV2_ERROR(21200,
                 "Initial sync attempt failed -- attempts left: "
-                "{stats_maxFailedInitialSyncAttempts_stats_failedInitialSyncAttempts} cause: "
-                "{result_getStatus}",
-                "stats_maxFailedInitialSyncAttempts_stats_failedInitialSyncAttempts"_attr =
+                "{attemptsLeft} cause: "
+                "{status}",
+                "attemptsLeft"_attr =
                     (_stats.maxFailedInitialSyncAttempts - _stats.failedInitialSyncAttempts),
-                "result_getStatus"_attr = redact(result.getStatus()));
+                "status"_attr = redact(result.getStatus()));
 
     // Check if need to do more retries.
     if (_stats.failedInitialSyncAttempts >= _stats.maxFailedInitialSyncAttempts) {
@@ -1704,8 +1696,8 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
         onCompletion(lastApplied);
     } catch (...) {
         LOGV2_WARNING(21198,
-                      "initial syncer finish callback threw exception: {exceptionToStatus}",
-                      "exceptionToStatus"_attr = redact(exceptionToStatus()));
+                      "initial syncer finish callback threw exception: {exception}",
+                      "exception"_attr = redact(exceptionToStatus()));
     }
 
     // Destroy the remaining reference to the completion callback before we transition the state to
@@ -1781,15 +1773,13 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
         // Check if any ops occurred while cloning or any ops need to be fetched.
         invariant(_initialSyncState->beginFetchingTimestamp < _initialSyncState->stopTimestamp);
         LOGV2(21195,
-              "Writing to the oplog and applying operations until {initialSyncState_stopTimestamp} "
+              "Writing to the oplog and applying operations until {stopTimestamp} "
               "before initial sync can complete. (started fetching at "
-              "{initialSyncState_beginFetchingTimestamp} and applying at "
-              "{initialSyncState_beginApplyingTimestamp})",
-              "initialSyncState_stopTimestamp"_attr = _initialSyncState->stopTimestamp.toBSON(),
-              "initialSyncState_beginFetchingTimestamp"_attr =
-                  _initialSyncState->beginFetchingTimestamp.toBSON(),
-              "initialSyncState_beginApplyingTimestamp"_attr =
-                  _initialSyncState->beginApplyingTimestamp.toBSON());
+              "{beginFetchingTimestamp} and applying at "
+              "{beginApplyingTimestamp})",
+              "stopTimestamp"_attr = _initialSyncState->stopTimestamp.toBSON(),
+              "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp.toBSON(),
+              "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp.toBSON());
         // Fall through to scheduling _getNextApplierBatchCallback().
     } else if (_lastApplied.opTime.getTimestamp() >= _initialSyncState->stopTimestamp) {
         // Check for rollback if we have applied far enough to be consistent.
