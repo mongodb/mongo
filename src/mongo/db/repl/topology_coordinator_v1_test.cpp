@@ -1839,16 +1839,12 @@ TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {
     if (!hasGlobalServiceContext()) {
         setGlobalServiceContext(ServiceContext::make());
     }
-    getTopoCoord().getIPAddrLookupService()->init();
 
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
     std::string setName = "mySet";
     auto now = Date_t::fromMillisSinceEpoch(100);
     auto originalIPv6Enabled = IPv6Enabled();
-    ON_BLOCK_EXIT([&] {
-        enableIPv6(originalIPv6Enabled);
-        getTopoCoord().getIPAddrLookupService()->shutdown();
-    });
+    ON_BLOCK_EXIT([&] { enableIPv6(originalIPv6Enabled); });
 
     auto testIP = [&](const std::string& hostAndIP) -> boost::optional<std::string> {
         // Test framework requires that time moves forward.

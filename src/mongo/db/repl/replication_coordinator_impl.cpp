@@ -875,9 +875,6 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
 
     _replExecutor->startup();
 
-    // Initialize the DNS cache service for topology coordinator
-    _topCoord->getIPAddrLookupService()->init();
-
     bool doneLoadingConfig = _startLoadLocalConfig(opCtx);
     if (doneLoadingConfig) {
         // If we're not done loading the config, then the config state will be set by
@@ -945,7 +942,6 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         initialSyncerCopy->join();
         initialSyncerCopy.reset();
     }
-    _topCoord->getIPAddrLookupService()->shutdown();
     _externalState->shutdown(opCtx);
     _replExecutor->shutdown();
     _replExecutor->join();
