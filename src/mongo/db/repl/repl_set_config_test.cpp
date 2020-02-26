@@ -320,6 +320,8 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(config.getConfigTerm(), -1);
+    // Serializing the config to BSON should omit a term field with value -1.
+    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kTermFieldName));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   config.initialize(BSON("_id"
                                          << "rs0"
@@ -351,6 +353,7 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kTermFieldName));
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version" << 1 << "term" << -2.0 << "protocolVersion" << 1

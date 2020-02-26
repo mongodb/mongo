@@ -864,8 +864,7 @@ BSONObj ReplSetConfig::toBSON() const {
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
 
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+    if (_term != OpTime::kUninitializedTerm) {
         configBuilder.appendIntOrLL(kTermFieldName, _term);
     }
 
