@@ -42,6 +42,9 @@
 namespace mongo {
 namespace {
 
+/*
+ * TODO (SERVER-46428): Unblacklist
+
 // Use this new name to register these tests under their own unit test suite.
 using ShardedUnionTest = ShardedAggTestFixture;
 
@@ -300,6 +303,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
 
     future.default_timed_get();
 }
+
+*/
 
 }  // namespace
 }  // namespace mongo
