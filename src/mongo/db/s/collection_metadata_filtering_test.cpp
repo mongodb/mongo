@@ -141,7 +141,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadataForOperation(operationContext()));
+        testFn(css->getOrphansFilter(operationContext()));
     }
 
     {
@@ -172,7 +172,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadataForOperation(operationContext()));
+        testFn(css->getOrphansFilter(operationContext()));
     }
 
     {
@@ -211,7 +211,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadataForOperation(operationContext()));
+        testFn(css->getOrphansFilter(operationContext()));
     }
 
     {
