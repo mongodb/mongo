@@ -795,7 +795,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"dbCheck", {dbCheckOplogCommand, {}}},
     {"dropDatabase",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          return dropDatabase(opCtx, entry.getNss().db().toString());
+          return dropDatabaseForApplyOps(opCtx, entry.getNss().db().toString());
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"drop",

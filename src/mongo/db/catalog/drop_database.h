@@ -33,7 +33,13 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Drops the database "dbName".
+ * Drops the database "dbName". Aborts in-progress index builds on each collection in the database
+ * if two-phase index builds are enabled.
  */
 Status dropDatabase(OperationContext* opCtx, const std::string& dbName);
+
+/**
+ * Drops the database "dbName". Does not abort in-progress index builds.
+ */
+Status dropDatabaseForApplyOps(OperationContext* opCtx, const std::string& dbName);
 }  // namespace mongo

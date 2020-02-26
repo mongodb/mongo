@@ -56,8 +56,28 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeInMemoryDrop);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterWaitingForIndexBuilds);
 
 namespace {
+
+Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const std::string& dbName) {
+    if (!db) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream()
+                          << "Could not drop database " << dbName << " because it does not exist");
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
+
+    if (userInitiatedWritesAndNotPrimary) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while dropping database " << dbName);
+    }
+
+    return Status::OK();
+}
 
 /**
  * Removes database from catalog and writes dropDatabase entry to oplog.
@@ -69,14 +89,17 @@ namespace {
 void _finishDropDatabase(OperationContext* opCtx,
                          const std::string& dbName,
                          Database* db,
-                         std::size_t numCollections) {
+                         std::size_t numCollections,
+                         bool abortIndexBuilds) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
     auto dropPendingGuard = makeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
-    BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-    IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
+    if (!abortIndexBuilds) {
+        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+        IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
+    }
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         WriteUnitOfWork wunit(opCtx);
@@ -100,9 +123,7 @@ void _finishDropDatabase(OperationContext* opCtx,
     LOGV2(20336, "dropDatabase {dbName} - finished", "dbName"_attr = dbName);
 }
 
-}  // namespace
-
-Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
+Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool abortIndexBuilds) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot drop a database in read-only mode",
             !storageGlobalParams.readOnly);
@@ -128,20 +149,13 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     repl::OpTime latestDropPendingOpTime;
 
     {
-        AutoGetDb autoDB(opCtx, dbName, MODE_X);
-        Database* const db = autoDB.getDb();
-        if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Could not drop database " << dbName
-                                        << " because it does not exist");
-        }
+        boost::optional<AutoGetDb> autoDB;
+        autoDB.emplace(opCtx, dbName, MODE_X);
 
-        bool userInitiatedWritesAndNotPrimary =
-            opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
-
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while dropping database " << dbName);
+        Database* db = autoDB->getDb();
+        Status status = _checkNssAndReplState(opCtx, db, dbName);
+        if (!status.isOK()) {
+            return status;
         }
 
         if (db->isDropPending(opCtx)) {
@@ -156,6 +170,43 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
         // on Database.
         auto dropPendingGuard = makeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+
+        if (abortIndexBuilds) {
+            // We need to keep aborting all the active index builders for this database until there
+            // are none left when we retrieve the exclusive database lock again.
+            while (indexBuildsCoord->inProgForDb(dbName)) {
+                // Sends the abort signal to all the active index builders for this database.
+                indexBuildsCoord->abortDatabaseIndexBuildsNoWait(dbName, "dropDatabase command");
+
+                // Now that the abort signals were sent out to the active index builders for this
+                // database, we need to release the lock temporarily to allow those index builders
+                // to process the abort signal. Holding a lock here will cause the index builders to
+                // block indefinitely.
+                autoDB = boost::none;
+                indexBuildsCoord->awaitNoBgOpInProgForDb(dbName);
+
+                if (MONGO_unlikely(dropDatabaseHangAfterWaitingForIndexBuilds.shouldFail())) {
+                    LOGV2(4612300,
+                          "dropDatabase - fail point dropDatabaseHangAfterWaitingForIndexBuilds "
+                          "enabled.");
+                    dropDatabaseHangAfterWaitingForIndexBuilds.pauseWhileSet();
+                }
+
+                autoDB.emplace(opCtx, dbName, MODE_X);
+                db = autoDB->getDb();
+
+                // Abandon the snapshot as the index catalog will compare the in-memory state to the
+                // disk state, which may have changed when we released the collection lock
+                // temporarily.
+                opCtx->recoveryUnit()->abandonSnapshot();
+
+                status = _checkNssAndReplState(opCtx, db, dbName);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        }
 
         std::vector<NamespaceString> collectionsToDrop;
         for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
@@ -200,9 +251,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                 invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"));
             }
 
-            BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
-            IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)->uuid());
+            if (!abortIndexBuilds) {
+                BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
+                IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
+                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)->uuid());
+            }
 
             writeConflictRetry(opCtx, "dropDatabase_collection", nss.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
@@ -220,7 +273,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
         // If there are no collection drops to wait for, we complete the drop database operation.
         if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
-            _finishDropDatabase(opCtx, dbName, db, numCollections);
+            _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds);
             return Status::OK();
         }
     }
@@ -344,9 +397,32 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     // _finishDropDatabase creates its own scope guard to ensure drop-pending is unset.
     dropPendingGuardWhileUnlocked.dismiss();
 
-    _finishDropDatabase(opCtx, dbName, db, numCollections);
+    _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds);
 
     return Status::OK();
+}
+
+}  // namespace
+
+Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
+    // Only allow aborting index builds if two-phase index builds are enabled.
+    bool abortIndexBuilds = true;
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    if (!indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
+        LOGV2_DEBUG(4612301,
+                    2,
+                    "dropDatabase - not aborting in-progress index builds because two phase index "
+                    "builds are disabled",
+                    "dbName"_attr = dbName);
+        abortIndexBuilds = false;
+    }
+
+    return _dropDatabase(opCtx, dbName, abortIndexBuilds);
+}
+
+Status dropDatabaseForApplyOps(OperationContext* opCtx, const std::string& dbName) {
+    const bool abortIndexBuilds = false;
+    return _dropDatabase(opCtx, dbName, abortIndexBuilds);
 }
 
 }  // namespace mongo

@@ -1803,11 +1803,11 @@ public:
 
         const Timestamp dropTime = _clock->reserveTicks(1).asTimestamp();
         if (SimulatePrimary) {
-            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.db().toString()));
         } else {
             repl::UnreplicatedWritesBlock uwb(_opCtx);
             TimestampBlock ts(_opCtx, dropTime);
-            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.db().toString()));
         }
 
         // Assert that the idents do not exist.
