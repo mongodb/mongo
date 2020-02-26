@@ -69,7 +69,7 @@ struct JSONValueExtractor {
                                                          false,
                                                          0,
                                                          _buffer,
-                                                         _attributeMaxSize);
+                                                         bufferSizeToTriggerTruncation());
             addTruncationReport(name, truncated, element.size());
         } else if (val.BSONSerialize) {
             // This is a JSON subobject, no quotes needed
@@ -77,16 +77,22 @@ struct JSONValueExtractor {
             BSONObjBuilder builder;
             val.BSONSerialize(builder);
             BSONObj obj = builder.done();
-            BSONObj truncated = obj.jsonStringBuffer(
-                JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer, _attributeMaxSize);
+            BSONObj truncated = obj.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                                     0,
+                                                     false,
+                                                     _buffer,
+                                                     bufferSizeToTriggerTruncation());
             addTruncationReport(name, truncated, builder.done().objsize());
 
         } else if (val.toBSONArray) {
             // This is a JSON subarray, no quotes needed
             storeUnquoted(name);
             BSONArray arr = val.toBSONArray();
-            BSONObj truncated = arr.jsonStringBuffer(
-                JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, _buffer, _attributeMaxSize);
+            BSONObj truncated = arr.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                                     0,
+                                                     true,
+                                                     _buffer,
+                                                     bufferSizeToTriggerTruncation());
             addTruncationReport(name, truncated, arr.objsize());
 
         } else if (val.stringSerialize) {
@@ -102,16 +108,22 @@ struct JSONValueExtractor {
     void operator()(StringData name, const BSONObj& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
-        BSONObj truncated = val.jsonStringBuffer(
-            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, _buffer, _attributeMaxSize);
+        BSONObj truncated = val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                                 0,
+                                                 false,
+                                                 _buffer,
+                                                 bufferSizeToTriggerTruncation());
         addTruncationReport(name, truncated, val.objsize());
     }
 
     void operator()(StringData name, const BSONArray& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
-        BSONObj truncated = val.jsonStringBuffer(
-            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, _buffer, _attributeMaxSize);
+        BSONObj truncated = val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                                 0,
+                                                 true,
+                                                 _buffer,
+                                                 bufferSizeToTriggerTruncation());
         addTruncationReport(name, truncated, val.objsize());
     }
 
@@ -173,6 +185,13 @@ private:
 
         _buffer.push_back('"');
         _separator = ","_sd;
+    }
+
+    std::size_t bufferSizeToTriggerTruncation() const {
+        if (!_attributeMaxSize)
+            return _attributeMaxSize;
+
+        return _buffer.size() + _attributeMaxSize;
     }
 
     void addTruncationReport(StringData name, const BSONObj& truncated, int64_t objsize) {
