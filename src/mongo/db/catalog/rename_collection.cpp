@@ -171,10 +171,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Make sure the source collection is not sharded.
     {
-        auto const css = CollectionShardingState::get(opCtx, source);
-        if (css->getMetadata(opCtx)->isSharded()) {
+        auto* const css = CollectionShardingState::get(opCtx, source);
+        const auto metadata = css->getCurrentMetadata();
+        if (metadata->isSharded())
             return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
-        }
     }
 
     // Disallow renaming from a replicated to an unreplicated collection or vice versa.
@@ -211,10 +211,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
         }
 
         {
-            auto const css = CollectionShardingState::get(opCtx, target);
-            if (css->getMetadata(opCtx)->isSharded()) {
+            auto* const css = CollectionShardingState::get(opCtx, target);
+            const auto metadata = css->getCurrentMetadata();
+            if (metadata->isSharded())
                 return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
-            }
         }
 
         // RenameCollectionForCommand cannot drop target by renaming.

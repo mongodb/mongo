@@ -185,6 +185,8 @@ private:
     // comments explaining the various state transitions.
     enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
 
+    ScopedCollectionMetadata _getCurrentMetadataAndCheckEpoch(OperationContext* opCtx);
+
     /**
      * If this donation moves the first chunk to the recipient (i.e., the recipient didn't have any
      * chunks), this function writes a no-op message to the oplog, so that change stream will notice
