@@ -112,6 +112,15 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
     });
 }
 
+Future<RemoteCommandOnAnyResponse> NetworkInterfaceIntegrationFixture::runCommandOnAny(
+    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequestOnAny request) {
+    RemoteCommandRequestOnAny rcroa{request};
+
+    return net().startCommand(cbHandle, rcroa).then([](TaskExecutor::ResponseOnAnyStatus roa) {
+        return roa;
+    });
+}
+
 Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
     const TaskExecutor::CallbackHandle& cbHandle,
     RemoteCommandRequest request,

@@ -581,6 +581,35 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
     assertNumOps(0u, 0u, 0u, 5u);
 }
 
+TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
+    auto commandRequest = makeEchoCmdObj();
+    auto request = [&] {
+        auto cs = fixture();
+        RemoteCommandRequestBase::HedgeOptions ho;
+        ho.count = 1;
+
+        return RemoteCommandRequestOnAny({cs.getServers()},
+                                         "admin",
+                                         std::move(commandRequest),
+                                         BSONObj(),
+                                         nullptr,
+                                         RemoteCommandRequest::kNoTimeout,
+                                         ho);
+    }();
+
+    auto deferred = runCommandOnAny(makeCallbackHandle(), std::move(request));
+    auto res = deferred.get();
+
+    auto cmdObj = res.data.getObjectField("echo");
+    uassertStatusOK(res.status);
+    ASSERT_EQ(1, cmdObj.getIntField("echo"));
+    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
+    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
+    ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
+    ASSERT_EQ(1, res.data.getIntField("ok"));
+    assertNumOps(0u, 0u, 0u, 1u);
+}
+
 TEST_F(NetworkInterfaceTest, SetAlarm) {
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);

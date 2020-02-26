@@ -81,6 +81,10 @@ public:
 
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                              RemoteCommandRequest request);
+
+    Future<RemoteCommandOnAnyResponse> runCommandOnAny(const TaskExecutor::CallbackHandle& cbHandle,
+                                                       RemoteCommandRequestOnAny request);
+
     Future<void> startExhaustCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
         RemoteCommandRequest request,

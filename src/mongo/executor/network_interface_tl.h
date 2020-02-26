@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
@@ -95,6 +96,7 @@ public:
 
 private:
     struct RequestState;
+    struct RequestManager;
 
     struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
         CommandStateBase(NetworkInterfaceTL* interface_,
@@ -105,7 +107,7 @@ private:
         /**
          * Use the current RequestState to send out a command request.
          */
-        virtual Future<RemoteCommandResponse> sendRequest() = 0;
+        virtual Future<RemoteCommandResponse> sendRequest(size_t reqId) = 0;
 
         /**
          * Return the maximum number of request failures this Command can tolerate
@@ -150,7 +152,7 @@ private:
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
 
-        std::weak_ptr<RequestState> requestStatePtr;
+        std::unique_ptr<RequestManager> requestManager;
 
         StrongWeakFinishLine finishLine;
 
@@ -169,11 +171,13 @@ private:
                          RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle);
 
-        Future<RemoteCommandResponse> sendRequest() override;
+        Future<RemoteCommandResponse> sendRequest(size_t reqId) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
         Promise<RemoteCommandOnAnyResponse> promise;
+
+        const size_t hedgeCount;
     };
 
     struct ExhaustCommandState final : public CommandStateBase {
@@ -190,7 +194,7 @@ private:
                          const TaskExecutor::CallbackHandle& cbHandle,
                          RemoteCommandOnReplyFn&& onReply);
 
-        Future<RemoteCommandResponse> sendRequest() override;
+        Future<RemoteCommandResponse> sendRequest(size_t reqId) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
@@ -201,10 +205,57 @@ private:
         RemoteCommandOnReplyFn onReplyFn;
     };
 
+    enum class ConnStatus { Unset, OK, Failed };
+
+    struct RequestManager {
+        RequestManager(size_t numHedges, std::shared_ptr<CommandStateBase> cmdState_)
+            : connStatus(cmdState_->requestOnAny.target.size(), ConnStatus::Unset),
+              requests(numHedges),
+              cmdState(cmdState_) {}
+
+        std::shared_ptr<RequestState> makeRequest(RequestManager* mgr) {
+            auto req = std::make_shared<RequestState>(mgr, cmdState.lock());
+            req->reqId = requestCnt.load();
+            requests[requestCnt.fetchAndAdd(1)] = req;
+            return req;
+        }
+
+        std::shared_ptr<RequestState> getRequest(size_t requestId);
+        std::shared_ptr<RequestState> getNextRequest();
+
+        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
+        void cancelRequests();
+
+        bool sentAll() const {
+            return sentIdx.load() == requests.size();
+        }
+
+        bool sentNone() const {
+            return sentIdx.load() == 0;
+        }
+
+        bool usedAllConn() const {
+            return std::count(connStatus.begin(), connStatus.end(), ConnStatus::Unset) == 0;
+        }
+
+        std::vector<ConnStatus> connStatus;
+        std::vector<std::weak_ptr<RequestState>> requests;
+        std::weak_ptr<CommandStateBase> cmdState;
+
+        // number of sent requests
+        AtomicWord<size_t> sentIdx{0};
+        // number of all requests
+        AtomicWord<size_t> requestCnt{0};
+        // blocks sending requests
+        bool isLocked{false};
+
+        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
+    };
+
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
-        RequestState(std::shared_ptr<CommandStateBase> cmdState_)
-            : cmdState{std::move(cmdState_)},
-              connFinishLine(cmdState->requestOnAny.target.size()) {}
+        RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_)
+            : cmdState{std::move(cmdState_)}, requestManager(mgr) {}
+
         ~RequestState();
 
         /**
@@ -232,8 +283,9 @@ private:
          * Attempt to send a request using the given connection
          */
         void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
-        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn,
-                     RemoteCommandRequest remoteCommandRequest) noexcept;
+
+        void send(StatusWith<ConnectionPool::ConnectionHandle> swConn,
+                  RemoteCommandRequest remoteCommandRequest) noexcept;
 
         /**
          * Resolve an eventual response
@@ -248,11 +300,12 @@ private:
 
         ClockSource::StopWatch stopwatch;
 
-        StrongWeakFinishLine connFinishLine;
+        RequestManager* const requestManager{nullptr};
 
         boost::optional<RemoteCommandRequest> request;
         HostAndPort host;
         ConnectionPool::ConnectionHandle conn;
+        size_t reqId;
     };
 
     struct AlarmState {
