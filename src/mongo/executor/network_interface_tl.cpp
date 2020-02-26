@@ -897,7 +897,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
     auto alarmState =
         std::make_shared<AlarmState>(when, cbHandle, _reactor->makeTimer(), std::move(pf.promise));
 
-    auto weakAlarmState = std::weak_ptr(alarmState);
+    auto weakAlarmState = std::weak_ptr<AlarmState>(alarmState);
 
     {
         stdx::lock_guard<Latch> lk(_inProgressMutex);
