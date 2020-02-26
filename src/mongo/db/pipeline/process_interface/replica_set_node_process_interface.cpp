@@ -39,6 +39,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future.h"
@@ -213,6 +214,7 @@ void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext*
     if (!writeConcern.usedDefault) {
         cmd->append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
     }
+    logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, cmd);
 }
 
 bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,

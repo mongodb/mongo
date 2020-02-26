@@ -199,4 +199,16 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
     return lsids;
 }
 
+namespace logical_session_id_helpers {
+
+void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder) {
+    OperationSessionInfo sessionInfo;
+    if (opCtx->getLogicalSessionId()) {
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    }
+    sessionInfo.setTxnNumber(opCtx->getTxnNumber());
+    sessionInfo.serialize(builder);
+}
+
+}  // namespace logical_session_id_helpers
 }  // namespace mongo

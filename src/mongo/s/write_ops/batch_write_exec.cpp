@@ -40,6 +40,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -231,17 +232,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                     BSONObjBuilder requestBuilder;
                     shardBatchRequest.serialize(&requestBuilder);
-
-                    {
-                        OperationSessionInfo sessionInfo;
-
-                        if (opCtx->getLogicalSessionId()) {
-                            sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-                        }
-
-                        sessionInfo.setTxnNumber(opCtx->getTxnNumber());
-                        sessionInfo.serialize(&requestBuilder);
-                    }
+                    logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &requestBuilder);
 
                     return requestBuilder.obj();
                 }();
