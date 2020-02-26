@@ -10,7 +10,7 @@ const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
 replSet.initiate();
 const primary = replSet.getPrimary();
-const secondary = replSet.add();
+const secondary = replSet.add({rsConfig: {votes: 0, priority: 0}});
 
 const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCreatingOplog');
 replSet.reInitiate();

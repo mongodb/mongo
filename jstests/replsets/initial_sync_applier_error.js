@@ -28,7 +28,8 @@ assert.commandWorked(coll.insert({_id: 0, content: "hi"}));
 
 // Add a secondary node but make it hang after retrieving the last op on the source
 // but before copying databases.
-var secondary = replSet.add({setParameter: "numInitialSyncAttempts=2"});
+var secondary =
+    replSet.add({setParameter: "numInitialSyncAttempts=2", rsConfig: {votes: 0, priority: 0}});
 secondary.setSlaveOk();
 
 let failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');

@@ -3362,7 +3362,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsErrorOnHorizonChange) {
     waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
-    args.force = false;
+    // Use force to bypass the oplog commitment check, which we're not worried about testing here.
+    args.force = true;
     // Do a reconfig that changes the SplitHorizon and also adds a third node. This should respond
     // to all waiting isMaster requests with an error.
     args.newConfigObj = BSON("_id"
@@ -3448,7 +3449,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterUsesDefaultHorizonWhenRequestedHorizonNotFoun
 
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
-    args.force = false;
+    args.force = true;
     // Do a reconfig that removes the configured horizon.
     args.newConfigObj = BSON("_id"
                              << "mySet"
@@ -3538,7 +3539,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsWithNewHorizon) {
 
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
-    args.force = false;
+    args.force = true;
     // Do a reconfig that adds a new horizon.
     const auto newHorizonNodeOne = "newhorizon.com:15";
     const auto newHorizonNodeTwo = "newhorizon.com:16";
@@ -4316,7 +4317,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfig) {
     // Do a reconfig to add a third node to the replica set. A reconfig should cause the server to
     // respond to the waiting IsMasterResponse.
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
+    stdx::thread reconfigThread(
+        [&] { doReplSetReconfig(getReplCoord(), &status, true /* force */); });
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
     ASSERT_OK(status);
@@ -4368,7 +4370,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
 
     // reconfig
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, true); });
 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
@@ -4516,7 +4518,7 @@ TEST_F(
     // reconfig to fewer nodes
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(
-        [&] { doReplSetReconfigToFewer(getReplCoord(), &status, false /* force */); });
+        [&] { doReplSetReconfigToFewer(getReplCoord(), &status, true /* force */); });
 
     replyToReceivedHeartbeatV1();
 

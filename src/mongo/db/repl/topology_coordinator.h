@@ -529,6 +529,12 @@ public:
     OpTime getLastCommittedInPrevConfig();
 
     /**
+     * Returns an optime that must become majority committed in the current config before it is safe
+     * for a primary to move to a new config.
+     */
+    OpTime getConfigOplogCommitmentOpTime();
+
+    /**
      * Sets lastVote to be for ourself in this term.
      */
     void voteForMyselfV1();

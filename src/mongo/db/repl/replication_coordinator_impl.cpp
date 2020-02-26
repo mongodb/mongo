@@ -3019,6 +3019,38 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         }
     }
 
+    // Make sure that the latest committed optime from the previous config is committed in the
+    // current config. If this is the initial reconfig, then we don't need to check this condition,
+    // since there were no prior configs. Also, for force reconfigs we bypass this safety check
+    // condition. In any FCV < 4.4 we also bypass it to preserve client facing behavior in mixed
+    // version sets.
+    auto isInitialReconfig = (oldConfig.getConfigVersion() == 1);
+    // If we our config was installed via a "force" reconfig, we bypass the oplog commitment check.
+    auto leavingForceConfig = (oldConfig.getConfigTerm() == OpTime::kUninitializedTerm);
+    auto enforceOplogCommitmentCheck =
+        (!args.force && !leavingForceConfig && !isInitialReconfig &&
+         serverGlobalParams.featureCompatibility.isVersion(
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44));
+    auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+    auto wcOpts = populateUnsetWriteConcernOptionsSyncMode(
+        WriteConcernOptions(oldConfig.getWriteMajority(),
+                            WriteConcernOptions::SyncMode::NONE,
+                            WriteConcernOptions::kNoWaiting));
+
+    if (enforceOplogCommitmentCheck &&
+        !_doneWaitingForReplication_inlock(configOplogCommitmentOpTime, wcOpts)) {
+        LOGV2(51816,
+              "Oplog config commitment condition failed to be satisfied. The last committed optime "
+              "in the previous config ({configOplogCommitmentOpTime}) is not committed in current "
+              "config",
+              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+        return Status(ErrorCodes::ConfigurationInProgress,
+                      str::stream() << "Last committed optime from previous config ("
+                                    << configOplogCommitmentOpTime.toString()
+                                    << ") is not committed in the current config.");
+    }
+
+    LOGV2(51814, "Persisting new config to disk.");
     status = _externalState->storeLocalConfigDocument(opCtx, newConfig.toBSON());
     if (!status.isOK()) {
         LOGV2_ERROR(21422,
@@ -3040,6 +3072,32 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         // Wait for the config document to be replicated to a majority of nodes in the new
         // config.
         uassertStatusOK(awaitReplication(opCtx, OpTime(), writeConcern).status);
+    }
+
+    // Now that the new config has been persisted and installed in memory, wait for the latest
+    // committed optime in the previous config to be committed in the newly installed config. For
+    // force reconfigs we don't need to check this safety condition, and in any FCV < 4.4 we also
+    // bypass this to preserve client facing behavior in mixed version sets. Note that even if we
+    // have just left a force config via a non-force reconfig, we still want to wait for this oplog
+    // commitment check, since a subsequent safe reconfig will check it as a precondition.
+    configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+    wcOpts = WriteConcernOptions(newConfig.getWriteMajority(),
+                                 WriteConcernOptions::SyncMode::NONE,
+                                 WriteConcernOptions::kNoTimeout);
+    if (!args.force &&
+        serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        LOGV2(51815,
+              "Waiting for the last committed optime in the previous config "
+              "({configOplogCommitmentOpTime}) to be committed in the current config.",
+              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+        auto statusDur = awaitReplication(opCtx, configOplogCommitmentOpTime, wcOpts);
+        if (!statusDur.status.isOK()) {
+            uasserted(statusDur.status.code(),
+                      str::stream() << "Last committed optime in the previous config ("
+                                    << configOplogCommitmentOpTime.toString()
+                                    << ") did not become committed in the current config.");
+        }
     }
 
     return Status::OK();

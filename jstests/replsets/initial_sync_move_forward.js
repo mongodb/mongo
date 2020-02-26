@@ -39,7 +39,8 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(masterColl.ensureIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
-var secondary = rst.add({setParameter: "numInitialSyncAttempts=1"});
+var secondary =
+    rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
 secondary.setSlaveOk();
 var secondaryColl = secondary.getDB("test").coll;
 

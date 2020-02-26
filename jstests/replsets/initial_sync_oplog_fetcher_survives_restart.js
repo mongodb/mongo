@@ -17,7 +17,7 @@ const primaryDb = primary.getDB("test");
 
 jsTest.log("Adding a new node to the replica set");
 const secondary = rst.add({
-    rsConfig: {priority: 0},
+    rsConfig: {priority: 0, votes: 0},
     setParameter: {
         // Wait for the cloners to finish.
         'failpoint.initialSyncHangAfterDataCloning': tojson({mode: 'alwaysOn'}),

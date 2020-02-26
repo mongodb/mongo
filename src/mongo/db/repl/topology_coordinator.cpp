@@ -1265,6 +1265,13 @@ OpTime TopologyCoordinator::getLastCommittedInPrevConfig() {
     return _lastCommittedInPrevConfig;
 }
 
+OpTime TopologyCoordinator::getConfigOplogCommitmentOpTime() {
+    // If we were previously a secondary, we must make sure that we commit a new op as primary
+    // before we can commit any other oplog entries, which necessitates the need for using the
+    // '_firstOpTimeOfMyTerm' value here.
+    return std::max(_lastCommittedInPrevConfig, _firstOpTimeOfMyTerm);
+}
+
 MemberData* TopologyCoordinator::_findMemberDataByMemberId(const int memberId) {
     const int memberIndex = _getMemberIndex(memberId);
     if (memberIndex >= 0)

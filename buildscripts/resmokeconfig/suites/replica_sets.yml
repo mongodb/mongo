@@ -6,6 +6,7 @@ selector:
   exclude_files:
   # Relies on the currently disabled config quorum checker for replSetReconfig.
   - jstests/replsets/disallow_adding_initialized_node1.js
+  - jstests/replsets/disallow_adding_initialized_node2.js
 
 executor:
   config:

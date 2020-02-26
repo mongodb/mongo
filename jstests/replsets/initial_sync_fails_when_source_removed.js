@@ -24,7 +24,7 @@ rst.awaitReplication();
 
 jsTest.log("Adding the initial sync destination node to the replica set");
 const initialSyncNode = rst.add({
-    rsConfig: {priority: 0},
+    rsConfig: {priority: 0, votes: 0},
     setParameter: {
         'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,

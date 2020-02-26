@@ -135,6 +135,12 @@ protected:
         getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
+    void replCoordSetMyLastAppliedAndDurableOpTime(const OpTime& opTime,
+                                                   Date_t wallTime = Date_t()) {
+        replCoordSetMyLastAppliedOpTime(opTime, wallTime);
+        replCoordSetMyLastDurableOpTime(opTime, wallTime);
+    }
+
     void replCoordAdvanceCommitPoint(const OpTime& opTime,
                                      Date_t wallTime = Date_t(),
                                      bool fromSyncSource = false) {

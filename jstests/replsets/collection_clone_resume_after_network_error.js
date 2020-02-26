@@ -70,7 +70,7 @@ assert.commandWorked(primaryDb.test.insert([
 
 jsTest.log("Adding a new node to the replica set");
 const secondary = rst.add({
-    rsConfig: {priority: 0},
+    rsConfig: {priority: 0, votes: 0},
     setParameter: {
         'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
         // Hang right after cloning the last document.

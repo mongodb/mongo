@@ -323,6 +323,14 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
+    auto newOpTime = OpTime(Timestamp(101, 1), 1);
+    replCoordSetMyLastAppliedOpTime(newOpTime, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(newOpTime, Date_t() + Seconds(100));
+
+    // Advance optimes of secondary so we pass the config oplog commitment check.
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, newOpTime));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 2, newOpTime));
+
     Status status(ErrorCodes::InternalError, "Not Set");
     getExternalState()->setStoreLocalConfigDocumentStatus(
         Status(ErrorCodes::OutOfDiskSpace, "The test set this"));
@@ -429,9 +437,18 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
+    auto newOpTime = OpTime(Timestamp(101, 1), 1);
+    replCoordSetMyLastAppliedOpTime(newOpTime, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(newOpTime, Date_t() + Seconds(100));
+
+    // Advance optimes of secondary so we pass the config oplog commitment check.
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, newOpTime));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 2, newOpTime));
+
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
+    stdx::thread reconfigThread(
+        [&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get(), OpTime::kInitialTerm); });
 
     // Receive heartbeat from secondary saying that it has replicated the new config (v: 3, t: 1).
     // This should allow us to finish waiting for the config majority.
@@ -473,6 +490,14 @@ TEST_F(ReplCoordTest, OverrideReconfigBsonTermSoReconfigSucceeds) {
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();  // Since we have simulated one election, term should be 1.
+
+    auto newOpTime = OpTime(Timestamp(101, 1), 1);
+    replCoordSetMyLastAppliedOpTime(newOpTime, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(newOpTime, Date_t() + Seconds(100));
+
+    // Advance optimes of secondary so we pass the config oplog commitment check.
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, newOpTime));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 2, newOpTime));
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
@@ -657,6 +682,205 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
 
     // ensure forced reconfig results in a random larger version
     ASSERT_GREATER_THAN(result.obj()["config"].Obj()["version"].numberInt(), 3);
+}
+
+class ReplCoordReconfigTest : public ReplCoordTest {
+public:
+    void setUp() {
+        setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    }
+
+    BSONObj member(int id, std::string host) {
+        return BSON("_id" << id << "host" << host);
+    }
+
+    BSONObj configWithMembers(int version, BSONArray members) {
+        return BSON("_id"
+                    << "mySet"
+                    << "protocolVersion" << 1 << "version" << version << "term" << 1 << "members"
+                    << members);
+    }
+
+    void respondToHeartbeat(NetworkInterfaceMock* net,
+                            int configVersion = 1,
+                            int configTerm = -1,
+                            bool blackHole = false) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        repl::ReplSetHeartbeatArgsV1 hbArgs;
+        ASSERT_OK(hbArgs.initialize(request.cmdObj));
+        repl::ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setConfigVersion(configVersion);
+        hbResp.setConfigTerm(configTerm);
+        BSONObjBuilder respObj;
+        hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+        hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj);
+        if (blackHole) {
+            net->blackHole(noi);
+        } else {
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+        }
+        net->runReadyNetworkOperations();
+    }
+};
+
+TEST_F(ReplCoordReconfigTest,
+       InitialReconfigAlwaysSucceedsOnlyRegardlessOfLastCommittedOpInPrevConfig) {
+    // Start up as a secondary.
+    init();
+    assertStartSuccess(
+        configWithMembers(1,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance the commit point by simulating optime reports from nodes.
+    auto commitPoint = OpTime(Timestamp(2, 1), 1);
+    auto configVersion = 2;
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, 2, commitPoint));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(configVersion, 2, commitPoint));
+    ASSERT_EQ(getReplCoord()->getLastCommittedOpTime(), commitPoint);
+
+    // An initial reconfig should succeed, since there is no config prior to the initial config.
+    ReplSetReconfigArgs args;
+    args.force = false;
+    args.newConfigObj =
+        configWithMembers(2,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")
+                                                       << member(4, "n4:1")));
+
+
+    BSONObjBuilder result;
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread;
+    reconfigThread = stdx::thread(
+        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+
+    // Satisfy config replication check.
+    auto net = getNet();
+    enterNetwork();
+    respondToHeartbeat(net, configVersion, 1 /* configTerm */);
+    respondToHeartbeat(net, configVersion, 1 /* configTerm */);
+    exitNetwork();
+
+    // Satisfy oplog commitment wait.
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, 3, commitPoint));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(configVersion, 3, commitPoint));
+
+    // The initial reconfig should succeed, since there is no config prior to the initial
+    // config.
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordReconfigTest,
+       ReconfigSucceedsOnlyWhenLastCommittedOpInPrevConfigIsCommittedInCurrentConfig) {
+    // Start out in config version 2 to simulate case where a node that already has a non-initial
+    // config.
+    init();
+    auto configVersion = 2;
+    assertStartSuccess(
+        configWithMembers(configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Write one new oplog entry.
+    auto commitPoint = OpTime(Timestamp(2, 1), 1);
+    configVersion = 3;
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+
+    // Do a reconfig that should fail the oplog commitment pre-condition check.
+    ReplSetReconfigArgs args;
+    args.force = false;
+    args.newConfigObj = configWithMembers(
+        configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    BSONObjBuilder result;
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread;
+    reconfigThread = stdx::thread(
+        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+
+    reconfigThread.join();
+    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+
+    // Reconfig should now succeed after advancing optime of other node.
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, 2, commitPoint));
+
+    reconfigThread = stdx::thread(
+        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+
+    // Satisfy config replication.
+    enterNetwork();
+    respondToHeartbeat(getNet(), configVersion, 1 /* configTerm */);
+    exitNetwork();
+
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordReconfigTest,
+       ForceReconfigSucceedsEvenWhenLastCommittedOpInPrevConfigIsNotCommittedInCurrentConfig) {
+    // Start out in config version 2 to simulate case where a node that already has a non-initial
+    // config.
+    init();
+    auto configVersion = 2;
+    assertStartSuccess(
+        configWithMembers(configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+
+    // Do a force reconfig that should succeed even though oplog commitment pre-condition check is
+    // not satisfied.
+    configVersion = 3;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    args.newConfigObj = configWithMembers(
+        configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    BSONObjBuilder result;
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread;
+    reconfigThread = stdx::thread(
+        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+
+    reconfigThread.join();
+    ASSERT_OK(status);
 }
 
 }  // anonymous namespace

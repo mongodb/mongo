@@ -40,8 +40,10 @@ for (let i = 0; i < initialDocs; ++i) {
 }
 
 // Add a secondary.
-const secondary = rst.add(
-    {setParameter: {"numInitialSyncAttempts": 1, 'collectionClonerBatchSize': clonerBatchSize}});
+const secondary = rst.add({
+    rsConfig: {votes: 0, priority: 0},
+    setParameter: {"numInitialSyncAttempts": 1, 'collectionClonerBatchSize': clonerBatchSize}
+});
 secondary.setSlaveOk();
 const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 

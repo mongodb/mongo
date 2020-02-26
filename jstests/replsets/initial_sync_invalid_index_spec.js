@@ -26,7 +26,7 @@ assert.commandWorked(primaryDB.runCommand(
     {createIndexes: "test", indexes: [{v: 2, name: "x_1", key: {x: 1}, invalidOption: 1}]}));
 
 // Add another node to the replica set to allow an initial sync to occur.
-var initSyncNode = replTest.add();
+var initSyncNode = replTest.add({rsConfig: {votes: 0, priority: 0}});
 var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
 clearRawMongoProgramOutput();

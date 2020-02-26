@@ -76,7 +76,7 @@ assert.gt(primaryCappedColl.find().itcount(), 2);
 
 // Add a SECONDARY node. It should use batchSize=2 for its initial sync queries.
 jsTestLog("Adding secondary node.");
-replTest.add({setParameter: "collectionClonerBatchSize=2"});
+replTest.add({rsConfig: {votes: 0, priority: 0}, setParameter: "collectionClonerBatchSize=2"});
 
 var secondary = replTest.getSecondary();
 var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
