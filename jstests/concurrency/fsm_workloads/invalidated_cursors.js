@@ -34,20 +34,29 @@ var $config = (function() {
          * multiple threads to perform this function simultaneously.
          */
         populateDataAndIndexes: function populateDataAndIndexes(db, collName) {
-            let bulk = db[collName].initializeUnorderedBulkOp();
-            for (let i = 0; i < this.numDocs; ++i) {
-                bulk.insert({});
+            try {
+                let bulk = db[collName].initializeUnorderedBulkOp();
+                for (let i = 0; i < this.numDocs; ++i) {
+                    bulk.insert({});
+                }
+                let res = bulk.execute();
+                assertAlways.commandWorked(res);
+                assertAlways.eq(this.numDocs, res.nInserted, tojson(res));
+            } catch (ex) {
+                assert.eq(true, ex instanceof BulkWriteError);
+                assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
             }
-            let res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.numDocs, res.nInserted, tojson(res));
 
             this.indexSpecs.forEach(indexSpec => {
                 let res = db[collName].createIndex(indexSpec);
                 assertWorkedOrFailedHandleTxnErrors(
                     res,
-                    [ErrorCodes.IndexBuildAborted, ErrorCodes.IndexBuildAlreadyInProgress],
-                    [ErrorCodes.IndexBuildAborted]);
+                    [
+                        ErrorCodes.DatabaseDropPending,
+                        ErrorCodes.IndexBuildAborted,
+                        ErrorCodes.IndexBuildAlreadyInProgress
+                    ],
+                    [ErrorCodes.DatabaseDropPending, ErrorCodes.IndexBuildAborted]);
             });
         },
 
@@ -238,8 +247,9 @@ var $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             // Re-create the index that was dropped.
-            assertAlways.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec),
-                                                       [ErrorCodes.IndexBuildAborted]);
+            assertAlways.commandWorkedOrFailedWithCode(
+                myDB[targetColl].createIndex(indexSpec),
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.DatabaseDropPending]);
         }
     };
 

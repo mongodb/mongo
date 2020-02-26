@@ -1,6 +1,6 @@
 /**
- * Test that the temp collection created by $out is not dropped even if the database containing it
- * is dropped during the operation.
+ * Test the behaviour of a dropDatabase command during an aggregation containing $out for single
+ * phase index builds.
  *
  * @tags: [
  *   assumes_unsharded_collection,
@@ -16,6 +16,7 @@
 
 load("jstests/libs/curop_helpers.js");    // for waitForCurOpByFilter.
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+load("jstests/noPassthrough/libs/index_build.js");
 
 function runTest(st, testDb, portNum) {
     const failpointName = "outWaitAfterTempCollectionCreation";
@@ -66,6 +67,12 @@ function runTest(st, testDb, portNum) {
     aggDone();
 }
 const conn = MongoRunner.runMongod({});
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(conn)) {
+    jsTest.log("Not running because two phase index builds are enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 runTest(null, conn.getDB("out_drop_temp"), conn.port);
 MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
