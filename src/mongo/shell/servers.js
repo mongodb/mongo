@@ -1433,10 +1433,18 @@ startMongoProgramNoConnect = function() {
 };
 
 myPort = function() {
-    var m = db.getMongo();
-    if (m.host.match(/:/))
-        return m.host.match(/:(.*)/)[1];
-    else
-        return 27017;
+    const hosts = db.getMongo().host.split(',');
+
+    const ip6Numeric = hosts[0].match(/^\[[0-9A-Fa-f:]+\]:(\d+)$/);
+    if (ip6Numeric) {
+        return ip6Numeric[1];
+    }
+
+    const hasPort = hosts[0].match(/:(\d+)/);
+    if (hasPort) {
+        return hasPort[1];
+    }
+
+    return 27017;
 };
 }());
