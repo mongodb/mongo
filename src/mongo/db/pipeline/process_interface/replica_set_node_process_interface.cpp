@@ -123,11 +123,16 @@ void ReplicaSetNodeProcessInterface::createIndexesOnEmptyCollection(
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
+            uassert(ErrorCodes::DatabaseDropPending,
+                    str::stream() << "The database is in the process of being dropped " << ns.db(),
+                    autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
+
             auto collection = autoColl.getCollection();
-            invariant(collection,
-                      str::stream() << "Failed to create indexes for aggregation because "
-                                       "collection does not exist: "
-                                    << ns << ": " << BSON("indexes" << indexSpecs));
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Failed to create indexes for aggregation because collection "
+                                     "does not exist: "
+                                  << ns << ": " << BSON("indexes" << indexSpecs),
+                    collection);
 
             invariant(0U == collection->numRecords(opCtx),
                       str::stream() << "Expected empty collection for index creation: " << ns

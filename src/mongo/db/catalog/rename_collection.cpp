@@ -111,8 +111,10 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    if (!db)
-        return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
+    if (!db || db->isDropPending(opCtx))
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream()
+                          << "Database " << source.db() << " does not exist or is drop pending");
 
     Collection* const sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
@@ -120,7 +122,8 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
         if (ViewCatalog::get(db)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "cannot rename view: " << source);
-        return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Source collection " << source.ns() << " does not exist");
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
