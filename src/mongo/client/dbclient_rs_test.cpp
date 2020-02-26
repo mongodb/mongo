@@ -44,6 +44,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_params_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -74,14 +75,69 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 }
 
 /**
- * Basic fixture with one primary and one secondary.
+ * Ensures a global ServiceContext exists and the ScanningReplicaSetMonitor is used for each test.
  */
-class BasicRS : public unittest::Test {
+class DBClientRSTest : public unittest::Test {
 protected:
     void setUp() {
         auto serviceContext = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContext));
 
+        setDisableStreamableTrue();
+    }
+
+    void tearDown() {
+        resetDisableStreamable();
+    }
+
+    /**
+     * Ensures the ScanningReplicaSetMonitor is used for the tests.
+     */
+    void setDisableStreamableTrue() {
+        const BSONObj newFlagParameter = BSON(kDisableStreamableFlagName << true);
+        BSONObjIterator parameterIterator(newFlagParameter);
+        BSONElement newParameter = parameterIterator.next();
+        const auto foundParameter = findDisableStreamableServerParameter();
+
+        uassertStatusOK(foundParameter->second->set(newParameter));
+        ASSERT_TRUE(disableStreamableReplicaSetMonitor.load());
+    }
+
+    /**
+     * Restores the disableStreamableReplicaSetMonitor parameter to its default value.
+     */
+    void resetDisableStreamable() {
+        const auto defaultParameter = kDefaultParameter[kDisableStreamableFlagName];
+        const auto foundParameter = findDisableStreamableServerParameter();
+
+        uassertStatusOK(foundParameter->second->set(defaultParameter));
+    }
+
+    /**
+     * Finds the disableStreamableReplicaSetMonitor ServerParameter.
+     */
+    ServerParameter::Map::const_iterator findDisableStreamableServerParameter() {
+        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+        return parameterMap.find(kDisableStreamableFlagName);
+    }
+
+    static inline const std::string kDisableStreamableFlagName =
+        "disableStreamableReplicaSetMonitor";
+
+    /**
+     * A BSONObj containing the default for the disableStreamableReplicaSetMonitor flag.
+     */
+    static inline const BSONObj kDefaultParameter =
+        BSON(kDisableStreamableFlagName << disableStreamableReplicaSetMonitor.load());
+};
+
+/**
+ * Basic fixture with one primary and one secondary.
+ */
+class BasicRS : public DBClientRSTest {
+protected:
+    void setUp() {
+        DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -94,6 +150,7 @@ protected:
         mongo::ScopedDbConnection::clearPool();
 
         ReplicaSetMonitor::shutdown();
+        DBClientRSTest::tearDown();
     }
 
     MockReplicaSet* getReplSet() {
@@ -204,12 +261,10 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
 /**
  * Setup for 2 member replica set will all of the nodes down.
  */
-class AllNodesDown : public unittest::Test {
+class AllNodesDown : public DBClientRSTest {
 protected:
     void setUp() {
-        auto serviceContext = ServiceContext::make();
-        setGlobalServiceContext(std::move(serviceContext));
-
+        DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -227,6 +282,7 @@ protected:
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
+        DBClientRSTest::tearDown();
     }
 
     MockReplicaSet* getReplSet() {
@@ -315,12 +371,10 @@ TEST_F(AllNodesDown, CommandNearest) {
 /**
  * Setup for 2 member replica set with the primary down.
  */
-class PrimaryDown : public unittest::Test {
+class PrimaryDown : public DBClientRSTest {
 protected:
     void setUp() {
-        auto serviceContext = ServiceContext::make();
-        setGlobalServiceContext(std::move(serviceContext));
-
+        DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -333,6 +387,7 @@ protected:
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
+        DBClientRSTest::tearDown();
     }
 
     MockReplicaSet* getReplSet() {
@@ -424,12 +479,10 @@ TEST_F(PrimaryDown, Nearest) {
 /**
  * Setup for 2 member replica set with the secondary down.
  */
-class SecondaryDown : public unittest::Test {
+class SecondaryDown : public DBClientRSTest {
 protected:
     void setUp() {
-        auto serviceContext = ServiceContext::make();
-        setGlobalServiceContext(std::move(serviceContext));
-
+        DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
@@ -443,6 +496,7 @@ protected:
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
+        DBClientRSTest::tearDown();
     }
 
     MockReplicaSet* getReplSet() {
@@ -538,11 +592,10 @@ TEST_F(SecondaryDown, CommandNearest) {
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that uses ConnectionString::setConnectionHook
  */
-class TaggedFiveMemberRS : public unittest::Test {
+class TaggedFiveMemberRS : public DBClientRSTest {
 protected:
     void setUp() {
-        auto serviceContext = ServiceContext::make();
-        setGlobalServiceContext(std::move(serviceContext));
+        DBClientRSTest::setUp();
 
         // Tests for pinning behavior require this.
         ReplicaSetMonitor::useDeterministicHostSelection = true;
@@ -655,6 +708,7 @@ protected:
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
+        DBClientRSTest::tearDown();
     }
 
     MockReplicaSet* getReplSet() {
