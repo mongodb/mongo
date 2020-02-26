@@ -158,17 +158,6 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextSpilled() {
 
     _currentId = _firstPartOfNextGroup.first;
     const size_t numAccumulators = _accumulatedFields.size();
-
-    // Call startNewGroup on every accumulator.
-    Value expandedId = expandId(_currentId);
-    Document idDoc =
-        expandedId.getType() == BSONType::Object ? expandedId.getDocument() : Document();
-    for (size_t i = 0; i < numAccumulators; ++i) {
-        Value initializerValue =
-            _accumulatedFields[i].expr.initializer->evaluate(idDoc, &pExpCtx->variables);
-        _currentAccumulators[i]->startNewGroup(initializerValue);
-    }
-
     while (pExpCtx->getValueComparator().evaluate(_currentId == _firstPartOfNextGroup.first)) {
         // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
         // At loop exit, it is the first value to be processed in the next group.
@@ -227,8 +216,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
     }
 
     for (auto&& accumulatedField : _accumulatedFields) {
-        accumulatedField.expr.initializer = accumulatedField.expr.initializer->optimize();
-        accumulatedField.expr.argument = accumulatedField.expr.argument->optimize();
+        accumulatedField.expression = accumulatedField.expression->optimize();
     }
 
     return this;
@@ -253,11 +241,9 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
 
     // Add the remaining fields.
     for (auto&& accumulatedField : _accumulatedFields) {
-        intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
+        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator();
         insides[accumulatedField.fieldName] =
-            Value(accum->serialize(accumulatedField.expr.initializer,
-                                   accumulatedField.expr.argument,
-                                   static_cast<bool>(explain)));
+            Value(accum->serialize(accumulatedField.expression, static_cast<bool>(explain)));
     }
 
     if (_doingMerge) {
@@ -277,8 +263,7 @@ DepsTracker::State DocumentSourceGroup::getDependencies(DepsTracker* deps) const
 
     // add the rest
     for (auto&& accumulatedField : _accumulatedFields) {
-        accumulatedField.expr.argument->addDependencies(deps);
-        // Don't add initializer, because it doesn't refer to docs from the input stream.
+        accumulatedField.expression->addDependencies(deps);
     }
 
     return DepsTracker::State::EXHAUSTIVE_ALL;
@@ -500,23 +485,16 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         // accumulator. This is done in a somewhat odd way in order to avoid hashing 'id' and
         // looking it up in '_groups' multiple times.
         const size_t oldSize = _groups->size();
-        vector<intrusive_ptr<AccumulatorState>>& group = (*_groups)[id];
+        vector<intrusive_ptr<Accumulator>>& group = (*_groups)[id];
         const bool inserted = _groups->size() != oldSize;
 
         if (inserted) {
             _memoryUsageBytes += id.getApproximateSize();
 
-            // Initialize and add the accumulators
-            Value expandedId = expandId(id);
-            Document idDoc =
-                expandedId.getType() == BSONType::Object ? expandedId.getDocument() : Document();
+            // Add the accumulators
             group.reserve(numAccumulators);
             for (auto&& accumulatedField : _accumulatedFields) {
-                auto accum = accumulatedField.makeAccumulator();
-                Value initializerValue =
-                    accumulatedField.expr.initializer->evaluate(idDoc, &pExpCtx->variables);
-                accum->startNewGroup(initializerValue);
-                group.push_back(accum);
+                group.push_back(accumulatedField.makeAccumulator());
             }
         } else {
             for (auto&& groupObj : group) {
@@ -530,7 +508,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
         for (size_t i = 0; i < numAccumulators; i++) {
             group[i]->process(
-                _accumulatedFields[i].expr.argument->evaluate(rootDocument, &pExpCtx->variables),
+                _accumulatedFields[i].expression->evaluate(rootDocument, &pExpCtx->variables),
                 _doingMerge);
 
             _memoryUsageBytes += group[i]->memUsageForSorter();
@@ -715,7 +693,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distr
         // original accumulator may be collecting an expression based on a field expression or
         // constant.  Here, we accumulate the output of the same name from the prior group.
         auto copiedAccumulatedField = accumulatedField;
-        copiedAccumulatedField.expr.argument =
+        copiedAccumulatedField.expression =
             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + copiedAccumulatedField.fieldName, vps);
         mergingGroup->addAccumulator(copiedAccumulatedField);
     }
@@ -797,10 +775,7 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     fields.push_back(std::make_pair("_id", ExpressionFieldPath::create(pExpCtx, groupId)));
 
     for (auto&& accumulator : _accumulatedFields) {
-        fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expr.argument));
-
-        // Since we don't attempt this transformation for non-$first accumulators,
-        // the initializer should always be trivial.
+        fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expression));
     }
 
     return GroupFromFirstDocumentTransformation::create(pExpCtx, groupId, std::move(fields));

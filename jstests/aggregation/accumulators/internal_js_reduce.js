@@ -43,7 +43,7 @@ const expectedResults = [
 ];
 
 let res = assert.commandWorked(db.runCommand(command));
-assert(resultsEq(res.cursor.firstBatch, expectedResults), res.cursor);
+assert(resultsEq(res.cursor.firstBatch, expectedResults, res.cursor));
 
 //
 // Test that the reduce function also accepts a string argument.

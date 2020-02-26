@@ -158,7 +158,7 @@ class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
 class AccumulatorMergeObjects;
-template <typename AccumulatorState>
+template <typename Accumulator>
 class ExpressionFromAccumulator;
 
 /**

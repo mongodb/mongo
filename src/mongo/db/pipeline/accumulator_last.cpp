@@ -55,7 +55,7 @@ Value AccumulatorLast::getValue(bool toBeMerged) {
 }
 
 AccumulatorLast::AccumulatorLast(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : AccumulatorState(expCtx) {
+    : Accumulator(expCtx) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -64,7 +64,7 @@ void AccumulatorLast::reset() {
     _last = Value();
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorLast::create(
+intrusive_ptr<Accumulator> AccumulatorLast::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorLast(expCtx);
 }

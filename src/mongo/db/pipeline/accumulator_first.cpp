@@ -59,7 +59,7 @@ Value AccumulatorFirst::getValue(bool toBeMerged) {
 }
 
 AccumulatorFirst::AccumulatorFirst(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : AccumulatorState(expCtx), _haveFirst(false) {
+    : Accumulator(expCtx), _haveFirst(false) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -70,7 +70,7 @@ void AccumulatorFirst::reset() {
 }
 
 
-intrusive_ptr<AccumulatorState> AccumulatorFirst::create(
+intrusive_ptr<Accumulator> AccumulatorFirst::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorFirst(expCtx);
 }
