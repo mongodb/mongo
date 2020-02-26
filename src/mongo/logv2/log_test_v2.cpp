@@ -245,6 +245,12 @@ TEST_F(LogTestV2, Basic) {
     // Text formatter selects format string
     LOGV2(20084, "fmtstr {name}", "msgstr", "name"_attr = 1);
     ASSERT_EQUALS(lines.back(), "fmtstr 1");
+
+    // Test that logging exceptions does not propagate out to user code in release builds
+    if (!kDebugBuild) {
+        LOGV2(4638203, "mismatch {name}", "not_name"_attr = 1);
+        ASSERT(StringData(lines.back()).startsWith("Exception during log"_sd));
+    }
 }
 
 TEST_F(LogTestV2, Types) {

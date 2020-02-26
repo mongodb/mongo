@@ -29,8 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/logv2/log_manager.h"
 
+#include <boost/log/core.hpp>
+
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 
@@ -46,6 +51,28 @@ struct LogManager::Impl {
 
 LogManager::LogManager() {
     _impl = std::make_unique<Impl>();
+
+    boost::log::core::get()->set_exception_handler([]() {
+        thread_local uint32_t depth = 0;
+        auto depthGuard = makeGuard([]() { --depth; });
+        ++depth;
+        // Try and log that we failed to log
+        if (depth == 1) {
+            try {
+                throw;
+            } catch (...) {
+                LOGV2(4638200,
+                      "Exception during log, message not written to stream",
+                      "exception"_attr = exceptionToStatus());
+            }
+        }
+
+        // Logging exceptions are fatal in debug builds. Guard ourselves from additional logging
+        // during the assert that might also fail
+        if (kDebugBuild && depth <= 2) {
+            dassert(false, "Exception during log");
+        }
+    });
 }
 
 LogManager::~LogManager() {}
