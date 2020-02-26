@@ -117,7 +117,9 @@ Status FileRotateSink::rotate(bool rename, StringData renameSuffix) {
 
         auto newFile = openFile(filename, false);
         if (newFile.isOK()) {
+            remove_stream(file.second);
             file.second = newFile.getValue();
+            add_stream(file.second);
         }
         return newFile.getStatus();
     }
