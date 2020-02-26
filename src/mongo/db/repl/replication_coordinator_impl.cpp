@@ -114,6 +114,7 @@ MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
 MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
 // Will cause an isMaster request to hang as it starts waiting.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
+MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -1196,6 +1197,11 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
 void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<Latch> lock(_mutex);
+
+    if (MONGO_unlikely(skipDurableTimestampUpdates.shouldFail())) {
+        return;
+    }
+
     if (opTimeAndWallTime.opTime > _getMyLastDurableOpTime_inlock()) {
         _setMyLastDurableOpTimeAndWallTime(lock, opTimeAndWallTime, false);
         _reportUpstream_inlock(std::move(lock));
