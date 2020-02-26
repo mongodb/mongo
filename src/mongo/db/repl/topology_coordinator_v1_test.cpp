@@ -2278,41 +2278,6 @@ TEST_F(TopoCoordTest, OmitUninitializedConfigTermFromHeartbeat) {
     ASSERT_FALSE(response.toBSON().hasField("configTerm"_sd));
 }
 
-TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileInInitialSync) {
-    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "h0")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "h1"))),
-                 1);
-
-    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
-
-    heartbeatFromMember(
-        HostAndPort("h0"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(3, 0), 0));
-
-    // The lastApplied and lastDurable should be null for any heartbeat responses we send while in
-    // STARTUP_2, even when they are otherwise initialized.
-    OpTime lastOpTime(Timestamp(2, 0), 0);
-    topoCoordSetMyLastAppliedOpTime(lastOpTime, Date_t(), false);
-    topoCoordSetMyLastDurableOpTime(lastOpTime, Date_t(), false);
-
-    ReplSetHeartbeatArgsV1 args;
-    args.setConfigVersion(1);
-    args.setSetName("rs0");
-    args.setSenderId(0);
-    ReplSetHeartbeatResponse response;
-
-    ASSERT_OK(getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", &response));
-    ASSERT_EQUALS(OpTime(), response.getAppliedOpTime());
-    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
-}
-
 TEST_F(TopoCoordTest, BecomeCandidateWhenBecomingSecondaryInSingleNodeSet) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
