@@ -163,11 +163,16 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     OperationContext* opCtx, const NamespaceString& ns, const BSONObj& cmdObj) const {
     BSONObjBuilder cmd(cmdObj);
     _attachGenericCommandArgs(opCtx, &cmd);
+
+    // Verify that the ReplicationCoordinator believes that a primary exists before issuing a
+    // command to it.
+    auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort();
+    if (hostAndPort.empty()) {
+        return StatusWith<BSONObj>{ErrorCodes::PrimarySteppedDown, "No primary exists currently"};
+    }
+
     executor::RemoteCommandRequest request(
-        repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort(),
-        ns.db().toString(),
-        cmd.obj(),
-        opCtx);
+        std::move(hostAndPort), ns.db().toString(), cmd.obj(), opCtx);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
