@@ -38,7 +38,6 @@ namespace mongo {
 class DocumentSourceOut final : public DocumentSourceWriter<BSONObj> {
 public:
     static constexpr StringData kStageName = "$out"_sd;
-    static constexpr StringData kInternalStageName = "$internalOutToDifferentDB"_sd;
 
     /**
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
@@ -50,9 +49,6 @@ public:
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
-
-        static std::unique_ptr<LiteParsed> parseToDifferentDB(const NamespaceString& nss,
-                                                              const BSONElement& spec);
 
         bool allowShardedForeignCollection(NamespaceString nss) const final {
             return _foreignNss != nss;
@@ -82,13 +78,6 @@ public:
 
     ~DocumentSourceOut() override;
 
-    const char* getSourceName() const final override {
-        if (_toDifferentDB) {
-            return kInternalStageName.rawData();
-        }
-        return kStageName.rawData();
-    }
-
     StageConstraints constraints(Pipeline::SplitState pipeState) const final override {
         return {StreamType::kStreaming,
                 PositionRequirement::kLast,
@@ -104,30 +93,23 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final override;
 
     /**
-     * Creates a new $out or $internalOutToDifferentDB stage from the given arguments.
+     * Creates a new $out stage from the given arguments.
      */
     static boost::intrusive_ptr<DocumentSource> create(
         NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    static boost::intrusive_ptr<DocumentSource> createAndAllowDifferentDB(
-        NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     /**
-     * Parses a $out or $internalOutToDifferentDB stage from the user-supplied BSON.
+     * Parses a $out stage from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    static boost::intrusive_ptr<DocumentSource> createFromBsonToDifferentDB(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     DocumentSourceOut(NamespaceString outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(outputNs.db() == expCtx->ns.db() ? kStageName.rawData()
-                                                                : kInternalStageName.rawData(),
-                               std::move(outputNs),
-                               expCtx),
-          _toDifferentDB(getOutputNs().db() != expCtx->ns.db()) {}
+        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx) {}
+
+    static NamespaceString parseNsFromElem(const BSONElement& spec, const StringData& defaultDB);
 
     void initialize() override;
 
@@ -155,10 +137,6 @@ private:
 
     // The temporary namespace for the $out writes.
     NamespaceString _tempNs;
-
-    // Keep track of whether this document source is writing to a different DB for serialization
-    // purposes.
-    bool _toDifferentDB;
 };
 
 }  // namespace mongo

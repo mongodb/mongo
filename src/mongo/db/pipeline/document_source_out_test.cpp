@@ -85,13 +85,13 @@ public:
 
 TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
     BSONObj spec = BSON("$out" << 1);
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
 
     spec = BSON("$out" << BSONArray());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
 
     spec = BSON("$out" << BSONObj());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 31278);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16994);
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {
@@ -106,12 +106,12 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
                         << "some_collection");
     auto outStage = createOutStage(spec);
     auto serialized = outStage->serialize().getDocument();
-    ASSERT_EQ(serialized["$out"].getStringData(), "some_collection");
+    ASSERT_EQ(serialized["$out"]["coll"].getStringData(), "some_collection");
 
     // Make sure we can reparse the serialized BSON.
     auto reparsedOutStage = createOutStage(serialized.toBson());
     auto reSerialized = reparsedOutStage->serialize().getDocument();
-    ASSERT_EQ(reSerialized["$out"].getStringData(), "some_collection");
+    ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
 }  // namespace
