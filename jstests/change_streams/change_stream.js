@@ -132,6 +132,27 @@
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
+    jsTestLog("Testing multi:true update");
+    assert.writeOK(db.t1.insert({_id: 4, a: 0, b: 1}));
+    assert.writeOK(db.t1.insert({_id: 5, a: 0, b: 1}));
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.writeOK(db.t1.update({a: 0}, {$set: {b: 2}}, {multi: true}));
+    expected = [
+        {
+          documentKey: {_id: 4},
+          ns: {db: "test", coll: "t1"},
+          operationType: "update",
+          updateDescription: {removedFields: [], updatedFields: {b: 2}}
+        },
+        {
+          documentKey: {_id: 5},
+          ns: {db: "test", coll: "t1"},
+          operationType: "update",
+          updateDescription: {removedFields: [], updatedFields: {b: 2}}
+        }
+    ];
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+
     jsTestLog("Testing delete");
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.remove({_id: 1}));
@@ -141,6 +162,25 @@
         operationType: "delete",
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+
+    jsTestLog("Testing justOne:false delete");
+    assert.writeOK(db.t1.insert({_id: 6, a: 1, b: 1}));
+    assert.writeOK(db.t1.insert({_id: 7, a: 1, b: 1}));
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.writeOK(db.t1.remove({a: 1}, {justOne: false}));
+    expected = [
+        {
+          documentKey: {_id: 6},
+          ns: {db: "test", coll: "t1"},
+          operationType: "delete",
+        },
+        {
+          documentKey: {_id: 7},
+          ns: {db: "test", coll: "t1"},
+          operationType: "delete",
+        }
+    ];
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
     jsTestLog("Testing intervening write on another collection");
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});

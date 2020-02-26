@@ -201,7 +201,7 @@ public:
         Collection* const collection = ctx->getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
-        auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, nss, std::move(cq));
+        auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, std::move(cq));
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -312,7 +312,7 @@ public:
         Collection* const collection = ctx->getCollection();
 
         // Get the execution plan for the query.
-        auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, nss, std::move(cq));
+        auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, std::move(cq));
         uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
