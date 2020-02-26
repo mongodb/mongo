@@ -1910,14 +1910,19 @@ public:
                           << "rs0"
                           << "version" << initConfigVersion << "term" << initConfigTerm << "members"
                           << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                                   << "hself")
+                                                   << "hself"
+                                                   << "arbiterOnly" << useArbiter)
                                         << BSON("_id" << 20 << "host"
                                                       << "h2")
                                         << BSON("_id" << 30 << "host"
                                                       << "h3"))
                           << "settings" << BSON("protocolVersion" << 1)),
                      0);
-        setSelfMemberState(MemberState::RS_SECONDARY);
+        if (useArbiter) {
+            ASSERT_EQUALS(MemberState::RS_ARBITER, getTopoCoord().getMemberState().s);
+        } else {
+            setSelfMemberState(MemberState::RS_SECONDARY);
+        }
     }
 
     void prepareHeartbeatResponseV1(const ReplSetHeartbeatArgsV1& args,
@@ -1928,6 +1933,15 @@ public:
 
     int initConfigVersion = 1;
     int initConfigTerm = 1;
+    bool useArbiter = false;
+};
+
+class ArbiterPrepareHeartbeatResponseV1Test : public PrepareHeartbeatResponseV1Test {
+public:
+    void setUp() override {
+        useArbiter = true;
+        PrepareHeartbeatResponseV1Test::setUp();
+    }
 };
 
 TEST_F(PrepareHeartbeatResponseV1Test,
@@ -2087,6 +2101,28 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_TRUE(response.hasConfig());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
+    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(1, response.getConfigVersion());
+}
+
+TEST_F(ArbiterPrepareHeartbeatResponseV1Test,
+       ArbiterPopulateHeartbeatResponseWithFullConfigWhenHeartbeatRequestHasAnOldConfigTerm) {
+    // set up args with a config version lower than ours
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(initConfigVersion);
+    args.setConfigTerm(initConfigTerm - 1);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // prepare response and check the results
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_TRUE(response.hasConfig());
+    ASSERT_EQUALS("rs0", response.getReplicaSetName());
+    ASSERT_EQUALS(MemberState::RS_ARBITER, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -2881,68 +2917,76 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenReplSetNameDoesNotMatch) {
     ASSERT_FALSE(response.getVoteGranted());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigVersionIsLower) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "term" << 1LL << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
-                 0);
-    setSelfMemberState(MemberState::RS_SECONDARY);
+class ConfigTermAndVersionVoteTest : public TopoCoordTest {
+public:
+    auto testWithArbiter(bool useArbiter,
+                         long long requestVotesConfigVersion,
+                         long long requestVotesConfigTerm) {
+        updateConfig(BSON("_id"
+                          << "rs0"
+                          << "version" << 2 << "term" << 2LL << "members"
+                          << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                                   << "hself"
+                                                   << "arbiterOnly" << useArbiter)
+                                        << BSON("_id" << 20 << "host"
+                                                      << "h2")
+                                        << BSON("_id" << 30 << "host"
+                                                      << "h3"))),
+                     0);
+        if (useArbiter) {
+            ASSERT_EQUALS(MemberState::RS_ARBITER, getTopoCoord().getMemberState().s);
+        } else {
+            setSelfMemberState(MemberState::RS_SECONDARY);
+        }
 
-    // mismatched configVersion
-    ReplSetRequestVotesArgs args;
-    args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
-                                               << "rs0"
-                                               << "term" << 1LL << "candidateIndex" << 1LL
-                                               << "configVersion" << 0LL << "configTerm" << 1LL
-                                               << "lastAppliedOpTime"
-                                               << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
-        .transitional_ignore();
-    ReplSetRequestVotesResponse response;
+        // mismatched configVersion
+        ReplSetRequestVotesArgs args;
+        args.initialize(BSON("replSetRequestVotes"
+                             << 1 << "setName"
+                             << "rs0"
+                             << "term" << 1LL << "configVersion" << requestVotesConfigVersion
+                             << "configTerm" << requestVotesConfigTerm << "candidateIndex" << 1LL
+                             << "lastAppliedOpTime"
+                             << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
+            .transitional_ignore();
+        ReplSetRequestVotesResponse response;
 
-    getTopoCoord().processReplSetRequestVotes(args, &response);
+        getTopoCoord().processReplSetRequestVotes(args, &response);
+        ASSERT_FALSE(response.getVoteGranted());
+        return response;
+    }
+};
+
+TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigVersionIsLower) {
+    auto response = testWithArbiter(false, 1, 2);
     ASSERT_EQUALS(
-        "candidate's config with {version: 0, term: 1} is older than mine with {version: 1, term: "
-        "1}",
+        "candidate's config with {version: 1, term: 2} is older than mine with"
+        " {version: 2, term: 2}",
         response.getReason());
-    ASSERT_FALSE(response.getVoteGranted());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigTermIsLower) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "term" << 2LL << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
-                 0);
-    setSelfMemberState(MemberState::RS_SECONDARY);
-
-    // lower configTerm
-    ReplSetRequestVotesArgs args;
-    args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
-                                               << "rs0"
-                                               << "term" << 1LL << "candidateIndex" << 1LL
-                                               << "configVersion" << 1LL << "configTerm" << 1LL
-                                               << "lastAppliedOpTime"
-                                               << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)))
-        .transitional_ignore();
-    ReplSetRequestVotesResponse response;
-
-    getTopoCoord().processReplSetRequestVotes(args, &response);
+TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigVersionIsLower) {
+    auto response = testWithArbiter(true, 1, 2);
     ASSERT_EQUALS(
-        "candidate's config with {version: 1, term: 1} is older than mine with {version: 1, term: "
-        "2}",
+        "candidate's config with {version: 1, term: 2} is older than mine with"
+        " {version: 2, term: 2}",
         response.getReason());
-    ASSERT_FALSE(response.getVoteGranted());
+}
+
+TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigTermIsLower) {
+    auto response = testWithArbiter(false, 2, 1);
+    ASSERT_EQUALS(
+        "candidate's config with {version: 2, term: 1} is older than mine with"
+        " {version: 2, term: 2}",
+        response.getReason());
+}
+
+TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigTermIsLower) {
+    auto response = testWithArbiter(true, 2, 1);
+    ASSERT_EQUALS(
+        "candidate's config with {version: 2, term: 1} is older than mine with"
+        " {version: 2, term: 2}",
+        response.getReason());
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
