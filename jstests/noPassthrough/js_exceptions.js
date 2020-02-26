@@ -5,8 +5,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/logv2_helpers.js");
-
 let tests = [
     {
         callback: function() {
@@ -101,11 +99,7 @@ tests.forEach(function(t) {
         assert(matchShellExp);
         assertMatch(/\s*/, lines.pop());
         assertMatch(/exiting with code/, lines.pop());
-        if (isJsonLogNoConn()) {
-            assertMatch(new RegExp("\"ctx\":\"js\".*" + t.match), lines.shift());
-        } else {
-            assertMatch(new RegExp("\\\[js\\\] " + t.match + "$"), lines.shift());
-        }
+        assertMatch(new RegExp(t.match), lines.shift());
 
         if (t.stack == true) {
             assert.eq(lines.length,
