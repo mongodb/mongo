@@ -96,7 +96,6 @@ struct ServerGlobalParams {
     std::string timeZoneInfoPath;  // Path to time zone info directory, or empty if none.
 
     std::string logpath;  // Path to log file, if logging to a file; otherwise, empty.
-    logv2::LogFormat logFormat = logv2::LogFormat::kDefault;  // Log format to output to
     logv2::LogTimestampFormat logTimestampFormat = logv2::LogTimestampFormat::kISO8601Local;
 
     bool logAppend = false;         // True if logging to a file in append mode.

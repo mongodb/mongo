@@ -143,9 +143,6 @@ def _make_parser():  # pylint: disable=too-many-statements
               " started by resmoke.py. The argument is specified as bracketed YAML -"
               " i.e. JSON with support for single quoted and unquoted keys."))
 
-    parser.add_option("--logFormat", dest="log_format",
-                      help="The log format used by mongo executables.")
-
     parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
                       help="The path to the mongos executable for resmoke.py to use.")
 
@@ -619,7 +616,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
-    _config.LOG_FORMAT = config.pop("log_format")
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
     if _config.MIXED_BIN_VERSIONS is not None:

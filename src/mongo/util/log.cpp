@@ -56,26 +56,12 @@
 
 namespace mongo {
 
-#if defined(MONGO_CONFIG_LOGV1_DEFAULT)
-static bool _logV2Enabled = false;
-#else
-static bool _logV2Enabled = true;
-#endif
-
 bool logV2Enabled() {
-    return _logV2Enabled;
+    return true;
 }
 
 bool logV2IsJson(logv2::LogFormat format) {
-    return format == logv2::LogFormat::kJson
-#if !defined(MONGO_CONFIG_TEXT_LOG_DEFAULT)
-        || format == logv2::LogFormat::kDefault
-#endif
-        ;
-}
-
-void logV2Set(bool setting) {
-    _logV2Enabled = setting;
+    return format == logv2::LogFormat::kJson || format == logv2::LogFormat::kDefault;
 }
 
 static logger::ExtraLogContextFn _appendExtraLogContext;

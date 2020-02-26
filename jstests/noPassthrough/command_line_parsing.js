@@ -36,7 +36,6 @@ delete m2result.parsed.storage.inMemory;
 delete m2result.parsed.storage.journal;
 delete m2result.parsed.storage.rocksdb;
 delete m2result.parsed.storage.wiredTiger;
-delete m2result.parsed.systemLog;
 delete m2result.parsed.replication;  // Removes enableMajorityReadConcern setting.
 assert.docEq(m2expected.parsed, m2result.parsed);
 
@@ -66,6 +65,5 @@ delete m3result.parsed.storage.inMemory;
 delete m3result.parsed.storage.journal;
 delete m3result.parsed.storage.rocksdb;
 delete m3result.parsed.storage.wiredTiger;
-delete m3result.parsed.systemLog;
 delete m3result.parsed.replication;  // Removes enableMajorityReadConcern setting.
 assert.docEq(m3expected.parsed, m3result.parsed);

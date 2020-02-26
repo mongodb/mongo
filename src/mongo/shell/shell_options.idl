@@ -213,9 +213,3 @@ configs:
     description: "logging gets directed to the logv2 backend"
     arg_vartype: Switch
     source: [ cli, ini ]
-
-  "logFormat":
-    description: 'Set the log output format (default|text|json)'
-    short_name: logFormat
-    arg_vartype: String
-    default: "default"

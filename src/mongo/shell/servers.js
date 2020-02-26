@@ -1129,15 +1129,6 @@ function appendSetParameterArgs(argArray) {
             argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
         }
 
-        // New options in 4.3.x
-        if (!programMajorMinorVersion || programMajorMinorVersion >= 403) {
-            if (jsTest.options().logFormat) {
-                if (!argArrayContains("--logFormat")) {
-                    argArray.push(...["--logFormat", jsTest.options().logFormat]);
-                }
-            }
-        }
-
         // Since options may not be backward compatible, mongos options are not
         // set on older versions, e.g., mongos-3.0.
         if (programName.endsWith('mongos')) {

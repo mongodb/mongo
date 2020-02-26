@@ -374,7 +374,6 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
 
     if (logV2Enabled()) {
-        lv2Config.format = serverGlobalParams.logFormat;
         lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
         Status result = lv2Manager.getGlobalDomainInternal().configure(lv2Config);
         if (result.isOK() && writeServerRestartedAfterLogConfig)

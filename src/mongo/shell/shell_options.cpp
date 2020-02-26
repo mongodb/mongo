@@ -341,27 +341,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
     }
 
-    if (params.count("logv2")) {
-        logV2Set(true);
-    }
-
-    if (params.count("logFormat")) {
-        std::string formatStr = params["logFormat"].as<string>();
-        if (!logV2Enabled() && formatStr != "default")
-            return Status(ErrorCodes::BadValue, "Can only use logFormat if logv2 is enabled.");
-        if (formatStr == "default") {
-            shellGlobalParams.logFormat = logv2::LogFormat::kDefault;
-        } else if (formatStr == "text") {
-            shellGlobalParams.logFormat = logv2::LogFormat::kText;
-        } else if (formatStr == "json") {
-            shellGlobalParams.logFormat = logv2::LogFormat::kJson;
-        } else {
-            return Status(ErrorCodes::BadValue,
-                          "Unsupported value for logFormat: " + formatStr +
-                              ". Valid values are: default, text or json");
-        }
-    }
-
     return Status::OK();
 }
 

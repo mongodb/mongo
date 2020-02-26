@@ -287,8 +287,12 @@ template <
 CustomAttributeValue mapValue(const T& val) {
     static_assert(HasToString<T>::value || HasToStringReturnStringData<T>::value ||
                       HasStringSerialize<T>::value || HasNonMemberToString<T>::value ||
-                      HasNonMemberToStringReturnStringData<T>::value,
-                  "custom type needs toString() or serialize(fmt::memory_buffer&) implementation");
+                      HasNonMemberToStringReturnStringData<T>::value ||
+                      HasBSONBuilderAppend<T>::value || HasBSONSerialize<T>::value ||
+                      HasToBSON<T>::value || HasToBSONArray<T>::value ||
+                      HasNonMemberToBSON<T>::value,
+                  "custom type needs toBSON(), toBSONArray(), serialize(BSONObjBuilder*), "
+                  "toString() or serialize(fmt::memory_buffer&) implementation");
 
     CustomAttributeValue custom;
     if constexpr (HasBSONBuilderAppend<T>::value) {

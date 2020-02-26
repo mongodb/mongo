@@ -31,7 +31,7 @@
 
 namespace mongo {
 namespace logv2 {
-enum class LogFormat { kDefault, kText, kJson, kPlain };
+enum class LogFormat { kDefault, kJson, kPlain };
 enum class LogTimestampFormat { kISO8601UTC, kISO8601Local };
 }  // namespace logv2
 }  // namespace mongo

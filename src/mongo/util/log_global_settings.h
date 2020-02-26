@@ -43,7 +43,6 @@ namespace mongo {
 
 bool logV2Enabled();
 bool logV2IsJson(logv2::LogFormat format);
-void logV2Set(bool setting);
 
 /**
  * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
