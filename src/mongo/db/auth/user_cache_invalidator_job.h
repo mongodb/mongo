@@ -29,9 +29,9 @@
 #pragma once
 
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/background.h"
-
-#include <string>
 
 namespace mongo {
 
@@ -46,18 +46,21 @@ class OperationContext;
  */
 class UserCacheInvalidator : public BackgroundJob {
 public:
+    using OIDorTimestamp = stdx::variant<OID, Timestamp>;
+
     UserCacheInvalidator(AuthorizationManager* authzManager);
     ~UserCacheInvalidator();
 
     void initialize(OperationContext* opCtx);
 
 protected:
-    virtual std::string name() const;
-    virtual void run();
+    std::string name() const override;
+    void run() override;
 
 private:
-    AuthorizationManager* _authzManager;
-    OID _previousCacheGeneration;
+    AuthorizationManager* const _authzManager;
+
+    OIDorTimestamp _previousGeneration;
 };
 
 Status userCacheInvalidationIntervalSecsNotify(const int& newValue);
