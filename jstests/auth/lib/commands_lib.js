@@ -1107,61 +1107,39 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "aggregate_out_to_different_db",
+          testname: "aggregate_out_replace_collection",
           command: function(state, args) {
               return {
                   aggregate: "foo",
-                  pipeline: [{$internalOutToDifferentDB: {db: args.targetDB, coll: "foo_out"}}],
+                  pipeline: [{$out: "foo_out"}],
                   cursor: {},
                   bypassDocumentValidation: args.bypassDocumentValidation,
               };
           },
-          setup: function(db) {
-              // Create the target database to avoid NamespaceNotFound errors.
-              assert.commandWorked(db.getSiblingDB(firstDbName).foo.insert({}));
-              assert.commandWorked(db.getSiblingDB(secondDbName).foo.insert({}));
-          },
           testcases: [
               {
                 runOnDb: firstDbName,
-                commandArgs: {targetDB: firstDbName, bypassDocumentValidation: false},
+                commandArgs: {bypassDocumentValidation: false},
                 roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
-                    {
-                        resource: {db: firstDbName, collection: "foo_out"}, 
-                        actions: ["insert", "remove"]
-                    },
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["remove"]}
                 ]
               },
               {
                 runOnDb: secondDbName,
-                commandArgs: {targetDB: secondDbName, bypassDocumentValidation: false},
+                commandArgs: {bypassDocumentValidation: false},
                 roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
-                    {
-                        resource: {db: secondDbName, collection: "foo_out"}, 
-                        actions: ["insert", "remove"]
-                    },
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["remove"]}
                 ]
               },
               {
                 runOnDb: firstDbName,
-                commandArgs: {targetDB: secondDbName, bypassDocumentValidation: false},
-                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
-                privileges: [
-                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
-                    {
-                        resource: {db: secondDbName, collection: "foo_out"}, 
-                        actions: ["insert", "remove"]
-                    },
-                ]
-              },
-              // Test for bypassDocumentValidation.
-              {
-                runOnDb: firstDbName,
-                commandArgs: {targetDB: firstDbName, bypassDocumentValidation: true},
+                commandArgs: {bypassDocumentValidation: true},
                 // Note that the built-in role must have 'bypassDocumentValidation' for this test.
                 roles: {dbOwner: 1, root: 1, __system: 1},
                 privileges: [
@@ -1172,20 +1150,7 @@ var authCommandsLib = {
                     },
                 ]
               },
-              // Test for bypassDocumentValidation to a foreign database.
-              {
-                runOnDb: firstDbName,
-                commandArgs: {targetDB: secondDbName, bypassDocumentValidation: true},
-                // Note that the built-in role must have 'bypassDocumentValidation' for this test.
-                roles: {root: 1, __system: 1},
-                privileges: [
-                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
-                    {
-                      resource: {db: secondDbName, collection: "foo_out"},
-                      actions: ["insert", "remove", "bypassDocumentValidation"]
-                    },
-                ]
-              },
+              // TODO SERVER-36832: Test with a foreign database.
           ]
         },
         {
