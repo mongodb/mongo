@@ -1,4 +1,5 @@
 // Attempt to verify that connections can make use of TCP_FASTOPEN
+// @tags: [multiversion_incompatible]
 
 (function() {
 'use strict';
