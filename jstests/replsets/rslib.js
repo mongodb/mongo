@@ -17,6 +17,7 @@ var setLogVerbosity;
 var stopReplicationAndEnforceNewPrimaryToCatchUp;
 var setFailPoint;
 var clearFailPoint;
+var isConfigCommitted;
 
 (function() {
 "use strict";
@@ -509,5 +510,14 @@ setFailPoint = function(node, failpoint, data = {}) {
 clearFailPoint = function(node, failpoint) {
     jsTestLog("Clearing fail point " + failpoint);
     assert.commandWorked(node.adminCommand({configureFailPoint: failpoint, mode: "off"}));
+};
+
+/**
+ * Returns the replSetGetConfig field 'commitmentStatus', which is true or false.
+ */
+isConfigCommitted = function(node) {
+    let adminDB = node.getDB('admin');
+    return assert.commandWorked(adminDB.runCommand({replSetGetConfig: 1, commitmentStatus: true}))
+        .commitmentStatus;
 };
 }());

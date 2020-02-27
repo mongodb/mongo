@@ -196,7 +196,10 @@ public:
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
 
-        ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(&result);
+        bool wantCommitmentStatus;
+        uassertStatusOK(bsonExtractBooleanFieldWithDefault(
+            cmdObj, "commitmentStatus", false, &wantCommitmentStatus));
+        ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(&result, wantCommitmentStatus);
         return true;
     }
 

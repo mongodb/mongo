@@ -289,7 +289,8 @@ ReplSetConfig ReplicationCoordinatorNoOp::getConfig() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::processReplSetGetConfig(BSONObjBuilder*) {
+void ReplicationCoordinatorNoOp::processReplSetGetConfig(BSONObjBuilder* result,
+                                                         bool commitmentStatus) {
     MONGO_UNREACHABLE;
 }
 

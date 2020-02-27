@@ -164,7 +164,7 @@ public:
 
     ReplSetConfig getConfig() const final;
 
-    void processReplSetGetConfig(BSONObjBuilder*) final;
+    void processReplSetGetConfig(BSONObjBuilder*, bool commitmentStatus = false) final;
 
     void processReplSetMetadata(const rpc::ReplSetMetadata&) final;
 

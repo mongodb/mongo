@@ -2729,9 +2729,30 @@ ReplSetConfig ReplicationCoordinatorImpl::getConfig() const {
     return _rsConfig;
 }
 
-void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
+void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
+                                                         bool commitmentStatus) {
     stdx::lock_guard<Latch> lock(_mutex);
     result->append("config", _rsConfig.toBSON());
+
+    if (commitmentStatus) {
+        WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
+                                               WriteConcernOptions::SyncMode::NONE,
+                                               WriteConcernOptions::kNoTimeout);
+        configWriteConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+
+        auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+        auto oplogWriteConcern = _populateUnsetWriteConcernOptionsSyncMode(
+            lock,
+            WriteConcernOptions(_rsConfig.getWriteMajority(),
+                                WriteConcernOptions::SyncMode::NONE,
+                                WriteConcernOptions::kNoTimeout));
+
+        // OpTime isn't used when checking for config replication.
+        OpTime ignored;
+        auto committed = _doneWaitingForReplication_inlock(ignored, configWriteConcern) &&
+            _doneWaitingForReplication_inlock(configOplogCommitmentOpTime, oplogWriteConcern);
+        result->append("commitmentStatus", committed);
+    }
 }
 
 void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {

@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 load("jstests/libs/write_concern_util.js");
+load("jstests/replsets/rslib.js");
 
 const dbName = "test";
 const collName = "coll";
@@ -39,6 +40,7 @@ singleNodeConfig.version++;
 
 jsTestLog("Force reconfig down to a single node.");
 assert.commandWorked(primary.adminCommand({replSetReconfig: singleNodeConfig, force: true}));
+assert(isConfigCommitted(primary));
 
 jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
@@ -53,7 +55,6 @@ assert.commandFailedWithCode(
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-// TODO (SERVER-44812): Wait for this by checking commitment status.
 assert.soon(function() {
     const res = primary.adminCommand({replSetGetStatus: 1});
     return res.members[1].configVersion === rst.getReplSetConfigFromNode().version;
@@ -61,6 +62,7 @@ assert.soon(function() {
 
 // Reconfig should fail immediately since we have not committed the last committed op in the current
 // config.
+assert.eq(isConfigCommitted(primary), false);
 twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: twoNodeConfig}),
                              ErrorCodes.ConfigurationInProgress);
@@ -71,10 +73,11 @@ reconnect(secondary);
 // Let the last committed op from the original 1 node config become committed in the current config.
 restartServerReplication(secondary);
 rst.awaitReplication();
+assert.soon(() => isConfigCommitted(primary));
 
 // Now that we can commit the op in the new config, reconfig should succeed.
 assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig}));
-
+assert(isConfigCommitted(primary));
 rst.awaitReplication();
 
 rst.stopSet();

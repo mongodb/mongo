@@ -332,7 +332,8 @@ void ReplicationCoordinatorMock::setGetConfigReturnValue(ReplSetConfig returnVal
     _getConfigReturnValue = std::move(returnValue);
 }
 
-void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
+void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result,
+                                                         bool commitmentStatus) {
     // TODO
 }
 

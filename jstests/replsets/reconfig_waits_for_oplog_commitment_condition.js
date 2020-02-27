@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 load("jstests/libs/write_concern_util.js");
+load("jstests/replsets/rslib.js");
 
 const dbName = "test";
 const collName = "coll";
@@ -36,6 +37,7 @@ let singleNodeConfig = Object.assign({}, origConfig);
 singleNodeConfig.members = singleNodeConfig.members.slice(0, 1);  // Remove the second node.
 singleNodeConfig.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: singleNodeConfig}));
+assert(isConfigCommitted(primary));
 
 //
 // Below we start out in config C1 = {n0}, try to reconfig to C2 = {n0,n1}, and then to C3 =
@@ -66,10 +68,10 @@ jsTestLog("Reconfig to add the secondary back in.");
 // committed in C2.
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C2, maxTimeMS: 1000}),
                              ErrorCodes.MaxTimeMSExpired);
+assert.eq(isConfigCommitted(primary), false);
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-// TODO (SERVER-44812): Wait for this by checking commitment status.
 assert.soon(function() {
     const res = primary.adminCommand({replSetGetStatus: 1});
     return res.members[1].configVersion === rst.getReplSetConfigFromNode().version;
@@ -78,6 +80,7 @@ assert.soon(function() {
 // Reconfig should fail immediately since we have not committed the last committed op from C1 in C2.
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C3}),
                              ErrorCodes.ConfigurationInProgress);
+assert.eq(isConfigCommitted(primary), false);
 
 // Make sure we can connect to the secondary after it was REMOVED.
 reconnect(secondary);
@@ -85,10 +88,11 @@ reconnect(secondary);
 // Let the last committed op from C1 become committed in the current config.
 restartServerReplication(secondary);
 rst.awaitReplication();
+assert.soon(() => isConfigCommitted(primary));
 
 // Now that we can commit the op in the new config, reconfig should succeed.
 assert.commandWorked(primary.adminCommand({replSetReconfig: C3}));
-
+assert(isConfigCommitted(primary));
 rst.awaitReplication();
 
 //
@@ -106,6 +110,7 @@ stopServerReplication(secondary);
 // config.
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
+assert(isConfigCommitted(primary));
 
 jsTestLog("Stepping down the primary.");
 // Step down the primary and then step it back up so that it writes a log entry in a newer term.
@@ -118,6 +123,7 @@ rst.stepUpNoAwaitReplication(primary);
 assert.eq(primary, rst.getPrimary());
 
 // Reconfig should now fail since the primary has not yet committed an op in its term.
+assert.eq(isConfigCommitted(primary), false);
 config.version++;
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
                              ErrorCodes.ConfigurationInProgress);
@@ -125,10 +131,11 @@ assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
 // Restart server replication to let the primary commit an op.
 restartServerReplication(secondary);
 rst.awaitLastOpCommitted();
+assert.soon(() => isConfigCommitted(primary));
 
 // Reconfig should now succeed.
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-
+assert(isConfigCommitted(primary));
 rst.stopSet();
 }());
