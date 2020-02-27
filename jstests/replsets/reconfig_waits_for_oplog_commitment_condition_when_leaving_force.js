@@ -51,6 +51,14 @@ assert.commandFailedWithCode(
     primary.adminCommand({replSetReconfig: twoNodeConfig, maxTimeMS: 1000}),
     ErrorCodes.MaxTimeMSExpired);
 
+// Wait until the config has propagated to the secondary and the primary has learned of it, so that
+// the config replication check is satisfied.
+// TODO (SERVER-44812): Wait for this by checking commitment status.
+assert.soon(function() {
+    const res = primary.adminCommand({replSetGetStatus: 1});
+    return res.members[1].configVersion === rst.getReplSetConfigFromNode().version;
+});
+
 // Reconfig should fail immediately since we have not committed the last committed op in the current
 // config.
 twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
