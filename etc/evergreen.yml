@@ -9360,45 +9360,86 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_TG
     distros:
     - windows-64-vs2019-large
   - name: burn_in_tests_gen
-  - name: .aggfuzzer
-  - name: audit
-  - name: auth_audit_gen
   - name: buildscripts_test
-  - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-64-vs2019-large
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-64-2016
-  - name: .jscore .common !.compat !.sharding
-  - name: jsCore_auth
-  - name: jsCore_ese
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
-  - name: mqlrun
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog
-  - name: replica_sets_ese_gen
-  - name: sasl
   - name: server_discovery_and_monitoring_json_test_TG
-  - name: .sharding .txns
-  - name: sharding_auth_gen
-  - name: sharding_auth_audit_gen
-  - name: sharding_ese_gen
-  - name: snmp
-  - name: unittest_shell_hang_analyzer_gen
-  - name: push
+  - name: dbtest_TG
     distros:
-    - rhel70-small
+      - windows-64-vs2019-large
+  - name: unittest_shell_hang_analyzer_gen
+
+- name: enterprise-windows
+  display_name: "* Enterprise Windows"
+  batchtime: 180 # 3 hours
+  modules:
+    - enterprise
+  run_on:
+    - windows-64-vs2019-small
+  expansions:
+    exe: ".exe"
+    msi_target: msi
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    mh_target: archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    large_distro_name: windows-64-vs2019-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+  tasks:
+    - name: compile_all_run_unittests_TG
+      distros:
+        - windows-64-vs2019-large
+    - name: .aggfuzzer
+    - name: audit
+    - name: auth_audit_gen
+    - name: buildscripts_test
+    - name: causally_consistent_jscore_txns_passthrough
+      distros:
+        - windows-64-vs2019-large
+    - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+    - name: external_auth
+    - name: external_auth_aws
+    - name: external_auth_windows
+      distros:
+        - windows-64-2016
+    - name: .jscore .common !.compat !.sharding
+    - name: jsCore_auth
+    - name: jsCore_ese
+    - name: jsCore_txns_large_txns_format
+    - name: .jstestfuzz .common
+    - name: mqlrun
+    - name: noPassthrough_gen
+    - name: noPassthroughWithMongod_gen
+    - name: .replica_sets .common
+    - name: .replica_sets .multi_oplog
+    - name: replica_sets_ese_gen
+    - name: sasl
+    - name: server_discovery_and_monitoring_json_test_TG
+    - name: .sharding .txns
+    - name: sharding_auth_gen
+    - name: sharding_auth_audit_gen
+    - name: sharding_ese_gen
+    - name: snmp
+    - name: unittest_shell_hang_analyzer_gen
+    - name: push
+      distros:
+        - rhel70-small
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
