@@ -2943,9 +2943,11 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             WriteConcernOptions::kNoTimeout);
 
         if (!_doneWaitingForReplication_inlock(OpTime(), writeConcern)) {
-            return Status(
-                ErrorCodes::ConfigurationInProgress,
-                "Cannot run replSetReconfig because the current config is not majority committed");
+            return Status(ErrorCodes::ConfigurationInProgress,
+                          str::stream()
+                              << "Cannot run replSetReconfig because the current config: "
+                              << _rsConfig.getConfigVersionAndTerm().toString() << " is not "
+                              << "majority committed.");
         }
 
         // Make sure that the latest committed optime from the previous config is committed in the
