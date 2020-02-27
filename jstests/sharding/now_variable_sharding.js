@@ -1,7 +1,10 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a sharded cluster.
  */
-// @tags: [requires_find_command]
+// @tags: [
+//   requires_find_command,
+//   requires_fcv_44  # Uses $unionWith.
+// ]
 (function() {
 "use strict";
 
@@ -66,12 +69,12 @@ function toResultsArray(queryRes) {
     return Array.isArray(queryRes) ? queryRes : queryRes.toArray();
 }
 
-function runTests(query) {
+function runTests({query, expectedNumDocs = numdocs}) {
     const results = toResultsArray(query());
-    assert.eq(results.length, numdocs);
+    assert.eq(results.length, expectedNumDocs);
 
     // Make sure the values are the same for all documents
-    for (let i = 0; i < numdocs; ++i) {
+    for (let i = 0; i < expectedNumDocs; ++i) {
         assert.eq(results[0].timeField, results[i].timeField);
     }
 
@@ -79,7 +82,7 @@ function runTests(query) {
     sleep(3000);
 
     const resultsLater = toResultsArray(query());
-    assert.eq(resultsLater.length, numdocs);
+    assert.eq(resultsLater.length, expectedNumDocs);
 
     // Later results should be later in time.
     assert.lte(results[0].timeField, resultsLater[0].timeField);
@@ -107,6 +110,23 @@ function baseCollectionClusterTimeAgg() {
     return coll.aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]);
 }
 
+function baseCollectionNowUnion() {
+    return coll.aggregate([
+        {$addFields: {timeField: "$$NOW"}},
+        {$unionWith: {coll: otherColl.getName(), pipeline: [{$addFields: {timeField: "$$NOW"}}]}}
+    ]);
+}
+
+function baseCollectionClusterTimeUnion() {
+    return coll.aggregate([
+        {$addFields: {timeField: "$$CLUSTER_TIME"}},
+        {
+            $unionWith:
+                {coll: otherColl.getName(), pipeline: [{$addFields: {timeField: "$$CLUSTER_TIME"}}]}
+        }
+    ]);
+}
+
 function fromViewWithNow() {
     return viewWithNow.find();
 }
@@ -124,10 +144,11 @@ function withExprClusterTime() {
 }
 
 // $$NOW
-runTests(baseCollectionNowFind);
-runTests(baseCollectionNowAgg);
-runTests(fromViewWithNow);
-runTests(withExprNow);
+runTests({query: baseCollectionNowFind});
+runTests({query: baseCollectionNowAgg});
+runTests({query: baseCollectionNowUnion, expectedNumDocs: 2 * numdocs});
+runTests({query: fromViewWithNow});
+runTests({query: withExprNow});
 
 // Test that $$NOW can be used in explain for both find and aggregate.
 assert.commandWorked(coll.explain().find({$expr: {$lte: ["$timeField", "$$NOW"]}}).finish());
@@ -135,10 +156,11 @@ assert.commandWorked(viewWithNow.explain().find({$expr: {$eq: ["$timeField", "$$
 assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$NOW"}}]));
 
 // $$CLUSTER_TIME
-runTests(baseCollectionClusterTimeFind);
-runTests(baseCollectionClusterTimeAgg);
-runTests(fromViewWithClusterTime);
-runTests(withExprClusterTime);
+runTests({query: baseCollectionClusterTimeFind});
+runTests({query: baseCollectionClusterTimeAgg});
+runTests({query: baseCollectionClusterTimeUnion, expectedNumDocs: 2 * numdocs});
+runTests({query: fromViewWithClusterTime});
+runTests({query: withExprClusterTime});
 
 // Test that $$CLUSTER_TIME can be used in explain for both find and aggregate.
 assert.commandWorked(
