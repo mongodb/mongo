@@ -118,15 +118,16 @@ public:
  * Ensure we work for a single simple batch
  */
 TEST_F(TaskExecutorCursorFixture, SingleBatchWorks) {
-    auto findCmd = BSON("find"
-                        << "test"
-                        << "batchSize" << 2);
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+    const CursorId cursorId = 0;
 
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr);
 
-    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 2, 0));
+    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId));
 
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
 
@@ -141,12 +142,11 @@ TEST_F(TaskExecutorCursorFixture, SingleBatchWorks) {
  * Ensure we work if find fails (and that we receive the error code it failed with)
  */
 TEST_F(TaskExecutorCursorFixture, FailureInFind) {
-    RemoteCommandRequest rcr(HostAndPort("localhost"),
-                             "test",
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2),
-                             opCtx.get());
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr);
 
@@ -165,17 +165,17 @@ TEST_F(TaskExecutorCursorFixture, FailureInFind) {
  * Ensure early termination of the cursor calls killCursor (if we know about the cursor id)
  */
 TEST_F(TaskExecutorCursorFixture, EarlyReturnKillsCursor) {
-    RemoteCommandRequest rcr(HostAndPort("localhost"),
-                             "test",
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2),
-                             opCtx.get());
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+    const CursorId cursorId = 1;
+
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     {
         TaskExecutorCursor tec(&getExecutor(), rcr);
 
-        scheduleSuccessfulCursorResponse("firstBatch", 1, 2, 1);
+        scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
         ASSERT(tec.getNext(opCtx.get()));
     }
@@ -190,12 +190,12 @@ TEST_F(TaskExecutorCursorFixture, EarlyReturnKillsCursor) {
  * Ensure multiple batches works correctly
  */
 TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
-    RemoteCommandRequest rcr(HostAndPort("localhost"),
-                             "test",
-                             BSON("find"
-                                  << "test"
-                                  << "batchSize" << 2),
-                             opCtx.get());
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 2);
+    CursorId cursorId = 1;
+
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr, [] {
         TaskExecutorCursor::Options opts;
@@ -203,7 +203,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
         return opts;
     }());
 
-    scheduleSuccessfulCursorResponse("firstBatch", 1, 2, 1);
+    scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
 
@@ -222,13 +222,14 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
     ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
                                      << "test"
                                      << "batchSize" << 3),
-                      scheduleSuccessfulCursorResponse("nextBatch", 3, 5, 1));
+                      scheduleSuccessfulCursorResponse("nextBatch", 3, 5, cursorId));
 
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 3);
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 4);
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 5);
 
-    scheduleSuccessfulCursorResponse("nextBatch", 6, 6, 0);
+    cursorId = 0;
+    scheduleSuccessfulCursorResponse("nextBatch", 6, 6, cursorId);
 
     // We don't issue extra getmores after returning a 0 cursor id
     ASSERT_FALSE(hasReadyRequests());
@@ -248,6 +249,8 @@ TEST_F(TaskExecutorCursorFixture, EmptyFirstBatch) {
     const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
                                            << "test"
                                            << "batchSize" << 3);
+    const CursorId cursorId = 1;
+
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr, [] {
@@ -258,7 +261,7 @@ TEST_F(TaskExecutorCursorFixture, EmptyFirstBatch) {
 
     // Schedule a cursor response with an empty "firstBatch". Use end < start so we don't
     // append any doc to "firstBatch".
-    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 0, 1));
+    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 0, cursorId));
 
     stdx::thread th([&] {
         // Wait for the getMore run by the getNext() below to be ready, and schedule a
@@ -267,7 +270,8 @@ TEST_F(TaskExecutorCursorFixture, EmptyFirstBatch) {
             sleepmillis(10);
         }
 
-        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 1, 1));
+        ASSERT_BSONOBJ_EQ(getMoreCmd,
+                          scheduleSuccessfulCursorResponse("nextBatch", 1, 1, cursorId));
     });
 
     // Verify that the first doc is the doc from the second batch.
@@ -286,6 +290,8 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
     const auto getMoreCmd = BSON("getMore" << 1LL << "collection"
                                            << "test"
                                            << "batchSize" << 3);
+    const CursorId cursorId = 1;
+
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr, [] {
@@ -295,13 +301,13 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
     }());
 
     // Schedule a cursor response with a non-empty "firstBatch".
-    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, 1));
+    ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
 
     // Schedule two consecutive cursor responses with empty "nextBatch". Use end < start so
     // we don't append any doc to "nextBatch".
-    ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 0, 1));
+    ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 0, cursorId));
 
     stdx::thread th([&] {
         // Wait for the first getMore run by the getNext() below to be ready, and schedule a
@@ -310,7 +316,8 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
             sleepmillis(10);
         }
 
-        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 1, 0, 1));
+        ASSERT_BSONOBJ_EQ(getMoreCmd,
+                          scheduleSuccessfulCursorResponse("nextBatch", 1, 0, cursorId));
 
         // Wait for the second getMore run by the getNext() below to be ready, and schedule a
         // cursor response with a non-empty "nextBatch".
@@ -318,7 +325,8 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
             sleepmillis(10);
         }
 
-        ASSERT_BSONOBJ_EQ(getMoreCmd, scheduleSuccessfulCursorResponse("nextBatch", 2, 2, 1));
+        ASSERT_BSONOBJ_EQ(getMoreCmd,
+                          scheduleSuccessfulCursorResponse("nextBatch", 2, 2, cursorId));
     });
 
     // Verify that the next doc is the doc from the fourth batch.
@@ -334,9 +342,10 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     auto lsid = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(lsid);
 
-    auto findCmd = BSON("find"
-                        << "test"
-                        << "batchSize" << 1);
+    const auto findCmd = BSON("find"
+                              << "test"
+                              << "batchSize" << 1);
+    const CursorId cursorId = 1;
 
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
@@ -351,7 +360,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     ASSERT_BSONOBJ_EQ(BSON("find"
                            << "test"
                            << "batchSize" << 1 << "lsid" << lsid.toBSON()),
-                      scheduleSuccessfulCursorResponse("firstBatch", 1, 1, 1));
+                      scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
     ASSERT_EQUALS(tec->getNext(opCtx.get()).get()["x"].Int(), 1);
 
@@ -359,7 +368,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
                                      << "test"
                                      << "batchSize" << 1 << "lsid" << lsid.toBSON()),
-                      scheduleSuccessfulCursorResponse("nextBatch", 2, 2, 1));
+                      scheduleSuccessfulCursorResponse("nextBatch", 2, 2, cursorId));
 
     tec.reset();
 
