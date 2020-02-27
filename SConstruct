@@ -3821,7 +3821,7 @@ if get_option('ninja') != 'disabled':
 
         if get_option("install-mode") == "hygienic":
             ninja_build = env.Ninja(
-                target="$NINJA_PREFIX.ninja$NINJA_SUFFIX",
+                target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
                 source=[
                     env.Alias("install-all-meta"),
                     env.Alias("test-execution-aliases"),
@@ -3829,7 +3829,7 @@ if get_option('ninja') != 'disabled':
             )
         else:
             ninja_build = env.Ninja(
-                target="$NINJA_PREFIX.ninja$NINJA_SUFFIX",
+                target="${NINJA_PREFIX}.ninja$NINJA_SUFFIX",
                 source=[
                     env.Alias("all"),
                     env.Alias("test-execution-aliases"),
