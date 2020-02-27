@@ -3092,11 +3092,9 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                                     << configOplogCommitmentOpTime.toString()
                                     << ") did not become committed in the current config.");
         }
-        LOGV2(4508700,
-              "Committed new config with version {newConfigVersion} and term {newConfigTerm}. "
-              "Waited {configWaitDuration} for the config to become committed and waited "
-              "{oplogWaitDuration} for the last committed optime in the previous config "
-              "({configOplogCommitmentOpTime}) to become committed in the config.",
+
+        LOGV2(4508701,
+              "Committed new replica set config",
               "newConfigVersion"_attr = newConfig.getConfigVersion(),
               "newConfigTerm"_attr = newConfig.getConfigTerm(),
               "configWaitDuration"_attr = configAwaitStatus.duration,
