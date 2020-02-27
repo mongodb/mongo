@@ -38,7 +38,8 @@ let explain = sourceColl.explain("queryPlanner").aggregate([{$out: targetColl.ge
 let outExplain = getAggPlanStage(explain, "$out");
 assert.neq(outExplain, null, explain);
 
-assert.eq(outExplain.$out, targetColl.getName(), explain);
+assert.eq(outExplain.$out.coll, targetColl.getName(), explain);
+assert.eq(outExplain.$out.db, db.getName(), explain);
 assert.eq(targetColl.find().itcount(), 0, explain);
 
 // Verify that execution explains don't error for $out.

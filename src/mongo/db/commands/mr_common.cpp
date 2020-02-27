@@ -168,7 +168,7 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 auto translateOutReplace(boost::intrusive_ptr<ExpressionContext> expCtx,
                          NamespaceString targetNss) {
-    return DocumentSourceOut::createAndAllowDifferentDB(std::move(targetNss), expCtx);
+    return DocumentSourceOut::create(std::move(targetNss), expCtx);
 }
 
 auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx,
