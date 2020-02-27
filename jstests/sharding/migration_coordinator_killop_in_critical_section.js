@@ -99,6 +99,7 @@ testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
                          "cancel range deletion on recipient");
 testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible",
                          "ready local range deletion");
+testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "advance migration txn number");
 
 st.stop();
 })();

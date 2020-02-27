@@ -76,4 +76,5 @@ testShutDownAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterrupti
 testShutDownAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible");
 testShutDownAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible");
 testShutDownAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible");
+testShutDownAfterFailPoint("hangInAdvanceTxnNumInterruptible");
 })();

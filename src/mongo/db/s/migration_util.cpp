@@ -87,6 +87,8 @@ MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInAdvanceTxnNumInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInAdvanceTxnNumThenSimulateErrorUninterruptible);
 
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
@@ -622,7 +624,18 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     auto passthroughFields = BSON(WriteConcernOptions::kWriteConcernField
                                   << WriteConcernOptions::Majority << "lsid" << lsid.toBSON()
                                   << "txnNumber" << currentTxnNumber + 1);
-    sendToRecipient(opCtx, recipientId, updateOp, passthroughFields);
+
+    retryIdempotentWorkUntilSuccess(
+        opCtx, "advance migration txn number", [&](OperationContext* newOpCtx) {
+            hangInAdvanceTxnNumInterruptible.pauseWhileSet(newOpCtx);
+            sendToRecipient(newOpCtx, recipientId, updateOp, passthroughFields);
+
+            if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when initiating range deletion locally");
+            }
+        });
 }
 
 void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {

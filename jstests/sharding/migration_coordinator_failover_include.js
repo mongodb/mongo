@@ -1,16 +1,3 @@
-/**
- * Tests that a donor resumes coordinating a migration if it fails over after creating the
- * migration coordinator document but before deleting it.
- *
- * @tags: [requires_fcv_44]
- */
-
-// This test induces failovers on shards.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
-(function() {
-'use strict';
-
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
@@ -23,15 +10,11 @@ function getNewNs(dbName) {
     return [collName, dbName + "." + collName];
 }
 
-const dbName = "test";
-
-var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
-
-function runMoveChunkMakeDonorStepDownAfterFailpoint(
-    failpointName, shouldMakeMigrationFailToCommitOnConfig, expectAbortDecisionWithCode) {
+function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
+                                                     dbName,
+                                                     failpointName,
+                                                     shouldMakeMigrationFailToCommitOnConfig,
+                                                     expectAbortDecisionWithCode) {
     const [collName, ns] = getNewNs(dbName);
     jsTest.log("Running migration, making donor step down after failpoint " + failpointName +
                "; shouldMakeMigrationFailToCommitOnConfig is " +
@@ -117,79 +100,3 @@ function runMoveChunkMakeDonorStepDownAfterFailpoint(
             {configureFailPoint: "migrationCommitVersionError", mode: "off"}));
     }
 }
-
-//
-// Decision is commit
-//
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeMakingCommitDecisionDurable",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */);
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeSendingCommitDecision",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */);
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeForgettingMigrationAfterCommitDecision",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */);
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible",
-    false /* shouldMakeMigrationFailToCommitOnConfig */);
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
-    false /* shouldMakeMigrationFailToCommitOnConfig */);
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible",
-    false /* shouldMakeMigrationFailToCommitOnConfig */);
-
-//
-// Decision is abort
-//
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("moveChunkHangAtStep3",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.OperationFailed);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("moveChunkHangAtStep4",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.OperationFailed);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("moveChunkHangAtStep5",
-                                            false /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.OperationFailed);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.OperationFailed);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.OperationFailed);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint(
-    "hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
-    true /* shouldMakeMigrationFailToCommitOnConfig */,
-    ErrorCodes.StaleEpoch);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeMakingAbortDecisionDurable",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeSendingAbortDecision",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
-
-runMoveChunkMakeDonorStepDownAfterFailpoint("hangBeforeForgettingMigrationAfterAbortDecision",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            ErrorCodes.StaleEpoch);
-
-st.stop();
-})();

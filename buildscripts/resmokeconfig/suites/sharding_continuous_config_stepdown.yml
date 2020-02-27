@@ -96,7 +96,8 @@ selector:
   - jstests/sharding/key_rotation.js
   - jstests/sharding/keys_rotation_interval_sec.js
   - jstests/sharding/migration_coordinator_basic.js # sets a failpoint on the config primary
-  - jstests/sharding/migration_coordinator_failover.js # sets a failpoint on the config primary
+  - jstests/sharding/migration_coordinator_abort_failover.js # sets a failpoint on the config primary
+  - jstests/sharding/migration_coordinator_commit_failover.js # sets a failpoint on the config primary
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
