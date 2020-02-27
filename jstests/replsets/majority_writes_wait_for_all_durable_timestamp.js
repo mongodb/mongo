@@ -45,8 +45,11 @@ failPoint.wait();
 
 try {
     jsTest.log("Do a write with majority write concern that should time out.");
+    // Note: we must use {j: false} otherwise the command can hang where writeConcern waits for no
+    // oplog holes, which currently does not obey wtimeout (SERVER-46191), before persistence on
+    // single voter replica set primaries.
     assertWriteConcernTimeout(
-        testColl.insert({_id: 0}, {writeConcern: {w: "majority", wtimeout: 2 * 1000}}));
+        testColl.insert({_id: 0}, {writeConcern: {w: "majority", j: false, wtimeout: 2 * 1000}}));
 } finally {
     failPoint.off();
 }

@@ -41,6 +41,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -244,6 +245,32 @@ void WriteConcernResult::appendTo(BSONObjBuilder* result) const {
         result->append("err", err);
 }
 
+/**
+ * Write concern with {j: true} on single voter replica set primaries must wait for no oplog holes
+ * behind a write, before flushing to disk (not done in this function), in order to guarantee that
+ * a write will remain after unclean shutdown and server restart recovery.
+ *
+ * Multi-voter replica sets will likely roll back writes if the primary crashes and restarts.
+ * However, single voter sets never roll back writes, so we must maintain that behavior. Multi-node
+ * single-voter primaries must truncate the oplog to ensure cross-replica set data consistency; and
+ * single-node single-voter sets must never lose confirmed writes.
+ *
+ * The oplogTruncateAfterPoint is updated with the no holes point prior to journal flushing (write
+ * persistence). Ensuring the no holes point is past (or equal to) our write, ensures the flush to
+ * disk will save a truncate point that will not truncate the new write we wish to guarantee.
+ *
+ * Can throw on opCtx interruption.
+ */
+void waitForNoOplogHolesIfNeeded(OperationContext* opCtx) {
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getConfig().votingMembers().size() == 1) {
+        // It is safe for secondaries in multi-node single voter replica sets to truncate writes if
+        // there are oplog holes. They can catch up again.
+        repl::StorageInterface::get(opCtx)->waitForAllEarlierOplogWritesToBeVisible(
+            opCtx, /*primaryOnly*/ true);
+    }
+}
+
 Status waitForWriteConcern(OperationContext* opCtx,
                            const OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
@@ -277,6 +304,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
             case WriteConcernOptions::SyncMode::NONE:
                 break;
             case WriteConcernOptions::SyncMode::FSYNC: {
+                waitForNoOplogHolesIfNeeded(opCtx);
                 if (!storageEngine->isDurable()) {
                     storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
@@ -290,6 +318,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
                 break;
             }
             case WriteConcernOptions::SyncMode::JOURNAL:
+                waitForNoOplogHolesIfNeeded(opCtx);
                 storageEngine->waitForJournalFlush(opCtx);
                 break;
         }
