@@ -1224,19 +1224,19 @@ Status _syncRollback(OperationContext* opCtx,
                           << e.what());
     }
 
-    OpTime commonPoint = how.commonPoint;
+    OpTime commonPointOpTime = how.commonPoint;
     OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
     OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
 
-    LOGV2(21683, "Rollback common point is {commonPoint}", "commonPoint"_attr = commonPoint);
+    LOGV2(21683, "Rollback common point is {commonPoint}", "commonPoint"_attr = commonPointOpTime);
 
     // Rollback common point should be >= the replication commit point.
-    invariant(commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
-    invariant(commonPoint >= lastCommittedOpTime);
+    invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(commonPointOpTime >= lastCommittedOpTime);
 
     // Rollback common point should be >= the committed snapshot optime.
-    invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
-    invariant(commonPoint >= committedSnapshot);
+    invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPointOpTime >= committedSnapshot);
 
     try {
         // It is always safe to increment the rollback ID first, even if we fail to complete
