@@ -355,7 +355,7 @@ private:
      */
     void _startInitialSyncAttemptCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
                                           std::uint32_t initialSyncAttempt,
-                                          std::uint32_t initialSyncMaxAttempts);
+                                          std::uint32_t initialSyncMaxAttempts) noexcept;
 
     /**
      * Callback to obtain sync source from sync source selector.
@@ -366,7 +366,7 @@ private:
     void _chooseSyncSourceCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
                                    std::uint32_t chooseSyncSourceAttempt,
                                    std::uint32_t chooseSyncSourceMaxAttempts,
-                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard) noexcept;
 
     /**
      * This function does the following:
@@ -424,8 +424,9 @@ private:
     /**
      * Callback to obtain next batch of operations to apply.
      */
-    void _getNextApplierBatchCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
-                                      std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+    void _getNextApplierBatchCallback(
+        const executor::TaskExecutor::CallbackArgs& callbackArgs,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard) noexcept;
 
     /**
      * Callback for MultiApplier completion.
