@@ -171,6 +171,10 @@ makeView("a",
          [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
          ErrorCodes.FailedToParse);
 
+// Check that free variables in view pipeline are disallowed.
+makeView("a", "b", [{"$project": {field: "$$undef"}}], 17276);
+makeView("a", "b", [{"$addFields": {field: "$$undef"}}], 17276);
+
 const invalidDb = db.getSiblingDB("$gt");
 assert.commandFailedWithCode(
     invalidDb.createView('testView', 'testColl', []),
