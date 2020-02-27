@@ -3056,44 +3056,51 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     configStateGuard.dismiss();
     _finishReplSetReconfig(opCtx, newConfig, args.force, myIndex.getValue());
 
-    WriteConcernOptions writeConcern(WriteConcernOptions::kConfigMajority,
-                                     WriteConcernOptions::SyncMode::NONE,
-                                     WriteConcernOptions::kNoTimeout);
-
     if (!args.force &&
         serverGlobalParams.featureCompatibility.isVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
         // Wait for the config document to be replicated to a majority of nodes in the new
         // config.
-        uassertStatusOK(awaitReplication(opCtx, OpTime(), writeConcern).status);
-    }
+        WriteConcernOptions writeConcern(WriteConcernOptions::kConfigMajority,
+                                         WriteConcernOptions::SyncMode::NONE,
+                                         WriteConcernOptions::kNoTimeout);
+        StatusAndDuration configAwaitStatus = awaitReplication(opCtx, OpTime(), writeConcern);
+        uassertStatusOK(configAwaitStatus.status);
 
-    // Now that the new config has been persisted and installed in memory, wait for the latest
-    // committed optime in the previous config to be committed in the newly installed config. For
-    // force reconfigs we don't need to check this safety condition, and in any FCV < 4.4 we also
-    // bypass this to preserve client facing behavior in mixed version sets. Note that even if we
-    // have just left a force config via a non-force reconfig, we still want to wait for this oplog
-    // commitment check, since a subsequent safe reconfig will check it as a precondition.
-    auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-    auto wcOpts = WriteConcernOptions(newConfig.getWriteMajority(),
-                                      WriteConcernOptions::SyncMode::NONE,
-                                      WriteConcernOptions::kNoTimeout);
-    if (!args.force &&
-        serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+        // Now that the new config has been persisted and installed in memory, wait for the latest
+        // committed optime in the previous config to be committed in the newly installed config.
+        // For force reconfigs we don't need to check this safety condition, and in any FCV < 4.4 we
+        // also bypass this to preserve client facing behavior in mixed version sets. Note that even
+        // if we have just left a force config via a non-force reconfig, we still want to wait for
+        // this oplog commitment check, since a subsequent safe reconfig will check it as a
+        // precondition.
+        auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+        auto oplogWriteConcern = WriteConcernOptions(newConfig.getWriteMajority(),
+                                                     WriteConcernOptions::SyncMode::NONE,
+                                                     WriteConcernOptions::kNoTimeout);
         LOGV2(51815,
               "Waiting for the last committed optime in the previous config "
               "({configOplogCommitmentOpTime}) to be committed in the current config.",
               "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
-        auto statusDur = awaitReplication(opCtx, configOplogCommitmentOpTime, wcOpts);
-        if (!statusDur.status.isOK()) {
-            uasserted(statusDur.status.code(),
+        StatusAndDuration oplogAwaitStatus =
+            awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);
+        if (!oplogAwaitStatus.status.isOK()) {
+            uasserted(oplogAwaitStatus.status.code(),
                       str::stream() << "Last committed optime in the previous config ("
                                     << configOplogCommitmentOpTime.toString()
                                     << ") did not become committed in the current config.");
         }
+        LOGV2(4508700,
+              "Committed new config with version {newConfigVersion} and term {newConfigTerm}. "
+              "Waited {configWaitDuration} for the config to become committed and waited "
+              "{oplogWaitDuration} for the last committed optime in the previous config "
+              "({configOplogCommitmentOpTime}) to become committed in the config.",
+              "newConfigVersion"_attr = newConfig.getConfigVersion(),
+              "newConfigTerm"_attr = newConfig.getConfigTerm(),
+              "configWaitDuration"_attr = configAwaitStatus.duration,
+              "oplogWaitDuration"_attr = oplogAwaitStatus.duration,
+              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
     }
-
     return Status::OK();
 }
 
