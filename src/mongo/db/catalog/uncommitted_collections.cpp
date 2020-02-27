@@ -67,17 +67,40 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx,
         UncommittedCollections::erase(uuid, nss, collListUnowned.lock().get());
     });
 
-
+    // If we are inside of a multi-document transaction, `createTime` will be the null timestamp,
+    // since we have not yet reserved a new oplog slot for the collection creation. Pre-commit
+    // hooks do not presently have awareness of `commitTs`, so we register a separate onCommit
+    // handler to update the minVisibleTimestamp for multi-document transactions. This is fine
+    // because the collection should not be visible in the catalog until a subsequent onCommit
+    // handler executes.
     opCtx->recoveryUnit()->registerPreCommitHook(
         [collListUnowned, uuid, createTime](OperationContext* opCtx) {
             UncommittedCollections::commit(opCtx, uuid, createTime, collListUnowned.lock().get());
         });
 
+    // commitTs does not exist for the ephemeralForTest storage engine.
+    if (opCtx->inMultiDocumentTransaction() &&
+        !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
+        opCtx->recoveryUnit()->onCommit(
+            [collListUnowned, collPtr](boost::optional<Timestamp> commitTs) {
+                collPtr->setMinimumVisibleSnapshot(commitTs.get());
+            });
+    }
+
+    auto isEphemeral = opCtx->getServiceContext()->getStorageEngine()->isEphemeral();
+
     opCtx->recoveryUnit()->onCommit(
-        [collListUnowned, collPtr, createTime](boost::optional<Timestamp> commitTs) {
-            // Verify that the collection was given a minVisibleTimestamp equal to the transactions
-            // commit timestamp.
-            invariant(collPtr->getMinimumVisibleSnapshot() == createTime);
+        [collListUnowned, collPtr, createTime, isEphemeral](boost::optional<Timestamp> commitTs) {
+            // Verify that the collection was given a minVisibleTimestamp equal to the transaction's
+            // commit timestamp. Rely on commitTs to dictate this timestamp value, if commitTs
+            // exists. Otherwise, rely on createTime. A stronger invariant, in which we ensure that
+            // commitTs must be equal to the minVisibleTimestamp if commitTs exists, is desirable,
+            // but that invariant does not hold.
+            // Unit tests that run transactions use the ephemeralForTest storage engine, but this
+            // invariant is expected not to hold for that storage engine.
+            invariant(isEphemeral ||
+                      (commitTs && collPtr->getMinimumVisibleSnapshot() == commitTs.get()) ||
+                      (collPtr->getMinimumVisibleSnapshot() == createTime));
             UncommittedCollections::clear(collListUnowned.lock().get());
         });
 }
@@ -135,7 +158,12 @@ void UncommittedCollections::commit(OperationContext* opCtx,
     auto it = map->_collections.find(uuid);
     // Invariant that a collection is found.
     invariant(it->second.get(), uuid.toString());
-    it->second->setMinimumVisibleSnapshot(createTs);
+
+    // `createTs` will be null at this point if we are inside a multi-document transaction. It is
+    // misleading to use its value here (see comment in UncommittedCollections::addToTxn).
+    if (!opCtx->inMultiDocumentTransaction()) {
+        it->second->setMinimumVisibleSnapshot(createTs);
+    }
 
     auto nss = it->second->ns();
     CollectionCatalog::get(opCtx).registerCollection(uuid, &(it->second));
