@@ -59,7 +59,15 @@ public:
     bool peek(OperationContext* opCtx, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
+    // In drain mode, the queue does not block. It is the responsibility of the caller to ensure
+    // that no items are added to the queue while in drain mode; this is enforced by invariant().
+    void enterDrainMode() final;
+    void exitDrainMode() final;
+
 private:
+    Mutex _notEmptyMutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::mutex");
+    stdx::condition_variable _notEmptyCv;
+    bool _drainMode = false;
     Counters* const _counters;
     BlockingQueue<BSONObj> _queue;
 };

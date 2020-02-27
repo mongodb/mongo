@@ -168,7 +168,7 @@ void BackgroundSync::startup(OperationContext* opCtx) {
 void BackgroundSync::shutdown(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lock(_mutex);
 
-    _state = ProducerState::Stopped;
+    setState(lock, ProducerState::Stopped);
 
     if (_syncSourceResolver) {
         _syncSourceResolver->shutdown();
@@ -227,9 +227,13 @@ void BackgroundSync::_run() {
 }
 
 void BackgroundSync::_runProducer() {
-    if (getState() == ProducerState::Stopped) {
-        sleepsecs(1);
-        return;
+    {
+        // This wait keeps us from spinning.  We will re-check the condition in _produce(), so if
+        // the state changes after we release the lock, the behavior is still correct.
+        stdx::unique_lock<Latch> lk(_mutex);
+        _stateCv.wait(lk, [&]() { return _inShutdown || _state != ProducerState::Stopped; });
+        if (_inShutdown)
+            return;
     }
 
     auto memberState = _replCoord->getMemberState();
@@ -810,7 +814,7 @@ void BackgroundSync::clearSyncTarget() {
 void BackgroundSync::stop(bool resetLastFetchedOptime) {
     stdx::lock_guard<Latch> lock(_mutex);
 
-    _state = ProducerState::Stopped;
+    setState(lock, ProducerState::Stopped);
     LOGV2(21107, "Stopping replication producer");
 
     _syncSourceHost = HostAndPort();
@@ -848,7 +852,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
         if (!_oplogApplier->getBuffer()->isEmpty()) {
             LOGV2(21109, "going to start syncing, but buffer is not empty");
         }
-        _state = ProducerState::Running;
+        setState(lk, ProducerState::Running);
 
         // When a node steps down during drain mode, the last fetched optime would be newer than
         // the last applied.
@@ -925,11 +929,16 @@ BackgroundSync::ProducerState BackgroundSync::getState() const {
     return _state;
 }
 
+void BackgroundSync::setState(WithLock, ProducerState newState) {
+    _state = newState;
+    _stateCv.notify_one();
+}
+
 void BackgroundSync::startProducerIfStopped() {
     stdx::lock_guard<Latch> lock(_mutex);
     // Let producer run if it's already running.
     if (_state == ProducerState::Stopped) {
-        _state = ProducerState::Starting;
+        setState(lock, ProducerState::Starting);
     }
 }
 

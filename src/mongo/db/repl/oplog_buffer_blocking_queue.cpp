@@ -64,7 +64,9 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
 void OplogBufferBlockingQueue::push(OperationContext*,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end) {
+    invariant(!_drainMode);
     _queue.pushAllBlocking(begin, end);
+    _notEmptyCv.notify_one();
 
     if (_counters) {
         for (auto i = begin; i != end; ++i) {
@@ -112,7 +114,10 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
 
 bool OplogBufferBlockingQueue::waitForData(Seconds waitDuration) {
     Value ignored;
-    return _queue.blockingPeek(ignored, static_cast<int>(durationCount<Seconds>(waitDuration)));
+    stdx::unique_lock<Latch> lk(_notEmptyMutex);
+    _notEmptyCv.wait_for(
+        lk, waitDuration.toSystemDuration(), [&] { return _drainMode || _queue.peek(ignored); });
+    return _queue.peek(ignored);
 }
 
 bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {
@@ -122,6 +127,17 @@ bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {
 boost::optional<OplogBuffer::Value> OplogBufferBlockingQueue::lastObjectPushed(
     OperationContext*) const {
     return _queue.lastObjectPushed();
+}
+
+void OplogBufferBlockingQueue::enterDrainMode() {
+    stdx::lock_guard<Latch> lk(_notEmptyMutex);
+    _drainMode = true;
+    _notEmptyCv.notify_one();
+}
+
+void OplogBufferBlockingQueue::exitDrainMode() {
+    stdx::lock_guard<Latch> lk(_notEmptyMutex);
+    _drainMode = false;
 }
 
 }  // namespace repl
