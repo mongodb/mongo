@@ -1835,67 +1835,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
     ASSERT_EQUALS(2, rsStatus["writableVotingMembersCount"].numberInt());
 }
 
-TEST_F(TopoCoordTest, ReplSetGetStatusIPs) {
-    if (!hasGlobalServiceContext()) {
-        setGlobalServiceContext(ServiceContext::make());
-    }
-
-    BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
-    std::string setName = "mySet";
-    auto now = Date_t::fromMillisSinceEpoch(100);
-    auto originalIPv6Enabled = IPv6Enabled();
-    ON_BLOCK_EXIT([&] { enableIPv6(originalIPv6Enabled); });
-
-    auto testIP = [&](const std::string& hostAndIP) -> boost::optional<std::string> {
-        // Test framework requires that time moves forward.
-        now += Milliseconds(10);
-        updateConfig(BSON("_id" << setName << "version" << 1 << "members"
-                                << BSON_ARRAY(BSON("_id" << 0 << "host" << hostAndIP))),
-                     0,
-                     now);
-
-        BSONObjBuilder statusBuilder;
-        Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
-        getTopoCoord().prepareStatusResponse({}, &statusBuilder, &resultStatus);
-        ASSERT_OK(resultStatus);
-        BSONObj rsStatus = statusBuilder.obj();
-        unittest::log() << rsStatus;
-        auto elem = rsStatus["members"].Array()[0].Obj();
-        if (elem.hasField("ip"))
-            return elem["ip"].String();
-        return boost::none;
-    };
-
-    auto waitAndTestIP = [&](const std::string& hostAndIP) -> std::string {
-        auto now = Date_t::now();
-        const auto deadline = now + Seconds(10);
-
-        while (!testIP(hostAndIP)) {
-            if (Date_t::now() >= deadline) {
-                FAIL(str::stream() << "Timed out while waiting for the DNS cache to update");
-            }
-            sleepFor(Milliseconds(10));
-        }
-        return *testIP(hostAndIP);
-    };
-
-    // We can't rely on any hostname like mongodb.org that requires DNS from the CI machine, test
-    // localhost and IP literals.
-    enableIPv6(false);
-    ASSERT_EQUALS("127.0.0.1", waitAndTestIP("localhost:1234"));
-    enableIPv6(true);
-
-    // localhost can resolve to IPv4 or IPv6 depending on precedence.
-    auto localhostIP = waitAndTestIP("localhost:1234");
-    if (localhostIP != "127.0.0.1" && localhostIP != "::1") {
-        FAIL(str::stream() << "Expected localhost IP to be 127.0.0.1 or ::1, not " << localhostIP);
-    }
-
-    ASSERT_EQUALS("1.2.3.4", waitAndTestIP("1.2.3.4:1234"));
-    ASSERT_EQUALS("::1", waitAndTestIP("[::1]:1234"));
-    ASSERT(!testIP("test0:1234"));
-}
-
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {
     // This test starts by configuring a TopologyCoordinator to NOT be a member of a 3 node
     // replica set. Then running prepareStatusResponse should fail.
