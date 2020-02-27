@@ -2939,6 +2939,34 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                 ErrorCodes::ConfigurationInProgress,
                 "Cannot run replSetReconfig because the current config is not majority committed");
         }
+
+        // Make sure that the latest committed optime from the previous config is committed in the
+        // current config. If this is the initial reconfig, then we don't need to check this
+        // condition, since there were no prior configs. Also, for force reconfigs we bypass this
+        // safety check condition. In any FCV < 4.4 we also bypass it to preserve client facing
+        // behavior in mixed version sets.
+        auto isInitialReconfig = (_rsConfig.getConfigVersion() == 1);
+        // If our config was installed via a "force" reconfig, we bypass the oplog commitment check.
+        auto leavingForceConfig = (_rsConfig.getConfigTerm() == OpTime::kUninitializedTerm);
+        auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+        auto wcOpts = _populateUnsetWriteConcernOptionsSyncMode(
+            lk,
+            WriteConcernOptions(_rsConfig.getWriteMajority(),
+                                WriteConcernOptions::SyncMode::NONE,
+                                WriteConcernOptions::kNoWaiting));
+
+        if (!leavingForceConfig && !isInitialReconfig &&
+            !_doneWaitingForReplication_inlock(configOplogCommitmentOpTime, wcOpts)) {
+            LOGV2(51816,
+                  "Oplog config commitment condition failed to be satisfied. The last committed "
+                  "optime in the previous config ({configOplogCommitmentOpTime}) is not committed "
+                  "in current config",
+                  "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+            return Status(ErrorCodes::ConfigurationInProgress,
+                          str::stream() << "Last committed optime from previous config ("
+                                        << configOplogCommitmentOpTime.toString()
+                                        << ") is not committed in the current config.");
+        }
     }
 
     _setConfigState_inlock(kConfigReconfiguring);
@@ -3010,37 +3038,6 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         }
     }
 
-    // Make sure that the latest committed optime from the previous config is committed in the
-    // current config. If this is the initial reconfig, then we don't need to check this condition,
-    // since there were no prior configs. Also, for force reconfigs we bypass this safety check
-    // condition. In any FCV < 4.4 we also bypass it to preserve client facing behavior in mixed
-    // version sets.
-    auto isInitialReconfig = (oldConfig.getConfigVersion() == 1);
-    // If we our config was installed via a "force" reconfig, we bypass the oplog commitment check.
-    auto leavingForceConfig = (oldConfig.getConfigTerm() == OpTime::kUninitializedTerm);
-    auto enforceOplogCommitmentCheck =
-        (!args.force && !leavingForceConfig && !isInitialReconfig &&
-         serverGlobalParams.featureCompatibility.isVersion(
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44));
-    auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-    auto wcOpts = populateUnsetWriteConcernOptionsSyncMode(
-        WriteConcernOptions(oldConfig.getWriteMajority(),
-                            WriteConcernOptions::SyncMode::NONE,
-                            WriteConcernOptions::kNoWaiting));
-
-    if (enforceOplogCommitmentCheck &&
-        !_doneWaitingForReplication_inlock(configOplogCommitmentOpTime, wcOpts)) {
-        LOGV2(51816,
-              "Oplog config commitment condition failed to be satisfied. The last committed optime "
-              "in the previous config ({configOplogCommitmentOpTime}) is not committed in current "
-              "config",
-              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
-        return Status(ErrorCodes::ConfigurationInProgress,
-                      str::stream() << "Last committed optime from previous config ("
-                                    << configOplogCommitmentOpTime.toString()
-                                    << ") is not committed in the current config.");
-    }
-
     LOGV2(51814, "Persisting new config to disk.");
     status = _externalState->storeLocalConfigDocument(opCtx, newConfig.toBSON());
     if (!status.isOK()) {
@@ -3071,10 +3068,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     // bypass this to preserve client facing behavior in mixed version sets. Note that even if we
     // have just left a force config via a non-force reconfig, we still want to wait for this oplog
     // commitment check, since a subsequent safe reconfig will check it as a precondition.
-    configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-    wcOpts = WriteConcernOptions(newConfig.getWriteMajority(),
-                                 WriteConcernOptions::SyncMode::NONE,
-                                 WriteConcernOptions::kNoTimeout);
+    auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+    auto wcOpts = WriteConcernOptions(newConfig.getWriteMajority(),
+                                      WriteConcernOptions::SyncMode::NONE,
+                                      WriteConcernOptions::kNoTimeout);
     if (!args.force &&
         serverGlobalParams.featureCompatibility.isVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
