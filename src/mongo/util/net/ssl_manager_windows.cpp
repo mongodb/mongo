@@ -52,6 +52,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/sockaddr.h"
@@ -69,6 +70,9 @@ namespace mongo {
 extern SSLManagerInterface* theSSLManager;
 
 namespace {
+
+// This failpoint is a no-op on Windows.
+MONGO_FAIL_POINT_DEFINE(disableStapling);
 
 /**
  * Free a Certificate Context.

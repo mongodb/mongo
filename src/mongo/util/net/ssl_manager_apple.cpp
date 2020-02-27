@@ -47,6 +47,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
@@ -69,6 +70,9 @@ extern "C" SecIdentityRef SecIdentityCreate(CFAllocatorRef, SecCertificateRef, S
 namespace mongo {
 
 namespace {
+
+// This failpoint is a no-op on OSX.
+MONGO_FAIL_POINT_DEFINE(disableStapling);
 
 template <typename T>
 constexpr T cf_cast(::CFTypeRef val) {

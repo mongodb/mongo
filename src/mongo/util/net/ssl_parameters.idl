@@ -61,7 +61,7 @@ server_parameters:
   ocspEnabled:
     description: "Enable OCSP"
     set_at: startup
-    default: false
+    default: true
     cpp_vartype: bool
     cpp_varname: "tlsOCSPEnabled"
   ocspCacheSize:
