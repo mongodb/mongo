@@ -34,66 +34,80 @@
 
 namespace mongo {
 
+MirroringSampler::SamplingParameters::SamplingParameters(const double ratio_,
+                                                         const int rndMax,
+                                                         const int rndValue)
+    : ratio{ratio_}, max{rndMax}, value{rndValue} {
+
+    invariant(ratio <= 1.0);
+    invariant(ratio >= 0.0);
+
+    invariant(value <= max);
+    invariant(value >= 0);
+}
+
+MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
+                                                         const int rndMax,
+                                                         RandomFunc rnd)
+    : SamplingParameters(ratio, rndMax, [&] {
+          if (ratio == 0.0) {
+              // We should never sample, avoid invoking rnd().
+              return rndMax;
+          }
+
+          if (ratio == 1.0) {
+              // We should always sample, avoid invoking rnd().
+              return 0;
+          }
+
+          return std::move(rnd)();
+      }()) {}
+
+bool MirroringSampler::shouldSample(const SamplingParameters& params) const noexcept {
+    // If our value is less than our max, then take a sample.
+    return params.value < static_cast<int>(params.max * params.ratio);
+}
+
+std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
+    const std::shared_ptr<const repl::IsMasterResponse>& isMaster) noexcept {
+    invariant(isMaster);
+    if (!isMaster->isMaster()) {
+        // Don't mirror if we're not primary
+        return {};
+    }
+
+    const auto& hosts = isMaster->getHosts();
+    if (hosts.size() < 2) {
+        // Don't mirror if we're standalone
+        return {};
+    }
+
+    const auto& self = isMaster->getPrimary();
+
+    std::vector<HostAndPort> potentialTargets;
+    for (auto& host : hosts) {
+        if (host != self) {
+            potentialTargets.push_back(host);
+        }
+    }
+
+    return potentialTargets;
+}
+
 std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
-    std::shared_ptr<const repl::IsMasterResponse> isMaster,
+    const std::shared_ptr<const repl::IsMasterResponse>& isMaster,
     const double ratio,
     RandomFunc rnd,
     const int rndMax) noexcept {
 
-    invariant(ratio >= 0 && ratio <= 1);
-    invariant(isMaster);
-    if (!isMaster->isMaster()) {
+    auto sampler = MirroringSampler();
+
+    auto samplingParams = SamplingParameters(ratio, rndMax, std::move(rnd));
+    if (!sampler.shouldSample(samplingParams)) {
         return {};
     }
 
-    /**
-     * `ratio == 0` disables mirroring
-     * Also, mirroring requires at least one active secondary.
-     */
-    if (ratio == 0 || isMaster->getHosts().size() < 2) {
-        return {};
-    }
-
-    /**
-     * The goal is to mirror every request to approximately `ratio x secondariesCount`.
-     */
-    const auto secondariesCount = isMaster->getHosts().size() - 1;
-    const auto secondariesRatio = ratio * secondariesCount;
-
-    // Mirroring factor is the number of secondaries that will receive the command.
-    auto mirroringFactor = std::ceil(secondariesRatio);
-    invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
-
-    size_t randVar = rnd();
-    const auto normalizedRatio = static_cast<size_t>(secondariesRatio * rndMax / mirroringFactor);
-
-    if (randVar > normalizedRatio) {
-        return {};
-    }
-
-    auto getEligibleSecondaries = [](auto isMaster) noexcept->std::vector<HostAndPort> {
-        auto self = isMaster->getPrimary();
-        auto hosts = isMaster->getHosts();
-        invariant(hosts.size() > 1);
-
-        std::vector<HostAndPort> potentialTargets;
-        for (auto host : hosts) {
-            if (host != self) {
-                potentialTargets.push_back(host);
-            }
-        }
-
-        return potentialTargets;
-    };
-
-    auto eligibleSecondaries = getEligibleSecondaries(isMaster);
-    invariant(!eligibleSecondaries.empty());
-
-    std::mt19937 twisterEngine(randVar);
-    std::shuffle(eligibleSecondaries.begin(), eligibleSecondaries.end(), twisterEngine);
-
-    auto it = eligibleSecondaries.begin();
-    return std::vector<HostAndPort>(it, it + mirroringFactor);
+    return sampler.getRawMirroringTargets(isMaster);
 }
 
 }  // namespace mongo

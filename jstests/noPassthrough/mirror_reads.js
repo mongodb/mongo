@@ -45,7 +45,7 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
 
         let numNodes = rst.getSecondaries().length;
         jsTestLog(`Seen ${readsSeen} requests; ` +
-                  `verified ${readsMirrored / 2} requests ` +
+                  `verified ${readsMirrored / numNodes} requests ` +
                   `x ${numNodes} nodes`);
 
         let rate = readsMirrored / readsSeen / numNodes;

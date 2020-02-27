@@ -127,39 +127,43 @@ std::string TopologyVersionObserver::toString() const {
     return str::stream() << kTopologyVersionObserverName;
 }
 
-std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::_getIsMasterResponse(
-    boost::optional<TopologyVersion> topologyVersion, bool* shouldShutdown) noexcept try {
-    invariant(*shouldShutdown == false);
-    ServiceContext::UniqueOperationContext opCtx;
-    try {
-        opCtx = Client::getCurrent()->makeOperationContext();
-    } catch (...) {
-        // Failure to create an operation context could cause deadlocks.
-        *shouldShutdown = true;
-        LOGV2_WARNING(40442, "Observer was unable to create a new OperationContext.");
-        return nullptr;
-    }
-
+void TopologyVersionObserver::_cacheIsMasterResponse(
+    OperationContext* opCtx, boost::optional<TopologyVersion> topologyVersion) noexcept try {
     invariant(opCtx);
 
-    invariant(_replCoordinator);
-    auto future = _replCoordinator->getIsMasterResponseFuture({}, topologyVersion);
-    auto response = future.get(opCtx.get());
-    if (!response->isConfigSet()) {
-        return nullptr;
+    {
+        auto cacheGuard = makeGuard([&] {
+            // If we're not dismissed, reset the _cache.
+            stdx::lock_guard lk(_mutex);
+            _cache.reset();
+        });
+
+        invariant(_replCoordinator);
+        auto future = _replCoordinator->getIsMasterResponseFuture({}, topologyVersion);
+
+        if (auto response = std::move(future).get(opCtx); response->isConfigSet()) {
+            stdx::lock_guard lk(_mutex);
+            _cache = response;
+
+            // Reset the cacheGuard because we got a good value.
+            cacheGuard.dismiss();
+        }
     }
 
-    return response;
+    if (_shouldShutdown.load()) {
+        // Pessimistically check if we should shutdown before we sleepFor(...).
+        return;
+    }
+
+    // We could be a PeriodicRunner::Job someday. For now, OperationContext::sleepFor() will serve
+    // the same purpose.
+    opCtx->sleepFor(kDelayMS);
 } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-    LOGV2_WARNING(
-        40443, "Observer was interrupted by {exception}", "exception"_attr = e.toString());
-    *shouldShutdown = true;
-    return nullptr;
+    LOGV2_INFO(40443, "Observer was interrupted by {exception}", "exception"_attr = e.toString());
 } catch (DBException& e) {
     LOGV2_WARNING(40444,
                   "Observer could not retrieve isMasterResponse: {exception}",
                   "exception"_attr = e.toString());
-    return nullptr;
 }
 
 void TopologyVersionObserver::_workerThreadBody() noexcept {
@@ -215,16 +219,11 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
                    "topologyVersionObserverName"_attr = toString());
     });
 
-    bool receivedShutdownError;
     do {
-        receivedShutdownError = false;
-        auto response = _getIsMasterResponse(getTopologyVersion(), &receivedShutdownError);
+        auto opCtxHandle = tc->makeOperationContext();
 
-        stdx::lock_guard lk(_mutex);
-        _cache = response;
-
-        // If either the global shutdown flag was set or we received a shutdown error, we're done
-    } while (!(receivedShutdownError || _shouldShutdown.load()));
+        _cacheIsMasterResponse(opCtxHandle.get(), getTopologyVersion());
+    } while (!_shouldShutdown.load());
 }
 
 }  // namespace repl

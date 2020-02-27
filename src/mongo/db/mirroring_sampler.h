@@ -48,19 +48,61 @@ class MirroringSampler final {
 public:
     using RandomFunc = std::function<int()>;
 
+    static RandomFunc defaultRandomFunc() {
+        return std::rand;
+    }
+
+    static constexpr int defaultRandomMax() {
+        return RAND_MAX;
+    };
+
     /**
-     * Sampler function for mirroring commands to eligible secondaries.
-     * The caller must be the primary node of the replica-set.
-     * @arg isMaster  replica-set topology that determines mirroring targets.
-     * @arg ratio  the mirroring ratio (must be between 0 and 1 inclusive).
-     * @arg rnd  the random generator function (default is `std::rand()`).
-     * @arg rndMax  the maximum value that `rnd()` returns (default is `RAND_MAX`).
+     * Sampling parameters for mirroring commands to eligible secondaries.
+     *
+     * Note that the value member is a raw integer and thus can be normalized to fit different
+     * interpretations of ratio.
+     */
+    struct SamplingParameters {
+        explicit SamplingParameters(const double ratio, const int rndMax, const int rndValue);
+
+        /**
+         * Construct with a value from rnd().
+         */
+        explicit SamplingParameters(const double ratio, const int rndMax, RandomFunc rnd);
+
+        /**
+         * Construct with a value from defaultRandomFunc().
+         */
+        explicit SamplingParameters(const double ratio)
+            : SamplingParameters(ratio, defaultRandomMax(), defaultRandomFunc()) {}
+
+        const double ratio;
+
+        const int max;
+        const int value;
+    };
+
+    /**
+     * Use the given params to determine if we should attempt to sample.
+     */
+    bool shouldSample(const SamplingParameters& params) const noexcept;
+
+    /**
+     * Return all eligible hosts from an IsMasterResponse that we should mirror to.
+     */
+    std::vector<HostAndPort> getRawMirroringTargets(
+        const std::shared_ptr<const repl::IsMasterResponse>& isMaster) noexcept;
+
+    /**
+     * Approximate use of the MirroringSampler for testing.
+     *
+     * In practice, we call constituent functions in sequence to pessimistically spare work.
      */
     static std::vector<HostAndPort> getMirroringTargets(
-        std::shared_ptr<const repl::IsMasterResponse> isMaster,
+        const std::shared_ptr<const repl::IsMasterResponse>& isMaster,
         const double ratio,
-        RandomFunc rnd = std::rand,
-        const int rndMax = RAND_MAX) noexcept;
+        RandomFunc rnd = defaultRandomFunc(),
+        const int rndMax = defaultRandomMax()) noexcept;
 };
 
 }  // namespace mongo

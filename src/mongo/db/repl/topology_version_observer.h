@@ -69,6 +69,8 @@ constexpr auto kTopologyVersionObserverName = "TopologyVersionObserver";
  */
 class TopologyVersionObserver final {
 public:
+    static constexpr auto kDelayMS = Milliseconds(10);
+
     TopologyVersionObserver() = default;
 
     ~TopologyVersionObserver() {
@@ -98,8 +100,7 @@ private:
         kShutdown,
     };
 
-    std::shared_ptr<const IsMasterResponse> _getIsMasterResponse(boost::optional<TopologyVersion>,
-                                                                 bool*) noexcept;
+    void _cacheIsMasterResponse(OperationContext*, boost::optional<TopologyVersion>) noexcept;
 
     void _workerThreadBody() noexcept;
 

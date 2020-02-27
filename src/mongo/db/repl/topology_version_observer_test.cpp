@@ -160,11 +160,13 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
     ASSERT(cachedResponse);
 
     Client* observerClient = nullptr;
-    auto cur = ServiceContext::LockedClientsCursor(getGlobalServiceContext());
-    while (auto client = cur.next()) {
-        if (client->desc() == kTopologyVersionObserverName) {
-            observerClient = client;
-            break;
+    {
+        auto cur = ServiceContext::LockedClientsCursor(getGlobalServiceContext());
+        while (auto client = cur.next()) {
+            if (client->desc() == kTopologyVersionObserverName) {
+                observerClient = client;
+                break;
+            }
         }
     }
     // The client should not go out-of-scope as it is attached to the observer thread.
@@ -180,12 +182,14 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
             FAIL(str::stream() << "Timed out while waiting for the observer to create OpCtx.");
         }
 
-        observerClient->lock();
-        if (observerClient->getOperationContext()) {
-            observerClient->getOperationContext()->markKilled(ErrorCodes::ShutdownInProgress);
+        stdx::lock_guard clientLock(*observerClient);
+        if (auto opCtx = observerClient->getOperationContext()) {
+            observerClient->getServiceContext()->killOperation(clientLock, opCtx);
             wasAbleToKillOpCtx = true;
+            continue;
         }
-        observerClient->unlock();
+
+        sleepFor(sleepTime);
     }
 
     // Observer thread must handle the exception and fetch the most recent IMR

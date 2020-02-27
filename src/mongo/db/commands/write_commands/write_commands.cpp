@@ -331,9 +331,13 @@ private:
             : InvocationBase(cmd, request), _batch(UpdateOp::parse(request)) {}
 
         bool supportsReadMirroring() const override {
+            // TODO SERVER-46533 Remove this and uncomment below when update can be safely mirrored.
+            // Disable readMIrrroing for update
+            return false;
+
             // This would translate to a find command with no filter!
             // Based on the documentation for `update`, this vector should never be empty.
-            return !_batch.getUpdates().empty();
+            // return !_batch.getUpdates().empty();
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
