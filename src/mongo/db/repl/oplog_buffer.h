@@ -162,6 +162,18 @@ public:
      * Returns the item most recently added to the oplog buffer or nothing if the buffer is empty.
      */
     virtual boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const = 0;
+
+    /**
+     * Enters "drain mode".  May only be called by the producer.  When the buffer is in drain mode,
+     * "waitForData" will return immediately even if there is data in the queue.  This
+     * is an optimization and subclasses may choose not to implement this function.
+     */
+    virtual void enterDrainMode(){};
+
+    /**
+     * Leaves "drain mode".  May only be called by the producer.
+     */
+    virtual void exitDrainMode(){};
 };
 
 }  // namespace repl

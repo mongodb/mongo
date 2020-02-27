@@ -474,6 +474,10 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
 
+    if (_oplogBuffer) {
+        _oplogBuffer->exitDrainMode();
+    }
+
     // If this is a config server node becoming a primary, ensure the balancer is ready to start.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         // We must ensure the balancer has stopped because it may still be in the process of
@@ -877,10 +881,16 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
     if (_bgSync) {
         _bgSync->stop(false);
     }
+    if (_oplogBuffer) {
+        _oplogBuffer->enterDrainMode();
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     LockGuard lk(_threadMutex);
+    if (_oplogBuffer) {
+        _oplogBuffer->exitDrainMode();
+    }
     if (_bgSync) {
         _bgSync->startProducerIfStopped();
     }

@@ -47,6 +47,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -212,6 +213,9 @@ private:
     // restart syncing
     void start(OperationContext* opCtx);
 
+    // Set the state and notify the condition variable.
+    void setState(WithLock, ProducerState newState);
+
     OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* opCtx);
 
     // This OplogBuffer holds oplog entries fetched from the sync source.
@@ -251,6 +255,9 @@ private:
 
     // Thread running producerThread().
     std::unique_ptr<stdx::thread> _producerThread;  // (M)
+
+    // Condition variable to notify of _state and _inShutdown changes.
+    stdx::condition_variable _stateCv;  // (S)
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;  // (M)
