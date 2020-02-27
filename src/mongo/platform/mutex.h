@@ -178,8 +178,9 @@ inline auto& getDiagnosticListenerState() noexcept {
         AtomicWord<bool> isFinalized{false};
         std::vector<latch_detail::DiagnosticListener*> listeners;
     };
-    static State state;
-    return state;
+    // Make state immortal
+    static const auto state = new State();  // Intentionally leaked!
+    return *state;
 }
 
 /**

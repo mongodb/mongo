@@ -2,6 +2,7 @@
 leak:mongo::Client::Client
 
 # DiagnosticListeners and WaitListeners need to be available in detached threads
+leak:mongo::latch_detail::getDiagnosticListenerState
 leak:mongo::latch_detail::installDiagnosticListener
 leak:mongo::Interruptible::installWaitListener
 
