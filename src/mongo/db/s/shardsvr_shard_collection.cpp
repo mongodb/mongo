@@ -188,11 +188,11 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
  *
  * If the collection is empty and no index on the shard key exists, creates the required index.
  */
-void createCollectionOrValidateExisting(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const BSONObj& proposedKey,
-                                        const ShardKeyPattern& shardKeyPattern,
-                                        const ShardsvrShardCollection& request) {
+void createIndexesOrValidateExisting(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const BSONObj& proposedKey,
+                                     const ShardKeyPattern& shardKeyPattern,
+                                     const ShardsvrShardCollection& request) {
     // The proposed shard key must be validated against the set of existing indexes.
     // In particular, we must ensure the following constraints
     //
@@ -480,16 +480,11 @@ SplitPoints calculateInitialAndFinalSplitPoints(const ShardsvrShardCollection& r
 
 ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                const ShardsvrShardCollection& request) {
-    // Fail if there are partially written chunks from a previous failed shardCollection.
-    checkForExistingChunks(opCtx, nss);
-
-    auto proposedKey(request.getKey().getOwned());
+                                                const ShardsvrShardCollection& request,
+                                                const BSONObj& proposedKey) {
     ShardKeyPattern shardKeyPattern(proposedKey);
 
-    createCollectionOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
-
-    auto tags = getTagsAndValidate(opCtx, nss, proposedKey, shardKeyPattern);
+    auto tags = getTagsAndValidate(opCtx, nss, shardKeyPattern.toBSON(), shardKeyPattern);
     auto uuid = getOrGenerateUUID(opCtx, nss, request);
 
     const bool isEmpty = checkIfCollectionIsEmpty(opCtx, nss);
@@ -714,6 +709,13 @@ UUID shardCollection(OperationContext* opCtx,
         refreshAllShards(opCtx, nss, dbPrimaryShardId, initialChunks.chunks);
     };
 
+    // Fail if there are partially written chunks from a previous failed shardCollection.
+    checkForExistingChunks(opCtx, nss);
+
+    const auto proposedKey(request.getKey().getOwned());
+    const ShardKeyPattern shardKeyPattern(proposedKey);
+    createIndexesOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
+
     {
         // From this point onward the collection can only be read, not written to, so it is safe to
         // construct the prerequisites and generate the target state.
@@ -728,7 +730,7 @@ UUID shardCollection(OperationContext* opCtx,
             return *collectionOptional->getUUID();
         }
 
-        targetState = calculateTargetState(opCtx, nss, request);
+        targetState = calculateTargetState(opCtx, nss, request, proposedKey);
 
         // From this point onward, the collection can not be written to or read from.
         critSec.enterCommitPhase();
