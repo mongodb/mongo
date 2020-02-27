@@ -554,7 +554,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
 void InitialSyncer::_startInitialSyncAttemptCallback(
     const executor::TaskExecutor::CallbackArgs& callbackArgs,
     std::uint32_t initialSyncAttempt,
-    std::uint32_t initialSyncMaxAttempts) {
+    std::uint32_t initialSyncMaxAttempts) noexcept {
     auto status = _checkForShutdownAndConvertStatus_inlock(
         callbackArgs,
         str::stream() << "error while starting initial sync attempt " << (initialSyncAttempt + 1)
@@ -637,7 +637,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     const executor::TaskExecutor::CallbackArgs& callbackArgs,
     std::uint32_t chooseSyncSourceAttempt,
     std::uint32_t chooseSyncSourceMaxAttempts,
-    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) noexcept try {
     stdx::unique_lock<Latch> lock(_mutex);
     // Cancellation should be treated the same as other errors. In this case, the most likely cause
     // of a failed _chooseSyncSourceCallback() task is a cancellation triggered by
@@ -730,6 +730,10 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
     _getBaseRollbackIdHandle = scheduleResult.getValue();
+} catch (const DBException&) {
+    // Report exception as an initial syncer failure.
+    stdx::unique_lock<Latch> lock(_mutex);
+    onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, exceptionToStatus());
 }
 
 Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
@@ -1388,7 +1392,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
 
 void InitialSyncer::_getNextApplierBatchCallback(
     const executor::TaskExecutor::CallbackArgs& callbackArgs,
-    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) noexcept try {
     stdx::lock_guard<Latch> lock(_mutex);
     auto status =
         _checkForShutdownAndConvertStatus_inlock(callbackArgs, "error getting next applier batch");
@@ -1477,6 +1481,10 @@ void InitialSyncer::_getNextApplierBatchCallback(
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
     }
+} catch (const DBException&) {
+    // Report exception as an initial syncer failure.
+    stdx::unique_lock<Latch> lock(_mutex);
+    onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, exceptionToStatus());
 }
 
 void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
