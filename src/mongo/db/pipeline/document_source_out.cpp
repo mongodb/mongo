@@ -53,6 +53,9 @@ MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson);
+REGISTER_DOCUMENT_SOURCE(internalOutToDifferentDB,
+                         DocumentSourceOut::LiteParsed::parseToDifferentDB,
+                         DocumentSourceOut::createFromBsonToDifferentDB);
 
 DocumentSourceOut::~DocumentSourceOut() {
     DESTRUCTOR_GUARD(
@@ -73,32 +76,35 @@ DocumentSourceOut::~DocumentSourceOut() {
         });
 }
 
-NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
-                                                   const StringData& defaultDB) {
-    if (spec.type() == BSONType::String) {
-        return NamespaceString(defaultDB, spec.valueStringData());
-    } else if (spec.type() == BSONType::Object) {
-        auto nsObj = spec.Obj();
-        uassert(16994,
-                str::stream() << kStageName << " $out must have only db and coll string arguments",
-                nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
-        return NamespaceString(nsObj["db"].String(), nsObj["coll"].String());
-    } else {
-        uassert(16990,
-                "{} only supports a string or object argument, but found {}"_format(
-                    kStageName, typeName(spec.type())),
-                spec.type() == BSONType::String);
-    }
-    MONGO_UNREACHABLE;
+std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parseToDifferentDB(
+    const NamespaceString& nss, const BSONElement& spec) {
+
+    auto specObj = spec.Obj();
+    auto dbElem = specObj["db"];
+    auto collElem = specObj["coll"];
+    uassert(16994,
+            str::stream() << kStageName << " must have db and coll string arguments",
+            dbElem.type() == BSONType::String && collElem.type() == BSONType::String);
+    NamespaceString targetNss{dbElem.String(), collElem.String()};
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
+            targetNss.isValid());
+
+    return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
 
-    NamespaceString targetNss = parseNsFromElem(spec, nss.db());
+    uassert(16990,
+            "{} only supports a string argument, but found {}"_format(kStageName,
+                                                                      typeName(spec.type())),
+            spec.type() == BSONType::String);
+    NamespaceString targetNss{nss.db(), spec.valueStringData()};
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
+
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
@@ -182,6 +188,16 @@ void DocumentSourceOut::finalize() {
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
+    // TODO (SERVER-36832): Allow this combination.
+    uassert(50939,
+            "{} is not supported when the output collection is in a different "
+            "database"_format(kStageName),
+            outputNs.db() == expCtx->ns.db());
+    return createAndAllowDifferentDB(outputNs, expCtx);
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createAndAllowDifferentDB(
+    NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->inMultiDocumentTransaction);
@@ -203,12 +219,24 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto targetNS = parseNsFromElem(elem, expCtx->ns.db());
-    return create(targetNS, expCtx);
+    uassert(31278,
+            "{} only supports a string argument, but found {}"_format(kStageName,
+                                                                      typeName(elem.type())),
+            elem.type() == BSONType::String);
+    return create({expCtx->ns.db(), elem.str()}, expCtx);
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBsonToDifferentDB(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
+    auto nsObj = elem.Obj();
+    return createAndAllowDifferentDB(NamespaceString(nsObj["db"].String(), nsObj["coll"].String()),
+                                     expCtx);
+}
 Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(kStageName << DOC("db" << _outputNs.db() << "coll" << _outputNs.coll())));
+    return _toDifferentDB
+        ? Value(DOC(getSourceName() << DOC("db" << _outputNs.db() << "coll" << _outputNs.coll())))
+        : Value(DOC(getSourceName() << _outputNs.coll()));
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {

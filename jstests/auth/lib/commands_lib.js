@@ -1111,7 +1111,7 @@ var authCommandsLib = {
           command: function(state, args) {
               return {
                   aggregate: "foo",
-                  pipeline: [{$out: {db: args.targetDB, coll: "foo_out"}}],
+                  pipeline: [{$out: "foo_out"}],
                   cursor: {},
                   bypassDocumentValidation: args.bypassDocumentValidation,
               };
