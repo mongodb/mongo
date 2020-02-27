@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 #include "mongo/platform/basic.h"
@@ -880,7 +881,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     request.setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
                                                                : PlanExecutor::YIELD_AUTO);
     request.setStmtId(stmtId);
-    request.setHint(op.getHint());
 
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());

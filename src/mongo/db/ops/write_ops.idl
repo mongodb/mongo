@@ -150,10 +150,6 @@ structs:
                               matching documents and 1 deletes a single document."
                 type: multi_delete_bool
                 cpp_name: multi
-            hint:
-                description: "Specifies the hint to use for the operation."
-                type: indexHint 
-                default: mongo::BSONObj()
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object

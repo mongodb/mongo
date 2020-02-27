@@ -767,46 +767,37 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     }
 
     if (!parsedDelete->hasParsedQuery()) {
+        // This is the idhack fast-path for getting a PlanExecutor without doing the work to create
+        // a CanonicalQuery.
+        const BSONObj& unparsedQuery = request->getQuery();
 
-        // Only consider using the idhack if no hint was provided.
-        if (request->getHint().isEmpty()) {
-            // This is the idhack fast-path for getting a PlanExecutor without doing the work to
-            // create a CanonicalQuery.
-            const BSONObj& unparsedQuery = request->getQuery();
+        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-            const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
-
-            // Construct delete request collator.
-            std::unique_ptr<CollatorInterface> collator;
-            if (!request->getCollation().isEmpty()) {
-                auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(request->getCollation());
-                if (!statusWithCollator.isOK()) {
-                    return statusWithCollator.getStatus();
-                }
-                collator = std::move(statusWithCollator.getValue());
+        // Construct delete request collator.
+        std::unique_ptr<CollatorInterface> collator;
+        if (!request->getCollation().isEmpty()) {
+            auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                          ->makeFromBSON(request->getCollation());
+            if (!statusWithCollator.isOK()) {
+                return statusWithCollator.getStatus();
             }
-            const bool hasCollectionDefaultCollation = request->getCollation().isEmpty() ||
-                CollatorInterface::collatorsMatch(collator.get(), collection->getDefaultCollator());
+            collator = std::move(statusWithCollator.getValue());
+        }
+        const bool hasCollectionDefaultCollation = request->getCollation().isEmpty() ||
+            CollatorInterface::collatorsMatch(collator.get(), collection->getDefaultCollator());
 
-            if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-                request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-                LOGV2_DEBUG(20928,
-                            2,
-                            "Using idhack: {unparsedQuery}",
-                            "unparsedQuery"_attr = redact(unparsedQuery));
+        if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            request->getProj().isEmpty() && hasCollectionDefaultCollation) {
+            LOGV2_DEBUG(20928,
+                        2,
+                        "Using idhack: {unparsedQuery}",
+                        "unparsedQuery"_attr = redact(unparsedQuery));
 
-                auto idHackStage = std::make_unique<IDHackStage>(
-                    opCtx, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
-                unique_ptr<DeleteStage> root =
-                    std::make_unique<DeleteStage>(opCtx,
-                                                  std::move(deleteStageParams),
-                                                  ws.get(),
-                                                  collection,
-                                                  idHackStage.release());
-                return PlanExecutor::make(
-                    opCtx, std::move(ws), std::move(root), collection, policy);
-            }
+            auto idHackStage = std::make_unique<IDHackStage>(
+                opCtx, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
+            unique_ptr<DeleteStage> root = std::make_unique<DeleteStage>(
+                opCtx, std::move(deleteStageParams), ws.get(), collection, idHackStage.release());
+            return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
