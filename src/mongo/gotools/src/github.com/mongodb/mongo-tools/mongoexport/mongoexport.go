@@ -40,9 +40,9 @@ type jsonFormat string
 
 const (
 	// Canonical indicates Canonical json format
-	Canonical jsonFormat = "Canonical"
+	Canonical jsonFormat = "canonical"
 	// Relaxed indicates Relaxed json format
-	Relaxed jsonFormat = "Relaxed"
+	Relaxed jsonFormat = "relaxed"
 )
 
 const (

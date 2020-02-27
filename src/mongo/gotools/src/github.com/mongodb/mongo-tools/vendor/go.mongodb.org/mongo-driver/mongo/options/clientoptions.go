@@ -25,33 +25,54 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.mongodb.org/mongo-driver/tag"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage"
 )
 
-// ContextDialer makes new network connections
+// ContextDialer is an interface that can be implemented by types that can create connections. It should be used to
+// provide a custom dialer when configuring a Client.
+//
+// DialContext should return a connection to the provided address on the given network.
 type ContextDialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-// Credential holds auth options.
+// Credential can be used to provide authentication options when configuring a Client.
 //
-// AuthMechanism indicates the mechanism to use for authentication.
-// Supported values include "SCRAM-SHA-256", "SCRAM-SHA-1", "MONGODB-CR", "PLAIN", "GSSAPI", and "MONGODB-X509".
+// AuthMechanism: the mechanism to use for authentication. Supported values include "SCRAM-SHA-256", "SCRAM-SHA-1",
+// "MONGODB-CR", "PLAIN", "GSSAPI", and "MONGODB-X509". This can also be set through the "authMechanism" URI option.
+// (e.g. "authMechanism=PLAIN"). For more information, see
+// https://docs.mongodb.com/manual/core/authentication-mechanisms/.
 //
-// AuthMechanismProperties specifies additional configuration options which may be used by certain
-// authentication mechanisms. Supported properties are:
-// SERVICE_NAME: Specifies the name of the service. Defaults to mongodb.
-// CANONICALIZE_HOST_NAME: If true, tells the driver to canonicalize the given hostname. Defaults to false. This
-// property may not be used on Linux and Darwin systems and may not be used at the same time as SERVICE_HOST.
-// SERVICE_REALM: Specifies the realm of the service.
-// SERVICE_HOST: Specifies a hostname for GSSAPI authentication if it is different from the server's address. For
-// authentication mechanisms besides GSSAPI, this property is ignored.
+// AuthMechanismProperties can be used to specify additional configuration options for certain mechanisms. They can also
+// be set through the "authMechanismProperites" URI option
+// (e.g. "authMechanismProperties=SERVICE_NAME:service,CANONICALIZE_HOST_NAME:true"). Supported properties are:
 //
-// AuthSource specifies the database to authenticate against.
+// 1. SERVICE_NAME: The service name to use for GSSAPI authentication. The default is "mongodb".
 //
-// Username specifies the username that will be authenticated.
+// 2. CANONICALIZE_HOST_NAME: If "true", the driver will canonicalize the host name for GSSAPI authentication. The default
+// is "false".
 //
-// Password specifies the password used for authentication.
+// 3. SERVICE_REALM: The service realm for GSSAPI authentication.
+//
+// 4. SERVICE_HOST: The host name to use for GSSAPI authentication. This should be specified if the host name to use for
+// authentication is different than the one given for Client construction.
+//
+// The SERVICE_HOST and CANONICALIZE_HOST_NAME properties must not be used at the same time on Linux and Darwin
+// systems.
+//
+// AuthSource: the name of the database to use for authentication. This defaults to "$external" for MONGODB-X509,
+// GSSAPI, and PLAIN and "admin" for all other mechanisms. This can also be set through the "authSource" URI option
+// (e.g. "authSource=otherDb").
+//
+// Username: the username for authentication. This can also be set through the URI as a username:password pair before
+// the first @ character. For example, a URI for user "user", password "pwd", and host "localhost:27017" would be
+// "mongodb://user:pwd@localhost:27017". This is optional for X509 authentication and will be extracted from the
+// client certificate if not specified.
+//
+// Password: the password for authentication. This must not be specified for X509 and is optional for GSSAPI
+// authentication.
 //
 // PasswordSet specifies if the password is actually set, since an empty password is a valid password.
 type Credential struct {
@@ -63,7 +84,8 @@ type Credential struct {
 	PasswordSet             bool
 }
 
-// ClientOptions represents all possible options to configure a client.
+// ClientOptions contains options to configure a Client instance. Each option can be set through setter functions. See
+// documentation for each setter function for an explanation of the option.
 type ClientOptions struct {
 	AppName                *string
 	Auth                   *Credential
@@ -90,12 +112,15 @@ type ClientOptions struct {
 	TLSConfig              *tls.Config
 	WriteConcern           *writeconcern.WriteConcern
 	ZlibLevel              *int
+	ZstdLevel              *int
+	AutoEncryptionOptions  *AutoEncryptionOptions
 
 	err error
 
-	// Adds an option for internal use only and should not be set. This option is deprecated and is
-	// not part of the stability guarantee. It may be removed in the future.
+	// These options are for internal use only and should not be set. They are deprecated and are
+	// not part of the stability guarantee. They may be removed in the future.
 	AuthenticateToAnything *bool
+	Deployment             driver.Deployment
 }
 
 // Client creates a new ClientOptions instance.
@@ -106,12 +131,20 @@ func Client() *ClientOptions {
 // Validate validates the client options. This method will return the first error found.
 func (c *ClientOptions) Validate() error { return c.err }
 
-// ApplyURI parses the provided connection string and sets the values and options accordingly.
+// ApplyURI parses the given URI and sets options accordingly. The URI can contain host names, IPv4/IPv6 literals, or
+// an SRV record that will be resolved when the Client is created. When using an SRV record, TLS support is
+// implictly enabled. Specify the "tls=false" URI option to override this.
 //
-// Errors that occur in this method can be retrieved by calling Validate.
+// If the connection string contains any options that have previously been set, it will overwrite them. Options that
+// correspond to multiple URI parameters, such as WriteConcern, will be completely overwritten if any of the query
+// parameters are specified. If an option is set on ClientOptions after this method is called, that option will override
+// any option applied via the connection string.
 //
-// If the URI contains ssl=true this method will overwrite TLSConfig, even if there aren't any other
-// tls options specified.
+// If the URI format is incorrect or there are conflicing options specified in the URI an error will be recorded and
+// can be retrieved by calling Validate.
+//
+// For more information about the URI format, see https://docs.mongodb.com/manual/reference/connection-string/. See
+// mongo.Connect documentation for examples of using URIs for different Client configurations.
 func (c *ClientOptions) ApplyURI(uri string) *ClientOptions {
 	if c.err != nil {
 		return c
@@ -150,6 +183,14 @@ func (c *ClientOptions) ApplyURI(uri string) *ClientOptions {
 
 	if len(cs.Compressors) > 0 {
 		c.Compressors = cs.Compressors
+		if stringSliceContains(c.Compressors, "zlib") {
+			defaultLevel := wiremessage.DefaultZlibLevel
+			c.ZlibLevel = &defaultLevel
+		}
+		if stringSliceContains(c.Compressors, "zstd") {
+			defaultLevel := wiremessage.DefaultZstdLevel
+			c.ZstdLevel = &defaultLevel
+		}
 	}
 
 	if cs.HeartbeatIntervalSet {
@@ -204,6 +245,10 @@ func (c *ClientOptions) ApplyURI(uri string) *ClientOptions {
 
 	if cs.RetryWritesSet {
 		c.RetryWrites = &cs.RetryWrites
+	}
+
+	if cs.RetryReadsSet {
+		c.RetryReads = &cs.RetryReads
 	}
 
 	if cs.ReplicaSet != "" {
@@ -280,173 +325,312 @@ func (c *ClientOptions) ApplyURI(uri string) *ClientOptions {
 	if cs.ZlibLevelSet {
 		c.ZlibLevel = &cs.ZlibLevel
 	}
+	if cs.ZstdLevelSet {
+		c.ZstdLevel = &cs.ZstdLevel
+	}
 
 	return c
 }
 
-// SetAppName specifies the client application name. This value is used by MongoDB when it logs
-// connection information and profile information, such as slow queries.
+// SetAppName specifies an application name that is sent to the server when creating new connections. It is used by the
+// server to log connection and profiling information (e.g. slow query logs). This can also be set through the "appName"
+// URI option (e.g "appName=example_application"). The default is empty, meaning no app name will be sent.
 func (c *ClientOptions) SetAppName(s string) *ClientOptions {
 	c.AppName = &s
 	return c
 }
 
-// SetAuth sets the authentication options.
+// SetAuth specifies a Credential containing options for configuring authentication. See the options.Credential
+// documentation for more information about Credential fields. The default is an empty Credential, meaning no
+// authentication will be configured.
 func (c *ClientOptions) SetAuth(auth Credential) *ClientOptions {
 	c.Auth = &auth
 	return c
 }
 
-// SetCompressors sets the compressors that can be used when communicating with a server.
+// SetCompressors sets the compressors that can be used when communicating with a server. Valid values are:
+//
+// 1. "snappy" - requires server version >= 3.4
+//
+// 2. "zlib" - requires server version >= 3.6
+//
+// 3. "zstd" - requires driver version >= 1.2.0, server version >= 4.2, and cgo support to be enabled.
+//
+// To use compression, it must be enabled on the server as well. If this option is specified, the driver will perform a
+// negotiation with the server to determine a common list of of compressors and will use the first one in that list when
+// performing operations. See
+// https://docs.mongodb.com/manual/reference/program/mongod/#cmdoption-mongod-networkmessagecompressors for more
+// information about how to enable this feature on the server.
+//
+// This can also be set through the "compressors" URI option (e.g. "compressors=zstd,zlib,snappy"). The default is
+// an empty slice, meaning no compression will be enabled.
 func (c *ClientOptions) SetCompressors(comps []string) *ClientOptions {
 	c.Compressors = comps
 
 	return c
 }
 
-// SetConnectTimeout specifies the timeout for an initial connection to a server.
-// If a custom Dialer is used, this method won't be set and the user is
-// responsible for setting the ConnectTimeout for connections on the dialer
-// themselves.
+// SetConnectTimeout specifies a timeout that is used for creating connections to the server. If a custom Dialer is
+// specified through SetDialer, this option must not be used. This can be set through ApplyURI with the
+// "connectTimeoutMS" (e.g "connectTimeoutMS=30") option. If set to 0, no timeout will be used. The default is 30
+// seconds.
 func (c *ClientOptions) SetConnectTimeout(d time.Duration) *ClientOptions {
 	c.ConnectTimeout = &d
 	return c
 }
 
-// SetDialer specifies a custom dialer used to dial new connections to a server.
-// If a custom dialer is not set, a net.Dialer with a 300 second keepalive time will be used by default.
+// SetDialer specifies a custom ContextDialer to be used to create new connections to the server. The default is a
+// net.Dialer instance with a 300 second keepalive time.
 func (c *ClientOptions) SetDialer(d ContextDialer) *ClientOptions {
 	c.Dialer = d
 	return c
 }
 
-// SetDirect specifies whether the driver should connect directly to the server instead of
-// auto-discovering other servers in the cluster.
+// SetDirect specifies whether or not a direct connect should be made. To use this option, a URI with a single host must
+// be specified through ApplyURI. If set to true, the driver will only connect to the host provided in the URI and will
+// not discover other hosts in the cluster. This can also be set through the "connect" URI option with the following
+// values:
+//
+// 1. "connect=direct" for direct connections
+//
+// 2. "connect=automatic" for automatic discovery.
+//
+// The default is false ("automatic" in the connection string).
 func (c *ClientOptions) SetDirect(b bool) *ClientOptions {
 	c.Direct = &b
 	return c
 }
 
-// SetHeartbeatInterval specifies the interval to wait between server monitoring checks.
+// SetHeartbeatInterval specifies the amount of time to wait between periodic background server checks. This can also be
+// set through the "heartbeatIntervalMS" URI option (e.g. "heartbeatIntervalMS=10000"). The default is 10 seconds.
 func (c *ClientOptions) SetHeartbeatInterval(d time.Duration) *ClientOptions {
 	c.HeartbeatInterval = &d
 	return c
 }
 
-// SetHosts specifies the initial list of addresses from which to discover the rest of the cluster.
+// SetHosts specifies a list of host names or IP addresses for servers in a cluster. Both IPv4 and IPv6 addresses are
+// supported. IPv6 literals must be enclosed in '[]' following RFC-2732 syntax.
+//
+// Hosts can also be specified as a comma-separated list in a URI. For example, to include "localhost:27017" and
+// "localhost:27018", a URI could be "mongodb://localhost:27017,localhost:27018". The default is ["localhost:27017"]
 func (c *ClientOptions) SetHosts(s []string) *ClientOptions {
 	c.Hosts = s
 	return c
 }
 
-// SetLocalThreshold specifies how far to distribute queries, beyond the server with the fastest
-// round-trip time. If a server's roundtrip time is more than LocalThreshold slower than the
-// the fastest, the driver will not send queries to that server.
+// SetLocalThreshold specifies the width of the 'latency window': when choosing between multiple suitable servers for an
+// operation, this is the acceptable non-negative delta between shortest and longest average round-trip times. A server
+// within the latency window is selected randomly. This can also be set through the "localThresholdMS" URI option (e.g.
+// "localThresholdMS=15000"). The default is 15 milliseconds.
 func (c *ClientOptions) SetLocalThreshold(d time.Duration) *ClientOptions {
 	c.LocalThreshold = &d
 	return c
 }
 
-// SetMaxConnIdleTime specifies the maximum number of milliseconds that a connection can remain idle
-// in a connection pool before being removed and closed.
+// SetMaxConnIdleTime specifies the maximum amount of time that a connection will remain idle in a connection pool
+// before it is removed from the pool and closed. This can also be set through the "maxIdleTimeMS" URI option (e.g.
+// "maxIdleTimeMS=10000"). The default is 0, meaning a connection can remain unused indefinitely.
 func (c *ClientOptions) SetMaxConnIdleTime(d time.Duration) *ClientOptions {
 	c.MaxConnIdleTime = &d
 	return c
 }
 
-// SetMaxPoolSize specifies the max size of a server's connection pool.
+// SetMaxPoolSize specifies that maximum number of connections allowed in the driver's connection pool to each server.
+// Requests to a server will block if this maximum is reached. This can also be set through the "maxPoolSize" URI option
+// (e.g. "maxPoolSize=100"). The default is 100. If this is 0, it will be set to math.MaxInt64.
 func (c *ClientOptions) SetMaxPoolSize(u uint64) *ClientOptions {
 	c.MaxPoolSize = &u
 	return c
 }
 
-// SetMinPoolSize specifies the min size of a server's connection pool.
+// SetMinPoolSize specifies the minimum number of connections allowed in the driver's connection pool to each server. If
+// this is non-zero, each server's pool will be maintained in the background to ensure that the size does not fall below
+// the minimum. This can also be set through the "minPoolSize" URI option (e.g. "minPoolSize=100"). The default is 0.
 func (c *ClientOptions) SetMinPoolSize(u uint64) *ClientOptions {
 	c.MinPoolSize = &u
 	return c
 }
 
-// SetPoolMonitor specifies the PoolMonitor for a server's connection pool.
+// SetPoolMonitor specifies a PoolMonitor to receive connection pool events. See the event.PoolMonitor documentation
+// for more information about the structure of the monitor and events that can be received.
 func (c *ClientOptions) SetPoolMonitor(m *event.PoolMonitor) *ClientOptions {
 	c.PoolMonitor = m
 	return c
 }
 
-// SetMonitor specifies a command monitor used to see commands for a client.
+// SetMonitor specifies a CommandMonitor to receive command events. See the event.CommandMonitor documentation for more
+// information about the structure of the monitor and events that can be received.
 func (c *ClientOptions) SetMonitor(m *event.CommandMonitor) *ClientOptions {
 	c.Monitor = m
 	return c
 }
 
-// SetReadConcern specifies the read concern.
+// SetReadConcern specifies the read concern to use for read operations. A read concern level can also be set through
+// the "readConcernLevel" URI option (e.g. "readConcernLevel=majority"). The default is nil, meaning the server will use
+// its configured default.
 func (c *ClientOptions) SetReadConcern(rc *readconcern.ReadConcern) *ClientOptions {
 	c.ReadConcern = rc
 
 	return c
 }
 
-// SetReadPreference specifies the read preference.
+// SetReadPreference specifies the read preference to use for read operations. This can also be set through the
+// following URI options:
+//
+// 1. "readPreference" - Specifiy the read preference mode (e.g. "readPreference=primary").
+//
+// 2. "readPreferenceTags": Specify one or more read preference tags
+// (e.g. "readPreferenceTags=region:south,datacenter:A").
+//
+// 3. "maxStalenessSeconds" (or "maxStaleness"): Specify a maximum replication lag for reads from secondaries in a
+// replica set (e.g. "maxStalenessSeconds=10").
+//
+// The default is readpref.Primary(). See https://docs.mongodb.com/manual/core/read-preference/#read-preference for
+// more information about read preferences.
 func (c *ClientOptions) SetReadPreference(rp *readpref.ReadPref) *ClientOptions {
 	c.ReadPreference = rp
 
 	return c
 }
 
-// SetRegistry specifies the bsoncodec.Registry.
+// SetRegistry specifies the BSON registry to use for BSON marshalling/unmarshalling operations. The default is
+// bson.DefaultRegistry.
 func (c *ClientOptions) SetRegistry(registry *bsoncodec.Registry) *ClientOptions {
 	c.Registry = registry
 	return c
 }
 
-// SetReplicaSet specifies the name of the replica set of the cluster.
+// SetReplicaSet specifies the replica set name for the cluster. If specified, the cluster will be treated as a replica
+// set and the driver will automatically discover all servers in the set, starting with the nodes specified through
+// ApplyURI or SetHosts. All nodes in the replica set must have the same replica set name, or they will not be
+// considered as part of the set by the Client. This can also be set through the "replicaSet" URI option (e.g.
+// "replicaSet=replset"). The default is empty.
 func (c *ClientOptions) SetReplicaSet(s string) *ClientOptions {
 	c.ReplicaSet = &s
 	return c
 }
 
-// SetRetryWrites specifies whether the client has retryable writes enabled.
+// SetRetryWrites specifies whether supported write operations should be retried once on certain errors, such as network
+// errors.
+//
+// Supported operations are InsertOne, UpdateOne, ReplaceOne, DeleteOne, FindOneAndDelete, FindOneAndReplace,
+// FindOneAndDelete, InsertMany, and BulkWrite. Note that BulkWrite requests must not include UpdateManyModel or
+// DeleteManyModel instances to be considered retryable. Unacknowledged writes will not be retried, even if this option
+// is set to true.
+//
+// This option requires server version >= 3.6 and a replica set or sharded cluster and will be ignored for any other
+// cluster type. This can also be set through the "retryWrites" URI option (e.g. "retryWrites=true"). The default is
+// true.
 func (c *ClientOptions) SetRetryWrites(b bool) *ClientOptions {
 	c.RetryWrites = &b
 
 	return c
 }
 
-// SetServerSelectionTimeout specifies a timeout in milliseconds to block for server selection.
+// SetRetryReads specifies whether supported read operations should be retried once on certain errors, such as network
+// errors.
+//
+// Supported operations are Find, FindOne, Aggregate without a $out stage, Distinct, CountDocuments,
+// EstimatedDocumentCount, Watch (for Client, Database, and Collection), ListCollections, and ListDatabases. Note that
+// operations run through RunCommand are not retried.
+//
+// This option requires server version >= 3.6 and driver version >= 1.1.0. The default is true.
+func (c *ClientOptions) SetRetryReads(b bool) *ClientOptions {
+	c.RetryReads = &b
+	return c
+}
+
+// SetServerSelectionTimeout specifies how long the driver will wait to find an available, suitable server to execute an
+// operation. This can also be set through the "serverSelectionTimeoutMS" URI option (e.g.
+// "serverSelectionTimeoutMS=30000"). The default value is 30 seconds.
 func (c *ClientOptions) SetServerSelectionTimeout(d time.Duration) *ClientOptions {
 	c.ServerSelectionTimeout = &d
 	return c
 }
 
-// SetSocketTimeout specifies the time in milliseconds to attempt to send or receive on a socket
-// before the attempt times out.
+// SetSocketTimeout specifies how long the driver will wait for a socket read or write to return before returning a
+// network error. This can also be set through the "socketTimeoutMS" URI option (e.g. "socketTimeoutMS=1000"). The
+// default value is 0, meaning no timeout is used and socket operations can block indefinitely.
 func (c *ClientOptions) SetSocketTimeout(d time.Duration) *ClientOptions {
 	c.SocketTimeout = &d
 	return c
 }
 
-// SetTLSConfig sets the tls.Config.
+// SetTLSConfig specifies a tls.Config instance to use use to configure TLS on all connections created to the cluster.
+// This can also be set through the following URI options:
+//
+// 1. "tls" (or "ssl"): Specify if TLS should be used (e.g. "tls=true").
+//
+// 2. "tlsCertificateKeyFile" (or "sslClientCertificateKeyFile"): Specify the path to the client certificate key file or
+// the client private key file. If they are both needed, the files should be concatentated into one file. For example,
+// "tlsCertificateKeyFile=/path/to/ca.pem".
+//
+// 3. "tlsCertificateKeyFilePassword" (or "sslClientCertificateKeyPassword"): Specify the password to decrypt the client
+// private key file (e.g. "tlsCertificateKeyFilePassword=password").
+//
+// 4. "tlsCaFile" (or "sslCertificateAuthorityFile"): Specify the path to a single or bundle of certificate authorities
+// to be considered trusted when making a TLS connection (e.g. "tlsCaFile=/path/to/caFile").
+//
+// 5. "tlsInsecure" (or "sslInsecure"): Specifies whether or not certificates and hostnames received from the server
+// should be validated. If true (e.g. "tlsInsecure=true"), the TLS library will accept any certificate presented by the
+// server and any host name in that certificate. Note that setting this to true makes TLS susceptible to
+// man-in-the-middle attacks and should only be done for testing.
+//
+// The default is nil, meaning no TLS will be enabled.
 func (c *ClientOptions) SetTLSConfig(cfg *tls.Config) *ClientOptions {
 	c.TLSConfig = cfg
 	return c
 }
 
-// SetWriteConcern sets the write concern.
+// SetWriteConcern specifies the write concern to use to for write operations. This can also be se through the following
+// URI options:
+//
+// 1. "w": Specify the number of nodes in the cluster that must acknowledge write operations before the operation
+// returns or "majority" to specify that a majority of the nodes must acknowledge writes. This can either be an integer
+// (e.g. "w=10") or the string "majority" (e.g. "w=majority").
+//
+// 2. "wTimeoutMS": Specify how long write operations should wait for the correct number of nodes to acknowledge the
+// operation (e.g. "wTimeoutMS=1000").
+//
+// 3. "journal": Specifies whether or not write operations should be written to an on-disk journal on the server before
+// returning (e.g. "journal=true").
+//
+// The default is nil, meaning the server will use its configured default.
 func (c *ClientOptions) SetWriteConcern(wc *writeconcern.WriteConcern) *ClientOptions {
 	c.WriteConcern = wc
 
 	return c
 }
 
-// SetZlibLevel sets the level for the zlib compressor.
+// SetZlibLevel specifies the level for the zlib compressor. This option is ignored if zlib is not specified as a
+// compressor through ApplyURI or SetCompressors. Supported values are -1 through 9, inclusive. -1 tells the zlib
+// library to use its default, 0 means no compression, 1 means best speed, and 9 means best compression.
+// This can also be set through the "zlibCompressionLevel" URI option (e.g. "zlibCompressionLevel=-1"). Defaults to -1.
 func (c *ClientOptions) SetZlibLevel(level int) *ClientOptions {
 	c.ZlibLevel = &level
 
 	return c
 }
 
-// MergeClientOptions combines the given connstring and *ClientOptions into a single *ClientOptions in a last one wins
-// fashion. The given connstring will be used for the default options, which can be overwritten using the given
-// *ClientOptions.
+// SetZstdLevel sets the level for the zstd compressor. This option is ignored if zstd is not specified as a compressor
+// through ApplyURI or SetCompressors. Supported values are 1 through 20, inclusive. 1 means best speed and 20 means
+// best compression. This can also be set through the "zstdCompressionLevel" URI option. Defaults to 6.
+func (c *ClientOptions) SetZstdLevel(level int) *ClientOptions {
+	c.ZstdLevel = &level
+	return c
+}
+
+// SetAutoEncryptionOptions specifies an AutoEncryptionOptions instance to automatically encrypt and decrypt commands
+// and their results. See the options.AutoEncryptionOptions documentation for more information about the supported
+// options.
+func (c *ClientOptions) SetAutoEncryptionOptions(opts *AutoEncryptionOptions) *ClientOptions {
+	c.AutoEncryptionOptions = opts
+	return c
+}
+
+// MergeClientOptions combines the given *ClientOptions into a single *ClientOptions in a last one wins fashion.
+// The specified options are merged with the existing options on the collection, with the specified options taking
+// precedence.
 func MergeClientOptions(opts ...*ClientOptions) *ClientOptions {
 	c := Client()
 
@@ -532,6 +716,15 @@ func MergeClientOptions(opts ...*ClientOptions) *ClientOptions {
 		}
 		if opt.ZlibLevel != nil {
 			c.ZlibLevel = opt.ZlibLevel
+		}
+		if opt.ZstdLevel != nil {
+			c.ZstdLevel = opt.ZstdLevel
+		}
+		if opt.AutoEncryptionOptions != nil {
+			c.AutoEncryptionOptions = opt.AutoEncryptionOptions
+		}
+		if opt.Deployment != nil {
+			c.Deployment = opt.Deployment
 		}
 		if opt.err != nil {
 			c.err = opt.err
@@ -659,4 +852,13 @@ func addClientCertFromFile(cfg *tls.Config, clientFile, keyPasswd string) (strin
 	}
 
 	return x509CertSubject(crt), nil
+}
+
+func stringSliceContains(source []string, target string) bool {
+	for _, str := range source {
+		if str == target {
+			return true
+		}
+	}
+	return false
 }

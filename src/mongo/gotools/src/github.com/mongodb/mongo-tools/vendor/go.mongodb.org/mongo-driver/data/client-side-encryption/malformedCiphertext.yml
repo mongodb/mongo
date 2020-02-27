@@ -1,0 +1,69 @@
+runOn:
+  - minServerVersion: "4.1.10"
+database_name: &database_name "default"
+collection_name: &collection_name "default"
+
+data:
+  - &doc0
+    _id: 1
+    encrypted_string:
+      $binary:
+        base64: AQAAAAAAAAAAAAAAAAAAAAACDdw4KFz3ZLquhsbt7RmDjD0N67n0uSXx7IGnQNCLeIKvot6s/ouI21Eo84IOtb6lhwUNPlSEBNY0/hbszWAKJg==
+        subType: "00"
+  - _id: 2
+    encrypted_string:
+      $binary:
+        base64: "AQ=="
+        subType: "06"
+  - _id: 3
+    encrypted_string:
+      $binary:
+        base64: "AQAAa2V2aW4gYWxiZXJ0c29uCg=="
+        subType: "06"
+
+# Since test requires invalid data to be inserted, use a local schema.
+key_vault_data: [{'status': 1, '_id': {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}, 'masterKey': {'provider': 'aws', 'key': 'arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'region': 'us-east-1'}, 'updateDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyMaterial': {'$binary': {'base64': 'AQICAHhQNmWG2CzOm1dq3kWLM+iDUZhEqnhJwH9wZVpuZ94A8gEqnsxXlR51T5EbEVezUqqKAAAAwjCBvwYJKoZIhvcNAQcGoIGxMIGuAgEAMIGoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDHa4jo6yp0Z18KgbUgIBEIB74sKxWtV8/YHje5lv5THTl0HIbhSwM6EqRlmBiFFatmEWaeMk4tO4xBX65eq670I5TWPSLMzpp8ncGHMmvHqRajNBnmFtbYxN3E3/WjxmdbOOe+OXpnGJPcGsftc7cB2shRfA4lICPnE26+oVNXT6p0Lo20nY5XC7jyCO', 'subType': '00'}}, 'creationDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyAltNames': ['altname', 'another_altname']}]
+
+tests:
+  - description: "Wrong subtype"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_w_altname': {'encrypt': {'keyId': '/altname', 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}, 'random': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string_equivalent': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: find
+        arguments:
+          filter: { _id: 1 }
+        result:
+          # gets returned without decryption
+          - *doc0
+  - description: "Empty data"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+            "default.default": {'properties': {'encrypted_w_altname': {'encrypt': {'keyId': '/altname', 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}, 'random': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string_equivalent': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: find
+        arguments:
+          filter: { _id: 2 }
+        result:
+          errorContains: "malformed ciphertext"
+  - description: "Malformed data"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_w_altname': {'encrypt': {'keyId': '/altname', 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}, 'random': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string_equivalent': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: find
+        arguments:
+          filter: { _id: 3 }
+        result:
+          # ciphertext can only validate subtype (which is correct)
+          # but takes the 16 byte UUID to look up key. Fails to find.
+          errorContains: "not all keys requested were satisfied"

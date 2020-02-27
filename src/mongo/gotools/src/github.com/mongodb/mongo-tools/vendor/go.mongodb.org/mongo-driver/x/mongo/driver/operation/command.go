@@ -29,6 +29,7 @@ type Command struct {
 	result         bsoncore.Document
 	srvr           driver.Server
 	desc           description.Server
+	crypt          *driver.Crypt
 }
 
 // NewCommand constructs and returns a new Command.
@@ -70,6 +71,7 @@ func (c *Command) Execute(ctx context.Context) error {
 		Deployment:     c.deployment,
 		ReadPreference: c.readPreference,
 		Selector:       c.selector,
+		Crypt:          c.crypt,
 	}.Execute(ctx, nil)
 }
 
@@ -160,5 +162,15 @@ func (c *Command) ServerSelector(selector description.ServerSelector) *Command {
 	}
 
 	c.selector = selector
+	return c
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (c *Command) Crypt(crypt *driver.Crypt) *Command {
+	if c == nil {
+		c = new(Command)
+	}
+
+	c.crypt = crypt
 	return c
 }

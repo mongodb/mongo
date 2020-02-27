@@ -247,6 +247,7 @@ func (p Properties) Builtins() []Builtin {
 		ClientSession:  {},
 		ClusterClock:   {},
 		Collection:     {},
+		Crypt:          {},
 	}
 	for _, builtin := range p.Disabled {
 		delete(defaults, builtin)
@@ -274,9 +275,12 @@ func (p Properties) Builtins() []Builtin {
 	if _, ok := defaults[Collection]; ok {
 		builtins = append(builtins, Collection)
 	}
+	if _, ok := defaults[Crypt]; ok {
+		builtins = append(builtins, Crypt)
+	}
 	for _, builtin := range p.Enabled {
 		switch builtin {
-		case Deployment, Database, Selector, CommandMonitor, ClientSession, ClusterClock, Collection:
+		case Deployment, Database, Selector, CommandMonitor, ClientSession, ClusterClock, Collection, Crypt:
 			continue // If someone added a default to enable, just ignore it.
 		}
 		builtins = append(builtins, builtin)
@@ -388,6 +392,7 @@ const (
 	Selector       Builtin = "selector"
 	Database       Builtin = "database"
 	Deployment     Builtin = "deployment"
+	Crypt          Builtin = "crypt"
 )
 
 // ExecuteName provides the name used when setting this built-in on a driver.Operation.
@@ -412,6 +417,8 @@ func (b Builtin) ExecuteName() string {
 		execname = "Database"
 	case Deployment:
 		execname = "Deployment"
+	case Crypt:
+		execname = "Crypt"
 	}
 	return execname
 }
@@ -441,6 +448,8 @@ func (b Builtin) ReferenceName() string {
 		refname = "database"
 	case Deployment:
 		refname = "deployment"
+	case Crypt:
+		refname = "crypt"
 	}
 	return refname
 }
@@ -469,6 +478,8 @@ func (b Builtin) SetterName() string {
 		setter = "Database"
 	case Deployment:
 		setter = "Deployment"
+	case Crypt:
+		setter = "Crypt"
 	}
 	return setter
 }
@@ -497,6 +508,8 @@ func (b Builtin) Type() string {
 		t = "string"
 	case Deployment:
 		t = "driver.Deployment"
+	case Crypt:
+		t = "*driver.Crypt"
 	}
 	return t
 }
@@ -525,6 +538,8 @@ func (b Builtin) Documentation() string {
 		doc = "Database sets the database to run this operation against."
 	case Deployment:
 		doc = "Deployment sets the deployment to use for this operation."
+	case Crypt:
+		doc = "Crypt sets the Crypt object to use for automatic encryption and decryption."
 	}
 	return doc
 }

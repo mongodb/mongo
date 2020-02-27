@@ -1,0 +1,54 @@
+runOn:
+  - minServerVersion: "4.1.10"
+database_name: &database_name "default"
+collection_name: &collection_name "default"
+
+data: []
+json_schema: {'properties': {'encrypted_string': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}, 'random': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}}, 'bsonType': 'object'}
+key_vault_data: [{'_id': {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}, 'keyMaterial': {'$binary': {'base64': 'Ce9HSz/HKKGkIt4uyy+jDuKGA+rLC2cycykMo6vc8jXxqa1UVDYHWq1r+vZKbnnSRBfB981akzRKZCFpC05CTyFqDhXv6OnMjpG97OZEREGIsHEYiJkBW0jJJvfLLgeLsEpBzsro9FztGGXASxyxFRZFhXvHxyiLOKrdWfs7X1O/iK3pEoHMx6uSNSfUOgbebLfIqW7TO++iQS5g1xovXA==', 'subType': '00'}}, 'creationDate': {'$date': {'$numberLong': '1552949630483'}}, 'updateDate': {'$date': {'$numberLong': '1552949630483'}}, 'status': {'$numberInt': '0'}, 'masterKey': {'provider': 'local'}}]
+
+tests:
+  - description: "Insert a document with auto encryption using local KMS provider"
+    clientOptions:
+      autoEncryptOpts:
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+          local: {'key': {'$binary': {'base64': 'Mng0NCt4ZHVUYUJCa1kxNkVyNUR1QURhZ2h2UzR2d2RrZzh0cFBwM3R6NmdWMDFBMUN3YkQ5aXRRMkhGRGdQV09wOGVNYUMxT2k3NjZKelhaQmRCZGJkTXVyZG9uSjFk', 'subType': '00'}}}
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc0 { _id: 1, encrypted_string: "string0", random: "abc" }
+    expectations:
+    # Auto encryption will request the collection info.
+    - command_started_event:
+        command:
+          listCollections: 1
+          filter:
+            name: *collection_name
+        command_name: listCollections
+    - command_started_event:
+        command:
+          listCollections: 1
+          filter:
+            name: "datakeys"
+          $db: admin
+        command_name: listCollections
+    # Then key is fetched from the key vault.
+    - command_started_event:
+        command:
+          find: datakeys
+          filter: { $or: [ { _id: { $in: [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] } }, { keyAltNames: { $in: [] } } ] }
+          $db: admin
+        command_name: find
+    - command_started_event:
+        command:
+          insert: *collection_name
+          documents:
+            - &doc0_encrypted { _id: 1, encrypted_string: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAACV/+zJmpqMU47yxS/xIVAviGi7wHDuFwaULAixEAoIh0xHz73UYOM3D8D44gcJn67EROjbz4ITpYzzlCJovDL0Q==', 'subType': '06'}}, random: { $$type: "binData" } }
+          ordered: true
+        command_name: insert
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc0_encrypted

@@ -31,19 +31,18 @@ const errorInterrupted int32 = 11601
 const errorCappedPositionLost int32 = 136
 const errorCursorKilled int32 = 237
 
-// ErrMissingResumeToken indicates that a change stream notification from the server did not
-// contain a resume token.
+// ErrMissingResumeToken indicates that a change stream notification from the server did not contain a resume token.
 var ErrMissingResumeToken = errors.New("cannot provide resume functionality when the resume token is missing")
 
-// ErrNilCursor indicates that the cursor for the change stream is nil.
+// ErrNilCursor indicates that the underlying cursor for the change stream is nil.
 var ErrNilCursor = errors.New("cursor is nil")
 
-// ChangeStream instances iterate a stream of change documents. Each document can be decoded via the
-// Decode method. Resume tokens should be retrieved via the ResumeToken method and can be stored to
-// resume the change stream at a specific point in time.
-//
-// A typical usage of the ChangeStream type would be:
+// ChangeStream is used to iterate over a stream of events. Each event can be decoded into a Go type via the Decode
+// method or accessed as raw BSON via the Current field. For more information about change streams, see
+// https://docs.mongodb.com/manual/changeStreams/.
 type ChangeStream struct {
+	// Current is the BSON bytes of the current event. This property is only valid until the next call to Next or
+	// TryNext. If continued access is required, a copy must be made.
 	Current bson.Raw
 
 	aggregate     *operation.Aggregate
@@ -87,8 +86,8 @@ func newChangeStream(ctx context.Context, config changeStreamConfig, pipeline in
 	}
 
 	cs.sess = sessionFromContext(ctx)
-	if cs.sess == nil && cs.client.topology.SessionPool != nil {
-		cs.sess, cs.err = session.NewClientSession(cs.client.topology.SessionPool, cs.client.id, session.Implicit)
+	if cs.sess == nil && cs.client.sessionPool != nil {
+		cs.sess, cs.err = session.NewClientSession(cs.client.sessionPool, cs.client.id, session.Implicit)
 		if cs.err != nil {
 			return nil, cs.Err()
 		}
@@ -100,7 +99,7 @@ func newChangeStream(ctx context.Context, config changeStreamConfig, pipeline in
 
 	cs.aggregate = operation.NewAggregate(nil).
 		ReadPreference(config.readPreference).ReadConcern(config.readConcern).
-		Deployment(cs.client.topology).ClusterClock(cs.client.clock).
+		Deployment(cs.client.deployment).ClusterClock(cs.client.clock).
 		CommandMonitor(cs.client.monitor).Session(cs.sess).ServerSelector(cs.selector).Retry(driver.RetryNone)
 
 	if cs.options.Collation != nil {
@@ -163,7 +162,7 @@ func (cs *ChangeStream) executeOperation(ctx context.Context, resuming bool) err
 	var conn driver.Connection
 	var err error
 
-	if server, cs.err = cs.client.topology.SelectServer(ctx, cs.selector); cs.err != nil {
+	if server, cs.err = cs.client.deployment.SelectServer(ctx, cs.selector); cs.err != nil {
 		return cs.Err()
 	}
 	if conn, cs.err = server.Connection(ctx); cs.err != nil {
@@ -209,18 +208,17 @@ func (cs *ChangeStream) executeOperation(ctx context.Context, resuming bool) err
 				break
 			}
 
-			server, err = cs.client.topology.SelectServer(ctx, cs.selector)
+			server, err = cs.client.deployment.SelectServer(ctx, cs.selector)
 			if err != nil {
 				break
 			}
 
 			conn.Close()
 			conn, err = server.Connection(ctx)
-			defer conn.Close()
-
 			if err != nil {
 				break
 			}
+			defer conn.Close()
 
 			wireVersion := conn.Description().WireVersion
 			if wireVersion == nil || wireVersion.Max < 6 {
@@ -406,7 +404,7 @@ func (cs *ChangeStream) replaceOptions(ctx context.Context, wireVersion *descrip
 	cs.options.SetStartAtOperationTime(nil)
 }
 
-// ID returns the cursor ID for this change stream.
+// ID returns the ID for this change stream, or 0 if the cursor has been closed or exhausted.
 func (cs *ChangeStream) ID() int64 {
 	if cs.cursor == nil {
 		return 0
@@ -414,7 +412,8 @@ func (cs *ChangeStream) ID() int64 {
 	return cs.cursor.ID()
 }
 
-// Decode will decode the current document into val.
+// Decode will unmarshal the current event document into val and return any errors from the unmarshalling process
+// without any modification. If val is nil or is a typed nil, an error will be returned.
 func (cs *ChangeStream) Decode(val interface{}) error {
 	if cs.cursor == nil {
 		return ErrNilCursor
@@ -423,7 +422,7 @@ func (cs *ChangeStream) Decode(val interface{}) error {
 	return bson.UnmarshalWithRegistry(cs.registry, cs.Current, val)
 }
 
-// Err returns the current error.
+// Err returns the last error seen by the change stream, or nil if no errors has occurred.
 func (cs *ChangeStream) Err() error {
 	if cs.err != nil {
 		return replaceErrors(cs.err)
@@ -435,7 +434,8 @@ func (cs *ChangeStream) Err() error {
 	return replaceErrors(cs.cursor.Err())
 }
 
-// Close closes this cursor.
+// Close closes this change stream and the underlying cursor. Next and TryNext must not be called after Close has been
+// called. Close is idempotent. After the first call, any subsequent calls will not change the state.
 func (cs *ChangeStream) Close(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -452,26 +452,60 @@ func (cs *ChangeStream) Close(ctx context.Context) error {
 	return cs.Err()
 }
 
-// ResumeToken returns the last cached resume token for this change stream.
+// ResumeToken returns the last cached resume token for this change stream, or nil if a resume token has not been
+// stored.
 func (cs *ChangeStream) ResumeToken() bson.Raw {
 	return cs.resumeToken
 }
 
-// Next gets the next result from this change stream. Returns true if there were no errors and the next
-// result is available for decoding.
+// Next gets the next event for this change stream. It returns true if there were no errors and the next event document
+// is available.
+//
+// Next blocks until an event is available, an error occurs, or ctx expires. If ctx expires, the error
+// will be set to ctx.Err(). In an error case, Next will return false.
+//
+// If Next returns false, subsequent calls will also return false.
 func (cs *ChangeStream) Next(ctx context.Context) bool {
+	return cs.next(ctx, false)
+}
+
+// TryNext attempts to get the next event for this change stream. It returns true if there were no errors and the next
+// event document is available.
+//
+// TryNext returns false if the change stream is closed by the server, an error occurs when getting changes from the
+// server, the next change is not yet available, or ctx expires. If ctx expires, the error will be set to ctx.Err().
+//
+// If TryNext returns false and an error occurred or the change stream was closed
+// (i.e. cs.Err() != nil || cs.ID() == 0), subsequent attempts will also return false. Otherwise, it is safe to call
+// TryNext again until a change is available.
+//
+// This method requires driver version >= 1.2.0.
+func (cs *ChangeStream) TryNext(ctx context.Context) bool {
+	return cs.next(ctx, true)
+}
+
+func (cs *ChangeStream) next(ctx context.Context, nonBlocking bool) bool {
+	// return false right away if the change stream has already errored.
+	if cs.err != nil {
+		return false
+	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	if len(cs.batch) == 0 {
-		cs.loopNext(ctx)
-		if cs.err != nil || len(cs.batch) == 0 {
+		cs.loopNext(ctx, nonBlocking)
+		if cs.err != nil {
 			cs.err = replaceErrors(cs.err)
+			return false
+		}
+		if len(cs.batch) == 0 {
 			return false
 		}
 	}
 
+	// successfully got non-empty batch
 	cs.Current = bson.Raw(cs.batch[0])
 	cs.batch = cs.batch[1:]
 	if cs.err = cs.storeResumeToken(); cs.err != nil {
@@ -480,30 +514,28 @@ func (cs *ChangeStream) Next(ctx context.Context) bool {
 	return true
 }
 
-func (cs *ChangeStream) loopNext(ctx context.Context) {
+func (cs *ChangeStream) loopNext(ctx context.Context, nonBlocking bool) {
 	for {
 		if cs.cursor == nil {
 			return
 		}
 
 		if cs.cursor.Next(ctx) {
-			// If this is the first batch, the batch cursor will return true, but the batch could be empty.
-			if cs.batch, cs.err = cs.cursor.Batch().Documents(); cs.err != nil || len(cs.batch) > 0 {
-				return
-			}
-
-			// no error but empty batch
-			cs.updatePbrtFromCommand()
-			continue
+			// non-empty batch returned
+			cs.batch, cs.err = cs.cursor.Batch().Documents()
+			return
 		}
 
 		cs.err = replaceErrors(cs.cursor.Err())
 		if cs.err == nil {
-			// If a getMore was done but the batch was empty, the batch cursor will return false with no error
-			if len(cs.batch) == 0 {
-				continue
+			// If a getMore was done but the batch was empty, the batch cursor will return false with no error.
+			// Update the tracked resume token to catch the post batch resume token from the server response.
+			cs.updatePbrtFromCommand()
+			if nonBlocking {
+				// stop after a successful getMore, even though the batch was empty
+				return
 			}
-			return
+			continue // loop getMore until a non-empty batch is returned or an error occurs
 		}
 
 		switch t := cs.err.(type) {
@@ -526,11 +558,11 @@ func (cs *ChangeStream) emptyBatch() bool {
 	return cs.cursor.Batch().Empty()
 }
 
-// StreamType represents the type of a change stream.
+// StreamType represents the cluster type against which a ChangeStream was created.
 type StreamType uint8
 
 // These constants represent valid change stream types. A change stream can be initialized over a collection, all
-// collections in a database, or over a whole client.
+// collections in a database, or over a cluster.
 const (
 	CollectionStream StreamType = iota
 	DatabaseStream

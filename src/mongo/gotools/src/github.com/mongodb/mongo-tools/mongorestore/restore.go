@@ -321,6 +321,9 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) Result {
 		if restore.OutputOptions.ConvertLegacyIndexes {
 			convertLegacyIndexes(indexes)
 		}
+		if restore.OutputOptions.FixDottedHashedIndexes {
+			fixDottedHashedIndexes(indexes)
+		}
 		err = restore.CreateIndexes(intent, indexes, hasNonSimpleCollation)
 		if err != nil {
 			result.Err = fmt.Errorf("error creating indexes for %v: %v", intent.Namespace(), err)
@@ -337,6 +340,26 @@ func convertLegacyIndexes(indexes []IndexDocument) {
 	for _, index := range indexes {
 		convertLegacyIndexKeys(index)
 		convertLegacyIndexOptions(index)
+	}
+}
+
+func fixDottedHashedIndexes(indexes []IndexDocument) {
+	for _, index := range indexes {
+		fixDottedHashedIndex(index)
+	}
+}
+
+// fixDottedHashedIndex fixes the issue introduced by a server bug where hashed index constraints are not
+// correctly enforced under all circumstance by changing the hashed index on the dotted field to an
+// ascending single field index.
+func fixDottedHashedIndex(index IndexDocument) {
+	indexFields := index.Key
+	for i, field := range indexFields {
+		fieldName := field.Key
+		if strings.Contains(fieldName, ".") && field.Value == "hashed" {
+			// Change the hashed index to single field index
+			indexFields[i].Value = int32(1)
+		}
 	}
 }
 

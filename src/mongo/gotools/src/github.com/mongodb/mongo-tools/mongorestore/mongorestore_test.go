@@ -487,3 +487,99 @@ func TestKnownCollections(t *testing.T) {
 		})
 	})
 }
+
+func TestFixHashedIndexes(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	session, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+
+	type indexRes struct {
+		Key bson.D
+	}
+
+	Convey("Test MongoRestore with hashed indexes and --fixHashedIndexes", t, func() {
+		args := []string{
+			FixDottedHashedIndexesOption,
+		}
+
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		session, _ = restore.SessionProvider.GetSession()
+		db := session.Database("testdata")
+
+		defer func() {
+			db.Collection("hashedIndexes").Drop(nil)
+		}()
+
+		Convey("The index for a.b should be changed from 'hashed' to 1, since it is dotted", func() {
+			restore.TargetDirectory = "testdata/hashedIndexes.bson"
+			result := restore.Restore()
+			So(result.Err, ShouldBeNil)
+
+			indexes := db.Collection("hashedIndexes").Indexes()
+			c, err := indexes.List(context.Background())
+			So(err, ShouldBeNil)
+			var res indexRes
+
+			for c.Next(context.Background()) {
+				err := c.Decode(&res)
+				So(err, ShouldBeNil)
+				for _, key := range res.Key {
+					if key.Key == "b" {
+						So(key.Value, ShouldEqual, "hashed")
+					} else if key.Key == "a.a" {
+						So(key.Value, ShouldEqual, 1)
+					} else if key.Key == "a.b" {
+						So(key.Value, ShouldEqual, 1)
+					} else if key.Key != "_id" {
+						t.Fatalf("Unexepected Index: %v", key.Key)
+					}
+				}
+			}
+		})
+	})
+
+	Convey("Test MongoRestore with hashed indexes without --fixHashedIndexes", t, func() {
+		args := []string{}
+
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		session, _ = restore.SessionProvider.GetSession()
+		db := session.Database("testdata")
+
+		defer func() {
+			db.Collection("hashedIndexes").Drop(nil)
+		}()
+
+		Convey("All indexes should be unchanged", func() {
+			restore.TargetDirectory = "testdata/hashedIndexes.bson"
+			result := restore.Restore()
+			So(result.Err, ShouldBeNil)
+
+			indexes := db.Collection("hashedIndexes").Indexes()
+			c, err := indexes.List(context.Background())
+			So(err, ShouldBeNil)
+			var res indexRes
+
+			for c.Next(context.Background()) {
+				err := c.Decode(&res)
+				So(err, ShouldBeNil)
+				for _, key := range res.Key {
+					if key.Key == "b" {
+						So(key.Value, ShouldEqual, "hashed")
+					} else if key.Key == "a.a" {
+						So(key.Value, ShouldEqual, 1)
+					} else if key.Key == "a.b" {
+						So(key.Value, ShouldEqual, "hashed")
+					} else if key.Key != "_id" {
+						t.Fatalf("Unexepected Index: %v", key.Key)
+					}
+				}
+			}
+		})
+	})
+}

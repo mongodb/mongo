@@ -75,3 +75,8 @@ func (rc *ReadConcern) MarshalBSONValue() (bsontype.Type, []byte, error) {
 
 	return bsontype.EmbeddedDocument, bsoncore.BuildDocument(nil, elems), nil
 }
+
+// GetLevel returns the read concern level.
+func (rc *ReadConcern) GetLevel() string {
+	return rc.level
+}

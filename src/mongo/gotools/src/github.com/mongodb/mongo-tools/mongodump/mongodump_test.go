@@ -243,6 +243,14 @@ func setUpMongoDumpTestData() error {
 			if err != nil {
 				return err
 			}
+
+			idx := mongo.IndexModel{
+				Keys: bson.M{`"`: 1},
+			}
+			_, err = coll.Indexes().CreateOne(context.Background(), idx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

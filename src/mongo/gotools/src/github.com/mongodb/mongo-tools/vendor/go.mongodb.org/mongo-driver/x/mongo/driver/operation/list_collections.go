@@ -27,6 +27,7 @@ type ListCollections struct {
 	session        *session.Client
 	clock          *session.ClusterClock
 	monitor        *event.CommandMonitor
+	crypt          *driver.Crypt
 	database       string
 	deployment     driver.Deployment
 	readPreference *readpref.ReadPref
@@ -75,6 +76,7 @@ func (lc *ListCollections) Execute(ctx context.Context) error {
 		Client:            lc.session,
 		Clock:             lc.clock,
 		CommandMonitor:    lc.monitor,
+		Crypt:             lc.crypt,
 		Database:          lc.database,
 		Deployment:        lc.deployment,
 		ReadPreference:    lc.readPreference,
@@ -143,6 +145,16 @@ func (lc *ListCollections) CommandMonitor(monitor *event.CommandMonitor) *ListCo
 	}
 
 	lc.monitor = monitor
+	return lc
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (lc *ListCollections) Crypt(crypt *driver.Crypt) *ListCollections {
+	if lc == nil {
+		lc = new(ListCollections)
+	}
+
+	lc.crypt = crypt
 	return lc
 }
 

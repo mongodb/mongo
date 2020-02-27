@@ -29,6 +29,7 @@ type DropIndexes struct {
 	clock        *session.ClusterClock
 	collection   string
 	monitor      *event.CommandMonitor
+	crypt        *driver.Crypt
 	database     string
 	deployment   driver.Deployment
 	selector     description.ServerSelector
@@ -88,6 +89,7 @@ func (di *DropIndexes) Execute(ctx context.Context) error {
 		Client:            di.session,
 		Clock:             di.clock,
 		CommandMonitor:    di.monitor,
+		Crypt:             di.crypt,
 		Database:          di.database,
 		Deployment:        di.deployment,
 		Selector:          di.selector,
@@ -165,6 +167,16 @@ func (di *DropIndexes) CommandMonitor(monitor *event.CommandMonitor) *DropIndexe
 	}
 
 	di.monitor = monitor
+	return di
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (di *DropIndexes) Crypt(crypt *driver.Crypt) *DropIndexes {
+	if di == nil {
+		di = new(DropIndexes)
+	}
+
+	di.crypt = crypt
 	return di
 }
 

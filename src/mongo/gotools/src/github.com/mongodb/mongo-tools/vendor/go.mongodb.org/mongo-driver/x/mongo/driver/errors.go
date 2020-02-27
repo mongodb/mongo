@@ -190,6 +190,7 @@ type Error struct {
 	Message string
 	Labels  []string
 	Name    string
+	Wrapped error
 }
 
 // UnsupportedStorageEngine returns whether e came as a result of an unsupported storage engine

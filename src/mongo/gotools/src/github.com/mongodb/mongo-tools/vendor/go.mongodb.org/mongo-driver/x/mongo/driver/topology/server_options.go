@@ -68,6 +68,14 @@ func WithCompressionOptions(fn func(...string) []string) ServerOption {
 	}
 }
 
+// WithServerAppName configures the server's application name.
+func WithServerAppName(fn func(string) string) ServerOption {
+	return func(cfg *serverConfig) error {
+		cfg.appname = fn(cfg.appname)
+		return nil
+	}
+}
+
 // WithHeartbeatInterval configures a server's heartbeat interval.
 func WithHeartbeatInterval(fn func(time.Duration) time.Duration) ServerOption {
 	return func(cfg *serverConfig) error {
@@ -86,7 +94,7 @@ func WithHeartbeatTimeout(fn func(time.Duration) time.Duration) ServerOption {
 }
 
 // WithMaxConnections configures the maximum number of connections to allow for
-// a given server. If max is 0, then the default will be 100
+// a given server. If max is 0, then the default will be math.MaxInt64.
 func WithMaxConnections(fn func(uint64) uint64) ServerOption {
 	return func(cfg *serverConfig) error {
 		cfg.maxConns = fn(cfg.maxConns)

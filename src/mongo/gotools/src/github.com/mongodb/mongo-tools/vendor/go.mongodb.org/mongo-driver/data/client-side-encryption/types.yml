@@ -1,0 +1,527 @@
+# Attempt to round trip some BSON types.
+# Note: db pointer is excluded since it is deprecated and numberlong is excluded due to different driver interpretations of { $numberLong: '123' } in relaxed JSON parsing.
+
+runOn:
+  - minServerVersion: "4.1.10"
+database_name: &database_name "default"
+collection_name: &collection_name "default"
+
+data: []
+json_schema: {}
+key_vault_data: [{'status': 1, '_id': {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}, 'masterKey': {'provider': 'aws', 'key': 'arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'region': 'us-east-1'}, 'updateDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyMaterial': {'$binary': {'base64': 'AQICAHhQNmWG2CzOm1dq3kWLM+iDUZhEqnhJwH9wZVpuZ94A8gEqnsxXlR51T5EbEVezUqqKAAAAwjCBvwYJKoZIhvcNAQcGoIGxMIGuAgEAMIGoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDHa4jo6yp0Z18KgbUgIBEIB74sKxWtV8/YHje5lv5THTl0HIbhSwM6EqRlmBiFFatmEWaeMk4tO4xBX65eq670I5TWPSLMzpp8ncGHMmvHqRajNBnmFtbYxN3E3/WjxmdbOOe+OXpnGJPcGsftc7cB2shRfA4lICPnE26+oVNXT6p0Lo20nY5XC7jyCO', 'subType': '00'}}, 'creationDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyAltNames': ['altname', 'another_altname']}]
+
+tests:
+  - description: "type=objectId"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_objectId': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'objectId', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc0 { _id: 1, encrypted_objectId: {"$oid": "AAAAAAAAAAAAAAAAAAAAAAAA"} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc0
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc0_encrypted { _id: 1, encrypted_objectId: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAAHmkTPqvzfHMWpvS1mEsrjOxVQ2dyihEgIFWD5E0eNEsiMBQsC0GuvjdqYRL5DHLFI1vKuGek7EYYp0Qyii/tHqA==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc0_encrypted
+  - description: "type=symbol"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_symbol': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'symbol', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc1 { _id: 1, encrypted_symbol: {"$symbol": "test"} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc1
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc1_encrypted { _id: 1, encrypted_symbol: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAAOOmvDmWjcuKsSCO7U/7t9HJ8eI73B6wduyMbdkvn7n7V4uTJes/j+BTtneSdyG2JHKHGkevWAJSIU2XoO66BSXw==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc1_encrypted
+  - description: "type=int"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_int': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'int', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc2 { _id: 1, encrypted_int: {"$numberInt": "123"} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc2
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc2_encrypted { _id: 1, encrypted_int: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAAQPNXJVXMEjGZnftMuf2INKufXCtQIRHdw5wTgn6QYt3ejcoAXyiwI4XIUizkpsob494qpt2in4tWeiO7b9zkA8Q==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc2_encrypted
+  - description: "type=double"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_double': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'double', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc4 { _id: 1, encrypted_double: {"$numberDouble": "1.23"} }
+        result:
+            errorContains: "Cannot use deterministic encryption for element of type: double"
+  - description: "type=decimal"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_decimal': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'decimal', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc5 { _id: 1, encrypted_decimal: {"$numberDecimal": "1.23"} }
+        result:
+            errorContains: "Cannot use deterministic encryption for element of type: decimal"
+  - description: "type=binData"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_binData': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'binData', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc6 { _id: 1, encrypted_binData: {"$binary": { base64: "AAAA", subType: "00" } } }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc6
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc6_encrypted { _id: 1, encrypted_binData: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAAFB/KHZQHaHHo8fctcl7v6kR+sLkJoTRx2cPSSck9ya+nbGROSeFhdhDRHaCzhV78fDEqnMDSVPNi+ZkbaIh46GQ==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc6_encrypted
+  - description: "type=javascript"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_javascript': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'javascript', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc7 { _id: 1, encrypted_javascript: {"$code": "var x = 1;" } }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc7
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc7_encrypted { _id: 1, encrypted_javascript: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAANrvMgJkTKWGMc9wt3E2RBR2Hu5gL9p+vIIdHe9FcOm99t1W480/oX1Gnd87ON3B399DuFaxi/aaIiQSo7gTX6Lw==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc7_encrypted
+  - description: "type=javascriptWithScope"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_javascriptWithScope': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'javascriptWithScope', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc8 { _id: 1, encrypted_javascriptWithScope: {"$code": "var x = 1;", "$scope": {} } }
+        result:
+          errorContains: "Cannot use deterministic encryption for element of type: javascriptWithScope"
+  - description: "type=object"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_object': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'object', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc9 { _id: 1, encrypted_object: {} }
+        result:
+          errorContains: "Cannot use deterministic encryption for element of type: object"
+  - description: "type=timestamp"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_timestamp': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'timestamp', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc10 { _id: 1, encrypted_timestamp: {$timestamp: {t: 123, i: 456}} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc10
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc10_encrypted { _id: 1, encrypted_timestamp: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAARJHaM4Gq3MpDTdBasBsEolQaOmxJQU1wsZVaSFAOLpEh1QihDglXI95xemePFMKhg+KNpFg7lw1ChCs2Wn/c26Q==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc10_encrypted
+  - description: "type=regex"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_regex': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'regex', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc11 { _id: 1, encrypted_regex: {$regularExpression: { pattern: "test", options: ""}} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc11
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc11_encrypted { _id: 1, encrypted_regex: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAALVnxM4UqGhqf5eXw6nsS08am3YJrTf1EvjKitT8tyyMAbHsICIU3GUjuC7EBofCHbusvgo7pDyaClGostFz44nA==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc11_encrypted
+  - description: "type=date"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_date': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'date', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc13 { _id: 1, encrypted_date: {$date: { $numberLong: "123" }} }
+      - name: findOne
+        arguments:
+          filter: { _id: 1 }
+        result: *doc13
+    expectations:
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - &doc13_encrypted { _id: 1, encrypted_date: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAAJ5sN7u6l97+DswfKTqZAijSTSOo5htinGKQKUD7pHNJYlLXGOkB4glrCu7ibu0g3344RHQ5yUp4YxMEa8GD+Snw==', 'subType': '06'}} }
+            ordered: true
+          command_name: insert
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: 1}
+          command_name: find
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - *doc13_encrypted
+  - description: "type=minKey"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_minKey': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'minKey', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc14 { _id: 1, encrypted_minKey: {$minKey: 1} }
+        result:
+          errorContains: "Cannot encrypt element of type: minKey"
+  - description: "type=maxKey"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_maxKey': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'maxKey', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc15 { _id: 1, encrypted_maxKey: {$maxKey: 1} }
+        result:
+          errorContains: "Cannot encrypt element of type: maxKey"
+  - description: "type=undefined"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_undefined': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'undefined', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc16 { _id: 1, encrypted_undefined: {$undefined: true} }
+        result:
+          errorContains: "Cannot encrypt element of type: undefined"
+  - description: "type=array"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_array': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'array', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc17 { _id: 1, encrypted_array: [] }
+        result:
+          errorContains: "Cannot use deterministic encryption for element of type: array"
+  - description: "type=bool"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_bool': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'bool', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc18 { _id: 1, encrypted_bool: true }
+        result:
+          errorContains: "Cannot use deterministic encryption for element of type: bool"
+  - description: "type=null"
+    clientOptions:
+      autoEncryptOpts:
+        schemaMap:
+          "default.default": {'properties': {'encrypted_null': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'null', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: insertOne
+        arguments:
+          document: &doc19 { _id: 1, encrypted_null: true }
+        result:
+          errorContains: "Cannot encrypt element of type: null"

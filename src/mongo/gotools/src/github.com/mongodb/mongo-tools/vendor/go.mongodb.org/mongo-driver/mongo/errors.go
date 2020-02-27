@@ -13,23 +13,20 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/mongocrypt"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 )
 
-// ErrUnacknowledgedWrite is returned from functions that have an unacknowledged
-// write concern.
+// ErrUnacknowledgedWrite is returned by operations that have an unacknowledged write concern.
 var ErrUnacknowledgedWrite = errors.New("unacknowledged write")
 
-// ErrClientDisconnected is returned when a user attempts to call a method on a
-// disconnected client
+// ErrClientDisconnected is returned when disconnected Client is used to run an operation.
 var ErrClientDisconnected = errors.New("client is disconnected")
 
-// ErrNilDocument is returned when a user attempts to pass a nil document or filter
-// to a function where the field is required.
+// ErrNilDocument is returned when a nil document is passed to a CRUD method.
 var ErrNilDocument = errors.New("document is nil")
 
-// ErrEmptySlice is returned when a user attempts to pass an empty slice as input
-// to a function wehere the field is required.
+// ErrEmptySlice is returned when an empty slice is passed to a CRUD method that requires a non-empty slice.
 var ErrEmptySlice = errors.New("must provide at least one element in input slice")
 
 func replaceErrors(err error) error {
@@ -54,16 +51,51 @@ func replaceErrors(err error) error {
 
 		return ce
 	}
+	if me, ok := err.(mongocrypt.Error); ok {
+		return MongocryptError{Code: me.Code, Message: me.Message}
+	}
 
 	return err
 }
 
-// CommandError represents an error in execution of a command against the database.
+// MongocryptError represents an libmongocrypt error during client-side encryption.
+type MongocryptError struct {
+	Code    int32
+	Message string
+}
+
+// Error implements the error interface.
+func (m MongocryptError) Error() string {
+	return fmt.Sprintf("mongocrypt error %d: %v", m.Code, m.Message)
+}
+
+// EncryptionKeyVaultError represents an error while communicating with the key vault collection during client-side
+// encryption.
+type EncryptionKeyVaultError struct {
+	Wrapped error
+}
+
+// Error implements the error interface.
+func (ekve EncryptionKeyVaultError) Error() string {
+	return fmt.Sprintf("key vault communication error: %v", ekve.Wrapped)
+}
+
+// MongocryptdError represents an error while communicating with mongocryptd during client-side encryption.
+type MongocryptdError struct {
+	Wrapped error
+}
+
+// Error implements the error interface.
+func (e MongocryptdError) Error() string {
+	return fmt.Sprintf("mongocryptd communication error: %v", e.Wrapped)
+}
+
+// CommandError represents a server error during execution of a command. This can be returned by any operation.
 type CommandError struct {
 	Code    int32
 	Message string
-	Labels  []string
-	Name    string
+	Labels  []string // Categories to which the error belongs
+	Name    string   // A human-readable name corresponding to the error code
 }
 
 // Error implements the error interface.
@@ -86,25 +118,27 @@ func (e CommandError) HasErrorLabel(label string) bool {
 	return false
 }
 
-// IsMaxTimeMSExpiredError indicates if the error is a MaxTimeMSExpiredError.
+// IsMaxTimeMSExpiredError returns true if the error is a MaxTimeMSExpired error.
 func (e CommandError) IsMaxTimeMSExpiredError() bool {
 	return e.Code == 50 || e.Name == "MaxTimeMSExpired"
 }
 
-// WriteError is a non-write concern failure that occurred as a result of a write
-// operation.
+// WriteError is an error that occurred during execution of a write operation. This error type is only returned as part
+// of a WriteException or BulkWriteException.
 type WriteError struct {
-	Index   int
+	// The index of the write in the slice passed to an InsertMany or BulkWrite operation that caused this error.
+	Index int
+
 	Code    int
 	Message string
 }
 
 func (we WriteError) Error() string { return we.Message }
 
-// WriteErrors is a group of non-write concern failures that occurred as a result
-// of a write operation.
+// WriteErrors is a group of write errors that occurred during execution of a write operation.
 type WriteErrors []WriteError
 
+// Error implements the error interface.
 func (we WriteErrors) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "write errors: [")
@@ -126,8 +160,8 @@ func writeErrorsFromDriverWriteErrors(errs driver.WriteErrors) WriteErrors {
 	return wes
 }
 
-// WriteConcernError is a write concern failure that occurred as a result of a
-// write operation.
+// WriteConcernError represents a write concern failure during execution of a write operation. This error type is only
+// returned as part of a WriteException or a BulkWriteException.
 type WriteConcernError struct {
 	Name    string
 	Code    int
@@ -135,6 +169,7 @@ type WriteConcernError struct {
 	Details bson.Raw
 }
 
+// Error implements the error interface.
 func (wce WriteConcernError) Error() string {
 	if wce.Name != "" {
 		return fmt.Sprintf("(%v) %v", wce.Name, wce.Message)
@@ -142,12 +177,17 @@ func (wce WriteConcernError) Error() string {
 	return wce.Message
 }
 
-// WriteException is an error for a non-bulk write operation.
+// WriteException is the error type returned by the InsertOne, DeleteOne, DeleteMany, UpdateOne, UpdateMany, and
+// ReplaceOne operations.
 type WriteException struct {
+	// The write concern error that occurred, or nil if there was none.
 	WriteConcernError *WriteConcernError
-	WriteErrors       WriteErrors
+
+	// The write errors that occurred during operation execution.
+	WriteErrors WriteErrors
 }
 
+// Error implements the error interface.
 func (mwe WriteException) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "multiple write errors: [")
@@ -164,24 +204,30 @@ func convertDriverWriteConcernError(wce *driver.WriteConcernError) *WriteConcern
 	return &WriteConcernError{Code: int(wce.Code), Message: wce.Message, Details: bson.Raw(wce.Details)}
 }
 
-// BulkWriteError is an error for one operation in a bulk write.
+// BulkWriteError is an error that occurred during execution of one operation in a BulkWrite. This error type is only
+// returned as part of a BulkWriteException.
 type BulkWriteError struct {
-	WriteError
-	Request WriteModel
+	WriteError            // The WriteError that occurred.
+	Request    WriteModel // The WriteModel that caused this error.
 }
 
+// Error implements the error interface.
 func (bwe BulkWriteError) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "{%s}", bwe.WriteError)
 	return buf.String()
 }
 
-// BulkWriteException is an error for a bulk write operation.
+// BulkWriteException is the error type returned by BulkWrite and InsertMany operations.
 type BulkWriteException struct {
+	// The write concern error that occurred, or nil if there was none.
 	WriteConcernError *WriteConcernError
-	WriteErrors       []BulkWriteError
+
+	// The write errors that occurred during operation execution.
+	WriteErrors []BulkWriteError
 }
 
+// Error implements the error interface.
 func (bwe BulkWriteException) Error() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "bulk write error: [")

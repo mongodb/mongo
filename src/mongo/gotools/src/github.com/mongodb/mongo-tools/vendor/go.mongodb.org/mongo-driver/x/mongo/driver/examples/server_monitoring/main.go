@@ -22,7 +22,7 @@ func main() {
 		topology.WithHeartbeatInterval(func(time.Duration) time.Duration { return 2 * time.Second }),
 		topology.WithConnectionOptions(
 			func(opts ...topology.ConnectionOption) []topology.ConnectionOption {
-				return append(opts, topology.WithAppName(func(string) string { return "server monitoring test" }))
+				return append(opts, topology.WithConnectionAppName(func(string) string { return "server monitoring test" }))
 			},
 		),
 	)

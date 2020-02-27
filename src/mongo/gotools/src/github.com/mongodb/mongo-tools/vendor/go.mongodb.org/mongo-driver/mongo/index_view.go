@@ -27,23 +27,29 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
 )
 
-// ErrInvalidIndexValue indicates that the index Keys document has a value that isn't either a number or a string.
+// ErrInvalidIndexValue is returned if an index is created with a keys document that has a value that is not a number
+// or string.
 var ErrInvalidIndexValue = errors.New("invalid index value")
 
-// ErrNonStringIndexName indicates that the index name specified in the options is not a string.
+// ErrNonStringIndexName is returned if an index is created with a name that is not a string.
 var ErrNonStringIndexName = errors.New("index name must be a string")
 
-// ErrMultipleIndexDrop indicates that multiple indexes would be dropped from a call to IndexView.DropOne.
+// ErrMultipleIndexDrop is returned if multiple indexes would be dropped from a call to IndexView.DropOne.
 var ErrMultipleIndexDrop = errors.New("multiple indexes would be dropped")
 
-// IndexView is used to create, drop, and list indexes on a given collection.
+// IndexView is a type that can be used to create, drop, and list indexes on a collection. An IndexView for a collection
+// can be created by a call to Collection.Indexes().
 type IndexView struct {
 	coll *Collection
 }
 
-// IndexModel contains information about an index.
+// IndexModel represents a new index to be created.
 type IndexModel struct {
-	Keys    interface{}
+	// A document describing which keys should be used for the index. It cannot be nil. See
+	// https://docs.mongodb.com/manual/indexes/#indexes for examples of valid documents.
+	Keys interface{}
+
+	// The options to use to create the index.
 	Options *options.IndexOptions
 }
 
@@ -54,16 +60,21 @@ func isNamespaceNotFoundError(err error) bool {
 	return false
 }
 
-// List returns a cursor iterating over all the indexes in the collection.
+// List executes a listIndexes command and returns a cursor over the indexes in the collection.
+//
+// The opts parameter can be used to specify options for this operation (see the options.ListIndexesOptions
+// documentation).
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/listIndexes/.
 func (iv IndexView) List(ctx context.Context, opts ...*options.ListIndexesOptions) (*Cursor, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	sess := sessionFromContext(ctx)
-	if sess == nil && iv.coll.client.topology.SessionPool != nil {
+	if sess == nil && iv.coll.client.sessionPool != nil {
 		var err error
-		sess, err = session.NewClientSession(iv.coll.client.topology.SessionPool, iv.coll.client.id, session.Implicit)
+		sess, err = session.NewClientSession(iv.coll.client.sessionPool, iv.coll.client.id, session.Implicit)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +95,7 @@ func (iv IndexView) List(ctx context.Context, opts ...*options.ListIndexesOption
 		Session(sess).CommandMonitor(iv.coll.client.monitor).
 		ServerSelector(selector).ClusterClock(iv.coll.client.clock).
 		Database(iv.coll.db.name).Collection(iv.coll.name).
-		Deployment(iv.coll.client.topology)
+		Deployment(iv.coll.client.deployment)
 
 	var cursorOpts driver.CursorOptions
 	lio := options.MergeListIndexesOptions(opts...)
@@ -121,7 +132,8 @@ func (iv IndexView) List(ctx context.Context, opts ...*options.ListIndexesOption
 	return cursor, replaceErrors(err)
 }
 
-// CreateOne creates a single index in the collection specified by the model.
+// CreateOne executes a createIndexes command to create an index on the collection and returns the name of the new
+// index. See the IndexView.CreateMany documentation for more information and an example.
 func (iv IndexView) CreateOne(ctx context.Context, model IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
 	names, err := iv.CreateMany(ctx, []IndexModel{model}, opts...)
 	if err != nil {
@@ -131,8 +143,16 @@ func (iv IndexView) CreateOne(ctx context.Context, model IndexModel, opts ...*op
 	return names[0], nil
 }
 
-// CreateMany creates multiple indexes in the collection specified by the models. The names of the
-// created indexes are returned.
+// CreateMany executes a createIndexes command to create multiple indexes on the collection and returns the names of
+// the new indexes.
+//
+// For each IndexModel in the models parameter, the index name can be specified via the Options field. If a name is not
+// given, it will be generated from the Keys document.
+//
+// The opts parameter can be used to specify options for this operation (see the options.CreateIndexesOptions
+// documentation).
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/createIndexes/.
 func (iv IndexView) CreateMany(ctx context.Context, models []IndexModel, opts ...*options.CreateIndexesOptions) ([]string, error) {
 	names := make([]string, 0, len(models))
 
@@ -185,8 +205,8 @@ func (iv IndexView) CreateMany(ctx context.Context, models []IndexModel, opts ..
 
 	sess := sessionFromContext(ctx)
 
-	if sess == nil && iv.coll.client.topology.SessionPool != nil {
-		sess, err = session.NewClientSession(iv.coll.client.topology.SessionPool, iv.coll.client.id, session.Implicit)
+	if sess == nil && iv.coll.client.sessionPool != nil {
+		sess, err = session.NewClientSession(iv.coll.client.sessionPool, iv.coll.client.id, session.Implicit)
 		if err != nil {
 			return nil, err
 		}
@@ -198,14 +218,22 @@ func (iv IndexView) CreateMany(ctx context.Context, models []IndexModel, opts ..
 		return nil, err
 	}
 
+	wc := iv.coll.writeConcern
+	if sess.TransactionRunning() {
+		wc = nil
+	}
+	if !writeconcern.AckWrite(wc) {
+		sess = nil
+	}
+
 	selector := makePinnedSelector(sess, iv.coll.writeSelector)
 
 	option := options.MergeCreateIndexesOptions(opts...)
 
 	op := operation.NewCreateIndexes(indexes).
-		Session(sess).ClusterClock(iv.coll.client.clock).
+		Session(sess).WriteConcern(wc).ClusterClock(iv.coll.client.clock).
 		Database(iv.coll.db.name).Collection(iv.coll.name).CommandMonitor(iv.coll.client.monitor).
-		Deployment(iv.coll.client.topology).ServerSelector(selector)
+		Deployment(iv.coll.client.deployment).ServerSelector(selector)
 
 	if option.MaxTime != nil {
 		op.MaxTimeMS(int64(*option.MaxTime / time.Millisecond))
@@ -308,9 +336,9 @@ func (iv IndexView) drop(ctx context.Context, name string, opts ...*options.Drop
 	}
 
 	sess := sessionFromContext(ctx)
-	if sess == nil && iv.coll.client.topology.SessionPool != nil {
+	if sess == nil && iv.coll.client.sessionPool != nil {
 		var err error
-		sess, err = session.NewClientSession(iv.coll.client.topology.SessionPool, iv.coll.client.id, session.Implicit)
+		sess, err = session.NewClientSession(iv.coll.client.sessionPool, iv.coll.client.id, session.Implicit)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +365,7 @@ func (iv IndexView) drop(ctx context.Context, name string, opts ...*options.Drop
 		Session(sess).WriteConcern(wc).CommandMonitor(iv.coll.client.monitor).
 		ServerSelector(selector).ClusterClock(iv.coll.client.clock).
 		Database(iv.coll.db.name).Collection(iv.coll.name).
-		Deployment(iv.coll.client.topology)
+		Deployment(iv.coll.client.deployment)
 	if dio.MaxTime != nil {
 		op.MaxTimeMS(int64(*dio.MaxTime / time.Millisecond))
 	}
@@ -354,7 +382,17 @@ func (iv IndexView) drop(ctx context.Context, name string, opts ...*options.Drop
 	return res, nil
 }
 
-// DropOne drops the index with the given name from the collection.
+// DropOne executes a dropIndexes operation to drop an index on the collection. If the operation succeeds, this returns
+// a BSON document in the form {nIndexesWas: <int32>}. The "nIndexesWas" field in the response contains the number of
+// indexes that existed prior to the drop.
+//
+// The name parameter should be the name of the index to drop. If the name is "*", ErrMultipleIndexDrop will be returned
+// without running the command because doing so would drop all indexes.
+//
+// The opts parameter can be used to specify options for this operation (see the options.DropIndexesOptions
+// documentation).
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/dropIndexes/.
 func (iv IndexView) DropOne(ctx context.Context, name string, opts ...*options.DropIndexesOptions) (bson.Raw, error) {
 	if name == "*" {
 		return nil, ErrMultipleIndexDrop
@@ -363,7 +401,14 @@ func (iv IndexView) DropOne(ctx context.Context, name string, opts ...*options.D
 	return iv.drop(ctx, name, opts...)
 }
 
-// DropAll drops all indexes in the collection.
+// DropAll executes a dropIndexes operation to drop all indexes on the collection. If the operation succeeds, this
+// returns a BSON document in the form {nIndexesWas: <int32>}. The "nIndexesWas" field in the response contains the
+// number of indexes that existed prior to the drop.
+//
+// The opts parameter can be used to specify options for this operation (see the options.DropIndexesOptions
+// documentation).
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/dropIndexes/.
 func (iv IndexView) DropAll(ctx context.Context, opts ...*options.DropIndexesOptions) (bson.Raw, error) {
 	return iv.drop(ctx, "*", opts...)
 }

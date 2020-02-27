@@ -27,6 +27,7 @@ type CommitTransaction struct {
 	session       *session.Client
 	clock         *session.ClusterClock
 	monitor       *event.CommandMonitor
+	crypt         *driver.Crypt
 	database      string
 	deployment    driver.Deployment
 	selector      description.ServerSelector
@@ -58,6 +59,7 @@ func (ct *CommitTransaction) Execute(ctx context.Context) error {
 		Client:            ct.session,
 		Clock:             ct.clock,
 		CommandMonitor:    ct.monitor,
+		Crypt:             ct.crypt,
 		Database:          ct.database,
 		Deployment:        ct.deployment,
 		Selector:          ct.selector,
@@ -125,6 +127,16 @@ func (ct *CommitTransaction) CommandMonitor(monitor *event.CommandMonitor) *Comm
 	}
 
 	ct.monitor = monitor
+	return ct
+}
+
+// Crypt sets the Crypt object to use for automatic encryption and decryption.
+func (ct *CommitTransaction) Crypt(crypt *driver.Crypt) *CommitTransaction {
+	if ct == nil {
+		ct = new(CommitTransaction)
+	}
+
+	ct.crypt = crypt
 	return ct
 }
 

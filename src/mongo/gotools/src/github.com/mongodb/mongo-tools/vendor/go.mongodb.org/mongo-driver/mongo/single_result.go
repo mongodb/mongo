@@ -14,13 +14,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 )
 
-// ErrNoDocuments is returned by Decode when an operation that returns a
-// SingleResult doesn't return any documents.
+// ErrNoDocuments is returned by SingleResult methods when the operation that created the SingleResult did not return
+// any documents.
 var ErrNoDocuments = errors.New("mongo: no documents in result")
 
-// SingleResult represents a single document returned from an operation. If
-// the operation returned an error, the Err method of SingleResult will
-// return that error.
+// SingleResult represents a single document returned from an operation. If the operation resulted in an error, all
+// SingleResult methods will return that error. If the operation did not return any documents, all SingleResult methods
+// will return ErrNoDocuments.
 type SingleResult struct {
 	err error
 	cur *Cursor
@@ -28,10 +28,12 @@ type SingleResult struct {
 	reg *bsoncodec.Registry
 }
 
-// Decode will attempt to decode the first document into v. If there was an
-// error from the operation that created this SingleResult then the error
-// will be returned. If there were no returned documents, ErrNoDocuments is
-// returned. If v is nil or is a typed nil, an error will be returned.
+// Decode will unmarshal the document represented by this SingleResult into v. If there was an error from the operation
+// that created this SingleResult, that error will be returned. If the operation returned no documents, DecodeBytes will
+// return ErrNoDocuments.
+//
+// If the operation was successful and returned a document, Decode will return any errors from the unmarshalling process
+// without any modification. If v is nil or is a typed nil, an error will be returned.
 func (sr *SingleResult) Decode(v interface{}) error {
 	if sr.err != nil {
 		return sr.err
@@ -46,10 +48,9 @@ func (sr *SingleResult) Decode(v interface{}) error {
 	return bson.UnmarshalWithRegistry(sr.reg, sr.rdr, v)
 }
 
-// DecodeBytes will return a copy of the document as a bson.Raw. If there was an
-// error from the operation that created this SingleResult then the error
-// will be returned along with the result. If there were no returned documents, ErrNoDocuments is
-// returned.
+// DecodeBytes will return the document represented by this SingleResult as a bson.Raw. If there was an error from the
+// operation that created this SingleResult, both the result and that error will be returned. If the operation returned
+// no documents, this will return (nil, ErrNoDocuments).
 func (sr *SingleResult) DecodeBytes() (bson.Raw, error) {
 	if sr.err != nil {
 		return sr.rdr, sr.err
@@ -84,8 +85,9 @@ func (sr *SingleResult) setRdrContents() error {
 	return ErrNoDocuments
 }
 
-// Err will return the error from the operation that created this SingleResult.
-// If there was no error, nil is returned.
+// Err returns the error from the operation that created this SingleResult. If the operation was successful but did not
+// return any documents, Err will return ErrNoDocuments. If the operation was successful and returned a document, Err
+// will return nil.
 func (sr *SingleResult) Err() error {
 	sr.err = sr.setRdrContents()
 

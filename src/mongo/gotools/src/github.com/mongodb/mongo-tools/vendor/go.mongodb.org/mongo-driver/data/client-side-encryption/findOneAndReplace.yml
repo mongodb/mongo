@@ -1,0 +1,57 @@
+runOn:
+  - minServerVersion: "4.1.10"
+database_name: &database_name "default"
+collection_name: &collection_name "default"
+
+data:
+  - &doc0_encrypted { _id: 1, encrypted_string: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAACwj+3zkv2VM+aTfk60RqhXq6a/77WlLwu/BxXFkL7EppGsju/m8f0x5kBDD3EZTtGALGXlym5jnpZAoSIkswHoA==', 'subType': '06'}} }
+json_schema: {'properties': {'encrypted_w_altname': {'encrypt': {'keyId': '/altname', 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}, 'random': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Random'}}, 'encrypted_string_equivalent': {'encrypt': {'keyId': [{'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}], 'bsonType': 'string', 'algorithm': 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic'}}}, 'bsonType': 'object'}
+key_vault_data: [{'status': 1, '_id': {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}}, 'masterKey': {'provider': 'aws', 'key': 'arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'region': 'us-east-1'}, 'updateDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyMaterial': {'$binary': {'base64': 'AQICAHhQNmWG2CzOm1dq3kWLM+iDUZhEqnhJwH9wZVpuZ94A8gEqnsxXlR51T5EbEVezUqqKAAAAwjCBvwYJKoZIhvcNAQcGoIGxMIGuAgEAMIGoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDHa4jo6yp0Z18KgbUgIBEIB74sKxWtV8/YHje5lv5THTl0HIbhSwM6EqRlmBiFFatmEWaeMk4tO4xBX65eq670I5TWPSLMzpp8ncGHMmvHqRajNBnmFtbYxN3E3/WjxmdbOOe+OXpnGJPcGsftc7cB2shRfA4lICPnE26+oVNXT6p0Lo20nY5XC7jyCO', 'subType': '00'}}, 'creationDate': {'$date': {'$numberLong': '1552949630483'}}, 'keyAltNames': ['altname', 'another_altname']}]
+
+tests:
+  - description: "findOneAndReplace with deterministic encryption"
+    clientOptions:
+      autoEncryptOpts:
+        kmsProviders:
+          aws: {} # Credentials filled in from environment.
+    operations:
+      - name: findOneAndReplace
+        arguments:
+          filter: { encrypted_string: "string0" }
+          replacement: { encrypted_string: "string1" }
+          returnDocument: Before
+        result: { _id: 1, encrypted_string: "string0" }
+    expectations:
+      # Auto encryption will request the collection info.
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: *collection_name
+          command_name: listCollections
+      - command_started_event:
+          command:
+            listCollections: 1
+            filter:
+              name: "datakeys"
+            $db: admin
+          command_name: listCollections
+      # Then key is fetched from the key vault.
+      - command_started_event:
+          command:
+            find: datakeys
+            filter: {"$or": [{"_id": {"$in": [ {'$binary': {'base64': 'AAAAAAAAAAAAAAAAAAAAAA==', 'subType': '04'}} ] }}, {"keyAltNames": {"$in": []}}]}
+            $db: admin
+            readConcern: { level: "majority" }
+          command_name: find
+      - command_started_event:
+          command:
+            findAndModify: *collection_name
+            query: { encrypted_string: { $eq: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAACwj+3zkv2VM+aTfk60RqhXq6a/77WlLwu/BxXFkL7EppGsju/m8f0x5kBDD3EZTtGALGXlym5jnpZAoSIkswHoA==', 'subType': '06'}} } }
+            update: { encrypted_string: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAACDdw4KFz3ZLquhsbt7RmDjD0N67n0uSXx7IGnQNCLeIKvot6s/ouI21Eo84IOtb6lhwUNPlSEBNY0/hbszWAKJg==', 'subType': '06'}}  }
+          command_name: findAndModify
+    outcome:
+      collection:
+        # Outcome is checked using a separate MongoClient without auto encryption.
+        data:
+          - { _id: 1, encrypted_string: {'$binary': {'base64': 'AQAAAAAAAAAAAAAAAAAAAAACDdw4KFz3ZLquhsbt7RmDjD0N67n0uSXx7IGnQNCLeIKvot6s/ouI21Eo84IOtb6lhwUNPlSEBNY0/hbszWAKJg==', 'subType': '06'}} }

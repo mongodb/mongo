@@ -26,6 +26,8 @@ var defaultValueEncoders DefaultValueEncoders
 
 var bvwPool = bsonrw.NewBSONValueWriterPool()
 
+var errInvalidValue = errors.New("cannot encode invalid element")
+
 var sliceWriterPool = sync.Pool{
 	New: func() interface{} {
 		sw := make(bsonrw.SliceWriter, 0, 0)
@@ -66,7 +68,7 @@ func (dve DefaultValueEncoders) RegisterDefaultEncoders(rb *RegistryBuilder) {
 	}
 	rb.
 		RegisterEncoder(tByteSlice, ValueEncoderFunc(dve.ByteSliceEncodeValue)).
-		RegisterEncoder(tTime, ValueEncoderFunc(dve.TimeEncodeValue)).
+		RegisterEncoder(tTime, defaultTimeCodec).
 		RegisterEncoder(tEmpty, ValueEncoderFunc(dve.EmptyInterfaceEncodeValue)).
 		RegisterEncoder(tOID, ValueEncoderFunc(dve.ObjectIDEncodeValue)).
 		RegisterEncoder(tDecimal, ValueEncoderFunc(dve.Decimal128EncodeValue)).
@@ -102,10 +104,10 @@ func (dve DefaultValueEncoders) RegisterDefaultEncoders(rb *RegistryBuilder) {
 		RegisterDefaultEncoder(reflect.Float32, ValueEncoderFunc(dve.FloatEncodeValue)).
 		RegisterDefaultEncoder(reflect.Float64, ValueEncoderFunc(dve.FloatEncodeValue)).
 		RegisterDefaultEncoder(reflect.Array, ValueEncoderFunc(dve.ArrayEncodeValue)).
-		RegisterDefaultEncoder(reflect.Map, ValueEncoderFunc(dve.MapEncodeValue)).
+		RegisterDefaultEncoder(reflect.Map, defaultMapCodec).
 		RegisterDefaultEncoder(reflect.Slice, ValueEncoderFunc(dve.SliceEncodeValue)).
-		RegisterDefaultEncoder(reflect.String, ValueEncoderFunc(dve.StringEncodeValue)).
-		RegisterDefaultEncoder(reflect.Struct, &StructCodec{cache: make(map[reflect.Type]*structDescription), parser: DefaultStructTagParser}).
+		RegisterDefaultEncoder(reflect.String, defaultStringCodec).
+		RegisterDefaultEncoder(reflect.Struct, defaultStructCodec).
 		RegisterDefaultEncoder(reflect.Ptr, NewPointerCodec())
 }
 
@@ -289,8 +291,9 @@ func (dve DefaultValueEncoders) MapEncodeValue(ec EncodeContext, vw bsonrw.Value
 // struct codec.
 func (dve DefaultValueEncoders) mapEncodeValue(ec EncodeContext, dw bsonrw.DocumentWriter, val reflect.Value, collisionFn func(string) bool) error {
 
-	encoder, err := ec.LookupEncoder(val.Type().Elem())
-	if err != nil {
+	elemType := val.Type().Elem()
+	encoder, err := ec.LookupEncoder(elemType)
+	if err != nil && elemType.Kind() != reflect.Interface {
 		return err
 	}
 
@@ -299,19 +302,33 @@ func (dve DefaultValueEncoders) mapEncodeValue(ec EncodeContext, dw bsonrw.Docum
 		if collisionFn != nil && collisionFn(key.String()) {
 			return fmt.Errorf("Key %s of inlined map conflicts with a struct field name", key)
 		}
+
+		currEncoder, currVal, lookupErr := dve.lookupElementEncoder(ec, encoder, val.MapIndex(key))
+		if lookupErr != nil && lookupErr != errInvalidValue {
+			return lookupErr
+		}
+
 		vw, err := dw.WriteDocumentElement(key.String())
 		if err != nil {
 			return err
 		}
 
-		if enc, ok := encoder.(ValueEncoder); ok {
-			err = enc.EncodeValue(ec, vw, val.MapIndex(key))
+		if lookupErr == errInvalidValue {
+			err = vw.WriteNull()
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		err = encoder.EncodeValue(ec, vw, val.MapIndex(key))
+
+		if enc, ok := currEncoder.(ValueEncoder); ok {
+			err = enc.EncodeValue(ec, vw, currVal)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = encoder.EncodeValue(ec, vw, currVal)
 		if err != nil {
 			return err
 		}
@@ -349,18 +366,32 @@ func (dve DefaultValueEncoders) ArrayEncodeValue(ec EncodeContext, vw bsonrw.Val
 		return err
 	}
 
-	encoder, err := ec.LookupEncoder(val.Type().Elem())
-	if err != nil {
+	elemType := val.Type().Elem()
+	encoder, err := ec.LookupEncoder(elemType)
+	if err != nil && elemType.Kind() != reflect.Interface {
 		return err
 	}
 
 	for idx := 0; idx < val.Len(); idx++ {
+		currEncoder, currVal, lookupErr := dve.lookupElementEncoder(ec, encoder, val.Index(idx))
+		if lookupErr != nil && lookupErr != errInvalidValue {
+			return lookupErr
+		}
+
 		vw, err := aw.WriteArrayElement()
 		if err != nil {
 			return err
 		}
 
-		err = encoder.EncodeValue(ec, vw, val.Index(idx))
+		if lookupErr == errInvalidValue {
+			err = vw.WriteNull()
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		err = currEncoder.EncodeValue(ec, vw, currVal)
 		if err != nil {
 			return err
 		}
@@ -402,23 +433,50 @@ func (dve DefaultValueEncoders) SliceEncodeValue(ec EncodeContext, vw bsonrw.Val
 		return err
 	}
 
-	encoder, err := ec.LookupEncoder(val.Type().Elem())
-	if err != nil {
+	elemType := val.Type().Elem()
+	encoder, err := ec.LookupEncoder(elemType)
+	if err != nil && elemType.Kind() != reflect.Interface {
 		return err
 	}
 
 	for idx := 0; idx < val.Len(); idx++ {
+		currEncoder, currVal, lookupErr := dve.lookupElementEncoder(ec, encoder, val.Index(idx))
+		if lookupErr != nil && lookupErr != errInvalidValue {
+			return lookupErr
+		}
+
 		vw, err := aw.WriteArrayElement()
 		if err != nil {
 			return err
 		}
 
-		err = encoder.EncodeValue(ec, vw, val.Index(idx))
+		if lookupErr == errInvalidValue {
+			err = vw.WriteNull()
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		err = currEncoder.EncodeValue(ec, vw, currVal)
 		if err != nil {
 			return err
 		}
 	}
 	return aw.WriteArrayEnd()
+}
+
+func (dve DefaultValueEncoders) lookupElementEncoder(ec EncodeContext, origEncoder ValueEncoder, currVal reflect.Value) (ValueEncoder, reflect.Value, error) {
+	if origEncoder != nil || (currVal.Kind() != reflect.Interface) {
+		return origEncoder, currVal, nil
+	}
+	currVal = currVal.Elem()
+	if !currVal.IsValid() {
+		return nil, currVal, errInvalidValue
+	}
+	currEncoder, err := ec.LookupEncoder(currVal.Type())
+
+	return currEncoder, currVal, err
 }
 
 // EmptyInterfaceEncodeValue is the ValueEncoderFunc for interface{}.
