@@ -11871,7 +11871,6 @@ buildvariants:
   - ubuntu1804-build
   stepback: true
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
