@@ -115,6 +115,8 @@ MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
 // Will cause an isMaster request to hang as it starts waiting.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
+// Will cause a reconfig to hang after completing the config quorum check.
+MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -3033,9 +3035,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
           "replSetReconfig config object with {numMembers} members parses ok",
           "numMembers"_attr = newConfig.getNumMembers());
 
-    if (!args.force &&
-        !serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+    if (!args.force && !MONGO_unlikely(omitConfigQuorumCheck.shouldFail())) {
         status = checkQuorumForReconfig(
             _replExecutor.get(), newConfig, myIndex.getValue(), _topCoord->getTerm());
         if (!status.isOK()) {

@@ -17,7 +17,7 @@ var replSetA = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {_id: 10}},
-        {rsConfig: {_id: 11, arbiterOnly: true}},
+        {rsConfig: {_id: 11, priority: 0}},
     ]
 });
 replSetA.startSet({dbpath: "$set-A-$node"});

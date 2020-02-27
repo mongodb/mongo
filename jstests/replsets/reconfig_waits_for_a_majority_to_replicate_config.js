@@ -9,6 +9,7 @@
 "use strict";
 
 load("jstests/replsets/rslib.js");
+load("jstests/libs/fail_point_util.js");
 
 var replTest = new ReplSetTest({nodes: 2, useBridge: true});
 var nodes = replTest.startSet();
@@ -21,6 +22,10 @@ var secondary = replTest.getSecondary();
 // Disconnect the secondary from the primary.
 secondary.disconnect(primary);
 
+// Configure a failpoint so that we bypass the config quorum check and go straight to the
+// config replication check.
+let reconfigFailPoint = configureFailPoint(primary, "omitConfigQuorumCheck");
+
 // Run a reconfig with a timeout of 5 seconds, this should fail with a maxTimeMSExpired error.
 var config = primary.getDB("local").system.replset.findOne();
 config.version++;
@@ -30,7 +35,7 @@ assert.commandFailedWithCode(
 
 // Try to run another reconfig, which should also fail immediately because the previous config is
 // not committed.
-config = primary.getDB("local").system.replset.findOne();
+var config = primary.getDB("local").system.replset.findOne();
 config.version++;
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
@@ -39,6 +44,8 @@ assert.commandFailedWithCode(
 // Reconnect the secondary to the primary.
 secondary.reconnect(primary);
 // TODO SERVER-44812: test commitment status of reconfig.
+
+reconfigFailPoint.off();
 
 replTest.stopSet();
 }());

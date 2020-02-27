@@ -265,49 +265,48 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
     *status = replCoord->processReplSetReconfig(opCtx, args, &garbage);
 }
 
-// TEST_F(ReplCoordTest,
-//        NodeReturnsNewReplicaSetConfigurationIncompatibleWhenQuorumCheckFailsDuringReconfig) {
-//     // start up, become primary, fail during quorum check due to a heartbeat
-//     // containing a higher config version
-//     assertStartSuccess(BSON("_id"
-//                             << "mySet"
-//                             << "version" << 2 << "members"
-//                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-//                                                      << "node1:12345")
-//                                           << BSON("_id" << 2 << "host"
-//                                                         << "node2:12345"))),
-//                        HostAndPort("node1", 12345));
-//     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-//     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-//     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-//     simulateSuccessfulV1Election();
+TEST_F(ReplCoordTest,
+       NodeReturnsNewReplicaSetConfigurationIncompatibleWhenQuorumCheckFailsDuringReconfig) {
+    // start up, become primary, fail during quorum check due to a heartbeat
+    // containing a higher config version
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
 
-//     Status status(ErrorCodes::InternalError, "Not Set");
-//     const auto opCtx = makeOperationContext();
-//     stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get());
-//     });
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
-//     NetworkInterfaceMock* net = getNet();
-//     getNet()->enterNetwork();
-//     const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-//     const RemoteCommandRequest& request = noi->getRequest();
-//     repl::ReplSetHeartbeatArgsV1 hbArgs;
-//     ASSERT_OK(hbArgs.initialize(request.cmdObj));
-//     repl::ReplSetHeartbeatResponse hbResp;
-//     hbResp.setSetName("mySet");
-//     hbResp.setState(MemberState::RS_SECONDARY);
-//     hbResp.setConfigVersion(5);
-//     BSONObjBuilder respObj;
-//     hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-//     hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-//     respObj << "ok" << 1;
-//     hbResp.addToBSON(&respObj);
-//     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-//     net->runReadyNetworkOperations();
-//     getNet()->exitNetwork();
-//     reconfigThread.join();
-//     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
-// }
+    NetworkInterfaceMock* net = getNet();
+    getNet()->enterNetwork();
+    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+    repl::ReplSetHeartbeatArgsV1 hbArgs;
+    ASSERT_OK(hbArgs.initialize(request.cmdObj));
+    repl::ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(5);
+    BSONObjBuilder respObj;
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    respObj << "ok" << 1;
+    hbResp.addToBSON(&respObj);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+    net->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+    reconfigThread.join();
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
+}
 
 TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringReconfig) {
     // start up, become primary, saving the config fails
@@ -338,6 +337,7 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
     const auto opCtx = makeOperationContext();
     stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
+    replyToReceivedHeartbeatV1();
     reconfigThread.join();
     ASSERT_EQUALS(ErrorCodes::OutOfDiskSpace, status);
 }
@@ -451,6 +451,9 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     stdx::thread reconfigThread(
         [&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get(), OpTime::kInitialTerm); });
 
+    // Satisfy quorum check.
+    replyToReceivedHeartbeatV1();
+
     // Receive heartbeat from secondary saying that it has replicated the new config (v: 3, t: 1).
     // This should allow us to finish waiting for the config majority.
     NetworkInterfaceMock* net = getNet();
@@ -507,7 +510,29 @@ TEST_F(ReplCoordTest, OverrideReconfigBsonTermSoReconfigSucceeds) {
     stdx::thread reconfigThread(
         [&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get(), 50 /* incorrect term */); });
 
+    // Satisfy quorum check.
     replyToReceivedHeartbeatV1();
+    // Satisfy config replication check.
+    auto net = getNet();
+    enterNetwork();
+    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+    repl::ReplSetHeartbeatArgsV1 hbArgs;
+    ASSERT_OK(hbArgs.initialize(request.cmdObj));
+    repl::ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(3);
+    hbResp.setConfigTerm(1);
+    BSONObjBuilder respObj;
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    respObj << "ok" << 1;
+    hbResp.addToBSON(&respObj);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+    net->runReadyNetworkOperations();
+    exitNetwork();
+
     reconfigThread.join();
     ASSERT_OK(status);
 
@@ -578,73 +603,72 @@ TEST_F(
     globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 }
 
-// TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfig) {
-//     // start up, become primary, reconfig, while reconfigging receive reconfig via heartbeat
-//     assertStartSuccess(BSON("_id"
-//                             << "mySet"
-//                             << "version" << 2 << "members"
-//                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-//                                                      << "node1:12345")
-//                                           << BSON("_id" << 2 << "host"
-//                                                         << "node2:12345"))),
-//                        HostAndPort("node1", 12345));
-//     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-//     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-//     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-//     simulateSuccessfulV1Election();
-//     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfig) {
+    // start up, become primary, reconfig, while reconfigging receive reconfig via heartbeat
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-//     // start reconfigThread
-//     Status status(ErrorCodes::InternalError, "Not Set");
-//     const auto opCtx = makeOperationContext();
-//     stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get());
-//     });
+    // start reconfigThread
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
-//     // wait for reconfigThread to create network requests to ensure the replication coordinator
-//     // is in state kConfigReconfiguring
-//     NetworkInterfaceMock* net = getNet();
-//     net->enterNetwork();
-//     net->blackHole(net->getNextReadyRequest());
+    // wait for reconfigThread to create network requests to ensure the replication coordinator
+    // is in state kConfigReconfiguring
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    net->blackHole(net->getNextReadyRequest());
 
-//     // schedule hb reconfig
-//     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
-//     const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-//     ReplSetHeartbeatResponse hbResp;
-//     ReplSetConfig config;
-//     config
-//         .initialize(BSON("_id"
-//                          << "mySet"
-//                          << "version" << 4 << "members"
-//                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-//                                                   << "node1:12345")
-//                                        << BSON("_id" << 2 << "host"
-//                                                      << "node2:12345"))))
-//         .transitional_ignore();
-//     hbResp.setConfig(config);
-//     hbResp.setConfigVersion(4);
-//     hbResp.setSetName("mySet");
-//     hbResp.setState(MemberState::RS_SECONDARY);
-//     hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-//     hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-//     BSONObjBuilder respObj2;
-//     respObj2 << "ok" << 1;
-//     hbResp.addToBSON(&respObj2);
-//     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj2.obj()));
+    // schedule hb reconfig
+    net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
+    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    ReplSetHeartbeatResponse hbResp;
+    ReplSetConfig config;
+    config
+        .initialize(BSON("_id"
+                         << "mySet"
+                         << "version" << 4 << "members"
+                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345"))))
+        .transitional_ignore();
+    hbResp.setConfig(config);
+    hbResp.setConfigVersion(4);
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    BSONObjBuilder respObj2;
+    respObj2 << "ok" << 1;
+    hbResp.addToBSON(&respObj2);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj2.obj()));
 
-//     setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
-//     startCapturingLogMessages();
-//     // execute hb reconfig, which should fail with a log message; confirmed at end of test
-//     net->runReadyNetworkOperations();
-//     // respond to reconfig's quorum check so that we can join that thread and exit cleanly
-//     net->exitNetwork();
-//     stopCapturingLogMessages();
-//     ASSERT_EQUALS(1,
-//                   countTextFormatLogLinesContaining(
-//                       "because already in the midst of a configuration process"));
-//     shutdown(opCtx.get());
-//     reconfigThread.join();
-//     setMinimumLoggedSeverity(logger::LogSeverity::Log());
-// }
+    setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    startCapturingLogMessages();
+    // execute hb reconfig, which should fail with a log message; confirmed at end of test
+    net->runReadyNetworkOperations();
+    // respond to reconfig's quorum check so that we can join that thread and exit cleanly
+    net->exitNetwork();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "because already in the midst of a configuration process"));
+    shutdown(opCtx.get());
+    reconfigThread.join();
+    setMinimumLoggedSeverity(logger::LogSeverity::Log());
+}
 
 TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary) {
     // start up, become a secondary, receive a forced reconfig
@@ -771,8 +795,14 @@ TEST_F(ReplCoordReconfigTest,
     reconfigThread = stdx::thread(
         [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
 
-    // Satisfy config replication check.
+    // Satisfy the quorum check.
     auto net = getNet();
+    enterNetwork();
+    respondToHeartbeat(net);
+    respondToHeartbeat(net);
+    exitNetwork();
+
+    // Satisfy config replication check.
     enterNetwork();
     respondToHeartbeat(net, configVersion, 1 /* configTerm */);
     respondToHeartbeat(net, configVersion, 1 /* configTerm */);
@@ -834,7 +864,12 @@ TEST_F(ReplCoordReconfigTest,
     reconfigThread = stdx::thread(
         [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
 
-    // Satisfy config replication.
+    // Satisfy the quorum check.
+    enterNetwork();
+    respondToHeartbeat(getNet());
+    exitNetwork();
+
+    // Satisfy config replication check.
     enterNetwork();
     respondToHeartbeat(getNet(), configVersion, 1 /* configTerm */);
     exitNetwork();
