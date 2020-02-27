@@ -17,6 +17,8 @@ env.Library(
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/namespace_string',
+            '$BUILD_DIR/mongo/db/matcher/expressions',
+            '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         ],
 )
 

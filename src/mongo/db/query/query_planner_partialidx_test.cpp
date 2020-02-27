@@ -502,5 +502,49 @@ TEST_F(QueryPlannerTest, InternalExprEqCannotUsePartialIndex) {
     assertNoSolutions();
 }
 
+TEST_F(QueryPlannerTest, MultipleOverlappingPartialIndexes) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    // Create two partial indexes with an overlapping range on the same key pattern.
+    BSONObj minus5To5 = fromjson("{a: {$gte: -5, $lte: 5}}");
+    BSONObj gte0 = fromjson("{a: {$gte: 0}}");
+    std::unique_ptr<MatchExpression> minus5To5Filter = parseMatchExpression(minus5To5);
+    std::unique_ptr<MatchExpression> gte0Filter = parseMatchExpression(gte0);
+    addIndex(fromjson("{a: 1}"), minus5To5Filter.get());
+    params.indices.back().identifier = CoreIndexInfo::Identifier{"minus5To5"};
+    addIndex(fromjson("{a: 1}"), gte0Filter.get());
+    params.indices.back().identifier = CoreIndexInfo::Identifier{"gte0"};
+
+    // Test that both indexes are eligible when the query falls within the intersecting range.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, name: 'minus5To5', "
+        "bounds: {a: [[1, 1, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, name: 'gte0', "
+        "bounds: {a: [[1, 1, true, true]]}}}}}");
+
+    // Test that only a single index is eligible when the query falls within a single range.
+    runQuery(fromjson("{a: -5}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, name: 'minus5To5', "
+        "bounds: {a: [[-5, -5, true, true]]}}}}}");
+    runQuery(fromjson("{a: 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, name: 'gte0', "
+        "bounds: {a: [[10, 10, true, true]]}}}}}");
+
+    // Test that neither index is eligible when the query falls outside both ranges.
+    runInvalidQuery(fromjson("{a: -10}"));
+    assertNoSolutions();
+}
+
 }  // namespace
 }  // namespace mongo

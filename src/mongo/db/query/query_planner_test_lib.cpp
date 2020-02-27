@@ -82,9 +82,9 @@ bool filterMatches(const BSONObj& testFilter,
         return false;
     }
     const std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
-    CanonicalQuery::sortTree(root.get());
+    MatchExpression::sortTree(root.get());
     std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
-    CanonicalQuery::sortTree(trueFilter.get());
+    MatchExpression::sortTree(trueFilter.get());
     return trueFilter->equivalent(root.get());
 }
 

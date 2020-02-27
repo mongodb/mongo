@@ -472,6 +472,7 @@ env.CppUnitTest(
         'index_build_entry_test.cpp',
         'index_builds_manager_test.cpp',
         'index_key_validate_test.cpp',
+        'index_signature_test.cpp',
         'index_spec_validate_test.cpp',
         'multi_index_block_test.cpp',
         'rename_collection_test.cpp',

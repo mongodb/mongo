@@ -59,6 +59,13 @@ public:
     enum class IndexVersion { kV1 = 1, kV2 = 2 };
     static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
 
+    // Used to report the result of a comparison between two indexes.
+    enum class Comparison {
+        kDifferent,   // Indicates that the indexes do not match.
+        kEquivalent,  // Indicates that the options which uniquely identify an index match.
+        kIdentical    // Indicates that all applicable index options match.
+    };
+
     static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;
     static constexpr StringData k2dIndexMinFieldName = "min"_sd;
     static constexpr StringData k2dIndexMaxFieldName = "max"_sd;
@@ -218,7 +225,12 @@ public:
     }
     const IndexCatalog* getIndexCatalog() const;
 
-    bool areIndexOptionsEquivalent(const IndexDescriptor* other) const;
+    /**
+     * Compares the current IndexDescriptor against the given index entry. Returns kIdentical if all
+     * index options are logically identical, kEquivalent if all options which uniquely identify an
+     * index are logically identical, and kDifferent otherwise.
+     */
+    Comparison compareIndexOptions(OperationContext* opCtx, const IndexCatalogEntry* other) const;
 
     const BSONObj& collation() const {
         return _collation;

@@ -319,13 +319,11 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
 std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
                                                              const Collection* collection,
                                                              std::vector<BSONObj> indexSpecs) {
-    auto swDefaults = collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
-    uassertStatusOK(swDefaults.getStatus());
+    // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
+    auto normalSpecs = IndexBuildsCoordinator::normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
-    auto indexCatalog = collection->getIndexCatalog();
-
-    return indexCatalog->removeExistingIndexes(
-        opCtx, swDefaults.getValue(), false /*removeIndexBuildsToo*/);
+    return collection->getIndexCatalog()->removeExistingIndexes(
+        opCtx, normalSpecs, false /*removeIndexBuildsToo*/);
 }
 
 /**

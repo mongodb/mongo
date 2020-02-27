@@ -118,11 +118,11 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
 }
 
 //
-// Tests for CanonicalQuery::sortTree
+// Tests for MatchExpression::sortTree
 //
 
 /**
- * Helper function for testing CanonicalQuery::sortTree().
+ * Helper function for testing MatchExpression::sortTree().
  *
  * Verifies that sorting the expression 'unsortedQueryStr' yields an expression equivalent to
  * the expression 'sortedQueryStr'.
@@ -140,12 +140,12 @@ void testSortTree(const char* unsortedQueryStr, const char* sortedQueryStr) {
     // Sanity check that sorting the sorted expression is a no-op.
     {
         unique_ptr<MatchExpression> sortedQueryExprClone(parseMatchExpression(sortedQueryObj));
-        CanonicalQuery::sortTree(sortedQueryExprClone.get());
+        MatchExpression::sortTree(sortedQueryExprClone.get());
         assertEquivalent(unsortedQueryStr, sortedQueryExpr.get(), sortedQueryExprClone.get());
     }
 
     // Test that sorting the unsorted expression yields the sorted expression.
-    CanonicalQuery::sortTree(unsortedQueryExpr.get());
+    MatchExpression::sortTree(unsortedQueryExpr.get());
     assertEquivalent(unsortedQueryStr, unsortedQueryExpr.get(), sortedQueryExpr.get());
 }
 

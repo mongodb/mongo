@@ -424,6 +424,22 @@ public:
                                                          const std::vector<BSONObj>& indexSpecs);
 
     /**
+     * Helper function which normalizes a vector of index specs. This function will populate a
+     * complete collation spec in cases where the index spec specifies a collation, and will add
+     * the collection-default collation, if present, in cases where collation is omitted. If the
+     * index spec omits the collation and the collection does not have a default, the collation
+     * field is omitted from the spec. This function also converts 'wildcardProjection' and
+     * 'partialFilterExpression' to canonical form in any cases where they exist.
+     *
+     * If 'collection' is null, no changes are made to the input specs.
+     *
+     * This function throws on error.
+     */
+    static std::vector<BSONObj> normalizeIndexSpecs(OperationContext* opCtx,
+                                                    const Collection* collection,
+                                                    const std::vector<BSONObj>& indexSpecs);
+
+    /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.
      *
      * Used to set statistics on index build results.

@@ -158,6 +158,21 @@ public:
         }
     }
 
+    /**
+     * Traverses expression tree post-order. Sorts children at each non-leaf node by (MatchType,
+     * path(), children, number of children).
+     */
+    static void sortTree(MatchExpression* tree);
+
+    /**
+     * Convenience method which normalizes a MatchExpression tree by optimizing and then sorting it.
+     */
+    static std::unique_ptr<MatchExpression> normalize(std::unique_ptr<MatchExpression> tree) {
+        tree = optimize(std::move(tree));
+        sortTree(tree.get());
+        return tree;
+    }
+
     MatchExpression(MatchType type);
     virtual ~MatchExpression() {}
 
@@ -297,6 +312,15 @@ public:
      * context where the path has been serialized elsewhere, such as within an $elemMatch value.
      */
     virtual void serialize(BSONObjBuilder* out, bool includePath = true) const = 0;
+
+    /**
+     * Convenience method which serializes this MatchExpression to a BSONObj.
+     */
+    BSONObj serialize(bool includePath = true) const {
+        BSONObjBuilder bob;
+        serialize(&bob, includePath);
+        return bob.obj();
+    }
 
     /**
      * Returns true if this expression will always evaluate to false, such as an $or with no

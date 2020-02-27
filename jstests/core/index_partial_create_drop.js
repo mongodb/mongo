@@ -29,52 +29,74 @@ var getNumKeys = function(idxName) {
 coll.drop();
 
 // Check bad filter spec on create.
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: 5}));
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {x: {$asdasd: 3}}}));
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {$and: 5}}));
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {x: /abc/}}));
-assert.commandFailed(coll.ensureIndex({x: 1}, {
-    partialFilterExpression: {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
-}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: 5}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$asdasd: 3}}}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {$and: 5}}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {x: /abc/}}));
+
 // Use of $expr is banned in a partial index filter.
 assert.commandFailed(
     coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}));
 assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
+// Only top-level $and is permitted, but by normalizing the input filter we absorb the child $and.
+assert.commandWorked(coll.createIndex({x: 1}, {
+    partialFilterExpression: {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
+}));
+assert.commandWorked(coll.dropIndexes());
+
 for (var i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i, a: i}));
 }
 
 // Create partial index.
-assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);
 
 // Create partial index in background.
 assert.commandWorked(
-    coll.ensureIndex({x: 1}, {background: true, partialFilterExpression: {a: {$lt: 5}}}));
+    coll.createIndex({x: 1}, {background: true, partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);
 
 // Create complete index, same key as previous indexes.
-assert.commandWorked(coll.ensureIndex({x: 1}));
+assert.commandWorked(coll.createIndex({x: 1}));
 assert.eq(10, getNumKeys("x_1"));
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);
 
 // Partial indexes can't also be sparse indexes.
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: true}));
-assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: 1}));
-assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: false}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: true}));
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: 1}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: 1}, sparse: false}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);
 
 // SERVER-18858: Verify that query compatible w/ partial index succeeds after index drop.
-assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.find({x: 0, a: 0}).itcount());
+
+// Can create multiple partial indexes on the same key pattern as long as the filter is different.
+assert.commandWorked(coll.dropIndexes());
+
+let numIndexesBefore = coll.getIndexes().length;
+assert.commandWorked(
+    coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}));
+assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
+
+numIndexesBefore = coll.getIndexes().length;
+assert.commandWorked(
+    coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
+assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
+
+numIndexesBefore = coll.getIndexes().length;
+assert.commandFailedWithCode(coll.dropIndex({x: 1}), ErrorCodes.AmbiguousIndexKeyPattern);
+assert.commandWorked(coll.dropIndex("partialIndex2"));
+assert.eq(coll.getIndexes().length, numIndexesBefore - 1);
 })();

@@ -19,13 +19,18 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
     this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
 };
 
+function mergeNodeOptions(nodeOptions, options) {
+    for (let nodeName in nodeOptions) {
+        nodeOptions[nodeName] = Object.merge(nodeOptions[nodeName], options);
+    }
+    return nodeOptions;
+}
+
 ReplSetTest.prototype.upgradeMembers = function(primary, members, options, user, pwd) {
     const noDowntimePossible = this.nodes.length > 2;
 
     // Merge new options into node settings.
-    for (let nodeName in this.nodeOptions) {
-        this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
-    }
+    this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
     for (let member of members) {
         this.upgradeNode(member, options, user, pwd);
@@ -48,19 +53,20 @@ ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd)
 
 ReplSetTest.prototype.upgradeArbiters = function(primary, options, user, pwd) {
     // We don't support downgrading data files for arbiters. We need to instead delete the dbpath.
+    const oldStartClean = {startClean: (options && !!options["startClean"])};
     if (options && options.binVersion == "last-stable") {
         options["startClean"] = true;
     }
     this.upgradeMembers(primary, this.getArbiters(), options, user, pwd);
+    // Make sure we don't set {startClean:true} on other nodes unless the user explicitly requested.
+    this.nodeOptions = mergeNodeOptions(this.nodeOptions, oldStartClean);
 };
 
 ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     const noDowntimePossible = this.nodes.length > 2;
 
     // Merge new options into node settings.
-    for (let nodeName in this.nodeOptions) {
-        this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
-    }
+    this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
     let oldPrimary = this.stepdown(primary);
     this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY);

@@ -773,86 +773,93 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                                        const BSONObj& spec,
                                                        const bool includeUnfinishedIndexes) const {
-    const char* name = spec.getStringField("name");
+    const char* name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
     invariant(name[0]);
 
-    const BSONObj key = spec.getObjectField("key");
-    const BSONObj collation = spec.getObjectField("collation");
+    const BSONObj key = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
 
     {
+        // Check whether an index with the specified candidate name already exists in the catalog.
         const IndexDescriptor* desc = findIndexByName(opCtx, name, includeUnfinishedIndexes);
+
         if (desc) {
-            // index already exists with same name
+            // Index already exists with same name. Check whether the options are the same as well.
+            IndexDescriptor candidate(_collection, _getAccessMethodName(key), spec);
+            auto indexComparison = candidate.compareIndexOptions(opCtx, getEntry(desc));
 
-            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key) &&
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    desc->infoObj().getObjectField("collation") != collation)) {
-                // key patterns are equal but collations differ.
-                return Status(ErrorCodes::IndexOptionsConflict,
-                              str::stream()
-                                  << "An index with the same key pattern, but a different "
-                                  << "collation already exists with the same name.  Try again with "
-                                  << "a unique name. "
-                                  << "Existing index: " << desc->infoObj()
-                                  << " Requested index: " << spec);
-            }
-
-            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    desc->infoObj().getObjectField("collation") != collation)) {
+            // Key pattern or another uniquely-identifying option differs. We can build this index,
+            // but not with the specified (duplicate) name. User must specify another index name.
+            if (indexComparison == IndexDescriptor::Comparison::kDifferent) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,
-                              str::stream()
-                                  << "Index must have unique name."
-                                  << "The existing index: " << desc->infoObj()
-                                  << " has the same name as the requested index: " << spec);
+                              str::stream() << "An existing index has the same name as the "
+                                               "requested index. Requested index: "
+                                            << spec << ", existing index: " << desc->infoObj());
             }
 
-            IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
-            if (!desc->areIndexOptionsEquivalent(&temp))
+            // The candidate's key and uniquely-identifying options are equivalent to an existing
+            // index, but some other options are not identical. Return a message to that effect.
+            if (indexComparison == IndexDescriptor::Comparison::kEquivalent) {
                 return Status(ErrorCodes::IndexOptionsConflict,
-                              str::stream() << "Index with name: " << name
-                                            << " already exists with different options");
+                              str::stream() << "An equivalent index already exists with the same "
+                                               "name but different options. Requested index: "
+                                            << spec << ", existing index: " << desc->infoObj());
+            }
 
+            // If we've reached this point, the requested index is identical to an existing index.
+            invariant(indexComparison == IndexDescriptor::Comparison::kIdentical);
 
             // If an identical index exists, but it is frozen, return an error with a different
-            // code to the user, forcing the user to drop before recreating the index.
+            // error code to the user, forcing the user to drop before recreating the index.
             auto entry = getEntry(desc);
             if (entry->isFrozen()) {
                 return Status(ErrorCodes::CannotCreateIndex,
-                              str::stream() << "An identical, unfinished index already exists. The "
-                                               "index must be dropped first: "
-                                            << name << ", spec: " << desc->infoObj());
+                              str::stream()
+                                  << "An identical, unfinished index '" << name
+                                  << "' already exists. Must drop before recreating. Spec: "
+                                  << desc->infoObj());
             }
 
-            // Index already exists with the same options, so no need to build a new
-            // one (not an error). Most likely requested by a client using ensureIndex.
+            // Index already exists with the same options, so there is no need to build a new one.
+            // This is not an error condition.
             return Status(ErrorCodes::IndexAlreadyExists,
                           str::stream() << "Identical index already exists: " << name);
         }
     }
 
     {
+        // No index with the candidate name exists. Check for an index with conflicting options.
         const IndexDescriptor* desc =
-            findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, includeUnfinishedIndexes);
+            findIndexByKeyPatternAndOptions(opCtx, key, spec, includeUnfinishedIndexes);
+
         if (desc) {
             LOGV2_DEBUG(20353,
                         2,
-                        "Index already exists with a different name: {name} pattern: {key} "
-                        "collation: {collation}",
-                        "name"_attr = name,
-                        "key"_attr = key,
-                        "collation"_attr = collation);
+                        "Index already exists with a different name: {name}, spec: {spec}",
+                        "Index already exists with a different name",
+                        "name"_attr = desc->indexName(),
+                        "spec"_attr = desc->infoObj());
 
-            IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
-            if (!desc->areIndexOptionsEquivalent(&temp))
+            // Index already exists with a different name. Check whether the options are identical.
+            // We will return an error in either case, but this check allows us to generate a more
+            // informative error message.
+            IndexDescriptor candidate(_collection, _getAccessMethodName(key), spec);
+            auto indexComparison = candidate.compareIndexOptions(opCtx, getEntry(desc));
+
+            // The candidate's key and uniquely-identifying options are equivalent to an existing
+            // index, but some other options are not identical. Return a message to that effect.
+            if (indexComparison == IndexDescriptor::Comparison::kEquivalent)
                 return Status(ErrorCodes::IndexOptionsConflict,
-                              str::stream()
-                                  << "Index: " << spec
-                                  << " already exists with different options: " << desc->infoObj());
+                              str::stream() << "An equivalent index already exists with a "
+                                               "different name and options. Requested index: "
+                                            << spec << ", existing index: " << desc->infoObj());
 
+            // If we've reached this point, the requested index is identical to an existing index.
+            invariant(indexComparison == IndexDescriptor::Comparison::kIdentical);
+
+            // An identical index already exists with a different name. We cannot build this index.
             return Status(ErrorCodes::IndexOptionsConflict,
-                          str::stream() << "Index with name: " << name
-                                        << " already exists with a different name");
+                          str::stream() << "Index already exists with a different name: "
+                                        << desc->indexName());
         }
     }
 
@@ -1203,18 +1210,17 @@ const IndexDescriptor* IndexCatalogImpl::findIndexByName(OperationContext* opCtx
     return nullptr;
 }
 
-const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndCollationSpec(
+const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
     OperationContext* opCtx,
     const BSONObj& key,
-    const BSONObj& collationSpec,
+    const BSONObj& indexSpec,
     bool includeUnfinishedIndexes) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
+    IndexDescriptor needle(_collection, _getAccessMethodName(key), indexSpec);
     while (ii->more()) {
-        const IndexDescriptor* desc = ii->next()->descriptor();
-        if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key) &&
-            SimpleBSONObjComparator::kInstance.evaluate(
-                desc->infoObj().getObjectField("collation") == collationSpec)) {
-            return desc;
+        const auto* entry = ii->next();
+        if (needle.compareIndexOptions(opCtx, entry) != IndexDescriptor::Comparison::kDifferent) {
+            return entry->descriptor();
         }
     }
     return nullptr;
@@ -1242,7 +1248,7 @@ const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationCont
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
-        bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
+        bool hasSimpleCollation = desc->collation().isEmpty();
 
         if (desc->isPartial() || desc->isSparse())
             continue;

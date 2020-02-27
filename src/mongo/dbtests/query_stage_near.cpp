@@ -69,12 +69,18 @@ public:
         _autoColl.emplace(_opCtx, NamespaceString{kTestNamespace});
         auto* coll = _autoColl->getCollection();
         ASSERT(coll);
-        _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndCollationSpec(
-            _opCtx, kTestKeyPattern, BSONObj{});
+        _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+            _opCtx, kTestKeyPattern, _makeMinimalIndexSpec(kTestKeyPattern));
         ASSERT(_mockGeoIndex);
     }
 
 protected:
+    BSONObj _makeMinimalIndexSpec(BSONObj keyPattern) {
+        return BSON(IndexDescriptor::kKeyPatternFieldName
+                    << keyPattern << IndexDescriptor::kIndexVersionFieldName
+                    << IndexDescriptor::getDefaultIndexVersion());
+    }
+
     const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
     OperationContext* const _opCtx = _uniqOpCtx.get();
     DBDirectClient directClient{_opCtx};

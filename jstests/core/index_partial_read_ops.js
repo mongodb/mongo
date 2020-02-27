@@ -13,7 +13,7 @@ var explain;
 var coll = db.index_partial_read_ops;
 coll.drop();
 
-assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: {$lte: 1.5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lte: 1.5}}}));
 assert.commandWorked(coll.insert({x: 5, a: 2}));  // Not in index.
 assert.commandWorked(coll.insert({x: 6, a: 1}));  // In index.
 
@@ -79,4 +79,46 @@ explain = coll.explain('executionStats')
               .findAndModify({query: {x: {$gt: 1}, a: 2}, update: {$inc: {x: 1}}});
 assert.eq(1, explain.executionStats.nReturned);
 assert(isCollscan(db, explain.queryPlanner.winningPlan));
+
+//
+// Verify functionality with multiple overlapping partial indexes on the same key pattern.
+//
+
+// Remove existing indexes and documents.
+assert.commandWorked(coll.dropIndexes());
+assert.commandWorked(coll.remove({}));
+
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: "index1", partialFilterExpression: {a: {$gte: 0}}}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: "index2", partialFilterExpression: {a: {$gte: 10}}}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: "index3", partialFilterExpression: {a: {$gte: 100}}}));
+
+assert.commandWorked(coll.insert([{a: 1}, {a: 2}, {a: 3}]));
+assert.commandWorked(coll.insert([{a: 11}, {a: 12}, {a: 13}]));
+assert.commandWorked(coll.insert([{a: 101}, {a: 102}, {a: 103}]));
+
+// Function which verifies that the given query is indexed, that it produces the same output as a
+// COLLSCAN and the given 'expectedResults' array, and that 'numAlternativePlans' were generated.
+function assertIndexedQueryAndResults(query, numAlternativePlans, expectedResults) {
+    const explainOut = coll.explain().find(query).finish();
+    const results = coll.find(query).toArray();
+    assert(isIxscan(db, explainOut), tojson(explainOut));
+    assert.eq(getRejectedPlans(explainOut).length, numAlternativePlans, tojson(explainOut));
+    assert.sameMembers(results, coll.find(query).hint({$natural: 1}).toArray());
+    assert.sameMembers(results.map(doc => (delete doc._id && doc)), expectedResults);
+}
+
+// Queries which fall within the covered ranges generate plans for all applicable partial indexes.
+assertIndexedQueryAndResults({a: {$gt: 0, $lt: 10}}, 0, [{a: 1}, {a: 2}, {a: 3}]);
+assertIndexedQueryAndResults({a: {$gt: 10, $lt: 100}}, 1, [{a: 11}, {a: 12}, {a: 13}]);
+assertIndexedQueryAndResults({a: {$gt: 100, $lt: 1000}}, 2, [{a: 101}, {a: 102}, {a: 103}]);
+assertIndexedQueryAndResults(
+    {a: {$gt: 0}},
+    0,
+    [{a: 1}, {a: 2}, {a: 3}, {a: 11}, {a: 12}, {a: 13}, {a: 101}, {a: 102}, {a: 103}]);
+
+// Queries which fall outside the range of any partial indexes produce a COLLSCAN.
+assert(isCollscan(db, coll.explain().find({a: {$lt: 0}}).finish()));
 })();

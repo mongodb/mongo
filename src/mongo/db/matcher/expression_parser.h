@@ -124,5 +124,15 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         AllowedFeatureSet allowedFeatures = kDefaultSpecialFeatures);
+
+    /**
+     * Parse the given MatchExpression and normalize the resulting tree by optimizing and then
+     * sorting it. Throws if the given BSONObj fails to parse.
+     */
+    static std::unique_ptr<MatchExpression> parseAndNormalize(
+        const BSONObj& obj,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+        AllowedFeatureSet allowedFeatures = kDefaultSpecialFeatures);
 };
 }  // namespace mongo

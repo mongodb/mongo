@@ -34,6 +34,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 
 #include <algorithm>
 
@@ -50,9 +52,9 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
         const BSONElement e = it.next();
 
         StringData fieldName = e.fieldNameStringData();
-        if (fieldName == IndexDescriptor::kKeyPatternFieldName ||
-            fieldName == IndexDescriptor::kNamespaceFieldName ||  // removed in 4.4
-            fieldName == IndexDescriptor::kIndexNameFieldName ||
+        if (fieldName == IndexDescriptor::kKeyPatternFieldName ||  // checked specially
+            fieldName == IndexDescriptor::kNamespaceFieldName ||   // removed in 4.4
+            fieldName == IndexDescriptor::kIndexNameFieldName ||   // checked separately
             fieldName ==
                 IndexDescriptor::kIndexVersionFieldName ||  // not considered for equivalence
             fieldName == IndexDescriptor::kTextVersionFieldName ||      // same as index version
@@ -60,9 +62,9 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
             fieldName ==
                 IndexDescriptor::kBackgroundFieldName ||  // this is a creation time option only
             fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
-            fieldName == IndexDescriptor::kSparseFieldName ||          // checked specially
-            fieldName == IndexDescriptor::kHiddenFieldName ||  // not considered for equivalence
-            fieldName == IndexDescriptor::kUniqueFieldName     // check specially
+            fieldName == IndexDescriptor::kHiddenFieldName ||     // not considered for equivalence
+            fieldName == IndexDescriptor::kCollationFieldName ||  // checked specially
+            fieldName == IndexDescriptor::kPartialFilterExprFieldName  // checked specially
         ) {
             continue;
         }
@@ -176,25 +178,69 @@ const NamespaceString& IndexDescriptor::parentNS() const {
     return _collection->ns();
 }
 
-bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {
-    if (isSparse() != other->isSparse()) {
-        return false;
+IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
+    OperationContext* opCtx, const IndexCatalogEntry* other) const {
+    // We first check whether the key pattern is identical for both indexes.
+    if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern() !=
+                                                    other->descriptor()->keyPattern())) {
+        return Comparison::kDifferent;
     }
 
-    if (!isIdIndex() && unique() != other->unique()) {
-        // Note: { _id: 1 } or { _id: -1 } implies unique: true.
-        return false;
+    // Check whether both indexes have the same collation. If not, then they are not equivalent.
+    auto collator = collation().isEmpty()
+        ? nullptr
+        : uassertStatusOK(
+              CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation()));
+    if (!CollatorInterface::collatorsMatch(collator.get(), other->getCollator())) {
+        return Comparison::kDifferent;
     }
 
-    // Then compare the rest of the options.
+    // The partialFilterExpression is only part of the index signature if FCV has been set to 4.6.
+    // TODO SERVER-47766: remove these FCV checks after we branch for 4.7.
+    auto isFCV46 = serverGlobalParams.featureCompatibility.isVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+
+    // If we have a partial filter expression and the other index doesn't, or vice-versa, then the
+    // two indexes are not equivalent. We therefore return Comparison::kDifferent immediately.
+    if (isFCV46 && isPartial() != other->descriptor()->isPartial()) {
+        return Comparison::kDifferent;
+    }
+    // Compare 'partialFilterExpression' in each descriptor to see if they are equivalent. We use
+    // the collator that we parsed earlier to create the filter's ExpressionContext, although we
+    // don't currently consider collation when comparing string predicates for filter equivalence.
+    // For instance, under a case-sensitive collation, the predicates {a: "blah"} and {a: "BLAH"}
+    // would match the same set of documents, but these are not currently considered equivalent.
+    // TODO SERVER-47664: take collation into account while comparing string predicates.
+    if (isFCV46 && other->getFilterExpression()) {
+        auto expCtx =
+            make_intrusive<ExpressionContext>(opCtx, std::move(collator), _collection->ns());
+        auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
+        if (!filter->equivalent(other->getFilterExpression())) {
+            return Comparison::kDifferent;
+        }
+    }
+
+    // If we are here, then the two descriptors match on all option fields that uniquely distinguish
+    // an index, and so the return value will be at least Comparison::kEquivalent. We now proceed to
+    // compare the rest of the options to see if we should return Comparison::kIdentical instead.
 
     std::map<StringData, BSONElement> existingOptionsMap;
     populateOptionsMap(existingOptionsMap, infoObj());
 
     std::map<StringData, BSONElement> newOptionsMap;
-    populateOptionsMap(newOptionsMap, other->infoObj());
+    populateOptionsMap(newOptionsMap, other->descriptor()->infoObj());
 
-    return existingOptionsMap.size() == newOptionsMap.size() &&
+    // If the FCV has not been upgraded to 4.6, add partialFilterExpression to the options map. It
+    // does not contribute to the index signature, but can determine whether or not the candidate
+    // index is identical to the existing index.
+    if (!isFCV46) {
+        existingOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
+            other->descriptor()->infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
+        newOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
+            infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
+    }
+
+    const bool optsIdentical = existingOptionsMap.size() == newOptionsMap.size() &&
         std::equal(existingOptionsMap.begin(),
                    existingOptionsMap.end(),
                    newOptionsMap.begin(),
@@ -204,6 +250,10 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
                            SimpleBSONElementComparator::kInstance.evaluate(lhs.second ==
                                                                            rhs.second);
                    });
+
+    // If all non-identifying options also match, the descriptors are identical. Otherwise, we
+    // consider them equivalent; two indexes with these options and the same key cannot coexist.
+    return optsIdentical ? Comparison::kIdentical : Comparison::kEquivalent;
 }
 
 }  // namespace mongo

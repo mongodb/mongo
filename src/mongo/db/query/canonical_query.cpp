@@ -46,60 +46,6 @@
 namespace mongo {
 namespace {
 
-/**
- * Comparator for MatchExpression nodes.  Returns an integer less than, equal to, or greater
- * than zero if 'lhs' is less than, equal to, or greater than 'rhs', respectively.
- *
- * Sorts by:
- * 1) operator type (MatchExpression::MatchType)
- * 2) path name (MatchExpression::path())
- * 3) sort order of children
- * 4) number of children (MatchExpression::numChildren())
- *
- * The third item is needed to ensure that match expression trees which should have the same
- * cache key always sort the same way. If you're wondering when the tuple (operator type, path
- * name) could ever be equal, consider this query:
- *
- * {$and:[{$or:[{a:1},{a:2}]},{$or:[{a:1},{b:2}]}]}
- *
- * The two OR nodes would compare as equal in this case were it not for tuple item #3 (sort
- * order of children).
- */
-int matchExpressionComparator(const MatchExpression* lhs, const MatchExpression* rhs) {
-    MatchExpression::MatchType lhsMatchType = lhs->matchType();
-    MatchExpression::MatchType rhsMatchType = rhs->matchType();
-    if (lhsMatchType != rhsMatchType) {
-        return lhsMatchType < rhsMatchType ? -1 : 1;
-    }
-
-    StringData lhsPath = lhs->path();
-    StringData rhsPath = rhs->path();
-    int pathsCompare = lhsPath.compare(rhsPath);
-    if (pathsCompare != 0) {
-        return pathsCompare;
-    }
-
-    const size_t numChildren = std::min(lhs->numChildren(), rhs->numChildren());
-    for (size_t childIdx = 0; childIdx < numChildren; ++childIdx) {
-        int childCompare =
-            matchExpressionComparator(lhs->getChild(childIdx), rhs->getChild(childIdx));
-        if (childCompare != 0) {
-            return childCompare;
-        }
-    }
-
-    if (lhs->numChildren() != rhs->numChildren()) {
-        return lhs->numChildren() < rhs->numChildren() ? -1 : 1;
-    }
-
-    // They're equal!
-    return 0;
-}
-
-bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* rhs) {
-    return matchExpressionComparator(lhs, rhs) < 0;
-}
-
 bool parsingCanProduceNoopMatchNodes(const ExtensionsCallback& extensionsCallback,
                                      MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     return extensionsCallback.hasNoopExtensions() &&
@@ -225,9 +171,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
 
-    // Normalize, sort and validate tree.
-    _root = MatchExpression::optimize(std::move(root));
-    sortTree(_root.get());
+    // Normalize and validate tree.
+    _root = MatchExpression::normalize(std::move(root));
     auto validStatus = isValid(_root.get(), *_qr);
     if (!validStatus.isOK()) {
         return validStatus.getStatus();
@@ -335,17 +280,6 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
     return hasID;
 }
 
-// static
-void CanonicalQuery::sortTree(MatchExpression* tree) {
-    for (size_t i = 0; i < tree->numChildren(); ++i) {
-        sortTree(tree->getChild(i));
-    }
-    if (auto&& children = tree->getChildVector()) {
-        std::stable_sort(children->begin(), children->end(), matchExpressionLessThan);
-    }
-}
-
-// static
 size_t CanonicalQuery::countNodes(const MatchExpression* root, MatchExpression::MatchType type) {
     size_t sum = 0;
     if (type == root->matchType()) {

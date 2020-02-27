@@ -1741,6 +1741,15 @@ StatusWithMatchExpression MatchExpressionParser::parse(
     }
 }
 
+std::unique_ptr<MatchExpression> MatchExpressionParser::parseAndNormalize(
+    const BSONObj& obj,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback,
+    AllowedFeatureSet allowedFeatures) {
+    auto parsedTree = uassertStatusOK(parse(obj, expCtx, extensionsCallback, allowedFeatures));
+    return MatchExpression::normalize(std::move(parsedTree));
+}
+
 namespace {
 // Maps from query operator string name to function.
 std::unique_ptr<StringMap<

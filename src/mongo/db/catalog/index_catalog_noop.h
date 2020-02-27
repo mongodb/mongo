@@ -81,10 +81,10 @@ public:
         return nullptr;
     }
 
-    IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
+    IndexDescriptor* findIndexByKeyPatternAndOptions(
         OperationContext* const opCtx,
         const BSONObj& key,
-        const BSONObj& collationSpec,
+        const BSONObj& indexSpec,
         const bool includeUnfinishedIndexes = false) const override {
         return nullptr;
     }

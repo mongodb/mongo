@@ -95,19 +95,15 @@ public:
                                            bool includeUnfinishedIndexes = false) const override;
 
     /**
-     * Find index by matching key pattern and collation spec.  The key pattern and collation spec
-     * uniquely identify an index.
+     * Find index by matching key pattern and options. The key pattern, collation spec, and partial
+     * filter expression together uniquely identify an index.
      *
-     * Collation is specified as a normalized collation spec as returned by
-     * CollationInterface::getSpec.  An empty object indicates the simple collation.
-     *
-     * @return null if cannot find index, otherwise the index with a matching key pattern and
-     * collation.
+     * @return null if cannot find index, otherwise the index with a matching signature.
      */
-    const IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
+    const IndexDescriptor* findIndexByKeyPatternAndOptions(
         OperationContext* opCtx,
         const BSONObj& key,
-        const BSONObj& collationSpec,
+        const BSONObj& indexSpec,
         bool includeUnfinishedIndexes = false) const override;
 
     /**

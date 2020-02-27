@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -2453,15 +2454,15 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
         return indexSpecs;
     }
 
-    auto specsWithCollationDefaults =
-        uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
+    // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
+    auto normalSpecs = normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
+    // Remove any index specifications which already exist in the catalog.
     auto indexCatalog = collection->getIndexCatalog();
-    std::vector<BSONObj> resultSpecs;
+    auto resultSpecs =
+        indexCatalog->removeExistingIndexes(opCtx, normalSpecs, true /*removeIndexBuildsToo*/);
 
-    resultSpecs = indexCatalog->removeExistingIndexes(
-        opCtx, specsWithCollationDefaults, true /*removeIndexBuildsToo*/);
-
+    // Verify that each spec is compatible with the collection's sharding state.
     for (const BSONObj& spec : resultSpecs) {
         if (spec[kUniqueFieldName].trueValue()) {
             checkShardKeyRestrictions(opCtx, nss, spec[kKeyFieldName].Obj());
@@ -2471,4 +2472,50 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     return resultSpecs;
 }
 
+std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
+    OperationContext* opCtx, const Collection* collection, const std::vector<BSONObj>& indexSpecs) {
+    // This helper function may be called before the collection is created, when we are attempting
+    // to check whether the candidate index collides with any existing indexes. If 'collection' is
+    // nullptr, skip normalization. Since the collection does not exist there cannot be a conflict,
+    // and we will normalize once the candidate spec is submitted to the IndexBuildsCoordinator.
+    if (!collection) {
+        return indexSpecs;
+    }
+
+    // Add collection-default collation where needed and normalize the collation in each index spec.
+    auto normalSpecs =
+        uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
+
+    // If the index spec has a partialFilterExpression, we normalize it by parsing to an optimized,
+    // sorted MatchExpression tree, re-serialize it to BSON, and add it back into the index spec.
+    const auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, collection->ns());
+    std::transform(normalSpecs.begin(), normalSpecs.end(), normalSpecs.begin(), [&](auto& spec) {
+        const auto kPartialFilterName = IndexDescriptor::kPartialFilterExprFieldName;
+        auto partialFilterExpr = spec.getObjectField(kPartialFilterName);
+        if (partialFilterExpr.isEmpty()) {
+            return spec;
+        }
+        // Parse, optimize and sort the MatchExpression to reduce it to its normalized form.
+        // Serialize the normalized filter back into the index spec before returning.
+        auto partialFilter = MatchExpressionParser::parseAndNormalize(partialFilterExpr, expCtx);
+        return spec.addField(BSON(kPartialFilterName << partialFilter->serialize()).firstElement());
+    });
+
+    // If any of the specs describe wildcard indexes, normalize the wildcard projections if present.
+    // This will change all specs of the form {"a.b.c": 1} to normalized form {a: {b: {c : 1}}}.
+    std::transform(normalSpecs.begin(), normalSpecs.end(), normalSpecs.begin(), [](auto& spec) {
+        const auto kProjectionName = IndexDescriptor::kPathProjectionFieldName;
+        const auto pathProjectionSpec = spec.getObjectField(kProjectionName);
+        static const auto kWildcardKeyPattern = BSON("$**" << 1);
+        if (pathProjectionSpec.isEmpty()) {
+            return spec;
+        }
+        auto wildcardProjection =
+            WildcardKeyGenerator::createProjectionExecutor(kWildcardKeyPattern, pathProjectionSpec);
+        auto normalizedProjection =
+            wildcardProjection.exec()->serializeTransformation(boost::none).toBson();
+        return spec.addField(BSON(kProjectionName << normalizedProjection).firstElement());
+    });
+    return normalSpecs;
+}
 }  // namespace mongo

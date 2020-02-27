@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/internal_plans.h"
@@ -100,9 +101,8 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIxscanPlan(BSONObj keyPattern,
                                                                         BSONObj startKey,
                                                                         BSONObj endKey) {
-        auto indexDescriptor =
-            collection()->getIndexCatalog()->findIndexByKeyPatternAndCollationSpec(
-                &_opCtx, keyPattern, {});
+        auto indexDescriptor = collection()->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+            &_opCtx, keyPattern, _makeMinimalIndexSpec(keyPattern));
         ASSERT(indexDescriptor);
         return InternalPlanner::indexScan(&_opCtx,
                                           collection(),
@@ -134,6 +134,13 @@ public:
     DBDirectClient _client;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+private:
+    BSONObj _makeMinimalIndexSpec(BSONObj keyPattern) {
+        return BSON(IndexDescriptor::kKeyPatternFieldName
+                    << keyPattern << IndexDescriptor::kIndexVersionFieldName
+                    << IndexDescriptor::getDefaultIndexVersion());
+    }
 };
 
 TEST_F(PlanExecutorInvalidationTest, ExecutorToleratesDeletedDocumentsDuringYield) {

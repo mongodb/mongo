@@ -191,12 +191,6 @@ public:
     std::string toStringShort() const;
 
     /**
-     * Traverses expression tree post-order.
-     * Sorts children at each non-leaf node by (MatchType, path(), children, number of children)
-     */
-    static void sortTree(MatchExpression* tree);
-
-    /**
      * Returns a count of 'type' nodes in expression tree.
      */
     static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type);
