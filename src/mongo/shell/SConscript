@@ -33,6 +33,7 @@ js_header = env.JSHeader(
     source=[
         "assert.js",
         "bulk_api.js",
+        "check_log.js",
         "collection.js",
         "crud_api.js",
         "db.js",
