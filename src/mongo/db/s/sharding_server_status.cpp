@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/s/balancer_configuration.h"
@@ -111,6 +112,8 @@ public:
         BSONObjBuilder result;
         ShardingStatistics::get(opCtx).report(&result);
         catalogCache->report(&result);
+        CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
+
         return result.obj();
     }
 

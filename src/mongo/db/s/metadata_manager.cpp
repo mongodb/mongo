@@ -279,6 +279,19 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     amrArr.done();
 }
 
+void MetadataManager::appendForServerStatus(BSONArrayBuilder* builder) const {
+    auto numRangeDeletes = ([this] {
+        stdx::lock_guard<Latch> lg(_managerLock);
+        return _rangesScheduledForDeletion.size();
+    })();
+
+    if (numRangeDeletes > 0) {
+        BSONObjBuilder statBuilder;
+        statBuilder.appendNumber(_nss.ns(), numRangeDeletes);
+        builder->append(statBuilder.obj());
+    }
+}
+
 SharedSemiFuture<void> MetadataManager::beginReceive(ChunkRange const& range) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());

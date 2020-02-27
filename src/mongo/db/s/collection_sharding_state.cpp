@@ -91,6 +91,19 @@ public:
         versionB.done();
     }
 
+    void appendInfoForServerStatus(BSONObjBuilder* builder) {
+        BSONArrayBuilder rangeDeleterArrayBuilder(builder->subarrayStart("rangeDeleterTasks"));
+
+        {
+            stdx::lock_guard lg(_mutex);
+            for (auto& coll : _collections) {
+                coll.second->appendInfoForServerStatus(&rangeDeleterArrayBuilder);
+            }
+        }
+
+        rangeDeleterArrayBuilder.done();
+    }
+
 private:
     using CollectionsMap = StringMap<std::shared_ptr<CollectionShardingState>>;
 
@@ -124,6 +137,12 @@ CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svc
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     collectionsMap->report(opCtx, builder);
+}
+
+void CollectionShardingState::appendInfoForServerStatus(OperationContext* opCtx,
+                                                        BSONObjBuilder* builder) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    collectionsMap->appendInfoForServerStatus(builder);
 }
 
 void CollectionShardingStateFactory::set(ServiceContext* service,

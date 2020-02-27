@@ -105,6 +105,8 @@ public:
 
     void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) override;
 
+    void appendInfoForServerStatus(BSONArrayBuilder* builder) override;
+
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
      * shard version match will fail with StaleConfig errors in order to trigger an update.

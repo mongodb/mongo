@@ -83,6 +83,7 @@ public:
     }
 
     void toBSONPending(BSONArrayBuilder&) const override {}
+    void appendInfoForServerStatus(BSONArrayBuilder* builder) {}
 
     void setFilteringMetadata(OperationContext*, CollectionMetadata) override {}
 };

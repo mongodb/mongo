@@ -400,6 +400,13 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
     MONGO_UNREACHABLE;
 }
 
+void CollectionShardingRuntime::appendInfoForServerStatus(BSONArrayBuilder* builder) {
+    stdx::lock_guard lk(_metadataManagerLock);
+    if (_metadataManager) {
+        _metadataManager->appendForServerStatus(builder);
+    }
+}
+
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
     : _nss(std::move(ns)), _opCtx(opCtx) {
     AutoGetCollection autoColl(_opCtx,

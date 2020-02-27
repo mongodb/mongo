@@ -87,6 +87,11 @@ public:
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
+     * Attaches info for server status.
+     */
+    static void appendInfoForServerStatus(OperationContext* opCtx, BSONObjBuilder* builder);
+
+    /**
      * Returns the chunk filtering object that the current operation should be using for
      * the collection.
      *
@@ -175,6 +180,11 @@ public:
      * locks itself.
      */
     virtual void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) = 0;
+
+    /**
+     * Append info to display in server status.
+     */
+    virtual void appendInfoForServerStatus(BSONArrayBuilder* builder) = 0;
 };
 
 /**

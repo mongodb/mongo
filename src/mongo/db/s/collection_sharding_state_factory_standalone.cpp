@@ -76,6 +76,7 @@ public:
     }
 
     void toBSONPending(BSONArrayBuilder& bb) const noexcept override {}
+    void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
 
     void setFilteringMetadata(OperationContext*, CollectionMetadata) noexcept override {}
 };
