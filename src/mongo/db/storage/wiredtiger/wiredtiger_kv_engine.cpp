@@ -110,6 +110,7 @@ MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
 MONGO_FAIL_POINT_DEFINE(pauseCheckpointThread);
+MONGO_FAIL_POINT_DEFINE(pauseJournalFlusherThread);
 
 }  // namespace
 
@@ -251,6 +252,9 @@ public:
         // Initialize the thread's opCtx.
         _uniqueCtx.emplace(tc->makeOperationContext());
         while (true) {
+
+            pauseJournalFlusherThread.pauseWhileSet(_uniqueCtx->get());
+
             try {
                 ON_BLOCK_EXIT([&] {
                     // We do not want to miss an interrupt for the next round. Therefore, the opCtx
