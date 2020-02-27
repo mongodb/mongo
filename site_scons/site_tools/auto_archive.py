@@ -166,15 +166,7 @@ def archive_builder(source, target, env, for_signature):
     #
     # We pass the common_ancestor to tar via -C so that $PREFIX is
     # preserved in the tarball.
-    dest_dir_elems = env.Dir("$DESTDIR").get_abspath()
-    prefix_elems = env.subst("$PREFIX")
-
-    # In python slicing a string with [:-0] gives an empty string. So
-    # make sure we have a prefix to slice off before trying it.
-    if prefix_elems:
-        common_ancestor = dest_dir_elems[: -len(prefix_elems)]
-    else:
-        common_ancestor = dest_dir_elems
+    common_ancestor = env.Dir("$DESTDIR").get_abspath()
 
     archive_type = env["__AUTO_ARCHIVE_TYPE"]
     make_archive_script = source[0].get_abspath()
