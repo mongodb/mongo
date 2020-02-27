@@ -9859,9 +9859,8 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
-  - name: .jstestfuzz
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: .logical_session_cache
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -9888,9 +9887,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common
-  - name: sharded_multi_stmt_txn_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
@@ -10443,7 +10439,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
-  runs_on:
+  run_on:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
