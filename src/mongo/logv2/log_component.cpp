@@ -247,5 +247,9 @@ StringData LogComponent::getNameForLog() const {
     MONGO_UNREACHABLE;
 }
 
+std::ostream& operator<<(std::ostream& os, LogComponent component) {
+    return os << component.getNameForLog();
+}
+
 }  // namespace logv2
 }  // namespace mongo

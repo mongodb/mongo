@@ -42,10 +42,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 using std::string;
@@ -54,11 +52,10 @@ using std::stringstream;
 namespace mongo {
 
 namespace {
-using logger::globalLogDomain;
-using logger::LogComponent;
 using logger::LogComponentSetting;
-using logger::LogSeverity;
 using logger::parseLogComponentSettings;
+using logv2::LogComponent;
+using logv2::LogSeverity;
 
 void appendParameterNames(std::string* help) {
     *help += "supported:\n";
@@ -102,8 +99,11 @@ void getLogComponentVerbosity(BSONObj* output) {
         LogComponent component = static_cast<LogComponent::Value>(i);
 
         int severity = -1;
-        if (hasMinimumLogSeverity(component)) {
-            severity = getMinimumLogSeverity(component).toInt();
+        if (logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(component)) {
+            severity = logv2::LogManager::global()
+                           .getGlobalSettings()
+                           .getMinimumLogSeverity(component)
+                           .toInt();
         }
 
         // Save LogComponent::kDefault LogSeverity at root
@@ -173,13 +173,15 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 
         // Negative value means to clear log level of component.
         if (newSetting.level < 0) {
-            clearMinimumLoggedSeverity(newSetting.component);
+            logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(
+                logComponentV1toV2(newSetting.component));
             continue;
         }
         // Convert non-negative value to Log()/Debug(N).
         LogSeverity newSeverity =
             (newSetting.level > 0) ? LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
-        setMinimumLoggedSeverity(newSetting.component, newSeverity);
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            logComponentV1toV2(newSetting.component), newSeverity);
     }
 
     return Status::OK();
@@ -396,7 +398,11 @@ public:
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder& builder,
                                      const std::string& name) {
-    builder.append(name, getMinimumLogSeverity().toInt());
+    builder.append(name,
+                   logv2::LogManager::global()
+                       .getGlobalSettings()
+                       .getMinimumLogSeverity(mongo::logv2::LogComponent::kDefault)
+                       .toInt());
 }
 
 Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
@@ -405,7 +411,9 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid value for logLevel: " << newValueElement);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-    setMinimumLoggedSeverity(newSeverity);
+
+    logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        mongo::logv2::LogComponent::kDefault, newSeverity);
     return Status::OK();
 }
 
@@ -418,7 +426,9 @@ Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid value for logLevel: " << newValue);
     LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-    setMinimumLoggedSeverity(newSeverity);
+
+    logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        mongo::logv2::LogComponent::kDefault, newSeverity);
     return Status::OK();
 }
 

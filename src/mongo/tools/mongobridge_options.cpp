@@ -35,8 +35,8 @@
 #include <iostream>
 
 #include "mongo/base/status.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -81,7 +81,9 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
             return {ErrorCodes::BadValue,
                     "The string for the --verbose option cannot contain characters other than 'v'"};
         }
-        setMinimumLoggedSeverity(logger::LogSeverity::Debug(verbosity.length()));
+
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            mongo::logv2::LogComponent::kDefault, logv2::LogSeverity::Debug(verbosity.length()));
     }
 
     return Status::OK();

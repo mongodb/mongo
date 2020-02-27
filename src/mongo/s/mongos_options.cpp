@@ -43,6 +43,7 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -68,7 +69,8 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
         return false;
     }
     if (params.count("test") && params["test"].as<bool>() == true) {
-        setMinimumLoggedSeverity(::mongo::logger::LogSeverity::Debug(5));
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            mongo::logv2::LogComponent::kDefault, ::mongo::logv2::LogSeverity::Debug(5));
         return false;
     }
 

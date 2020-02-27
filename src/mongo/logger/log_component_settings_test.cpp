@@ -31,6 +31,7 @@
 
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_component_settings.h"
+#include "mongo/logger/log_test.h"
 #include "mongo/logger/logger.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"

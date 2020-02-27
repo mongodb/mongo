@@ -71,6 +71,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -6147,8 +6148,8 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Log all the election messages.
-    setMinimumLoggedSeverity(logger::LogComponent::kReplicationElection,
-                             logger::LogSeverity::Debug(5));
+    setMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection,
+                             logv2::LogSeverity::Debug(5));
     startCapturingLogMessages();
     // heartbeatTimeoutSecs is made large so we can advance the clock without worrying about
     // additional heartbeats.
@@ -6207,8 +6208,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
-    setMinimumLoggedSeverity(logger::LogComponent::kReplicationElection,
-                             logger::LogSeverity::Debug(4));
+    setMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection,
+                             logv2::LogSeverity::Debug(4));
     net->enterNetwork();
     until = electionTimeoutWhen + Milliseconds(500);
     net->runUntil(until);

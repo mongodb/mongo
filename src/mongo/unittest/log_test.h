@@ -29,36 +29,38 @@
 
 #pragma once
 
-#include <utility>
-
-#include "mongo/logger/log_component.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/log_global_settings.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
 
 namespace mongo {
 
-/*
- * Return a pair of booleans. The first value is if we should log the operation and the second value
- * is if we should sample this operation for profiling.
- */
-inline std::pair<bool, bool> shouldLogSlowOpWithSampling(OperationContext* opCtx,
-                                                         logv2::LogComponent logComponent,
-                                                         Milliseconds opDuration,
-                                                         Milliseconds slowMS) {
-    // Log the operation if log message verbosity for operation component is >= 1.
-    const bool componentHasTargetLogVerbosity =
-        shouldLog(logComponentV2toV1(logComponent), logger::LogSeverity::Debug(1));
+inline logv2::LogSeverity getMinimumLogSeverity() {
+    return logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
+        mongo::logv2::LogComponent::kDefault);
+}
 
-    const auto client = opCtx->getClient();
-    const bool shouldSample =
-        client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+inline logv2::LogSeverity getMinimumLogSeverity(logv2::LogComponent component) {
+    return logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(component);
+}
 
-    // Log the transaction if we should sample and its duration is greater than or equal to the
-    // slowMS command threshold.
-    const bool shouldLogSlowOp = shouldSample && opDuration >= slowMS;
+inline void setMinimumLoggedSeverity(logv2::LogSeverity severity) {
+    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        mongo::logv2::LogComponent::kDefault, severity);
+}
 
-    return std::pair<bool, bool>(componentHasTargetLogVerbosity || shouldLogSlowOp, shouldSample);
+inline void setMinimumLoggedSeverity(logv2::LogComponent component, logv2::LogSeverity severity) {
+    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(component,
+                                                                                    severity);
+}
+
+inline void clearMinimumLoggedSeverity(logv2::LogComponent component) {
+    return logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(component);
+}
+
+inline bool hasMinimumLogSeverity(logv2::LogComponent component) {
+    return logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(component);
 }
 
 }  // namespace mongo

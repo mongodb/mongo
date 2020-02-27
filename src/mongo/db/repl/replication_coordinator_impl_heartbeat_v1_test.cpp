@@ -43,6 +43,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -87,7 +88,7 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplSetCo
 
 TEST_F(ReplCoordHBV1Test,
        NodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
-    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     ReplSetConfig rsConfig = assertMakeRSConfig(BSON("_id"
                                                      << "mySet"
                                                      << "version" << 3 << "members"
@@ -157,7 +158,7 @@ TEST_F(ReplCoordHBV1Test,
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
 public:
     void setUp() {
-        setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
         BSONObj configBson = BSON("_id"
                                   << "mySet"
                                   << "version" << initConfigVersion << "term" << initConfigTerm
@@ -498,7 +499,7 @@ TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
         ASSERT_EQUALS("node3", hosts[2].host());
     });
 
-    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "mySet"
@@ -549,7 +550,7 @@ TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
 
 TEST_F(ReplCoordHBV1Test,
        ArbiterJoinsExistingReplSetWhenReceivingAConfigContainingTheArbiterViaHeartbeat) {
-    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "mySet"
@@ -622,7 +623,7 @@ TEST_F(ReplCoordHBV1Test,
        NodeDoesNotJoinExistingReplSetWhenReceivingAConfigNotContainingTheNodeViaHeartbeat) {
     // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
     // configuration that does not contain it.
-    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     ReplSetConfig rsConfig = assertMakeRSConfig(BSON("_id"
                                                      << "mySet"
                                                      << "version" << 3 << "members"
@@ -704,7 +705,7 @@ TEST_F(ReplCoordHBV1Test,
 TEST_F(ReplCoordHBV1Test,
        NodeChangesToRecoveringStateWhenAllNodesRespondToHeartbeatsWithUnauthorized) {
     // Tests that a node that only has auth error heartbeats is recovering
-    setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 1 << "members"

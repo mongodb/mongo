@@ -48,6 +48,7 @@
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
@@ -3171,14 +3172,14 @@ TEST_F(TransactionRouterMetricsTest, OnlyLogSlowTransactionsOnce) {
 
 TEST_F(TransactionRouterMetricsTest, NoTransactionsLoggedAtDefaultTransactionLogLevel) {
     // Set verbosity level of transaction components to the default, i.e. debug level 0.
-    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Log());
+    setMinimumLoggedSeverity(logv2::LogComponent::kTransaction, logv2::LogSeverity::Log());
     beginTxnWithDefaultTxnNumber();
     runSingleShardCommit();
     assertDidNotPrintSlowLogLine();
 }
 
 TEST_F(TransactionRouterMetricsTest, AllTransactionsLoggedAtTransactionLogLevelOne) {
-    setMinimumLoggedSeverity(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(logv2::LogComponent::kTransaction, logv2::LogSeverity::Debug(1));
     beginTxnWithDefaultTxnNumber();
     runSingleShardCommit();
     assertPrintedExactlyOneSlowLogLine();

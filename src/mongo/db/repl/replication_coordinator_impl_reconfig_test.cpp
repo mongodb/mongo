@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -687,7 +688,7 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
 class ReplCoordReconfigTest : public ReplCoordTest {
 public:
     void setUp() {
-        setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     }
 
     BSONObj member(int id, std::string host) {

@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -91,7 +92,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     }
 
     if (params.count("debug") || params.count("verbose")) {
-        setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
     }
 
     boost::filesystem::path p(frameworkGlobalParams.dbpathSpec);

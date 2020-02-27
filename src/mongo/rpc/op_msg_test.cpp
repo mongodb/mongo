@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -161,15 +162,15 @@ public:
 class OpMsgParser : public unittest::Test {
 public:
     void setUp() override {
-        _original = getMinimumLogSeverity(logger::LogComponent::kNetwork);
-        setMinimumLoggedSeverity(logger::LogComponent::kNetwork, logger::LogSeverity::Debug(1));
+        _original = getMinimumLogSeverity(logv2::LogComponent::kNetwork);
+        setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(1));
     }
     void tearDown() override {
-        setMinimumLoggedSeverity(logger::LogComponent::kNetwork, _original);
+        setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, _original);
     }
 
 private:
-    logger::LogSeverity _original = logger::LogSeverity::Debug(0);
+    logv2::LogSeverity _original = logv2::LogSeverity::Debug(0);
 };
 
 // Section bytes

@@ -143,6 +143,8 @@ private:
     int _severity;
 };
 
+std::ostream& operator<<(std::ostream& os, LogSeverity severity);
+
 LogSeverity LogSeverity::Severe() {
     return LogSeverity(-4);
 }

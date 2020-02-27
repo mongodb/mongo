@@ -32,7 +32,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/util/log_global_settings.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/util/log_with_sampling.h"
 
 namespace mongo {
@@ -57,14 +58,11 @@ TEST(LogWithSamplingTest, ShouldLogCorrectlyWhenSampleRateIsSet) {
     const auto slowOpDurationMS = Milliseconds(11);
     // Set verbosity level of operation component to info so that it doesn't log due to the log
     // level.
-    setMinimumLoggedSeverity(MONGO_LOG_DEFAULT_COMPONENT, logger::LogSeverity::Info());
+    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Info());
 
     bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    slowOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
 
     // Verify that shouldLogSlowOp is true when the sampleRate is 1.
     ASSERT_TRUE(shouldLogSlowOp);
@@ -75,11 +73,8 @@ TEST(LogWithSamplingTest, ShouldLogCorrectlyWhenSampleRateIsSet) {
     // Set sample rate to never profile a slow operation.
     serverGlobalParams.sampleRate = 0;
 
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    slowOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
 
     // Verify that shouldLogSlowOp is false when the sampleRate is 0.
     ASSERT_FALSE(shouldLogSlowOp);
@@ -105,14 +100,11 @@ TEST(LogWithSamplingTest, ShouldAlwaysLogsWithVerbosityLevelDebug) {
     // Set the op duration to be greater than slowMS so that the op is considered slow.
     const auto slowOpDurationMS = Milliseconds(11);
     // Set verbosity level of operation component to debug so that it should always log.
-    setMinimumLoggedSeverity(MONGO_LOG_DEFAULT_COMPONENT, logger::LogSeverity::Debug(1));
+    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Debug(1));
 
     bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    slowOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
 
     // Verify that shouldLogSlowOp is true when the op is slow.
     ASSERT_TRUE(shouldLogSlowOp);
@@ -123,11 +115,8 @@ TEST(LogWithSamplingTest, ShouldAlwaysLogsWithVerbosityLevelDebug) {
     // Set sample rate to never profile a slow operation.
     serverGlobalParams.sampleRate = 0;
 
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    slowOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
 
     // Verify that we should still log even when the sampleRate is 0.
     ASSERT_TRUE(shouldLogSlowOp);
@@ -154,14 +143,11 @@ TEST(LogWithSamplingTest, ShouldNotLogFastOp) {
     const auto fastOpDurationMS = Milliseconds(9);
     // Set verbosity level of operation component to info so that it doesn't log due to the log
     // level.
-    setMinimumLoggedSeverity(MONGO_LOG_DEFAULT_COMPONENT, logger::LogSeverity::Info());
+    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Info());
 
     bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    fastOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, fastOpDurationMS, slowOpThresholdMS);
 
     // Verify that shouldLogSlowOp is false when the op is fast.
     ASSERT_FALSE(shouldLogSlowOp);
@@ -172,11 +158,8 @@ TEST(LogWithSamplingTest, ShouldNotLogFastOp) {
     // Set sample rate to never profile a slow operation.
     serverGlobalParams.sampleRate = 0;
 
-    std::tie(shouldLogSlowOp, shouldSample) =
-        shouldLogSlowOpWithSampling(opCtx.get(),
-                                    logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT),
-                                    fastOpDurationMS,
-                                    slowOpThresholdMS);
+    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+        opCtx.get(), MongoLogV2DefaultComponent_component, fastOpDurationMS, slowOpThresholdMS);
 
     // Verify that we should still not log when the sampleRate is 0.
     ASSERT_FALSE(shouldLogSlowOp);

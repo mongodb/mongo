@@ -274,13 +274,14 @@ Status storeBaseOptions(const moe::Environment& params) {
             return Status(ErrorCodes::BadValue,
                           "systemLog.verbosity YAML Config cannot be negative");
         }
-        setMinimumLoggedSeverity(logger::LogSeverity::Debug(verbosity));
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            mongo::logv2::LogComponent::kDefault, logv2::LogSeverity::Debug(verbosity));
     }
 
     // log component hierarchy verbosity levels
-    for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
-        logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
-        if (component == logger::LogComponent::kDefault) {
+    for (int i = 0; i < int(logv2::LogComponent::kNumLogComponents); ++i) {
+        logv2::LogComponent component = static_cast<logv2::LogComponent::Value>(i);
+        if (component == logv2::LogComponent::kDefault) {
             continue;
         }
         const string dottedName = "systemLog.component." + component.getDottedName() + ".verbosity";
@@ -288,9 +289,11 @@ Status storeBaseOptions(const moe::Environment& params) {
             int verbosity = params[dottedName].as<int>();
             // Clear existing log level if log level is negative.
             if (verbosity < 0) {
-                clearMinimumLoggedSeverity(component);
+                logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(
+                    component);
             } else {
-                setMinimumLoggedSeverity(component, logger::LogSeverity::Debug(verbosity));
+                logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+                    component, logv2::LogSeverity::Debug(verbosity));
             }
         }
     }
