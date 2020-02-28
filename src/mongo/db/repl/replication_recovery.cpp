@@ -324,28 +324,28 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
         fassertFailedNoTrace(31399);
     }
 
-    Timestamp startPoint = _consistencyMarkers->getAppliedThrough(opCtx).getTimestamp();
-    if (startPoint.isNull()) {
-        log() << "No stored oplog entries to apply for recovery.";
-        return;
+    boost::optional<Timestamp> startPoint =
+        _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
+    if (!startPoint) {
+        fassert(31436, "No recovery timestamp, cannot recover from the oplog.");
     }
 
     invariant(!endPoint.isNull());
 
-    if (startPoint == endPoint) {
+    if (*startPoint == endPoint) {
         log() << "No oplog entries to apply for recovery. Start point '" << startPoint
               << "' is at the end point '" << endPoint << "' in the oplog.";
         return;
-    } else if (startPoint > endPoint) {
+    } else if (*startPoint > endPoint) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "No oplog entries to apply for recovery. Start point '"
-                                << startPoint.toString() << "' is beyond the end point '"
+                                << startPoint->toString() << "' is beyond the end point '"
                                 << endPoint.toString() << "' in the oplog.");
     }
 
-    Timestamp appliedUpTo = _applyOplogOperations(opCtx, startPoint, endPoint);
+    Timestamp appliedUpTo = _applyOplogOperations(opCtx, *startPoint, endPoint);
     if (appliedUpTo.isNull()) {
-        log() << "No stored oplog entries to apply for recovery between " << startPoint.toString()
+        log() << "No stored oplog entries to apply for recovery between " << startPoint->toString()
               << " (inclusive) and " << endPoint.toString() << " (inclusive).";
     } else {
         invariant(appliedUpTo <= endPoint);
