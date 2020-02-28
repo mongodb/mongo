@@ -66,8 +66,8 @@ void assertChunkVectorsAreEqual(const std::vector<ChunkType>& expected,
     for (auto expectedIt = expected.begin(), actualIt = actual.begin();
          expectedIt != expected.end() && actualIt != actual.end();
          ++expectedIt, ++actualIt) {
-        ASSERT_BSONOBJ_EQ((*expectedIt).toShardBSON().removeField("lastmod"),
-                          (*actualIt).toShardBSON().removeField("lastmod"));
+        ASSERT_BSONOBJ_EQ((*expectedIt).toShardBSON().removeField("lastmod").removeField("history"),
+                          (*actualIt).toShardBSON().removeField("lastmod").removeField("history"));
     }
 }
 
