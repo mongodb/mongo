@@ -1273,7 +1273,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
 
     _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5, 6, 7, 8, 9, 10});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
 
     // Recovers operations with timestamps: 3, 4, 5.
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
@@ -1292,7 +1291,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToEndOfOplog) {
 
     _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5, 6, 7, 8, 9, 10});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
 
     // Recovers all operations
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(10, 10));
@@ -1306,21 +1304,20 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToInvalidEndPoint) {
 
     _setUpOplog(opCtx, getStorageInterface(), {2, 3, 4, 5});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
 
     ASSERT_THROWS_CODE(
         recovery.recoverFromOplogUpTo(opCtx, Timestamp(1, 1)), DBException, ErrorCodes::BadValue);
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(2, 2));
 
     _assertDocsInTestCollection(opCtx, {});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(2, 2), 1));
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
-    _setUpOplog(opCtx, getStorageInterface(), {});
+    _setUpOplog(opCtx, getStorageInterface(), {2});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
 
     startCapturingLogMessages();
@@ -1328,7 +1325,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery."));
+        1, countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery"));
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
 }
@@ -1351,7 +1348,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToDoesNotExceedEndPoint) {
 
     _setUpOplog(opCtx, getStorageInterface(), {2, 5, 10});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
@@ -1366,7 +1362,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithNoOperationsToRecover) {
 
     _setUpOplog(opCtx, getStorageInterface(), {1, 1580148188, std::numeric_limits<int>::max()});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1580148188, 1580148188));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1580148188, 1580148188), 1));
 
     startCapturingLogMessages();
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(1580148193, 1));
@@ -1383,7 +1378,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
 
     _setUpOplog(opCtx, getStorageInterface(), {1, 2});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
 
     const auto sessionId = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(sessionId);
@@ -1426,7 +1420,6 @@ TEST_F(ReplicationRecoveryTest,
 
     _setUpOplog(opCtx, getStorageInterface(), {});
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
 
     const auto sessionId = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(sessionId);

@@ -358,34 +358,34 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, recoveryTS);
 
-    Timestamp startPoint = _consistencyMarkers->getAppliedThrough(opCtx).getTimestamp();
-    if (startPoint.isNull()) {
-        LOGV2(21539, "No stored oplog entries to apply for recovery.");
-        return;
+    boost::optional<Timestamp> startPoint =
+        _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
+    if (!startPoint) {
+        fassert(31436, "No recovery timestamp, cannot recover from the oplog.");
     }
 
     invariant(!endPoint.isNull());
 
-    if (startPoint == endPoint) {
+    if (*startPoint == endPoint) {
         LOGV2(21540,
               "No oplog entries to apply for recovery. Start point '{startPoint}' is at the end "
               "point '{endPoint}' in the oplog.",
               "startPoint"_attr = startPoint,
               "endPoint"_attr = endPoint);
         return;
-    } else if (startPoint > endPoint) {
+    } else if (*startPoint > endPoint) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "No oplog entries to apply for recovery. Start point '"
-                                << startPoint.toString() << "' is beyond the end point '"
+                                << startPoint->toString() << "' is beyond the end point '"
                                 << endPoint.toString() << "' in the oplog.");
     }
 
-    Timestamp appliedUpTo = _applyOplogOperations(opCtx, startPoint, endPoint);
+    Timestamp appliedUpTo = _applyOplogOperations(opCtx, *startPoint, endPoint);
     if (appliedUpTo.isNull()) {
         LOGV2(21541,
               "No stored oplog entries to apply for recovery between {startPoint} (inclusive) and "
               "{endPoint} (inclusive).",
-              "startPoint"_attr = startPoint.toString(),
+              "startPoint"_attr = startPoint->toString(),
               "endPoint"_attr = endPoint.toString());
     } else {
         invariant(appliedUpTo <= endPoint);
