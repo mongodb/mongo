@@ -210,11 +210,11 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
          * readers can keep queuing up in front of writers and
          * throughput is unstable.
          *
-         * If the maximum number of readers are already queued, wait
-         * until we can get a valid ticket.
+         * If the maximum allowed number of readers are already queued or there is a
+         * potential overflow, wait until we can get a valid ticket.
          */
         writers_active = old.u.s.next - old.u.s.current;
-        if (old.u.s.readers_queued > writers_active) {
+        if (old.u.s.readers_queued == UINT8_MAX || old.u.s.readers_queued > writers_active) {
 stall:
             __wt_cond_wait(session, l->cond_readers, 10 * WT_THOUSAND, NULL);
             continue;
@@ -228,7 +228,7 @@ stall:
         if (new.u.s.readers_queued++ == 0)
             new.u.s.reader = new.u.s.next;
         ticket = new.u.s.reader;
-
+        WT_ASSERT(session, new.u.s.readers_queued != 0);
         if (__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v))
             break;
     }

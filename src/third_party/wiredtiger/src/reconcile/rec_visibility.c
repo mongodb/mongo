@@ -182,6 +182,13 @@ __wt_rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, voi
                 list_prepared = true;
                 if (upd->timestamp > max_ts)
                     max_ts = upd->timestamp;
+
+                /*
+                 * Track the oldest update not on the page, used to decide whether reads can use the
+                 * page image, hence using the start rather than the durable timestamp.
+                 */
+                if (upd->timestamp < r->min_skipped_ts)
+                    r->min_skipped_ts = upd->timestamp;
                 continue;
             }
         }
@@ -229,11 +236,8 @@ __wt_rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, voi
                 skipped_birthmark = true;
 
             /*
-             * Track the oldest update not on the page.
-             *
-             * This is used to decide whether reads can use the
-             * page image, hence using the start rather than the
-             * durable timestamp.
+             * Track the oldest update not on the page, used to decide whether reads can use the
+             * page image, hence using the start rather than the durable timestamp.
              */
             if (*updp == NULL && upd->timestamp < r->min_skipped_ts)
                 r->min_skipped_ts = upd->timestamp;

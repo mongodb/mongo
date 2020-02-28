@@ -979,11 +979,8 @@ __las_sweep_init(WT_SESSION_IMPL *session)
     /*
      * If no files have been dropped and the lookaside file is empty, there's nothing to do.
      */
-    if (cache->las_dropped_next == 0) {
-        if (__wt_las_empty(session))
-            ret = WT_NOTFOUND;
-        goto err;
-    }
+    if (cache->las_dropped_next == 0 && __wt_las_empty(session))
+        WT_ERR(WT_NOTFOUND);
 
     /*
      * Record the current page ID: sweep will stop after this point.
