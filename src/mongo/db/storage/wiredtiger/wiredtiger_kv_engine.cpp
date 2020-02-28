@@ -839,39 +839,37 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
     // from using the journal.
-    if (!_readOnly) {
-        // If we're readOnly skip all WAL-related settings.
-        ss << "log=(enabled=true,archive=true,path=journal,compressor=";
-        ss << wiredTigerGlobalOptions.journalCompressor << "),";
-        ss << "file_manager=(close_idle_time=" << gWiredTigerFileHandleCloseIdleTime
-           << ",close_scan_interval=" << gWiredTigerFileHandleCloseScanInterval
-           << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
-        ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
+    ss << "log=(enabled=true,archive=" << (_readOnly ? "false" : "true")
+       << ",path=journal,compressor=";
+    ss << wiredTigerGlobalOptions.journalCompressor << "),";
+    ss << "file_manager=(close_idle_time=" << gWiredTigerFileHandleCloseIdleTime
+       << ",close_scan_interval=" << gWiredTigerFileHandleCloseScanInterval
+       << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
+    ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
 
-        if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery,
-                      logv2::LogSeverity::Debug(3))) {
-            ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress,recovery],";
-        } else {
-            ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress],";
-        }
-
-        if (kDebugBuild) {
-            // Enable debug write-ahead logging for all tables under debug build.
-            ss << "debug_mode=(table_logging=true,";
-            // For select debug builds, support enabling WiredTiger eviction debug mode. This uses
-            // more aggressive eviction tactics, but may have a negative performance impact.
-            if (gWiredTigerEvictionDebugMode) {
-                ss << "eviction=true,";
-            }
-            ss << "),";
-        }
+    if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, logv2::LogSeverity::Debug(3))) {
+        ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress,recovery],";
+    } else {
+        ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress],";
     }
+
+    if (kDebugBuild) {
+        // Enable debug write-ahead logging for all tables under debug build.
+        ss << "debug_mode=(table_logging=true,";
+        // For select debug builds, support enabling WiredTiger eviction debug mode. This uses
+        // more aggressive eviction tactics, but may have a negative performance impact.
+        if (gWiredTigerEvictionDebugMode) {
+            ss << "eviction=true,";
+        }
+        ss << "),";
+    }
+
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig("system");
     ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
     ss << extraOpenOptions;
 
-    if (!_durable && !_readOnly) {
+    if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
         // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
         // the normal path without the journal.
