@@ -173,7 +173,6 @@ function standaloneToStandaloneTest() {
     let mongod = startStandalone();
     let collDB = mongod.getDB(dbName);
 
-    // TODO(SERVER-44468): Re-enable when standalone startup works with two-phase builds.
     if (IndexBuildTest.supportsTwoPhaseIndexBuild(mongod)) {
         jsTestLog(
             '[standaloneToStandaloneTest] Two phase index builds not supported, skipping test.');
