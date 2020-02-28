@@ -116,7 +116,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-    ASSERT_EQUALS(1, hbResponseObj["t"].Number());
+    ASSERT_EQUALS(1, hbResponseObj["configTerm"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());

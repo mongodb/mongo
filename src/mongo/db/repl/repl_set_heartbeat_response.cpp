@@ -50,7 +50,7 @@ namespace {
 
 const std::string kConfigFieldName = "config";
 const std::string kConfigVersionFieldName = "v";
-const std::string kConfigTermFieldName = "t";
+const std::string kConfigTermFieldName = "configTerm";
 const std::string kElectionTimeFieldName = "electionTime";
 const std::string kMemberStateFieldName = "state";
 const std::string kOkFieldName = "ok";
@@ -80,6 +80,8 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     }
     if (_configVersion != -1) {
         *builder << kConfigVersionFieldName << _configVersion;
+    }
+    if (_configTerm != OpTime::kUninitializedTerm) {
         *builder << kConfigTermFieldName << _configTerm;
     }
     if (!_setName.empty()) {
