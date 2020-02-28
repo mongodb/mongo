@@ -211,7 +211,8 @@ private:
         RequestManager(size_t numHedges, std::shared_ptr<CommandStateBase> cmdState_)
             : connStatus(cmdState_->requestOnAny.target.size(), ConnStatus::Unset),
               requests(numHedges),
-              cmdState(cmdState_) {}
+              cmdState(cmdState_),
+              isHedging(numHedges > 1) {}
 
         std::shared_ptr<RequestState> makeRequest(RequestManager* mgr) {
             auto req = std::make_shared<RequestState>(mgr, cmdState.lock());
@@ -248,6 +249,7 @@ private:
         AtomicWord<size_t> requestCnt{0};
         // blocks sending requests
         bool isLocked{false};
+        bool isHedging{false};
 
         Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
     };

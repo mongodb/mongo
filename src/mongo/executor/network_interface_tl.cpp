@@ -334,12 +334,14 @@ void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept 
 void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
     invariant(finishLine.isReady());
 
+    LOGV2_DEBUG(4646302, 2, "Finished request {request_id}", "request_id"_attr = requestOnAny.id);
+
     if (timer) {
         // The command has resolved one way or another,
         timer->cancel(baton);
     }
 
-    if (!status.isOK()) {
+    if (!status.isOK()) {  // TODO: SERVER-46469: || (requestManager && requestManager->isHedging))
         if (requestManager) {
             requestManager->cancelRequests();
         }
@@ -552,6 +554,11 @@ void NetworkInterfaceTL::RequestManager::cancelRequests() {
     for (size_t i = 0; i < requests.size(); i++) {
         auto requestState = requests[i].lock();
         if (requestState) {
+            LOGV2_DEBUG(4646301,
+                        2,
+                        "Cancelling request {request_id} with index {idx}",
+                        "request_id"_attr = cmdState.lock()->requestOnAny.id,
+                        "idx"_attr = i);
             requestState->cancel();
         }
     }
@@ -593,6 +600,12 @@ void NetworkInterfaceTL::RequestManager::trySend(
             return;
         }
     }
+
+    LOGV2_DEBUG(4646300,
+                2,
+                "Sending request {request_id} with index {idx}",
+                "request_id"_attr = cmdState.lock()->requestOnAny.id,
+                "idx"_attr = idx);
 
     auto req = getNextRequest();
     if (req) {
