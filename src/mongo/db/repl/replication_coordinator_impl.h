@@ -1096,11 +1096,6 @@ private:
                                 const HostAndPort& host);
 
     /**
-     * Schedules a request that the given host step down; logs any errors.
-     */
-    void _requestRemotePrimaryStepdown(const HostAndPort& target);
-
-    /**
      * Schedules stepdown to run with the global exclusive lock.
      */
     executor::TaskExecutor::EventHandle _stepDownStart();

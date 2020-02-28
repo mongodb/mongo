@@ -372,23 +372,6 @@ void remoteStepdownCallback(const executor::TaskExecutor::RemoteCommandCallbackA
 }
 }  // namespace
 
-void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort& target) {
-    auto secondaryCatchUpPeriod(duration_cast<Seconds>(_rsConfig.getHeartbeatInterval() / 2));
-    RemoteCommandRequest request(
-        target,
-        "admin",
-        BSON("replSetStepDown" << 20 << "secondaryCatchUpPeriodSecs"
-                               << std::min(static_cast<long long>(secondaryCatchUpPeriod.count()),
-                                           20LL)),
-        nullptr);
-
-    LOGV2(21478, "Requesting {target} step down from primary", "target"_attr = target);
-    auto cbh = _replExecutor->scheduleRemoteCommand(request, remoteStepdownCallback);
-    if (cbh.getStatus() != ErrorCodes::ShutdownInProgress) {
-        fassert(18808, cbh.getStatus());
-    }
-}
-
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
     auto finishEvent = _makeEvent();
     if (!finishEvent) {
