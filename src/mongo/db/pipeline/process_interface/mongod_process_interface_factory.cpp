@@ -45,9 +45,8 @@ std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(Operation
     if (ShardingState::get(opCtx)->enabled()) {
         return std::make_shared<ShardServerProcessInterface>(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
-    } else if (getTestCommandsEnabled()) {
-        if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx))
-            return std::make_shared<ReplicaSetNodeProcessInterface>(std::move(executor));
+    } else if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx)) {
+        return std::make_shared<ReplicaSetNodeProcessInterface>(std::move(executor));
     }
     return std::make_shared<StandaloneProcessInterface>(nullptr);
 }
