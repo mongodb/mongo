@@ -175,11 +175,7 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     // The configTerm field is new in 4.4 and cannot be parsed by MongoDB 4.2. Therefore omit it if
     // we have a 4.2-style replica set config with no "term". This permits us to downgrade by first
     // removing the replica set config's term, then downgrading to 4.2.
-    // TODO (SERVER-46288): Don't check FCV.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        _configTerm != OpTime::kUninitializedTerm) {
+    if (_configTerm != OpTime::kUninitializedTerm) {
         builder->appendIntOrLL(kConfigTermFieldName, _configTerm);
     }
     if (_hasHeartbeatVersion) {
