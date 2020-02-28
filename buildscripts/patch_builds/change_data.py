@@ -1,11 +1,11 @@
 """Tools for detecting changes in a commit."""
-from itertools import chain
 import os
-from typing import Any, Set, Iterable, Dict, Optional
+from itertools import chain
+from typing import Any, Iterable, Set, Optional, Dict
 
-from git import Repo, DiffIndex
 import structlog
 from structlog.stdlib import LoggerFactory
+from git import DiffIndex, Repo
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
