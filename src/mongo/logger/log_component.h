@@ -61,6 +61,7 @@ public:
         kReplicationRollback,
         kSharding,
         kShardingCatalogRefresh,
+        kShardingMigration,
         kStorage,
         kStorageRecovery,
         kJournal,

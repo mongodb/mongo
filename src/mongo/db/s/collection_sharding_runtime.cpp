@@ -269,18 +269,20 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             stillScheduled = self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
             if (!stillScheduled) {
-                LOGV2(21918,
-                      "Finished deleting {nss_ns} range {orphanRange}",
-                      "nss_ns"_attr = nss.ns(),
-                      "orphanRange"_attr = redact(orphanRange.toString()));
+                LOGV2_OPTIONS(21918,
+                              {logv2::LogComponent::kShardingMigration},
+                              "Finished waiting for deletion of {nss_ns} range {orphanRange}",
+                              "nss_ns"_attr = nss.ns(),
+                              "orphanRange"_attr = redact(orphanRange.toString()));
                 return Status::OK();
             }
         }
 
-        LOGV2(21919,
-              "Waiting for deletion of {nss_ns} range {orphanRange}",
-              "nss_ns"_attr = nss.ns(),
-              "orphanRange"_attr = orphanRange);
+        LOGV2_OPTIONS(21919,
+                      {logv2::LogComponent::kShardingMigration},
+                      "Waiting for deletion of {nss_ns} range {orphanRange}",
+                      "nss_ns"_attr = nss.ns(),
+                      "orphanRange"_attr = orphanRange);
 
         Status result = stillScheduled->getNoThrow(opCtx);
 

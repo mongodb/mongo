@@ -114,11 +114,6 @@ private:
     // The decision of the migration commit against the config server.
     boost::optional<Decision> _decision;
 
-    /**
-     * Returns a string that uniquely identifies the migration.
-     */
-    std::string _logPrefix() const;
-
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;
 };

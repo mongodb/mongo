@@ -290,11 +290,12 @@ SharedSemiFuture<void> MetadataManager::beginReceive(ChunkRange const& range) {
 
     _receivingChunks.emplace(range.getMin().getOwned(), range.getMax().getOwned());
 
-    LOGV2(21987,
-          "Scheduling deletion of any documents in {nss_ns} range {range} before migrating in a "
-          "chunk covering the range",
-          "nss_ns"_attr = _nss.ns(),
-          "range"_attr = redact(range.toString()));
+    LOGV2_OPTIONS(21987,
+                  {logv2::LogComponent::kShardingMigration},
+                  "Scheduling deletion of any documents in {nss_ns} range {range} before migrating "
+                  "in a chunk covering the range",
+                  "nss_ns"_attr = _nss.ns(),
+                  "range"_attr = redact(range.toString()));
 
     return _submitRangeForDeletion(
         lg, SemiFuture<void>::makeReady(), range, Seconds(orphanCleanupDelaySecs.load()));
@@ -306,11 +307,12 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
     // This is potentially a partially received chunk, which needs to be cleaned up. We know none
     // of these documents are in use, so they can go straight to the deletion queue.
-    LOGV2(21988,
-          "Abandoning in-migration of {nss_ns} range {range}; scheduling deletion of any documents "
-          "already copied",
-          "nss_ns"_attr = _nss.ns(),
-          "range"_attr = range);
+    LOGV2_OPTIONS(21988,
+                  {logv2::LogComponent::kShardingMigration},
+                  "Abandoning in-migration of {nss_ns} range {range}; scheduling deletion of any "
+                  "documents already copied",
+                  "nss_ns"_attr = _nss.ns(),
+                  "range"_attr = range);
 
     invariant(!_overlapsInUseChunk(lg, range));
 
@@ -344,11 +346,12 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         shouldDelayBeforeDeletion ? Seconds(orphanCleanupDelaySecs.load()) : Seconds(0);
 
     if (overlapMetadata) {
-        LOGV2(21989,
-              "Deletion of {nss_ns} range {range} will be scheduled after all possibly dependent "
-              "queries finish",
-              "nss_ns"_attr = _nss.ns(),
-              "range"_attr = redact(range.toString()));
+        LOGV2_OPTIONS(21989,
+                      {logv2::LogComponent::kShardingMigration},
+                      "Deletion of {nss_ns} range {range} will be scheduled after all possibly "
+                      "dependent queries finish",
+                      "nss_ns"_attr = _nss.ns(),
+                      "range"_attr = redact(range.toString()));
         ++overlapMetadata->numContingentRangeDeletionTasks;
         // Schedule the range for deletion once the overlapping metadata object is destroyed
         // (meaning no more queries can be using the range) and obtain a future which will be
@@ -359,10 +362,11 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
                                        delayForActiveQueriesOnSecondariesToComplete);
     } else {
         // No running queries can depend on this range, so queue it for deletion immediately.
-        LOGV2(21990,
-              "Scheduling deletion of {nss_ns} range {range}",
-              "nss_ns"_attr = _nss.ns(),
-              "range"_attr = redact(range.toString()));
+        LOGV2_OPTIONS(21990,
+                      {logv2::LogComponent::kShardingMigration},
+                      "Scheduling deletion of {nss_ns} range {range}",
+                      "nss_ns"_attr = _nss.ns(),
+                      "range"_attr = redact(range.toString()));
 
         return _submitRangeForDeletion(
             lg, SemiFuture<void>::makeReady(), range, delayForActiveQueriesOnSecondariesToComplete);

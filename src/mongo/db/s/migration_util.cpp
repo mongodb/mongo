@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/platform/basic.h"
 
@@ -260,7 +260,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                     ? " has UUID that does not match UUID of the deletion task"
                                     : " is unsharded")
                              : " is not known"),
-                    "deletionTask_getNss"_attr = deletionTask.getNss());
+                    "deletionTask_getNss"_attr = deletionTask.getNss(),
+                    "migrationId"_attr = deletionTask.getId());
 
                 // TODO (SERVER-46075): Add an asynchronous version of
                 // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
@@ -282,7 +283,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
 
             LOGV2(22026,
                   "Submitting range deletion task {deletionTask}",
-                  "deletionTask"_attr = deletionTask.toBSON());
+                  "deletionTask"_attr = deletionTask.toBSON(),
+                  "migrationId"_attr = deletionTask.getId());
 
             const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
                 ? CollectionShardingRuntime::kNow
@@ -303,7 +305,8 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                   "Failed to submit range deletion task "
                   "{deletionTask}{causedBy_status}",
                   "deletionTask"_attr = deletionTask.toBSON(),
-                  "causedBy_status"_attr = causedBy(status));
+                  "causedBy_status"_attr = causedBy(status),
+                  "migrationId"_attr = deletionTask.getId());
 
             if (status == ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 deleteRangeDeletionTaskLocally(
@@ -742,9 +745,10 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
             auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClientInfo.setLastOpToSystemLastOpTime(opCtx);
             const auto lastOpTime = replClientInfo.getLastOp();
-            LOGV2(22038,
-                  "Waiting for OpTime {lastOpTime} to become majority committed",
-                  "lastOpTime"_attr = lastOpTime);
+            LOGV2_DEBUG(22038,
+                        2,
+                        "Waiting for OpTime {lastOpTime} to become majority committed",
+                        "lastOpTime"_attr = lastOpTime);
             return WaitForMajorityService::get(serviceContext).waitUntilMajority(lastOpTime);
         })
         .thenRunOn(getMigrationUtilExecutor())
@@ -761,7 +765,7 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
                 opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
             Query query;
             store.forEach(opCtx, query, [&opCtx](const MigrationCoordinatorDocument& doc) {
-                LOGV2(22039, "Recovering migration {doc}", "doc"_attr = doc.toBSON());
+                LOGV2_DEBUG(22039, 2, "Recovering migration {doc}", "doc"_attr = doc.toBSON());
 
                 // Create a MigrationCoordinator to complete the coordination.
                 MigrationCoordinator coordinator(doc);

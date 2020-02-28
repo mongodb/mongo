@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/platform/basic.h"
 
@@ -269,13 +269,14 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                    auto numDeleted = uassertStatusOK(deleteNextBatch(
                        opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
 
-                   LOGV2(23769,
-                         "Deleted {numDeleted} documents in pass in namespace {nss_ns} with UUID "
-                         "{collectionUuid} for range {range}",
-                         "numDeleted"_attr = numDeleted,
-                         "nss_ns"_attr = nss.ns(),
-                         "collectionUuid"_attr = collectionUuid,
-                         "range"_attr = range.toString());
+                   LOGV2_DEBUG(23769,
+                               2,
+                               "Deleted {numDeleted} documents in pass in namespace {nss_ns} with "
+                               "UUID  {collectionUuid} for range {range}",
+                               "numDeleted"_attr = numDeleted,
+                               "nss_ns"_attr = nss.ns(),
+                               "collectionUuid"_attr = collectionUuid,
+                               "range"_attr = range.toString());
 
                    return numDeleted;
                });
@@ -344,12 +345,13 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
-        LOGV2(23771,
-              "Waiting for majority replication of local deletions in namespace {nss_ns} with UUID "
-              "{collectionUuid} for range {range}",
-              "nss_ns"_attr = nss.ns(),
-              "collectionUuid"_attr = collectionUuid,
-              "range"_attr = redact(range.toString()));
+        LOGV2_DEBUG(23771,
+                    2,
+                    "Waiting for majority replication of local deletions in namespace {nss_ns} "
+                    "with UUID  {collectionUuid} for range {range}",
+                    "nss_ns"_attr = nss.ns(),
+                    "collectionUuid"_attr = collectionUuid,
+                    "range"_attr = redact(range.toString()));
 
         // Asynchronously wait for majority write concern.
         return WaitForMajorityService::get(opCtx->getServiceContext())
@@ -384,12 +386,13 @@ SharedSemiFuture<void> removeDocumentsInRange(
                               executor->now() + delayForActiveQueriesOnSecondariesToComplete);
         })
         .then([=]() mutable {
-            LOGV2(23772,
-                  "Beginning deletion of any documents in {nss_ns} range {range} with "
-                  "numDocsToRemovePerBatch {numDocsToRemovePerBatch}",
-                  "nss_ns"_attr = nss.ns(),
-                  "range"_attr = redact(range.toString()),
-                  "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch);
+            LOGV2_DEBUG(23772,
+                        2,
+                        "Beginning deletion of any documents in {nss_ns} range {range} with  "
+                        "numDocsToRemovePerBatch {numDocsToRemovePerBatch}",
+                        "nss_ns"_attr = nss.ns(),
+                        "range"_attr = redact(range.toString()),
+                        "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch);
 
             notifySecondariesThatDeletionIsOccurring(nss, collectionUuid, range);
 
@@ -409,10 +412,11 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .onCompletion([=](Status s) {
             if (s.isOK()) {
-                LOGV2(23773,
-                      "Completed deletion of documents in {nss_ns} range {range}",
-                      "nss_ns"_attr = nss.ns(),
-                      "range"_attr = redact(range.toString()));
+                LOGV2_DEBUG(23773,
+                            2,
+                            "Completed deletion of documents in {nss_ns} range {range}",
+                            "nss_ns"_attr = nss.ns(),
+                            "range"_attr = redact(range.toString()));
             } else {
                 LOGV2(23774,
                       "Failed to delete of documents in {nss_ns} range {range}{causedBy_s}",

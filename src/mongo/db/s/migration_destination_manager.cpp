@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/platform/basic.h"
 
@@ -827,7 +827,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "nss_ns"_attr = _nss.ns(),
           "fromShard"_attr = _fromShard,
           "epoch"_attr = _epoch.toString(),
-          "sessionId"_attr = *_sessionId);
+          "sessionId"_attr = *_sessionId,
+          "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
 
     MoveTimingHelper timing(
         outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
@@ -835,7 +836,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     const auto initialState = getState();
 
     if (initialState == ABORT) {
-        LOGV2_ERROR(22013, "Migration abort requested before it started");
+        LOGV2_ERROR(22013,
+                    "Migration abort requested before it started",
+                    "migrationId"_attr =
+                        _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
         return;
     }
 
@@ -859,7 +863,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                       "Migration paused because range overlaps with a "
                       "range that is scheduled for deletion: collection: {nss_ns} range: {range}",
                       "nss_ns"_attr = _nss.ns(),
-                      "range"_attr = redact(range.toString()));
+                      "range"_attr = redact(range.toString()),
+                      "migrationId"_attr =
+                          _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
 
                 auto status = CollectionShardingRuntime::waitForClean(
                     outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
@@ -1000,7 +1006,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                         LOGV2_WARNING(22011,
                                       "secondaryThrottle on, but doc insert timed out; "
-                                      "continuing");
+                                      "continuing",
+                                      "migrationId"_attr = _enableResumableRangeDeleter
+                                          ? _migrationId.toBSON()
+                                          : BSONObj());
                     } else {
                         uassertStatusOK(replStatus.status);
                     }
@@ -1075,7 +1084,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
                 if (getState() == ABORT) {
                     LOGV2(22002,
-                          "Migration aborted while waiting for replication at catch up stage");
+                          "Migration aborted while waiting for replication at catch up stage",
+                          "migrationId"_attr =
+                              _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
                     return;
                 }
 
@@ -1083,7 +1094,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     break;
 
                 if (i > 100) {
-                    LOGV2(22003, "secondaries having hard time keeping up with migrate");
+                    LOGV2(22003,
+                          "secondaries having hard time keeping up with migrate",
+                          "migrationId"_attr =
+                              _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
                 }
 
                 sleepmillis(20);
@@ -1103,14 +1117,20 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         // Pause to wait for replication. This will prevent us from going into critical section
         // until we're ready.
 
-        LOGV2(22004, "Waiting for replication to catch up before entering critical section");
+        LOGV2(22004,
+              "Waiting for replication to catch up before entering critical section",
+              "migrationId"_attr =
+                  _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
 
         auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
             opCtx, lastOpApplied, _writeConcern);
         uassertStatusOKWithContext(awaitReplicationResult.status,
                                    awaitReplicationResult.status.codeString());
 
-        LOGV2(22005, "Chunk data replicated successfully.");
+        LOGV2(22005,
+              "Chunk data replicated successfully.",
+              "migrationId"_attr =
+                  _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
     }
 
     {
@@ -1147,7 +1167,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             }
 
             if (getState() == ABORT) {
-                LOGV2(22006, "Migration aborted while transferring mods");
+                LOGV2(22006,
+                      "Migration aborted while transferring mods",
+                      "migrationId"_attr =
+                          _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
                 return;
             }
 
@@ -1270,7 +1293,11 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                 const std::string errMsg = str::stream()
                     << "cannot migrate chunk, local document " << redact(localDoc)
                     << " has same _id as reloaded remote document " << redact(updatedDoc);
-                LOGV2_WARNING(22012, "{errMsg}", "errMsg"_attr = errMsg);
+                LOGV2_WARNING(22012,
+                              "{errMsg}",
+                              "errMsg"_attr = errMsg,
+                              "migrationId"_attr =
+                                  _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
 
                 // Exception will abort migration cleanly
                 uasserted(16977, errMsg);
@@ -1299,7 +1326,9 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
                   "nss_ns"_attr = _nss.ns(),
                   "min"_attr = redact(_min),
                   "max"_attr = redact(_max),
-                  "op"_attr = op);
+                  "op"_attr = op,
+                  "migrationId"_attr =
+                      _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
         }
         return false;
     }
@@ -1308,7 +1337,8 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
           "migrate commit succeeded flushing to secondaries for '{nss_ns}' {min} -> {max}",
           "nss_ns"_attr = _nss.ns(),
           "min"_attr = redact(_min),
-          "max"_attr = redact(_max));
+          "max"_attr = redact(_max),
+          "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId.toBSON() : BSONObj());
 
     return true;
 }

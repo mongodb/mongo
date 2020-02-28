@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 #include "mongo/platform/basic.h"
 
@@ -122,6 +122,10 @@ bool isFCVLatest() {
     auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
 
     return fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
+}
+
+BSONObj getMigrationIdBSON(migrationutil::MigrationCoordinator* coordinator) {
+    return coordinator ? coordinator->getMigrationId().toBSON() : BSONObj();
 }
 
 }  // namespace
@@ -399,7 +403,9 @@ Status MigrationSourceManager::enterCriticalSection() {
                           << signalStatus.toString()};
     }
 
-    LOGV2(22017, "Migration successfully entered critical section");
+    LOGV2(22017,
+          "Migration successfully entered critical section",
+          "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
 
     scopedGuard.dismiss();
     return Status::OK();
@@ -513,7 +519,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     LOGV2(
         22018,
         "Migration succeeded and updated collection version to {refreshedMetadata_getCollVersion}",
-        "refreshedMetadata_getCollVersion"_attr = refreshedMetadata->getCollVersion());
+        "refreshedMetadata_getCollVersion"_attr = refreshedMetadata->getCollVersion(),
+        "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
 
     if (_enableResumableRangeDeleter) {
         _coordinator->setMigrationDecision(
@@ -560,7 +567,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             LOGV2(22019,
                   "Waiting for cleanup of {getNss_ns} range {range}",
                   "getNss_ns"_attr = getNss().ns(),
-                  "range"_attr = redact(range.toString()));
+                  "range"_attr = redact(range.toString()),
+                  "migrationId"_attr = _coordinator->getMigrationId());
 
             invariant(_cleanupCompleteFuture);
             auto deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
@@ -628,7 +636,8 @@ void MigrationSourceManager::cleanupOnError() {
         LOGV2_WARNING(22022,
                       "Failed to clean up migration: {args}due to: {ex}",
                       "args"_attr = redact(_args.toString()),
-                      "ex"_attr = redact(ex));
+                      "ex"_attr = redact(ex),
+                      "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
     }
 }
 
@@ -768,7 +777,6 @@ void MigrationSourceManager::_cleanup() {
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();
             _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
-            _coordinator.reset();
         }
     }
 
