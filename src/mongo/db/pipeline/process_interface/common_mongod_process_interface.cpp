@@ -628,9 +628,6 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     newCmd.append("from", renameCommandObj["renameCollection"].String());
     newCmd.append("to", renameCommandObj["to"].String());
     newCmd.append("collectionOptions", originalCollectionOptions);
-    if (!opCtx->getWriteConcern().usedDefault) {
-        newCmd.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
-    }
     BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
     for (auto&& index : originalIndexes) {
         indexArrayBuilder.append(index);

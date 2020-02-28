@@ -171,6 +171,12 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const std::list<BSONObj>& originalIndexes) {
     auto newCmdObj = CommonMongodProcessInterface::_convertRenameToInternalRename(
         opCtx, renameCommandObj, originalCollectionOptions, originalIndexes);
+    BSONObjBuilder newCmdWithWriteConcernBuilder(std::move(newCmdObj));
+    if (!opCtx->getWriteConcern().usedDefault) {
+        newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                             opCtx->getWriteConcern().toBSON());
+    }
+    newCmdObj = newCmdWithWriteConcernBuilder.done();
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, destinationNs.db()));
     auto response =
