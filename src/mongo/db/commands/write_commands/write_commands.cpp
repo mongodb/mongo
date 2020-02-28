@@ -474,6 +474,7 @@ private:
             deleteRequest.setCollation(write_ops::collationOf(_batch.getDeletes()[0]));
             deleteRequest.setMulti(_batch.getDeletes()[0].getMulti());
             deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            deleteRequest.setHint(_batch.getDeletes()[0].getHint());
             deleteRequest.setExplain();
 
             ParsedDelete parsedDelete(opCtx, &deleteRequest);

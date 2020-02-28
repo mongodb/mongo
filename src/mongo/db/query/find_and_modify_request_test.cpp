@@ -617,24 +617,6 @@ TEST(FindAndModifyRequest, ParseWithRemoveAndArrayFilters) {
     ASSERT_NOT_OK(parseStatus.getStatus());
 }
 
-TEST(FindAndModifyRequest, ParseWithRemoveAndHint) {
-    const BSONObj query(BSON("x" << 1));
-    const BSONObj hint(BSON("z" << -1));
-
-    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
-    request.setHint(hint);
-
-    BSONObj cmdObj(fromjson(R"json({
-            findAndModify: 'user',
-            query: { x: 1 },
-            remove: true,
-            hint: { z: -1 }
-        })json"));
-
-    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
-    ASSERT_NOT_OK(parseStatus.getStatus());
-}
-
 TEST(FindAndModifyRequest, ParseWithCollationTypeMismatch) {
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
