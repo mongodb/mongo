@@ -57,7 +57,7 @@ def _install_action_function(_env, node):
     }
 
 
-def _mkdir_action_function(_env, node):
+def _mkdir_action_function(env, node):
     return {
         "outputs": get_outputs(node),
         "rule": "CMD",
