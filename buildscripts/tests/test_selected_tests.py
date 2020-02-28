@@ -9,7 +9,7 @@ from shrub.config import Configuration
 # pylint: disable=wrong-import-position
 import buildscripts.ciconfig.evergreen as _evergreen
 from buildscripts.evergreen_generate_resmoke_tasks import Suite
-from buildscripts.tests.test_burn_in_tests import get_evergreen_config
+from buildscripts.tests.test_burn_in_tests import get_evergreen_config, mock_changed_git_files
 from buildscripts import selected_tests as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,protected-access
@@ -63,11 +63,11 @@ class TestAcceptance(unittest.TestCase):
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
-        changed_files = ["src/file1.cpp"]
+        repos = [mock_changed_git_files([])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
+                                     selected_tests_variant_expansions, repos,
                                      origin_build_variants)
 
         self.assertEqual(config_dict["selected_tests_config.json"], "{}")
@@ -87,11 +87,11 @@ class TestAcceptance(unittest.TestCase):
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
-        changed_files = ["src/file1.cpp"]
+        repos = [mock_changed_git_files(["src/file1.cpp"])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
+                                     selected_tests_variant_expansions, repos,
                                      origin_build_variants)
 
         self.assertIn("selected_tests_config.json", config_dict)
@@ -121,11 +121,11 @@ class TestAcceptance(unittest.TestCase):
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
-        changed_files = ["src/file1.cpp"]
+        repos = [mock_changed_git_files(["src/file1.cpp"])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
+                                     selected_tests_variant_expansions, repos,
                                      origin_build_variants)
 
         self.assertIn("selected_tests_config.json", config_dict)
@@ -565,3 +565,16 @@ class TestGetTaskConfigs(unittest.TestCase):
                                                     changed_files)
 
         self.assertEqual(task_configs["task_config_key"], "task_config_value_2")
+
+
+class RemoveRepoPathPrefix(unittest.TestCase):
+    def test_file_is_in_enterprise_modules(self):
+        filepath = under_test._remove_repo_path_prefix(
+            "src/mongo/db/modules/enterprise/src/file1.cpp")
+
+        self.assertEqual(filepath, "src/file1.cpp")
+
+    def test_file_is_not_in_enterprise_modules(self):
+        filepath = under_test._remove_repo_path_prefix("other_directory/src/file1.cpp")
+
+        self.assertEqual(filepath, "other_directory/src/file1.cpp")
