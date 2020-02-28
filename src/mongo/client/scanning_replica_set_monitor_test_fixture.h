@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
 #include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -44,7 +45,7 @@ namespace mongo {
 // current (only) thread, so they do not lock SetState::mutex before examining state. This is
 // NOT something that non-test code should do.
 
-class ScanningReplicaSetMonitorTest : public unittest::Test {
+class ScanningReplicaSetMonitorTest : public ReplicaSetMonitorProtocolTestFixture {
 public:
     // Pull in nested types
     using SetState = ScanningReplicaSetMonitor::SetState;
@@ -73,8 +74,8 @@ public:
             std::forward<Args>(args)..., &_notifier, nullptr);
     }
 
-    void setUp() override {}
-    void tearDown() override {}
+    void setUp() override;
+    void tearDown() override;
 
     static const std::vector<HostAndPort> basicSeeds;
     static const std::set<HostAndPort> basicSeedsSet;

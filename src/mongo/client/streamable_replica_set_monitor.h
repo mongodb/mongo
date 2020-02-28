@@ -88,6 +88,8 @@ public:
     void appendInfo(BSONObjBuilder& b, bool forFTDC = false) const override;
 
     bool isKnownToHaveGoodPrimary() const override;
+
+    void runScanForMockReplicaSet() override;
 };
 
 }  // namespace mongo

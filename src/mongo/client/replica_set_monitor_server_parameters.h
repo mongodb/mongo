@@ -27,30 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/basic.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-/**
- * Setup every test to use replicaSetMonitorProtocol::kScanning.
- */
-void ScanningReplicaSetMonitorTest::setUp() {
-    setGlobalServiceContext(ServiceContext::make());
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-    ReplicaSetMonitor::cleanup();
-}
+enum class ReplicaSetMonitorProtocol { kScanning, kSdam };
+extern ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol;
+std::string toString(ReplicaSetMonitorProtocol protocol);
 
-void ScanningReplicaSetMonitorTest::tearDown() {
-    ReplicaSetMonitor::cleanup();
-    unsetRSMProtocol();
-}
-
-const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {
-    HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ScanningReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
-                                                                            std::end(basicSeeds)};
-const MongoURI ScanningReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
-                                                                                       basicSeeds));
 }  // namespace mongo

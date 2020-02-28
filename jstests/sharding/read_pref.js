@@ -1,6 +1,6 @@
 /**
  * Integration test for read preference and tagging. The more comprehensive unit test can be found
- * in dbtests/replica_set_monitor_test.cpp.
+ * in dbtests/scanning_replica_set_monitor_test.cpp.
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown

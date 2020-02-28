@@ -26,31 +26,34 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
+#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+void ReplicaSetMonitorProtocolTestFixture::setRSMProtocol(ReplicaSetMonitorProtocol protocol) {
+    const BSONObj newParameterObj = BSON(kRSMProtocolFieldName << toString(protocol));
+    BSONObjIterator parameterIterator(newParameterObj);
+    BSONElement newParameter = parameterIterator.next();
+    const auto foundParameter = findRSMProtocolServerParameter();
 
-/**
- * Setup every test to use replicaSetMonitorProtocol::kScanning.
- */
-void ScanningReplicaSetMonitorTest::setUp() {
-    setGlobalServiceContext(ServiceContext::make());
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-    ReplicaSetMonitor::cleanup();
+    uassertStatusOK(foundParameter->second->set(newParameter));
 }
 
-void ScanningReplicaSetMonitorTest::tearDown() {
-    ReplicaSetMonitor::cleanup();
-    unsetRSMProtocol();
+void ReplicaSetMonitorProtocolTestFixture::unsetRSMProtocol() {
+    const auto defaultParameter = kDefaultParameter[kRSMProtocolFieldName];
+    const auto foundParameter = findRSMProtocolServerParameter();
+
+    uassertStatusOK(foundParameter->second->set(defaultParameter));
 }
 
-const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {
-    HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ScanningReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
-                                                                            std::end(basicSeeds)};
-const MongoURI ScanningReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
-                                                                                       basicSeeds));
+ServerParameter::Map::const_iterator
+ReplicaSetMonitorProtocolTestFixture::findRSMProtocolServerParameter() {
+    const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+    invariant(parameterMap.size());
+    return parameterMap.find(kRSMProtocolFieldName);
+}
+
 }  // namespace mongo

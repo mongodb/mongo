@@ -27,30 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/client/replica_set_monitor_server_parameters.h"
 
-#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
+#include "mongo/base/status.h"
+#include "mongo/client/replica_set_monitor_server_parameters_gen.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-/**
- * Setup every test to use replicaSetMonitorProtocol::kScanning.
- */
-void ScanningReplicaSetMonitorTest::setUp() {
-    setGlobalServiceContext(ServiceContext::make());
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-    ReplicaSetMonitor::cleanup();
+ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol{ReplicaSetMonitorProtocol::kScanning};
+
+std::string toString(ReplicaSetMonitorProtocol protocol) {
+    if (protocol == ReplicaSetMonitorProtocol::kScanning) {
+        return "scanning";
+    } else {
+        return "sdam";
+    }
 }
 
-void ScanningReplicaSetMonitorTest::tearDown() {
-    ReplicaSetMonitor::cleanup();
-    unsetRSMProtocol();
+void RSMProtocolServerParameter::append(OperationContext*,
+                                        BSONObjBuilder& builder,
+                                        const std::string& name) {
+    builder.append(name, toString(gReplicaSetMonitorProtocol));
 }
 
-const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {
-    HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ScanningReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
-                                                                            std::end(basicSeeds)};
-const MongoURI ScanningReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
-                                                                                       basicSeeds));
+Status RSMProtocolServerParameter::setFromString(const std::string& protocolStr) {
+    if (protocolStr == toString(ReplicaSetMonitorProtocol::kScanning)) {
+        gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kScanning;
+    } else if (protocolStr == toString(ReplicaSetMonitorProtocol::kSdam)) {
+        gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kSdam;
+    } else {
+        return Status{ErrorCodes::BadValue,
+                      str::stream()
+                          << "Unrecognized replicaSetMonitorProtocol '" << protocolStr << "'"};
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo

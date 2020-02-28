@@ -29,11 +29,10 @@ global:
     cpp_namespace: mongo
 
 server_parameters:
-    disableStreamableReplicaSetMonitor:
+    replicaSetMonitorProtocol:
         description: >-
-            Disable the StreamableReplicaSetMonitor and revert to the prior behavior with the
-            ScanningReplicaSetMonitor
+            Select which replica set monitor protocol to use - the new 'sdam' compliant protocol or
+            the old 'scanning' protocol.
         set_at: startup
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: disableStreamableReplicaSetMonitor
-        default: true 
+        cpp_class:
+            name: RSMProtocolServerParameter

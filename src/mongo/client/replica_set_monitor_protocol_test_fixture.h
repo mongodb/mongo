@@ -27,30 +27,44 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/scanning_replica_set_monitor_test_fixture.h"
+#include "mongo/client/replica_set_monitor_server_parameters.h"
+#include "mongo/client/replica_set_monitor_server_parameters_gen.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 /**
- * Setup every test to use replicaSetMonitorProtocol::kScanning.
+ * Test wrapper for tests that need to set and unset the replicaSetMonitorProtocol server parameter.
  */
-void ScanningReplicaSetMonitorTest::setUp() {
-    setGlobalServiceContext(ServiceContext::make());
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-    ReplicaSetMonitor::cleanup();
-}
+class ReplicaSetMonitorProtocolTestFixture : public unittest::Test {
+protected:
+    /**
+     * Sets the replicaSetMonitorProtocol to 'protocol'.
+     */
+    void setRSMProtocol(ReplicaSetMonitorProtocol protocol);
 
-void ScanningReplicaSetMonitorTest::tearDown() {
-    ReplicaSetMonitor::cleanup();
-    unsetRSMProtocol();
-}
+    /**
+     * Restores the replicaSetMonitorProtocol parameter to its default value.
+     */
+    void unsetRSMProtocol();
 
-const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {
-    HostAndPort("a"), HostAndPort("b"), HostAndPort("c")};
-const std::set<HostAndPort> ScanningReplicaSetMonitorTest::basicSeedsSet = {std::begin(basicSeeds),
-                                                                            std::end(basicSeeds)};
-const MongoURI ScanningReplicaSetMonitorTest::basicUri(ConnectionString::forReplicaSet(kSetName,
-                                                                                       basicSeeds));
+    /**
+     * Finds the replicaSetMonitorProtocol ServerParameter.
+     */
+    ServerParameter::Map::const_iterator findRSMProtocolServerParameter();
+
+    static inline const std::string kRSMProtocolFieldName = "replicaSetMonitorProtocol";
+
+    /**
+     * A BSONObj containing the default for the replicaSetMonitorProtocol server parameter.
+     */
+    const BSONObj kDefaultParameter =
+        BSON(kRSMProtocolFieldName << toString(gReplicaSetMonitorProtocol));
+};
+
 }  // namespace mongo

@@ -105,4 +105,8 @@ bool StreamableReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
     MONGO_UNREACHABLE;
 }
 
+void StreamableReplicaSetMonitor::runScanForMockReplicaSet() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo
