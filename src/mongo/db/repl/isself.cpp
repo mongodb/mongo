@@ -145,7 +145,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
         }
     }
 
-    if (shouldLog(logger::LogSeverity::Debug(2))) {
+    if (shouldLog(logv2::LogSeverity::Debug(2))) {
         StringBuilder builder;
         builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
         for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
@@ -340,7 +340,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 
 #endif  // defined(_WIN32)
 
-    if (shouldLog(logger::LogSeverity::Debug(2))) {
+    if (shouldLog(logv2::LogSeverity::Debug(2))) {
         StringBuilder builder;
         builder << "getBoundAddrs():";
         for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {

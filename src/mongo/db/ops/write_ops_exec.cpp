@@ -771,8 +771,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
                 throw;
             }
 
-            logAndBackoff(::mongo::logger::LogComponent::kWrite,
-                          logger::LogSeverity::Debug(1),
+            logAndBackoff(4640402,
+                          ::mongo::logv2::LogComponent::kWrite,
+                          logv2::LogSeverity::Debug(1),
                           numAttempts,
                           str::stream()
                               << "Caught DuplicateKey exception during upsert for namespace "

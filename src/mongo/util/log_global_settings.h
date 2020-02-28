@@ -49,7 +49,7 @@ void logV2Set(bool setting);
  * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
  */
 
-inline bool shouldLog(logger::LogComponent logComponent1, logger::LogSeverity severity) {
+inline bool shouldLogV1(logger::LogComponent logComponent1, logger::LogSeverity severity) {
     if (logV2Enabled())
         return logv2::LogManager::global().getGlobalSettings().shouldLog(
             logComponentV1toV2(logComponent1), logSeverityV1toV2(severity));

@@ -53,7 +53,7 @@ namespace {
 // because the recovery unit may not ever actually be in a prepared state.
 MONGO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
 
-logger::LogSeverity kSlowTransactionSeverity = logger::LogSeverity::Debug(1);
+logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 
 }  // namespace
 
@@ -340,7 +340,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         // break.
         if (transactionTime >= std::max(1, serverGlobalParams.slowMS)) {
             LOGV2_DEBUG(22411,
-                        logSeverityV1toV2(kSlowTransactionSeverity).toInt(),
+                        kSlowTransactionSeverity.toInt(),
                         "Slow WT transaction. Lifetime of SnapshotId {getSnapshotId_toNumber} was "
                         "{transactionTime}ms",
                         "getSnapshotId_toNumber"_attr = getSnapshotId().toNumber(),

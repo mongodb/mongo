@@ -220,7 +220,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
 }
 
 void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
-    if (!shouldLog(logger::LogSeverity::Debug(1))) {
+    if (!shouldLog(logv2::LogSeverity::Debug(1))) {
         // don't collect stats unless verbose
         return;
     }

@@ -175,34 +175,34 @@ inline LogstreamBuilderDeprecated log(logger::LogComponent::Value componentValue
 }  // namespace
 
 // this can't be in log_global_settings.h because it utilizes MongoLogDefaultComponent_component
-inline bool shouldLog(logger::LogSeverity severity) {
+inline bool shouldLogV1(logger::LogSeverity severity) {
     if (logV2Enabled())
         return logv2::LogManager::global().getGlobalSettings().shouldLog(
             logComponentV1toV2(MongoLogDefaultComponent_component), logSeverityV1toV2(severity));
-    return mongo::shouldLog(MongoLogDefaultComponent_component, severity);
+    return mongo::shouldLogV1(MongoLogDefaultComponent_component, severity);
 }
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
-#define MONGO_LOG(DLEVEL)                                                                 \
-    if (!::mongo::shouldLog(MongoLogDefaultComponent_component,                           \
-                            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL))) { \
-    } else                                                                                \
-        ::mongo::logger::LogstreamBuilderDeprecated(                                      \
-            ::mongo::logger::globalLogDomain(),                                           \
-            ::mongo::getThreadName(),                                                     \
-            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                    \
+#define MONGO_LOG(DLEVEL)                                                                   \
+    if (!::mongo::shouldLogV1(MongoLogDefaultComponent_component,                           \
+                              ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL))) { \
+    } else                                                                                  \
+        ::mongo::logger::LogstreamBuilderDeprecated(                                        \
+            ::mongo::logger::globalLogDomain(),                                             \
+            ::mongo::getThreadName(),                                                       \
+            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                      \
             MongoLogDefaultComponent_component)
 
 #define LOG MONGO_LOG
 
-#define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1)                                           \
-    if (!::mongo::shouldLog((COMPONENT1),                                                 \
-                            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL))) { \
-    } else                                                                                \
-        ::mongo::logger::LogstreamBuilderDeprecated(                                      \
-            ::mongo::logger::globalLogDomain(),                                           \
-            ::mongo::getThreadName(),                                                     \
-            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                    \
+#define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1)                                             \
+    if (!::mongo::shouldLogV1((COMPONENT1),                                                 \
+                              ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL))) { \
+    } else                                                                                  \
+        ::mongo::logger::LogstreamBuilderDeprecated(                                        \
+            ::mongo::logger::globalLogDomain(),                                             \
+            ::mongo::getThreadName(),                                                       \
+            ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                      \
             (COMPONENT1))
 
 

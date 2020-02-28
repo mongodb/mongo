@@ -406,7 +406,7 @@ void TransactionCoordinator::_done(Status status) {
         _decisionDurable ? _decision : boost::none);
 
     if (status.isOK() &&
-        (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+        (shouldLog(logv2::LogComponent::kTransaction, logv2::LogSeverity::Debug(1)) ||
          _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats()
                  .getTwoPhaseCommitDuration(tickSource, tickSource->getTicks()) >
              Milliseconds(serverGlobalParams.slowMS))) {

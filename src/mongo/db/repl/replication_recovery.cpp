@@ -61,6 +61,8 @@ namespace {
 
 const auto kRecoveryBatchLogLevel = logger::LogSeverity::Debug(2);
 const auto kRecoveryOperationLogLevel = logger::LogSeverity::Debug(3);
+const auto kRecoveryBatchLogLevelV2 = logv2::LogSeverity::Debug(2);
+const auto kRecoveryOperationLogLevelV2 = logv2::LogSeverity::Debug(3);
 
 /**
  * Tracks and logs operations applied during recovery.
@@ -76,8 +78,8 @@ public:
             << " (inclusive)). Operations applied so far: " << _numOpsApplied;
 
         _numOpsApplied += batch.size();
-        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
-                      kRecoveryOperationLogLevel)) {
+        if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery,
+                      kRecoveryOperationLogLevelV2)) {
             std::size_t i = 0;
             for (const auto& entry : batch) {
                 i++;

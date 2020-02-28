@@ -175,6 +175,15 @@ namespace mongo {
                         MESSAGE,                                                          \
                         ##__VA_ARGS__)
 
+inline bool shouldLog(logv2::LogSeverity severity) {
+    return logv2::LogManager::global().getGlobalSettings().shouldLog(
+        MongoLogV2DefaultComponent_component, severity);
+}
+
+inline bool shouldLog(logv2::LogComponent logComponent, logv2::LogSeverity severity) {
+    return logv2::LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
+}
+
 }  // namespace mongo
 
 #endif  // MONGO_UTIL_LOGV2_H_

@@ -1618,7 +1618,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                     schema.jsonString(JsonStringFormat::LegacyStrict));
     try {
         auto translation = _parse(expCtx, ""_sd, schema, ignoreUnknownKeywords);
-        if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
+        if (shouldLog(logv2::LogSeverity::Debug(5)) && translation.isOK()) {
             LOGV2_DEBUG(20729,
                         5,
                         "Translated schema match expression: {translation_getValue_debugString}",

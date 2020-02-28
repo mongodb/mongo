@@ -65,7 +65,7 @@ using std::vector;
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
-const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
+const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 }  // namespace
 
 StorageEngineImpl::StorageEngineImpl(KVEngine* engine, StorageEngineOptions options)
@@ -123,7 +123,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
     _catalogRecordStore = _engine->getGroupedRecordStore(
         opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
-    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+    if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
     }
@@ -280,7 +280,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
-    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+    if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
     }

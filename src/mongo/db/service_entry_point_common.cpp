@@ -1101,7 +1101,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         command->incrementCommandsExecuted();
 
-        if (shouldLog(logger::LogComponent::kTracking, logger::LogSeverity::Debug(1)) &&
+        if (shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1)) &&
             rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
             LOGV2_DEBUG_OPTIONS(4615605,
                                 1,
@@ -1394,7 +1394,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     const char* cursorArray = dbmessage.getArray(n);
     int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
 
-    if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
+    if (shouldLog(logv2::LogSeverity::Debug(1)) || found != n) {
         LOGV2_DEBUG(21967,
                     logSeverityV1toV2(found == n ? 1 : 0).toInt(),
                     "killcursors: found {found} of {n}",

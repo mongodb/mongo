@@ -40,7 +40,7 @@ list_files = False  # pylint: disable=invalid-name
 def parse_source_files(callback):
     """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
 
-    quick = [r"assert", r"Exception", r"ErrorCodes::Error", r"LOGV2"]
+    quick = [r"assert", r"Exception", r"ErrorCodes::Error", r"LOGV2", r"logAndBackoff"]
 
     patterns = [
         re.compile(r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE),
@@ -48,6 +48,7 @@ def parse_source_files(callback):
         re.compile(r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
                    re.MULTILINE),
         re.compile(r"LOGV2(?:\w*)?\s*\(\s*(\d+)", re.MULTILINE),
+        re.compile(r"logAndBackoff\(\s*(\d+)", re.MULTILINE),
         re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
     ]
 

@@ -54,7 +54,7 @@ TEST(SERVER25981Test, SetSeverityShouldLogAndClear) {
     stdx::thread shouldLogThread([&]() {
         startupBarrier.countDownAndWait();
         while (running.load()) {
-            shouldLog(LogComponent::kDefault, logger::LogSeverity::Debug(3));
+            shouldLogV1(LogComponent::kDefault, logger::LogSeverity::Debug(3));
         }
     });
 
