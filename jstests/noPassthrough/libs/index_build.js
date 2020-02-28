@@ -1,6 +1,6 @@
 // Helper functions for testing index builds.
 
-class IndexBuildTest {
+var IndexBuildTest = class {
     /**
      * Starts an index build in a separate mongo shell process with given options.
      * Ensures the index build worked or failed with one of the expected failures.
@@ -218,4 +218,4 @@ class IndexBuildTest {
                 conn.adminCommand({getParameter: 1, enableIndexBuildMajorityCommitQuorum: 1}))
             .enableIndexBuildMajorityCommitQuorum;
     }
-}
+};
