@@ -664,8 +664,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     if (kDebugBuild) {
         ss << "debug_mode=(table_logging=true),";
     }
-    ss << "),";
-
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig("system");
     ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
