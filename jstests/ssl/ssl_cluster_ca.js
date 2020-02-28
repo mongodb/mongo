@@ -17,9 +17,16 @@ function testRS(opts, succeed) {
         rs.initiate();
         assert.commandWorked(rs.getPrimary().getDB('admin').runCommand({isMaster: 1}));
     } else {
-        assert.throws(function() {
-            rs.initiate();
-        });
+        // The rs.initiate will fail in an assert.soon, which would ordinarily trigger the hang
+        // analyzer.  We don't want that to happen, so we disable it here.
+        MongoRunner.runHangAnalyzer.disable();
+        try {
+            assert.throws(function() {
+                rs.initiate();
+            });
+        } finally {
+            MongoRunner.runHangAnalyzer.enable();
+        }
         TestData.skipCheckDBHashes = true;
     }
     rs.stopSet();
