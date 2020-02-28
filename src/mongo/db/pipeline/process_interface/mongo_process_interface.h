@@ -260,19 +260,15 @@ public:
      * whether or not this function is called in a sharded environment.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards = true) = 0;
+        Pipeline* pipeline, bool allowTargetingShards = true) = 0;
 
     /**
      * Accepts a pipeline and attaches a cursor source to it. Returns a BSONObj of the form
      * {"pipeline": <explainOutput>}. Note that <explainOutput> can be an object (shardsvr) or an
      * array (non_shardsvr).
      */
-    virtual BSONObj attachCursorSourceAndExplain(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
-        ExplainOptions::Verbosity verbosity) = 0;
+    virtual BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
+                                                 ExplainOptions::Verbosity verbosity) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying
@@ -289,7 +285,7 @@ public:
      * compiler expects to find an implementation of PipelineDeleter.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
+        Pipeline* pipeline) = 0;
 
     /**
      * Produces a ShardFilterer. May return null.

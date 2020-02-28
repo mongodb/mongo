@@ -40,19 +40,17 @@ namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
+    Pipeline* ownedPipeline) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+        ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
     pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
     return pipeline;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
+                                                                       bool allowTargetingShards) {
+    return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
 boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingleDocument(

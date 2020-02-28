@@ -1068,9 +1068,8 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
     return Status::OK();
 }
 
-BSONObj targetShardsForExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               Pipeline* ownedPipeline) {
-
+BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
+    auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
     invariant(pipeline->getSources().empty() ||
@@ -1137,10 +1136,9 @@ bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream) {
     return nss.isCollectionlessAggregateNS() || hasChangeStream;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* ownedPipeline,
+                                                                  bool allowTargetingShards) {
+    auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
     invariant(pipeline->getSources().empty() ||
@@ -1154,7 +1152,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                 // If the db is local, this may be a change stream examining the oplog. We know the
                 // oplog (and any other local collections) will not be sharded.
                 return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                    expCtx, pipeline.release());
+                    pipeline.release());
             }
             return targetShardsAndAddMergeCursors(expCtx, pipelineToTarget.release());
         });

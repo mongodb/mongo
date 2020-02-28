@@ -157,10 +157,8 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 }
 
 BSONObj ShardServerProcessInterface::attachCursorSourceAndExplain(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    ExplainOptions::Verbosity verbosity) {
-    return sharded_agg_helpers::targetShardsForExplain(expCtx, ownedPipeline);
+    Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
+    return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
 }
 
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
@@ -311,11 +309,9 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-ShardServerProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
+ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
+                                                          bool allowTargetingShards) {
+    return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
 }
 
 }  // namespace mongo

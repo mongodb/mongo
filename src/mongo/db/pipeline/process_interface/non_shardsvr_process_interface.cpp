@@ -43,11 +43,9 @@
 namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+NonShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
+                                                             bool allowTargetingShards) {
+    return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
 std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
@@ -174,10 +172,8 @@ void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,
 }
 
 BSONObj NonShardServerProcessInterface::attachCursorSourceAndExplain(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    ExplainOptions::Verbosity verbosity) {
-    auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+    Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
+    auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
     BSONArrayBuilder bab;
     auto pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
     for (auto&& stage : pipelineVec) {

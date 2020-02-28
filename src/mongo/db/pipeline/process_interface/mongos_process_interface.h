@@ -148,12 +148,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
+    BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
                                          ExplainOptions::Verbosity verbosity) final;
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
+        Pipeline* pipeline) final {
         // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
     }
@@ -229,9 +228,7 @@ public:
      * operation.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) final;
+        Pipeline* pipeline, bool allowTargetingShards) final;
 
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,

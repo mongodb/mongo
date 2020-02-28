@@ -654,7 +654,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
 
     if (opts.attachCursorSource) {
         pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            expCtx, pipeline.release(), opts.allowTargetingShards);
+            pipeline.release(), opts.allowTargetingShards);
     }
 
     return pipeline;

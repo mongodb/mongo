@@ -104,18 +104,14 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 }  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
+    Pipeline* ownedPipeline, bool allowTargetingShards) {
     // On mongos we can't have local cursors.
-    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
+    return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
 }
 
-BSONObj MongosProcessInterface::attachCursorSourceAndExplain(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    ExplainOptions::Verbosity verbosity) {
-    return sharded_agg_helpers::targetShardsForExplain(expCtx, ownedPipeline);
+BSONObj MongosProcessInterface::attachCursorSourceAndExplain(Pipeline* ownedPipeline,
+                                                             ExplainOptions::Verbosity verbosity) {
+    return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
 }
 
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(

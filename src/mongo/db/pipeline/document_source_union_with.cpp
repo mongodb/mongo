@@ -182,10 +182,9 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                     3,
                     "$unionWith attaching cursor to pipeline {pipeline}",
                     "pipeline"_attr = serializedPipe);
-        auto expCtxCopy = _pipeline->getContext();
         try {
-            _pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-                expCtxCopy, _pipeline.release());
+            _pipeline =
+                pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
             _executionState = ExecutionProgress::kIteratingSubPipeline;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             _pipeline = buildPipelineFromViewDefinition(
@@ -250,7 +249,7 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
         auto containers = _pipeline->getSources();
         auto pipeCopy = Pipeline::create(containers, ctx);
         auto explainObj = pExpCtx->mongoProcessInterface->attachCursorSourceAndExplain(
-            ctx, pipeCopy.release(), *explain);
+            pipeCopy.release(), *explain);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
         invariant(explainObj.nFields() == 1);

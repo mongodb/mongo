@@ -88,11 +88,10 @@ BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
 }
 
 class StubExplainInterface : public StubMongoProcessInterface {
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
+    BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
                                          ExplainOptions::Verbosity verbosity) override {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                            PipelineDeleter(expCtx->opCtx));
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
         BSONArrayBuilder bab;
         auto pipelineVec = pipeline->writeExplainOps(verbosity);
         for (auto&& stage : pipelineVec) {
@@ -101,9 +100,9 @@ class StubExplainInterface : public StubMongoProcessInterface {
         return BSON("pipeline" << bab.arr());
     }
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                            PipelineDeleter(expCtx->opCtx));
+        Pipeline* ownedPipeline) {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
         return pipeline;
     }
 };

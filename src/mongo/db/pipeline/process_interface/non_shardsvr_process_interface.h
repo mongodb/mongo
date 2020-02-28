@@ -52,12 +52,9 @@ public:
                                      bool includeBuildUUIDs) override;
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) override;
+        Pipeline* pipeline, bool allowTargetingShards) override;
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
+    BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
                                          ExplainOptions::Verbosity verbosity);
 
     std::unique_ptr<ShardFilterer> getShardFilterer(

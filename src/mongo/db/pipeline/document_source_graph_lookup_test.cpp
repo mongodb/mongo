@@ -63,11 +63,9 @@ public:
         : _results(std::move(results)) {}
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
-        bool allowTargetingShards) final {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                            PipelineDeleter(expCtx->opCtx));
+        Pipeline* ownedPipeline, bool allowTargetingShards) final {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
         pipeline->addInitialSource(DocumentSourceMock::createForTest(_results));
         return pipeline;
     }

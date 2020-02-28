@@ -155,8 +155,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
  * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
  * true. Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
  */
-BSONObj targetShardsForExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               Pipeline* ownedPipeline);
+BSONObj targetShardsForExplain(Pipeline* ownedPipeline);
 
 /**
  * Appends the explain output of `dispatchResults` to `result`.
@@ -191,10 +190,8 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
  * merging half executing in this process after attaching a $mergeCursors. Will retry on network
  * errors and also on StaleConfig errors to avoid restarting the entire operation.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards);
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* ownedPipeline,
+                                                                  bool allowTargetingShards);
 
 /**
  * Adds a log message with the given message. Simple helper to avoid defining the log component in a

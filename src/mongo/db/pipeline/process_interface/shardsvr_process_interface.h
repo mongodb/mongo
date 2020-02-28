@@ -87,8 +87,7 @@ public:
                                     bool multi,
                                     boost::optional<OID> targetEpoch) final;
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
+    BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
                                          ExplainOptions::Verbosity verbosity) final;
 
     std::unique_ptr<ShardFilterer> getShardFilterer(
@@ -117,9 +116,7 @@ public:
      * operation.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* pipeline,
-        bool allowTargetingShards) final;
+        Pipeline* pipeline, bool allowTargetingShards) final;
 };
 
 }  // namespace mongo

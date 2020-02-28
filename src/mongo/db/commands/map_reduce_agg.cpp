@@ -121,7 +121,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-            expCtx, pipeline.release());
+            pipeline.release());
     }();
 
     {

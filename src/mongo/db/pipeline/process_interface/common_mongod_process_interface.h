@@ -77,7 +77,7 @@ public:
                                 BSONObjBuilder* builder) const final override;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
+        Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
     boost::optional<Document> lookupSingleDocument(
