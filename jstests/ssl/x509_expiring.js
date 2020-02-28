@@ -38,15 +38,10 @@ function test(expiration, expect) {
 
     if (isJsonLog(mongo)) {
         function checkPeerCertificateExpires(element, index, array) {
-            // TODO SERVER-46018: Parse can show because RamLog may return a truncated log
-            try {
-                const logJson = JSON.parse(element);
+            const logJson = JSON.parse(element);
 
-                return (logJson.id === 23221 || logJson.id === 23222) &&
-                    logJson.attr.peerSubjectName === CLIENT_USER;
-            } catch (exception) {
-                return false;
-            }
+            return (logJson.id === 23221 || logJson.id === 23222) &&
+                logJson.attr.peerSubjectName === CLIENT_USER;
         }
         assert.eq(log.some(checkPeerCertificateExpires), expect);
     } else {
