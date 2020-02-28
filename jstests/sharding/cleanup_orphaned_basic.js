@@ -3,10 +3,14 @@
 // command fail.
 //
 // requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
+// requires_persistence because it restarts a shard.
+// @tags: [requires_fcv_44, requires_persistence]
 
 (function() {
 "use strict";
+
+// This test restarts a shard.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 /*****************************************************************************
  * Unsharded mongod.
@@ -15,6 +19,7 @@
 // cleanupOrphaned fails against unsharded mongod.
 var mongod = MongoRunner.runMongod();
 assert.commandFailed(mongod.getDB('admin').runCommand({cleanupOrphaned: 'foo.bar'}));
+MongoRunner.stopMongod(mongod);
 
 /*****************************************************************************
  * Bad invocations of cleanupOrphaned command.
@@ -93,32 +98,44 @@ assert.eq(
  * Bad startingFromKeys.
  ****************************************************************************/
 
-// startingFromKey of MaxKey.
-response = shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {_id: MaxKey}});
-assert.commandWorked(response);
-assert.eq(null, response.stoppedAtKey);
+function testBadStartingFromKeys(shardAdmin) {
+    // startingFromKey of MaxKey.
+    response = shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {_id: MaxKey}});
+    assert.commandWorked(response);
+    assert.eq(null, response.stoppedAtKey);
 
-// startingFromKey doesn't match number of fields in shard key.
-assert.commandFailed(shardAdmin.runCommand(
-    {cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue', someOtherKey: 1}}));
+    // startingFromKey doesn't match number of fields in shard key.
+    assert.commandFailed(shardAdmin.runCommand(
+        {cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue', someOtherKey: 1}}));
 
-// startingFromKey matches number of fields in shard key but not field names.
-assert.commandFailed(
-    shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue'}}));
+    // startingFromKey matches number of fields in shard key but not field names.
+    assert.commandFailed(
+        shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue'}}));
 
-var coll2 = mongos.getCollection('foo.baz');
+    var coll2 = mongos.getCollection('foo.baz');
 
-assert.commandWorked(
-    mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}));
+    assert.commandWorked(
+        mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}));
 
-// startingFromKey doesn't match number of fields in shard key.
-assert.commandFailed(shardAdmin.runCommand(
-    {cleanupOrphaned: coll2.getFullName(), startingFromKey: {someKey: 'someValue'}}));
+    // startingFromKey doesn't match number of fields in shard key.
+    assert.commandFailed(shardAdmin.runCommand(
+        {cleanupOrphaned: coll2.getFullName(), startingFromKey: {someKey: 'someValue'}}));
 
-// startingFromKey matches number of fields in shard key but not field names.
-assert.commandFailed(shardAdmin.runCommand(
-    {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
+    // startingFromKey matches number of fields in shard key but not field names.
+    assert.commandFailed(shardAdmin.runCommand(
+        {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
+}
+
+// Test when disableResumableRangeDeleter=true.
+testBadStartingFromKeys(shardAdmin);
+
+// Restart the shard with disableResumableRangeDeleter=false and test bad startingFromKey's. Note
+// that the 'startingFromKey' parameter is validated when disableResumableRangeDeleter=false and the
+// FCV is 4.4, but is not otherwise used (cleanupOrphaned waits for there to be no orphans in the
+// entire key space).
+st.rs0.stopSet(null /* signal */, true /* forRestart */);
+st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
+testBadStartingFromKeys(st.rs0.getPrimary().getDB("admin"));
 
 st.stop();
-MongoRunner.stopMongod(mongod);
 })();

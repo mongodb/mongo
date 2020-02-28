@@ -112,5 +112,20 @@ private:
     static void _runUpdateCommand(OperationContext* opCtx, UpdateBuilder callback);
 };
 
+/**
+ * Utility class to prevent the FCV from changing while the FixedFCVRegion is in scope.
+ */
+class FixedFCVRegion {
+public:
+    explicit FixedFCVRegion(OperationContext* opCtx) {
+        invariant(!opCtx->lockState()->isLocked());
+        _lk.emplace(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+    }
+
+    ~FixedFCVRegion() = default;
+
+private:
+    boost::optional<Lock::SharedLock> _lk;
+};
 
 }  // namespace mongo

@@ -220,12 +220,12 @@ Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid) {
                  << GT << range.getMin());
 }
 
-bool checkForConflictingDeletions(OperationContext* opCtx,
-                                  const ChunkRange& range,
-                                  const UUID& uuid) {
+size_t checkForConflictingDeletions(OperationContext* opCtx,
+                                    const ChunkRange& range,
+                                    const UUID& uuid) {
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
-    return store.count(opCtx, overlappingRangeQuery(range, uuid)) > 0;
+    return store.count(opCtx, overlappingRangeQuery(range, uuid));
 }
 
 ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,

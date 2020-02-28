@@ -74,9 +74,9 @@ Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
  * Checks the pending range deletions collection to see if there are any pending ranges that
  * conflict with the passed in range.
  */
-bool checkForConflictingDeletions(OperationContext* opCtx,
-                                  const ChunkRange& range,
-                                  const UUID& uuid);
+size_t checkForConflictingDeletions(OperationContext* opCtx,
+                                    const ChunkRange& range,
+                                    const UUID& uuid);
 
 /**
  * Asynchronously attempts to submit the RangeDeletionTask for processing.
