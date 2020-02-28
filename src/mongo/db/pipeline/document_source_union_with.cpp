@@ -226,28 +226,12 @@ void DocumentSourceUnionWith::doDispose() {
 
 void DocumentSourceUnionWith::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
-        auto ctx = _pipeline->getContext();
-        auto containers = _pipeline->getSources();
-        auto pipeCopy = Pipeline::create(containers, ctx);
-        auto explainObj = pExpCtx->mongoProcessInterface->attachCursorSourceAndExplain(
-            ctx, pipeCopy.release(), *explain);
-        LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
-        // We expect this to be an explanation of a pipeline -- there should only be one field.
-        invariant(explainObj.nFields() == 1);
-        Document doc =
-            DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
-                                              << explainObj.firstElement()));
-        array.push_back(Value(doc));
-        return;
-    } else {
-        BSONArrayBuilder bab;
-        for (auto&& stage : _pipeline->serialize())
-            bab << stage;
-        Document doc = DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll()
-                                                         << "pipeline" << bab.arr()));
-        array.push_back(Value(doc));
-    }
+    BSONArrayBuilder bab;
+    for (auto&& stage : _pipeline->serialize())
+        bab << stage;
+    Document doc = DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll()
+                                                     << "pipeline" << bab.arr()));
+    array.push_back(Value(doc));
 }
 
 DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) const {

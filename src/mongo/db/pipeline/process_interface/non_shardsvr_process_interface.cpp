@@ -172,19 +172,4 @@ void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOK(mongo::dropCollectionForApplyOps(
         opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 }
-
-BSONObj NonShardServerProcessInterface::attachCursorSourceAndExplain(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    ExplainOptions::Verbosity verbosity) {
-    auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
-    BSONArrayBuilder bab;
-    auto pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
-    for (auto&& stage : pipelineVec) {
-        bab << stage;
-    }
-
-    return BSON("pipeline" << bab.arr());
-}
-
 }  // namespace mongo

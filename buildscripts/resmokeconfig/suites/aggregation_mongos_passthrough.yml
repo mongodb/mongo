@@ -15,9 +15,6 @@ selector:
   # Mongos does not support runtimeConstants.
   - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
   - jstests/aggregation/expressions/internal_js_emit_with_scope.js
-  # $unionWith explain output does not check whether the collection is sharded in a sharded
-  # cluster.
-  - jstests/aggregation/sources/unionWith/unionWith_explain.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - requires_profiling
