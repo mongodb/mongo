@@ -94,6 +94,7 @@ using TCPFastOpenConnect = asio::detail::socket_option::boolean<IPPROTO_TCP, TCP
  * - tcpFastOpenQueueSize
  */
 bool tcpFastOpenIsConfigured = false;
+boost::optional<Status> maybeTcpFastOpenStatus;
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
@@ -713,6 +714,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
     return mergedFuture;
 }
 
+namespace {
 #if defined(TCP_FASTOPEN) || defined(TCP_FASTOPEN_CONNECT)
 /**
  * Attempt to set an option on a dummy SOCK_STREAM/AF_INET socket
@@ -752,7 +754,7 @@ Status validateFastOpen() noexcept {
 #ifndef TCP_FASTOPEN
     if (tcpFastOpenIsConfigured && gTCPFastOpenServer) {
         return {ErrorCodes::BadValue,
-                "TCP FastOpen server support requested, but unavailable in this build of MongoDB"};
+                "TCP FastOpen server support unavailable in this build of MongoDB"};
     }
 #else
     networkCounter.setTFOServerSupport(trySetSockOpt(IPPROTO_TCP, TCP_FASTOPEN, 1));
@@ -761,7 +763,7 @@ Status validateFastOpen() noexcept {
 #ifndef TCP_FASTOPEN_CONNECT
     if (tcpFastOpenIsConfigured && gTCPFastOpenClient) {
         return {ErrorCodes::BadValue,
-                "TCP FastOpen client support requested, but unavailable in this build of MongoDB"};
+                "TCP FastOpen client support unavailable in this build of MongoDB"};
     }
 #else
     networkCounter.setTFOClientSupport(trySetSockOpt(IPPROTO_TCP, TCP_FASTOPEN_CONNECT, 1));
@@ -776,8 +778,7 @@ Status validateFastOpen() noexcept {
     boost::system::error_code ec;
     if (!boost::filesystem::exists(procfile, ec)) {
         return {ErrorCodes::BadValue,
-                str::stream() << "TCP FastOpen support requested, but unable to locate " << procfile
-                              << ": " << errorCodeToStatus(ec)};
+                str::stream() << "Unable to locate " << procfile << ": " << errorCodeToStatus(ec)};
     }
 
     std::fstream f(procfile, std::ifstream::in);
@@ -803,13 +804,54 @@ Status validateFastOpen() noexcept {
 
     if (val != wantval) {
         return {ErrorCodes::BadValue,
-                str::stream() << "TCP FastOpen support requested, but disabled in kernel. "
+                str::stream() << "TCP FastOpen disabled in kernel. "
                               << "Set " << procfile << " to " << std::to_string(wantval)};
     }
 #endif
 
     return Status::OK();
 }
+
+Status validateFastOpenOnce() noexcept {
+    if (!maybeTcpFastOpenStatus) {
+        // If we haven't validated the TCP FastOpen situation yet, do so.
+        maybeTcpFastOpenStatus = validateFastOpen();
+
+        if (!maybeTcpFastOpenStatus->isOK()) {
+            // This has to be a char[] because that's what logv2 understands
+            static constexpr char kPrefixString[] = "Unable to enable TCP FastOpen";
+
+            if (tcpFastOpenIsConfigured) {
+                // If the user asked for TCP FastOpen and we couldn't provide it, log a startup
+                // warning in addition to the hard failure.
+                LOGV2_WARNING_OPTIONS(23014,
+                                      {logv2::LogTag::kStartupWarnings},
+                                      kPrefixString,
+                                      "reason"_attr = maybeTcpFastOpenStatus->reason());
+            } else {
+                LOGV2_INFO(4648601,
+                           "Implicit TCP FastOpen unavailable. "
+                           "If TCP FastOpen is required, set tcpFastOpenServer, tcpFastOpenClient, "
+                           "and tcpFastOpenQueueSize.");
+            }
+
+            maybeTcpFastOpenStatus->addContext(kPrefixString);
+        } else {
+            if (!tcpFastOpenIsConfigured) {
+                LOGV2_INFO(4648602, "Implicit TCP FastOpen in use.");
+            }
+        }
+    }
+
+    if (!tcpFastOpenIsConfigured) {
+        // If nobody asked for TCP FastOpen, no one will miss it.
+        return Status::OK();
+    }
+
+    // TCP FastOpen was requested. It's either there or it's not.
+    return *maybeTcpFastOpenStatus;
+}
+}  // namespace
 
 Status TransportLayerASIO::setup() {
     std::vector<std::string> listenAddrs;
@@ -828,12 +870,8 @@ Status TransportLayerASIO::setup() {
     }
 #endif
 
-    if (auto foStatus = validateFastOpen(); !foStatus.isOK()) {
-        if (tcpFastOpenIsConfigured) {
-            return foStatus;
-        } else {
-            LOGV2(23014, "{foStatus_reason}", "foStatus_reason"_attr = foStatus.reason());
-        }
+    if (auto foStatus = validateFastOpenOnce(); !foStatus.isOK()) {
+        return foStatus;
     }
 
     if (!(_listenerOptions.isIngress()) && !listenAddrs.empty()) {
