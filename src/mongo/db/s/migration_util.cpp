@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -774,75 +775,88 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
+            long long migrationRecoveryCount = 0;
             PersistentTaskStore<MigrationCoordinatorDocument> store(
                 opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
             Query query;
-            store.forEach(opCtx, query, [&opCtx](const MigrationCoordinatorDocument& doc) {
-                LOGV2_DEBUG(22039, 2, "Recovering migration {doc}", "doc"_attr = doc.toBSON());
+            store.forEach(
+                opCtx,
+                query,
+                [&opCtx, &migrationRecoveryCount](const MigrationCoordinatorDocument& doc) {
+                    LOGV2_DEBUG(22039, 2, "Recovering migration {doc}", "doc"_attr = doc.toBSON());
 
-                // Create a MigrationCoordinator to complete the coordination.
-                MigrationCoordinator coordinator(doc);
+                    migrationRecoveryCount++;
 
-                if (doc.getDecision()) {
-                    // The decision is already known.
-                    coordinator.setMigrationDecision(
-                        (*doc.getDecision()) == DecisionEnum::kCommitted
-                            ? MigrationCoordinator::Decision::kCommitted
-                            : MigrationCoordinator::Decision::kAborted);
+                    // Create a MigrationCoordinator to complete the coordination.
+                    MigrationCoordinator coordinator(doc);
+
+                    if (doc.getDecision()) {
+                        // The decision is already known.
+                        coordinator.setMigrationDecision(
+                            (*doc.getDecision()) == DecisionEnum::kCommitted
+                                ? MigrationCoordinator::Decision::kCommitted
+                                : MigrationCoordinator::Decision::kAborted);
+                        coordinator.completeMigration(opCtx);
+                        return true;
+                    }
+
+                    // The decision is not known. Recover the decision from the config server.
+
+                    ensureChunkVersionIsGreaterThan(
+                        opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
+
+                    hangBeforeFilteringMetadataRefresh.pauseWhileSet();
+
+                    refreshFilteringMetadataUntilSuccess(opCtx, doc.getNss());
+
+                    auto refreshedMetadata = [&] {
+                        AutoGetCollection autoColl(opCtx, doc.getNss(), MODE_IS);
+                        auto* const css = CollectionShardingRuntime::get(opCtx, doc.getNss());
+                        return css->getCurrentMetadataIfKnown();
+                    }();
+
+                    if (!refreshedMetadata || !(*refreshedMetadata)->isSharded() ||
+                        !(*refreshedMetadata)->uuidMatches(doc.getCollectionUuid())) {
+                        LOGV2(
+                            22040,
+                            "Even after forced refresh, filtering metadata for namespace in "
+                            "migration coordinator doc "
+                            "{doc}{refreshedMetadata_refreshedMetadata_isSharded_is_not_known_has_"
+                            "UUID_"
+                            "that_does_not_match_the_collection_UUID_in_the_coordinator_doc}. "
+                            "Deleting "
+                            "the range deletion tasks on the donor and recipient as "
+                            "well as the migration coordinator document on this node.",
+                            "doc"_attr = doc.toBSON(),
+                            "refreshedMetadata_refreshedMetadata_isSharded_is_not_known_has_UUID_that_does_not_match_the_collection_UUID_in_the_coordinator_doc"_attr =
+                                (!refreshedMetadata || !(*refreshedMetadata)->isSharded()
+                                     ? "is not known"
+                                     : "has UUID that does not match the collection UUID in the "
+                                       "coordinator doc"));
+
+                        // TODO (SERVER-45707): Test that range deletion tasks are eventually
+                        // deleted even if the collection is dropped before migration coordination
+                        // is resumed.
+                        deleteRangeDeletionTaskOnRecipient(
+                            opCtx, doc.getRecipientShardId(), doc.getId());
+                        deleteRangeDeletionTaskLocally(opCtx, doc.getId());
+                        coordinator.forgetMigration(opCtx);
+                        return true;
+                    }
+
+                    if ((*refreshedMetadata)->keyBelongsToMe(doc.getRange().getMin())) {
+                        coordinator.setMigrationDecision(MigrationCoordinator::Decision::kAborted);
+                    } else {
+                        coordinator.setMigrationDecision(
+                            MigrationCoordinator::Decision::kCommitted);
+                    }
+
                     coordinator.completeMigration(opCtx);
                     return true;
-                }
+                });
 
-                // The decision is not known. Recover the decision from the config server.
-
-                ensureChunkVersionIsGreaterThan(
-                    opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
-
-                hangBeforeFilteringMetadataRefresh.pauseWhileSet();
-
-                refreshFilteringMetadataUntilSuccess(opCtx, doc.getNss());
-
-                auto refreshedMetadata = [&] {
-                    AutoGetCollection autoColl(opCtx, doc.getNss(), MODE_IS);
-                    auto* const css = CollectionShardingRuntime::get(opCtx, doc.getNss());
-                    return css->getCurrentMetadataIfKnown();
-                }();
-
-                if (!refreshedMetadata || !(*refreshedMetadata)->isSharded() ||
-                    !(*refreshedMetadata)->uuidMatches(doc.getCollectionUuid())) {
-                    LOGV2(
-                        22040,
-                        "Even after forced refresh, filtering metadata for namespace in "
-                        "migration coordinator doc "
-                        "{doc}{refreshedMetadata_refreshedMetadata_isSharded_is_not_known_has_UUID_"
-                        "that_does_not_match_the_collection_UUID_in_the_coordinator_doc}. Deleting "
-                        "the range deletion tasks on the donor and recipient as "
-                        "well as the migration coordinator document on this node.",
-                        "doc"_attr = doc.toBSON(),
-                        "refreshedMetadata_refreshedMetadata_isSharded_is_not_known_has_UUID_that_does_not_match_the_collection_UUID_in_the_coordinator_doc"_attr =
-                            (!refreshedMetadata || !(*refreshedMetadata)->isSharded()
-                                 ? "is not known"
-                                 : "has UUID that does not match the collection UUID in the "
-                                   "coordinator doc"));
-
-                    // TODO (SERVER-45707): Test that range deletion tasks are eventually
-                    // deleted even if the collection is dropped before migration coordination
-                    // is resumed.
-                    deleteRangeDeletionTaskOnRecipient(
-                        opCtx, doc.getRecipientShardId(), doc.getId());
-                    deleteRangeDeletionTaskLocally(opCtx, doc.getId());
-                    coordinator.forgetMigration(opCtx);
-                    return true;
-                }
-
-                if ((*refreshedMetadata)->keyBelongsToMe(doc.getRange().getMin())) {
-                    coordinator.setMigrationDecision(MigrationCoordinator::Decision::kAborted);
-                } else {
-                    coordinator.setMigrationDecision(MigrationCoordinator::Decision::kCommitted);
-                }
-                coordinator.completeMigration(opCtx);
-                return true;
-            });
+            ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
+                migrationRecoveryCount);
         })
         .getAsync([](const Status& status) {
             if (!status.isOK()) {

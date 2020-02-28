@@ -65,6 +65,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("countDonorMoveChunkLockTimeout", countDonorMoveChunkLockTimeout.load());
     builder->append("countDonorMoveChunkAbortConflictingIndexOperation",
                     countDonorMoveChunkAbortConflictingIndexOperation.load());
+    builder->append("unfinishedMigrationFromPreviousPrimary",
+                    unfinishedMigrationFromPreviousPrimary.load());
 }
 
 }  // namespace mongo
