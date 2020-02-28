@@ -48,6 +48,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/hex.h"

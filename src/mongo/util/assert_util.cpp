@@ -47,7 +47,8 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/log_global_settings.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
@@ -88,7 +89,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, un
                 "expr"_attr = expr,
                 "file"_attr = file,
                 "line"_attr = line);
-    logContext();
+    printStackTrace();
     std::stringstream temp;
     temp << "assertion " << file << ":" << line;
 

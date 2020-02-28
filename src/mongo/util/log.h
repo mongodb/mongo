@@ -38,8 +38,7 @@
 
 #if defined(MONGO_UTIL_LOG_H_)
 #error \
-    "mongo/util/log.h cannot be included multiple times. " \
-       "This may occur when log.h is included in a header. " \
+    "This may occur when log.h is included in a header. " \
        "Please check your #include's."
 #else  // MONGO_UTIL_LOG_H_
 #define MONGO_UTIL_LOG_H_
@@ -83,9 +82,7 @@ namespace {
 const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
     MONGO_LOG_DEFAULT_COMPONENT;
 #else
-#error \
-    "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
-       "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
+#error "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
 
 using logger::LogstreamBuilderDeprecated;
@@ -221,11 +218,6 @@ bool rotateLogs(bool renameFiles);
 
 extern Tee* const warnings;            // Things put here go in serverStatus
 extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
-
-/**
- * Write the current context (backtrace), along with the optional "msg".
- */
-void logContext(const char* msg = nullptr);
 
 }  // namespace mongo
 

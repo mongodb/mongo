@@ -85,8 +85,10 @@ void doLog(int32_t id,
 }  // namespace detail
 }  // namespace logv2
 
+inline namespace literals {
 inline fmt::internal::udl_arg<char> operator"" _attr(const char* s, std::size_t) {
     return {s};
 }
+}  // namespace literals
 
 }  // namespace mongo

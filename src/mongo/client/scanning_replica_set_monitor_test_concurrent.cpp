@@ -39,9 +39,9 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -61,11 +61,7 @@ protected:
         launchExecutorThread();
         _startTime = getNet()->now();
 
-        {
-            using namespace logger;
-            globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kNetwork,
-                                                        LogSeverity::Debug(2));
-        }
+        { setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(2)); }
         setGlobalServiceContext(std::move(serviceContext));
     }
 

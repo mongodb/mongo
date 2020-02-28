@@ -40,7 +40,6 @@
 #include "mongo/scripting/mozjs/engine_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
-#include "mongo/util/log.h"
 
 namespace js {
 void DisableExtraThreads();

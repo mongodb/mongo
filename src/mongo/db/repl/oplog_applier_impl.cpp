@@ -49,7 +49,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/log_with_sampling.h"
 #include "third_party/murmurhash3/MurmurHash3.h"
 

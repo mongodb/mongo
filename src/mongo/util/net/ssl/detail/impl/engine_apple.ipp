@@ -40,7 +40,7 @@
 
 #include <arpa/inet.h>
 
-#include "mongo/util/log.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
@@ -149,7 +149,7 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
     const auto side = (type == stream_base::client) ? ::kSSLClientSide : ::kSSLServerSide;
     _ssl.reset(::SSLCreateContext(nullptr, side, ::kSSLStreamType));
     if (!_ssl) {
-        mongo::error() << "Failed allocating SSLContext";
+        LOGV2_ERROR(24140, "Failed allocating SSLContext");
         ec = errorCode(::errSSLInternal);
         return false;
     }
@@ -245,7 +245,7 @@ engine::want engine::shutdown(asio::error_code& ec) {
             ec = errorCode(status);
         }
     } else {
-        mongo::error() << "SSL connection already shut down";
+        LOGV2_ERROR(24141, "SSL connection already shut down");
         ec = errorCode(::errSSLInternal);
     }
     return want::want_nothing;

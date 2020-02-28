@@ -45,7 +45,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

@@ -77,7 +77,7 @@
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
-#include "mongo/util/log.h"
+#include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"

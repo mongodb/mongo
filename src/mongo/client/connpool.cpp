@@ -47,7 +47,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
 
 #if !defined(__has_feature)
@@ -91,8 +90,11 @@ PoolForHost::~PoolForHost() {
 
 void PoolForHost::clear() {
     if (!_parentDestroyed) {
-        logNoCache() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
-                     << _socketTimeoutSecs << " seconds)";
+        LOGV2(24124,
+              "Dropping all pooled connections to {hostName}(with timeout of {socketTimeoutSecs} "
+              "seconds)",
+              "hostName"_attr = _hostName,
+              "socketTimeoutSecs"_attr = _socketTimeoutSecs);
     }
 
     _pool = decltype(_pool){};
@@ -112,17 +114,23 @@ auto PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) -> ConnectionHea
     bool isBroken = c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec;
     if (isFailed || isBroken) {
         _badConns++;
-        logNoCache() << "Ending connection to host " << _hostName << "(with timeout of "
-                     << _socketTimeoutSecs << " seconds)"
-                     << " due to bad connection status; " << openConnections()
-                     << " connections to that host remain open";
+        LOGV2(
+            24125,
+            "Ending connection to host {hostName}(with timeout of {socketTimeoutSecs} seconds) due "
+            "to bad connection status; {openConnections} connections to that host remain open",
+            "hostName"_attr = _hostName,
+            "socketTimeoutSecs"_attr = _socketTimeoutSecs,
+            "openConnections"_attr = openConnections());
         return ConnectionHealth::kFailed;
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
-        logNoCache() << "Ending idle connection to host " << _hostName << "(with timeout of "
-                     << _socketTimeoutSecs << " seconds)"
-                     << " because the pool meets constraints; " << openConnections()
-                     << " connections to that host remain open";
+        LOGV2(24126,
+              "Ending idle connection to host {hostName}(with timeout of {socketTimeoutSecs} "
+              "seconds) because the pool meets constraints; {openConnections} connections to that "
+              "host remain open",
+              "hostName"_attr = _hostName,
+              "socketTimeoutSecs"_attr = _socketTimeoutSecs,
+              "openConnections"_attr = openConnections());
         return ConnectionHealth::kTooMany;
     }
 
@@ -135,9 +143,12 @@ void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
     if (microSec != DBClientBase::INVALID_SOCK_CREATION_TIME &&
         microSec > _minValidCreationTimeMicroSec) {
         _minValidCreationTimeMicroSec = microSec;
-        logNoCache() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
-                     << " microSec, clearing pool for " << _hostName << " of " << openConnections()
-                     << " connections" << endl;
+        LOGV2(24127,
+              "Detected bad connection created at {minValidCreationTimeMicroSec} microSec, "
+              "clearing pool for {hostName} of {openConnections} connections",
+              "minValidCreationTimeMicroSec"_attr = _minValidCreationTimeMicroSec,
+              "hostName"_attr = _hostName,
+              "openConnections"_attr = openConnections());
         clear();
     }
 }
@@ -689,8 +700,9 @@ ScopedDbConnection::~ScopedDbConnection() {
             }
         } else {
             /* see done() comments above for why we log this line */
-            logNoCache() << "scoped connection to " << _conn->getServerAddress()
-                         << " not being returned to the pool" << endl;
+            LOGV2(24128,
+                  "scoped connection to {conn_getServerAddress} not being returned to the pool",
+                  "conn_getServerAddress"_attr = _conn->getServerAddress());
             kill();
         }
     }

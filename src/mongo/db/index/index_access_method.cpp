@@ -53,9 +53,9 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -214,7 +214,7 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
               "e"_attr = redact(e),
               "keyString"_attr = keyString,
               "loc"_attr = loc);
-        logContext();
+        printStackTrace();
     }
 }
 

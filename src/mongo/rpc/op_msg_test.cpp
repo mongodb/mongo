@@ -42,7 +42,6 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/log.h"
 #include "third_party/wiredtiger/wiredtiger.h"
 
 namespace mongo {

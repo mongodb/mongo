@@ -100,15 +100,6 @@ bool rotateLogs(bool renameFiles) {
     return resultv2.isOK() && result.empty();
 }
 
-void logContext(const char* errmsg) {
-    if (errmsg) {
-        LOGV2(23167, "{errmsg}", "errmsg"_attr = errmsg);
-    }
-    // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
-    // the stack trace can sometimes exceed the long line limit.
-    printStackTrace(log().setIsTruncatable(false).stream());
-}
-
 Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
 }  // namespace mongo

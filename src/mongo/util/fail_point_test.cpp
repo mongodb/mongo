@@ -37,12 +37,12 @@
 #include <vector>
 
 #include "mongo/db/client.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
@@ -177,8 +177,10 @@ private:
                 // Expanded ASSERT_EQUALS since the error is not being
                 // printed out properly
                 if (data["a"].numberInt() != 44) {
-                    mongo::error() << "blockTask thread detected anomaly"
-                                   << " - data: " << data << std::endl;
+                    using namespace mongo::literals;
+                    LOGV2_ERROR(24129,
+                                "blockTask thread detected anomaly - data: {data}",
+                                "data"_attr = data);
                     ASSERT(false);
                 }
             });
@@ -194,8 +196,10 @@ private:
             try {
                 _fp.execute([](const BSONObj& data) {
                     if (data["a"].numberInt() != 44) {
-                        mongo::error() << "blockWithExceptionTask thread detected anomaly"
-                                       << " - data: " << data << std::endl;
+                        using namespace mongo::literals;
+                        LOGV2_ERROR(24130,
+                                    "blockWithExceptionTask thread detected anomaly - data: {data}",
+                                    "data"_attr = data);
                         ASSERT(false);
                     }
 

@@ -53,9 +53,9 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -87,8 +87,7 @@ ReplCoordTest::ReplCoordTest() {
 }
 
 ReplCoordTest::~ReplCoordTest() {
-    logger::globalLogDomain()->clearMinimumLoggedSeverity(
-        logger::LogComponent::kReplicationElection);
+    clearMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection);
     globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 
     if (_callShutdown) {

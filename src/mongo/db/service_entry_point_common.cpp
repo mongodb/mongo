@@ -97,7 +97,6 @@
 #include "mongo/transport/ismaster_metrics.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

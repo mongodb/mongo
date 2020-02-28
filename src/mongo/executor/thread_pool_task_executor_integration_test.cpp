@@ -39,7 +39,6 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {

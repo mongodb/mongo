@@ -47,7 +47,6 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/itoa.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
