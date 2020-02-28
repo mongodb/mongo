@@ -212,11 +212,6 @@ if (typeof _threadInject != "undefined") {
             // This test causes collMod commands to hang, which interferes with other tests running
             // collMod.
             "crud_ops_do_not_throw_locktimeout.js",
-
-            // These tests load noPassthrough/libs/index_build.js, which is incompatible with the
-            // parallelTester.
-            "apply_ops_index_collation.js",
-            "apply_ops_invalid_index_spec.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
