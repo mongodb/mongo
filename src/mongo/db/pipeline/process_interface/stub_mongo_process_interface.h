@@ -149,12 +149,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
-                                         ExplainOptions::Verbosity verbosity) override {
-        MONGO_UNREACHABLE;
-    }
-
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
         MONGO_UNREACHABLE;

@@ -56,10 +56,6 @@ public:
         Pipeline* pipeline,
         bool allowTargetingShards) override;
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
-                                         ExplainOptions::Verbosity verbosity);
-
     std::unique_ptr<ShardFilterer> getShardFilterer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
         // We'll never do shard filtering on a standalone.

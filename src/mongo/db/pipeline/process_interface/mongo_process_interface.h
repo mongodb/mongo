@@ -265,16 +265,6 @@ public:
         bool allowTargetingShards = true) = 0;
 
     /**
-     * Accepts a pipeline and attaches a cursor source to it. Returns a BSONObj of the form
-     * {"pipeline": <explainOutput>}. Note that <explainOutput> can be an object (shardsvr) or an
-     * array (non_shardsvr).
-     */
-    virtual BSONObj attachCursorSourceAndExplain(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        Pipeline* ownedPipeline,
-        ExplainOptions::Verbosity verbosity) = 0;
-
-    /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying
      * collection _locally_. Trying to run this method on mongos is a programming error. Running
      * this method on a shard server will only return results which match the pipeline on that

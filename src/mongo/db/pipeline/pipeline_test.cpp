@@ -87,24 +87,6 @@ BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
     return fromjson("{pipeline: " + jsonArray + "}");
 }
 
-class StubExplainInterface : public StubMongoProcessInterface {
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
-                                         ExplainOptions::Verbosity verbosity) override {
-        BSONArrayBuilder bab;
-        auto pipelineVec = ownedPipeline->writeExplainOps(verbosity);
-        for (auto&& stage : pipelineVec) {
-            bab << stage;
-        }
-        return BSON("pipeline" << bab.arr());
-    }
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                            PipelineDeleter(expCtx->opCtx));
-        return pipeline;
-    }
-};
 void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
                                             std::string outputPipeJson,
                                             std::string serializedPipeJson) {
@@ -124,7 +106,6 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
     AggregationRequest request(kTestNss, rawPipeline);
     intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
-    ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
     TempDir tempDir("PipelineTest");
     ctx->tempDir = tempDir.path();
 
@@ -1987,7 +1968,7 @@ TEST(PipelineOptimizationTest, MatchGetsPushedIntoBothChildrenOfUnion) {
         "    pipeline: ["
         "      {$match: {x: {$eq: 2}}},"
         "      {$project: {y: false}},"
-        "      {$sort: {sortKey: {score: 1}}}"
+        "      {$sort: {score: 1}}"
         "    ]"
         " }}"
         "]",

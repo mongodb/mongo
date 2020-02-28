@@ -148,10 +148,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj attachCursorSourceAndExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Pipeline* ownedPipeline,
-                                         ExplainOptions::Verbosity verbosity) final;
-
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         // It is not meaningful to perform a "local read" on mongos.
