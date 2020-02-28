@@ -49,6 +49,10 @@ public:
         int64_t records;      // Approximate number of records in a chunk of the oplog.
         int64_t bytes;        // Approximate size of records in a chunk of the oplog.
         RecordId lastRecord;  // RecordId of the last record in a chunk of the oplog.
+        Date_t wallTime;      // Walltime of when this chunk of the oplog was created.
+
+        Stone(int64_t records, int64_t bytes, RecordId lastRecord, Date_t wallTime)
+            : records(records), bytes(bytes), lastRecord(lastRecord), wallTime(wallTime) {}
     };
 
     OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs);
@@ -73,11 +77,11 @@ public:
 
     void popOldestStone();
 
-    void createNewStoneIfNeeded(RecordId lastRecord);
+    void createNewStoneIfNeeded(OperationContext* opCtx, RecordId lastRecord, Date_t wallTime);
 
     void updateCurrentStoneAfterInsertOnCommit(OperationContext* opCtx,
                                                int64_t bytesInserted,
-                                               RecordId highestInserted,
+                                               const Record& highestInsertedRecord,
                                                int64_t countInserted);
 
     void clearStonesOnCommit(OperationContext* opCtx);
