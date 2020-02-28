@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/uuid.h"
 
@@ -48,6 +49,7 @@ public:
     repl::OplogEntry::CommandType commandType;
     std::string commandName;
     UUID buildUUID;
+    boost::optional<CommitQuorumOptions> commitQuorum;
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
     boost::optional<Status> cause;

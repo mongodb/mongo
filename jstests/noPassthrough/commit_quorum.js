@@ -23,7 +23,16 @@ const replSet = new ReplSetTest({
 replSet.startSet();
 replSet.initiate();
 
-const testDB = replSet.getPrimary().getDB('test');
+const primary = replSet.getPrimary();
+if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
+      IndexBuildTest.IndexBuildCommitQuorumEnabled(primary))) {
+    jsTestLog(
+        'Skipping test because two phase index build and index build commit quorum are not supported.');
+    replSet.stopSet();
+    return;
+}
+
+const testDB = primary.getDB('test');
 const coll = testDB.twoPhaseIndexBuild;
 
 const bulk = coll.initializeUnorderedBulkOp();

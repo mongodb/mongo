@@ -78,7 +78,16 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
     return replState->sharedPromise.getFuture();
 }
 
-Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(const UUID& buildUUID,
+void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}
+
+Timestamp IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildAction(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    return Timestamp();
+}
+
+Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(OperationContext* opCtx,
+                                                            const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {
     MONGO_UNREACHABLE;
 }
@@ -87,6 +96,11 @@ Status IndexBuildsCoordinatorEmbedded::setCommitQuorum(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const std::vector<StringData>& indexNames,
                                                        const CommitQuorumOptions& newCommitQuorum) {
+    MONGO_UNREACHABLE;
+}
+
+void IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     MONGO_UNREACHABLE;
 }
 

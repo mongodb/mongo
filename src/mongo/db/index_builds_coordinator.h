@@ -48,6 +48,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -198,7 +200,9 @@ public:
      * provided 'reason' will be used in the error message that the index builders return to their
      * callers.
      */
-    void abortCollectionIndexBuilds(const UUID& collectionUUID, const std::string& reason);
+    void abortCollectionIndexBuilds(OperationContext* opCtx,
+                                    const UUID& collectionUUID,
+                                    const std::string& reason);
 
     /**
      * Signals all of the index builds on the specified collection to abort and returns the build
@@ -206,7 +210,8 @@ public:
      * provided 'reason' will be used in the error message that the index builders return to their
      * callers.
      */
-    std::vector<UUID> abortCollectionIndexBuildsNoWait(const UUID& collectionUUID,
+    std::vector<UUID> abortCollectionIndexBuildsNoWait(OperationContext* opCtx,
+                                                       const UUID& collectionUUID,
                                                        const std::string& reason);
 
     /**
@@ -214,21 +219,33 @@ public:
      * builds are no longer running. The provided 'reason' will be used in the error message that
      * the index builders return to their callers.
      */
-    void abortDatabaseIndexBuilds(StringData db, const std::string& reason);
+    void abortDatabaseIndexBuilds(OperationContext* opCtx,
+                                  StringData db,
+                                  const std::string& reason);
 
     /**
      * Signals all of the index builds on the specified database to abort. The provided 'reason'
      * will be used in the error message that the index builders return to their callers.
      */
-    void abortDatabaseIndexBuildsNoWait(StringData db, const std::string& reason);
+    void abortDatabaseIndexBuildsNoWait(OperationContext* opCtx,
+                                        StringData db,
+                                        const std::string& reason);
+
+    /**
+     * Aborts an index build by index build UUID. This gets called when the index build on primary
+     * failed due to interruption or replica set state change.
+     * It's a wrapper function to abortIndexBuildByBuildUUIDNoWait().
+     */
+    void abortIndexBuildOnError(OperationContext* opCtx, const UUID& buildUUID, Status abortStatus);
 
     /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
      */
     void abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                     const UUID& buildUUID,
-                                    Timestamp abortTimestamp,
-                                    const std::string& reason);
+                                    IndexBuildAction signalAction,
+                                    boost::optional<Timestamp> abortTimestamp = boost::none,
+                                    boost::optional<std::string> reason = boost::none);
 
     /**
      * Aborts an index build by index build UUID. Does not wait for the index build thread to
@@ -236,9 +253,9 @@ public:
      */
     bool abortIndexBuildByBuildUUIDNoWait(OperationContext* opCtx,
                                           const UUID& buildUUID,
-                                          Timestamp abortTimestamp,
-                                          const std::string& reason);
-
+                                          IndexBuildAction signalAction,
+                                          boost::optional<Timestamp> abortTimestamp = boost::none,
+                                          boost::optional<std::string> reason = boost::none);
     /**
      * Aborts an index build by its index name(s). This will only abort in-progress index builds if
      * all of the indexes are specified that a single builder is building together. When an
@@ -249,8 +266,7 @@ public:
         OperationContext* opCtx,
         const UUID& collectionUUID,
         const std::vector<std::string>& indexNames,
-        Timestamp abortTimestamp,
-        const std::string& reason);
+        boost::optional<std::string> reason = boost::none);
 
     /**
      * Returns true if there is an index builder building the given index names on a collection.
@@ -281,9 +297,13 @@ public:
     IndexBuilds onRollback(OperationContext* opCtx);
 
     /**
-     * TODO: This is not yet implemented.
+     * Handles the 'VoteCommitIndexBuild' command request.
+     * Writes the host and port information of the replica set member that has voted to commit an
+     * index build into config.system.indexBuilds collection.
      */
-    virtual Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) = 0;
+    virtual Status voteCommitIndexBuild(OperationContext* opCtx,
+                                        const UUID& buildUUID,
+                                        const HostAndPort& hostAndPort) = 0;
 
     /**
      * Sets a new commit quorum on an index build that manages 'indexNames' on collection 'nss'.
@@ -574,7 +594,34 @@ protected:
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
-     * Waits for commit or abort signal from primary.
+     * Reads the commit ready members list for index build UUID in 'replState' from
+     * "config.system.indexBuilds" collection. And, signals the index builder thread on primary to
+     * commit the index build if the number of voters have satisfied the commit quorum for that
+     * index build. Sets the ReplIndexBuildState::waitForNextAction promise value to be
+     * IndexBuildAction::kCommitQuorumSatisfied.
+     */
+    virtual void _signalIfCommitQuorumIsSatisfied(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+
+    /**
+     * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
+     * request to it with write concern 'majority', then waits for that command's response. And,
+     * command gets retried on error. This function gets called after the second draining phase of
+     * index build.
+     */
+    virtual void _signalPrimaryForCommitReadiness(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+
+    /**
+     * Both primary and secondaries will wait on 'ReplIndexBuildState::waitForNextAction' future for
+     * commit or abort index build signal.
+     * On primary:
+     *   - Commit signal can be sent either by voteCommitIndexBuild command or stepup.
+     *   - Abort signal can be sent either by createIndexes command thread on user interruption or
+     *     drop indexes/databases/collection commands.
+     * On secondaries:
+     *   - Commit signal can be sent only by oplog applier.
+     *   - Abort signal on secondaries can be sent by oplog applier, bgSync on rollback.
      *
      * On completion, this function returns a timestamp, which may be null, that may be used to
      * update the mdb catalog as we commit the index build. The commit index build timestamp is
@@ -583,14 +630,17 @@ protected:
      * are currently a primary, in which case we do not need to wait any external signal to commit
      * the index build.
      */
-    Timestamp _waitForCommitOrAbort(OperationContext* opCtx,
-                                    std::shared_ptr<ReplIndexBuildState> replState);
+    virtual Timestamp _waitForNextIndexBuildAction(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+
+    std::string _indexBuildActionToString(IndexBuildAction action);
 
     /**
      * Third phase is catching up on all the writes that occurred during the first two phases.
-     * Accepts a commit timestamp for the index, which could be null. See _waitForCommitOrAbort()
-     * comments. This timestamp is used only for committing the index, which sets the ready flag to
-     * true, to the catalog; it is not used for the catch-up writes during the final drain phase.
+     * Accepts a commit timestamp for the index, which could be null. See
+     * _waitForNextIndexBuildAction() comments. This timestamp is used only for committing the
+     * index, which sets the ready flag to true, to the catalog; it is not used for the catch-up
+     * writes during the final drain phase.
      */
     void _insertKeysFromSideTablesAndCommit(
         OperationContext* opCtx,
@@ -628,6 +678,7 @@ protected:
      * UUIDs of the aborted index builders
      */
     std::vector<UUID> _abortCollectionIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                                  OperationContext* opCtx,
                                                   const UUID& collectionUUID,
                                                   const std::string& reason,
                                                   bool shouldWait);
@@ -636,6 +687,7 @@ protected:
      * Helper for 'abortDatabaseIndexBuilds' and 'abortDatabaseIndexBuildsNoWait'.
      */
     void _abortDatabaseIndexBuilds(stdx::unique_lock<Latch>& lk,
+                                   OperationContext* opCtx,
                                    const StringData& db,
                                    const std::string& reason,
                                    bool shouldWait);

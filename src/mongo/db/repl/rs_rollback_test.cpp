@@ -101,7 +101,7 @@ OplogInterfaceMock::Operation makeStartIndexBuildOplogEntry(Collection* collecti
                                                             BSONObj spec,
                                                             int time) {
     auto entry = BSON("startIndexBuild" << collection->ns().coll() << "indexBuildUUID" << buildUUID
-                                        << "indexes" << BSON_ARRAY(spec));
+                                        << "indexes" << BSON_ARRAY(spec) << "commitQuorum" << 1);
 
     return std::make_pair(BSON("ts" << Timestamp(Seconds(time), 0) << "op"
                                     << "c"
@@ -1061,7 +1061,7 @@ TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, Timestamp(), "");
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
 }
 
 TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
@@ -1105,7 +1105,7 @@ TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, Timestamp(), "");
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
@@ -1154,7 +1154,7 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, Timestamp(), "");
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreNotRestartedWhenStartIsRolledBack) {

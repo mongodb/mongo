@@ -343,6 +343,13 @@ public:
 
     virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
 
+    void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
+    BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
+                                            const std::string& dbName,
+                                            const BSONObj& cmdObj,
+                                            OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                                            OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
+
 private:
     ServiceContext* const _service;
     ReplSettings _settings;

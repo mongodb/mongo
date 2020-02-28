@@ -404,8 +404,16 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     MultiIndexBlock::OnInitFn onInitFn;
     if (opCtx->writesAreReplicated() && buildUUID) {
         onInitFn = [&](std::vector<BSONObj>& specs) {
-            opObserver->onStartIndexBuild(
-                opCtx, to_collection, collection->uuid(), *buildUUID, specs, fromMigrate);
+            // Since, we don't use IndexBuildsCoordinatorMongod thread pool to build indexes,
+            // it's ok to set the commit quorum option as 1. Also, this is currently only get
+            // called in rollback via refetch. So, onStartIndexBuild() call will be a no-op.
+            opObserver->onStartIndexBuild(opCtx,
+                                          to_collection,
+                                          collection->uuid(),
+                                          *buildUUID,
+                                          specs,
+                                          CommitQuorumOptions(1),
+                                          fromMigrate);
             return Status::OK();
         };
     } else {

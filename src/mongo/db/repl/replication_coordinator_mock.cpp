@@ -603,5 +603,18 @@ HostAndPort ReplicationCoordinatorMock::getCurrentPrimaryHostAndPort() const {
     return HostAndPort();
 }
 
+void ReplicationCoordinatorMock::cancelCbkHandle(
+    executor::TaskExecutor::CallbackHandle activeHandle) {
+    MONGO_UNREACHABLE;
+}
+
+BSONObj ReplicationCoordinatorMock::runCmdOnPrimaryAndAwaitResponse(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+    OnRemoteCmdCompleteFn onRemoteCmdComplete) {
+    return BSON("ok" << 1);
+}
 }  // namespace repl
 }  // namespace mongo

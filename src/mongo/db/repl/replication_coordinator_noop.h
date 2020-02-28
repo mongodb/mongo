@@ -197,7 +197,6 @@ public:
 
     Status checkReplEnabledForCommand(BSONObjBuilder*) final;
 
-
     HostAndPort chooseNewSyncSource(const OpTime&) final;
 
     void blacklistSyncSource(const HostAndPort&, Date_t) final;
@@ -278,6 +277,14 @@ public:
     OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;
+
+    void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
+
+    BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
+                                            const std::string& dbName,
+                                            const BSONObj& cmdObj,
+                                            OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                                            OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
 private:
     ServiceContext* const _service;

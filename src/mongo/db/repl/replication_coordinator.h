@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -1006,6 +1007,28 @@ public:
      * stale unless run from the primary with the RSTL held.
      */
     virtual HostAndPort getCurrentPrimaryHostAndPort() const = 0;
+
+    /*
+     * Cancels the callback referenced in the given callback handle.
+     * This function expects the activeHandle to be valid.
+     */
+    virtual void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) = 0;
+
+    using OnRemoteCmdScheduledFn = std::function<void(executor::TaskExecutor::CallbackHandle)>;
+    using OnRemoteCmdCompleteFn = std::function<void(executor::TaskExecutor::CallbackHandle)>;
+    /**
+     * Runs the given command 'cmdObj' on primary and waits till the response for that command is
+     * received. If the node is primary, then the command will be executed using DBDirectClient to
+     * avoid tcp network calls. Otherwise, the node will execute the remote command using the repl
+     * task executor (AsyncDBClient).
+     * - 'OnRemoteCmdScheduled' will be called once the remote command is scheduled.
+     * - 'OnRemoteCmdComplete' will be called once the response for the remote command is received.
+     */
+    virtual BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
+                                                    const std::string& dbName,
+                                                    const BSONObj& cmdObj,
+                                                    OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                                                    OnRemoteCmdCompleteFn onRemoteCmdComplete) = 0;
 
 protected:
     ReplicationCoordinator();

@@ -71,8 +71,10 @@ public:
      */
     void runOperationOnAllBuilds(
         WithLock,
+        OperationContext* opCtx,
         IndexBuildsManager* indexBuildsManager,
         std::function<void(WithLock,
+                           OperationContext* opCtx,
                            IndexBuildsManager* indexBuildsManager,
                            std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
                            const std::string& reason)> func,

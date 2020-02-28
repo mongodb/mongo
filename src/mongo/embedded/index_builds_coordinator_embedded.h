@@ -68,11 +68,23 @@ public:
     /**
      * None of the following functions should ever be called on an embedded server node.
      */
-    Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) override;
+    Status voteCommitIndexBuild(OperationContext* opCtx,
+                                const UUID& buildUUID,
+                                const HostAndPort& hostAndPort) override;
     Status setCommitQuorum(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const std::vector<StringData>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
+
+private:
+    void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
+                                          std::shared_ptr<ReplIndexBuildState> replState) override;
+
+    void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
+                                          std::shared_ptr<ReplIndexBuildState> replState) override;
+
+    Timestamp _waitForNextIndexBuildAction(OperationContext* opCtx,
+                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 };
 
 }  // namespace mongo

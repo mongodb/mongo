@@ -204,7 +204,6 @@ public:
 
     Status checkReplEnabledForCommand(BSONObjBuilder*) override;
 
-
     HostAndPort chooseNewSyncSource(const repl::OpTime&) override;
 
     void blacklistSyncSource(const HostAndPort&, Date_t) override;
@@ -286,6 +285,14 @@ public:
     repl::OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;
+
+    void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
+
+    BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
+                                            const std::string& dbName,
+                                            const BSONObj& cmdObj,
+                                            OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                                            OnRemoteCmdCompleteFn onRemoteCmdComplete) final;
 
 private:
     // Back pointer to the ServiceContext that has started the instance.

@@ -54,6 +54,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
@@ -2105,6 +2106,90 @@ HostAndPort ReplicationCoordinatorImpl::getCurrentPrimaryHostAndPort() const {
     return primary ? primary->getHostAndPort() : HostAndPort();
 }
 
+void ReplicationCoordinatorImpl::cancelCbkHandle(CallbackHandle activeHandle) {
+    _replExecutor->cancel(activeHandle);
+}
+
+BSONObj ReplicationCoordinatorImpl::_runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
+                                                                     const std::string& dbName,
+                                                                     const BSONObj& cmdObj) {
+
+    auto client = opCtx->getServiceContext()->makeClient("DBDirectClientCmd");
+    // We want the command's opCtx that gets executed via DBDirectClient to be interruptible
+    // so that we don't block state transitions. Callers of this function might run opCtx
+    // in an uninterruptible mode. To be on safer side, run the command in AlternativeClientRegion,
+    // to make sure that the command's opCtx is interruptible.
+    AlternativeClientRegion acr(client);
+    auto uniqueNewOpCtx = cc().makeOperationContext();
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationKillable(lk);
+    }
+
+    DBDirectClient dbClient(uniqueNewOpCtx.get());
+    const auto commandResponse = dbClient.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
+
+    return commandResponse->getCommandReply();
+}
+
+BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+    OnRemoteCmdCompleteFn onRemoteCmdComplete) {
+    // Sanity check
+    invariant(!opCtx->lockState()->isRSTLLocked());
+
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
+    if (getMemberState().primary()) {
+        if (canAcceptWritesForDatabase(opCtx, dbName)) {
+            // Run command using DBDirectClient to avoid tcp connection.
+            return _runCmdOnSelfOnAlternativeClient(opCtx, dbName, cmdObj);
+        }
+        // Node is primary but it's not in a state to accept non-local writes because it might be in
+        // the catchup or draining phase. So, try releasing and reacquiring RSTL lock so that we
+        // give chance for the node to finish executing signalDrainComplete() and become master.
+        uassertStatusOK(
+            Status{ErrorCodes::NotMaster, "Node is in primary state but can't accept writes."});
+    }
+
+    // Node is not primary, so we will run the remote command via AsyncDBClient. To use
+    // AsyncDBClient, we will be using repl task executor.
+    const auto primary = getCurrentPrimaryHostAndPort();
+    if (primary.empty()) {
+        uassertStatusOK(Status{ErrorCodes::CommandFailed, "Primary is unknown/down."});
+    }
+
+    executor::RemoteCommandRequest request(primary, dbName, cmdObj, nullptr);
+    executor::RemoteCommandResponse cbkResponse(
+        Status{ErrorCodes::InternalError, "Uninitialized value"});
+
+    // Schedule the remote command.
+    auto&& scheduleResult = _replExecutor->scheduleRemoteCommand(
+        request, [&cbkResponse](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbk) {
+            cbkResponse = cbk.response;
+        });
+
+    uassertStatusOK(scheduleResult.getStatus());
+    CallbackHandle cbkHandle = scheduleResult.getValue();
+
+    onRemoteCmdScheduled(cbkHandle);
+    // Before, we wait for the remote command response, it's important we release the rstl lock to
+    // ensure that the state transition can happen during the wait period. Else, it can lead to
+    // deadlock. Consider a case, where the remote command waits for majority write concern. But, we
+    // are not able to transition our state to secondary (steady state replication).
+    rstl.release();
+
+    // Wait for the response in an interruptible mode.
+    _replExecutor->wait(cbkHandle, opCtx);
+
+    onRemoteCmdComplete(cbkHandle);
+    uassertStatusOK(cbkResponse.status);
+    return cbkResponse.data;
+}
+
 void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
     AutoGetRstlForStepUpStepDown* arsc, ErrorCodes::Error reason) {
     const OperationContext* rstlOpCtx = arsc->getOpCtx();
@@ -2644,7 +2729,11 @@ int ReplicationCoordinatorImpl::getMyId() const {
 }
 
 HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::unique_lock<Latch> lk(_mutex);
+
+    if (_selfIndex == -1) {
+        return HostAndPort();
+    }
     return _rsConfig.getMemberAt(_selfIndex).getHostAndPort();
 }
 

@@ -215,16 +215,24 @@ void Helpers::upsert(OperationContext* opCtx,
     BSONElement e = o["_id"];
     verify(e.type());
     BSONObj id = e.wrap();
+    upsert(opCtx, ns, id, o, fromMigrate);
+}
 
+void Helpers::upsert(OperationContext* opCtx,
+                     const string& ns,
+                     const BSONObj& filter,
+                     const BSONObj& updateMod,
+                     bool fromMigrate) {
     OldClientContext context(opCtx, ns);
 
     const NamespaceString requestNs(ns);
     UpdateRequest request(requestNs);
 
-    request.setQuery(id);
-    request.setUpdateModification(o);
+    request.setQuery(filter);
+    request.setUpdateModification(updateMod);
     request.setUpsert();
     request.setFromMigration(fromMigrate);
+    request.setYieldPolicy(PlanExecutor::NO_YIELD);
 
     update(opCtx, context.db(), request);
 }

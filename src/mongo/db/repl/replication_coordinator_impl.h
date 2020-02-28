@@ -364,6 +364,14 @@ public:
 
     virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
 
+    void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
+
+    BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
+                                            const std::string& dbName,
+                                            const BSONObj& cmdObj,
+                                            OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                                            OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
+
     // ================== Test support API ===================
 
     /**
@@ -1384,6 +1392,13 @@ private:
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).
      */
     int64_t _nextRandomInt64_inlock(int64_t limit);
+
+    /**
+     * Runs the command using DBDirectClient and returns the response received for that command.
+     */
+    BSONObj _runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
+                                             const std::string& dbName,
+                                             const BSONObj& cmdObj);
 
     //
     // All member variables are labeled with one of the following codes indicating the

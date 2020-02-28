@@ -144,8 +144,9 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
+        CommitQuorumOptions commitQuorum(1);
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, commitQuorum, false /*fromMigrate*/);
         wunit.commit();
     }
 
@@ -153,6 +154,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     BSONObjBuilder startIndexBuildBuilder;
     startIndexBuildBuilder.append("startIndexBuild", nss.coll());
     indexBuildUUID.appendToBuilder(&startIndexBuildBuilder, "indexBuildUUID");
+    startIndexBuildBuilder.append("commitQuorum", 1);
     BSONArrayBuilder indexesArr(startIndexBuildBuilder.subarrayStart("indexes"));
     indexesArr.append(specX);
     indexesArr.append(specA);

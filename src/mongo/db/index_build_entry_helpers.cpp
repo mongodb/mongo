@@ -60,7 +60,8 @@ namespace mongo {
 
 namespace {
 
-Status upsert(OperationContext* opCtx, IndexBuildEntry indexBuildEntry) {
+Status upsert(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
+
     return writeConflictRetry(opCtx,
                               "upsertIndexBuildEntry",
                               NamespaceString::kIndexBuildEntryNamespace.ns(),
@@ -79,6 +80,72 @@ Status upsert(OperationContext* opCtx, IndexBuildEntry indexBuildEntry) {
                                   Helpers::upsert(opCtx,
                                                   NamespaceString::kIndexBuildEntryNamespace.ns(),
                                                   indexBuildEntry.toBSON(),
+                                                  /*fromMigrate=*/false);
+                                  wuow.commit();
+                                  return Status::OK();
+                              });
+}
+
+std::pair<const BSONObj, const BSONObj> buildIndexBuildEntryFilterAndUpdate(
+    IndexBuildEntry& indexBuildEntry,
+    boost::optional<CommitQuorumOptions> currentCommitQuorum = boost::none) {
+    // Construct the filter.
+    const auto buildUUID =
+        BSON(IndexBuildEntry::kBuildUUIDFieldName << indexBuildEntry.getBuildUUID());
+    const auto collectionUUID =
+        BSON(IndexBuildEntry::kCollectionUUIDFieldName << indexBuildEntry.getCollectionUUID());
+    const auto indexNameList =
+        BSON(IndexBuildEntry::kIndexNamesFieldName << indexBuildEntry.getIndexNames());
+    BSONObjBuilder commitQuorumFilter;
+    if (!currentCommitQuorum) {
+        currentCommitQuorum = indexBuildEntry.getCommitQuorum();
+    }
+    currentCommitQuorum->appendToBuilder(IndexBuildEntry::kCommitQuorumFieldName,
+                                         &commitQuorumFilter);
+    const auto filter = BSON("$and" << BSON_ARRAY(buildUUID << collectionUUID << indexNameList
+                                                            << commitQuorumFilter.obj()));
+    // Construct the update.
+    BSONObjBuilder updateMod;
+    BSONObjBuilder commitQuorumUpdate;
+    indexBuildEntry.getCommitQuorum().appendToBuilder(IndexBuildEntry::kCommitQuorumFieldName,
+                                                      &commitQuorumUpdate);
+    // If the update commit quorum is same as the value on-disk, we don't update it.
+    updateMod.append("$set", commitQuorumUpdate.obj());
+
+    // '$addToSet' to prevent any duplicate entries written to "commitReadyMembers" field.
+    if (auto commitReadyMembers = indexBuildEntry.getCommitReadyMembers()) {
+        BSONArrayBuilder arrayBuilder;
+        for (const auto& item : commitReadyMembers.get()) {
+            arrayBuilder.append(item.toString());
+        }
+        const auto commitReadyMemberList = BSON(IndexBuildEntry::kCommitReadyMembersFieldName
+                                                << BSON("$each" << arrayBuilder.arr()));
+        updateMod.append("$addToSet", commitReadyMemberList);
+    }
+
+    return {filter, updateMod.obj()};
+}
+
+Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& updateMod) {
+    return writeConflictRetry(opCtx,
+                              "upsertIndexBuildEntry",
+                              NamespaceString::kIndexBuildEntryNamespace.ns(),
+                              [&]() -> Status {
+                                  AutoGetCollection autoCollection(
+                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                                  Collection* collection = autoCollection.getCollection();
+                                  if (!collection) {
+                                      str::stream ss;
+                                      ss << "Collection not found: "
+                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
+                                      return Status(ErrorCodes::NamespaceNotFound, ss);
+                                  }
+
+                                  WriteUnitOfWork wuow(opCtx);
+                                  Helpers::upsert(opCtx,
+                                                  NamespaceString::kIndexBuildEntryNamespace.ns(),
+                                                  filter,
+                                                  updateMod,
                                                   /*fromMigrate=*/false);
                                   wuow.commit();
                                   return Status::OK();
@@ -118,7 +185,24 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                        });
 }
 
-Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry indexBuildEntry) {
+Status persistCommitReadyMemberInfo(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
+    invariant(indexBuildEntry.getCommitReadyMembers());
+
+    auto [filter, updateMod] = buildIndexBuildEntryFilterAndUpdate(indexBuildEntry);
+    return upsert(opCtx, filter, updateMod);
+}
+
+Status setIndexCommitQuorum(OperationContext* opCtx,
+                            IndexBuildEntry& indexBuildEntry,
+                            CommitQuorumOptions currentCommitQuorum) {
+    invariant(!indexBuildEntry.getCommitReadyMembers());
+
+    auto [filter, updateMod] =
+        buildIndexBuildEntryFilterAndUpdate(indexBuildEntry, currentCommitQuorum);
+    return upsert(opCtx, filter, updateMod);
+}
+
+Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
     return writeConflictRetry(opCtx,
                               "addIndexBuildEntry",
                               NamespaceString::kIndexBuildEntryNamespace.ns(),
@@ -303,7 +387,6 @@ Status addCommitReadyMember(OperationContext* opCtx, UUID indexBuildUUID, HostAn
         indexBuildEntry.setCommitReadyMembers(newCommitReadyMembers);
         return upsert(opCtx, indexBuildEntry);
     }
-
     return Status::OK();
 }
 

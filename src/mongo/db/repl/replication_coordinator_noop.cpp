@@ -503,5 +503,19 @@ HostAndPort ReplicationCoordinatorNoOp::getCurrentPrimaryHostAndPort() const {
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorNoOp::cancelCbkHandle(
+    executor::TaskExecutor::CallbackHandle activeHandle) {
+    MONGO_UNREACHABLE;
+}
+
+BSONObj ReplicationCoordinatorNoOp::runCmdOnPrimaryAndAwaitResponse(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+    OnRemoteCmdCompleteFn onRemoteCmdComplete) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

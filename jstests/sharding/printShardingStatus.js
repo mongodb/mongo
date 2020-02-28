@@ -98,6 +98,11 @@ testBasicVerboseOnly(outputVerbose);
 var config = mongos.getDB("config");
 var configCopy = standalone.getDB("configCopy");
 config.getCollectionInfos().forEach(function(c) {
+    // It's illegal to copy the system collections.
+    if (c.name == "system.indexBuilds") {
+        return;
+    }
+
     // Create collection with options.
     assert.commandWorked(configCopy.createCollection(c.name, c.options));
     // Clone the docs.

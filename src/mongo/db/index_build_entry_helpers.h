@@ -70,6 +70,26 @@ namespace indexbuildentryhelpers {
 void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
 
 /**
+ * Persist the host and port information about the replica set members that have voted to commit an
+ * index build into config.system.indexBuilds collection. If the member info is already present in
+ * the collection for that index build, then we don't do any updates and don't generate any errors.
+ *
+ * Returns an error if collection is missing.
+ */
+Status persistCommitReadyMemberInfo(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry);
+
+/**
+ * Persist the new commit quorum value for an index build into config.system.indexBuilds collection.
+ * We will update the commit quorum value only if 'currentCommitQuorum' matches the value read from
+ * the "config.system.indexBuilds" collection for that index build.
+ *
+ * Returns an error if collection is missing.
+ */
+Status setIndexCommitQuorum(OperationContext* opCtx,
+                            IndexBuildEntry& indexBuildEntry,
+                            CommitQuorumOptions currentCommitQuorum);
+
+/**
  * Writes the 'indexBuildEntry' to the disk.
  *
  * An IndexBuildEntry should be stored on the disk during the duration of the index build process
@@ -78,7 +98,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
  * Returns 'DuplicateKey' error code if a document already exists on the disk with the same
  * 'indexBuildUUID'.
  */
-Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry indexBuildEntry);
+Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry);
 
 /**
  * Removes the IndexBuildEntry from the disk.

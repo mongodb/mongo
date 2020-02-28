@@ -161,6 +161,7 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
     while (true) {
         // Send the abort signal to any active index builds on the collection.
         indexBuildsCoord->abortCollectionIndexBuildsNoWait(
+            opCtx,
             collectionUUID,
             str::stream() << "Collection " << coll->ns() << "(" << collectionUUID
                           << ") is being dropped");

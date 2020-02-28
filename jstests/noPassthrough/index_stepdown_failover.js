@@ -56,8 +56,7 @@ checkLog.contains(primary, 'Index build interrupted: ');
 // This index build will not complete because it has to wait for a commitIndexBuild oplog
 // entry.
 IndexBuildTest.resumeIndexBuilds(primary);
-checkLog.contains(primary,
-                  'Index build waiting for commit or abort before completing final phase: ');
+checkLog.contains(primary, 'Index build waiting for next action before completing final phase: ');
 
 // Step up the new primary.
 rst.stepUp(newPrimary);

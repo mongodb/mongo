@@ -34,6 +34,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -99,6 +100,7 @@ public:
                                    CollectionUUID collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
+                                   const CommitQuorumOptions& commitQuorum,
                                    bool fromMigrate) = 0;
 
     /**

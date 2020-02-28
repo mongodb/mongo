@@ -95,14 +95,16 @@ std::vector<UUID> CollectionIndexBuildsTracker::getIndexBuildUUIDs(WithLock) con
 
 void CollectionIndexBuildsTracker::runOperationOnAllBuilds(
     WithLock lk,
+    OperationContext* opCtx,
     IndexBuildsManager* indexBuildsManager,
     std::function<void(WithLock,
+                       OperationContext* opCtx,
                        IndexBuildsManager* indexBuildsManager,
                        std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
                        const std::string& reason)> func,
     const std::string& reason) noexcept {
     for (auto it = _buildStateByBuildUUID.begin(); it != _buildStateByBuildUUID.end(); ++it) {
-        func(lk, indexBuildsManager, it->second, reason);
+        func(lk, opCtx, indexBuildsManager, it->second, reason);
     }
 }
 

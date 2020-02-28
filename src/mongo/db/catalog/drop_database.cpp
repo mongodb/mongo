@@ -177,7 +177,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
             // are none left when we retrieve the exclusive database lock again.
             while (indexBuildsCoord->inProgForDb(dbName)) {
                 // Sends the abort signal to all the active index builders for this database.
-                indexBuildsCoord->abortDatabaseIndexBuildsNoWait(dbName, "dropDatabase command");
+                indexBuildsCoord->abortDatabaseIndexBuildsNoWait(
+                    opCtx, dbName, "dropDatabase command");
 
                 // Now that the abort signals were sent out to the active index builders for this
                 // database, we need to release the lock temporarily to allow those index builders

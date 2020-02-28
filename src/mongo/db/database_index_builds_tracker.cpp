@@ -59,14 +59,16 @@ void DatabaseIndexBuildsTracker::removeIndexBuild(WithLock, const UUID& buildUUI
 
 void DatabaseIndexBuildsTracker::runOperationOnAllBuilds(
     WithLock lk,
+    OperationContext* opCtx,
     IndexBuildsManager* indexBuildsManager,
     std::function<void(WithLock,
+                       OperationContext* opCtx,
                        IndexBuildsManager* indexBuildsManager,
                        std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
                        const std::string& reason)> func,
     const std::string& reason) {
     for (auto it = _allIndexBuilds.begin(); it != _allIndexBuilds.end(); ++it) {
-        func(lk, indexBuildsManager, it->second, reason);
+        func(lk, opCtx, indexBuildsManager, it->second, reason);
     }
 }
 

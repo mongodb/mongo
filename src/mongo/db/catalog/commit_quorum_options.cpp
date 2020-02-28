@@ -80,15 +80,15 @@ CommitQuorumOptions CommitQuorumOptions::deserializerForIDL(
 
 BSONObj CommitQuorumOptions::toBSON() const {
     BSONObjBuilder builder;
-    append(kCommitQuorumField, &builder);
+    appendToBuilder(kCommitQuorumField, &builder);
     return builder.obj();
 }
 
-void CommitQuorumOptions::append(StringData fieldName, BSONObjBuilder* builder) const {
+void CommitQuorumOptions::appendToBuilder(StringData fieldName, BSONObjBuilder* builder) const {
     if (mode.empty()) {
-        builder->append(kCommitQuorumField, numNodes);
+        builder->append(fieldName, numNodes);
     } else {
-        builder->append(kCommitQuorumField, mode);
+        builder->append(fieldName, mode);
     }
 }
 

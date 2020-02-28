@@ -78,7 +78,7 @@ public:
     BSONObj toBSON() const;
 
     // Appends the BSON representation of this object.
-    void append(StringData fieldName, BSONObjBuilder* builder) const;
+    void appendToBuilder(StringData fieldName, BSONObjBuilder* builder) const;
 
     // The 'commitQuorum' parameter to define the required quorum for the index builds to commit.
     // The 'mode' represents the string format and takes precedence over the number format

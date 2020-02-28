@@ -159,7 +159,7 @@ std::vector<UUID> abortIndexBuildByIndexNamesNoWait(OperationContext* opCtx,
 
     boost::optional<UUID> buildUUID =
         IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByIndexNamesNoWait(
-            opCtx, collection->uuid(), indexNames, Timestamp(), "dropIndexes command");
+            opCtx, collection->uuid(), indexNames, std::string("dropIndexes command"));
     if (buildUUID) {
         return {*buildUUID};
     }
@@ -220,7 +220,7 @@ std::vector<UUID> abortActiveIndexBuilders(OperationContext* opCtx,
 
     if (indexNames.front() == "*") {
         return IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuildsNoWait(
-            collection->uuid(), "dropIndexes command");
+            opCtx, collection->uuid(), "dropIndexes command");
     }
 
     return abortIndexBuildByIndexNamesNoWait(opCtx, collection, indexNames);
