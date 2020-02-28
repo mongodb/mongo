@@ -72,15 +72,8 @@ void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) 
     sslPeerInfo = info;
 }
 
-using std::vector;
-
 class AuthorizationManagerTest : public ServiceContextTest {
 public:
-    virtual ~AuthorizationManagerTest() {
-        if (authzManager)
-            authzManager->invalidateUserCache(opCtx.get());
-    }
-
     AuthorizationManagerTest() {
         auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
@@ -105,6 +98,11 @@ public:
                                   "password", saslGlobalParams.scramSHA256IterationCount.load()));
     }
 
+    ~AuthorizationManagerTest() {
+        if (authzManager)
+            authzManager->invalidateUserCache(opCtx.get());
+    }
+
     transport::TransportLayerMock transportLayer;
     transport::SessionHandle session = transportLayer.createSession();
     AuthorizationManager* authzManager;
@@ -114,8 +112,6 @@ public:
 };
 
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
-
-
     ASSERT_OK(externalState->insertPrivilegeDocument(opCtx.get(),
                                                      BSON("_id"
                                                           << "admin.v2read"
@@ -259,8 +255,6 @@ private:
 
 // Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
 TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
-
-
     ASSERT_OK(externalState->insertPrivilegeDocument(
         opCtx.get(),
         BSON("_id"
@@ -313,7 +307,7 @@ public:
     public:
         MockRecoveryUnit(size_t* registeredChanges) : _registeredChanges(registeredChanges) {}
 
-        virtual void registerChange(std::unique_ptr<Change> change) final {
+        void registerChange(std::unique_ptr<Change> change) final {
             // RecoveryUnitNoop takes ownership of the Change
             RecoveryUnitNoop::registerChange(std::move(change));
             ++(*_registeredChanges);
@@ -323,7 +317,7 @@ public:
         size_t* _registeredChanges;
     };
 
-    virtual void setUp() override {
+    void setUp() override {
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         AuthorizationManagerTest::setUp();

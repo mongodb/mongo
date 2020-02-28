@@ -45,6 +45,14 @@ static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
 const auto getReadWriteConcernDefaults =
     ServiceContext::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
 
+ServiceContext::ConstructorActionRegisterer destroyDestroyReadWriteConcernDefaultsRegisterer(
+    "DestroyReadWriteConcernDefaults",
+    [](ServiceContext* service) {
+        // Intentionally empty, since construction happens through different code paths depending on
+        // the binary
+    },
+    [](ServiceContext* service) { getReadWriteConcernDefaults(service).reset(); });
+
 }  // namespace
 
 bool ReadWriteConcernDefaults::isSuitableReadConcernLevel(repl::ReadConcernLevel level) {
@@ -215,18 +223,18 @@ void ReadWriteConcernDefaults::create(ServiceContext* service, FetchDefaultsFn f
 
 ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
                                                    FetchDefaultsFn fetchDefaultsFn)
-    : _threadPool([] {
+    : _defaults(service,
+                _threadPool,
+                [fetchDefaultsFn = std::move(fetchDefaultsFn)](
+                    OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }),
+      _threadPool([] {
           ThreadPool::Options options;
           options.poolName = "ReadWriteConcernDefaults";
           options.minThreads = 0;
           options.maxThreads = 1;
 
           return options;
-      }()),
-      _defaults(service,
-                _threadPool,
-                [fetchDefaultsFn = std::move(fetchDefaultsFn)](
-                    OperationContext* opCtx, const Type&) { return fetchDefaultsFn(opCtx); }) {
+      }()) {
     _threadPool.startup();
 }
 

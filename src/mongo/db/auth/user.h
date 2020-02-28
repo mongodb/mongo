@@ -112,6 +112,7 @@ public:
 
     explicit User(const UserName& name);
     User(User&&) = default;
+    User& operator=(User&&) = default;
 
     const UserId& getID() const {
         return _id;

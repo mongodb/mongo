@@ -173,10 +173,10 @@ private:
         LookupFn _lookupFn;
     };
 
+    Cache _defaults;
+
     // Thread pool on which to perform loading of the cached RWC defaults
     ThreadPool _threadPool;
-
-    Cache _defaults;
 };
 
 }  // namespace mongo

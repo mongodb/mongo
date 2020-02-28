@@ -320,6 +320,7 @@ error_codes:
     - {code: 287,name: TransactionCoordinatorDeadlineTaskCanceled}
 
     - {code: 288,name: ChecksumMismatch,categories: [ConnectionFatalMessageParseError]}
+
     # Internal only code used by WaitForMajorityService.
     - {code: 289,name: WaitForMajorityServiceEarlierOpTimeAvailable}
 
@@ -338,10 +339,16 @@ error_codes:
     - {code: 301,name: DataCorruptionDetected}
     - {code: 302,name: OCSPCertificateStatusUnknown}
     - {code: 303,name: SplitHorizonChange}
+
     # This code should only be used upon finding that a shard has been marked stale in the sharding
     # catalog cache, and as such does not belong in the StaleShardVersionError or
     # NeedRetargettingError categories.
     - {code: 304,name: ShardInvalidatedForTargeting,extra: ShardInvalidatedForTargetingInfo}
+
+    # Internal only codes used by the ReadThroughCache and must never be returned in a network
+    # response
+    - {code: 305,name: ReadThroughCacheKeyNotFound}
+    - {code: 306,name: ReadThroughCacheLookupCanceled}
 
     # Error codes 4000-8999 are reserved.
 

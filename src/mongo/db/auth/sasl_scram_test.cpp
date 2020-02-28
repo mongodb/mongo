@@ -170,7 +170,7 @@ protected:
     const SCRAMStepsResult goalState =
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
 
-    ServiceContext::UniqueServiceContext serviceContext;
+    ServiceContext* serviceContext;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
 
@@ -182,7 +182,9 @@ protected:
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
 
     void setUp() final {
-        serviceContext = ServiceContext::make();
+        auto serviceContextHolder = ServiceContext::make();
+        serviceContext = serviceContextHolder.get();
+        setGlobalServiceContext(std::move(serviceContextHolder));
         client = serviceContext->makeClient("test");
         opCtx = serviceContext->makeOperationContext(client.get());
 
@@ -190,12 +192,12 @@ protected:
             std::make_unique<AuthzManagerExternalStateMock>();
         authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
         auto newManager = std::make_unique<AuthorizationManagerImpl>(
-            serviceContext.get(), std::move(uniqueAuthzManagerExternalStateMock));
+            serviceContext, std::move(uniqueAuthzManagerExternalStateMock));
         authzSession = std::make_unique<AuthorizationSessionImpl>(
             std::make_unique<AuthzSessionExternalStateMock>(newManager.get()),
             AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
         authzManager = newManager.get();
-        AuthorizationManager::set(serviceContext.get(), std::move(newManager));
+        AuthorizationManager::set(serviceContext, std::move(newManager));
 
         saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,
@@ -210,7 +212,8 @@ protected:
     void tearDown() final {
         opCtx.reset();
         client.reset();
-        serviceContext.reset();
+        setGlobalServiceContext(nullptr);
+        serviceContext = nullptr;
 
         saslClientSession.reset();
         saslServerSession.reset();

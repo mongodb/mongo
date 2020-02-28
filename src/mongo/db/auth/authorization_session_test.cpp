@@ -47,7 +47,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -80,12 +80,11 @@ private:
     bool _findsShouldFail{false};
 };
 
-class AuthorizationSessionTest : public ::mongo::unittest::Test {
+class AuthorizationSessionTest : public ScopedGlobalServiceContextForTest, public unittest::Test {
 public:
     FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
     transport::SessionHandle session;
-    ServiceContext::UniqueServiceContext serviceContext = ServiceContext::make();
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext _opCtx;
     AuthzSessionExternalStateMock* sessionState;
@@ -95,7 +94,7 @@ public:
 
     void setUp() {
         session = transportLayer.createSession();
-        client = serviceContext->makeClient("testClient", session);
+        client = getServiceContext()->makeClient("testClient", session);
         RestrictionEnvironment::set(
             session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _opCtx = client->makeOperationContext();
@@ -103,9 +102,9 @@ public:
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            serviceContext.get(), std::move(localManagerState));
+            getServiceContext(), std::move(localManagerState));
         authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(serviceContext.get(), std::move(uniqueAuthzManager));
+        AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
         auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
         sessionState = localSessionState.get();
         authzSession = std::make_unique<AuthorizationSessionForTest>(

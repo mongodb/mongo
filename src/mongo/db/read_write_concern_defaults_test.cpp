@@ -41,11 +41,6 @@ namespace mongo {
 namespace {
 
 class ReadWriteConcernDefaultsTest : public ServiceContextTest {
-public:
-    ~ReadWriteConcernDefaultsTest() {
-        _rwcd.invalidate();
-    }
-
 protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 

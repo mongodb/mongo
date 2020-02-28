@@ -340,6 +340,12 @@ Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::
 AuthorizationManagerImpl::AuthorizationManagerImpl(
     ServiceContext* service, std::unique_ptr<AuthzManagerExternalState> externalState)
     : _externalState(std::move(externalState)),
+      _authSchemaVersionCache(service, _threadPool, _externalState.get()),
+      _userCache(service,
+                 _threadPool,
+                 authorizationManagerCacheSize,
+                 &_authSchemaVersionCache,
+                 _externalState.get()),
       _threadPool([] {
           ThreadPool::Options options;
           options.poolName = "AuthorizationManager";
@@ -347,13 +353,7 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
           options.maxThreads = ThreadPool::Options::kUnlimited;
 
           return options;
-      }()),
-      _authSchemaVersionCache(service, _threadPool, _externalState.get()),
-      _userCache(service,
-                 _threadPool,
-                 authorizationManagerCacheSize,
-                 &_authSchemaVersionCache,
-                 _externalState.get()) {
+      }()) {
     _threadPool.startup();
 }
 

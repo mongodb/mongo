@@ -34,7 +34,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -55,172 +54,46 @@ protected:
     virtual ~ReadThroughCacheBase();
 
     /**
-     * Type used to guard accesses and updates to the cache.
+     * This method is an extension of ThreadPoolInterface::schedule, which in addition creates a
+     * client and an operation context and executes the specified 'work' under that environment. The
+     * difference is that instead of passing a status to 'work' in order to indicate an in-line
+     * execution, the function will throw without actually calling 'work' (see 'schedule' for more
+     * details on in-line execution).
      *
-     * Guard object for synchronizing accesses to data cached in ReadThroughCache instances.
-     * This guard allows one thread to access the cache at a time, and provides an exception-safe
-     * mechanism for a thread to release the cache mutex while performing network or disk operations
-     * while allowing other readers to proceed.
-     *
-     * There are two ways to use this guard.  One may simply instantiate the guard like a
-     * std::lock_guard, and perform reads or writes of the cache.
-     *
-     * Alternatively, one may instantiate the guard, examine the cache, and then enter into an
-     * update mode by first wait()ing until otherUpdateInFetchPhase() is false, and then
-     * calling beginFetchPhase().  At this point, other threads may acquire the guard in the simple
-     * manner and do reads, but other threads may not enter into a fetch phase.  During the fetch
-     * phase, the thread should perform required network or disk activity to determine what update
-     * it will make to the cache.  Then, it should call endFetchPhase(), to reacquire the cache
-     * mutex.  At that point, the thread can make its modifications to the cache and let the guard
-     * go out of scope.
-     *
-     * All updates by guards using a fetch-phase are totally ordered with respect to one another,
-     * and all guards using no fetch phase are totally ordered with respect to one another, but
-     * there is not a total ordering among all guard objects.
-     *
-     * The cached data has an associated counter, called the cache generation.  If the cache
-     * generation changes while a guard is in fetch phase, the fetched data should not be stored
-     * into the cache, because some invalidation event occurred during the fetch phase.
+     * If the task manages to get canceled before it is executed (through a call to tryCancel),
+     * 'work' will be invoked out-of-line with a non-OK status, set to error code
+     * ReadThroughCacheLookupCanceled.
      */
-    class CacheGuard {
-        CacheGuard(const CacheGuard&) = delete;
-        CacheGuard& operator=(const CacheGuard&) = delete;
-
+    class CancelToken {
     public:
-        /**
-         * Constructs a cache guard, locking the mutex that synchronizes ReadThroughCache accesses.
-         */
-        explicit CacheGuard(ReadThroughCacheBase* distCache)
-            : _distCache(distCache), _cacheLock(distCache->_cacheWriteMutex) {}
+        struct TaskInfo;
+        CancelToken(std::shared_ptr<TaskInfo> info);
+        CancelToken(CancelToken&&);
+        ~CancelToken();
 
-        /**
-         * Releases the mutex that synchronizes cache access, if held, and notifies any threads
-         * waiting for their own opportunity to update the cache.
-         */
-        ~CacheGuard() {
-            if (!_cacheLock.owns_lock()) {
-                _cacheLock.lock();
-            }
-
-            if (_isThisGuardInFetchPhase) {
-                invariant(otherUpdateInFetchPhase());
-                _distCache->_isFetchPhaseBusy = false;
-                _distCache->_fetchPhaseIsReady.notify_all();
-            }
-        }
-
-        /**
-         * Returns true if the distCache reports that it is in fetch phase.
-         */
-        bool otherUpdateInFetchPhase() const {
-            return _distCache->_isFetchPhaseBusy;
-        }
-
-        /**
-         * Waits on the _distCache->_fetchPhaseIsReady condition.
-         */
-        void wait() {
-            invariant(!_isThisGuardInFetchPhase);
-            _distCache->_fetchPhaseIsReady.wait(_cacheLock,
-                                                [&] { return !otherUpdateInFetchPhase(); });
-        }
-
-        /**
-         * Enters fetch phase, releasing the _distCache->_cacheMutex after recording the current
-         * cache generation.
-         */
-        void beginFetchPhase() {
-            invariant(!otherUpdateInFetchPhase());
-            _isThisGuardInFetchPhase = true;
-            _distCache->_isFetchPhaseBusy = true;
-            _distCacheFetchGenerationAtFetchBegin = _distCache->_fetchGeneration;
-            _cacheLock.unlock();
-        }
-
-        /**
-         * Exits the fetch phase, reacquiring the _distCache->_cacheMutex.
-         */
-        void endFetchPhase() {
-            _cacheLock.lock();
-            // We do not clear _distCache->_isFetchPhaseBusy or notify waiters until
-            // ~CacheGuard(), for two reasons.  First, there's no value to notifying the waiters
-            // before you're ready to release the mutex, because they'll just go to sleep on the
-            // mutex.  Second, in order to meaningfully check the preconditions of
-            // isSameCacheGeneration(), we need a state that means "fetch phase was entered and now
-            // has been exited."  That state is _isThisGuardInFetchPhase == true and
-            // _lock.owns_lock() == true.
-        }
-
-        /**
-         * Returns true if _distCache->_fetchGeneration remained the same while this guard was
-         * in fetch phase.  Behavior is undefined if this guard never entered fetch phase.
-         *
-         * If this returns true, do not update the cached data with this
-         */
-        bool isSameCacheGeneration() const {
-            invariant(_isThisGuardInFetchPhase);
-            invariant(_cacheLock.owns_lock());
-            return _distCacheFetchGenerationAtFetchBegin == _distCache->_fetchGeneration;
-        }
+        void tryCancel();
 
     private:
-        ReadThroughCacheBase* const _distCache;
-
-        stdx::unique_lock<Latch> _cacheLock;
-
-        bool _isThisGuardInFetchPhase{false};
-        OID _distCacheFetchGenerationAtFetchBegin;
+        std::shared_ptr<TaskInfo> _info;
     };
+    using WorkWithOpContext = unique_function<void(OperationContext*, const Status&)>;
+    CancelToken _asyncWork(WorkWithOpContext work);
 
-    friend class ReadThroughCacheBase::CacheGuard;
-
-    /**
-     * Creates a client and an operation context and executes the specified 'work' under that
-     * environment.
-     */
-    using WorkWithOpContext = unique_function<void(OperationContext*)>;
-    void _asyncWork(WorkWithOpContext work);
-
-    /**
-     * Updates _fetchGeneration to a new OID
-     */
-    void _updateCacheGeneration(const CacheGuard&);
-
-    /**
-     * Service context under which this cache has been instantiated (used for access to service-wide
-     * functionality, such as client/operation context creation)
-     */
+    // Service context under which this cache has been instantiated (used for access to service-wide
+    // functionality, such as client/operation context creation)
     ServiceContext* const _serviceContext;
 
-    /**
-     * Thread pool, to be used for invoking the blocking loader work.
-     */
+    // Thread pool to be used for invoking the blocking 'lookup' calls
     ThreadPoolInterface& _threadPool;
 
-    /**
-     * Protects _fetchGeneration and _isFetchPhaseBusy.  Manipulated via CacheGuard.
-     */
-    Mutex& _cacheWriteMutex;
+    // Used to protect the shared state in the child ReadThroughCache template below. Has a lock
+    // level of 3, meaning that while held, it is only allowed to take '_cancelTokenMutex' below and
+    // the Client lock.
+    Mutex& _mutex;
 
-    /**
-     * Current generation of cached data.  Updated every time part of the cache gets
-     * invalidated.  Protected by CacheGuard.
-     */
-    OID _fetchGeneration{OID::gen()};
-
-    /**
-     * True if there is an update to the _cache in progress, and that update is currently in
-     * the "fetch phase", during which it does not hold the _cacheMutex.
-     *
-     * Manipulated via CacheGuard.
-     */
-    bool _isFetchPhaseBusy{false};
-
-    /**
-     * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
-     * Manipulated via CacheGuard.
-     */
-    stdx::condition_variable _fetchPhaseIsReady;
+    // Used to protect calls to 'tryCancel' above. Has a lock level of 2, meaning what while held,
+    // it is only allowed to take the Client lock.
+    Mutex _cancelTokenMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokenMutex");
 };
 
 /**
@@ -304,86 +177,118 @@ public:
     };
 
     /**
-     * If 'key' is found in the cache, returns a ValidHandle, otherwise invokes the blocking
-     * 'lookup' method below to fetch the 'key' from the backing store. If the key is not found in
-     * the backing store, returns a ValueHandle which defaults to not-set (it's bool operator is
-     * false).
+     * If 'key' is found in the cache, returns a set ValueHandle (its operator bool will be true).
+     * Otherwise, either causes the blocking 'lookup' below to be asynchronously invoked to fetch
+     * 'key' from the backing store (or joins an already scheduled invocation) and returns a future
+     * which will be signaled when the lookup completes.
+     *
+     * If the lookup is successful and 'key' is found in the store, it will be cached (so subsequent
+     * lookups won't have to re-fetch it) and the future will be set. If 'key' is not found in the
+     * backing store, returns a not-set ValueHandle (it's bool operator will be false). If 'lookup'
+     * fails, the future will be set to the appropriate exception and nothing will be cached,
+     * meaning that subsequent calls to 'acquireAsync' will kick-off 'lookup' again.
      *
      * NOTES:
-     *  This is a potentially blocking method.
-     *  The returned value may be invalid by the time the caller gets access to it.
-     *  TODO SERVER-44978: needs to call acquireAsync and then get.
+     *  The returned value may be invalid by the time the caller gets access to it if invalidate is
+     *  called for 'key'.
      */
-    ValueHandle acquire(OperationContext* opCtx, const Key& key) {
-        while (true) {
-            auto cachedValue = _cache.get(key);
-            if (cachedValue)
-                return ValueHandle(std::move(cachedValue));
+    SharedSemiFuture<ValueHandle> acquireAsync(const Key& key) {
+        // Fast path
+        if (auto cachedValue = _cache.get(key))
+            return {std::move(cachedValue)};
 
-            // Otherwise make sure we have the locks we need and check whether and wait on another
-            // thread is fetching into the cache
-            CacheGuard guard(this);
+        stdx::unique_lock ul(_mutex);
 
-            while (!(cachedValue = _cache.get(key)) && guard.otherUpdateInFetchPhase()) {
-                guard.wait();
-            }
+        // Re-check the cache under a mutex, before kicking-off the asynchronous lookup
+        if (auto cachedValue = _cache.get(key))
+            return {std::move(cachedValue)};
 
-            if (cachedValue)
-                return ValueHandle(std::move(cachedValue));
+        // Join an in-progress lookup if one has already been scheduled
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            return *it->second->future;
 
-            // If there's still no value in the cache, then we need to go and get it. Take the slow
-            // path.
-            guard.beginFetchPhase();
+        // Schedule an asynchronous lookup for the key and then loop around and wait for it to
+        // complete
+        auto emplaceResult =
+            _inProgressLookups.emplace(key, std::make_unique<InProgressLookup>(key));
+        invariant(emplaceResult.second /* emplaced */);
+        auto& inProgressLookup = *emplaceResult.first->second;
 
-            auto value = lookup(opCtx, key);
-            if (!value)
-                return ValueHandle();
+        auto [kickOffAsyncLookupPromise, f] = makePromiseFuture<void>();
 
-            // All this does is re-acquire the _cacheWriteMutex if we don't hold it already - a
-            // caller may also call endFetchPhase() after this returns.
-            guard.endFetchPhase();
+        // Construct the future chain before scheduling the async work so it doesn't execute inline
+        // if it so happens that the async work completes by the time the future is constructed, or
+        // if it executes inline due to the task executor being shut down.
+        auto future = std::move(f)
+                          .then([this, &inProgressLookup] {
+                              stdx::unique_lock ul(_mutex);
+                              return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
+                          })
+                          .onCompletion([this, &inProgressLookup](StatusWith<Value> swValue) {
+                              const auto key = inProgressLookup.key;
+                              stdx::lock_guard lg(_mutex);
+                              invariant(_inProgressLookups.erase(key) == 1);
+                              if (swValue == ErrorCodes::ReadThroughCacheKeyNotFound)
+                                  return ValueHandle();
 
-            if (guard.isSameCacheGeneration())
-                return ValueHandle(_cache.insertOrAssignAndGet(
-                    key, {std::move(*value), _serviceContext->getFastClockSource()->now()}));
+                              return ValueHandle(_cache.insertOrAssignAndGet(
+                                  key,
+                                  {uassertStatusOK(std::move(swValue)),
+                                   _serviceContext->getFastClockSource()->now()}));
+                          })
+                          .share();
 
-            // If the cache generation changed while this thread was in fetch mode, the data
-            // associated with the value may now be invalid, so we will throw out the fetched value
-            // and retry.
-        }
+        inProgressLookup.future = future;
+        ul.unlock();
+        kickOffAsyncLookupPromise.emplaceValue();
+
+        return future;
     }
 
     /**
-     * This is an async version of acquire.
-     * TODO SERVER-44978: fix this method to make it actually async
+     * A blocking variant of 'acquireAsync' above - refer to it for more details.
+     *
+     * NOTES:
+     *  This is a potentially blocking method.
      */
-    SharedSemiFuture<ValueHandle> acquireAsync(const Key& key) {
-        return Future<ValueHandle>::makeReady(acquire(nullptr, key)).share();
+    ValueHandle acquire(OperationContext* opCtx, const Key& key) {
+        return acquireAsync(key).get(opCtx);
     }
 
     /**
      * Invalidates the given 'key' and immediately replaces it with a new value.
      */
     ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
-        CacheGuard guard(this);
-        _updateCacheGeneration(guard);
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidate(lg);
         return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime});
     }
 
     /**
-     * The invalidate methods below all marks the given value(s) as invalid and remove them from
-     * cache, which means that a subsequent call to acquire will invoke 'lookup'.
+     * The invalidate methods below guarantee the following:
+     *  - All affected keys already in the cache (or returned to callers) will be invalidated and
+     *    removed from the cache
+     *  - All affected keys, which are in the process of being loaded (i.e., acquireAsync has not
+     *    yet completed) will be internally interrupted and rescheduled again, as if 'acquireAsync'
+     *    was called *after* the call to invalidate
+     *
+     * In essence, the invalidate calls serve as a "barrier" for the affected keys.
      */
     void invalidate(const Key& key) {
-        CacheGuard guard(this);
-        _updateCacheGeneration(guard);
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidate(lg);
         _cache.invalidate(key);
     }
 
     template <typename Pred>
     void invalidateIf(const Pred& predicate) {
-        CacheGuard guard(this);
-        _updateCacheGeneration(guard);
+        stdx::lock_guard lg(_mutex);
+        for (auto& entry : _inProgressLookups) {
+            if (predicate(entry.first))
+                entry.second->invalidate(lg);
+        }
         _cache.invalidateIf([&](const Key& key, const StoredValue*) { return predicate(key); });
     }
 
@@ -400,17 +305,27 @@ public:
 
 protected:
     /**
-     * ReadThroughCache constructor, to be called by sub-classes. The 'cacheSize' parameter
-     * represents the maximum size of the cache and 'mutex' is for the exclusive use of the
-     * ReadThroughCache, the sub-class should never actually use it (apart from passing it to this
-     * constructor). Having the Mutex stored by the sub-class allows latch diagnostics to be
-     * correctly associated with the sub-class (not the generic ReadThroughCache class).
+     * ReadThroughCache constructor, to be called by sub-classes, which implement 'lookup'.
+     *
+     * The passed-in 'mutex' is for the exclusive usage of the ReadThroughCache and must not be used
+     * in any way by the implementing class. Having the Mutex stored by the sub-class allows latch
+     * diagnostics to be correctly associated with the sub-class (not the generic ReadThroughCache
+     * class). The 'threadPool' can be used for other purposes, but it is mandatory that by the time
+     * this object is destructed that it is shut down and joined so that there are no more
+     * asynchronous loading activities going on.
+     *
+     * The 'cacheSize' parameter represents the maximum size of the cache before least recently used
+     * entris will be evicted.
      */
     ReadThroughCache(Mutex& mutex,
                      ServiceContext* service,
                      ThreadPoolInterface& threadPool,
                      int cacheSize)
         : ReadThroughCacheBase(mutex, service, threadPool), _cache(cacheSize) {}
+
+    ~ReadThroughCache() {
+        invariant(_inProgressLookups.empty());
+    }
 
 private:
     /**
@@ -420,7 +335,101 @@ private:
      */
     virtual boost::optional<Value> lookup(OperationContext* opCtx, const Key& key) = 0;
 
+    // Refer to the comments on '_asyncLookupWhileInvalidated' for more detail on how this structure
+    // is used.
+    struct InProgressLookup {
+        InProgressLookup(Key key) : key(std::move(key)) {}
+
+        void invalidate(WithLock) {
+            invalidated = true;
+            if (cancelToken)
+                cancelToken->tryCancel();
+        }
+
+        Key key;
+        boost::optional<SharedSemiFuture<ValueHandle>> future;
+
+        bool invalidated;
+        boost::optional<CancelToken> cancelToken;
+    };
+    using InProgressLookupsMap = stdx::unordered_map<Key, std::unique_ptr<InProgressLookup>>;
+
+    /**
+     * This method is expected to be called with a constructed InProgressLookup object, emplaced on
+     * '_inProgressLookups' (represented by the 'inProgressLookup' argument). It implements an
+     * asynchronous "while (invalidated)" loop over the in-progress key referenced by
+     * 'inProgressLookup', which *must* be kept valid by the caller until the returned Future
+     * completes.
+     *
+     * The returned Future will be complete when that loop exists and will contain the latest value
+     * (or error) returned by 'lookup'.
+     *
+     * If thought of sequentially, the loop looks like this:
+     *
+     * while (true) {
+     *     inProgressLookup.invalidated = false;
+     *     inProgressLookup.cancelToken.reset();
+     *     valueOrError = lookup(key);
+     *     if (!inProgressLookup.invalidated)
+     *          return valueOrError;    // signals the future
+     * }
+     */
+    Future<Value> _asyncLookupWhileInvalidated(stdx::unique_lock<Mutex> ul,
+                                               InProgressLookup& inProgressLookup) noexcept {
+        auto [promise, f] = makePromiseFuture<Value>();
+        auto p = std::make_shared<Promise<Value>>(std::move(promise));
+
+        // Construct the future chain before scheduling the async work so it doesn't execute inline
+        auto future =
+            std::move(f).onCompletion([this, &inProgressLookup](StatusWith<Value> swValue) {
+                stdx::unique_lock ul(_mutex);
+                if (!inProgressLookup.invalidated)
+                    return Future<Value>::makeReady(uassertStatusOK(std::move(swValue)));
+
+                inProgressLookup.cancelToken.reset();
+                return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
+            });
+
+        invariant(!inProgressLookup.cancelToken);
+        inProgressLookup.invalidated = false;
+        try {
+            inProgressLookup.cancelToken.emplace(_asyncWork([ this, p, &inProgressLookup ](
+                OperationContext * opCtx, const Status& status) mutable noexcept {
+                p->setWith([&]() mutable {
+                    uassertStatusOK(status);
+                    auto value = lookup(opCtx, inProgressLookup.key);
+                    uassert(ErrorCodes::ReadThroughCacheKeyNotFound,
+                            "Internal only: key not found",
+                            value);
+                    return std::move(*value);
+                });
+            }));
+        } catch (const ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+            // The thread pool is being shut down, so this is an inline execution
+            invariant(!inProgressLookup.invalidated);
+            invariant(!inProgressLookup.cancelToken);
+
+            ul.unlock();
+            p->setError(ex.toStatus());
+        }
+
+        return std::move(future);
+    };
+
+    // Contains all the currently cached keys. This structure is self-synchronising and doesn't
+    // require a mutex. However, on cache miss it is accessed under '_mutex', which is safe, because
+    // _cache's mutex itself is at level 0.
+    //
+    // NOTE: From destruction order point of view, because keys first "start" in
+    // '_inProgressLookups' and then move on to '_cache' the order of these two fields is important.
     Cache _cache;
+
+    // Keeps track of all the keys, which were attempted to be 'acquireAsync'-ed, weren't found in
+    // the cache and are currently in the process of being looked up from the backing store. A
+    // single key may only be on this map or in '_cache', but never in both.
+    //
+    // This map is protected by '_mutex'.
+    InProgressLookupsMap _inProgressLookups;
 };
 
 }  // namespace mongo

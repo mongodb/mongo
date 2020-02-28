@@ -138,10 +138,6 @@ private:
     // A cache of whether there are any users set up for the cluster.
     AtomicWord<bool> _privilegeDocsExist{false};
 
-    // Thread pool on which to perform the blocking activities that load the user credentials from
-    // storage
-    ThreadPool _threadPool;
-
     // Serves as a source for the return value of getCacheGeneration(). Refer to this method for
     // more details.
     Mutex _cacheGenerationMutex =
@@ -193,6 +189,10 @@ private:
 
         AuthzManagerExternalState* const _externalState;
     } _userCache;
+
+    // Thread pool on which to perform the blocking activities that load the user credentials from
+    // storage
+    ThreadPool _threadPool;
 
     Mutex _pinnedUsersMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_pinnedUsersMutex");
     stdx::condition_variable _pinnedUsersCond;

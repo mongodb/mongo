@@ -70,6 +70,14 @@ ServiceContext::ConstructorActionRegisterer authzClientObserverRegisterer{
         service->registerClientObserver(std::make_unique<AuthzClientObserver>());
     }};
 
+ServiceContext::ConstructorActionRegisterer destroyAuthorizationManagerRegisterer(
+    "DestroyAuthorizationManager",
+    [](ServiceContext* service) {
+        // Intentionally empty, since construction happens through different code paths depending on
+        // the binary
+    },
+    [](ServiceContext* service) { AuthorizationManager::set(service, nullptr); });
+
 }  // namespace
 
 void AuthenticationSession::set(Client* client, std::unique_ptr<AuthenticationSession> newSession) {
