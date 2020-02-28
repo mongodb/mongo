@@ -152,6 +152,29 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            bool hasChangeStream);
 
 /**
+ * For a sharded collection, establishes remote cursors on each shard that may have results, and
+ * creates a DocumentSourceMergeCursors stage to merge the remove cursors. Returns a pipeline
+ * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
+ * be this node itself.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline);
+
+/**
+ * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
+ * true. Returns a BSONObj of the form {"pipeline": {<pipelineExplainOutput>}}.
+ */
+BSONObj targetShardsForExplain(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               Pipeline* ownedPipeline);
+
+/**
+ * Appends the explain output of `dispatchResults` to `result`.
+ */
+Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
+                            const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
+                            BSONObjBuilder* result);
+
+/**
  * Returns the proper routing table to use for targeting shards: either a historical routing table
  * based on the global read timestamp if there is an active transaction with snapshot level read
  * concern or the latest routing table otherwise.

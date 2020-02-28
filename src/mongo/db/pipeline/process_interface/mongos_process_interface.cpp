@@ -103,6 +103,21 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool allowTargetingShards) {
+    // On mongos we can't have local cursors.
+    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
+}
+
+BSONObj MongosProcessInterface::attachCursorSourceAndExplain(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    ExplainOptions::Verbosity verbosity) {
+    return sharded_agg_helpers::targetShardsForExplain(expCtx, ownedPipeline);
+}
+
 boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
@@ -339,13 +354,6 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
             targetCollectionVersion};
-}
-
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    Pipeline* ownedPipeline,
-    bool allowTargetingShards) {
-    return sharded_agg_helpers::attachCursorToPipeline(expCtx, ownedPipeline, allowTargetingShards);
 }
 
 }  // namespace mongo

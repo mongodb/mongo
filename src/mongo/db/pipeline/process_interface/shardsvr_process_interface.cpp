@@ -156,6 +156,13 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     return {{response.getN(), response.getNModified()}};
 }
 
+BSONObj ShardServerProcessInterface::attachCursorSourceAndExplain(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    ExplainOptions::Verbosity verbosity) {
+    return sharded_agg_helpers::targetShardsForExplain(expCtx, ownedPipeline);
+}
+
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     auto collectionFilter =
