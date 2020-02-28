@@ -7,8 +7,6 @@ from shrub.config import Configuration
 
 # pylint: disable=wrong-import-position
 import buildscripts.ciconfig.evergreen as _evergreen
-from buildscripts.evergreen_generate_resmoke_tasks import Suite
-from buildscripts.tests.test_burn_in_tests import get_evergreen_config
 from buildscripts import selected_tests as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,protected-access
@@ -37,102 +35,6 @@ def tests_by_task_stub():
             "distro": "rhel62-small",
         },
     }
-
-
-class TestAcceptance(unittest.TestCase):
-    """A suite of Acceptance tests for selected_tests."""
-
-    def setUp(self):
-        Suite._current_index = 0
-
-    @staticmethod
-    def _mock_evg_api():
-        evg_api_mock = MagicMock()
-        task_mock = evg_api_mock.task_by_id.return_value
-        task_mock.execution = 0
-        return evg_api_mock
-
-    def test_when_no_mappings_are_found_for_changed_files(self):
-        evg_api_mock = self._mock_evg_api()
-        evg_config = get_evergreen_config("etc/evergreen.yml")
-        selected_tests_service_mock = MagicMock()
-        selected_tests_service_mock.get_test_mappings.return_value = []
-        selected_tests_variant_expansions = {
-            "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
-        }
-        changed_files = ["src/file1.cpp"]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
-
-        config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
-                                     origin_build_variants)
-
-        self.assertEqual(config_dict["selected_tests_config.json"], "{}")
-
-    def test_when_test_mappings_are_found_for_changed_files(self):
-        evg_api_mock = self._mock_evg_api()
-        evg_config = get_evergreen_config("etc/evergreen.yml")
-        selected_tests_service_mock = MagicMock()
-        selected_tests_service_mock.get_test_mappings.return_value = [
-            {
-                "source_file": "src/file1.cpp",
-                "test_files": [{"name": "jstests/auth/auth1.js"}],
-            },
-        ]
-        selected_tests_variant_expansions = {
-            "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
-        }
-        changed_files = ["src/file1.cpp"]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
-
-        config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
-                                     origin_build_variants)
-
-        self.assertIn("selected_tests_config.json", config_dict)
-        # jstests/auth/auth1.js belongs to two suites, auth and auth_audit, each of which has
-        # fallback_num_sub_suites = 4 in their resmoke args, resulting in 4 subtasks being generated
-        # for each
-        self.assertEqual(len(config_dict), 9)
-        self.assertEqual(
-            sorted(config_dict.keys()), [
-                "auth_0.yml", "auth_1.yml", "auth_2.yml", "auth_3.yml", "auth_audit_4.yml",
-                "auth_audit_5.yml", "auth_audit_6.yml", "auth_audit_7.yml",
-                "selected_tests_config.json"
-            ])
-
-    def test_when_task_mappings_are_found_for_changed_files(self):
-        evg_api_mock = self._mock_evg_api()
-        evg_config = get_evergreen_config("etc/evergreen.yml")
-        selected_tests_service_mock = MagicMock()
-        selected_tests_service_mock.get_task_mappings.return_value = [
-            {
-                "source_file": "src/file1.cpp",
-                "tasks": [{"name": "auth"}],
-            },
-        ]
-        selected_tests_variant_expansions = {
-            "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
-        }
-        changed_files = ["src/file1.cpp"]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
-
-        config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, changed_files,
-                                     origin_build_variants)
-
-        self.assertIn("selected_tests_config.json", config_dict)
-        # the auth task's generator task, auth_gen, has fallback_num_sub_suites = 4 in
-        # its resmoke args, resulting in 4 subtasks being generated, plus a _misc task
-        self.assertEqual(len(config_dict), 6)
-        self.assertEqual(
-            sorted(config_dict.keys()), [
-                "auth_0.yml", "auth_1.yml", "auth_2.yml", "auth_3.yml", "auth_misc.yml",
-                "selected_tests_config.json"
-            ])
 
 
 class TestSelectedTestsConfigOptions(unittest.TestCase):
@@ -561,3 +463,26 @@ class TestGetTaskConfigs(unittest.TestCase):
                                                     changed_files)
 
         self.assertEqual(task_configs["task_config_key"], "task_config_value_2")
+
+
+class TestRun(unittest.TestCase):
+    @patch(ns("SelectedTestsConfigOptions"))
+    @patch(ns("_get_task_configs"))
+    @patch(ns("_update_config_with_task"))
+    def test_run(self, update_config_with_task_mock, get_task_configs_mock,
+                 selected_tests_config_options):
+        get_task_configs_mock.return_value = {"task_config_key": "task_config_value_1"}
+
+        def update_config_with_task(evg_api, shrub_config, config_options,
+                                    config_dict_of_suites_and_tasks):
+            config_dict_of_suites_and_tasks["new_config_key"] = "new_config_values"
+            shrub_config.task("my_fake_task")
+
+        update_config_with_task_mock.side_effect = update_config_with_task
+        changed_files = {"src/file1.cpp", "src/file2.js"}
+
+        config_dict_of_suites_and_tasks = under_test.run(MagicMock(), MagicMock(), MagicMock(), {},
+                                                         changed_files, ["variant_1", "variant_2"])
+
+        self.assertEqual(config_dict_of_suites_and_tasks["new_config_key"], "new_config_values")
+        self.assertIn("my_fake_task", config_dict_of_suites_and_tasks["selected_tests_config.json"])

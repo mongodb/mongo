@@ -97,7 +97,7 @@ class SelectedTestsConfigOptions(ConfigOptions):
 
         :param origin_variant_expansions: Expansions of the origin build variant.
         :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-        :param overwrites: Dict of configuration values to overwrite those listed in expansions.
+        :param overwrites: Dict of configuration values to overwrite those listed in filepath.
         :param required_keys: Set of keys required by this config.
         :param defaults: Dict of default values for keys.
         :param formats: Dict with functions to format values before returning.
