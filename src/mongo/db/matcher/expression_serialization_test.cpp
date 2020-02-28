@@ -1343,24 +1343,8 @@ TEST(SerializeBasic, ExpressionWhereSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(
-        *reserialized.getQuery(),
-        BSONObjBuilder().appendCodeWScope("$where", "this.a == this.b", BSONObj()).obj());
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
-}
-
-TEST(SerializeBasic, ExpressionWhereWithScopeSerializesCorrectly) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    Matcher original(BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))),
-                     expCtx,
-                     ExtensionsCallbackNoop(),
-                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    Matcher reserialized(serialize(original.getMatchExpression()),
-                         expCtx,
-                         ExtensionsCallbackNoop(),
-                         MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))));
+                      BSONObjBuilder().appendCode("$where", "this.a == this.b").obj());
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

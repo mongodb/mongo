@@ -105,11 +105,9 @@ ExtensionsCallback::extractWhereMatchExpressionParams(BSONElement where) {
         case mongo::String:
         case mongo::Code:
             params.code = where._asCode();
-            params.scope = BSONObj();
             break;
         case mongo::CodeWScope:
-            params.code = where._asCode();
-            params.scope = where.codeWScopeObject().getOwned();
+            uasserted(4649201, "$where no longer supports deprecated BSON type CodeWScope");
             break;
         default:
             return {ErrorCodes::BadValue, "$where got bad type"};

@@ -279,12 +279,19 @@ public:
             invariant(!forceLoadOfStoredProcedures);
             invariant(!isMapReduceCommand);
         }
+
+        // Stored procedures are only loaded for the $where expression and MapReduce command.
+        const bool loadStoredProcedures = forceLoadOfStoredProcedures || isMapReduceCommand;
+
+        if (hasWhereClause && !loadStoredProcedures) {
+            uasserted(4649200,
+                      "A single operation cannot use both JavaScript aggregation expressions and "
+                      "$where.");
+        }
+
         const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
-        return JsExecution::get(opCtx,
-                                scope.get_value_or(BSONObj()),
-                                ns.db(),
-                                forceLoadOfStoredProcedures || isMapReduceCommand,
-                                jsHeapLimitMB);
+        return JsExecution::get(
+            opCtx, scope.get_value_or(BSONObj()), ns.db(), loadStoredProcedures, jsHeapLimitMB);
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
@@ -296,6 +303,7 @@ public:
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
     bool inMultiDocumentTransaction = false;
+    bool hasWhereClause = false;
 
     NamespaceString ns;
 

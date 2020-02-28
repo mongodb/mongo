@@ -348,3 +348,10 @@ server_parameters:
       expr: 60 * 1000
     validator:
         gt: 0
+
+  internalQueryDesugarWhereToFunction:
+    description: "When true, desugars $where to $expr/$function."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryDesugarWhereToFunction"
+    cpp_vartype: AtomicWord<bool>
+    default: false

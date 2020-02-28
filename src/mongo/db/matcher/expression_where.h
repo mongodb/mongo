@@ -27,35 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/db/matcher/expression_where_base.h"
-
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
-WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
-    : MatchExpression(WHERE), _code(std::move(params.code)) {}
+class OperationContext;
 
-void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-    debug << "$where\n";
+class WhereMatchExpression final : public WhereMatchExpressionBase {
+public:
+    WhereMatchExpression(OperationContext* opCtx, WhereParams params, StringData dbName);
 
-    _debugAddSpace(debug, indentationLevel + 1);
-    debug << "code: " << getCode() << "\n";
-}
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
-void WhereMatchExpressionBase::serialize(BSONObjBuilder* out, bool includePath) const {
-    out->appendCode("$where", getCode());
-}
+    std::unique_ptr<MatchExpression> shallowClone() const final;
 
-bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType()) {
-        return false;
-    }
-    const WhereMatchExpressionBase* realOther = static_cast<const WhereMatchExpressionBase*>(other);
-    return getCode() == realOther->getCode();
-}
+private:
+    std::string _dbName;
+
+    std::unique_ptr<Scope> _scope;
+    ScriptingFunction _func;
+
+    OperationContext* const _opCtx;
+};
 
 }  // namespace mongo

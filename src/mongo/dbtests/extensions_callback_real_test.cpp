@@ -242,6 +242,8 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
 //
 const NamespaceString kTestNss = NamespaceString("db.dummy");
 
+// TODO SERVER-46494: Re-enable this test.
+/**
 TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
     auto query1 = fromjson("{$where: 'function() { return this.x == 10; }'}");
     boost::intrusive_ptr<ExpressionContext> expCtx(
@@ -258,6 +260,7 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
         "['$$CURRENT'], 'lang': 'js', '_internalSetObjToThis': true}}}");
     ASSERT_BSONOBJ_EQ(gotMatch.obj(), expectedMatch);
 }
+*/
 
 }  // namespace
 }  // namespace mongo

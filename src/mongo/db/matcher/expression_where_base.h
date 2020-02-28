@@ -42,7 +42,6 @@ class WhereMatchExpressionBase : public MatchExpression {
 public:
     struct WhereParams {
         std::string code;
-        BSONObj scope;  // Owned.
     };
 
     explicit WhereMatchExpressionBase(WhereParams params);
@@ -78,17 +77,12 @@ protected:
         return _code;
     }
 
-    const BSONObj& getScope() const {
-        return _scope;
-    }
-
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
 
     const std::string _code;
-    const BSONObj _scope;  // Owned.
 };
 
 }  // namespace mongo

@@ -75,7 +75,7 @@ assert.commandFailedWithCode(db.runCommand({
         ]
     }
 }),
-                             31438);
+                             4649200);
 
 // Mixed queries with both $function and $accumulator should succeed.
 // TODO SERVER-45450: Change $_internalJsReduce to $accumulator.

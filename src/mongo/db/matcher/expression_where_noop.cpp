@@ -46,7 +46,6 @@ bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetail
 std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
     WhereParams params;
     params.code = getCode();
-    params.scope = getScope();
     std::unique_ptr<WhereNoOpMatchExpression> e =
         std::make_unique<WhereNoOpMatchExpression>(std::move(params));
     if (getTag()) {
