@@ -1785,6 +1785,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                     Date_t::fromDurationSinceEpoch(Seconds(it->getElectionTime().getSecs())));
             }
             bb.appendIntOrLL("configVersion", it->getConfigVersion());
+            bb.appendIntOrLL("configTerm", it->getConfigTerm());
             membersOut.push_back(bb.obj());
         }
     }

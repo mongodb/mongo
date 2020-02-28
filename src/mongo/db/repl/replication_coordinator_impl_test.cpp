@@ -358,6 +358,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(1);
+    hbArgs.setConfigTerm(0);
     hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
@@ -391,6 +392,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(1);
+    hbArgs.setConfigTerm(0);
     hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
@@ -3786,6 +3788,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
 }
 
 TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWin) {
+    // The config does not have a "term" field, so step-up will not increment the config term
+    // via reconfig. As a result, step-up only triggers two topology changes.
     init();
     assertStartSuccess(BSON("_id"
                             << "mySet"

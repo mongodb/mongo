@@ -88,6 +88,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName(_rsConfig->getReplSetName());
     hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
+    hbArgs.setConfigTerm(_rsConfig->getConfigTerm());
     hbArgs.setHeartbeatVersion(1);
     if (isInitialConfig) {
         hbArgs.setCheckEmpty();

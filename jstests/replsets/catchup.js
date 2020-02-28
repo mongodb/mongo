@@ -45,12 +45,14 @@ function checkOpInOplog(node, op, count) {
 function reconfigElectionAndCatchUpTimeout(electionTimeout, catchupTimeout) {
     // Reconnect all nodes to make sure reconfig succeeds.
     rst.nodes.forEach(reconnect);
+    // Wait for the config with the new term to propagate.
+    waitForConfigReplication(rst.getPrimary());
     // Reconfigure replica set to decrease catchup timeout.
     var newConfig = rst.getReplSetConfigFromNode();
     newConfig.version++;
     newConfig.settings.catchUpTimeoutMillis = catchupTimeout;
     newConfig.settings.electionTimeoutMillis = electionTimeout;
-    reconfig(rst, newConfig);
+    reconfig(rst, newConfig, true);
     rst.awaitReplication();
     rst.awaitNodesAgreeOnPrimary();
 }

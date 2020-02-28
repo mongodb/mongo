@@ -30,25 +30,18 @@ const rsConn = new Mongo(rst.getURL());
 assert(rsConn.isReplicaSetConnection(),
        "expected " + rsConn.host + " to be a replica set connection string");
 
-const [secondary1, secondary2] = rst.getSecondaries();
-
 function stepDownPrimary(rst) {
     const awaitShell = startParallelShell(
         () => assert.commandWorked(db.adminCommand({replSetStepDown: 60, force: true})),
         directConn.port);
 
     // We wait for the primary to transition to the SECONDARY state to ensure we're waiting
-    // until after the parallel shell has started the replSetStepDown command and the server is
-    // paused at the failpoint.Do not attempt to reconnect to the node, since the node will be
-    // holding the global X lock at the failpoint.
+    // until after the parallel shell has started the replSetStepDown command.
     const reconnectNode = false;
     rst.waitForState(directConn, ReplSetTest.State.SECONDARY, null, reconnectNode);
 
     return awaitShell;
 }
-
-const failpoint = "stepdownHangBeforePerformingPostMemberStateUpdateActions";
-assert.commandWorked(directConn.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
 
 const awaitShell = stepDownPrimary(rst);
 
@@ -64,18 +57,6 @@ assert.commandFailedWithCode(rsConn.getDB("test").runCommand({create: "mycoll"})
 // However, once the server responds back with a ErrorCodes.NotMaster error, DBClientRS will
 // cause the ReplicaSetMonitor to attempt to discover the current primary.
 assert.commandWorked(rsConn.getDB("test").runCommand({create: "mycoll"}));
-
-try {
-    assert.commandWorked(directConn.adminCommand({configureFailPoint: failpoint, mode: "off"}));
-} catch (e) {
-    if (!isNetworkError(e)) {
-        throw e;
-    }
-
-    // We ignore network errors because it's possible that depending on how quickly the server
-    // closes connections that the connection would get closed before the server has a chance to
-    // respond to the configureFailPoint command with ok=1.
-}
 
 awaitShell();
 

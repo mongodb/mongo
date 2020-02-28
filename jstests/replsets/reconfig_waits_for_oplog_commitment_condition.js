@@ -124,6 +124,12 @@ assert.eq(primary, rst.getPrimary());
 
 // Reconfig should now fail since the primary has not yet committed an op in its term.
 assert.eq(isConfigCommitted(primary), false);
+
+// Wait for the config with the new term to propagate.
+waitForConfigReplication(primary);
+
+// Even though the current config has been replicated to all nodes, reconfig should still fail since
+// the primary has not yet committed an op in its term.
 config.version++;
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
                              ErrorCodes.ConfigurationInProgress);

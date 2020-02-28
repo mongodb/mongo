@@ -41,10 +41,12 @@ jsTestLog("Try to interrupt it with a reconfig");
 config.members[nodes.indexOf(candidate)].priority = 2;
 config.version++;
 // While the candidate is stepping up, it it possible for the RstlKillOpThread to kill this reconfig
-// command before it succeeds. Failing with an InterruptedDueToReplStateChange error is acceptable
-// here because we are testing that the reconfig command does not cause the server to invariant.
-assert.commandWorkedOrFailedWithCode(candidate.adminCommand({replSetReconfig: config, force: true}),
-                                     ErrorCodes.InterruptedDueToReplStateChange);
+// command before it succeeds. Failing due to interruption on stepup or the automatic reconfig on
+// stepup is acceptable here because we are testing that the reconfig command does not cause the
+// server to invariant.
+assert.commandWorkedOrFailedWithCode(
+    candidate.adminCommand({replSetReconfig: config, force: true}),
+    [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.ConfigurationInProgress]);
 
 failPoint.off();
 

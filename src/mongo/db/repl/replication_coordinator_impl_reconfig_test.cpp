@@ -718,36 +718,31 @@ public:
         return BSON("_id" << id << "host" << host);
     }
 
-    BSONObj configWithMembers(int version, BSONArray members) {
+    BSONObj configWithMembers(int version, long long term, BSONArray members) {
         return BSON("_id"
                     << "mySet"
-                    << "protocolVersion" << 1 << "version" << version << "term" << 1 << "members"
+                    << "protocolVersion" << 1 << "version" << version << "term" << term << "members"
                     << members);
     }
 
-    void respondToHeartbeat(NetworkInterfaceMock* net,
-                            int configVersion = 1,
-                            int configTerm = -1,
-                            bool blackHole = false) {
-        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const RemoteCommandRequest& request = noi->getRequest();
+    void respondToHeartbeat() {
+        auto net = getNet();
+        auto noi = net->getNextReadyRequest();
+        auto&& request = noi->getRequest();
         repl::ReplSetHeartbeatArgsV1 hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setConfigVersion(configVersion);
-        hbResp.setConfigTerm(configTerm);
+        // Secondaries learn of the config version and term immediately.
+        hbResp.setConfigVersion(getReplCoord()->getConfig().getConfigVersion());
+        hbResp.setConfigTerm(getReplCoord()->getConfig().getConfigTerm());
         BSONObjBuilder respObj;
         hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
         hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
-        if (blackHole) {
-            net->blackHole(noi);
-        } else {
-            net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-        }
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
         net->runReadyNetworkOperations();
     }
 };
@@ -757,8 +752,8 @@ TEST_F(ReplCoordReconfigTest,
     // Start up as a secondary.
     init();
     assertStartSuccess(
-        configWithMembers(1,
-                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"))),
+        configWithMembers(
+            1, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"))),
         HostAndPort("n1", 1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -783,9 +778,16 @@ TEST_F(ReplCoordReconfigTest,
     args.force = false;
     args.newConfigObj =
         configWithMembers(2,
+                          1,
                           BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")
                                                        << member(4, "n4:1")));
 
+    // Consume all remaining heartbeat requests.
+    enterNetwork();
+    while (getNet()->hasReadyRequests()) {
+        respondToHeartbeat();
+    }
+    exitNetwork();
 
     BSONObjBuilder result;
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -795,16 +797,15 @@ TEST_F(ReplCoordReconfigTest,
         [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
 
     // Satisfy the quorum check.
-    auto net = getNet();
     enterNetwork();
-    respondToHeartbeat(net);
-    respondToHeartbeat(net);
+    respondToHeartbeat();
+    respondToHeartbeat();
     exitNetwork();
 
     // Satisfy config replication check.
     enterNetwork();
-    respondToHeartbeat(net, configVersion, 1 /* configTerm */);
-    respondToHeartbeat(net, configVersion, 1 /* configTerm */);
+    respondToHeartbeat();
+    respondToHeartbeat();
     exitNetwork();
 
     // Satisfy oplog commitment wait.
@@ -824,7 +825,7 @@ TEST_F(ReplCoordReconfigTest,
     init();
     auto configVersion = 2;
     assertStartSuccess(
-        configWithMembers(configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
         HostAndPort("n1", 1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -845,7 +846,14 @@ TEST_F(ReplCoordReconfigTest,
     ReplSetReconfigArgs args;
     args.force = false;
     args.newConfigObj = configWithMembers(
-        configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+        configVersion, 1, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    // Consume all remaining heartbeat requests.
+    enterNetwork();
+    while (getNet()->hasReadyRequests()) {
+        respondToHeartbeat();
+    }
+    exitNetwork();
 
     BSONObjBuilder result;
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -865,12 +873,12 @@ TEST_F(ReplCoordReconfigTest,
 
     // Satisfy the quorum check.
     enterNetwork();
-    respondToHeartbeat(getNet());
+    respondToHeartbeat();
     exitNetwork();
 
     // Satisfy config replication check.
     enterNetwork();
-    respondToHeartbeat(getNet(), configVersion, 1 /* configTerm */);
+    respondToHeartbeat();
     exitNetwork();
 
     reconfigThread.join();
@@ -884,7 +892,7 @@ TEST_F(ReplCoordReconfigTest,
     init();
     auto configVersion = 2;
     assertStartSuccess(
-        configWithMembers(configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
         HostAndPort("n1", 1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -905,7 +913,7 @@ TEST_F(ReplCoordReconfigTest,
     ReplSetReconfigArgs args;
     args.force = true;
     args.newConfigObj = configWithMembers(
-        configVersion, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+        configVersion, 1, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
 
     BSONObjBuilder result;
     Status status(ErrorCodes::InternalError, "Not Set");

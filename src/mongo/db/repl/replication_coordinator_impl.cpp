@@ -120,6 +120,8 @@ MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Will cause a reconfig to hang after completing the config quorum check.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
+// Will cause signal drain complete to hang after reconfig
+MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -1096,7 +1098,46 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(opCtx));
 
     {
+        // If the config doesn't have a term, don't change it.
+        auto needBumpConfigTerm = _rsConfig.getConfigTerm() != OpTime::kUninitializedTerm;
         lk.unlock();
+
+        if (needBumpConfigTerm) {
+            // We re-write the term but keep version the same. This conceptually a no-op
+            // in the config consensus group, analogous to writing a new oplog entry
+            // in Raft log state machine on step up.
+            auto getNewConfig = [&](const ReplSetConfig& oldConfig, long long primaryTerm) {
+                auto config = oldConfig;
+                config.setConfigTerm(primaryTerm);
+                return config;
+            };
+            LOGV2(4508103, "Increment the config term via reconfig.");
+            auto reconfigStatus = doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+            if (!reconfigStatus.isOK()) {
+                LOGV2(4508100,
+                      "Automatic reconfig to increment the config term on stepup failed",
+                      "status"_attr = reconfigStatus);
+                // If the node stepped down after we released the lock, we can just return.
+                if (ErrorCodes::isNotMasterError(reconfigStatus.code())) {
+                    return;
+                }
+                // Writing this new config with a new term is somewhat "best effort", and if we get
+                // preempted by a concurrent reconfig, that is fine since that new config will have
+                // occurred after the node became primary and so the concurrent reconfig has updated
+                // the term appropriately.
+                if (reconfigStatus != ErrorCodes::ConfigurationInProgress) {
+                    LOGV2_FATAL(4508101,
+                                "Reconfig on stepup failed for unknown reasons.",
+                                "status"_attr = reconfigStatus);
+                    fassertFailedWithStatus(31477, reconfigStatus);
+                }
+            }
+        }
+        if (MONGO_unlikely(hangAfterReconfigOnDrainComplete.shouldFail())) {
+            LOGV2(4508102, "Hanging due to hangAfterReconfigOnDrainComplete failpoint.");
+            hangAfterReconfigOnDrainComplete.pauseWhileSet(opCtx);
+        }
+
         AllowNonLocalWritesBlock writesAllowed(opCtx);
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx);
         lk.lock();
@@ -4960,8 +5001,9 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(
 
     // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLExclusive());
-    _canAcceptNonLocalWrites.store(canAcceptWrites);
+    if (opCtx->lockState()->isRSTLExclusive()) {
+        _canAcceptNonLocalWrites.store(canAcceptWrites);
+    }
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(WithLock) const {

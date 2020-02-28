@@ -7,10 +7,7 @@ var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;
 var shards = [st.shard0, st.shard1];
-var coll = mongos.getCollection("foo.bar");
 var admin = mongos.getDB("admin");
-var cursor;
-var res;
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
 // to throw if it receives an operation with a max time.  See fail point declaration for
@@ -22,7 +19,7 @@ var configureMaxTimeAlwaysTimeOut = function(mode) {
         {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
 };
 
-// Positive test for "setFeatureCompatibilityVersion"
+jsTestLog("Positive test for setFeatureCompatibilityVersion");
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assert.commandFailedWithCode(
     admin.runCommand(
@@ -30,13 +27,14 @@ assert.commandFailedWithCode(
     ErrorCodes.MaxTimeMSExpired,
     "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
 
-// Negative test for "setFeatureCompatibilityVersion"
+jsTestLog("Negative test for setFeatureCompatibilityVersion to downgrade");
 configureMaxTimeAlwaysTimeOut("off");
 assert.commandWorked(
     admin.runCommand(
         {setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
     "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
 
+jsTestLog("Negative test for setFeatureCompatibilityVersion to upgrade");
 assert.commandWorked(
     admin.runCommand({setFeatureCompatibilityVersion: latestFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
     "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
