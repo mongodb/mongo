@@ -72,6 +72,7 @@
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -2910,7 +2911,8 @@ EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_inlock(
     const rpc::ReplSetMetadata& replMetadata) {
     // If we're in FCV 4.4, allow metadata updates between config versions.
     if (!serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) ||
+        !enableSafeReplicaSetReconfig) {
         if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
             return EventHandle();
         }
@@ -3021,9 +3023,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
         // Only explicitly set configTerm for reconfig to this node's term if we're in FCV 4.4.
         // Otherwise, use -1.
-        auto isUpgraded = serverGlobalParams.featureCompatibility.isVersion(
+        auto useSafeReconfig = serverGlobalParams.featureCompatibility.isVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-        auto term = (!args.force && isUpgraded) ? currentTerm : OpTime::kUninitializedTerm;
+        useSafeReconfig = useSafeReconfig && enableSafeReplicaSetReconfig;
+        auto term = (!args.force && useSafeReconfig) ? currentTerm : OpTime::kUninitializedTerm;
 
         // When initializing a new config through the replSetReconfig command, ignore the term
         // field passed in through its args. Instead, use this node's term.
@@ -3108,7 +3111,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
 
     if (serverGlobalParams.featureCompatibility.isVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
-        !force) {
+        !force && enableSafeReplicaSetReconfig) {
         if (!_doneWaitingForReplication_inlock(fakeOpTime, configWriteConcern)) {
             return Status(ErrorCodes::ConfigurationInProgress,
                           str::stream()
@@ -3202,7 +3205,8 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
 
     if (!force &&
         serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
+        enableSafeReplicaSetReconfig) {
         // Wait for the config document to be replicated to a majority of nodes in the new
         // config.
         StatusAndDuration configAwaitStatus =

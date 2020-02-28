@@ -689,6 +689,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/server_parameter',
         'local_oplog_info',
         'split_horizon',
+        'repl_server_parameters',
     ],
 )
 

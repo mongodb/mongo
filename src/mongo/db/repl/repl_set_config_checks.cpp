@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/service_context.h"
@@ -363,7 +364,8 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     // ensures that all quorums of the new config overlap with all quorums of the old config.
     if (!force &&
         serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
+        enableSafeReplicaSetReconfig) {
         status = validateSingleNodeChange(oldConfig, newConfig);
         if (!status.isOK()) {
             return StatusWith<int>(status);

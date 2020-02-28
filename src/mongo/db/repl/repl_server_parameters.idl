@@ -293,3 +293,11 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+
+    enableSafeReplicaSetReconfig:
+        description: Enables safe replica set reconfig.
+        set_at: startup
+        test_only: true
+        cpp_vartype: bool
+        cpp_varname: enableSafeReplicaSetReconfig
+        default: true
