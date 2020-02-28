@@ -428,7 +428,6 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("storage.queryableBackupMode") &&
         params["storage.queryableBackupMode"].as<bool>()) {
         storageGlobalParams.readOnly = true;
-        storageGlobalParams.dur = false;
     }
 
     if (params.count("storage.groupCollections")) {
