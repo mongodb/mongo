@@ -37,7 +37,7 @@ conf.version++;
 jsTestLog('Remove arbiter');
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 
-assert.soon(
+assert.soonNoExcept(
     () => {
         // The arbiter dropped connections when it was removed.
         reconnect(arbiterConn);
