@@ -10,7 +10,8 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");                // For assertStagesForExplainOfCommand.
-load("jstests/multiVersion/libs/multi_cluster.js");  // upgradeCluster.
+load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
+load("jstests/replsets/rslib.js");                   // For awaitRSClientHosts.
 
 TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replset.
 
@@ -69,10 +70,16 @@ function upgradeCluster(version, components) {
     components = Object.assign(defaultComponents, components);
     st.upgradeCluster(version, components);
 
-    // Wait for the config server and shards to become available, and restart mongoS.
+    // Wait for the config server and shards to become available.
     st.configRS.awaitSecondaryNodes();
     st.rs0.awaitSecondaryNodes();
     st.rs1.awaitSecondaryNodes();
+
+    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of both shards.
+    for (let client of [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()]) {
+        awaitRSClientHosts(
+            client, [st.rs0.getPrimary(), st.rs1.getPrimary()], {ok: true, ismaster: true});
+    }
 
     mongosDB = st.s.getDB(jsTestName());
     coll = mongosDB.coll;
