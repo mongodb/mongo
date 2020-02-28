@@ -1504,7 +1504,7 @@ buildvariants:
 #######################################
 - name: wtdevelop-1-node-replSet
   display_name: WT Develop 1-Node ReplSet
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
     setup: single-replica
@@ -1525,7 +1525,7 @@ buildvariants:
 
 - name: wtdevelop-standalone
   display_name: WT Develop Standalone
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
     setup: standalone
