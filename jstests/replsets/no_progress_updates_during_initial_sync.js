@@ -114,7 +114,7 @@ assert.neq(nullWallTime, secondaryOpTimes.optimeDurableDate, () => tojson(second
 
 // ...the primary thinks they're still null as they were null in the heartbeat responses.
 const primaryStatusRes = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-const secondaryOpTimesAsSeenByPrimary = primaryStatusRes.members[1];
+const secondaryOpTimesAsSeenByPrimary = primaryStatusRes.members[2];
 assert.docEq(secondaryOpTimesAsSeenByPrimary.optime,
              nullOpTime,
              () => tojson(secondaryOpTimesAsSeenByPrimary));
