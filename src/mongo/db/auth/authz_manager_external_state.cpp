@@ -31,7 +31,6 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
@@ -46,25 +45,5 @@ std::unique_ptr<AuthzManagerExternalState> AuthzManagerExternalState::create() {
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;
-
-bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* opCtx,
-                                                             const UserName& userName) {
-#ifdef MONGO_CONFIG_SSL
-    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
-        return false;
-    }
-
-    if (!allowRolesFromX509Certificates) {
-        return false;
-    }
-
-    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-    return sslPeerInfo.subjectName.toString() == userName.getUser() &&
-        userName.getDB() == "$external" && !sslPeerInfo.roles.empty();
-#else
-    return false;
-#endif
-}
-
 
 }  // namespace mongo

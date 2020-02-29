@@ -83,18 +83,20 @@ public:
     virtual Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) = 0;
 
     /**
-     * Writes into "result" a document describing the named user and returns Status::OK().  The
-     * description includes the user credentials and customData, if present, the user's role
-     * membership and delegation information, a full list of the user's privileges, and a full
-     * list of the user's roles, including those roles held implicitly through other roles
-     * (indirect roles). In the event that some of this information is inconsistent, the
-     * document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
+     * Writes into "result" a document describing the requested user and returns Status::OK().
+     * The caller is required to provide all information necessary to unique identify the request
+     * for a user, including the user's name and any roles which the user must possess via
+     * out-of-band attestation. The returned description includes the user credentials and
+     * customData, if present, the user's role membership and delegation information, a full
+     * list of the user's privileges, and a full list of the user's roles, including those
+     * roles held implicitly through other roles (indirect roles). In the event that some of this
+     * information is inconsistent, the document will contain a "warnings" array,
+     * with std::string messages describing inconsistencies.
      *
      * If the user does not exist, returns ErrorCodes::UserNotFound.
      */
     virtual Status getUserDescription(OperationContext* opCtx,
-                                      const UserName& userName,
+                                      const UserRequest& user,
                                       BSONObj* result) = 0;
 
     /**
@@ -171,12 +173,6 @@ public:
 
 protected:
     AuthzManagerExternalState();  // This class should never be instantiated directly.
-
-    /**
-     * Returns true if roles for this user were provided by the client, and can be obtained from
-     * the connection.
-     */
-    bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& username);
 };
 
 }  // namespace mongo

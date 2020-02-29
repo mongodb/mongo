@@ -234,9 +234,9 @@ public:
      * can control exactly what privileges are returned for the user.
      */
     Status getUserDescription(OperationContext* opCtx,
-                              const UserName& userName,
+                              const UserRequest& user,
                               BSONObj* result) override {
-        return _getUserDocument(opCtx, userName, result);
+        return _getUserDocument(opCtx, user.name, result);
     }
 
 private:

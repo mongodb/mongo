@@ -162,19 +162,19 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 }
 
 Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCtx,
-                                                          const UserName& userName,
+                                                          const UserRequest& userReq,
                                                           BSONObj* result) {
     Status status = Status::OK();
+    const UserName& userName = userReq.name;
 
-    if (!shouldUseRolesFromConnection(opCtx, userName)) {
+    if (!userReq.roles) {
         status = _getUserDocument(opCtx, userName, result);
         if (!status.isOK())
             return status;
     } else {
         // We are able to artifically construct the external user from the request
         BSONArrayBuilder userRoles;
-        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-        for (const RoleName& role : sslPeerInfo.roles) {
+        for (const RoleName& role : *(userReq.roles)) {
             userRoles << BSON("role" << role.getRole() << "db" << role.getDB());
         }
         *result = BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"

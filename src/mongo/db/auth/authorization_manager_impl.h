@@ -184,7 +184,7 @@ private:
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
         // the value can not be loaded, so if it returns, the value will always be set.
-        boost::optional<User> lookup(OperationContext* opCtx, const UserName& userName) override;
+        boost::optional<User> lookup(OperationContext* opCtx, const UserRequest& user) override;
 
     private:
         Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");

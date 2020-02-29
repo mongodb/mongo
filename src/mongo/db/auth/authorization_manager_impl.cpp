@@ -41,8 +41,10 @@
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_manager_impl_parameters_gen.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
@@ -53,6 +55,7 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -284,6 +287,29 @@ Status initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) {
     return Status::OK();
 }
 
+/**
+ * Returns true if roles for this user were provided by the client, and can be obtained from
+ * the connection.
+ */
+bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& userName) {
+#ifdef MONGO_CONFIG_SSL
+    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
+        return false;
+    }
+
+    if (!allowRolesFromX509Certificates) {
+        return false;
+    }
+
+    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+    return sslPeerInfo.subjectName.toString() == userName.getUser() &&
+        userName.getDB() == "$external"_sd && !sslPeerInfo.roles.empty();
+#else
+    return false;
+#endif
+}
+
+
 std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(
     ServiceContext* serviceContext) {
     return std::make_unique<AuthorizationManagerImpl>(serviceContext,
@@ -386,7 +412,7 @@ bool AuthorizationManagerImpl::hasAnyPrivilegeDocuments(OperationContext* opCtx)
 Status AuthorizationManagerImpl::getUserDescription(OperationContext* opCtx,
                                                     const UserName& userName,
                                                     BSONObj* result) {
-    return _externalState->getUserDescription(opCtx, userName, result);
+    return _externalState->getUserDescription(opCtx, UserRequest(userName, boost::none), result);
 }
 
 Status AuthorizationManagerImpl::getRoleDescription(OperationContext* opCtx,
@@ -423,7 +449,22 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
         return internalSecurity.user;
     }
 
-    auto cachedUser = _userCache.acquire(opCtx, userName);
+    UserRequest request(userName, boost::none);
+
+    // Clients connected via TLS may present an X.509 certificate which contains an authorization
+    // grant. If this is the case, the roles must be provided to the external state, for expansion
+    // into privileges.
+    if (shouldUseRolesFromConnection(opCtx, userName)) {
+        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+        request.roles = std::set<RoleName>();
+
+        // In order to be hashable, the role names must be converted from unordered_set to a set.
+        std::copy(sslPeerInfo.roles.begin(),
+                  sslPeerInfo.roles.end(),
+                  std::inserter(*request.roles, request.roles->begin()));
+    }
+
+    auto cachedUser = _userCache.acquire(opCtx, request);
     invariant(cachedUser);
 
     LOGV2_DEBUG(20226, 1, "Returning user {userName} from cache", "userName"_attr = userName);
@@ -561,14 +602,17 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
     LOGV2_DEBUG(20235, 2, "Invalidating user {userName}", "userName"_attr = userName);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    _userCache.invalidate(userName);
+    // Invalidate the named User, assuming no externally provided roles. When roles are defined
+    // externally, there exists no user document which may become invalid.
+    _userCache.invalidate(UserRequest(userName, boost::none));
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database {dbname}", "dbname"_attr = dbname);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    _userCache.invalidateIf([&](const UserName& user) { return user.getDB() == dbname; });
+    _userCache.invalidateIf(
+        [&](const UserRequest& userRequest) { return userRequest.name.getDB() == dbname; });
 }
 
 void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
@@ -605,7 +649,7 @@ std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getU
     ret.reserve(cacheData.size());
     std::transform(
         cacheData.begin(), cacheData.end(), std::back_inserter(ret), [](const auto& info) {
-            return AuthorizationManager::CachedUserInfo{info.key, info.useCount > 0};
+            return AuthorizationManager::CachedUserInfo{info.key.name, info.useCount > 0};
         });
 
     return ret;
@@ -639,8 +683,8 @@ AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
       _externalState(externalState) {}
 
 boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::lookup(OperationContext* opCtx,
-                                                                      const UserName& userName) {
-    LOGV2_DEBUG(20238, 1, "Getting user {userName} from disk", "userName"_attr = userName);
+                                                                      const UserRequest& userReq) {
+    LOGV2_DEBUG(20238, 1, "Getting user record", "userName"_attr = userReq.name);
 
     // Number of times to retry a user document that fetches due to transient AuthSchemaIncompatible
     // errors. These errors should only ever occur during and shortly after schema upgrades.
@@ -658,9 +702,9 @@ boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::lookup(OperationC
             case schemaVersion26Final:
             case schemaVersion26Upgrade: {
                 BSONObj userObj;
-                uassertStatusOK(_externalState->getUserDescription(opCtx, userName, &userObj));
+                uassertStatusOK(_externalState->getUserDescription(opCtx, userReq, &userObj));
 
-                User user(userName);
+                User user(userReq.name);
                 uassertStatusOK(initializeUserFromPrivilegeDocument(&user, userObj));
                 return user;
             }
