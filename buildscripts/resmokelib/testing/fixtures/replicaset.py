@@ -56,7 +56,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE,
                                                       config.DEFAULT_MONGOD_EXECUTABLE)
             latest_mongod = mongod_executable
-            last_stable_mongod = mongod_executable + "-" \
+            # The last-stable binary is currently expected to live in '/data/multiversion', which is
+            # part of the PATH.
+            last_stable_mongod = config.DEFAULT_MONGOD_EXECUTABLE + "-" \
                                 + ReplicaSetFixture._LAST_STABLE_BIN_VERSION
             is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
                 "configsvr"]

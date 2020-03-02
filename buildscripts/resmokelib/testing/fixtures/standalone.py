@@ -29,8 +29,8 @@ class MongoDFixture(interface.Fixture):
         if "dbpath" in mongod_options and dbpath_prefix is not None:
             raise ValueError("Cannot specify both mongod_options.dbpath and dbpath_prefix")
 
-        # Command line options override the YAML configuration.
-        self.mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE, mongod_executable)
+        # Default to command line options if the YAML configuration is not passed in.
+        self.mongod_executable = utils.default_if_none(mongod_executable, config.MONGOD_EXECUTABLE)
 
         self.mongod_options = utils.default_if_none(mongod_options, {}).copy()
 
