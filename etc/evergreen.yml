@@ -8532,7 +8532,7 @@ tasks:
           commit_message_content=$(cat commit_message.txt)
 
           ${activate_virtualenv}
-          $python buildscripts/validate_commit_message.py "$commit_message_content"
+          $python buildscripts/validate_commit_message.py "$commit_message_content" -a "${author}"
         fi
 
 - <<: *task_template
