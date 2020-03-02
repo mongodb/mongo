@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -761,12 +762,16 @@ public:
 
     void respondToHeartbeat() {
         counter++;
-        unittest::log() << "Going to respond to heartbeat " << counter;
+        LOGV2(24245, "Going to respond to heartbeat", "counter"_attr = counter);
         auto net = getNet();
         auto noi = net->getNextReadyRequest();
         auto&& request = noi->getRequest();
-        unittest::log() << "Going to respond to heartbeat request " << counter << ": "
-                        << request.cmdObj << " from " << request.target;
+        LOGV2(24258,
+              "Going to respond to heartbeat request {counter}: {request_cmdObj} from "
+              "{request_target}",
+              "counter"_attr = counter,
+              "request_cmdObj"_attr = request.cmdObj,
+              "request_target"_attr = request.target);
         repl::ReplSetHeartbeatArgsV1 hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
@@ -785,12 +790,14 @@ public:
         hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
-        unittest::log() << "Scheduling response to heartbeat request " << counter
-                        << " with response " << hbResp.toBSON();
+        LOGV2(24259,
+              "Scheduling response to heartbeat request {counter} with response {hbResp}",
+              "counter"_attr = counter,
+              "hbResp"_attr = hbResp.toBSON());
         net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-        unittest::log() << "Responding to heartbeat request " << counter;
+        LOGV2(24260, "Responding to heartbeat request {counter}", "counter"_attr = counter);
         net->runReadyNetworkOperations();
-        unittest::log() << "Responded to heartbeat request " << counter;
+        LOGV2(24261, "Responded to heartbeat request {counter}", "counter"_attr = counter);
     }
 
     void setUpNewlyAddedFieldTest() {
@@ -821,23 +828,23 @@ public:
     }
 
     void respondToNHeartbeats(int n) {
-        unittest::log() << "Responding to " << n << " heartbeats";
+        LOGV2(24262, "Responding to {n} heartbeats", "n"_attr = n);
         enterNetwork();
         for (int i = 0; i < n; i++) {
             respondToHeartbeat();
         }
         exitNetwork();
-        unittest::log() << "Responded to " << n << " heartbeats";
+        LOGV2(24263, "Responded to {n} heartbeats", "n"_attr = n);
     }
 
     void respondToAllHeartbeats() {
-        unittest::log() << "Responding to all heartbeats";
+        LOGV2(24264, "Responding to all heartbeats");
         enterNetwork();
         while (getNet()->hasReadyRequests()) {
             respondToHeartbeat();
         }
         exitNetwork();
-        unittest::log() << "Responded to all heartbeats";
+        LOGV2(24265, "Responded to all heartbeats");
     }
 
     Status doSafeReconfig(OperationContext* opCtx,
@@ -853,7 +860,9 @@ public:
         stdx::thread reconfigThread = stdx::thread(
             [&] { status = getReplCoord()->processReplSetReconfig(opCtx, args, &result); });
         // Satisfy quorum check with heartbeats.
-        unittest::log() << "Responding to quorum check with " << quorumHeartbeats << " heartbeats.";
+        LOGV2(24257,
+              "Responding to quorum check with heartbeats.",
+              "heartbeats"_attr = quorumHeartbeats);
         respondToNHeartbeats(quorumHeartbeats);
         reconfigThread.join();
 

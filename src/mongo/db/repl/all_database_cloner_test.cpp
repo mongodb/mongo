@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -328,7 +328,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButSourceNodeIsDowngraded) {
     _clock.advance(Minutes(60));
 
     // Bring the server up, but change the wire version to an older one.
-    unittest::log() << "Bringing mock server back up.";
+    LOGV2(21053, "Bringing mock server back up.");
     _mockClient->setWireVersions(WireVersion::SHARDED_TRANSACTIONS,
                                  WireVersion::SHARDED_TRANSACTIONS);
     _mockServer->reboot();
@@ -378,7 +378,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {
     _clock.advance(Minutes(60));
 
     // Bring the server up.
-    unittest::log() << "Bringing mock server back up.";
+    LOGV2(21052, "Bringing mock server back up.");
     _mockServer->reboot();
 
     // Clear and change the initial sync ID

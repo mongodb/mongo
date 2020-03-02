@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -133,6 +133,13 @@ public:
         static bool isRegex() {                                                      \
             return false;                                                            \
         }                                                                            \
+        static int getLine() {                                                       \
+            return __LINE__;                                                         \
+        }                                                                            \
+        static std::string getFile() {                                               \
+            return __FILE__;                                                         \
+        }                                                                            \
+                                                                                     \
                                                                                      \
     private:                                                                         \
         void _doTest() override;                                                     \

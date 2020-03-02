@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-using unittest::log;
-
 namespace {
 
 class IndexBuildsManagerTest : public CatalogTestFixture {

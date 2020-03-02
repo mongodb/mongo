@@ -96,6 +96,14 @@
             return IS_REGEX;                                                                   \
         }                                                                                      \
                                                                                                \
+        static int getLine() {                                                                 \
+            return __LINE__;                                                                   \
+        }                                                                                      \
+                                                                                               \
+        static std::string getFile() {                                                         \
+            return __FILE__;                                                                   \
+        }                                                                                      \
+                                                                                               \
     private:                                                                                   \
         void _doTest() override;                                                               \
         static inline const RegistrationAgent<::mongo::unittest::DeathTest<TEST_TYPE>> _agent{ \
@@ -118,6 +126,8 @@ private:
     virtual std::unique_ptr<Test> _doMakeTest() = 0;
     virtual std::string _doGetPattern() = 0;
     virtual bool _isRegex() = 0;
+    virtual int _getLine() = 0;
+    virtual std::string _getFile() = 0;
 };
 
 template <typename T>
@@ -134,6 +144,14 @@ private:
 
     bool _isRegex() override {
         return T::isRegex();
+    }
+
+    int _getLine() override {
+        return T::getLine();
+    }
+
+    std::string _getFile() override {
+        return T::getFile();
     }
 
     std::unique_ptr<Test> _doMakeTest() override {
