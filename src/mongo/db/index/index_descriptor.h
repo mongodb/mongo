@@ -203,6 +203,10 @@ public:
         return _infoObj;
     }
 
+    BSONObj toBSON() const {
+        return _infoObj;
+    }
+
     // Both the collection and the catalog must outlive the IndexDescriptor
     const Collection* getCollection() const {
         return _collection;
