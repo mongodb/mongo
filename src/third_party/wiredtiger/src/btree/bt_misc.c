@@ -85,6 +85,27 @@ __wt_cell_type_string(uint8_t type)
 }
 
 /*
+ * __wt_page_addr_string --
+ *     Figure out a page's "address" and load a buffer with a printable, nul-terminated
+ *     representation of that address.
+ */
+const char *
+__wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
+{
+    size_t addr_size;
+    const uint8_t *addr;
+
+    if (__wt_ref_is_root(ref)) {
+        buf->data = "[Root]";
+        buf->size = strlen("[Root]");
+        return (buf->data);
+    }
+
+    __wt_ref_info(session, ref, &addr, &addr_size, NULL);
+    return (__wt_addr_string(session, addr, addr_size, buf));
+}
+
+/*
  * __wt_addr_string --
  *     Load a buffer with a printable, nul-terminated representation of an address.
  */
