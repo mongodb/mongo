@@ -1,5 +1,5 @@
 // Attempt to verify that connections can make use of TCP_FASTOPEN
-// @tags: [multiversion_incompatible]
+// @tags: [multiversion_incompatible, does_not_support_stepdowns]
 
 (function() {
 'use strict';
@@ -20,6 +20,8 @@ try {
 
 const initial = db.serverStatus().network.tcpFastOpen;
 printjson(initial);
+print("/proc/net/netstat:");
+print(cat("/proc/net/netstat"));
 
 const confused = "proc file suggests this kernel is capable, but setsockopt failed";
 assert.eq(true, initial.serverSupported, confused);
@@ -27,6 +29,8 @@ assert.eq(true, initial.clientSupported, confused);
 
 // Initial connect to be sure a TFO cookie is requested and received.
 const netConn1 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
+print("/proc/net/netstat:");
+print(cat("/proc/net/netstat"));
 assert.eq(0, netConn1);
 
 const first = db.serverStatus().network.tcpFastOpen;
@@ -34,6 +38,8 @@ printjson(first);
 
 // Second connect using the TFO cookie.
 const netConn2 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
+print("/proc/net/netstat:");
+print(cat("/proc/net/netstat"));
 assert.eq(0, netConn2);
 
 const second = db.serverStatus().network.tcpFastOpen;
