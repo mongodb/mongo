@@ -57,7 +57,15 @@ checkLog = (function() {
         }
 
         for (let logMsg of logMessages) {
-            const obj = JSON.parse(logMsg);
+            let obj;
+            try {
+                obj = JSON.parse(logMsg);
+            } catch (ex) {
+                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
+                      logMsg);
+                throw ex;
+            }
+
             if (obj.id === id) {
                 let allAttrMatch = true;
                 for (let attrKey in attrsDict) {
