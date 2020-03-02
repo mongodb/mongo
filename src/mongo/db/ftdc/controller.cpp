@@ -138,8 +138,8 @@ BSONObj FTDCController::getMostRecentPeriodicDocument() {
 
 void FTDCController::start() {
     LOGV2(20625,
-          "Initializing full-time diagnostic data capture with directory '{path_generic_string}'",
-          "path_generic_string"_attr = _path.generic_string());
+          "Initializing full-time diagnostic data capture",
+          "dataDirectory"_attr = _path.generic_string());
 
     // Start the thread
     _thread = stdx::thread([this] { doLoop(); });
@@ -182,8 +182,8 @@ void FTDCController::stop() {
         auto s = _mgr->close();
         if (!s.isOK()) {
             LOGV2(20627,
-                  "Failed to close full-time diagnostic data capture file manager: {s}",
-                  "s"_attr = s);
+                  "Failed to close full-time diagnostic data capture file manager",
+                  "status"_attr = s);
         }
     }
 }

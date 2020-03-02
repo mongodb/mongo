@@ -145,8 +145,8 @@ void installSystemMetricsCollector(FTDCController* controller) {
     auto swCollector = createCollector();
     if (!swCollector.getStatus().isOK()) {
         LOGV2_WARNING(23718,
-                      "Failed to initialize Performance Counters for FTDC: {swCollector_getStatus}",
-                      "swCollector_getStatus"_attr = swCollector.getStatus());
+                      "Failed to initialize Performance Counters for FTDC",
+                      "status"_attr = swCollector.getStatus());
         return;
     }
 
