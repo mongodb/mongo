@@ -2824,6 +2824,9 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
     result->append("config", _rsConfig.toBSON());
 
     if (commitmentStatus) {
+        uassert(ErrorCodes::NotMaster,
+                "commitmentStatus is only supported on primary.",
+                _readWriteAbility->canAcceptNonLocalWrites(lock));
         WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
                                                WriteConcernOptions::SyncMode::NONE,
                                                WriteConcernOptions::kNoTimeout);
