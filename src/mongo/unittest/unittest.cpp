@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -42,14 +41,15 @@
 #include <map>
 #include <memory>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/init.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/log.h"
@@ -61,7 +61,6 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
@@ -73,11 +72,6 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
 
-logger::MessageLogDomain* unittestOutput() {
-    static const auto p = logger::globalLogManager()->getNamedDomain("unittest");
-    return p;
-}
-
 /** Each map key is owned by its corresponding Suite object. */
 auto& suitesMap() {
     static std::map<StringData, std::shared_ptr<Suite>> m;
@@ -85,28 +79,6 @@ auto& suitesMap() {
 }
 
 }  // namespace
-
-logger::LogstreamBuilderDeprecated log() {
-    return LogstreamBuilderDeprecated(
-        unittestOutput(), getThreadName(), logger::LogSeverity::Log());
-}
-
-logger::LogstreamBuilderDeprecated warning() {
-    return LogstreamBuilderDeprecated(
-        unittestOutput(), getThreadName(), logger::LogSeverity::Warning());
-}
-
-void setupTestLogger() {
-    unittestOutput()->attachAppender(
-        std::make_unique<logger::ConsoleAppender<logger::MessageLogDomain::Event>>(
-            std::make_unique<logger::MessageEventDetailsEncoder>()));
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "default"))
-(InitializerContext*) {
-    setupTestLogger();
-    return Status::OK();
-}
 
 class Result {
 public:
@@ -235,8 +207,6 @@ private:
 
     // Captured BSON
     std::vector<std::string> _capturedBSONLogMessages;
-    logger::MessageLogDomain::AppenderHandle _captureAppenderHandle;
-    std::unique_ptr<logger::MessageLogDomain::EventAppender> _captureAppender;
 
     // Capture Sink for Plain Text
     boost::shared_ptr<boost::log::sinks::synchronous_sink<logv2::LogCaptureBackend>> _captureSink;
@@ -315,43 +285,28 @@ void CaptureLogs::startCapturingLogMessages() {
     _capturedLogMessages.clear();
     _capturedBSONLogMessages.clear();
 
-    if (logV2Enabled()) {
-        if (!_captureSink) {
-            _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages);
-            _captureSink->set_filter(
-                logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
-            _captureSink->set_formatter(logv2::PlainFormatter());
+    if (!_captureSink) {
+        _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages);
+        _captureSink->set_filter(
+            logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
+        _captureSink->set_formatter(logv2::PlainFormatter());
 
-            _captureBSONSink = logv2::LogCaptureBackend::create(_capturedBSONLogMessages);
+        _captureBSONSink = logv2::LogCaptureBackend::create(_capturedBSONLogMessages);
 
-            _captureBSONSink->set_filter(
-                logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
-            _captureBSONSink->set_formatter(logv2::BSONFormatter());
-        }
-        boost::log::core::get()->add_sink(_captureSink);
-        boost::log::core::get()->add_sink(_captureBSONSink);
-    } else {
-        if (!_captureAppender) {
-            _captureAppender = std::make_unique<StringVectorAppender>(&_capturedLogMessages);
-        }
-        checked_cast<StringVectorAppender*>(_captureAppender.get())->enable();
-        _captureAppenderHandle =
-            logger::globalLogDomain()->attachAppender(std::move(_captureAppender));
+        _captureBSONSink->set_filter(
+            logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
+        _captureBSONSink->set_formatter(logv2::BSONFormatter());
     }
+    boost::log::core::get()->add_sink(_captureSink);
+    boost::log::core::get()->add_sink(_captureBSONSink);
 
     _isCapturingLogMessages = true;
 }
 
 void CaptureLogs::stopCapturingLogMessages() {
     invariant(_isCapturingLogMessages);
-    if (logV2Enabled()) {
-        boost::log::core::get()->remove_sink(_captureSink);
-        boost::log::core::get()->remove_sink(_captureBSONSink);
-    } else {
-        invariant(!_captureAppender);
-        _captureAppender = logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
-        checked_cast<StringVectorAppender*>(_captureAppender.get())->disable();
-    }
+    boost::log::core::get()->remove_sink(_captureSink);
+    boost::log::core::get()->remove_sink(_captureBSONSink);
 
     _isCapturingLogMessages = false;
 }

@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
 
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace {
@@ -83,12 +87,10 @@ TEST(Base64Test, encodeAllPossibleGroups) {
             std::string s = base64::encode(buf);
             ASSERT_EQ(s.size(), 4);
             if (kSuperVerbose) {
-                auto lobj = unittest::log();
-                lobj << "buf=[";
-                for (int nn = 0; nn < sz; ++nn) {
-                    lobj << format(FMT_STRING("{:02x} "), (unsigned char)buf[nn]);
-                }
-                lobj << format(FMT_STRING("], s=`{}`"), s);
+                LOGV2(23509,
+                      "buf=[{buf}] s=`{s}`",
+                      "buf"_attr = mongo::toHex(buf.data(), sz),
+                      "s"_attr = s);
             }
             std::string recovered = base64::decode(s);
             ASSERT_EQ(buf, recovered);

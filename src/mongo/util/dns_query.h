@@ -61,6 +61,10 @@ struct SRVHostEntry {
         return std::tie(host, port);
     }
 
+    inline std::string toString() const {
+        return std::string{host} + ":" + std::to_string(port);
+    }
+
     inline friend std::ostream& operator<<(std::ostream& os, const SRVHostEntry& entry) {
         return os << entry.host << ':' << entry.port;
     }

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -838,7 +839,9 @@ public:
         stdx::thread reconfigThread = stdx::thread(
             [&] { status = getReplCoord()->processReplSetReconfig(opCtx, args, &result); });
         // Satisfy quorum check with heartbeats.
-        unittest::log() << "Responding to quorum check with " << quorumHeartbeats << " heartbeats.";
+        LOGV2(24257,
+              "Responding to quorum check with heartbeats.",
+              "heartbeats"_attr = quorumHeartbeats);
         respondToNHeartbeats(quorumHeartbeats);
         reconfigThread.join();
 

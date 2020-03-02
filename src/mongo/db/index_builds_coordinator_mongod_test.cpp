@@ -42,7 +42,6 @@
 namespace mongo {
 
 using unittest::assertGet;
-using unittest::log;
 
 namespace {
 

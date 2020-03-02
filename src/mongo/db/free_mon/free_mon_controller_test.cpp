@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -68,6 +68,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/hex.h"
 
 
 namespace mongo {
@@ -75,8 +76,7 @@ namespace {
 
 auto makeRandom() {
     auto seed = SecureRandom().nextInt64();
-    unittest::log() << "PseudoRandom(" << std::showbase << std::hex << seed << std::dec
-                    << std::noshowbase << ")";
+    LOGV2(24189, "PseudoRandom()", "seed"_attr = seed);
     return PseudoRandom(seed);
 }
 

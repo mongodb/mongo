@@ -45,8 +45,6 @@
 namespace mongo {
 namespace {
 
-using unittest::log;
-
 bool collectionExists(OperationContext* opCtx, NamespaceString nss) {
     return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) != nullptr;
 }

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -55,6 +55,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
 
@@ -143,12 +144,6 @@ private:
     StringData sep = ","_sd;
 };
 
-auto tlog() {
-    auto r = unittest::log();
-    r.setIsTruncatable(false);
-    return r;
-}
-
 uintptr_t fromHex(const std::string& s) {
     return static_cast<uintptr_t>(std::stoull(s, nullptr, 16));
 }
@@ -172,7 +167,8 @@ TEST(StackTrace, PosixFormat) {
     stack_trace_test_detail::recurseWithLinkage(param, 3);
 
     if (kSuperVerbose) {
-        tlog() << "trace:{" << trace << "}";
+        LOGV2_OPTIONS(
+            24153, {logv2::LogTruncation::Disabled}, "trace:{{{trace}}}", "trace"_attr = trace);
     }
 
     std::string jsonLine;
@@ -181,11 +177,6 @@ TEST(StackTrace, PosixFormat) {
                             R"re(((?:.|\n)*))re")
                     .FullMatch(trace, &jsonLine, &traceBody))
         << "trace: {}"_format(trace);
-
-    if (kSuperVerbose) {
-        tlog() << "jsonLine:{" << jsonLine << "}";
-        tlog() << "traceBody:{" << traceBody << "}";
-    }
 
     BSONObj jsonObj = fromjson(jsonLine);  // throwy
     ASSERT_TRUE(jsonObj.hasField("backtrace"));
@@ -410,7 +401,7 @@ public:
         char storage;
         LOGV2(23388,
               "local var:{reinterpret_cast_uint64_t_storage}",
-              "reinterpret_cast_uint64_t_storage"_attr = reinterpret_cast<uint64_t>(&storage));
+              "reinterpret_cast_uint64_t_storage"_attr = reinterpret_cast<uintptr_t>(&storage));
     }
 
     static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
@@ -419,8 +410,10 @@ public:
         auto buf = std::make_unique<std::array<unsigned char, kStackSize>>();
         constexpr unsigned char kSentinel = 0xda;
         std::fill(buf->begin(), buf->end(), kSentinel);
-        unittest::log() << "sigaltstack buf: [" << std::hex << buf->size() << std::dec << "] @"
-                        << std::hex << uintptr_t(buf->data()) << std::dec << "\n";
+        LOGV2(24157,
+              "sigaltstack buf: [{size}] @{data}",
+              "size"_attr = integerToHex(buf->size()),
+              "data"_attr = integerToHex(reinterpret_cast<uintptr_t>(buf->data())));
         stdx::thread thr([&] {
             LOGV2(23389,
                   "tid:{ostr_stdx_this_thread_get_id} running\n",
@@ -562,7 +555,8 @@ public:
         StringStackTraceSink sink{dumped};
         printAllThreadStacks(sink);
         if (kSuperVerbose)
-            tlog() << dumped;
+            LOGV2_OPTIONS(
+                24156, {logv2::LogTruncation::Disabled}, "{dumped}", "dumped"_attr = dumped);
 
         reapWorkers();
 
