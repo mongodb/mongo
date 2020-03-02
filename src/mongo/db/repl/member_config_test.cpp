@@ -52,7 +52,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
     ASSERT_FALSE(mc.isHidden());
     ASSERT_FALSE(mc.isArbiter());
     ASSERT_TRUE(mc.shouldBuildIndexes());
-    ASSERT_EQUALS(4U, mc.getNumTags());
+    ASSERT_EQUALS(5U, mc.getNumTags());
     ASSERT_OK(mc.validate());
 }
 
@@ -289,8 +289,8 @@ TEST(MemberConfig, ParseTags) {
                                        << "k2"
                                        << "v2")),
                     &tagConfig);
-    ASSERT_EQUALS(6U, mc.getNumTags());
-    ASSERT_EQUALS(6, std::distance(mc.tagsBegin(), mc.tagsEnd()));
+    ASSERT_EQUALS(7U, mc.getNumTags());
+    ASSERT_EQUALS(7, std::distance(mc.tagsBegin(), mc.tagsEnd()));
     ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("k1", "v1")));
     ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("k2", "v2")));
     ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$voter", "0")));
@@ -299,6 +299,8 @@ TEST(MemberConfig, ParseTags) {
     ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$all", "0")));
     ASSERT_EQUALS(1,
                   std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$configAll", "0")));
+    ASSERT_EQUALS(1,
+                  std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$configVoter", "0")));
 }
 
 TEST(MemberConfig, ParseHorizonFields) {

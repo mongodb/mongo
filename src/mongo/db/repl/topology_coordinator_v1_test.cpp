@@ -5240,6 +5240,42 @@ TEST_F(ConfigReplicationTest, ArbiterIncludedInMajorityReplicatedConfigChecks) {
     ASSERT_TRUE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
 }
 
+TEST_F(ConfigReplicationTest, NonVotingNodeExcludedFromMajorityReplicatedConfigChecks) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "term" << 0 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017"
+                                                  << "votes" << 0 << "priority" << 0)
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"
+                                                  << "arbiterOnly" << true))),
+                 0);
+
+    // makeSelfPrimary() doesn't actually conduct a true election, so the term will still be 0.
+    makeSelfPrimary();
+
+    // Currently, only the primary has config 2 (the initial config).
+    auto tagPattern =
+        getCurrentConfig().findCustomWriteMode(ReplSetConfig::kConfigMajorityWriteConcernModeName);
+    ASSERT_TRUE(tagPattern.isOK());
+    auto pred = getTopoCoord().makeConfigPredicate();
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
+
+    // Receive a heartbeat from the non-voting node, but haveTaggedNodesSatisfiedCondition should
+    // still return false.
+    simulateHBWithConfigVersionAndTerm(1);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
+
+    // After receiving a heartbeat from the arbiter, we have 2/3 nodes that count towards the
+    // config commitment check.
+    simulateHBWithConfigVersionAndTerm(2);
+    ASSERT_TRUE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
+}
+
+
 TEST_F(ConfigReplicationTest, ArbiterIncludedInAllReplicatedConfigChecks) {
     updateConfig(BSON("_id"
                       << "rs0"

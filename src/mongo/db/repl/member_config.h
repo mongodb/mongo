@@ -67,6 +67,7 @@ public:
     static const std::string kInternalElectableTagName;
     static const std::string kInternalAllTagName;
     static const std::string kConfigAllTagName;
+    static const std::string kConfigVoterTagName;
 
     /**
      * Construct a MemberConfig from the contents of "mcfg".

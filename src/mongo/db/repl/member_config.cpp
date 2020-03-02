@@ -55,6 +55,7 @@ const std::string MemberConfig::kInternalVoterTagName = "$voter";
 const std::string MemberConfig::kInternalElectableTagName = "$electable";
 const std::string MemberConfig::kInternalAllTagName = "$all";
 const std::string MemberConfig::kConfigAllTagName = "$configAll";
+const std::string MemberConfig::kConfigVoterTagName = "$configVoter";
 
 namespace {
 const std::string kLegalMemberConfigFieldNames[] = {MemberConfig::kIdFieldName,
@@ -219,6 +220,12 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
         _tags.push_back(tagConfig->makeTag(kInternalAllTagName, id));
     }
 
+    // Add a config voter tag if this node counts towards the config majority for reconfig.
+    // This excludes non-voting members but does include arbiters.
+    if (isVoter()) {
+        _tags.push_back(tagConfig->makeTag(kConfigVoterTagName, id));
+    }
+
     // Add a tag for every node, including arbiters.
     _tags.push_back(tagConfig->makeTag(kConfigAllTagName, id));
 }
@@ -235,12 +242,12 @@ Status MemberConfig::validate() const {
                                     << " but must be 0 or 1");
     }
     if (_arbiterOnly) {
-        // Arbiters only have one internal tag.
-        if (_tags.size() != 1) {
-            return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
-        }
         if (!isVoter()) {
             return Status(ErrorCodes::BadValue, "Arbiter must vote (cannot have 0 votes)");
+        }
+        // Arbiters have two internal tags.
+        if (_tags.size() != 2) {
+            return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
         }
     }
     if (_slaveDelay < Seconds(0) || _slaveDelay > kMaxSlaveDelay) {
