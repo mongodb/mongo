@@ -103,11 +103,14 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 1, b: 1, c: 1, d: 1}));
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
-    // The full shard key is not required when updating documents.
+    // The full shard key is not required in the resulting document when updating. The full shard
+    // key is still required in the query, however.
+    assert.commandFailedWithCode(
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {b: 2}}), 31025);
     assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {b: 2}}));
+        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
     assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1}, {$set: {b: 4}}));
+        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
 
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
     assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);

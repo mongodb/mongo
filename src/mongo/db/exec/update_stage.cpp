@@ -719,6 +719,22 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     _assertPathsNotArray(_doc, shardKeyPaths);
 
+    // We do not allow modifying shard key value without specifying the full shard key in the query.
+    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
+    // But if we are here, we already know that the shard key is not _id, since we have an assertion
+    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
+    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
+    // shard key fields.
+    const auto& shardKeyPathsVector = collDesc->getKeyPatternFields();
+    pathsupport::EqualityMatches equalities;
+    uassert(31025,
+            "Shard key update is not allowed without specifying the full shard key in the query",
+            _params.canonicalQuery &&
+                pathsupport::extractFullEqualityMatches(
+                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                    .isOK() &&
+                equalities.size() == shardKeyPathsVector.size());
+
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,
             "Multi-update operations are not allowed when updating the shard key field.",
