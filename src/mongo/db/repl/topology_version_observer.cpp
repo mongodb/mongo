@@ -81,22 +81,14 @@ void TopologyVersionObserver::shutdown() noexcept {
     auto thread = [&] {
         stdx::unique_lock lk(_mutex);
 
-        _cv.wait(lk, [&] {
-            if (_state.load() != State::kRunning) {
-                // If we are no longer running, then we can safely join
-                return true;
-            }
+        // If we are still running, attempt to kill any opCtx
+        if (_workerOpCtx) {
+            stdx::lock_guard clientLk(*_workerOpCtx->getClient());
+            _serviceContext->killOperation(clientLk, _workerOpCtx, ErrorCodes::ShutdownInProgress);
+        }
 
-            // If we are still running, attempt to kill any opCtx
-            invariant(_observerClient);
-            stdx::lock_guard clientLk(*_observerClient);
-            auto opCtx = _observerClient->getOperationContext();
-            if (opCtx) {
-                _serviceContext->killOperation(clientLk, opCtx, ErrorCodes::ShutdownInProgress);
-            }
+        _cv.wait(lk, [&] { return _state.load() != State::kRunning; });
 
-            return false;
-        });
         invariant(_state.load() == State::kShutdown);
 
         return std::exchange(_thread, boost::none);
@@ -167,8 +159,6 @@ void TopologyVersionObserver::_cacheIsMasterResponse(
 }
 
 void TopologyVersionObserver::_workerThreadBody() noexcept {
-    // Creates a new client and makes `_observerClient` to point to it, which allows `shutdown()`
-    // to access the client object.
     invariant(_serviceContext);
     ThreadClient tc(kTopologyVersionObserverName, _serviceContext);
 
@@ -195,9 +185,8 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
             return;
         }
 
-        // The following notifies `init()` that `_observerClient` is set and ready to use.
+        // The following notifies `init()` that the worker thread is active.
         _state.store(State::kRunning);
-        _observerClient = tc.get();
         _cv.notify_all();
     }
 
@@ -209,8 +198,8 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
 
             // Invalidate the cache as it is no longer updated
             _cache.reset();
-            _observerClient = nullptr;
 
+            // Notify `shutdown()` that the worker thread is no longer active
             _cv.notify_all();
         }
 
@@ -219,11 +208,20 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
                    "topologyVersionObserverName"_attr = toString());
     });
 
-    do {
+    stdx::unique_lock lk(_mutex);
+    while (!_shouldShutdown.load()) {
         auto opCtxHandle = tc->makeOperationContext();
 
+        // Set the _workerOpCtx to our newly formed opCtxHandle before we unlock.
+        _workerOpCtx = opCtxHandle.get();
+
+        lk.unlock();
         _cacheIsMasterResponse(opCtxHandle.get(), getTopologyVersion());
-    } while (!_shouldShutdown.load());
+        lk.lock();
+
+        // We're done with our opCtxHandle, unset _workerOpCtx.
+        _workerOpCtx = nullptr;
+    }
 }
 
 }  // namespace repl
