@@ -104,4 +104,9 @@ void IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
     MONGO_UNREACHABLE;
 }
 
+bool IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumNotEnabled(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

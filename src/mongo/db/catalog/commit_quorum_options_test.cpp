@@ -62,7 +62,7 @@ TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIsAString) {
     CommitQuorumOptions options;
     BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kMajority);
     ASSERT_OK(options.parse(obj.getField("commitQuorum")));
-    ASSERT_EQUALS(0, options.numNodes);
+    ASSERT_EQUALS(-1, options.numNodes);
     ASSERT_EQUALS(CommitQuorumOptions::kMajority, options.mode);
 }
 

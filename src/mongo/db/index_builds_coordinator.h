@@ -604,6 +604,13 @@ protected:
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
 
     /**
+     * Skips the voting process and directly signal primary to commit index build if
+     * commit quorum is not enabled.
+     */
+    virtual bool _signalIfCommitQuorumNotEnabled(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+
+    /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
      * request to it with write concern 'majority', then waits for that command's response. And,
      * command gets retried on error. This function gets called after the second draining phase of

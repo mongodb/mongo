@@ -312,64 +312,102 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     return upsertStatus;
 }
 
+void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
+    WithLock lk, OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    if (!replState->waitForNextAction->getFuture().isReady()) {
+        replState->waitForNextAction->emplaceValue(IndexBuildAction::kCommitQuorumSatisfied);
+    } else {
+        // This implies we already got a commit or abort signal by other ways. This might have
+        // been signaled earlier with kPrimaryAbort or kCommitQuorumSatisfied. Or, it's also
+        // possible the node got stepped down and received kOplogCommit/koplogAbort or got
+        // kRollbackAbort. So, it's ok to skip signaling.
+        auto action = replState->waitForNextAction->getFuture().get(opCtx);
+
+        LOGV2(3856200,
+              "Not signaling \"{signalAction}\" as it was previously signaled with "
+              "\"{signalActionSet}\" for index build: {buildUUID}",
+              "signalAction"_attr =
+                  _indexBuildActionToString(IndexBuildAction::kCommitQuorumSatisfied),
+              "signalActionSet"_attr = _indexBuildActionToString(action),
+              "buildUUID"_attr = replState->buildUUID);
+    }
+}
+
 void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    auto sendCommitQuorumSatisfiedSignal = [&]() {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (!replState->waitForNextAction->getFuture().isReady()) {
-            replState->waitForNextAction->emplaceValue(IndexBuildAction::kCommitQuorumSatisfied);
-        } else {
-            // This implies we already got a commit or abort signal by other ways. This might have
-            // been signaled earlier with kPrimaryAbort or kCommitQuorumSatisfied. Or, it's also
-            // possible the node got stepped down and received kOplogCommit/koplogAbort or got
-            // kRollbackAbort. So, it's ok to skip signaling.
-            auto action = replState->waitForNextAction->getFuture().get(opCtx);
+    while (true) {
+        // Read the index builds entry from config.system.indexBuilds collection.
+        auto swIndexBuildEntry = getIndexBuildEntry(opCtx, replState->buildUUID);
+        // This can occur when no vote got received and stepup tries to check if commit quorum is
+        // satisfied.
+        if (swIndexBuildEntry == ErrorCodes::NoMatchingDocument)
+            return;
 
-            LOGV2(3856200,
-                  "Not signaling \"{signalAction}\" as it was previously signaled with "
-                  "\"{signalActionSet}\" for index build: {buildUUID}",
-                  "signalAction"_attr =
-                      _indexBuildActionToString(IndexBuildAction::kCommitQuorumSatisfied),
-                  "signalActionSet"_attr = _indexBuildActionToString(action),
-                  "buildUUID"_attr = replState->buildUUID);
+        auto indexBuildEntry = invariantStatusOK(swIndexBuildEntry);
+
+        auto voteMemberList = indexBuildEntry.getCommitReadyMembers();
+        invariant(voteMemberList,
+                  str::stream() << "'" << IndexBuildEntry::kCommitReadyMembersFieldName
+                                << "' list is empty for index build: " << replState->buildUUID);
+        int voteReceived = voteMemberList->size();
+
+        auto onDiskcommitQuorum = indexBuildEntry.getCommitQuorum();
+        int requiredQuorumCount = onDiskcommitQuorum.numNodes;
+        if (onDiskcommitQuorum.mode == CommitQuorumOptions::kMajority) {
+            requiredQuorumCount =
+                repl::ReplicationCoordinator::get(opCtx)->getConfig().getWriteMajority();
         }
-    };
 
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        invariant(replState->commitQuorum,
+                  str::stream() << "Commit quorum is missing for index build: "
+                                << replState->buildUUID);
+        if (onDiskcommitQuorum == replState->commitQuorum.get()) {
+            if (voteReceived >= requiredQuorumCount) {
+                LOGV2(3856201,
+                      "Index build Commit Quorum Satisfied: {indexBuildEntry}",
+                      "indexBuildEntry"_attr = indexBuildEntry);
+                _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
+            }
+            return;
+        }
+        // Try reading from system.indexBuilds collection again as the commit quorum value got
+        // changed after the data is read from system.indexBuilds collection.
+        LOGV2_DEBUG(
+            4655300,
+            1,
+            "Commit Quorum value got changed after reading the value from \"{collName}\" "
+            "collection for index build: {buildUUID}, current commit quorum : {currentVal}, old "
+            "commit quorum: {oldVal}",
+            "collName"_attr = NamespaceString::kIndexBuildEntryNamespace,
+            "buildUUID"_attr = replState->buildUUID,
+            "currentVal"_attr = replState->commitQuorum.get(),
+            "oldVal"_attr = onDiskcommitQuorum);
+        mongo::sleepmillis(10);
+        continue;
+    }
+}
+
+bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    // Locking order is important here to avoid deadlocks i.e, rstl followed by ReplIndexBuildState
+    // mutex.
+    invariant(opCtx->lockState()->isRSTLLocked());
+
+    // TODO SERVER-46557: Revisit this logic to see if we can check replState->commitQuorum for
+    // value to be zero to determine whether commit quorum is enabled or not for this index build.
     if (!enableIndexBuildCommitQuorum) {
-        // When enableIndexBuildCommitQuorum is turned off, we should not use
-        // system.indexBuilds collection to decide whether the commit quorum is satisfied or not.
-        sendCommitQuorumSatisfiedSignal();
-        return;
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+        if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+            // Node is primary here.
+            stdx::unique_lock<Latch> lk(replState->mutex);
+            _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
+        }
+        // No-op for secondaries.
+        return true;
     }
-
-    // Read the index builds entry from config.system.indexBuilds collection.
-    auto swIndexBuildEntry = getIndexBuildEntry(opCtx, replState->buildUUID);
-    auto status = swIndexBuildEntry.getStatus();
-    // This can occur when no vote got received and stepup tries to check if commit quorum is
-    // satisfied.
-    if (status == ErrorCodes::NoMatchingDocument)
-        return;
-    invariant(status.isOK());
-
-    auto indexBuildEntry = swIndexBuildEntry.getValue();
-
-    auto voteMemberList = indexBuildEntry.getCommitReadyMembers();
-    invariant(voteMemberList);
-    int voteCount = voteMemberList->size();
-
-    auto commitQuorum = indexBuildEntry.getCommitQuorum();
-    int requiredQuorumCount = commitQuorum.numNodes;
-    if (commitQuorum.mode == CommitQuorumOptions::kMajority) {
-        requiredQuorumCount =
-            repl::ReplicationCoordinator::get(opCtx)->getConfig().getWriteMajority();
-    }
-
-    if (voteCount >= requiredQuorumCount) {
-        LOGV2(3856201,
-              "Index build Commit Quorum Satisfied: {indexBuildEntry}",
-              "indexBuildEntry"_attr = indexBuildEntry.toBSON());
-        sendCommitQuorumSatisfiedSignal();
-    }
+    return false;
 }
 
 bool IndexBuildsCoordinatorMongod::_checkVoteCommitIndexCmdSucceeded(const BSONObj& response) {
@@ -392,13 +430,9 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         return;
     }
 
-    if (!enableIndexBuildCommitQuorum) {
-        // No need to vote instead directly signal primary to commit the index build.
-        invariant(opCtx->lockState()->isRSTLLocked());
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
-            _signalIfCommitQuorumIsSatisfied(opCtx, replState);
-        }
+    // Before voting see if we are eligible to skip voting and signal
+    // to commit index build if the node is primary.
+    if (_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
         return;
     }
 

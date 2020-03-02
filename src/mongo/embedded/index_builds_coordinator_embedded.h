@@ -80,6 +80,9 @@ private:
     void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
+    bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
+                                         std::shared_ptr<ReplIndexBuildState> replState) override;
+
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 

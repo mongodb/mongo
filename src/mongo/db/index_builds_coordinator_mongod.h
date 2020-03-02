@@ -130,8 +130,19 @@ private:
      */
     bool _checkVoteCommitIndexCmdSucceeded(const BSONObj& response);
 
-    void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
+    /**
+     * Signals index builder to commit.
+     */
+    void _sendCommitQuorumSatisfiedSignal(WithLock lk,
+                                          OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState);
+
+    void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
+                                          std::shared_ptr<ReplIndexBuildState> replState) override;
+
+
+    bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
+                                         std::shared_ptr<ReplIndexBuildState> replState) override;
 
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

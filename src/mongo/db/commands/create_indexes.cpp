@@ -295,12 +295,10 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
     }
 
     if (twoPhaseindexBuildEnabled) {
-        // Retrieve the default commit quorum if one wasn't passed in, which consists of all
-        // data-bearing nodes.
-        int numDataBearingMembers = (replCoord->isReplEnabled() && commitQuorumEnabled)
-            ? replCoord->getConfig().getNumDataBearingMembers()
-            : 1;
-        return CommitQuorumOptions(numDataBearingMembers);
+        // Setting CommitQuorum to 0 will make the index build to opt out of voting proces.
+        return (replCoord->isReplEnabled() && commitQuorumEnabled)
+            ? CommitQuorumOptions(CommitQuorumOptions::kMajority)
+            : CommitQuorumOptions(CommitQuorumOptions::kDisabled);
     }
 
     return boost::none;
