@@ -42,7 +42,7 @@ structs:
         description: >-
             A floating-point value within [0.0,1.0] specifying what fraction of reads to sample
         type: double
-        default: 0.0
+        default: 0.01
         validator:
           gte: 0.0
           lte: 1.0
