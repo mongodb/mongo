@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
@@ -38,14 +40,15 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
 RecoveryUnit* EphemeralForTestEngine::newRecoveryUnit() {
-    return new EphemeralForTestRecoveryUnit([this](OperationContext* opCtx) {
+    return new EphemeralForTestRecoveryUnit([this]() {
         stdx::lock_guard<Latch> lk(_mutex);
         if (_journalListener) {
-            JournalListener::Token token = _journalListener->getToken(opCtx);
+            JournalListener::Token token = _journalListener->getToken(nullptr);
             _journalListener->onDurable(token);
         }
     });

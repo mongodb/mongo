@@ -41,7 +41,7 @@ class SortedDataInterface;
 
 class EphemeralForTestRecoveryUnit : public RecoveryUnit {
 public:
-    EphemeralForTestRecoveryUnit(std::function<void(OperationContext*)> cb = nullptr)
+    EphemeralForTestRecoveryUnit(std::function<void()> cb = nullptr)
         : _waitUntilDurableCallback(cb) {}
 
     virtual ~EphemeralForTestRecoveryUnit();
@@ -89,7 +89,7 @@ private:
     typedef std::vector<std::shared_ptr<Change>> Changes;
 
     Changes _changes;
-    std::function<void(OperationContext*)> _waitUntilDurableCallback;
+    std::function<void()> _waitUntilDurableCallback;
 
     Timestamp _prepareTimestamp = Timestamp::min();
     Timestamp _commitTimestamp = Timestamp::min();
