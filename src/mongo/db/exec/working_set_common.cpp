@@ -90,21 +90,15 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                                           const auto& keyDatum) {
                                           return keyDatum.snapshotId == currentSnapshotId;
                                       })) != member->keyData.end()) {
-            std::stringstream ss;
-            ss << "Erroneous index key found with reference to non-existent record id "
-               << member->recordId << ": " << indexKeyVectorDebugString(member->keyData)
-               << ". Consider dropping and then re-creating the index with key pattern "
-               << keyDataIt->indexKeyPattern << " and then running the validate command on the "
-               << ns << " collection.";
-
             auto indexKeyEntryToObjFn = [](const IndexKeyDatum& ikd) {
                 BSONObjBuilder builder;
                 builder.append("key"_sd, redact(ikd.keyData));
                 builder.append("pattern"_sd, ikd.indexKeyPattern);
                 return builder.obj();
             };
-            LOGV2_ERROR(
+            LOGV2_ERROR_OPTIONS(
                 4615603,
+                {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
                 "Erroneous index key found with reference to non-existent record id "
                 "{recordId}: "
                 "{indexKeyData}. Consider dropping and then re-creating the index with key "
@@ -115,7 +109,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                     boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
                     boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn)),
                 "indexKeyPattern"_attr = keyDataIt->indexKeyPattern);
-            uasserted(ErrorCodes::DataCorruptionDetected, ss.str());
         }
         return false;
     }

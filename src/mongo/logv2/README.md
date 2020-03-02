@@ -277,6 +277,21 @@ Text | JSON/BSON
 ---- | ---------
 `(200 ns, 400 ns)` | `"samples": [{"durationNanos": 200}, {"durationNanos": 400}]`
 
+# Additional features
+
+## Combining uassert with log statement
+
+Code that emits a high severity log statement may also need to emit a `uassert` after the log. There is the `UserAssertAfterLog` helper that allows you to re-use the log statement to do the formatting required for the `uassert`. The reason string will be a plain text formatted log (replacement fields filled in format-string).
+
+##### Examples
+```
+LOGV2_ERROR_OPTIONS(1050, {UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)}, "Data corruption detected for {recordId}, "recordId"_attr=RecordId(123456));
+```
+Would emit an `uassert` after performing the log that is equivalent to:
+```
+uasserted(ErrorCodes::DataCorruptionDetected, "Data corruption detected for RecordId(123456)");
+```
+
 # Output formats
 
 Desired log output format is set to mongod, mongos and the mongo shell using the `-logFormat` option. Available values are `text` and `json`. Currently text formatting is default.

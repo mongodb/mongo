@@ -63,12 +63,14 @@ public:
           _component(LogComponent::kDefault),
           _tags(LogTag::kNone),
           _truncation(constants::kDefaultTruncation),
+          _uassertErrorCode(ErrorCodes::OK),
           _id(-1) {
         add_attribute_unlocked(attributes::domain(), _domain);
         add_attribute_unlocked(attributes::severity(), _severity);
         add_attribute_unlocked(attributes::component(), _component);
         add_attribute_unlocked(attributes::tags(), _tags);
         add_attribute_unlocked(attributes::truncation(), _truncation);
+        add_attribute_unlocked(attributes::userassert(), _uassertErrorCode);
         add_attribute_unlocked(attributes::id(), _id);
         add_attribute_unlocked(attributes::timeStamp(), boost::log::attributes::make_function([]() {
                                    return Date_t::now();
@@ -85,13 +87,15 @@ public:
                                    LogSeverity severity,
                                    LogComponent component,
                                    LogTag tags,
-                                   LogTruncation truncation) {
+                                   LogTruncation truncation,
+                                   ErrorCodes::Error userassertErrorCode) {
         // Perform a quick check first
         if (this->core()->get_logging_enabled()) {
             _severity.set(severity);
             _component.set(component);
             _tags.set(tags);
             _truncation.set(truncation);
+            _uassertErrorCode.set(userassertErrorCode);
             _id.set(id);
             return Base::open_record_unlocked();
         } else
@@ -104,6 +108,7 @@ public:
         _component.set(LogComponent::kDefault);
         _tags.set(LogTag::kNone);
         _truncation.set(constants::kDefaultTruncation);
+        _uassertErrorCode.set(ErrorCodes::OK);
         _id.set(-1);
     }
 
@@ -113,6 +118,7 @@ private:
     boost::log::attributes::mutable_constant<LogComponent> _component;
     boost::log::attributes::mutable_constant<LogTag> _tags;
     boost::log::attributes::mutable_constant<LogTruncation> _truncation;
+    boost::log::attributes::mutable_constant<ErrorCodes::Error> _uassertErrorCode;
     boost::log::attributes::mutable_constant<int32_t> _id;
 };
 

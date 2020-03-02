@@ -135,7 +135,7 @@ private:
 }  // namespace
 
 void PlainFormatter::operator()(boost::log::record_view const& rec,
-                                boost::log::formatting_ostream& strm) const {
+                                fmt::memory_buffer& buffer) const {
     using namespace boost::log;
 
     StringData message = extract<StringData>(attributes::message(), rec).get();
@@ -144,7 +144,6 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     TextValueExtractor extractor;
     extractor.args.reserve(attrs.size());
     attrs.apply(extractor);
-    fmt::memory_buffer buffer;
     fmt::vformat_to(
         buffer,
         to_string_view(message),
@@ -157,10 +156,18 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
         else
             attributeMaxSize = constants::kDefaultMaxAttributeOutputSizeKB * 1024;
     }
-    StringData dataToWrite(buffer.data(), std::min(attributeMaxSize, buffer.size()));
-    if (dataToWrite.endsWith("\n"_sd))
-        dataToWrite = StringData(dataToWrite.rawData(), dataToWrite.size() - 1);
-    strm.write(dataToWrite.rawData(), dataToWrite.size());
+
+    buffer.resize(std::min(attributeMaxSize, buffer.size()));
+    if (StringData sd(buffer.data(), buffer.size()); sd.endsWith("\n"_sd))
+        buffer.resize(buffer.size() - 1);
+}
+
+void PlainFormatter::operator()(boost::log::record_view const& rec,
+                                boost::log::formatting_ostream& strm) const {
+    using namespace boost::log;
+    fmt::memory_buffer buffer;
+    operator()(rec, buffer);
+    strm.write(buffer.data(), buffer.size());
 }
 
 }  // namespace mongo::logv2

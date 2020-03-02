@@ -49,8 +49,12 @@ void doLogImpl(int32_t id,
                TypeErasedAttributeStorage const& attrs) {
     dassert(options.component() != LogComponent::kNumLogComponents);
     auto& source = options.domain().internal().source();
-    auto record =
-        source.open_record(id, severity, options.component(), options.tags(), options.truncation());
+    auto record = source.open_record(id,
+                                     severity,
+                                     options.component(),
+                                     options.tags(),
+                                     options.truncation(),
+                                     options.uassertErrorCode());
     if (record) {
         record.attribute_values().insert(
             attributes::message(),

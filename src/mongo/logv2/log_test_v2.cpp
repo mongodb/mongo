@@ -44,6 +44,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/composite_backend.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
@@ -52,6 +53,7 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
+#include "mongo/logv2/uassert_sink.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
@@ -1513,6 +1515,47 @@ TEST_F(LogTestV2, FileLogging) {
     ASSERT(after_rotation.back() == "footer");
     before_rotation.push_back(after_rotation.back());
     ASSERT(before_rotation == after_rotation);
+}
+
+TEST_F(LogTestV2, UserAssert) {
+    std::vector<std::string> lines;
+
+    using backend_t = CompositeBackend<LogCaptureBackend, UserAssertSink>;
+
+    auto sink = boost::make_shared<boost::log::sinks::synchronous_sink<backend_t>>(
+        boost::make_shared<backend_t>(boost::make_shared<LogCaptureBackend>(lines),
+                                      boost::make_shared<UserAssertSink>()));
+
+    sink->set_filter(ComponentSettingsFilter(LogManager::global().getGlobalDomain(),
+                                             LogManager::global().getGlobalSettings()));
+    sink->set_formatter(PlainFormatter());
+    attach(sink);
+
+    bool gotUassert = false;
+    try {
+        LOGV2_OPTIONS(4652000, {UserAssertAfterLog(ErrorCodes::BadValue)}, "uasserting log");
+    } catch (const DBException& ex) {
+        ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
+        ASSERT_EQUALS(ex.reason(), "uasserting log");
+        ASSERT_EQUALS(lines.back(), ex.reason());
+        gotUassert = true;
+    }
+    ASSERT(gotUassert);
+
+
+    bool gotUassertWithReplacementFields = false;
+    try {
+        LOGV2_OPTIONS(4652001,
+                      {UserAssertAfterLog(ErrorCodes::BadValue)},
+                      "uasserting log {name}",
+                      "name"_attr = 1);
+    } catch (const DBException& ex) {
+        ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
+        ASSERT_EQUALS(ex.reason(), "uasserting log 1");
+        ASSERT_EQUALS(lines.back(), ex.reason());
+        gotUassertWithReplacementFields = true;
+    }
+    ASSERT(gotUassertWithReplacementFields);
 }
 
 }  // namespace

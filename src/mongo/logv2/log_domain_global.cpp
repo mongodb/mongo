@@ -40,6 +40,7 @@
 #include "mongo/logv2/shared_access_fstream.h"
 #include "mongo/logv2/tagged_severity_filter.h"
 #include "mongo/logv2/text_formatter.h"
+#include "mongo/logv2/uassert_sink.h"
 
 #include <boost/core/null_deleter.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -54,13 +55,20 @@ void LogDomainGlobal::ConfigurationOptions::makeDisabled() {
 }
 
 struct LogDomainGlobal::Impl {
-    typedef CompositeBackend<boost::log::sinks::text_ostream_backend, RamLogSink, RamLogSink>
+    typedef CompositeBackend<boost::log::sinks::text_ostream_backend,
+                             RamLogSink,
+                             RamLogSink,
+                             UserAssertSink>
         ConsoleBackend;
 #ifndef _WIN32
-    typedef CompositeBackend<boost::log::sinks::syslog_backend, RamLogSink, RamLogSink>
+    typedef CompositeBackend<boost::log::sinks::syslog_backend,
+                             RamLogSink,
+                             RamLogSink,
+                             UserAssertSink>
         SyslogBackend;
 #endif
-    typedef CompositeBackend<FileRotateSink, RamLogSink, RamLogSink> RotatableFileBackend;
+    typedef CompositeBackend<FileRotateSink, RamLogSink, RamLogSink, UserAssertSink>
+        RotatableFileBackend;
 
     Impl(LogDomainGlobal& parent);
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
@@ -87,7 +95,8 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
     auto console = boost::make_shared<ConsoleBackend>(
         boost::make_shared<boost::log::sinks::text_ostream_backend>(),
         boost::make_shared<RamLogSink>(RamLog::get("global")),
-        boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
+        boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")),
+        boost::make_shared<UserAssertSink>());
 
     console->lockedBackend<0>()->add_stream(
         boost::shared_ptr<std::ostream>(&Console::out(), boost::null_deleter()));
@@ -117,7 +126,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
                     boost::log::sinks::syslog::make_facility(options.syslogFacility),
                 boost::log::keywords::use_impl = boost::log::sinks::syslog::native),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
-            boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
+            boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")),
+            boost::make_shared<UserAssertSink>());
 
         boost::log::sinks::syslog::custom_severity_mapping<LogSeverity> mapping(
             attributes::severity());
@@ -158,7 +168,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         auto backend = boost::make_shared<RotatableFileBackend>(
             boost::make_shared<FileRotateSink>(),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
-            boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")));
+            boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")),
+            boost::make_shared<UserAssertSink>());
         Status ret = backend->lockedBackend<0>()->addFile(
             options.filePath,
             options.fileOpenMode == ConfigurationOptions::OpenMode::kAppend ? true : false);

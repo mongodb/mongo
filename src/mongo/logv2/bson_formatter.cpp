@@ -112,14 +112,12 @@ private:
 };
 }  // namespace
 
-void BSONFormatter::operator()(boost::log::record_view const& rec,
-                               boost::log::formatting_ostream& strm) const {
+void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilder& builder) const {
     using boost::log::extract;
 
     // Build a JSON object for the user attributes.
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
 
-    BSONObjBuilder builder;
     builder.append(constants::kTimestampFieldName,
                    extract<Date_t>(attributes::timeStamp(), rec).get());
     builder.append(constants::kSeverityFieldName,
@@ -140,9 +138,20 @@ void BSONFormatter::operator()(boost::log::record_view const& rec,
     if (tags != LogTag::kNone) {
         builder.append(constants::kTagsFieldName, tags.toBSONArray());
     }
+}
 
-    BSONObj obj = builder.obj();
+void BSONFormatter::operator()(boost::log::record_view const& rec,
+                               boost::log::formatting_ostream& strm) const {
+    BSONObjBuilder builder;
+    operator()(rec, builder);
+    BSONObj obj = builder.done();
     strm.write(obj.objdata(), obj.objsize());
+}
+
+BSONObj BSONFormatter::operator()(boost::log::record_view const& rec) const {
+    BSONObjBuilder builder;
+    operator()(rec, builder);
+    return builder.obj();
 }
 
 }  // namespace logv2

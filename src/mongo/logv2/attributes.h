@@ -46,6 +46,7 @@ const boost::log::attribute_name& id();
 const boost::log::attribute_name& message();
 const boost::log::attribute_name& attributes();
 const boost::log::attribute_name& truncation();
+const boost::log::attribute_name& userassert();
 
 }  // namespace attributes
 }  // namespace logv2

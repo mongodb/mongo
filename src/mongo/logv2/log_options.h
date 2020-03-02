@@ -37,6 +37,13 @@
 namespace mongo {
 namespace logv2 {
 
+class UserAssertAfterLog {
+public:
+    explicit UserAssertAfterLog(ErrorCodes::Error code) : errorCode(code) {}
+
+    ErrorCodes::Error errorCode;
+};
+
 class LogOptions {
 public:
     static LogOptions ensureValidComponent(LogOptions options, LogComponent component) {
@@ -53,6 +60,9 @@ public:
     LogOptions(LogTag tags) : _tags(tags) {}
 
     LogOptions(LogTruncation truncation) : _truncation(truncation) {}
+
+    LogOptions(UserAssertAfterLog uassertAfterLog)
+        : _userAssertErrorCode(uassertAfterLog.errorCode) {}
 
     LogOptions(LogTag tags, LogTruncation truncation) : _tags(tags), _truncation(truncation) {}
 
@@ -78,11 +88,16 @@ public:
         return _truncation;
     }
 
+    ErrorCodes::Error uassertErrorCode() const {
+        return _userAssertErrorCode;
+    }
+
 private:
     LogDomain* _domain = &LogManager::global().getGlobalDomain();
     LogTag _tags;
     LogComponent _component = LogComponent::kAutomaticDetermination;
     LogTruncation _truncation = constants::kDefaultTruncation;
+    ErrorCodes::Error _userAssertErrorCode = ErrorCodes::OK;
 };
 
 }  // namespace logv2

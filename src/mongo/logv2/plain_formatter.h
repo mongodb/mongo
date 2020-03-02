@@ -43,6 +43,7 @@ public:
     PlainFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr)
         : _maxAttributeSizeKB(maxAttributeSizeKB) {}
 
+    void operator()(boost::log::record_view const& rec, fmt::memory_buffer& buffer) const;
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 
 private:

@@ -83,6 +83,11 @@ const boost::log::attribute_name& truncation() {
     return attr;
 }
 
+const boost::log::attribute_name& userassert() {
+    static const boost::log::attribute_name attr("userassert");
+    return attr;
+}
+
 }  // namespace attributes
 }  // namespace logv2
 }  // namespace mongo
