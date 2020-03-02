@@ -72,6 +72,7 @@ public:
     void startup() override;
     void shutdown() override;
     void join() override;
+    SharedSemiFuture<void> joinAsync() override;
     void appendDiagnosticBSON(BSONObjBuilder* b) const override;
     Date_t now() override;
     StatusWith<EventHandle> makeEvent() override;

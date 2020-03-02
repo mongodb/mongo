@@ -63,6 +63,12 @@ public:
     void shutdown() override {
         auto handles = [&] {
             stdx::lock_guard lk(_mutex);
+            if (!_inShutdown && _cbHandles.empty()) {
+                // We are guaranteed that no more callbacks can be added to _cbHandles after
+                // _inShutdown is set to true. If there aren't any callbacks outstanding, then it is
+                // shutdown()'s responsibility to make the futures returned by joinAll() ready.
+                _promise.setWith([] {});
+            }
             _inShutdown = true;
 
             return _cbHandles;
@@ -81,8 +87,11 @@ public:
     }
 
     void join() override {
-        stdx::unique_lock lk(_mutex);
-        _cv.wait(lk, [&] { return _inShutdown && _cbHandles.empty(); });
+        joinAsync().wait();
+    }
+
+    SharedSemiFuture<void> joinAsync() override {
+        return _promise.getFuture();
     }
 
     void appendDiagnosticBSON(BSONObjBuilder* b) const override {
@@ -312,7 +321,10 @@ private:
         invariant(_cbHandles.erase(id) == 1);
 
         if (_inShutdown && _cbHandles.empty()) {
-            _cv.notify_all();
+            // We are guaranteed that no more callbacks can be added to _cbHandles after _inShutdown
+            // is set to true. If there are no more callbacks outstanding, then it is the last
+            // callback's responsibility to make the futures returned by joinAll() ready.
+            _promise.setWith([] {});
         }
     }
 
@@ -322,9 +334,9 @@ private:
     size_t _id = 0;
     stdx::unordered_map<size_t, CallbackHandle> _cbHandles;
 
-    // condition variable that callers of join wait on and outstanding callbacks potentially
-    // notify
-    stdx::condition_variable _cv;
+    // Promise that is set when the executor has been shut down and there aren't any outstanding
+    // callbacks. Callers of joinAsync() extract futures from this promise.
+    SharedPromise<void> _promise;
 };
 
 ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor)

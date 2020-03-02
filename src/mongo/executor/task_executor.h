@@ -142,6 +142,12 @@ public:
     virtual void join() = 0;
 
     /**
+     * Returns a future that becomes ready when shutdown() has been called and all outstanding
+     * callbacks have finished running.
+     */
+    virtual SharedSemiFuture<void> joinAsync() = 0;
+
+    /**
      * Writes diagnostic information into "b".
      */
     virtual void appendDiagnosticBSON(BSONObjBuilder* b) const = 0;

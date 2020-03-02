@@ -85,7 +85,7 @@ public:
     explicit ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor);
 
     // Delete all move/copy-ability
-    ScopedTaskExecutor(TaskExecutor&&) = delete;
+    ScopedTaskExecutor(ScopedTaskExecutor&&) = delete;
 
     ~ScopedTaskExecutor();
 

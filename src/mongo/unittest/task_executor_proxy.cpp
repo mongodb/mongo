@@ -58,6 +58,10 @@ void TaskExecutorProxy::join() {
     _executor->join();
 }
 
+SharedSemiFuture<void> TaskExecutorProxy::joinAsync() {
+    return _executor->joinAsync();
+}
+
 void TaskExecutorProxy::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
     _executor->appendDiagnosticBSON(builder);
 }

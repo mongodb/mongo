@@ -70,6 +70,10 @@ void ShardingTaskExecutor::join() {
     _executor->join();
 }
 
+SharedSemiFuture<void> ShardingTaskExecutor::joinAsync() {
+    return _executor->joinAsync();
+}
+
 void ShardingTaskExecutor::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
     _executor->appendDiagnosticBSON(builder);
 }

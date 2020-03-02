@@ -251,10 +251,12 @@ TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdown) {
 
     ASSERT_FALSE(resultPf.future.isReady());
 
+    ASSERT_FALSE(getExecutor()->joinAsync().isReady());
     getExecutor()->shutdown();
     getNet()->exitNetwork();
 
     ASSERT_EQUALS(resultPf.future.getNoThrow(), ErrorCodes::ShutdownInProgress);
+    ASSERT_TRUE(getExecutor()->joinAsync().isReady());
 }
 
 // ScheduleRemoteCommand on the underlying, but are shut down when we execute our wrapping callback
@@ -313,6 +315,12 @@ TEST_F(ScopedTaskExecutorTest, DestructionShutsDown) {
     }
 
     ASSERT_EQUALS(pf.future.getNoThrow(), ErrorCodes::ShutdownInProgress);
+}
+
+TEST_F(ScopedTaskExecutorTest, joinAllBecomesReadyOnShutdown) {
+    ASSERT_FALSE(getExecutor()->joinAsync().isReady());
+    getExecutor()->shutdown();
+    ASSERT_TRUE(getExecutor()->joinAsync().isReady());
 }
 
 }  // namespace

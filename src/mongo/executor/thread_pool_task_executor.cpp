@@ -177,6 +177,10 @@ void ThreadPoolTaskExecutor::join() {
     _join(stdx::unique_lock<Latch>(_mutex));
 }
 
+SharedSemiFuture<void> ThreadPoolTaskExecutor::joinAsync() {
+    MONGO_UNREACHABLE;
+}
+
 stdx::unique_lock<Latch> ThreadPoolTaskExecutor::_join(stdx::unique_lock<Latch> lk) {
     _stateChange.wait(lk, [this] {
         // All non-exhaust tasks are spliced into the _poolInProgressQueue immediately after we

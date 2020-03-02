@@ -1037,7 +1037,6 @@ public:
     TEMPLATE(typename Func)
     REQUIRES(future_details::isCallableR<T, Func, void>)
     void setWith(Func&& func) noexcept {
-        invariant(!std::exchange(_haveCompleted, true));
         setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
     }
 
