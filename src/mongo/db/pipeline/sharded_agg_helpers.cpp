@@ -602,9 +602,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     // Generate the command object for the targeted shards.
     AggregationRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
 
-    // The default value for 'allowDiskUse' in the AggregationRequest may not match what was set
-    // on the originating command, so copy it from the ExpressionContext.
+    // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregationRequest may not match
+    // what was set on the originating command, so copy it from the ExpressionContext.
     aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
+
+    if (auto maxTimeMS = expCtx->opCtx->getRemainingMaxTimeMillis();
+        maxTimeMS < Microseconds::max()) {
+        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    }
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();

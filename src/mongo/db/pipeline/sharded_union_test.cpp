@@ -83,6 +83,43 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     future.default_timed_get();
 }
 
+TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
+    // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
+    setupNShards(2);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
+
+    auto pipeline = Pipeline::create({}, expCtx());
+    auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
+    expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
+    auto queue = DocumentSourceQueue::create(expCtx());
+    unionWith.setSource(queue.get());
+
+    auto expectedResult = Document{{"_id"_sd, BSONNULL}, {"count"_sd, 1}};
+
+    expCtx()->opCtx->setDeadlineAfterNowBy(Milliseconds(15), ErrorCodes::MaxTimeMSExpired);
+
+    auto future = launchAsync([&] {
+        auto next = unionWith.getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        auto result = next.releaseDocument();
+        ASSERT_DOCUMENT_EQ(result, expectedResult);
+        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith.getNext().isEOF());
+        ASSERT(unionWith.getNext().isEOF());
+    });
+
+    const auto assertHasExpectedMaxTimeMSAndReturnResult =
+        [&](const executor::RemoteCommandRequest& request) {
+            ASSERT(request.cmdObj.hasField("maxTimeMS")) << request;
+            ASSERT(request.cmdObj["maxTimeMS"].isNumber());
+            return CursorResponse(kTestAggregateNss, CursorId{0}, {expectedResult.toBson()})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        };
+
+    onCommand(assertHasExpectedMaxTimeMSAndReturnResult);
+    onCommand(assertHasExpectedMaxTimeMSAndReturnResult);
+}
+
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
