@@ -229,9 +229,8 @@ Status FTDCFileManager::trimDirectory(std::vector<boost::filesystem::path>& file
         if (size >= maxSize) {
             LOGV2_DEBUG(20628,
                         1,
-                        "Cleaning file over full-time diagnostic data capture quota, file: "
-                        "{it_generic_string} with size {fileSize}",
-                        "it_generic_string"_attr = (*it).generic_string(),
+                        "Cleaning file over full-time diagnostic data capture quota",
+                        "fileName"_attr = (*it).generic_string(),
                         "fileSize"_attr = fileSize);
 
             boost::filesystem::remove(*it, ec);
@@ -262,8 +261,8 @@ FTDCFileManager::recoverInterimFile() {
     size_t size = boost::filesystem::file_size(interimFile, ec);
     if (ec) {
         LOGV2(20629,
-              "Recover interim file failed as the file size could not be checked: {ec_message}",
-              "ec_message"_attr = ec.message());
+              "Recover interim file failed as the file size could not be checked",
+              "errorMessage"_attr = ec.message());
         return docs;
     }
 
@@ -275,11 +274,9 @@ FTDCFileManager::recoverInterimFile() {
     auto s = read.open(interimFile);
     if (!s.isOK()) {
         LOGV2(20630,
-              "Unclean full-time diagnostic data capture shutdown detected, found interim file, "
-              "but failed "
-              "to open it, some "
-              "metrics may have been lost. {s}",
-              "s"_attr = s);
+              "Unclean full-time diagnostic data capture shutdown detected, found interim file,  "
+              "but failed to open it, some metrics may have been lost",
+              "status"_attr = s);
 
         // Note: We ignore any actual errors as reading from the interim files is a best-effort
         return docs;
@@ -296,9 +293,8 @@ FTDCFileManager::recoverInterimFile() {
     if (!m.isOK() || !docs.empty()) {
         LOGV2(20631,
               "Unclean full-time diagnostic data capture shutdown detected, found interim file, "
-              "some "
-              "metrics may have been lost. {m_getStatus}",
-              "m_getStatus"_attr = m.getStatus());
+              "some metrics may have been lost",
+              "status"_attr = m.getStatus());
     }
 
     // Note: We ignore any actual errors as reading from the interim files is a best-effort
