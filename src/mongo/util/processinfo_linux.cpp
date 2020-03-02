@@ -53,6 +53,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <pcrecpp.h>
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
@@ -244,6 +245,75 @@ public:
     // The current EIP (instruction pointer).
 };
 
+namespace {
+
+// As described in the /proc/[pid]/mountinfo section of `man 5 proc`:
+//
+// 36 35 98:0 /mnt1 /mnt2 rw,noatime master:1 - ext3 /dev/root rw,errors=continue
+// |  |  |    |     |     |          |          |      |     |
+// (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
+struct MountRecord {
+    bool parseLine(const std::string& line) {
+        static const pcrecpp::RE kRe{
+            //   (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
+            R"re((\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+))re"};
+        return kRe.FullMatch(line,
+                             &mountId,
+                             &parentId,
+                             &major,
+                             &minor,
+                             &root,
+                             &mountPoint,
+                             &options,
+                             &fields,
+                             &type,
+                             &source,
+                             &superOpt);
+    }
+
+    void appendBSON(BSONObjBuilder& bob) const {
+        bob.append("mountId", mountId)
+            .append("parentId", parentId)
+            .append("major", major)
+            .append("minor", minor)
+            .append("root", root)
+            .append("mountPoint", mountPoint)
+            .append("options", options)
+            .append("fields", fields)
+            .append("type", type)
+            .append("source", source)
+            .append("superOpt", superOpt);
+    }
+
+    int mountId;             //  (1) unique ID for the mount
+    int parentId;            //  (2) the ID of the parent mount (self for the root mount)
+    int major;               //  (3) major block device number (see stat(2))
+    int minor;               //  (4) minor block device number
+    std::string root;        //  (5) path in filesystem forming the root
+    std::string mountPoint;  //  (6) the mount point relative to the process's root
+    std::string options;     //  (7) per-mount options (see mount(2)).
+    std::string fields;      //  (8) zero or more: "tag[:value]" fields
+    std::string type;        //  (9) filesystem type: "type[.subtype]"
+    std::string source;      //  (10) fs-specific information or "none"
+    std::string superOpt;    //  (11) per-superblock options (see mount(2))
+};
+
+void appendMountInfo(BSONObjBuilder& bob) {
+    std::ifstream ifs("/proc/self/mountinfo");
+    if (!ifs)
+        return;
+    BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
+    std::string line;
+    MountRecord rec;
+    while (ifs && getline(ifs, line)) {
+        if (rec.parseLine(line)) {
+            auto bob = BSONObjBuilder(arr.subobjStart());
+            rec.appendBSON(bob);
+        }
+    }
+}
+
+}  // namespace
 
 class LinuxSysHelper {
 public:
@@ -560,6 +630,8 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
+
+    appendMountInfo(bExtra);
 
     _extraStats = bExtra.obj();
 }
