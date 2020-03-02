@@ -33,6 +33,9 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
@@ -48,6 +51,20 @@
 
 namespace mongo {
 namespace {
+
+template <typename T>
+std::string formatHex(T&& x) {
+    return format(FMT_STRING("{:#x}"), x);
+}
+
+std::string formatPtr(const void* x) {
+    return formatHex(reinterpret_cast<uintptr_t>(x));
+}
+
+std::string formatThreadId(stdx::thread::id x) {
+    return format(FMT_STRING("{}"), x);
+}
+
 
 /**
  * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new request
@@ -826,146 +843,65 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
 }
 
 void LockManager::dump() const {
-    LOGV2(20521,
-          "Dumping LockManager @ {lock_manager}",
-          "lock_manager"_attr = reinterpret_cast<uint64_t>(this));
-
-    auto lockToClientMap = getLockToClientMap(getGlobalServiceContext());
-    for (unsigned i = 0; i < _numLockBuckets; i++) {
-        LockBucket* bucket = &_lockBuckets[i];
-        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
-
-        if (!bucket->data.empty()) {
-            _dumpBucket(lockToClientMap, bucket);
-        }
-    }
-}
-
-void LockManager::_dumpBucketToBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
-                                    const LockBucket* bucket,
-                                    BSONObjBuilder* result) {
-    for (auto& bucketEntry : bucket->data) {
-        const LockHead* lock = bucketEntry.second;
-
-        if (lock->grantedList.empty()) {
-            // If there are no granted requests, this lock is empty, so no need to print it
-            continue;
-        }
-
-        result->append("resourceId", lock->resourceId.toString());
-
-        BSONArrayBuilder grantedLocks;
-        for (const LockRequest* iter = lock->grantedList._front; iter != nullptr;
-             iter = iter->next) {
-            _buildBucketBSON(iter, lockToClientMap, bucket, &grantedLocks);
-        }
-        result->append("granted", grantedLocks.arr());
-
-        BSONArrayBuilder pendingLocks;
-        for (const LockRequest* iter = lock->conflictList._front; iter != nullptr;
-             iter = iter->next) {
-            _buildBucketBSON(iter, lockToClientMap, bucket, &pendingLocks);
-        }
-        result->append("pending", pendingLocks.arr());
-    }
-}
-
-void LockManager::_buildBucketBSON(const LockRequest* iter,
-                                   const std::map<LockerId, BSONObj>& lockToClientMap,
-                                   const LockBucket* bucket,
-                                   BSONArrayBuilder* locks) {
-    BSONObjBuilder info;
-    info.append("mode", modeName(iter->mode));
-    info.append("convertMode", modeName(iter->convertMode));
-    info.append("enqueueAtFront", iter->enqueueAtFront);
-    info.append("compatibleFirst", iter->compatibleFirst);
-    info.append("debugInfo", iter->locker->getDebugInfo());
-
-    LockerId lockerId = iter->locker->getId();
-    std::map<LockerId, BSONObj>::const_iterator it = lockToClientMap.find(lockerId);
-    if (it != lockToClientMap.end()) {
-        info.appendElements(it->second);
-    }
-    locks->append(info.obj());
+    BSONArrayBuilder locks;
+    _buildLocksArray(getLockToClientMap(getGlobalServiceContext()), true, nullptr, &locks);
+    LOGV2(20521, "lock manager dump", "addr"_attr = formatPtr(this), "locks"_attr = locks.arr());
 }
 
 void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                                   BSONObjBuilder* result) {
-    BSONArrayBuilder lockInfo;
-    for (unsigned i = 0; i < _numLockBuckets; i++) {
-        LockBucket* bucket = &_lockBuckets[i];
-        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
-
-        _cleanupUnusedLocksInBucket(bucket);
-        if (!bucket->data.empty()) {
-            BSONObjBuilder b;
-            _dumpBucketToBSON(lockToClientMap, bucket, &b);
-            lockInfo.append(b.obj());
-        }
-    }
-    result->append("lockInfo", lockInfo.arr());
+    auto lockInfoArr = BSONArrayBuilder(result->subarrayStart("lockInfo"));
+    _buildLocksArray(lockToClientMap, false, this, &lockInfoArr);
 }
 
-void LockManager::_dumpBucket(const std::map<LockerId, BSONObj>& lockToClientMap,
-                              const LockBucket* bucket) const {
-    for (LockBucket::Map::const_iterator it = bucket->data.begin(); it != bucket->data.end();
-         it++) {
-        const LockHead* lock = it->second;
-
-        if (lock->grantedList.empty()) {
-            // If there are no granted requests, this lock is empty, so no need to print it
-            continue;
+void LockManager::_buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,
+                                   bool forLogging,
+                                   LockManager* mutableThis,
+                                   BSONArrayBuilder* locks) const {
+    for (size_t i = 0; i < _numLockBuckets; ++i) {
+        LockBucket& bucket = _lockBuckets[i];
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket.mutex);
+        // LockInfo cleans the unused locks as it goes, but dump doesn't.
+        if (mutableThis) {
+            invariant(mutableThis == this);
+            mutableThis->_cleanupUnusedLocksInBucket(&bucket);
         }
-
-        StringBuilder sb;
-        sb << "Lock @ " << lock << ": " << lock->resourceId.toString() << '\n';
-
-        sb << "GRANTED:\n";
-        for (const LockRequest* iter = lock->grantedList._front; iter != nullptr;
-             iter = iter->next) {
-            std::stringstream threadId;
-            threadId << iter->locker->getThreadId() << " | " << std::showbase << std::hex
-                     << iter->locker->getThreadId();
-            auto lockerId = iter->locker->getId();
-            sb << '\t' << "LockRequest " << lockerId << " @ " << iter->locker << ": "
-               << "Mode = " << modeName(iter->mode) << "; "
-               << "Thread = " << threadId.str() << "; "
-               << "ConvertMode = " << modeName(iter->convertMode) << "; "
-               << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
-               << "CompatibleFirst = " << iter->compatibleFirst << "; "
-               << "DebugInfo = " << iter->locker->getDebugInfo();
-            auto it = lockToClientMap.find(lockerId);
-            if (it != lockToClientMap.end()) {
-                sb << "; ClientInfo = ";
-                sb << it->second;
+        for (auto&& kv : bucket.data) {
+            const auto& lock = kv.second;
+            if (lock->grantedList.empty())
+                continue;
+            auto o = BSONObjBuilder(locks->subobjStart());
+            if (forLogging)
+                o.append("lockAddr", formatPtr(lock));
+            o.append("resourceId", lock->resourceId.toString());
+            struct {
+                StringData key;
+                LockRequest* iter;
+            } lists[] = {
+                {"granted"_sd, lock->grantedList._front},
+                {"pending"_sd, lock->conflictList._front},
+            };
+            for (auto [key, iter] : lists) {
+                auto arr = BSONArrayBuilder(o.subarrayStart(key));
+                for (; iter; iter = iter->next) {
+                    auto req = BSONObjBuilder(arr.subobjStart());
+                    if (forLogging) {
+                        req.append("lockRequest", formatHex(iter->locker->getId()));
+                        req.append("lockRequestAddr", formatPtr(iter->locker));
+                        req.append("thread", formatThreadId(iter->locker->getThreadId()));
+                    }
+                    req.append("mode", modeName(iter->mode));
+                    req.append("convertMode", modeName(iter->convertMode));
+                    req.append("enqueueAtFront", iter->enqueueAtFront);
+                    req.append("compatibleFirst", iter->compatibleFirst);
+                    req.append("debugInfo", iter->locker->getDebugInfo());
+                    if (auto it = lockToClientMap.find(iter->locker->getId());
+                        it != lockToClientMap.end()) {
+                        req.append("clientInfo", it->second);
+                    }
+                }
             }
-            sb << '\n';
         }
-
-        sb << "PENDING:\n";
-        for (const LockRequest* iter = lock->conflictList._front; iter != nullptr;
-             iter = iter->next) {
-            std::stringstream threadId;
-            threadId << iter->locker->getThreadId() << " | " << std::showbase << std::hex
-                     << iter->locker->getThreadId();
-            auto lockerId = iter->locker->getId();
-            sb << '\t' << "LockRequest " << lockerId << " @ " << iter->locker << ": "
-               << "Mode = " << modeName(iter->mode) << "; "
-               << "Thread = " << threadId.str() << "; "
-               << "ConvertMode = " << modeName(iter->convertMode) << "; "
-               << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
-               << "CompatibleFirst = " << iter->compatibleFirst << "; "
-               << "DebugInfo = " << iter->locker->getDebugInfo();
-            auto it = lockToClientMap.find(lockerId);
-            if (it != lockToClientMap.end()) {
-                sb << "; ClientInfo = ";
-                sb << it->second;
-            }
-            sb << '\n';
-        }
-
-        sb << "-----------------------------------------------------------\n";
-        LOGV2(20522, "{sb_str}", "sb_str"_attr = sb.str());
     }
 }
 

@@ -137,6 +137,16 @@ public:
     /**
      * Dumps the contents of all locks into a BSON object
      * to be used in lockInfo command in the shell.
+     * Adds a "lockInfo" element to the `result` object:
+     *     "lockInfo": [
+     *         // object for each lock in the LockManager (in any bucket),
+     *         {
+     *             "resourceId": <string>,
+     *             "granted": [ {...}, ... ],  // array of lock requests
+     *             "pending": [ {...}, ... ],  // array of lock requests
+     *         },
+     *         ...
+     *     ]
      */
     void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                          BSONObjBuilder* result);
@@ -178,27 +188,14 @@ private:
     Partition* _getPartition(LockRequest* request) const;
 
     /**
-     * Prints the contents of a bucket to the log.
+     * The backend of `dump` and `getLockInfoBSON`.
+     * If `mutableThis`, then we also clean the unused locks in the buckets while iterating.
+     * @param `mutableThis` is a nonconst `this`, but it is null if caller is const.
      */
-    void _dumpBucket(const std::map<LockerId, BSONObj>& lockToClientMap,
-                     const LockBucket* bucket) const;
-
-    /**
-     * Dump the contents of a bucket to the BSON.
-     */
-    void _dumpBucketToBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
-                           const LockBucket* bucket,
-                           BSONObjBuilder* result);
-
-    /**
-     * Build the BSON object containing the lock info for a particular
-     * bucket. The lockToClientMap is used to map the lockerId to
-     * more useful client information.
-     */
-    void _buildBucketBSON(const LockRequest* iter,
-                          const std::map<LockerId, BSONObj>& lockToClientMap,
-                          const LockBucket* bucket,
-                          BSONArrayBuilder* locks);
+    void _buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,
+                          bool forLogging,
+                          LockManager* mutableThis,
+                          BSONArrayBuilder* buckets) const;
 
     /**
      * Should be invoked when the state of a lock changes in a way, which could potentially
