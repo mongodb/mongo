@@ -105,6 +105,7 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
             // For now, multiple endpoints imply no versioning - we can't retry half a multi-write
             if (endpoints.size() > 1u) {
                 endpoint.shardVersion = ChunkVersion::IGNORED();
+                endpoint.shardVersion.setCanThrowSSVOnIgnored();
             }
 
             targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));

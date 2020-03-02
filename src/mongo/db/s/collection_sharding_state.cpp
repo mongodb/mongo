@@ -198,17 +198,16 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
         return;
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
-    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
-        return;
-    }
 
     // An operation with read concern 'available' should never have shardVersion set.
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
               repl::ReadConcernLevel::kAvailableReadConcern);
 
-    const auto metadata = getCurrentMetadata();
-    const auto wantedShardVersion =
-        metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+    const auto metadata = _getMetadata(boost::none);
+    auto wantedShardVersion = ChunkVersion::UNSHARDED();
+    if (metadata && (*metadata)->isSharded()) {
+        wantedShardVersion = (*metadata)->getShardVersion();
+    }
 
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                                         ? ShardingMigrationCriticalSection::kWrite
@@ -223,16 +222,23 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
                   str::stream() << "migration commit in progress for " << _nss.ns());
     }
 
-    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
-        return;
-    }
-
     //
     // Figure out exactly why not compatible, send appropriate error message
     // The versions themselves are returned in the error, so not needed in messages here
     //
 
     StaleConfigInfo sci(_nss, receivedShardVersion, wantedShardVersion);
+
+    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
+        uassert(std::move(sci),
+                "no metadata found on multi-write operation, need to refresh",
+                !receivedShardVersion.canThrowSSVOnIgnored() || metadata);
+        return;
+    }
+
+    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
+        return;
+    }
 
     uassert(std::move(sci),
             str::stream() << "epoch mismatch detected for " << _nss.ns() << ", "

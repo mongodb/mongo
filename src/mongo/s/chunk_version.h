@@ -57,11 +57,12 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion() : _combined(0), _epoch(OID()) {}
+    ChunkVersion() : _combined(0), _epoch(OID()), _canThrowSSVOnIgnored(false) {}
 
     ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
-          _epoch(epoch) {}
+          _epoch(epoch),
+          _canThrowSSVOnIgnored(false) {}
 
     static StatusWith<ChunkVersion> parseFromCommand(const BSONObj& obj) {
         return parseWithField(obj, kShardVersionField);
@@ -112,6 +113,14 @@ public:
             version.epoch() == IGNORED().epoch();
     }
 
+    /**
+     * Indicates that the shard version checking must be skipped but StaleShardVersion error
+     * must be thrown if the metadata is not loaded
+     */
+    void setCanThrowSSVOnIgnored() {
+        _canThrowSSVOnIgnored = true;
+    }
+
     void incMajor() {
         uassert(
             31180,
@@ -153,6 +162,9 @@ public:
         return _epoch;
     }
 
+    bool canThrowSSVOnIgnored() const {
+        return _canThrowSSVOnIgnored;
+    }
     //
     // Explicit comparison operators - versions with epochs have non-trivial comparisons.
     // > < operators do not check epoch cases.  Generally if using == we need to handle
@@ -223,6 +235,12 @@ public:
 private:
     uint64_t _combined;
     OID _epoch;
+
+    /**
+     * Temporary flag to indicate shards that a router is able to process and retry
+     * multi-write operations.
+     */
+    bool _canThrowSSVOnIgnored;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {
