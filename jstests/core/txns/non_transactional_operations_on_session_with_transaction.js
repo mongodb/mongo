@@ -9,6 +9,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For retryOnceOnTransientOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName = "test";
 const collName = "non_transactional_operations_on_session_with_transactions";
 
@@ -51,14 +55,20 @@ const doc2 = {
 };
 
 // Insert a document in a transaction.
-assert.commandWorked(sessionDb.runCommand({
-    insert: collName,
-    documents: [doc1],
-    readConcern: {level: "snapshot"},
-    txnNumber: NumberLong(txnNumber),
-    startTransaction: true,
-    autocommit: false
-}));
+// TODO (SERVER-39704): We use the retryOnceOnTransientOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// retryOnceOnTransientOnMongos can be removed
+retryOnceOnTransientOnMongos(session, () => {
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [doc1],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(++txnNumber),
+        startTransaction: true,
+        autocommit: false
+    }));
+});
 
 // Test that we cannot observe the insert outside of the transaction.
 assert.eq(null, testColl.findOne(doc1));

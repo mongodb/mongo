@@ -123,11 +123,21 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
 }
 
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationContext* opCtx) {
+    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+    if (!optReceivedShardVersion)
+        return {kUnshardedCollection};
+
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
 
-    if (!optMetadata)
-        return {kUnshardedCollection};
+    uassert(StaleConfigInfo(_nss,
+                            *optReceivedShardVersion,
+                            getCurrentShardVersionIfKnown(),
+                            ShardingState::get(opCtx)->shardId()),
+            str::stream() << "sharding status of collection " << _nss.ns()
+                          << " is not currently available for filtering and needs to be recovered "
+                          << "from the config server",
+            optMetadata);
 
     return {std::move(*optMetadata)};
 }
@@ -365,7 +375,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
         uassert(std::move(sci),
-                "no metadata found on multi-write operation, need to refresh",
+                str::stream()
+                    << "sharding status of collection " << _nss.ns()
+                    << " is not currently known and needs to be recovered from the config server",
                 !receivedShardVersion.getCanThrowSSVOnIgnored() ||
                     _getCurrentMetadataIfKnown(atClusterTime));
         return boost::none;

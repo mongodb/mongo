@@ -3,6 +3,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For retryOnceOnTransientOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName = "test";
 const collName = "finished_transaction_error_handling";
 const testDB = db.getSiblingDB(dbName);
@@ -25,16 +29,23 @@ const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 
 jsTestLog("Test aborted transaction number cannot be reused.");
-txnNumber++;
-assert.commandWorked(sessionDb.runCommand({
-    insert: collName,
-    documents: [{_id: "abort-txn-1"}],
-    readConcern: {level: "snapshot"},
-    txnNumber: NumberLong(txnNumber),
-    startTransaction: true,
-    stmtId: NumberInt(stmtId++),
-    autocommit: false
-}));
+
+// TODO (SERVER-39704): We use the retryOnceOnTransientOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// retryOnceOnTransientOnMongos can be removed
+retryOnceOnTransientOnMongos(session, () => {
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "abort-txn-1"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(++txnNumber),
+        startTransaction: true,
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
+    }));
+});
+
 assert.commandWorked(sessionDb.adminCommand({
     abortTransaction: 1,
     writeConcern: {w: "majority"},

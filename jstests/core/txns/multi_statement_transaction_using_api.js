@@ -3,6 +3,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For withTxnAndAutoRetryOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName = "test";
 const collName = "multi_transaction_test_using_api";
 const testDB = db.getSiblingDB(dbName);
@@ -39,37 +43,40 @@ session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "m
 assert.commandWorked(session.commitTransaction_forTesting());
 
 jsTestLog("Run CRUD ops, read ops, and commit transaction.");
-session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
-// Performing a read first should work when snapshot readConcern is specified.
-assert.docEq(null, sessionColl.findOne({_id: "insert-1"}));
+// TODO (SERVER-39704): We use the withTxnAndAutoRetryOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// withTxnAndAutoRetryOnMongos function can be removed
+withTxnAndAutoRetryOnMongos(session, () => {
+    // Performing a read first should work when snapshot readConcern is specified.
+    assert.docEq(null, sessionColl.findOne({_id: "insert-1"}));
 
-assert.commandWorked(sessionColl.insert({_id: "insert-1", a: 0}));
+    assert.commandWorked(sessionColl.insert({_id: "insert-1", a: 0}));
 
-assert.commandWorked(sessionColl.insert({_id: "insert-2", a: 0}));
+    assert.commandWorked(sessionColl.insert({_id: "insert-2", a: 0}));
 
-assert.commandWorked(sessionColl.insert({_id: "insert-3", a: 0}));
+    assert.commandWorked(sessionColl.insert({_id: "insert-3", a: 0}));
 
-assert.commandWorked(sessionColl.update({_id: "insert-1"}, {$inc: {a: 1}}));
+    assert.commandWorked(sessionColl.update({_id: "insert-1"}, {$inc: {a: 1}}));
 
-assert.commandWorked(sessionColl.deleteOne({_id: "insert-2"}));
+    assert.commandWorked(sessionColl.deleteOne({_id: "insert-2"}));
 
-sessionColl.findAndModify({query: {_id: "insert-3"}, update: {$set: {a: 2}}});
+    sessionColl.findAndModify({query: {_id: "insert-3"}, update: {$set: {a: 2}}});
 
-// Try to find a document within a transaction.
-let cursor = sessionColl.find({_id: "insert-1"});
-assert.docEq({_id: "insert-1", a: 1}, cursor.next());
-assert(!cursor.hasNext());
+    // Try to find a document within a transaction.
+    let cursor = sessionColl.find({_id: "insert-1"});
+    assert.docEq({_id: "insert-1", a: 1}, cursor.next());
+    assert(!cursor.hasNext());
 
-// Try to find a document using findOne within a transaction
-assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
+    // Try to find a document using findOne within a transaction
+    assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
 
-// Find a document with the aggregation shell helper within a transaction.
-cursor = sessionColl.aggregate({$match: {_id: "insert-1"}});
-assert.docEq({_id: "insert-1", a: 1}, cursor.next());
-assert(!cursor.hasNext());
-
-assert.commandWorked(session.commitTransaction_forTesting());
+    // Find a document with the aggregation shell helper within a transaction.
+    cursor = sessionColl.aggregate({$match: {_id: "insert-1"}});
+    assert.docEq({_id: "insert-1", a: 1}, cursor.next());
+    assert(!cursor.hasNext());
+}, {readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
 // Make sure the correct documents exist after committing the transaciton.
 assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));

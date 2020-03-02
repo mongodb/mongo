@@ -5,6 +5,10 @@
 
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For withTxnAndAutoRetryOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const session = db.getMongo().startSession({causalConsistency: false});
 const testDB = session.getDatabase("test");
 const coll = testDB.getCollection("aggregation_in_transaction");
@@ -31,76 +35,90 @@ assert.commandWorked(foreignColl.insert(foreignDoc, {writeConcern: {w: "majority
 
 const isForeignSharded = FixtureHelpers.isSharded(foreignColl);
 
-// Run a dummy find to start the transaction.
-jsTestLog("Starting transaction.");
-session.startTransaction({readConcern: {level: "snapshot"}});
-let cursor = coll.find();
-cursor.next();
+const txnOptions = {
+    readConcern: {level: "snapshot"}
+};
 
-// Insert a document outside of the transaction. Subsequent aggregations should not see this
-// document.
-jsTestLog("Inserting document outside of transaction.");
-assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({
-    _id: "not_visible_in_transaction",
-    foreignKey: "orange",
-}));
+// TODO (SERVER-39704): We use the withTxnAndAutoRetryOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// withTxnAndAutoRetryOnMongos function can be removed
+withTxnAndAutoRetryOnMongos(session, () => {
+    // Cleaning collection in case the transaction is retried
+    db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).remove({
+        _id: "not_visible_in_transaction"
+    });
 
-// Perform an aggregation that is fed by a cursor on the underlying collection. Only the
-// majority-committed document present at the start of the transaction should be found.
-jsTestLog("Starting aggregations inside of the transaction.");
-cursor = coll.aggregate({$match: {}});
-assert.docEq(testDoc, cursor.next());
-assert(!cursor.hasNext());
+    // Run a dummy find to start the transaction.
+    jsTestLog("Transaction started.");
 
-// Perform aggregations that look at other collections.
-// TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
-if (!isForeignSharded) {
-    const lookupDoc = Object.extend(testDoc, {lookup: [foreignDoc]});
-    cursor = coll.aggregate({
-            $lookup: {
-                from: foreignColl.getName(),
-                localField: "foreignKey",
-                foreignField: "_id",
-                as: "lookup",
-            }
-        });
-    assert.docEq(cursor.next(), lookupDoc);
+    let cursor = coll.find();
+    cursor.next();
+
+    // Insert a document outside of the transaction. Subsequent aggregations should not see this
+    // document.
+    jsTestLog("Inserting document outside of transaction.");
+    assert.commandWorked(db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({
+        _id: "not_visible_in_transaction",
+        foreignKey: "orange",
+    }));
+
+    // Perform an aggregation that is fed by a cursor on the underlying collection. Only the
+    // majority-committed document present at the start of the transaction should be found.
+    jsTestLog("Starting aggregations inside of the transaction.");
+    cursor = coll.aggregate({$match: {}});
+    assert.docEq(testDoc, cursor.next());
     assert(!cursor.hasNext());
 
-    cursor = coll.aggregate({
-            $graphLookup: {
-                from: foreignColl.getName(),
-                startWith: "$foreignKey",
-                connectFromField: "foreignKey",
-                connectToField: "_id",
-                as: "lookup"
-            }
-        });
-    assert.docEq(cursor.next(), lookupDoc);
-    assert(!cursor.hasNext());
-} else {
-    // TODO SERVER-39048: Test that $lookup on sharded collection is banned
-    // within a transaction.
-}
+    // Perform aggregations that look at other collections.
+    // TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
+    if (!isForeignSharded) {
+        const lookupDoc = Object.merge(testDoc, {lookup: [foreignDoc]});
+        cursor = coll.aggregate({
+                $lookup: {
+                    from: foreignColl.getName(),
+                    localField: "foreignKey",
+                    foreignField: "_id",
+                    as: "lookup",
+                }
+            });
+        assert.docEq(cursor.next(), lookupDoc);
+        assert(!cursor.hasNext());
 
-jsTestLog("Testing $count within a transaction.");
+        cursor = coll.aggregate({
+                $graphLookup: {
+                    from: foreignColl.getName(),
+                    startWith: "$foreignKey",
+                    connectFromField: "foreignKey",
+                    connectToField: "_id",
+                    as: "lookup"
+                }
+            });
+        assert.docEq(cursor.next(), lookupDoc);
+        assert(!cursor.hasNext());
+    } else {
+        // TODO SERVER-39048: Test that $lookup on sharded collection is banned
+        // within a transaction.
+    }
 
-let countRes = coll.aggregate([{$count: "count"}]).toArray();
-assert.eq(countRes.length, 1, tojson(countRes));
-assert.eq(countRes[0].count, 1, tojson(countRes));
+    jsTestLog("Testing $count within a transaction.");
 
-assert.commandWorked(coll.insert({a: 2}));
-countRes = coll.aggregate([{$count: "count"}]).toArray();
-assert.eq(countRes.length, 1, tojson(countRes));
-assert.eq(countRes[0].count, 2, tojson(countRes));
+    let countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 1, tojson(countRes));
 
-assert.commandWorked(
-    db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({a: 3}));
-countRes = coll.aggregate([{$count: "count"}]).toArray();
-assert.eq(countRes.length, 1, tojson(countRes));
-assert.eq(countRes[0].count, 2, tojson(countRes));
+    assert.commandWorked(coll.insert({a: 2}));
+    countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 2, tojson(countRes));
 
-assert.commandWorked(session.commitTransaction_forTesting());
+    assert.commandWorked(
+        db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({a: 3}));
+    countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 2, tojson(countRes));
+}, txnOptions);
+
 jsTestLog("Transaction committed.");
 
 // Perform aggregations with non-cursor initial sources and assert that they are not supported

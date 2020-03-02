@@ -4,6 +4,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For retryOnceOnTransientAndRestartTxnOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName1 = "test1";
 const dbName2 = "test2";
 const collNameA = "coll_A";
@@ -31,8 +35,18 @@ assert.commandWorked(sessionCollA.insert({}));
 assert.commandWorked(sessionCollB.insert({}));
 
 // Start the transaction with a write to collection A.
-session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandWorked(sessionCollA.insert({}));
+const txnOptions = {
+    readConcern: {level: "snapshot"}
+};
+session.startTransaction(txnOptions);
+
+// TODO (SERVER-39704): We use the retryOnceOnTransientAndRestartTxnOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// retryOnceOnTransientAndRestartTxnOnMongos can be removed
+retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    assert.commandWorked(sessionCollA.insert({}));
+}, txnOptions);
 
 // Drop collection B outside of the transaction. Advance the cluster time of the session
 // performing the drop to ensure it happens at a later cluster time than the transaction began.

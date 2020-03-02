@@ -7,6 +7,11 @@
 
 (function() {
 "use strict";
+
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For retryOnceOnTransientOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName = "test";
 const collName = "no_read_or_write_concerns_inside_txn";
 const testDB = db.getSiblingDB(dbName);
@@ -27,15 +32,22 @@ let txnNumber = 0;
 let stmtId = 0;
 
 jsTestLog("Starting first transaction");
-assert.commandWorked(sessionDb.runCommand({
-    insert: collName,
-    documents: [{_id: 0}],
-    readConcern: {level: "snapshot"},
-    startTransaction: true,
-    autocommit: false,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId++)
-}));
+// Insert a doc within the transaction.
+// TODO (SERVER-39704): We use the retryOnceOnTransientOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// retryOnceOnTransientOnMongos can be removed
+retryOnceOnTransientOnMongos(session, () => {
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: 0}],
+        readConcern: {level: "snapshot"},
+        startTransaction: true,
+        autocommit: false,
+        txnNumber: NumberLong(++txnNumber),
+        stmtId: NumberInt(stmtId++)
+    }));
+});
 
 jsTestLog("Attempting to insert with readConcern: snapshot within a transaction.");
 assert.commandFailedWithCode(sessionDb.runCommand({

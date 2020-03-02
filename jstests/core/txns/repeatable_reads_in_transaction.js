@@ -4,6 +4,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// For retryOnceOnTransientAndRestartTxnOnMongos.
+load('jstests/libs/auto_retry_transaction_in_sharding.js');
+
 const dbName = "test";
 const collName = "repeatable_reads_in_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -24,6 +28,9 @@ const sessionColl = sessionDb.getCollection(collName);
 const session2 = testDB.getMongo().startSession(sessionOptions);
 const session2Db = session2.getDatabase(dbName);
 const session2Coll = session2Db.getCollection(collName);
+const txnOptions = {
+    writeConcern: {w: "majority"}
+};
 
 jsTest.log("Prepopulate the collection.");
 assert.commandWorked(
@@ -35,14 +42,21 @@ assert.commandWorked(
 const expectedDocs = [{_id: 0}, {_id: 1}, {_id: 2}];
 
 jsTestLog("Start a read-only transaction on the first session.");
-session.startTransaction({writeConcern: {w: "majority"}});
+session.startTransaction(txnOptions);
 
 assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
 jsTestLog("Start a transaction on the second session that modifies the same collection.");
 session2.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
-assert.commandWorked(session2Coll.insert({_id: 3}));
+// TODO (SERVER-39704): We use the retryOnceOnTransientAndRestartTxnOnMongos
+// function to handle how MongoS will propagate a StaleShardVersion error as a
+// TransientTransactionError. After SERVER-39704 is completed the
+// retryOnceOnTransientAndRestartTxnOnMongos can be removed
+retryOnceOnTransientAndRestartTxnOnMongos(session2, () => {
+    assert.commandWorked(session2Coll.insert({_id: 3}));
+}, txnOptions);
+
 assert.commandWorked(session2Coll.update({_id: 1}, {$set: {a: 1}}));
 assert.commandWorked(session2Coll.deleteOne({_id: 2}));
 
