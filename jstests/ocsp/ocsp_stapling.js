@@ -14,9 +14,6 @@ if (!supportsStapling()) {
     return;
 }
 
-let mock_ocsp = new MockOCSPServer("", 1000);
-mock_ocsp.start();
-
 const ocsp_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: OCSP_SERVER_CERT,
@@ -27,7 +24,18 @@ const ocsp_options = {
     },
 };
 
+// This is to test what happens when the responder is down,
+// making sure that we soft fail.
 let conn = null;
+
+assert.doesNotThrow(() => {
+    conn = MongoRunner.runMongod(ocsp_options);
+});
+
+MongoRunner.stopMongod(conn);
+
+let mock_ocsp = new MockOCSPServer("", 1000);
+mock_ocsp.start();
 
 // In this scenario, the Mongod has the ocsp response stapled
 // which should allow the connection to proceed. Even when the

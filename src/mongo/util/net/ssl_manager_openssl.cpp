@@ -1450,7 +1450,7 @@ int ocspServerCallback(SSL* ssl, void* arg) {
             context = ocspStaplingContext;
         }
 
-        if (!context->sharedResponseForServer) {
+        if (!context || !context->sharedResponseForServer) {
             return SSL_TLSEXT_ERR_NOACK;
         }
 
@@ -1722,7 +1722,7 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
 
                     stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
 
-                    if (ocspStaplingContext->sharedResponseForServer != nullptr &&
+                    if (ocspStaplingContext && ocspStaplingContext->sharedResponseForServer &&
                         ocspStaplingContext->sharedResponseNextUpdate <
                             (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
 
