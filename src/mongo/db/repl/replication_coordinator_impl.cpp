@@ -3273,7 +3273,15 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
     // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
-    _dropAllSnapshots_inlock();
+    //
+    // If the new config has the same content but different version and term, skip it, since
+    // the quorum condition is still the same.
+    auto newConfigCopy = newConfig;
+    newConfigCopy.setConfigTerm(oldConfig.getConfigTerm());
+    newConfigCopy.setConfigVersion(oldConfig.getConfigVersion());
+    if (SimpleBSONObjComparator::kInstance.evaluate(oldConfig.toBSON() != newConfigCopy.toBSON())) {
+        _dropAllSnapshots_inlock();
+    }
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
