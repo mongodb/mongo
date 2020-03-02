@@ -1215,7 +1215,7 @@ var ShardingTest = function(params) {
 
     let randomSeedAlreadySet = false;
 
-    if (jsTest.options().randomBinVersions) {
+    if (jsTest.options().useRandomBinVersionsWithinReplicaSet) {
         // We avoid setting the random seed unequivocally to avoid unexpected behavior in tests
         // that already make use of Random.setRandomSeed(). This conditional can be removed if
         // it becomes the standard to always be generating the seed through ShardingTest.

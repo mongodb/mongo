@@ -3159,7 +3159,9 @@ var ReplSetTest = function(opts) {
         self.protocolVersion = opts.protocolVersion;
         self.waitForKeys = opts.waitForKeys;
 
-        self.seedRandomNumberGenerator = opts.seedRandomNumberGenerator || true;
+        self.seedRandomNumberGenerator = opts.hasOwnProperty('seedRandomNumberGenerator')
+            ? opts.seedRandomNumberGenerator
+            : true;
         self.isConfigServer = opts.isConfigServer;
 
         _useBridge = opts.useBridge || false;
