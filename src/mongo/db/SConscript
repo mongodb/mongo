@@ -637,6 +637,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'catalog/database_holder',
+        'repl/local_oplog_info',
         's/sharding_api_d',
     ]
 )

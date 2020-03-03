@@ -329,13 +329,13 @@ CollectionOptions _createOplogCollectionOptions() {
 void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector<int> timestamps) {
     ASSERT_OK(storage->createCollection(opCtx, oplogNs, _createOplogCollectionOptions()));
 
+    // Initialize the cached pointer to the oplog collection.
+    acquireOplogCollectionForLogging(opCtx);
+
     for (int ts : timestamps) {
         ASSERT_OK(storage->insertDocument(
             opCtx, oplogNs, _makeInsertOplogEntry(ts), OpTime::kUninitializedTerm));
     }
-
-    // Initialize the cached pointer to the oplog collection.
-    acquireOplogCollectionForLogging(opCtx);
 }
 
 /**

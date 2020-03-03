@@ -154,7 +154,7 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     }
 
     {
-        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         writeConflictRetry(
             opCtx,
             "session migration initialization majority commit barrier",

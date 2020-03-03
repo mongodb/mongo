@@ -223,10 +223,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/storage/oplog_cap_maintainer_thread',
         '$BUILD_DIR/mongo/db/logical_clock',
-        'repl_server_parameters',
     ],
 )
 
@@ -268,6 +268,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'oplog',
         'oplog_application',
+        'oplog_interface_local',
         'repl_server_parameters',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/storage/storage_options',

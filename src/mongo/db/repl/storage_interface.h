@@ -150,8 +150,7 @@ public:
      * Implementations are allowed to be "fuzzy" and delete documents when the actual size is
      * slightly above or below this, so callers should not rely on its exact value.
      */
-    virtual StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
-                                               const NamespaceString& nss) = 0;
+    virtual StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx) = 0;
 
     /**
      * Creates a collection.
@@ -318,6 +317,17 @@ public:
      * matches are found.
      */
     virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
+
+    /**
+     * Calls findOplogEntryLessThanOrEqualToTimestamp with endless WriteConflictException retries.
+     * Other errors get thrown. Concurrent oplog reads with the validate cmd on the same collection
+     * may throw WCEs. Obeys opCtx interrupts.
+     *
+     * Call this function instead of findOplogEntryLessThanOrEqualToTimestamp if the caller cannot
+     * fail, say for correctness.
+     */
+    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
 
     /**

@@ -31,7 +31,7 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/logical_clock.h"
@@ -425,9 +425,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, const int rea
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
     {
-        Lock::DBLock lk(opCtx, "local", MODE_IX);
-        Lock::CollectionLock lock(opCtx, NamespaceString("local.oplog.rs"), MODE_IX);
-
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
             return {ErrorCodes::NotMaster,
                     "No longer primary when waiting for linearizable read concern"};

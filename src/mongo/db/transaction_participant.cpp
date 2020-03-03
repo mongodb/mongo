@@ -87,6 +87,8 @@ MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
 
 MONGO_FAIL_POINT_DEFINE(restoreLocksFail);
 
+MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
+
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
@@ -317,10 +319,15 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
     // been satisfied.
     invariant(!opCtx->lockState()->hasMaxLockTimeout());
 
-    {
-        Lock::DBLock dbLock(opCtx, "local", MODE_IX);
-        Lock::CollectionLock collectionLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+    // Simulate an operation timeout and fail the noop write if the fail point is enabled. This is
+    // to test that NoSuchTransaction error is not considered transient if the noop write cannot
+    // occur.
+    if (MONGO_unlikely(failTransactionNoopWrite.shouldFail())) {
+        uasserted(ErrorCodes::MaxTimeMSExpired, "failTransactionNoopWrite fail point enabled");
+    }
 
+    {
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotMaster,
                 "Not primary when performing noop write for {}"_format(msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));

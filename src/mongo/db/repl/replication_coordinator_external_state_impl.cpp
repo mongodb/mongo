@@ -512,9 +512,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         opCtx, lastAppliedOpTime.getTimestamp());
 
     writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
-        // Writes to the oplog only require a Global intent lock.
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
-
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wuow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
             opCtx,

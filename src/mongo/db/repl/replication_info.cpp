@@ -50,7 +50,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -279,11 +278,11 @@ public:
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         auto earliestOplogTimestampFetch = [&] {
-            AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
-            if (!oplog.getCollection()) {
+            AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+            if (!oplogRead.getCollection()) {
                 return StatusWith<Timestamp>(ErrorCodes::NamespaceNotFound, "oplog doesn't exist");
             }
-            return oplog.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+            return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
         }();
 
         if (earliestOplogTimestampFetch.getStatus() == ErrorCodes::OplogOperationUnsupported) {

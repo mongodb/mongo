@@ -77,8 +77,7 @@ public:
     Status dropReplicatedDatabases(OperationContext* opCtx) override;
 
     Status createOplog(OperationContext* opCtx, const NamespaceString& nss) override;
-    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
-                                       const NamespaceString& nss) override;
+    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx) override;
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -144,6 +143,9 @@ public:
                           const BSONObj& filter) override;
 
     boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override;
+
+    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override;
 
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override;

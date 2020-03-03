@@ -338,14 +338,9 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         return {};
     }
 
-    auto oplogInfo = LocalOplogInfo::get(opCtx);
-    // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
-    boost::optional<Lock::DBLock> dbWriteLock;
-    boost::optional<Lock::CollectionLock> collWriteLock;
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
-        dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
-        collWriteLock.emplace(opCtx, oplogInfo->getOplogCollectionName(), MODE_IX);
-    }
+    // Use OplogAccessMode::kLogOp to avoid recursive locking.
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
+    auto oplogInfo = oplogWrite.getOplogInfo();
 
     // If an OpTime is not specified (i.e. isNull), a new OpTime will be assigned to the oplog entry
     // within the WUOW. If a new OpTime is assigned, it needs to be reset back to a null OpTime
@@ -399,15 +394,10 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     }
 
     const size_t count = end - begin;
-    auto oplogInfo = LocalOplogInfo::get(opCtx);
 
-    // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
-    boost::optional<Lock::DBLock> dbWriteLock;
-    boost::optional<Lock::CollectionLock> collWriteLock;
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
-        dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
-        collWriteLock.emplace(opCtx, oplogInfo->getOplogCollectionName(), MODE_IX);
-    }
+    // Use OplogAccessMode::kLogOp to avoid recursive locking.
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
+    auto oplogInfo = oplogWrite.getOplogInfo();
 
     WriteUnitOfWork wuow(opCtx);
 

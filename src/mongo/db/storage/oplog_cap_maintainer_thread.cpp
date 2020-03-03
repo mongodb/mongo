@@ -35,17 +35,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -69,35 +61,13 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
         // A Global IX lock should be good enough to protect the oplog truncation from
         // interruptions such as restartCatalog. PBWM, database lock or collection lock is not
         // needed. This improves concurrency if oplog truncation takes long time.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-            opCtx.get()->lockState());
-        Lock::GlobalLock lk(opCtx.get(), MODE_IX);
-
-        RecordStore* rs = nullptr;
-        NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
-        {
-            // Release the database lock right away because we don't want to
-            // block other operations on the local database and given the
-            // fact that oplog collection is so special, Global IX lock can
-            // make sure the collection exists.
-            Lock::DBLock dbLock(opCtx.get(), oplogNss.db(), MODE_IX);
-            auto databaseHolder = DatabaseHolder::get(opCtx.get());
-            auto db = databaseHolder->getDb(opCtx.get(), oplogNss.db());
-            if (!db) {
-                LOGV2_DEBUG(22241, 2, "no local database yet");
-                return false;
-            }
-            // We need to hold the database lock while getting the collection. Otherwise a
-            // concurrent collection creation would write to the map in the Database object
-            // while we concurrently read the map.
-            Collection* collection = CollectionCatalog::get(opCtx.get())
-                                         .lookupCollectionByNamespace(opCtx.get(), oplogNss);
-            if (!collection) {
-                LOGV2_DEBUG(22242, 2, "no collection {oplogNss}", "oplogNss"_attr = oplogNss);
-                return false;
-            }
-            rs = collection->getRecordStore();
+        AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+        auto oplog = oplogWrite.getCollection();
+        if (!oplog) {
+            LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
+            return false;
         }
+        auto rs = oplog->getRecordStore();
         if (!rs->yieldAndAwaitOplogDeletionRequest(opCtx.get())) {
             return false;  // Oplog went away.
         }

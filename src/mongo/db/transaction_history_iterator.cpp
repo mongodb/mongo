@@ -76,8 +76,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                             << causedBy(statusWithCQ.getStatus()));
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-    Lock::GlobalLock globalLock(opCtx, MODE_IS);
+    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
     invariant(localDb);
     AutoStatsTracker statsTracker(
@@ -87,10 +86,9 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
         AutoStatsTracker::LogMode::kUpdateTop,
         CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb),
         Date_t::max());
-    auto oplog = repl::LocalOplogInfo::get(opCtx)->getCollection();
-    invariant(oplog);
 
-    auto exec = uassertStatusOK(getExecutorFind(opCtx, oplog, std::move(cq), permitYield));
+    auto exec = uassertStatusOK(
+        getExecutorFind(opCtx, oplogRead.getCollection(), std::move(cq), permitYield));
 
     auto getNextResult = exec->getNext(&oplogBSON, nullptr);
     uassert(ErrorCodes::IncompleteTransactionHistory,
