@@ -394,19 +394,23 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState, bool onStepup) {
-    // Locking order is important here to avoid deadlocks i.e, rstl followed by ReplIndexBuildState
-    // mutex.
-    invariant(opCtx->lockState()->isRSTLLocked());
-
     // TODO SERVER-46557: Revisit this logic to see if we can check replState->commitQuorum for
     // value to be zero to determine whether commit quorum is enabled or not for this index build.
-    if (!enableIndexBuildCommitQuorum) {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // Single-phase and standalones don't support commit quorum, but they must go through the
+    // process of updating their state to synchronize with concurrent abort operations.
+    bool singlePhaseOrStandalone = replState->protocol == IndexBuildProtocol::kSinglePhase ||
+        !replCoord->getSettings().usingReplSets();
+    if (!enableIndexBuildCommitQuorum || singlePhaseOrStandalone) {
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        stdx::unique_lock<Latch> lk(replState->mutex);
         if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID) || onStepup) {
             // Node is primary here.
-            stdx::unique_lock<Latch> lk(replState->mutex);
             _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
+        } else if (replState->protocol == IndexBuildProtocol::kSinglePhase) {
+            replState->waitForNextAction->emplaceValue(
+                IndexBuildAction::kSinglePhaseSecondaryCommit);
         }
         // No-op for secondaries.
         return true;
@@ -431,10 +435,6 @@ bool IndexBuildsCoordinatorMongod::_checkVoteCommitIndexCmdSucceeded(const BSONO
 void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().usingReplSets()) {
-        // Standalones does not support commit quorum.
-        return;
-    }
 
     // Before voting see if we are eligible to skip voting and signal
     // to commit index build if the node is primary.
@@ -549,14 +549,6 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     Timestamp commitIndexBuildTimestamp;
 
-    invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-
-    // standalones doesn't need to wait for commit or abort index build oplog entry.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().usingReplSets()) {
-        return commitIndexBuildTimestamp;
-    };
-
     // Yield locks and storage engine resources before blocking.
     opCtx->recoveryUnit()->abandonSnapshot();
     Lock::TempRelease release(opCtx->lockState());
@@ -584,11 +576,14 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
         // Reacquire RSTL lock
         repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
 
         stdx::unique_lock<Latch> lk(replState->mutex);
         switch (nextAction) {
             case IndexBuildAction::kOplogCommit:
+                invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
+
                 // Sanity check
                 // This signal can be received during primary (drain phase), secondary,
                 // startup( startup recovery) and startup2 (initial sync).
@@ -607,6 +602,7 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                       "collectionUUID"_attr = replState->collectionUUID);
                 break;
             case IndexBuildAction::kOplogAbort:
+                invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
                 // Sanity check
                 // This signal can be received during primary (drain phase), secondary,
                 // startup( startup recovery) and startup2 (initial sync).
@@ -624,6 +620,7 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                       "abortReason"_attr = replState->indexBuildState.getAbortReason().get(),
                       "collectionUUID"_attr = replState->collectionUUID);
             case IndexBuildAction::kRollbackAbort:
+                invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
                 // Currently, We abort the index build before transitioning the state to rollback.
                 // So, we can check if the node state is rollback.
                 break;
@@ -640,6 +637,16 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                             << " , abort reason:"
                             << replState->indexBuildState.getAbortReason().get_value_or("")));
                 }
+            case IndexBuildAction::kSinglePhaseSecondaryCommit:
+                invariant(replState->protocol == IndexBuildProtocol::kSinglePhase);
+                if (isMaster) {
+                    LOGV2_FATAL(
+                        4639700,
+                        "Primary while trying to commit single-phase build that was started on a "
+                        "secondary");
+                    fassertFailed(4639701);
+                }
+                break;
             case IndexBuildAction::kCommitQuorumSatisfied:
                 if (!isMaster) {
                     // Reset the promise as the node has stepped down,

@@ -229,10 +229,8 @@ void abortIndexBuild(WithLock lk,
                      IndexBuildsManager* indexBuildsManager,
                      std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
                      const std::string& reason) {
-    auto protocol = replIndexBuildState->protocol;
     stdx::unique_lock<Latch> replStateLock(replIndexBuildState->mutex);
-    if (protocol == IndexBuildProtocol::kTwoPhase &&
-        replIndexBuildState->waitForNextAction->getFuture().isReady()) {
+    if (replIndexBuildState->waitForNextAction->getFuture().isReady()) {
         const auto nextAction = replIndexBuildState->waitForNextAction->getFuture().get();
         invariant(nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
                   nextAction == IndexBuildAction::kPrimaryAbort);
@@ -252,11 +250,7 @@ void abortIndexBuild(WithLock lk,
         IndexBuildState::kPrepareAbort, skipCheck, boost::none, reason);
     indexBuildsManager->abortIndexBuild(replIndexBuildState->buildUUID, reason);
 
-    if (protocol == IndexBuildProtocol::kTwoPhase) {
-        // Only for 2 phase we need to use signaling logic.
-        // Promise can be set only once.
-        replIndexBuildState->waitForNextAction->emplaceValue(IndexBuildAction::kPrimaryAbort);
-    }
+    replIndexBuildState->waitForNextAction->emplaceValue(IndexBuildAction::kPrimaryAbort);
 }
 
 /**
@@ -525,6 +519,8 @@ std::string IndexBuildsCoordinator::_indexBuildActionToString(IndexBuildAction a
         return "Rollback abort";
     } else if (action == IndexBuildAction::kPrimaryAbort) {
         return "Primary abort";
+    } else if (action == IndexBuildAction::kSinglePhaseSecondaryCommit) {
+        return "Single-phase secondary commit";
     } else if (action == IndexBuildAction::kCommitQuorumSatisfied) {
         return "Commit quorum Satisfied";
     }
@@ -908,11 +904,9 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
         }
 
         auto replState = replStateResult.getValue();
-        auto protocol = replState->protocol;
 
         stdx::unique_lock<Latch> lk(replState->mutex);
-        if (protocol == IndexBuildProtocol::kTwoPhase &&
-            replState->waitForNextAction->getFuture().isReady()) {
+        if (replState->waitForNextAction->getFuture().isReady()) {
             const auto nextAction = replState->waitForNextAction->getFuture().get(opCtx);
             invariant(nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
                       nextAction == IndexBuildAction::kPrimaryAbort);
@@ -929,8 +923,11 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
             // collection lock held in IX mode, So, there are possibilities, we might block the
             // index build from completing, leading to 3 way deadlocks involving step down,
             // dropIndexes command, IndexBuildCoordinator thread.
-            if (signalAction == IndexBuildAction::kPrimaryAbort)
-                return true;
+            if (signalAction == IndexBuildAction::kPrimaryAbort) {
+                // Only return true if the index build is being aborted already, not if it is going
+                // to commit.
+                return nextAction == IndexBuildAction::kPrimaryAbort;
+            }
 
             // Retry until the current promise result is consumed by the index builder thread and
             // a new empty promise got created by the indexBuildscoordinator thread. Or, until the
@@ -947,11 +944,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
             IndexBuildState::kPrepareAbort, skipCheck, abortTimestamp, reason);
         _indexBuildsManager.abortIndexBuild(buildUUID, reason.get_value_or(""));
 
-        if (protocol == IndexBuildProtocol::kTwoPhase) {
-            // Only for 2 phase we need to use signaling logic.
-            // Promise can be set only once.
-            replState->waitForNextAction->emplaceValue(signalAction);
-        }
+        replState->waitForNextAction->emplaceValue(signalAction);
         break;
     }
 
@@ -1950,6 +1943,8 @@ void IndexBuildsCoordinator::_buildIndexSinglePhase(
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _signalPrimaryForCommitReadiness(opCtx, replState);
+    _waitForNextIndexBuildAction(opCtx, replState);
     _insertKeysFromSideTablesAndCommit(
         opCtx, replState, indexBuildOptions, exclusiveCollectionLock, {});
 }
