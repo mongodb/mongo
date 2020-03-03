@@ -41,6 +41,8 @@
 #endif
 #endif
 
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 #include <pcrecpp.h>
 
 #include <sstream>
@@ -195,44 +197,48 @@ std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData s
 }
 
 void VersionInfoInterface::logTargetMinOS() const {
-    LOGV2(23398, "targetMinOS: {targetMinOS}", "targetMinOS"_attr = targetMinOS());
+    LOGV2(23398, "Target operating system minimum version", "targetMinOS"_attr = targetMinOS());
 }
 
 void VersionInfoInterface::logBuildInfo() const {
-    LOGV2(23399, "git version: {gitVersion}", "gitVersion"_attr = gitVersion());
+    logv2::DynamicAttributes attrs;
+    attrs.add("version", version());
+    attrs.add("gitVersion", gitVersion());
 
 #if defined(MONGO_CONFIG_SSL) && MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    LOGV2(23400,
-          "{openSSLVersion_OpenSSL_version}",
-          "openSSLVersion_OpenSSL_version"_attr = openSSLVersion("OpenSSL version: "));
+    std::string opensslVersion = openSSLVersion();
+    attrs.add("openSSLVersion", opensslVersion);
 #endif
 
-    LOGV2(23401, "allocator: {allocator}", "allocator"_attr = allocator());
+    attrs.add("allocator", allocator());
 
-    std::stringstream ss;
-    ss << "modules: ";
     auto modules_list = modules();
-    if (modules_list.size() == 0) {
-        ss << "none";
-    } else {
-        for (const auto& m : modules_list) {
-            ss << m << " ";
-        }
-    }
-    LOGV2(23402, "{ss_str}", "ss_str"_attr = ss.str());
+    auto modules_sequence = logv2::seqLog(modules_list.begin(), modules_list.end());
+    attrs.add("modules", modules_sequence);
 
-    LOGV2(23403, "build environment:");
-    for (auto&& envDataEntry : buildInfo()) {
-        if (std::get<3>(envDataEntry)) {
-            auto val = std::get<1>(envDataEntry);
-            if (val.size() == 0)
-                continue;
-            LOGV2(23404,
-                  "    {std_get_0_envDataEntry}: {std_get_1_envDataEntry}",
-                  "std_get_0_envDataEntry"_attr = std::get<0>(envDataEntry),
-                  "std_get_1_envDataEntry"_attr = std::get<1>(envDataEntry));
-        }
-    }
+    auto build = buildInfo();
+
+    auto envFilter = [](const BuildInfoTuple& bi) -> bool {
+        if (std::get<3>(bi))
+            return std::get<1>(bi).size() != 0;
+        return false;
+    };
+
+    auto filtered_begin = boost::make_filter_iterator(envFilter, build.begin(), build.end());
+    auto filtered_end = boost::make_filter_iterator(envFilter, build.end(), build.end());
+
+    auto envFormatter = [](const BuildInfoTuple& bi) {
+        BSONObjBuilder builder;
+        builder.append(std::get<0>(bi), std::get<1>(bi));
+        return builder.obj();
+    };
+
+    auto begin = boost::make_transform_iterator(filtered_begin, envFormatter);
+    auto end = boost::make_transform_iterator(filtered_end, envFormatter);
+    auto buildEnv = logv2::seqLog(begin, end);
+    attrs.add("environment", buildEnv);
+
+    LOGV2(23403, "Build Info", attrs);
 }
 
 std::string mongoShellVersion(const VersionInfoInterface& provider) {

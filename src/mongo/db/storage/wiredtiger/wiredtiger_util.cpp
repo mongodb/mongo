@@ -465,7 +465,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
     try {
-        LOGV2(22430, "WiredTiger message {message}", "message"_attr = redact(message));
+        LOGV2(22430, "WiredTiger message", "message"_attr = redact(message));
     } catch (...) {
         std::terminate();
     }
@@ -478,7 +478,7 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
                         uint64_t progress) {
     try {
         LOGV2(22431,
-              "WiredTiger progress {operation} {progress}",
+              "WiredTiger progress",
               "operation"_attr = redact(operation),
               "progress"_attr = progress);
     } catch (...) {

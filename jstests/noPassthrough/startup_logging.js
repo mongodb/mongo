@@ -20,7 +20,10 @@ function validateWaitingMessage(launcher) {
     clearRawMongoProgramOutput();
     var conn = launcher.start({});
     launcher.stop(conn, undefined, {});
-    testStartupLogging(launcher, makeRegExMatchFn(/waiting for connections on port/));
+    testStartupLogging(
+        launcher,
+        makeRegExMatchFn(
+            /"id":23016,"ctx":"listener","msg":"Waiting for connections","attr":{"port":/));
 }
 
 print("********************\nTesting startup logging in mongod\n********************");

@@ -55,7 +55,6 @@ void printShardingVersionInfo(bool isForVersionReportingOnly) {
         LOGV2(22900, "{mongosVersion_vii}", "mongosVersion_vii"_attr = mongosVersion(vii));
         vii.logBuildInfo();
     } else {
-        LOGV2(22901, "{mongosVersion_vii}", "mongosVersion_vii"_attr = mongosVersion(vii));
         logProcessDetails();
     }
 }
