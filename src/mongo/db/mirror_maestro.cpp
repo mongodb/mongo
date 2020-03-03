@@ -98,7 +98,7 @@ private:
      */
     void _mirror(std::vector<HostAndPort> hosts,
                  std::shared_ptr<CommandInvocation> invocation,
-                 MirroredReadsParameters params);
+                 MirroredReadsParameters params) noexcept;
 
     /**
      * An enum detailing the liveness of the Maestro
@@ -275,7 +275,7 @@ void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation)
 
 void MirrorMaestroImpl::_mirror(std::vector<HostAndPort> hosts,
                                 std::shared_ptr<CommandInvocation> invocation,
-                                MirroredReadsParameters params) {
+                                MirroredReadsParameters params) noexcept try {
     auto payload = [&] {
         BSONObjBuilder bob;
 
@@ -333,14 +333,13 @@ void MirrorMaestroImpl::_mirror(std::vector<HostAndPort> hosts,
         auto status =
             _executor->scheduleRemoteCommand(newRequest, std::move(mirrorResponseCallback))
                 .getStatus();
-        if (!status.isOK()) {
-            LOGV2_DEBUG(
-                31456, 2, "Failed to mirror read command due to {error}", "error"_attr = status);
-            continue;
-        }
+        uassertStatusOK(status);
 
         gMirroredReadsSection.sent.fetchAndAdd(1);
     }
+} catch (const DBException& e) {
+    // TODO SERVER-44570 Invariant this only in testing
+    LOGV2_DEBUG(31456, 2, "Failed to mirror read command due to an error", "error"_attr = e);
 }
 
 void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {

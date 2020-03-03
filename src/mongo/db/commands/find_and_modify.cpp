@@ -543,7 +543,9 @@ public:
         }();
 
         bob->append("find", cmdObj.firstElement().String());
-        bob->append("filter", cmdObj["query"].Obj());
+        if (cmdObj.hasField("query")) {
+            bob->append("filter", cmdObj["query"].Obj());
+        }
 
         cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
 
