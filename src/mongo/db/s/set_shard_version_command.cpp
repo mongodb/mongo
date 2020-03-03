@@ -253,7 +253,7 @@ public:
                         // A migration occurred
                         info->setVersion(nss.ns(), requestedVersion);
                     } else if (authoritative) {
-                        // The collection was dropped and recreated
+                        // The collection was dropped and recreated or had its shard key refined.
                         info->setVersion(nss.ns(), requestedVersion);
                     } else {
                         result.append("ns", nss.ns());

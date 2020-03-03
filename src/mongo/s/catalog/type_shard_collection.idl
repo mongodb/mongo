@@ -75,7 +75,7 @@ structs:
             epoch:
                 type: objectid
                 description: "Uniquely identifies this instance of the collection, in case of 
-                              drop/create."
+                              drop/create or shard key refine."
                 optional: false
             key:
                 cpp_name: keyPattern

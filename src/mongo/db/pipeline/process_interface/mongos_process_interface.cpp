@@ -157,9 +157,9 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                     // Find by UUID and shard versioning do not work together (SERVER-31946).  In
                     // the sharded case we've already checked the UUID, so find by namespace is
                     // safe.  In the unlikely case that the collection has been deleted and a new
-                    // collection with the same name created through a different mongos, the shard
-                    // version will be detected as stale, as shard versions contain an 'epoch' field
-                    // unique to the collection.
+                    // collection with the same name created through a different mongos or the
+                    // collection had its shard key refined, the shard version will be detected as
+                    // stale, as shard versions contain an 'epoch' field unique to the collection.
                     findCmd = findCmd.addField(BSON("find" << nss.coll()).firstElement());
                     findCmdIsByUuid = false;
                 }

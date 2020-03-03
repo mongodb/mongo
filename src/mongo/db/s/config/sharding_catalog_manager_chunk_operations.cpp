@@ -398,7 +398,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     if (collVersion.epoch() != requestEpoch) {
         return {ErrorCodes::StaleEpoch,
                 str::stream() << "splitChunk cannot split chunk " << range.toString()
-                              << ". Collection '" << nss.ns() << "' was dropped and re-created."
+                              << ". Epoch of collection '" << nss.ns() << "' has changed."
                               << " Current epoch: " << collVersion.epoch()
                               << ", cmd epoch: " << requestEpoch};
     }
@@ -654,8 +654,8 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     // Return an error if epoch of chunk does not match epoch of request
     if (collVersion.epoch() != requestEpoch) {
         return {ErrorCodes::StaleEpoch,
-                "epoch of chunk does not match epoch of request. This most likely means "
-                "that the collection was dropped and re-created."};
+                str::stream() << "Epoch of chunk does not match epoch of request. Chunk epoch: "
+                              << collVersion.epoch() << ", request epoch: " << requestEpoch};
     }
 
     // Check if the chunk(s) have already been merged. If so, return success.
@@ -827,12 +827,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // It is possible for a migration to end up running partly without the protection of the
     // distributed lock if the config primary stepped down since the start of the migration and
     // failed to recover the migration. Check that the collection has not been dropped and recreated
-    // since the migration began, unbeknown to the shard when the command was sent.
+    // or had its shard key refined since the migration began, unbeknown to the shard when the
+    // command was sent.
     if (currentCollectionVersion.epoch() != collectionEpoch) {
         return {ErrorCodes::StaleEpoch,
-                str::stream() << "The collection '" << nss.ns()
-                              << "' has been dropped and recreated since the migration began."
-                                 " The config server's collection version epoch is now '"
+                str::stream() << "The epoch of collection '" << nss.ns()
+                              << "' has changed since the migration began. The config server's "
+                                 "collection version epoch is now '"
                               << currentCollectionVersion.epoch().toString()
                               << "', but the shard's is " << collectionEpoch.toString()
                               << "'. Aborting migration commit for chunk ("
@@ -1030,11 +1031,12 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     // It is possible for a migration to end up running partly without the protection of the
     // distributed lock if the config primary stepped down since the start of the migration and
     // failed to recover the migration. Check that the collection has not been dropped and recreated
-    // since the migration began, unbeknown to the shard when the command was sent.
+    // or had its shard key refined since the migration began, unbeknown to the shard when the
+    // command was sent.
     uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "The collection '" << nss.ns()
-                          << "' has been dropped and recreated since the migration began."
-                             " The config server's collection version epoch is now '"
+            str::stream() << "The epoch of collection '" << nss.ns()
+                          << "' has changed since the migration began. The config server's "
+                             "collection version epoch is now '"
                           << currentCollectionVersion.epoch().toString() << "', but the shard's is "
                           << collectionEpoch.toString() << "'. Aborting clear jumbo on chunk ("
                           << chunk.toString() << ").",
@@ -1142,7 +1144,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         LOGV2(23886,
               "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {version_epoch} "
               "when attempting to find the collectionVersion. The collection must have been "
-              "dropped concurrently. Returning success.",
+              "dropped concurrently or had its shard key refined. Returning success.",
               "version_epoch"_attr = version.epoch());
         return;
     }
@@ -1176,8 +1178,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         LOGV2(23888,
               "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
               "maxKey {maxKey}, and epoch {version_epoch} when trying to bump its version. The "
-              "collection must have been dropped "
-              "concurrently. Returning success.",
+              "collection must have been dropped concurrently or had its shard key refined. "
+              "Returning success.",
               "minKey"_attr = minKey,
               "maxKey"_attr = maxKey,
               "version_epoch"_attr = version.epoch());
