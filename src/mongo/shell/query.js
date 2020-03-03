@@ -489,15 +489,19 @@ DBQuery.prototype.allowDiskUse = function() {
  *
  * @param mode {string} read preference mode to use.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
- *     Note that this object only keeps a shallow copy of this array.
+ * @param hedgeOptions {<Object>} optional. The hedge options of the form {enabled: <bool>}.
  *
  * @return this cursor
  */
-DBQuery.prototype.readPref = function(mode, tagSet) {
+DBQuery.prototype.readPref = function(mode, tagSet, hedgeOptions) {
     var readPrefObj = {mode: mode};
 
     if (tagSet) {
         readPrefObj.tags = tagSet;
+    }
+
+    if (hedgeOptions) {
+        readPrefObj.hedge = hedgeOptions;
     }
 
     return this._addSpecial("$readPreference", readPrefObj);
