@@ -105,7 +105,7 @@ void IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
 }
 
 bool IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumNotEnabled(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState, bool onStepUp) {
     MONGO_UNREACHABLE;
 }
 

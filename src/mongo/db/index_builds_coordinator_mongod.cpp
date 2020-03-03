@@ -393,7 +393,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
 }
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState, bool onStepup) {
     // Locking order is important here to avoid deadlocks i.e, rstl followed by ReplIndexBuildState
     // mutex.
     invariant(opCtx->lockState()->isRSTLLocked());
@@ -403,7 +403,7 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     if (!enableIndexBuildCommitQuorum) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+        if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID) || onStepup) {
             // Node is primary here.
             stdx::unique_lock<Latch> lk(replState->mutex);
             _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);

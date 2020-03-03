@@ -144,6 +144,12 @@ TEST_F(ValidateStateTest, UncheckpointedCollectionShouldThrowCursorNotFoundError
 
 // Basic test with {background:false} to open cursors against all collection indexes.
 TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
+    // Disable index build commit quorum as we don't have support of replication subsystem for
+    // voting.
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("enableIndexBuildCommitQuorum")
+                  ->second->setFromString("false"));
     auto opCtx = operationContext();
     createCollectionAndPopulateIt(opCtx, kNss);
 
@@ -187,6 +193,13 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
 
 // Open cursors against checkpoint'ed indexes with {background:true}.
 TEST_F(ValidateStateTest, OpenCursorsOnCheckpointedIndexes) {
+    // Disable index build commit quorum as we don't have support of replication subsystem for
+    // voting.
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("enableIndexBuildCommitQuorum")
+                  ->second->setFromString("false"));
+
     auto opCtx = operationContext();
     createCollectionAndPopulateIt(opCtx, kNss);
 
@@ -214,6 +227,13 @@ TEST_F(ValidateStateTest, OpenCursorsOnCheckpointedIndexes) {
 
 // Only open cursors against indexes that are consistent with the rest of the checkpoint'ed data.
 TEST_F(ValidateStateTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
+    // Disable index build commit quorum as we don't have support of replication subsystem for
+    // voting.
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("enableIndexBuildCommitQuorum")
+                  ->second->setFromString("false"));
+
     auto opCtx = operationContext();
     Collection* coll = createCollectionAndPopulateIt(opCtx, kNss);
 
@@ -257,6 +277,13 @@ TEST_F(ValidateStateTest, OpenCursorsOnConsistentlyCheckpointedIndexes) {
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
 // them.
 TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereLaterDropped) {
+    // Disable index build commit quorum as we don't have support of replication subsystem for
+    // voting.
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("enableIndexBuildCommitQuorum")
+                  ->second->setFromString("false"));
+
     auto opCtx = operationContext();
     createCollectionAndPopulateIt(opCtx, kNss);
 

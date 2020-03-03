@@ -9,7 +9,21 @@ load('jstests/replsets/libs/rollback_test.js');     // for RollbackTest
 
 class RollbackIndexBuildsTest {
     constructor() {
-        this.rollbackTest = new RollbackTest();
+        // This test create indexes with majority of nodes not avialable for replication. So,
+        // disabling index build commit quorum.
+        jsTestLog("Set up a Rollback Test with enableIndexBuildCommitQuorum=false");
+        const replTest = new ReplSetTest({
+            name: jsTestName(),
+            nodes: 3,
+            useBridge: true,
+            nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
+        });
+        replTest.startSet();
+        let config = replTest.getReplSetConfig();
+        config.members[2].priority = 0;
+        config.settings = {chainingAllowed: false};
+        replTest.initiateWithHighElectionTimeout(config);
+        this.rollbackTest = new RollbackTest(jsTestName(), replTest);
     }
 
     // Given two ordered arrays, returns all permutations of the two using all elements of each.

@@ -47,7 +47,22 @@ function CommonOps(node) {
     IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "x_1");
 }
 
-const rollbackTest = new RollbackTest();
+// TODO SERVER-46558: Should turn the commit quorum as true.
+const replTest = new ReplSetTest({
+    name: jsTestName(),
+    nodes: 3,
+    useBridge: true,
+    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
+});
+replTest.startSet();
+let config = replTest.getReplSetConfig();
+config.members[2].priority = 0;
+config.settings = {
+    chainingAllowed: false
+};
+replTest.initiateWithHighElectionTimeout(config);
+
+const rollbackTest = new RollbackTest(jsTestName(), replTest);
 const originalPrimary = rollbackTest.getPrimary();
 const testDB = originalPrimary.getDB(dbName);
 CommonOps(originalPrimary);

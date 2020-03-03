@@ -2122,6 +2122,13 @@ public:
 class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
+        // Disable index build commit quorum as we don't have support of replication subsystem for
+        // voting.
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("enableIndexBuildCommitQuorum")
+                      ->second->setFromString("false"));
+
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 
@@ -2240,6 +2247,12 @@ public:
 class TimestampMultiIndexBuildsDuringRename : public StorageTimestampTest {
 public:
     void run() {
+        // Disable index build commit quorum as we don't have support of replication subsystem for
+        // voting.
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("enableIndexBuildCommitQuorum")
+                      ->second->setFromString("false"));
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 

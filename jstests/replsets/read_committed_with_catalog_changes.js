@@ -218,8 +218,13 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
 
 // Set up a set and grab things for later.
 var name = "read_committed_with_catalog_changes";
-var replTest =
-    new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+// This test create indexes with majority of nodes not avialable for replication. So, disabling
+// index build commit quorum.
+var replTest = new ReplSetTest({
+    name: name,
+    nodes: 3,
+    nodeOptions: {enableMajorityReadConcern: '', setParameter: "enableIndexBuildCommitQuorum=false"}
+});
 
 if (!startSetIfSupportsReadMajority(replTest)) {
     jsTest.log("skipping test since storage engine doesn't support committed reads");

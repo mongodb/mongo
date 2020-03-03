@@ -607,8 +607,9 @@ protected:
      * Skips the voting process and directly signal primary to commit index build if
      * commit quorum is not enabled.
      */
-    virtual bool _signalIfCommitQuorumNotEnabled(
-        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+    virtual bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
+                                                 std::shared_ptr<ReplIndexBuildState> replState,
+                                                 bool onStepUp) = 0;
 
     /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command

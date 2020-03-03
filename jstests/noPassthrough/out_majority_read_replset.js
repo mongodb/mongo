@@ -5,7 +5,12 @@
 load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
 
-const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
+// This test create indexes with majority of nodes not avialable for replication. So, disabling
+// index build commit quorum.
+const rst = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {enableMajorityReadConcern: "", setParameter: "enableIndexBuildCommitQuorum=false"}
+});
 
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&

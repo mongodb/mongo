@@ -4851,7 +4851,9 @@ tasks:
       num_tasks: 5
       npm_command: rollback-fuzzer
       suite: rollback_multiversion_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
+      # index build commit quorum.
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
       name: rollback_multiversion_fuzzer
       task_path_suffix: "/data/multiversion"
 
@@ -4867,7 +4869,9 @@ tasks:
       num_tasks: 5
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
+      # index build commit quorum.
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
       name: rollback_fuzzer
 
 ## rollback generational fuzzer with clean shutdowns ##
@@ -4883,7 +4887,9 @@ tasks:
       jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_clean_shutdowns
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
+      # index build commit quorum.
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
       name: rollback_fuzzer_clean_shutdowns
 
 ## rollback generational fuzzer with unclean shutdowns ##
@@ -4899,7 +4905,9 @@ tasks:
       jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_unclean_shutdowns
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
+      # index build commit quorum.
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
       name: rollback_fuzzer_unclean_shutdowns
 
 ## jstestfuzz ##
@@ -6479,7 +6487,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_replication --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6500,7 +6509,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6510,7 +6520,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication_multi_stmt_txn --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_replication_multi_stmt_txn --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
   # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
@@ -6551,7 +6562,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6561,7 +6573,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6571,7 +6584,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_replication --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6592,7 +6606,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_with_balancer --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_replication_with_balancer --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6602,7 +6617,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_replication --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6612,7 +6628,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6642,7 +6659,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6652,7 +6670,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6662,7 +6681,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6672,7 +6692,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_terminate_primary_with_balancer --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_terminate_primary_with_balancer --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6682,7 +6703,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_kill_primary_with_balancer --storageEngine=wiredTiger
+      # TODO SERVER-46594: Enables commit quorum for concurrency suites.
+      resmoke_args: "--suites=concurrency_sharded_kill_primary_with_balancer --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6732,7 +6754,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_with_stepdowns --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_sharded_multi_stmt_txn_with_stepdowns --storageEngine=wiredTiger  --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6742,7 +6764,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_terminate_primary --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_sharded_multi_stmt_txn_terminate_primary --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6752,7 +6774,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_kill_primary --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_sharded_multi_stmt_txn_kill_primary --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6772,7 +6794,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_simultaneous_replication --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_simultaneous_replication --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6782,7 +6804,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_simultaneous_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6792,7 +6814,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger
+      resmoke_args: "--suites=concurrency_simultaneous_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger --mongodSetParameters='{enableIndexBuildCommitQuorum: false}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template

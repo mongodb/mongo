@@ -47,15 +47,16 @@ const collName = "createIndexes";
 // SERVER-44405, will not occur in this test unless the collection is created beforehand.
 assert.commandWorked(testDB.runCommand({create: collName}));
 
-// Use createIndex(es) to build indexes and check the commit quorum.
+// Use createIndex(es) to build indexes and check the commit quorum default.
 let res = assert.commandWorked(testDB[collName].createIndex({x: 1}));
-assert.eq(2, res.commitQuorum);
+assert.eq("majority", res.commitQuorum);
 
 res = assert.commandWorked(testDB[collName].createIndex({y: 1}, {}, 1));
 assert.eq(1, res.commitQuorum);
 
+// Use createIndex(es) to build indexes and check the commit quorum default.
 res = assert.commandWorked(testDB[collName].createIndexes([{i: 1}]));
-assert.eq(2, res.commitQuorum);
+assert.eq("majority", res.commitQuorum);
 
 res = assert.commandWorked(testDB[collName].createIndexes([{j: 1}], {}, 1));
 assert.eq(1, res.commitQuorum);

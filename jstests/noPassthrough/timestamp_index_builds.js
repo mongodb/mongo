@@ -25,11 +25,17 @@
 "use strict";
 
 load('jstests/noPassthrough/libs/index_build.js');
-
+// This test create indexes with majority of nodes not avialable for replication. So, disabling
+// index build commit quorum.
 const rst = new ReplSetTest({
     name: "timestampingIndexBuilds",
     nodes: 2,
-    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
+    nodeOptions: {
+        setParameter: {
+            enableIndexBuildCommitQuorum: false,
+            logComponentVerbosity: tojsononeline({storage: {recovery: 2}})
+        }
+    }
 });
 const nodes = rst.startSet();
 rst.initiateWithHighElectionTimeout();

@@ -9,6 +9,8 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
+// TODO SERVER-46560: This test is currently racy due to index build abort logic. So,
+// disabling index build commit quorum.
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -19,7 +21,8 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
+    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 const nodes = rst.startSet();
 rst.initiate();
