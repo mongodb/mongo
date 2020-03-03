@@ -356,17 +356,16 @@ env.CppUnitTest(
         'fetcher',
         'read_preference',
         'remote_command_retry_scheduler',
-        'replica_set_monitor_protocol_test_fixture',
+        'replica_set_monitor_protocol_test_util',
     ],
 )
 
 env.Library(
-    target='replica_set_monitor_protocol_test_fixture',
+    target='replica_set_monitor_protocol_test_util',
     source=[
-        'replica_set_monitor_protocol_test_fixture.cpp',
+        'replica_set_monitor_protocol_test_util.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/dbtests/mocklib',
         'clientdriver_network',
     ],
 )
@@ -381,7 +380,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/dbtests/mocklib',
         'clientdriver_network',
-        'replica_set_monitor_protocol_test_fixture',
+        'replica_set_monitor_protocol_test_util',
     ],
 )
 

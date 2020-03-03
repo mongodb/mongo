@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -53,9 +54,10 @@ using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 using NetworkOperationIterator = NetworkInterfaceMock::NetworkOperationIterator;
 using StepKind = ScanningReplicaSetMonitor::Refresher::NextStep::StepKind;
 
-class ReplicaSetMonitorConcurrentTest : public ThreadPoolExecutorTest {
+class ScanningReplicaSetMonitorConcurrentTest : public ThreadPoolExecutorTest {
 protected:
     void setUp() {
+        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
         auto serviceContext = ServiceContext::make();
         ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
@@ -70,6 +72,7 @@ protected:
         joinExecutorThread();
         ReplicaSetMonitor::cleanup();
         ThreadPoolExecutorTest::tearDown();
+        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
     }
 
     bool hasReadyRequests() {
@@ -170,7 +173,7 @@ private:
 //    getHostOrRefresh(primaryOnly) succeeds.
 // 8. At 5 seconds the Node 1 check times out, assert getHostOrRefresh(secondaryOnly) fails
 #if 0
-TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
+TEST_F(ScanningReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
     MockReplicaSet replSet("test", 2, false /* hasPrimary */, false /* dollarPrefixHosts */);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
@@ -236,7 +239,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
 // 4. After 1 second, Node 0 becomes primary
 // 5. After 2 seconds, Node 0 steps down
 // 6. After 3 seconds, Node 1 becomes primary
-TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
+TEST_F(ScanningReplicaSetMonitorConcurrentTest, StepdownAndElection) {
     MockReplicaSet replSet("test", 3, false /* hasPrimary */, false /* dollarPrefixHosts */);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
@@ -319,7 +322,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
 // 2. Begin a ReplicaSetMonitor::getHostOrRefresh call with primaryOnly
 // 3. Node 0 responds but Node 1 does not
 // 4. After 0.5s call ReplicaSetMonitor::getHostOrRefresh again
-TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
+TEST_F(ScanningReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
     MockReplicaSet replSet("test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
@@ -380,7 +383,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
 }
 
 // Check that requests actually experience timeout despite in-flight isMasters
-TEST_F(ReplicaSetMonitorConcurrentTest, RecheckUntilTimeout) {
+TEST_F(ScanningReplicaSetMonitorConcurrentTest, RecheckUntilTimeout) {
     MockReplicaSet replSet("test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
     const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
     const auto node1 = HostAndPort(replSet.getSecondaries()[1]);

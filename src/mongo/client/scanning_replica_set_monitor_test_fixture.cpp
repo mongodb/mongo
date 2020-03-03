@@ -38,13 +38,13 @@ namespace mongo {
  */
 void ScanningReplicaSetMonitorTest::setUp() {
     setGlobalServiceContext(ServiceContext::make());
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
+    ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
     ReplicaSetMonitor::cleanup();
 }
 
 void ScanningReplicaSetMonitorTest::tearDown() {
     ReplicaSetMonitor::cleanup();
-    unsetRSMProtocol();
+    ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
 }
 
 const std::vector<HostAndPort> ScanningReplicaSetMonitorTest::basicSeeds = {

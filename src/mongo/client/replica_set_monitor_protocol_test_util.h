@@ -26,34 +26,45 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/client/replica_set_monitor_server_parameters.h"
+#include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-void ReplicaSetMonitorProtocolTestFixture::setRSMProtocol(ReplicaSetMonitorProtocol protocol) {
-    const BSONObj newParameterObj = BSON(kRSMProtocolFieldName << toString(protocol));
-    BSONObjIterator parameterIterator(newParameterObj);
-    BSONElement newParameter = parameterIterator.next();
-    const auto foundParameter = findRSMProtocolServerParameter();
 
-    uassertStatusOK(foundParameter->second->set(newParameter));
-}
+/**
+ * Test wrapper for tests that need to set and unset the replicaSetMonitorProtocol server parameter.
+ */
+class ReplicaSetMonitorProtocolTestUtil {
+public:
+    /**
+     * Sets the replicaSetMonitorProtocol to 'protocol'.
+     */
+    static void setRSMProtocol(ReplicaSetMonitorProtocol protocol);
 
-void ReplicaSetMonitorProtocolTestFixture::unsetRSMProtocol() {
-    const auto defaultParameter = kDefaultParameter[kRSMProtocolFieldName];
-    const auto foundParameter = findRSMProtocolServerParameter();
+    /**
+     * Restores the replicaSetMonitorProtocol parameter to its default value.
+     */
+    static void resetRSMProtocol();
 
-    uassertStatusOK(foundParameter->second->set(defaultParameter));
-}
+private:
+    /**
+     * Finds the replicaSetMonitorProtocol ServerParameter.
+     */
+    static ServerParameter::Map::const_iterator findRSMProtocolServerParameter();
 
-ServerParameter::Map::const_iterator
-ReplicaSetMonitorProtocolTestFixture::findRSMProtocolServerParameter() {
-    const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
-    invariant(parameterMap.size());
-    return parameterMap.find(kRSMProtocolFieldName);
-}
+    static inline const std::string kRSMProtocolFieldName = "replicaSetMonitorProtocol";
+
+    /**
+     * A BSONObj containing the default for the replicaSetMonitorProtocol server parameter.
+     */
+    static inline const BSONObj kDefaultParameter =
+        BSON(kRSMProtocolFieldName << toString(gReplicaSetMonitorProtocol));
+};
 
 }  // namespace mongo

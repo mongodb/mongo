@@ -36,7 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -63,16 +63,16 @@ MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that uses ConnectionString::setConnectionHook
  */
-class ScanningReplicaSetMonitorDBTest : public ReplicaSetMonitorProtocolTestFixture {
+class ScanningReplicaSetMonitorDBTest : public unittest::Test {
 protected:
     void setUp() {
         // Restrict the test to use ReplicaSetMonitorProtocol::kScanning only.
-        setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
+        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
     }
 
     void tearDown() {
         ReplicaSetMonitor::cleanup();
-        unsetRSMProtocol();
+        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
     }
 };
 

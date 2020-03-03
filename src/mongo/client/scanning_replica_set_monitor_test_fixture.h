@@ -34,7 +34,7 @@
 #include <vector>
 
 #include "mongo/client/replica_set_change_notifier.h"
-#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -45,7 +45,7 @@ namespace mongo {
 // current (only) thread, so they do not lock SetState::mutex before examining state. This is
 // NOT something that non-test code should do.
 
-class ScanningReplicaSetMonitorTest : public ReplicaSetMonitorProtocolTestFixture {
+class ScanningReplicaSetMonitorTest : public unittest::Test {
 public:
     // Pull in nested types
     using SetState = ScanningReplicaSetMonitor::SetState;

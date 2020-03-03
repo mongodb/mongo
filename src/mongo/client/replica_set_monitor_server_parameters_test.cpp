@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
@@ -43,7 +43,7 @@ namespace {
 /**
  * Tests the replicaSetMonitorProtocol server parameter.
  */
-class ReplicaSetMonitorProtocolTest : public ReplicaSetMonitorProtocolTestFixture {
+class ReplicaSetMonitorProtocolTest : public unittest::Test {
 protected:
     void setUp() {
         setGlobalServiceContext(ServiceContext::make());
@@ -52,7 +52,7 @@ protected:
 
     void tearDown() {
         ReplicaSetMonitor::cleanup();
-        unsetRSMProtocol();
+        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
     }
 };
 
@@ -62,7 +62,7 @@ protected:
  * parameter is set to 'sdam'.
  */
 TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamSdam) {
-    setRSMProtocol(ReplicaSetMonitorProtocol::kSdam);
+    ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kSdam);
     auto uri = MongoURI::parse("mongodb:a,b,c/?replicaSet=name");
     ASSERT_OK(uri.getStatus());
     auto createdMonitor = ReplicaSetMonitor::createIfNeeded(uri.getValue());
@@ -82,7 +82,7 @@ TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamSdam) {
  * parameter is set to 'scanning'.
  */
 TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamScanning) {
-    setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
+    ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
     auto uri = MongoURI::parse("mongodb:a,b,c/?replicaSet=name");
     ASSERT_OK(uri.getStatus());
     auto createdMonitor = ReplicaSetMonitor::createIfNeeded(uri.getValue());

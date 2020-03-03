@@ -44,7 +44,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_protocol_test_fixture.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -77,17 +77,17 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 /**
  * Ensures a global ServiceContext exists and the ScanningReplicaSetMonitor is used for each test.
  */
-class DBClientRSTest : public ReplicaSetMonitorProtocolTestFixture {
+class DBClientRSTest : public unittest::Test {
 protected:
     void setUp() {
         auto serviceContext = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContext));
 
-        setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
+        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
     }
 
     void tearDown() {
-        unsetRSMProtocol();
+        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
     }
 };
 
