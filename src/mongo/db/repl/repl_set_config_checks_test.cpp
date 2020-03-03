@@ -38,11 +38,14 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {
 namespace {
+
+using unittest::EnsureFCV;
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     ReplicationCoordinatorExternalStateMock rses;
@@ -1098,6 +1101,20 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeRemovalDisallowed) {
     BSONArray newMembers = BSON_ARRAY(m1 << m2);  // remove 2 voting nodes.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                   validateMemberReconfig(oldMembers, newMembers, m1));
+}
+
+TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionAllowedFCV42) {
+    EnsureFCV fcv{ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42};
+    BSONArray oldMembers = BSON_ARRAY(m1 << m2);
+    BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3 << m4);  // add 2 voting nodes.
+    ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
+}
+
+TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeRemovalAllowedFCV42) {
+    EnsureFCV fcv{ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42};
+    BSONArray oldMembers = BSON_ARRAY(m1 << m2 << m3 << m4);
+    BSONArray newMembers = BSON_ARRAY(m1 << m2);  // remove 2 voting nodes.
+    ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfNonVotingNodesAllowed) {

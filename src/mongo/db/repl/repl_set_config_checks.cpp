@@ -361,7 +361,9 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
 
     // For non-force reconfigs, verify that the reconfig only adds or removes a single node. This
     // ensures that all quorums of the new config overlap with all quorums of the old config.
-    if (!force) {
+    if (!force &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         status = validateSingleNodeChange(oldConfig, newConfig);
         if (!status.isOK()) {
             return StatusWith<int>(status);
