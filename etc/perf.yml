@@ -149,7 +149,7 @@ functions:
           evergreen_api_key=${evergreen_api_key}
           evergreen_api_user=${evergreen_api_user}
           source ./buildscripts/signal_processing_setup.sh
-          detect-changes --evergreen-api-config .evergreen.yml
+          detect-changes  --config .signal-processing.yml
     - command: json.get_history
       params:
         task: ${task_name}
