@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Command line utility for executing MongoDB tests of all kinds."""
 
+import os
 import os.path
-import platform
 import random
 import subprocess
 import sys
@@ -75,9 +75,13 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
             self._exit_on_incomplete_logging()
             return
 
-        logging.flush.stop_thread()
+        flush_success = logging.flush.stop_thread()
+        if not flush_success:
+            self._resmoke_logger.error(
+                'Failed to flush all logs within a reasonable amount of time, '
+                'treating logs as incomplete')
 
-        if logging.buildlogger.is_log_output_incomplete():
+        if not flush_success or logging.buildlogger.is_log_output_incomplete():
             self._exit_on_incomplete_logging()
 
     def _exit_on_incomplete_logging(self):
@@ -94,7 +98,12 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
         self._resmoke_logger.info(
             "Exiting with code %d rather than requested code %d because we failed to flush all"
             " log output to logkeeper.", exit_code, self._exit_code)
-        self.exit(exit_code)
+        self._exit_code = exit_code
+        # Force exit the process without cleaning up or calling the finally block
+        # to avoid threads making system calls from blocking process termination.
+        # This must be the last line of code that is run.
+        # pylint: disable=protected-access
+        os._exit(exit_code)
 
     def run(self):
         """Run resmoke."""
@@ -112,6 +121,8 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
             else:
                 self.run_tests()
         finally:
+            # self._exit_logging() may never return when the log output is incomplete.
+            # Our workaround is to call os._exit().
             self._exit_logging()
 
     def list_suites(self):
