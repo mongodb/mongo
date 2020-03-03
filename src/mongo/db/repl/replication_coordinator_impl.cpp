@@ -2860,6 +2860,23 @@ ReplSetConfig ReplicationCoordinatorImpl::getConfig() const {
     return _rsConfig;
 }
 
+WriteConcernOptions ReplicationCoordinatorImpl::_getOplogCommitmentWriteConcern(WithLock lk) {
+    auto syncMode = getWriteConcernMajorityShouldJournal_inlock()
+        ? WriteConcernOptions::SyncMode::JOURNAL
+        : WriteConcernOptions::SyncMode::NONE;
+    WriteConcernOptions oplogWriteConcern(
+        ReplSetConfig::kMajorityWriteConcernModeName, syncMode, WriteConcernOptions::kNoTimeout);
+    return oplogWriteConcern;
+}
+
+WriteConcernOptions ReplicationCoordinatorImpl::_getConfigReplicationWriteConcern() {
+    WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
+                                           WriteConcernOptions::SyncMode::NONE,
+                                           WriteConcernOptions::kNoTimeout);
+    configWriteConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+    return configWriteConcern;
+}
+
 void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
                                                          bool commitmentStatus) {
     stdx::lock_guard<Latch> lock(_mutex);
@@ -2869,17 +2886,9 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
         uassert(ErrorCodes::NotMaster,
                 "commitmentStatus is only supported on primary.",
                 _readWriteAbility->canAcceptNonLocalWrites(lock));
-        WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
-                                               WriteConcernOptions::SyncMode::NONE,
-                                               WriteConcernOptions::kNoTimeout);
-        configWriteConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
-
+        auto configWriteConcern = _getConfigReplicationWriteConcern();
         auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-        auto oplogWriteConcern = _populateUnsetWriteConcernOptionsSyncMode(
-            lock,
-            WriteConcernOptions(_rsConfig.getWriteMajority(),
-                                WriteConcernOptions::SyncMode::NONE,
-                                WriteConcernOptions::kNoTimeout));
+        auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lock);
 
         // OpTime isn't used when checking for config replication.
         OpTime ignored;
@@ -3102,10 +3111,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     }
     auto topCoordTerm = _topCoord->getTerm();
 
-    WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
-                                           WriteConcernOptions::SyncMode::NONE,
-                                           WriteConcernOptions::kNoTimeout);
-    configWriteConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+    auto configWriteConcern = _getConfigReplicationWriteConcern();
     // Construct a fake OpTime that can be accepted but isn't used.
     OpTime fakeOpTime(Timestamp(1, 1), topCoordTerm);
 
@@ -3129,14 +3135,10 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         // If our config was installed via a "force" reconfig, we bypass the oplog commitment check.
         auto leavingForceConfig = (_rsConfig.getConfigTerm() == OpTime::kUninitializedTerm);
         auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-        auto wcOpts = _populateUnsetWriteConcernOptionsSyncMode(
-            lk,
-            WriteConcernOptions(_rsConfig.getWriteMajority(),
-                                WriteConcernOptions::SyncMode::NONE,
-                                WriteConcernOptions::kNoWaiting));
+        auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
 
         if (!leavingForceConfig && !isInitialReconfig &&
-            !_doneWaitingForReplication_inlock(configOplogCommitmentOpTime, wcOpts)) {
+            !_doneWaitingForReplication_inlock(configOplogCommitmentOpTime, oplogWriteConcern)) {
             LOGV2(51816,
                   "Oplog config commitment condition failed to be satisfied. The last committed "
                   "optime in the previous config ({configOplogCommitmentOpTime}) is not committed "
@@ -3220,10 +3222,11 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         // if we have just left a force config via a non-force reconfig, we still want to wait for
         // this oplog commitment check, since a subsequent safe reconfig will check it as a
         // precondition.
+        lk.lock();
         auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-        auto oplogWriteConcern = WriteConcernOptions(newConfig.getWriteMajority(),
-                                                     WriteConcernOptions::SyncMode::NONE,
-                                                     WriteConcernOptions::kNoTimeout);
+        auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
+        lk.unlock();
+
         LOGV2(51815,
               "Waiting for the last committed optime in the previous config "
               "({configOplogCommitmentOpTime}) to be committed in the current config.",

@@ -765,6 +765,12 @@ private:
     bool getWriteConcernMajorityShouldJournal_inlock() const;
 
     /**
+     * Returns the write concerns used by oplog commitment check and config replication check.
+     */
+    WriteConcernOptions _getOplogCommitmentWriteConcern(WithLock lk);
+    WriteConcernOptions _getConfigReplicationWriteConcern();
+
+    /**
      * Returns the OpTime of the current committed snapshot, if one exists.
      */
     OpTime _getCurrentCommittedSnapshotOpTime_inlock() const;

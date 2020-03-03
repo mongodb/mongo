@@ -5342,6 +5342,55 @@ TEST_F(ConfigReplicationTest, ArbiterAndNonVotingNodeIncludedInAllReplicatedConf
     ASSERT_TRUE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
 }
 
+TEST_F(TopoCoordTest, OnlyDataBearingVoterIncludedInInternalMajorityWriteConcern) {
+    // The config has 3 voting members including an arbiter, so the majority
+    // number is 2.
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "term" << 0 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"
+                                                  << "votes" << 0 << "priority" << 0)
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"
+                                                  << "arbiterOnly" << true))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+
+    auto caughtUpOpTime = OpTime(Timestamp(100, 0), term);
+    auto laggedOpTime = OpTime(Timestamp(50, 0), term);
+
+    auto tagPatternStatus =
+        getCurrentConfig().findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
+    ASSERT_TRUE(tagPatternStatus.isOK());
+    auto tagPattern = tagPatternStatus.getValue();
+    auto durable = false;
+
+    setMyOpTime(caughtUpOpTime);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+    // One secondary is not caught up.
+    heartbeatFromMember(HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, laggedOpTime);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+
+    // The non-voter is caught up, but should not count towards the majority.
+    heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, caughtUpOpTime);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+
+    // The arbiter is caught up, but should not count towards the majority.
+    heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_ARBITER, caughtUpOpTime);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+
+    // The secondary is caught up and counts towards the majority.
+    heartbeatFromMember(HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, caughtUpOpTime);
+    ASSERT_TRUE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+}
+
 TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
     // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
     updateConfig(BSON("_id"

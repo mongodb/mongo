@@ -867,6 +867,7 @@ TEST_F(ReplCoordReconfigTest,
 
     // Reconfig should now succeed after advancing optime of other node.
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, 2, commitPoint));
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(configVersion, 2, commitPoint));
 
     reconfigThread = stdx::thread(
         [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
