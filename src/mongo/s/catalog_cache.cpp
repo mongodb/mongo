@@ -82,8 +82,8 @@ bool shardVersionsHaveMatchingEpoch(boost::optional<ChunkVersion> wanted,
  * Throws ConflictingOperationInProgress if the chunk metadata was found to be inconsistent (not
  * containing all the necessary chunks, contains overlaps or chunks' epoch values are not the same
  * as that of the collection). Since this situation may be transient, due to the collection being
- * dropped or recreated concurrently, the caller must retry the reload up to some configurable
- * number of attempts.
+ * dropped or having its shard key refined concurrently, the caller must retry the reload up to some
+ * configurable number of attempts.
  */
 std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
     OperationContext* opCtx,

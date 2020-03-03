@@ -211,12 +211,12 @@ bool isExactIdQuery(OperationContext* opCtx,
 
 /**
  * Returns the relationship of two shard versions. Shard versions of a collection that has not
- * been dropped and recreated and where there is at least one chunk on a shard are comparable,
- * otherwise the result is ambiguous.
+ * been dropped and recreated or had its shard key refined and where there is at least one chunk on
+ * a shard are comparable, otherwise the result is ambiguous.
  */
 CompareResult compareShardVersions(const ChunkVersion& shardVersionA,
                                    const ChunkVersion& shardVersionB) {
-    // Collection may have been dropped
+    // Collection may have been dropped or had its shard key refined.
     if (shardVersionA.epoch() != shardVersionB.epoch()) {
         return CompareResult_Unknown;
     }
@@ -372,7 +372,7 @@ Status ChunkManagerTargeter::init(OperationContext* opCtx) {
     if (_targetEpoch) {
         uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", _routingInfo->cm());
         uassert(ErrorCodes::StaleEpoch,
-                "Collection has been dropped and recreated",
+                "Collection epoch has changed",
                 _routingInfo->cm()->getVersion().epoch() == *_targetEpoch);
     }
 

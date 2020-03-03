@@ -180,8 +180,8 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
  * ChunkVersion::UNSHARDED() version.
  *
  * It is unsafe to call this when a task for 'nss' is running concurrently because the collection
- * could be dropped and recreated between reading the collection epoch and retrieving the chunk,
- * which would make the returned ChunkVersion corrupt.
+ * could be dropped and recreated or have its shard key refined between reading the collection epoch
+ * and retrieving the chunk, which would make the returned ChunkVersion corrupt.
  */
 ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const NamespaceString& nss) {
     // Must read the collections entry to get the epoch to pass into ChunkType for shard's chunk
@@ -282,7 +282,8 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
 
         auto afterShardCollectionsEntry = uassertStatusOK(readShardCollectionsEntry(opCtx, nss));
         if (collAndChunks.epoch != afterShardCollectionsEntry.getEpoch()) {
-            // The collection was dropped and recreated since we began. Return empty results.
+            // The collection was dropped and recreated or had its shard key refined since we began.
+            // Return empty results.
             return CollectionAndChangedChunks();
         }
 
@@ -694,7 +695,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                               << "' Previous collection epoch was '"
                               << collAndChunks.epoch.toString() << "', but found a new epoch '"
                               << collAndChunks.changedChunks.back().getVersion().epoch().toString()
-                              << "'. Collection was dropped and recreated."};
+                              << "'."};
         }
 
         if ((collAndChunks.epoch != maxLoaderVersion.epoch()) ||

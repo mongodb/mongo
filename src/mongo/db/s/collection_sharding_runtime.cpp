@@ -388,8 +388,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     }
 
     uassert(std::move(sci),
-            str::stream() << "epoch mismatch detected for " << _nss.ns() << ", "
-                          << "the collection may have been dropped and recreated",
+            str::stream() << "epoch mismatch detected for " << _nss.ns(),
             wantedShardVersion.epoch() == receivedShardVersion.epoch());
 
     if (!wantedShardVersion.isSet() && receivedShardVersion.isSet()) {

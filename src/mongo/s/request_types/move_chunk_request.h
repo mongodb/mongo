@@ -164,7 +164,8 @@ private:
     // Range of the chunk being moved
     ChunkRange _range;
 
-    // Assures the collection has not been dropped and recreated since the moveChunk was sent.
+    // Used to ensure the collection has not been dropped and recreated or had its shard key refined
+    // since the moveChunk was sent.
     OID _versionEpoch;
 
     // This value is used by the migration source to determine the data size threshold above which a

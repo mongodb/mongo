@@ -116,6 +116,6 @@ structs:
                 optional: true
                 description: If set, the collection's ChunkVersion found when parsed on mongos. Can
                              be used to check if a collection has since been dropped and re-created,
-                             in which case the shard key may have changed. This also can be used to
-                             detect if the collection has gone from unsharded to sharded, and thus
-                             now has a shard key.
+                             in which case the shard key may have changed, or had its shard key
+                             refined. This also can be used to detect if the collection has gone
+                             from unsharded to sharded, and thus now has a shard key.
