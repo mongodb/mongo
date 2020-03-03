@@ -61,7 +61,11 @@ def _mkdir_action_function(env, node):
     return {
         "outputs": get_outputs(node),
         "rule": "CMD",
-        "implicit": get_dependencies(node),
+        # implicit explicitly omitted, we translate these so they can be
+        # used by anything that depends on these but commonly this is
+        # hit with a node that will depend on all of the fake
+        # srcnode's that SCons will never give us a rule for leading
+        # to an invalid ninja file.
         "variables": {
             # On Windows mkdir "-p" is always on
             "cmd": "{mkdir} $out".format(
@@ -101,7 +105,13 @@ def is_valid_dependent_node(node):
     check because some nodes (like src files) won't have builders but
     are valid implicit dependencies.
     """
-    return not isinstance(node, SCons.Node.Alias.Alias) or node.children()
+    if isinstance(node, SCons.Node.Alias.Alias):
+        return node.children()
+
+    if not node.env:
+        return True
+
+    return not node.env.get("NINJA_SKIP")
 
 
 def alias_to_ninja_build(node):
@@ -110,7 +120,7 @@ def alias_to_ninja_build(node):
         "outputs": get_outputs(node),
         "rule": "phony",
         "implicit": [
-            get_path(n) for n in node.children() if is_valid_dependent_node(n)
+            get_path(src_file(n)) for n in node.children() if is_valid_dependent_node(n)
         ],
     }
 
@@ -506,6 +516,7 @@ class NinjaState:
             return False
 
         self.builds.append(build)
+        self.built.update(build["outputs"])
         return True
 
     def is_generated_source(self, output):
