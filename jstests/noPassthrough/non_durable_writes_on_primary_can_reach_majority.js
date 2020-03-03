@@ -40,6 +40,7 @@ const res = assert.commandWorked(
 const primaryReplSetStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
 const primaryPreFailPointDurableTs = primaryReplSetStatus.optimes.durableOpTime.ts;
 const primaryPreFailPointMajorityTs = primaryReplSetStatus.optimes.readConcernMajorityOpTime.ts;
+jsTestLog("Primary's optimes (initializing): " + tojson(primaryReplSetStatus.optimes));
 assert.neq(primaryPreFailPointDurableTs, null);
 assert.neq(primaryPreFailPointMajorityTs, null);
 assert.eq(primaryPreFailPointDurableTs, primaryPreFailPointMajorityTs);
@@ -62,17 +63,16 @@ try {
     const primaryStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
     const primaryPostWritesDurableTs = primaryStatus.optimes.durableOpTime.ts;
     const primaryPostWritesMajorityTs = primaryStatus.optimes.readConcernMajorityOpTime.ts;
+    jsTestLog("Primary's optimes (when 3 nodes): " + tojson(primaryStatus.optimes));
     assert.eq(primaryPostWritesDurableTs, primaryPreFailPointDurableTs);
     assert.gt(primaryPostWritesMajorityTs, primaryPreFailPointDurableTs);
 
-    // Check that the secondaries' durable and majority timestamps have moved forward.
+    // Check that the secondaries' durable timestamps have moved forward.
     rst.getSecondaries().forEach(function(secondary) {
         const secondaryStatus = assert.commandWorked(secondary.adminCommand("replSetGetStatus"));
         const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
-        const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
-        assert.eq(secondaryDurableTs, secondaryMajorityTs);
+        jsTestLog("One secondary's optimes (when 3 nodes): " + tojson(secondaryStatus.optimes));
         assert.gt(secondaryDurableTs, primaryPreFailPointDurableTs);
-        assert.eq(secondaryMajorityTs, primaryPostWritesMajorityTs);
     });
 
     // Shutdown a secondary so that there is no longer a majority able to confirm the durability of
@@ -102,6 +102,7 @@ try {
     const primaryReplStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
     const primaryPostFsyncDurableTs = primaryReplStatus.optimes.durableOpTime.ts;
     const primaryPostFsyncMajorityTs = primaryReplStatus.optimes.readConcernMajorityOpTime.ts;
+    jsTestLog("Primary's optimes (when 2 nodes): " + tojson(primaryReplStatus.optimes));
     assert.eq(primaryPostFsyncDurableTs, primaryPreFailPointDurableTs);
     assert.eq(primaryPostFsyncMajorityTs, primaryPostWritesMajorityTs);
 
@@ -109,6 +110,7 @@ try {
     const secondaryStatus = assert.commandWorked(runningSecondary.adminCommand("replSetGetStatus"));
     const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
     const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
+    jsTestLog("Secondary's optimes (when 2 nodes): " + tojson(secondaryStatus.optimes));
     assert.gt(secondaryDurableTs, primaryPostFsyncMajorityTs);
     assert.eq(secondaryMajorityTs, primaryPostFsyncMajorityTs);
 } finally {
