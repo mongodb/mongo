@@ -27,40 +27,8 @@ concurrency_replication_multiversion:
 concurrency_sharded_replication_multiversion:
 
 replica_sets_jscore_multiversion_passthrough:
-- ticket: SERVER-35921
-  test_file: jstests/core/min_max_key.js
-- ticket: SERVER-40805
-  test_file: jstests/core/profile_find.js
-- ticket: SERVER-44260
-  test_file: jstests/core/txns/new_transaction_waits_for_previous_txn_table_updates.js
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
 
 replica_sets_multiversion:
-- ticket: SERVER-42825
-  test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_down.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_up.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/no_disconnect_on_stepdown.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_rollback.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_step_down.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_step_up.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/step_down_on_secondary.js
-- ticket: SERVER-45010
-  test_file: jstests/replsets/rollback_dup_ids_clean_shutdown_during_rollback.js
-- ticket: SERVER-45906
-  test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
-- ticket: SERVER-45178
-  test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
-- ticket: SERVER-32903
-  test_file: jstests/replsets/initial_sync_ambiguous_index.js
-- ticket: SERVER-45143
-  test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
 - ticket: SERVER-46389
   test_file: jstests/replsets/election_handoff_basic.js
 - ticket: SERVER-46389
@@ -83,17 +51,7 @@ replica_sets_multiversion:
   test_file: jstests/replsets/initial_sync_test_fixture_test.js
 
 sharding_multiversion:
-- ticket: SERVER-38691
-  test_file: jstests/sharding/explain_cmd.js
-- ticket: SERVER-43889
-  test_file: jstests/sharding/retryable_writes.js
 
 sharding_jscore_multiversion_passthrough:
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
 
 sharded_collections_jscore_multiversion_passthrough:
-- ticket: SERVER-35921
-  test_file: jstests/core/min_max_key.js
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
