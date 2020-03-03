@@ -19,6 +19,10 @@ var {
      * committed after the withTxnAndAutoRetryOnMongos() function returns.
      *
      * This behaviour only applies if the client is a mongos
+     *
+     * TODO SERVER-39704: Once completed, the usages of this function should be revisited to
+     * determine whether it is still necessary or the retries performed by MongoS make it
+     * unnecessary
      */
     function withTxnAndAutoRetryOnMongos(session, func, txnOptions) {
         if (session.getClient().isMongos()) {
@@ -34,6 +38,10 @@ var {
      * Runs 'func' and retries it only once if a transient error occurred.
      *
      * This behaviour only applies if the client is a mongos
+     *
+     * TODO SERVER-39704: Once completed, the usages of this function should be revisited to
+     * determine whether it is still necessary or the retries performed by MongoS make it
+     * unnecessary
      */
     function retryOnceOnTransientOnMongos(session, func) {
         if (session.getClient().isMongos()) {
@@ -57,6 +65,10 @@ var {
      * error occurred.
      *
      * This behaviour only applies if the client is a mongos
+     *
+     * TODO SERVER-39704: Once completed, the usages of this function should be revisited to
+     * determine whether it is still necessary or the retries performed by MongoS make it
+     * unnecessary
      */
     function retryOnceOnTransientAndRestartTxnOnMongos(session, func, txnOptions) {
         if (session.getClient().isMongos()) {

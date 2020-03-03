@@ -9,6 +9,7 @@
 "use strict";
 
 load("jstests/libs/create_collection_txn_helpers.js");
+load("jstests/libs/auto_retry_transaction_in_sharding.js");
 
 function runParallelCollectionCreateTest(explicitCreate, upsert) {
     const dbName = "test";
@@ -28,8 +29,9 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -49,8 +51,12 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -67,7 +73,9 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
     assert.commandWorked(secondSessionDB.runCommand({create: collName}));  // outside txn
     assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
@@ -81,10 +89,14 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
         "Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -99,10 +111,14 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     assert.commandWorked(sessionDB.dropDatabase());
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -116,12 +132,16 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
                "previously committed collection.");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(
-        sessionDB, distinctCollName, explicitCreate, upsert);             // does not conflict
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);  // conflicts
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(
+            sessionDB, distinctCollName, explicitCreate, upsert);             // does not conflict
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);  // conflicts
+    }, {writeConcern: {w: "majority"}});
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -135,10 +155,14 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     jsTest.log("Testing distinct createCollections in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
+    }, {writeConcern: {w: "majority"}});
 
     session.commitTransaction();
     secondSession.commitTransaction();

@@ -148,13 +148,14 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // throw so that MongoS can target the insert to the correct shard.
     if (_shouldCheckForShardKeyUpdate) {
         auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-        const auto& collDesc = css->getCollectionDescription();
+        const auto collFilter = css->getOwnershipFilter(
+            opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
-        if (collDesc.isSharded()) {
-            const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+        if (collFilter.isSharded()) {
+            const ShardKeyPattern shardKeyPattern(collFilter.getKeyPattern());
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
 
-            if (!collDesc->keyBelongsToMe(newShardKey)) {
+            if (!collFilter.keyBelongsToMe(newShardKey)) {
                 // An attempt to upsert a document with a shard key value that belongs on another
                 // shard must either be a retryable write or inside a transaction.
                 uassert(ErrorCodes::IllegalOperation,
