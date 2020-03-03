@@ -11575,8 +11575,6 @@ buildvariants:
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
-  stepback: false
-  batchtime: 1440 # 1 day
   run_on:
   - rhel62-small
   expansions:
