@@ -119,6 +119,10 @@ function verifyMirrorReads(rst, cmd) {
     jsTestLog("Verifying mirrored reads for 'findAndModify' commands");
     verifyMirrorReads(rst, {findAndModify: kCollName, query: {}, update: {'$inc': {x: 1}}});
 
+    jsTestLog("Verifying mirrored reads for 'update' commands");
+    verifyMirrorReads(
+        rst, {update: kCollName, updates: [{q: {_id: 1}, u: {'$inc': {x: 1}}}], ordered: false});
+
     rst.stopSet();
 }
 })();
