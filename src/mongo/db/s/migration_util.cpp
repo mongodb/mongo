@@ -325,8 +325,7 @@ void submitPendingDeletions(OperationContext* opCtx) {
 
     auto query = QUERY("pending" << BSON("$exists" << false));
 
-    std::vector<RangeDeletionTask> invalidRanges;
-    store.forEach(opCtx, query, [&opCtx, &invalidRanges](const RangeDeletionTask& deletionTask) {
+    store.forEach(opCtx, query, [&opCtx](const RangeDeletionTask& deletionTask) {
         migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
         return true;
     });
@@ -336,7 +335,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22028, "Starting pending deletion submission thread.");
 
     ExecutorFuture<void>(getMigrationUtilExecutor())
-        .getAsync([serviceContext](const Status& status) {
+        .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
@@ -346,6 +345,13 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             auto opCtx = tc->makeOperationContext();
 
             submitPendingDeletions(opCtx.get());
+        })
+        .getAsync([](const Status& status) {
+            if (!status.isOK()) {
+                LOGV2(45739,
+                      "Error while submitting pending deletions: {status}",
+                      "status"_attr = status);
+            }
         });
 }
 
