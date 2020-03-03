@@ -54,14 +54,13 @@ public:
         client.reset(nullptr);
     }
 
-    virtual BSONObj makeCommand(std::string, std::vector<BSONObj>) = 0;
+    virtual OpMsgRequest makeCommand(std::string, std::vector<BSONObj>) = 0;
 
     const LogicalSessionId& getLogicalSessionId() const {
         return _lsid;
     }
 
-    BSONObj getMirroredCommand(BSONObj& bson) {
-        auto request = OpMsgRequest::fromDBAndBody(kDB, bson);
+    BSONObj getMirroredCommand(OpMsgRequest& request) {
         auto cmd = globalCommandRegistry()->findCommand(request.getCommandName());
         ASSERT(cmd);
 
@@ -84,18 +83,23 @@ private:
 
 class UpdateCommandTest : public CommandMirroringTest {
 public:
-    BSONObj makeCommand(std::string coll, std::vector<BSONObj> updates) override {
+    OpMsgRequest makeCommand(std::string coll, std::vector<BSONObj> updates) override {
         BSONObjBuilder bob;
 
         bob << "update" << coll;
-        BSONArrayBuilder bab;
-        for (auto update : updates) {
-            bab << update;
-        }
-        bob << "updates" << bab.arr();
         bob << "lsid" << getLogicalSessionId().toBSON();
 
-        return bob.obj();
+        auto request = OpMsgRequest::fromDBAndBody(kDB, bob.obj());
+
+        // Directly add `updates` to `OpMsg::sequences` to emulate `OpMsg::parse()` behavior.
+        OpMsg::DocumentSequence seq;
+        seq.name = "updates";
+        for (auto update : updates) {
+            seq.objs.emplace_back(std::move(update));
+        }
+        request.sequences.emplace_back(std::move(seq));
+
+        return request;
     }
 };
 

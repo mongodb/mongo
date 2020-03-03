@@ -334,40 +334,47 @@ private:
                    UpdateMetrics* updateMetrics)
             : InvocationBase(cmd, request),
               _batch(UpdateOp::parse(request)),
-              _updateMetrics{updateMetrics} {
+              _updateMetrics{updateMetrics},
+              _commandObj(request.body) {
             invariant(_updateMetrics);
-        }
+            invariant(_commandObj.isOwned());
 
-        bool supportsReadMirroring() const override {
-            // TODO SERVER-46533 Remove this and uncomment below when update can be safely mirrored.
-            // Disable readMIrrroing for update
-            return false;
-
-            // This would translate to a find command with no filter!
-            // Based on the documentation for `update`, this vector should never be empty.
-            // return !_batch.getUpdates().empty();
-        }
-
-        void appendMirrorableRequest(BSONObjBuilder* bob) const override {
-            auto extractQueryDetails = [](const write_ops::Update& query,
-                                          BSONObjBuilder* bob) -> void {
-                auto updates = query.getUpdates();
-                // `supportsReadMirroring()` is responsible for this validation.
-                invariant(!updates.empty());
-
+            // Extend the lifetime of `updates` to allow asynchronous mirroring.
+            if (auto seq = request.getSequence("updates"_sd); seq && !seq->objs.empty()) {
                 // Current design ignores contents of `updates` array except for the first entry.
                 // Assuming identical collation for all elements in `updates`, future design could
                 // use the disjunction primitive (i.e, `$or`) to compile all queries into a single
                 // filter. Such a design also requires a sound way of combining hints.
-                bob->append("filter", updates.front().getQ());
-                if (!updates.front().getHint().isEmpty())
-                    bob->append("hint", updates.front().getHint());
-                if (updates.front().getCollation())
-                    bob->append("collation", *updates.front().getCollation());
+                invariant(seq->objs.front().isOwned());
+                _updateOpObj = seq->objs.front();
+            }
+        }
+
+        bool supportsReadMirroring() const override {
+            return true;
+        }
+
+        void appendMirrorableRequest(BSONObjBuilder* bob) const override {
+            auto extractQueryDetails = [](const BSONObj& update, BSONObjBuilder* bob) -> void {
+                // "filter", "hint", and "collation" fields are optional.
+                if (update.isEmpty())
+                    return;
+
+                // The constructor verifies the following.
+                invariant(update.isOwned());
+
+                if (update.hasField("q"))
+                    bob->append("filter", update["q"].Obj());
+                if (update.hasField("hint") && !update["hint"].Obj().isEmpty())
+                    bob->append("hint", update["hint"].Obj());
+                if (update.hasField("collation") && !update["collation"].Obj().isEmpty())
+                    bob->append("collation", update["collation"].Obj());
             };
 
-            bob->append("find", _batch.getNamespace().coll());
-            extractQueryDetails(_batch, bob);
+            invariant(!_commandObj.isEmpty());
+
+            bob->append("find", _commandObj["update"].String());
+            extractQueryDetails(_updateOpObj, bob);
             bob->append("batchSize", 1);
             bob->append("singleBatch", true);
         }
@@ -452,6 +459,11 @@ private:
 
         // Update related command execution metrics.
         UpdateMetrics* const _updateMetrics;
+
+        BSONObj _commandObj;
+
+        // Holds a shared pointer to the first entry in `updates` array.
+        BSONObj _updateOpObj;
     };
 
     std::unique_ptr<CommandInvocation> parse(OperationContext*, const OpMsgRequest& request) {
