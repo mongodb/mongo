@@ -488,5 +488,37 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
         {ShardId("0")});
 }
 
+TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
+    const auto epoch = OID::gen();
+    ChunkVersion version(1, 0, epoch);
+
+    ChunkType chunk0(kNss, {BSON("x" << MINKEY), BSON("x" << 0)}, version, ShardId("0"));
+
+    version.incMajor();
+    ChunkType chunk1(kNss, {BSON("x" << 0), BSON("x" << MAXKEY)}, version, ShardId("1"));
+
+    auto oldRoutingTable = RoutingTableHistory::makeNew(
+        kNss, boost::none, BSON("x" << 1), nullptr, false, epoch, {chunk0, chunk1});
+
+    // Simulate move chunk {x: 0} to shard 0. Effectively moving all remaining chunks to shard 0.
+    version.incMajor();
+    chunk1.setVersion(version);
+    chunk1.setShard(chunk0.getShard());
+    chunk1.setHistory({ChunkHistory(Timestamp(20, 0), ShardId("0")),
+                       ChunkHistory(Timestamp(1, 0), ShardId("1"))});
+
+    auto newRoutingTable = oldRoutingTable->makeUpdated({chunk1});
+    ChunkManager chunkManager(newRoutingTable, Timestamp(5, 0));
+
+    std::set<ShardId> shardIds;
+    chunkManager.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
+    ASSERT_EQ(2u, shardIds.size());
+
+    shardIds.clear();
+    chunkManager.getShardIdsForQuery(
+        operationContext(), BSON("x" << BSON("$gt" << -20)), {}, &shardIds);
+    ASSERT_EQ(2u, shardIds.size());
+}
+
 }  // namespace
 }  // namespace mongo
