@@ -405,41 +405,26 @@ Status dropIndexes(OperationContext* opCtx,
     }
 
     // If the "*" wildcard was not specified, verify that all the index names belonging to the
-    // index builder were aborted. If not, they must be ready, so we drop them.
+    // index builder were aborted.
     if (!isWildcard && !abortedIndexBuilders.empty()) {
         invariant(abortedIndexBuilders.size() == 1);
 
-        return writeConflictRetry(
-            opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, result] {
-                WriteUnitOfWork wunit(opCtx);
+        // This is necessary to check shard version.
+        OldClientContext ctx(opCtx, collection->ns().ns());
 
-                // This is necessary to check shard version.
-                OldClientContext ctx(opCtx, collection->ns().ns());
+        // Iterate through all aborted indexes and verify none of them are ready. This would
+        // indicate a flaw with the abort logic that allows indexes to complete despite the
+        // dropIndexes command reporting they were aborted.
+        auto indexCatalog = collection->getIndexCatalog();
+        const bool includeUnfinished = false;
+        const bool noneReady = std::none_of(indexNames.begin(), indexNames.end(), [&](auto name) {
+            return indexCatalog->findIndexByName(opCtx, name, includeUnfinished);
+        });
 
-                size_t numReady = 0;
-                const bool includeUnfinished = false;
-                IndexCatalog* indexCatalog = collection->getIndexCatalog();
-                for (const auto& indexName : indexNames) {
-                    const IndexDescriptor* desc =
-                        indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
-                    if (!desc) {
-                        // The given index name was successfully aborted.
-                        continue;
-                    }
-
-                    Status status = dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-
-                    numReady++;
-                }
-
-                invariant(numReady == 0 || numReady == indexNames.size());
-
-                wunit.commit();
-                return Status::OK();
-            });
+        invariant(noneReady,
+                  str::stream() << "Found completed indexes despite aborting index build: "
+                                << abortedIndexBuilders.front());
+        return Status::OK();
     }
 
     if (!abortedIndexBuilders.empty()) {

@@ -45,6 +45,7 @@ jsTest.log("Aborting index builder with one index build and simple index spec");
 assert.commandWorked(testDB.getCollection(collName).insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
+IndexBuildTest.pauseIndexBuilds(secondaryReadsTest.getSecondaryDB().getMongo());
 
 const awaitIndexBuild = IndexBuildTest.startIndexBuild(
     testDB.getMongo(), coll.getFullName(), {a: 1}, {}, [ErrorCodes.IndexBuildAborted]);
@@ -89,6 +90,7 @@ const awaitDropIndex = startParallelShell(() => {
 
 checkLog.contains(testDB.getMongo(), "About to abort index builder");
 IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
+IndexBuildTest.resumeIndexBuilds(secondaryReadsTest.getSecondaryDB().getMongo());
 awaitIndexBuild();
 awaitDropIndex();
 
