@@ -36,16 +36,6 @@ function checkHasResumeAfter(recordId) {
     }
 }
 
-// Verify that we sent a killCursors command on the namespace we are cloning.
-function checkHasKillCursors() {
-    if (isJsonLogNoConn()) {
-        checkLog.contains(primary, /"ns":"test.test",.*"command":{"killCursors":"test"/);
-    } else {
-        checkLog.contains(primary,
-                          "command test.test command: killCursors { killCursors: \"test\"");
-    }
-}
-
 const beforeRetryFailPointName = "hangBeforeRetryingClonerStage";
 const afterBatchFailPointName = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
 
@@ -180,7 +170,6 @@ beforeRetryFailPoint.off();
 afterBatchFailPoint.wait();
 checkHasRequestResumeToken();  // check params of second query resume
 checkHasResumeAfter(4 /* recordId */);
-checkHasKillCursors();
 assert.commandWorked(secondaryDb.adminCommand({clearLog: "global"}));
 
 // Reconnect nodes and turn off cloner failpoints.

@@ -141,8 +141,6 @@ private:
 
         bool isTransientError(const Status& status) override {
             if (isCursorError(status)) {
-                // We have already lost this cursor so do not try to kill it.
-                getCloner()->forgetOldQueryCursor();
                 return true;
             }
             return ErrorCodes::isRetriableError(status);
@@ -217,18 +215,6 @@ private:
      * wire version and clone progress.
      */
     void runQuery();
-
-    /**
-     * Attempts to clean up the cursor on the upstream node. This is called any time we
-     * receive a transient error during the query stage.
-     */
-    void killOldQueryCursor();
-
-    /**
-     * Clears the stored id of the remote cursor so that we do not attempt to kill it.
-     * We call this when we know it has already been killed by the sync source itself.
-     */
-    void forgetOldQueryCursor();
 
     /**
      * Used to terminate the clone when we encounter a fatal error during a non-resumable query.

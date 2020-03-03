@@ -617,7 +617,6 @@ TEST_F(CollectionClonerTest, ResumableQueryFailTransientlyBeforeFirstBatchRetryS
 // We will resume our query using the resume token we stored after receiving the first batch.
 TEST_F(CollectionClonerTest, ResumableQueryFailTransientlyAfterFirstBatchRetrySuccess) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
@@ -674,7 +673,6 @@ TEST_F(CollectionClonerTest, ResumableQueryFailTransientlyAfterFirstBatchRetrySu
 
 TEST_F(CollectionClonerTest, ResumableQueryNonRetriableError) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
@@ -719,7 +717,6 @@ TEST_F(CollectionClonerTest, ResumableQueryNonRetriableError) {
 
 TEST_F(CollectionClonerTest, ResumableQueryFailNonTransientlyAfterProgressMadeCannotRetry) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
@@ -762,122 +759,9 @@ TEST_F(CollectionClonerTest, ResumableQueryFailNonTransientlyAfterProgressMadeCa
     clonerThread.join();
 }
 
-TEST_F(CollectionClonerTest, ResumableQueryKillCursorsNetworkError) {
-    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    _mockServer->setCommandReply("count", createCountResponse(3));
-    _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    // Preliminary setup for hanging failpoint.
-    auto afterBatchFailpoint =
-        globalFailPointRegistry().find("initialSyncHangCollectionClonerAfterHandlingBatchResponse");
-    auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
-
-    auto cloner = makeCollectionCloner();
-    cloner->setBatchSize_forTest(2);
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        ASSERT_OK(cloner->run());
-    });
-
-    // Wait for us to process the first batch.
-    afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
-
-    // Verify we've only managed to store one batch.
-    auto stats = cloner->getStats();
-    ASSERT_EQUALS(1, stats.receivedBatches);
-
-    // This will cause the next batch to fail once (transiently).
-    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'HostUnreachable'}"));
-
-    // Prepare the network error response to 'killCursors'.
-    // This will cause us to retry the query stage.
-    _mockServer->setCommandReply("killCursors",
-                                 Status{ErrorCodes::HostUnreachable, "HostUnreachable for test"});
-
-    // Let the query stage finish.
-    afterBatchFailpoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-
-    ASSERT_EQUALS(3, _collectionStats->insertCount);
-    ASSERT_TRUE(_collectionStats->commitCalled);
-    stats = cloner->getStats();
-    ASSERT_EQUALS(3u, stats.documentsCopied);
-}
-
-TEST_F(CollectionClonerTest, ResumableQueryKillCursorsOtherError) {
-    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    _mockServer->setCommandReply("count", createCountResponse(3));
-    _mockServer->setCommandReply("listIndexes",
-                                 createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    // Preliminary setup for hanging failpoint.
-    auto afterBatchFailpoint =
-        globalFailPointRegistry().find("initialSyncHangCollectionClonerAfterHandlingBatchResponse");
-    auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
-
-    auto cloner = makeCollectionCloner();
-    cloner->setBatchSize_forTest(2);
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        ASSERT_OK(cloner->run());
-    });
-
-    // Wait for us to process the first batch.
-    afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
-
-    // Verify we've only managed to store one batch.
-    auto stats = cloner->getStats();
-    ASSERT_EQUALS(1, stats.receivedBatches);
-
-    // This will cause the next batch to fail once (transiently).
-    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'HostUnreachable'}"));
-
-    // Prepare the network error response to 'killCursors'.
-    // This will cause us to retry the whole query.
-    _mockServer->setCommandReply("killCursors",
-                                 Status{ErrorCodes::UnknownError, "UnknownError for test"});
-
-    // Let the query stage finish.
-    afterBatchFailpoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-
-    // We ignored the 'killCursors' request and just resumed the query. We should have cloned every
-    // document exactly once.
-    ASSERT_EQUALS(3, _collectionStats->insertCount);
-    ASSERT_TRUE(_collectionStats->commitCalled);
-    stats = cloner->getStats();
-    ASSERT_EQUALS(3u, stats.documentsCopied);
-}
-
 // We retry the query after a transient error and we immediately encounter a non-retriable one.
 TEST_F(CollectionClonerTest, ResumableQueryNonTransientErrorAtRetry) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
@@ -939,7 +823,6 @@ TEST_F(CollectionClonerTest, ResumableQueryNonTransientErrorAtRetry) {
 // a non-retriable one.
 TEST_F(CollectionClonerTest, ResumableQueryNonTransientErrorAfterPastRetry) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
@@ -1017,7 +900,6 @@ TEST_F(CollectionClonerTest, ResumableQueryTwoResumes) {
      */
 
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("killCursors", fromjson("{ok:1}"));
 
     // Set up data for preliminary stages
     auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
