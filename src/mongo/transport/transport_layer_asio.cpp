@@ -1037,21 +1037,16 @@ void TransportLayerASIO::_runListener() noexcept {
         }
 
         _acceptConnection(acceptor.second);
-        LOGV2(23015,
-              "Listening on {acceptor_first_getAddr}",
-              "acceptor_first_getAddr"_attr = acceptor.first.getAddr());
+        LOGV2(23015, "Listening on", "address"_attr = acceptor.first.getAddr());
     }
 
-    const char* ssl = "";
+    const char* ssl = "off";
 #ifdef MONGO_CONFIG_SSL
     if (_sslMode() != SSLParams::SSLMode_disabled) {
-        ssl = " ssl";
+        ssl = "on";
     }
 #endif
-    LOGV2(23016,
-          "waiting for connections on port {listenerPort}{ssl}",
-          "listenerPort"_attr = _listenerPort,
-          "ssl"_attr = ssl);
+    LOGV2(23016, "Waiting for connections", "port"_attr = _listenerPort, "ssl"_attr = ssl);
 
     _listener.active = true;
     _listener.cv.notify_all();

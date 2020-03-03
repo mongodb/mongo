@@ -19,11 +19,11 @@ function runTest(bindIP, expectOk) {
         // We use assert.soonNoExcept() here because the mongod may not be logging yet.
         assert.soonNoExcept(() => {
             const logContents = rawMongoProgramOutput();
-            const found =
-                logContents.match(/waiting for connections on port( (\d+)|.*listenerPort":(\d+))/);
+            const found = logContents.match(
+                /"id":23016,"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
             if (found !== null) {
                 print("Found message from mongod with port it is listening on: " + found[0]);
-                port = found[2] != undefined ? found[2] : found[3];
+                port = found[1];
                 return true;
             }
         });

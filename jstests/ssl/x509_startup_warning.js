@@ -28,9 +28,11 @@ function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostn
         const output = rawMongoProgramOutput();
         return (
             expectWarningCertifcates ==
-                output.includes('WARNING: While invalid X509 certificates may be used') &&
+                output.includes(
+                    'While invalid X509 certificates may be used to connect to this server, they will not be considered permissible for authentication.') &&
             expectWarningHostnames ==
-                output.includes('WARNING: This server will not perform X.509 hostname validation'));
+                output.includes(
+                    'This server will not perform X.509 hostname validation. This may allow your server to make or accept connections to untrusted parties.'));
     });
 
     stopMongoProgramByPid(mongo.pid);

@@ -162,7 +162,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     if (connectionCount > _maxNumConnections && !usingMaxConnOverride) {
         if (!quiet) {
             LOGV2(22942,
-                  "connection refused because too many open connections: {connectionCount}",
+                  "connection refused because too many open connections",
                   "connectionCount"_attr = connectionCount);
         }
         return;
@@ -171,14 +171,11 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     }
 
     if (!quiet) {
-        const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
         LOGV2(22943,
-              "connection accepted from {session_remote} #{session_id} ({connectionCount}{word} "
-              "now open)",
-              "session_remote"_attr = session->remote(),
-              "session_id"_attr = session->id(),
-              "connectionCount"_attr = connectionCount,
-              "word"_attr = word);
+              "connection accepted",
+              "remote"_attr = session->remote(),
+              "sessionId"_attr = session->id(),
+              "connectionCount"_attr = connectionCount);
     }
 
     ssm->setCleanupHook([this, ssmIt, quiet, session = std::move(session)] {
@@ -193,12 +190,10 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         _shutdownCondition.notify_one();
 
         if (!quiet) {
-            const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
             LOGV2(22944,
-                  "end connection {remote} ({connectionCount}{word} now open)",
+                  "connection ended",
                   "remote"_attr = remote,
-                  "connectionCount"_attr = connectionCount,
-                  "word"_attr = word);
+                  "connectionCount"_attr = connectionCount);
         }
     });
 
