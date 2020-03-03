@@ -8,6 +8,7 @@
  * @tags: [
  *     uses_transactions,
  *     uses_prepare_transaction,
+ *     multiversion_incompatible,
  * ]
  */
 (function() {

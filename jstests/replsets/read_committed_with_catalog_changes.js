@@ -20,6 +20,8 @@
  *  - repair database
  *  - reindex collection
  *  - compact collection
+ *
+ * @tags: [multiversion_incompatible]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.

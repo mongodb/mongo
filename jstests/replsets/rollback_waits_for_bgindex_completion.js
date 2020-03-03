@@ -7,6 +7,7 @@
  *     requires_wiredtiger,
  *     requires_journaling,
  *     requires_majority_read_concern,
+       multiversion_incompatible,
  * ]
  */
 (function() {
