@@ -148,7 +148,7 @@ functions:
         script: |
           set -o verbose
           source ./signal_processing_venv/bin/activate
-          detect-changes --evergreen-api-config .evergreen.yml
+          detect-changes --config .signal-processing.yml
     - command: shell.exec
       params:
         working_dir: src

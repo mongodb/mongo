@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 rm -rf ./signal_processing_venv
-rm -f ./analysis.yml
-rm -f ./.evergreen.yml
+rm -f ./.signal-processing.yml
 
 # Configure signal processing
-cat > ./analysis.yml << EOF
-mongo_uri: mongodb+srv://${analysis_user}:${analysis_password}@performancedata-g6tsc.mongodb.net/perf
-is_patch: ${is_patch}
+cat > .signal-processing.yml << EOF
 task_id: ${task_id}
+is_patch: ${is_patch}
+mongo_uri: mongodb+srv://${analysis_user}:${analysis_password}@performancedata-g6tsc.mongodb.net/perf
+evergreen:
+  api_key: "${evergreen_api_key}"
+  user: "${evergreen_api_user}"
+  api_server_host: https://evergreen.mongodb.com
 EOF
-
-# Create the Evergreen API credentials
-cat > .evergreen.yml <<END_OF_CREDS
-api_server_host: https://evergreen.mongodb.com/api
-api_key: "${evergreen_api_key}"
-user: "${evergreen_api_user}"
-END_OF_CREDS
 
 # need to create virtualenv here to configure it below
 virtualenv -p /opt/mongodbtoolchain/v3/bin/python3 signal_processing_venv
@@ -28,4 +24,4 @@ extra-index-url = https://${perf_jira_user}:${perf_jira_pw}@artifactory.corp.mon
 EOF
 
 source ./signal_processing_venv/bin/activate
-pip install dag-signal-processing~=1.0.14
+pip install dag-signal-processing~=2.0.0
