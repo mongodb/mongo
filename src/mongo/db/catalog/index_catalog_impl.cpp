@@ -909,7 +909,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         string indexName = indexNamesToDrop[i];
         const IndexDescriptor* desc = findIndexByName(opCtx, indexName, true);
         invariant(desc);
-        LOGV2_DEBUG(20355, 1, "\t dropAllIndexes dropping: {desc}", "desc"_attr = desc->toString());
+        LOGV2_DEBUG(20355, 1, "\t dropAllIndexes dropping: {desc}", "desc"_attr = *desc);
         IndexCatalogEntry* entry = _readyIndexes.find(desc);
         invariant(entry);
 
@@ -1136,7 +1136,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
         if (itIndexes.size() != completedIndexes.size()) {
             LOGV2(20357, "index catalog reports: ");
             for (const IndexDescriptor* i : itIndexes) {
-                LOGV2(20358, "  index: {i}", "i"_attr = i->toString());
+                LOGV2(20358, "  index: {i}", "i"_attr = *i);
             }
 
             LOGV2(20359, "collection catalog reports: ");
@@ -1660,12 +1660,12 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
         LOGV2_DEBUG(20363,
                     1,
                     "compacting index: {entry_descriptor}",
-                    "entry_descriptor"_attr = entry->descriptor()->toString());
+                    "entry_descriptor"_attr = *(entry->descriptor()));
         Status status = entry->accessMethod()->compact(opCtx);
         if (!status.isOK()) {
             LOGV2_ERROR(20377,
                         "failed to compact index: {entry_descriptor}",
-                        "entry_descriptor"_attr = entry->descriptor()->toString());
+                        "entry_descriptor"_attr = *(entry->descriptor()));
             return status;
         }
     }

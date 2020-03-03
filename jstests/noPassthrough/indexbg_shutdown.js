@@ -12,6 +12,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/logv2_helpers.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 var dbname = 'bgIndexSec';
@@ -81,32 +82,87 @@ jsTestLog('Index builds started on secondary. Op ID of one of the builds: ' + op
 assert.commandWorked(secondDB.killOp(opId));
 
 // There should be a message for each index we tried to create.
-checkLog.containsWithCount(
-    replTest.getSecondary(),
-    new RegExp(`(index build: starting on ${
-        masterColl
-            .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
-        masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
-    indexSpecs.length);
+if (isJsonLog(second)) {
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij1';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij2';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij3';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij4';
+        },
+    });
+} else {
+    checkLog.containsWithCount(
+        second,
+        new RegExp(
+            `(index build: starting on ${
+                masterColl
+                    .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
+                masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
+        indexSpecs.length);
+}
 jsTest.log("Restarting secondary to retry replication");
 
 // Secondary should restart cleanly.
 assert.commandWorked(second.adminCommand(
     {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
 IndexBuildTest.resumeIndexBuilds(second);
-replTest.restart(secondaryId, {}, /*wait=*/true);
+second = replTest.restart(secondaryId, {}, /*wait=*/true);
 
 // There should again be a message for each index we tried to create, because the server
 // restarts the interrupted index build upon process startup. Note, the RAMLog is reset on
 // restart, so there should just be one set of messages in the RAMLog after restart, even though
 // the message was logged twice in total.
-checkLog.containsWithCount(
-    replTest.getSecondary(),
-    new RegExp(`(index build: starting on ${
-        masterColl
-            .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
-        masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
-    indexSpecs.length);
-
+if (isJsonLog(second)) {
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij1';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij2';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij3';
+        },
+    });
+    checkLog.containsJson(second, 20384, {
+        ns: masterColl.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'ij4';
+        },
+    });
+} else {
+    checkLog.containsWithCount(
+        replTest.getSecondary(),
+        new RegExp(
+            `(index build: starting on ${
+                masterColl
+                    .getFullName()} properties: \\{ v: 2, key: \\{ i:|index build: starting on .*"ns":"${
+                masterColl.getFullName()}".*"descriptor":"\\{ v: 2, key: \\{ i)`),
+        indexSpecs.length);
+}
 replTest.stopSet();
 }());

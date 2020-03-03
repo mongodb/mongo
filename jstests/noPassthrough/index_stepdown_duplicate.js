@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load('jstests/libs/logv2_helpers.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({
@@ -37,7 +38,17 @@ assert.commandWorked(primary.adminCommand(
 // Use a custom index name because we are going to reuse it later with a different key pattern.
 const createIdx =
     IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {name: 'myidx'});
-checkLog.contains(primary, new RegExp('index build: starting.*' + coll.getFullName() + '.*myidx'));
+if (isJsonLog(primary)) {
+    checkLog.containsJson(primary, 20384, {
+        ns: coll.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'myidx';
+        },
+    });
+} else {
+    checkLog.contains(primary,
+                      new RegExp('index build: starting.*' + coll.getFullName() + '.*myidx'));
+}
 
 const newPrimary = rst.getSecondary();
 

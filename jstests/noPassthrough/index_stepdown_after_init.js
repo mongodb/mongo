@@ -35,10 +35,13 @@ assert.commandWorked(primary.adminCommand(
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
-if (isJsonLogNoConn()) {
-    checkLog.contains(
-        primary,
-        /\"index build: starting on {ns} properties: {descriptor} using method: {method}\".*\"descriptor\":\"{ v: 2, key: { a:/);
+if (isJsonLog(primary)) {
+    checkLog.containsJson(primary, 20384, {
+        ns: coll.getFullName(),
+        descriptor: (desc) => {
+            return desc.name === 'a_1';
+        },
+    });
 } else {
     checkLog.contains(
         primary,
@@ -62,9 +65,10 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Wait for the IndexBuildCoordinator thread, not the command thread, to report the index build
     // as failed.
-    if (isJsonLogNoConn()) {
-        checkLog.contains(
-            primary, "\"ctx\":\"IndexBuildsCoordinatorMongod-0\",\"msg\":\"Index build failed");
+    if (isJsonLog(primary)) {
+        checkLog.containsJson(primary, 20649, {
+            nss: coll.getFullName(),
+        });
     } else {
         checkLog.contains(primary, '[IndexBuildsCoordinatorMongod-0] Index build failed: ');
     }

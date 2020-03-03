@@ -338,7 +338,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             LOGV2(20384,
                   "index build: starting on {ns} properties: {descriptor} using method: {method}",
                   "ns"_attr = ns,
-                  "descriptor"_attr = descriptor->toString(),
+                  "descriptor"_attr = *descriptor,
                   "method"_attr = _method);
             if (index.bulk)
                 LOGV2(20385,
