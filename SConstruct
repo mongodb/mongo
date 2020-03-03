@@ -3879,6 +3879,7 @@ if get_option('ninja') != 'disabled':
     else:
         ninja_builder = Tool("ninja_next")
         ninja_builder.generate(env)
+        env.Default(env.Alias("install-all-meta"))
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4242,10 +4243,8 @@ else:
         target="#lint-eslint",
         source=[
             "buildscripts/eslint.py",
-            "jstests/",
-            "src/mongo/",
         ],
-        action="$PYTHON ${SOURCES[0]} --dirmode lint ${SOURCES[1:]}",
+        action="$PYTHON ${SOURCES[0]} --dirmode lint jstests/ src/mongo",
     )
 
 lint_py = env.Command(
@@ -4531,12 +4530,13 @@ env.SConscript(
 )
 
 
-allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'libfuzzer_tests', 'benchmarks']
+if get_option("install-mode") != "hygienic":
+    allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'libfuzzer_tests', 'benchmarks']
 
-if not has_option('noshell') and usemozjs:
-    allTargets.extend(['dbtest'])
+    if not has_option('noshell') and usemozjs:
+        allTargets.extend(['dbtest'])
 
-env.Alias('all', allTargets)
+    env.Alias('all', allTargets)
 
 # run the Dagger tool if it's installed
 if should_dagger:
