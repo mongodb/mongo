@@ -28,7 +28,7 @@ TestData.skipCheckDBHashes = true;
     jsTestLog('Add arbiter with zero votes:');
     var response = admin.runCommand({replSetReconfig: conf});
     assert.commandFailed(response);
-    assert.eq(response.code, NewReplicaSetConfigurationIncompatible);
+    assert.eq(response.code, InvalidReplicaSetConfig);
     assert(/.*arbiter must vote.*/i.test(response.errmsg));
 
     replTest.stopSet();
@@ -54,7 +54,7 @@ TestData.skipCheckDBHashes = true;
     var response = admin.runCommand({replSetReconfig: conf});
     printjson(response);
     assert.commandFailed(response);
-    assert.eq(response.code, NewReplicaSetConfigurationIncompatible);
+    assert.eq(response.code, InvalidReplicaSetConfig);
     assert(/.*arbiter must vote.*/i.test(response.errmsg));
 
     replTest.stopSet();
@@ -101,7 +101,7 @@ TestData.skipCheckDBHashes = true;
     jsTestLog('Add arbiter with zero votes:');
     var response = admin.runCommand({replSetReconfig: conf});
     assert.commandFailed(response);
-    assert.eq(response.code, NewReplicaSetConfigurationIncompatible);
+    assert.eq(response.code, InvalidReplicaSetConfig);
     assert(/.*arbiter must vote.*/i.test(response.errmsg));
 
     replTest.stopSet();

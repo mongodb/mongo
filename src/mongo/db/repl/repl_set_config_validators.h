@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,20 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_set_config_params_gen.h"
-#include "mongo/db/repl/repl_settings_gen.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 namespace repl {
 
-class ReplSettings {
-public:
-    std::string ourSetName() const;
-    bool usingReplSets() const;
-
-    /**
-     * Getters
-     */
-    long long getOplogSizeBytes() const;
-    std::string getReplSetString() const;
-
-    /**
-     * Static getter for the 'recoverFromOplogAsStandalone' server parameter.
-     */
-    static bool shouldRecoverFromOplogAsStandalone();
-
-    /**
-     * Setters
-     */
-    void setOplogSizeBytes(long long oplogSizeBytes);
-    void setReplSetString(std::string replSetString);
-
-private:
-    long long _oplogSizeBytes = 0;  // --oplogSize
-
-    std::string _replSetString;  // --replSet[/<seedlist>]
-};
+/**
+ * Validates that the given bool is true.
+ */
+inline Status validateTrue(bool boolVal) {
+    if (!boolVal) {
+        return {ErrorCodes::InvalidReplicaSetConfig, "Value must be true if specified"};
+    }
+    return Status::OK();
+}
 
 }  // namespace repl
 }  // namespace mongo

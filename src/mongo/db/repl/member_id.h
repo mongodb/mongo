@@ -31,6 +31,7 @@
 
 #include <iostream>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/str.h"
 
@@ -50,6 +51,19 @@ public:
                       str::stream() << "_id field value of " << id << " is out of range.");
         }
         _id = id;
+    }
+
+    static MemberId parseFromBSON(const BSONElement& element) {
+        if (!element.isNumber()) {
+            uasserted(ErrorCodes::TypeMismatch,
+                      str::stream()
+                          << "Element for MemberId was not a number: " << element.toString());
+        }
+        return MemberId(element.numberInt());
+    }
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+        builder->appendNumber(fieldName, _id);
     }
 
     int getData() const {

@@ -443,6 +443,13 @@ public:
         return numberDouble();
     }
 
+    /** Like numberDouble() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as doubles.
+     *  NaNs -> 0
+     *  very large decimals -> DOUBLE_MAX
+     *  very small decimals -> DOUBLE_MIN  */
+    double safeNumberDouble() const;
+
     /** Retrieve the object ID stored in the object.
         You must ensure the element is of type jstOID first. */
     mongo::OID __oid() const {
@@ -784,6 +791,14 @@ public:
      */
     static const double kLongLongMaxPlusOneAsDouble;
 
+    /**
+     * Constant 'long long' representation of 2^53 (and -2^53). This is the largest (and smallest)
+     * 'long long' such that all 'long long's between the two can be safely represented as a double
+     * without losing precision.
+     */
+    static const long long kLargestSafeLongLongAsDouble;
+    static const long long kSmallestSafeLongLongAsDouble;
+
 private:
     template <typename Generator>
     BSONObj _jsonStringGenerator(const Generator& g,
@@ -876,6 +891,46 @@ inline double BSONElement::numberDouble() const {
             return _numberLong();
         case NumberDecimal:
             return _numberDecimal().toDouble();
+        default:
+            return 0;
+    }
+}
+
+inline double BSONElement::safeNumberDouble() const {
+    switch (type()) {
+        case NumberDouble: {
+            double d = _numberDouble();
+            if (std::isnan(d)) {
+                return 0;
+            }
+            return d;
+        }
+        case NumberInt: {
+            return _numberInt();
+        }
+        case NumberLong: {
+            long long d = _numberLong();
+            if (d > 0 && d > kLargestSafeLongLongAsDouble) {
+                return static_cast<double>(kLargestSafeLongLongAsDouble);
+            }
+            if (d < 0 && d < kSmallestSafeLongLongAsDouble) {
+                return static_cast<double>(kSmallestSafeLongLongAsDouble);
+            }
+            return d;
+        }
+        case NumberDecimal: {
+            Decimal128 d = _numberDecimal();
+            if (d.isNaN()) {
+                return 0;
+            }
+            if (d.isGreater(Decimal128(std::numeric_limits<double>::max()))) {
+                return std::numeric_limits<double>::max();
+            }
+            if (d.isLess(Decimal128(std::numeric_limits<double>::min()))) {
+                return std::numeric_limits<double>::min();
+            }
+            return _numberDecimal().toDouble();
+        }
         default:
             return 0;
     }

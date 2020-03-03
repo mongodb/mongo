@@ -27,15 +27,86 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::repl"
+    cpp_includes:
+        - "mongo/db/repl/repl_set_config_validators.h"
+        - "mongo/db/repl/member_id.h"
 
-server_parameters:
-    skipShardingConfigurationChecks:
-        description: Dont run any sharding validations. Can not be combined with --configsvr or 
-                     shardvr. Intended to allow restarting config server or shard as an 
-                     independent replica set.
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: skipShardingConfigurationChecks
-        default: false
 
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/util/net/hostandport.idl"
+    - "mongo/db/repl/replication_types.idl"
+
+types:
+    memberId:
+        bson_serialization_type: any
+        description: A wrapper around an integer for the MemberId of a MemberConfig.
+        cpp_type: "MemberId"
+        serializer: MemberId::serializeToBSON
+        deserializer: MemberId::parseFromBSON
+
+structs:
+    MemberConfigBase:
+        description: "The configuration for a given member inside of the replica set config"
+        fields:
+            _id:
+                cpp_name: id
+                type: memberId
+                description: "An integer identifier of every member in the replica set"
+            host:
+                type: string
+                description: "The hostname and, if specified, the port number, of the set member"
+            votes:
+                type: safeInt64
+                default: 1
+                validator: { gte: 0, lte: 1 }
+                description: "The number of votes a server will cast in a replica set election. The
+                              number of votes each member has is either 1 or 0, and arbiters always
+                              have exactly 1 vote"
+            newlyAdded:
+                type: bool
+                optional: true
+                validator: { callback: "validateTrue" }
+                description: "Set to true if the member was just added and is in initial sync.
+                              Must be true when specified. Indicates that the votes and priority
+                              fields should be considered '0' for the duration of the initial sync"
+            priority:
+                type: safeDouble
+                default: 1.0
+                validator: { gte: 0, lte: 1000 }
+                description: "A number that indicates the relative eligibility of a member to become
+                              a primary"
+            hidden:
+                type: safeBool
+                default: false
+                description: "When this value is true, the replica set hides this instance and does
+                             not include the member in the output of db.isMaster() or isMaster. This
+                             prevents read operations (i.e. queries) from ever reaching this host by
+                             way of secondary read preference"
+            slaveDelay:
+                cpp_name: slaveDelaySecs
+                type: safeInt64
+                default: 0
+                validator: { gte: 0, lte: 31622400 }
+                description: "The number of seconds 'behind' the primary that this replica set
+                              member should 'lag'"
+            arbiterOnly:
+                type: safeBool
+                default: false
+                description: "A boolean that identifies an arbiter. A value of true indicates that
+                              the member is an arbiter"
+            buildIndexes:
+                type: safeBool
+                default: true
+                description: "A boolean that indicates whether the mongod builds indexes on this
+                              member"
+            tags:
+                type: object
+                optional: true
+                description: "A tags document contains user-defined tag field and value pairs for
+                              the replica set member"
+            horizons:
+                type: object
+                optional: true
+                description: "The hostnames for the provided horizons"

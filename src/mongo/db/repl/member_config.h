@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/util/net/hostandport.h"
@@ -49,21 +50,28 @@ namespace repl {
 /**
  * Representation of the configuration information about a particular member of a replica set.
  */
-class MemberConfig {
+class MemberConfig : private MemberConfigBase {
 public:
+    // Expose certain member functions used externally.
+    using MemberConfigBase::getId;
+    using MemberConfigBase::getPriority;
+
+    using MemberConfigBase::setNewlyAdded;
+
+    using MemberConfigBase::kArbiterOnlyFieldName;
+    using MemberConfigBase::kBuildIndexesFieldName;
+    using MemberConfigBase::kHiddenFieldName;
+    using MemberConfigBase::kHorizonsFieldName;
+    using MemberConfigBase::kHostFieldName;
+    using MemberConfigBase::kIdFieldName;
+    using MemberConfigBase::kNewlyAddedFieldName;
+    using MemberConfigBase::kPriorityFieldName;
+    using MemberConfigBase::kSlaveDelaySecsFieldName;
+    using MemberConfigBase::kTagsFieldName;
+    using MemberConfigBase::kVotesFieldName;
+
     typedef std::vector<ReplSetTag>::const_iterator TagIterator;
 
-    static const std::string kIdFieldName;
-    static const std::string kVotesFieldName;
-    static const std::string kPriorityFieldName;
-    static const std::string kHostFieldName;
-    static const std::string kHiddenFieldName;
-    static const std::string kSlaveDelayFieldName;
-    static const std::string kArbiterOnlyFieldName;
-    static const std::string kNewlyAddedFieldName;
-    static const std::string kBuildIndexesFieldName;
-    static const std::string kTagsFieldName;
-    static const std::string kHorizonsFieldName;
     static const std::string kInternalVoterTagName;
     static const std::string kInternalElectableTagName;
     static const std::string kInternalAllTagName;
@@ -79,18 +87,6 @@ public:
      * tag not previously added to "tagConfig".
      */
     MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig);
-
-    /**
-     * Performs basic consistency checks on the member configuration.
-     */
-    Status validate() const;
-
-    /**
-     * Gets the identifier for this member, unique within a ReplSetConfig.
-     */
-    MemberId getId() const {
-        return _id;
-    }
 
     /**
      * Gets the canonical name of this member, by which other members and clients
@@ -124,19 +120,11 @@ public:
     }
 
     /**
-     * Gets this member's priority.  Higher means more likely to be elected
-     * primary.
-     */
-    double getPriority() const {
-        return _priority;
-    }
-
-    /**
      * Gets the amount of time behind the primary that this member will atempt to
      * remain.  Zero seconds means stay as caught up as possible.
      */
     Seconds getSlaveDelay() const {
-        return _slaveDelay;
+        return Seconds(getSlaveDelaySecs());
     }
 
     /**
@@ -144,11 +132,11 @@ public:
      */
     bool isVoter() const {
         const bool isNewlyAddedFieldSet = isNewlyAdded().get_value_or(false);
-        return (_votes != 0 && !isNewlyAddedFieldSet);
+        return (getVotes() != 0 && !isNewlyAddedFieldSet);
     }
 
     /**
-     * Returns the number of votes that this member gets.
+     * Returns the number of votes the member has.
      */
     int getNumVotes() const {
         return isVoter() ? 1 : 0;
@@ -158,7 +146,7 @@ public:
      * Returns true if this member is an arbiter (is not data-bearing).
      */
     bool isArbiter() const {
-        return _arbiterOnly;
+        return getArbiterOnly();
     }
 
     /**
@@ -166,35 +154,21 @@ public:
      * should be treated as non-voting.
      */
     boost::optional<bool> isNewlyAdded() const {
-        // _newlyAdded should never have been set to false.
-        invariant(_newlyAdded == boost::none || _newlyAdded.get());
-        return _newlyAdded;
-    }
-
-    /**
-     * Set the newlyAdded field for this member.
-     */
-    void setNewlyAdded(boost::optional<bool> newlyAdded) {
-        // We should never try to set 'newlyAdded' to false.
-        uassert(ErrorCodes::InvalidReplicaSetConfig,
-                str::stream() << kNewlyAddedFieldName
-                              << " field in MemberConfig should never be set to false",
-                newlyAdded == boost::none || newlyAdded.get());
-        _newlyAdded = newlyAdded;
+        return getNewlyAdded();
     }
 
     /**
      * Returns true if this member is hidden (not reported by isMaster, not electable).
      */
     bool isHidden() const {
-        return _hidden;
+        return getHidden();
     }
 
     /**
      * Returns true if this member should build secondary indexes.
      */
     bool shouldBuildIndexes() const {
-        return _buildIndexes;
+        return getBuildIndexes();
     }
 
     /**
@@ -241,17 +215,7 @@ private:
         return getHostAndPort(SplitHorizon::kDefaultHorizon);
     }
 
-    MemberId _id;
-    double _priority;  // 0 means can never be primary
-    int _votes;        // Can this member vote? Only 0 and 1 are valid.  Default 1.
-    bool _arbiterOnly;
-    boost::optional<bool> _newlyAdded =
-        boost::none;  // If set, this member should be considered as a non-voting node.
-    Seconds _slaveDelay;
-    bool _hidden;                   // if set, don't advertise to drivers in isMaster.
-    bool _buildIndexes;             // if false, do not create any non-_id indexes
     std::vector<ReplSetTag> _tags;  // tagging for data center, rack, etc.
-
     SplitHorizon _splitHorizon;
 };
 

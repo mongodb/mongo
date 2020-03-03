@@ -65,6 +65,10 @@ using std::string;
 
 const double BSONElement::kLongLongMaxPlusOneAsDouble =
     scalbn(1, std::numeric_limits<long long>::digits);
+const long long BSONElement::kLargestSafeLongLongAsDouble =
+    scalbn(1, std::numeric_limits<double>::digits);
+const long long BSONElement::kSmallestSafeLongLongAsDouble =
+    scalbn(-1, std::numeric_limits<double>::digits);
 
 std::string BSONElement::jsonString(JsonStringFormat format,
                                     bool includeSeparator,

@@ -203,6 +203,41 @@ TEST(BSONElement, SafeNumberLongNegativeBound) {
     ASSERT_EQ(obj["negativeInfinity"].safeNumberLong(), std::numeric_limits<long long>::lowest());
 }
 
+TEST(BSONElement, SafeNumberDoublePositiveBound) {
+    BSONObj obj = BSON("kLargestSafeLongLongAsDouble"
+                       << BSONElement::kLargestSafeLongLongAsDouble << "towardsZero"
+                       << BSONElement::kLargestSafeLongLongAsDouble - 1 << "towardsInfinity"
+                       << BSONElement::kLargestSafeLongLongAsDouble + 1 << "positiveInfinity"
+                       << std::numeric_limits<long long>::max());
+
+    ASSERT_EQ(obj["kLargestSafeLongLongAsDouble"].safeNumberDouble(),
+              (double)BSONElement::kLargestSafeLongLongAsDouble);
+    ASSERT_EQ(obj["towardsZero"].safeNumberDouble(),
+              (double)(BSONElement::kLargestSafeLongLongAsDouble - 1));
+    ASSERT_EQ(obj["towardsInfinity"].safeNumberDouble(),
+              (double)BSONElement::kLargestSafeLongLongAsDouble);
+    ASSERT_EQ(obj["positiveInfinity"].safeNumberDouble(),
+              (double)BSONElement::kLargestSafeLongLongAsDouble);
+}
+
+TEST(BSONElement, SafeNumberDoubleNegativeBound) {
+    BSONObj obj =
+        BSON("kSmallestSafeLongLongAsDouble"
+             << BSONElement::kSmallestSafeLongLongAsDouble << "towardsZero"
+             << BSONElement::kSmallestSafeLongLongAsDouble + 1 << "towardsNegativeInfinity"
+             << BSONElement::kSmallestSafeLongLongAsDouble - 1 << "negativeInfinity"
+             << std::numeric_limits<long long>::min());
+
+    ASSERT_EQ(obj["kSmallestSafeLongLongAsDouble"].safeNumberDouble(),
+              (double)BSONElement::kSmallestSafeLongLongAsDouble);
+    ASSERT_EQ(obj["towardsZero"].safeNumberDouble(),
+              (double)(BSONElement::kSmallestSafeLongLongAsDouble + 1));
+    ASSERT_EQ(obj["towardsNegativeInfinity"].safeNumberDouble(),
+              (double)BSONElement::kSmallestSafeLongLongAsDouble);
+    ASSERT_EQ(obj["negativeInfinity"].safeNumberDouble(),
+              (double)BSONElement::kSmallestSafeLongLongAsDouble);
+}
+
 TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNegative) {
     BSONObj query = BSON("" << -2LL);
     ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());

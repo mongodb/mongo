@@ -838,7 +838,7 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplSetConfig, ValidateFailsWithInvalidMember) {
+TEST(ReplSetConfig, InitializeFailsWithInvalidMember) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
@@ -846,10 +846,7 @@ TEST(ReplSetConfig, ValidateFailsWithInvalidMember) {
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"
                                                                     << "hidden" << true))));
-    ASSERT_OK(status);
-
-    status = config.validate();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
 }
 
 TEST(ReplSetConfig, ChainingAllowedField) {
@@ -1264,6 +1261,11 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
 }
 
 TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetConfig configA;
     ReplSetConfig configB;
     ASSERT_OK(configA.initialize(BSON(
@@ -1277,7 +1279,7 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
                                     << "localhost:3828"
                                     << "arbiterOnly" << false << "hidden" << true << "buildIndexes"
                                     << false << "priority" << 0 << "slaveDelay" << 17 << "votes"
-                                    << 0 << "tags"
+                                    << 0 << "newlyAdded" << true << "tags"
                                     << BSON("coast"
                                             << "east"
                                             << "ssd"
@@ -1307,23 +1309,25 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
 TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_OK(configA.initialize(
-        BSON("_id"
-             << ""
-             << "version" << -3 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                      << "localhost:12345"
-                                      << "arbiterOnly" << true << "votes" << 0 << "priority" << 0)
-                           << BSON("_id" << 0 << "host"
-                                         << "localhost:3828"
-                                         << "arbiterOnly" << false << "buildIndexes" << false
-                                         << "priority" << 2)
-                           << BSON("_id" << 2 << "host"
-                                         << "localhost:3828"
-                                         << "votes" << 0 << "priority" << 0))
-             << "settings"
-             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
-                                               << "electionTimeoutMillis" << 2))));
+    ASSERT_EQUALS(
+        configA.initialize(BSON(
+            "_id"
+            << ""
+            << "version" << -3 << "protocolVersion" << 1 << "members"
+            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                     << "localhost:12345"
+                                     << "arbiterOnly" << true << "votes" << 0 << "priority" << 0)
+                          << BSON("_id" << 0 << "host"
+                                        << "localhost:3828"
+                                        << "arbiterOnly" << false << "buildIndexes" << false
+                                        << "priority" << 2)
+                          << BSON("_id" << 2 << "host"
+                                        << "localhost:3828"
+                                        << "votes" << 0 << "priority" << 0))
+            << "settings"
+            << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
+                                              << "electionTimeoutMillis" << 2))),
+        ErrorCodes::InvalidReplicaSetConfig);
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());

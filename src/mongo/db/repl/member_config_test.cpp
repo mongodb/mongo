@@ -56,24 +56,25 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
     ASSERT_FALSE(mc.isNewlyAdded());
     ASSERT_TRUE(mc.shouldBuildIndexes());
     ASSERT_EQUALS(5U, mc.getNumTags());
-    ASSERT_OK(mc.validate());
 }
 
 TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
-                                          << "localhost"
-                                          << "frim" << 1),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::BadValue>);
+    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                               << "localhost"
+                                               << "frim" << 1),
+                                    &tagConfig),
+                       AssertionException,
+                       40415);
 }
 
 TEST(MemberConfig, ParseFailsWithMissingIdField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS(MemberConfig(BSON("host"
-                                    << "localhost:12345"),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::NoSuchKey>);
+    ASSERT_THROWS_CODE(MemberConfig(BSON("host"
+                                         << "localhost:12345"),
+                                    &tagConfig),
+                       AssertionException,
+                       40414);
 }
 
 TEST(MemberConfig, ParseFailsWithIdOutOfRange) {
@@ -85,7 +86,7 @@ TEST(MemberConfig, ParseFailsWithIdOutOfRange) {
                       ExceptionFor<ErrorCodes::BadValue>);
     }
     {
-        ASSERT_THROWS(MemberConfig(BSON("_id" << -1 << "host"
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 256 << "host"
                                               << "localhost:12345"),
                                    &tagConfig),
                       ExceptionFor<ErrorCodes::BadValue>);
@@ -94,10 +95,11 @@ TEST(MemberConfig, ParseFailsWithIdOutOfRange) {
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS(MemberConfig(BSON("host"
-                                    << "localhost:12345"),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::NoSuchKey>);
+    ASSERT_THROWS_CODE(MemberConfig(BSON("host"
+                                         << "localhost:12345"),
+                                    &tagConfig),
+                       AssertionException,
+                       40414);
     ASSERT_THROWS(MemberConfig(BSON("_id"
                                     << "0"
                                     << "host"
@@ -110,11 +112,56 @@ TEST(MemberConfig, ParseFailsWithBadIdField) {
                   ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
-TEST(MemberConfig, ParseFailsWithMissingHostField) {
+TEST(MemberConfig, ParseAcceptsAnyNumberId) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS(MemberConfig(BSON("_id" << 0), &tagConfig), ExceptionFor<ErrorCodes::NoSuchKey>);
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0.5 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << -0.5 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(1));
+    }
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << -1.5 << "host"
+                                              << "localhost:12345"),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1.6 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(1));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 4 << "host"
+                                   << "h"),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getId(), MemberId(4));
+    }
 }
 
+TEST(MemberConfig, ParseFailsWithMissingHostField) {
+    ReplSetTagConfig tagConfig;
+    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0), &tagConfig), AssertionException, 40414);
+}
 
 TEST(MemberConfig, ParseFailsWithBadHostField) {
     ReplSetTagConfig tagConfig;
@@ -128,6 +175,22 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
                                           << "myhost:zabc"),
                                &tagConfig),
                   ExceptionFor<ErrorCodes::FailedToParse>);
+}
+
+TEST(MemberConfig, ParseTrimsHostname) {
+    ReplSetTagConfig tagConfig;
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "localhost:12345 "),
+                        &tagConfig);
+        ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h "),
+                        &tagConfig);
+        ASSERT_EQUALS(HostAndPort("h", 27017), mc.getHostAndPort());
+    }
 }
 
 TEST(MemberConfig, ParseArbiterOnly) {
@@ -220,7 +283,7 @@ TEST(MemberConfig, ParseHidden) {
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
-                                   << "hidden" << 1.0),
+                                   << "priority" << 0 << "hidden" << 1.0),
                         &tagConfig);
         ASSERT_TRUE(mc.isHidden());
     }
@@ -233,10 +296,16 @@ TEST(MemberConfig, ParseHidden) {
     }
     ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
                                           << "h"
-                                          << "hidden"
+                                          << "priority" << 0 << "hidden"
                                           << "1.0"),
                                &tagConfig),
                   ExceptionFor<ErrorCodes::TypeMismatch>);
+
+    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                          << "h"
+                                          << "hidden" << 1.0),
+                               &tagConfig),
+                  ExceptionFor<ErrorCodes::BadValue>);
 }
 
 TEST(MemberConfig, ParseBuildIndexes) {
@@ -244,17 +313,23 @@ TEST(MemberConfig, ParseBuildIndexes) {
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
-                                   << "buildIndexes" << 1.0),
+                                   << "priority" << 0 << "buildIndexes" << 1.0),
                         &tagConfig);
         ASSERT_TRUE(mc.shouldBuildIndexes());
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
-                                   << "buildIndexes" << false),
+                                   << "priority" << 0 << "buildIndexes" << false),
                         &tagConfig);
-        ASSERT_TRUE(!mc.shouldBuildIndexes());
+        ASSERT_FALSE(mc.shouldBuildIndexes());
     }
+
+    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                          << "h"
+                                          << "buildIndexes" << false),
+                               &tagConfig),
+                  ExceptionFor<ErrorCodes::BadValue>);
 }
 
 TEST(MemberConfig, ParseVotes) {
@@ -284,28 +359,47 @@ TEST(MemberConfig, ParseVotes) {
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
-                                   << "votes" << 0.5),
+                                   << "votes" << 0.5 << "priority" << 0),
                         &tagConfig);
         ASSERT_FALSE(mc.isVoter());
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
-                                   << "votes" << -0.5),
+                                   << "votes" << -0.5 << "priority" << 0),
                         &tagConfig);
         ASSERT_FALSE(mc.isVoter());
     }
     {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 2),
-                        &tagConfig);
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                                   << "h"
+                                                   << "votes" << 2 << "priority" << 0),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
     }
-    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
-                                          << "h"
-                                          << "votes" << Date_t::fromMillisSinceEpoch(2)),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::TypeMismatch>);
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "votes" << Date_t::fromMillisSinceEpoch(2)),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::TypeMismatch>);
+    }
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "votes" << 0),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
+    }
+    {
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                                   << "h"
+                                                   << "votes" << -1 << "priority" << 0),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
+    }
 }
 
 TEST(MemberConfig, ParsePriority) {
@@ -331,20 +425,137 @@ TEST(MemberConfig, ParsePriority) {
                         &tagConfig);
         ASSERT_EQUALS(100.8, mc.getPriority());
     }
-    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
-                                          << "h"
-                                          << "priority" << Date_t::fromMillisSinceEpoch(2)),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::TypeMismatch>);
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "priority" << Date_t::fromMillisSinceEpoch(2)),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::TypeMismatch>);
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "priority" << 1000),
+                        &tagConfig);
+        ASSERT_EQUALS(1000, mc.getPriority());
+    }
+    {
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                                   << "h"
+                                                   << "priority" << -1),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
+    }
+    {
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                                   << "h"
+                                                   << "priority" << 1001),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
+    }
 }
 
 TEST(MemberConfig, ParseSlaveDelay) {
     ReplSetTagConfig tagConfig;
-    MemberConfig mc(BSON("_id" << 0 << "host"
-                               << "h"
-                               << "slaveDelay" << 100),
-                    &tagConfig);
-    ASSERT_EQUALS(Seconds(100), mc.getSlaveDelay());
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 100),
+                        &tagConfig);
+        ASSERT_EQUALS(Seconds(100), mc.getSlaveDelay());
+    }
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "slaveDelay" << 100),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 0),
+                        &tagConfig);
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 3600 * 10),
+                        &tagConfig);
+    }
+    {
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
+                                                   << "h"
+                                                   << "priority" << 0 << "slaveDelay" << -1),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
+    }
+    {
+        ASSERT_THROWS_CODE(
+            MemberConfig(BSON("_id" << 0 << "host"
+                                    << "h"
+                                    << "priority" << 0 << "slaveDelay" << 3600 * 24 * 400),
+                         &tagConfig),
+            AssertionException,
+            51024);
+    }
+}
+
+TEST(MemberConfig, ParseAcceptsAnyNumberSlaveDelay) {
+    ReplSetTagConfig tagConfig;
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 0),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 0.5),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << -0.5),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(0));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 1),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(1));
+    }
+    {
+        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 1 << "host"
+                                                   << "h"
+                                                   << "priority" << 0 << "slaveDelay" << -1.5),
+                                        &tagConfig),
+                           AssertionException,
+                           51024);
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 1.6),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(1));
+    }
+    {
+        MemberConfig mc(BSON("_id" << 1 << "host"
+                                   << "h"
+                                   << "priority" << 0 << "slaveDelay" << 4),
+                        &tagConfig);
+        ASSERT_EQUALS(mc.getSlaveDelay(), Seconds(4));
+    }
 }
 
 TEST(MemberConfig, ParseTags) {
@@ -533,174 +744,46 @@ TEST(MemberConfig, HorizonFieldWithEmptyStringIsRejected) {
     }
 }
 
-TEST(MemberConfig, ValidateVotes) {
-    ReplSetTagConfig tagConfig;
-
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 1.0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-        ASSERT_TRUE(mc.isVoter());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 0 << "priority" << 0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-        ASSERT_FALSE(mc.isVoter());
-    }
-    {
-        // For backwards compatibility, truncate 1.X to 1, and 0.X to 0 (and -0.X to 0).
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 1.5),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-        ASSERT_TRUE(mc.isVoter());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 0.5 << "priority" << 0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-        ASSERT_FALSE(mc.isVoter());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << -0.5 << "priority" << 0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-        ASSERT_FALSE(mc.isVoter());
-    }
-    {
-        // Invalid values
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 2),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << -1),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-}
-
-TEST(MemberConfig, ValidatePriorityRanges) {
-    ReplSetTagConfig tagConfig;
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 1000),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << -1),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 1001),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-}
-
-TEST(MemberConfig, ValidateSlaveDelays) {
-    ReplSetTagConfig tagConfig;
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 0),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 3600 * 10),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << -1),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 3600 * 24 * 400),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-}
-
 TEST(MemberConfig, ValidatePriorityAndSlaveDelayRelationship) {
     ReplSetTagConfig tagConfig;
-    MemberConfig mc(BSON("_id" << 0 << "host"
-                               << "h"
-                               << "priority" << 1 << "slaveDelay" << 60),
-                    &tagConfig);
-    ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                          << "h"
+                                          << "priority" << 1 << "slaveDelay" << 60),
+                               &tagConfig),
+                  ExceptionFor<ErrorCodes::BadValue>);
 }
 
 TEST(MemberConfig, ValidatePriorityAndHiddenRelationship) {
     ReplSetTagConfig tagConfig;
     {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 1 << "hidden" << true),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "priority" << 1 << "hidden" << true),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
                                    << "priority" << 1 << "hidden" << false),
                         &tagConfig);
-        ASSERT_OK(mc.validate());
     }
 }
 
 TEST(MemberConfig, ValidatePriorityAndBuildIndexesRelationship) {
     ReplSetTagConfig tagConfig;
     {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 1 << "buildIndexes" << false),
-                        &tagConfig);
-
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                              << "h"
+                                              << "priority" << 1 << "buildIndexes" << false),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
                                    << "priority" << 1 << "buildIndexes" << true),
                         &tagConfig);
-        ASSERT_OK(mc.validate());
     }
 }
 
@@ -711,28 +794,26 @@ TEST(MemberConfig, ValidateArbiterVotesRelationship) {
                                    << "h"
                                    << "votes" << 1 << "arbiterOnly" << true),
                         &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 0 << "priority" << 0 << "arbiterOnly" << false),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 1 << "arbiterOnly" << false),
-                        &tagConfig);
-        ASSERT_OK(mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "votes" << 0 << "arbiterOnly" << true),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+        {
+            MemberConfig mc(BSON("_id" << 0 << "host"
+                                       << "h"
+                                       << "votes" << 0 << "priority" << 0 << "arbiterOnly"
+                                       << false),
+                            &tagConfig);
+        }
+        {
+            MemberConfig mc(BSON("_id" << 0 << "host"
+                                       << "h"
+                                       << "votes" << 1 << "arbiterOnly" << false),
+                            &tagConfig);
+        }
+        {
+            ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                                  << "h"
+                                                  << "votes" << 0 << "arbiterOnly" << true),
+                                       &tagConfig),
+                          ExceptionFor<ErrorCodes::BadValue>);
+        }
     }
 }
 

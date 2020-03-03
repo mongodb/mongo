@@ -318,7 +318,7 @@ TEST(SplitHorizonTesting, BSONConstruction) {
             const auto host = HostAndPort(test.host);
             const auto& bsonElement = bson.firstElement();
             try {
-                return SplitHorizon(host, bsonElement);
+                return SplitHorizon(host, bsonElement.Obj());
             } catch (const DBException& ex) {
                 ASSERT_NOT_EQUALS(expectedErrorCode, ErrorCodes::OK)
                     << "Failing on test case # " << (&test - tests)
@@ -455,7 +455,7 @@ TEST(SplitHorizonTesting, BSONRoundTrip) {
             return outputBuilder.obj();
         }();
 
-        const SplitHorizon witness(HostAndPort(defaultHostAndPort), bson["horizons"]);
+        const SplitHorizon witness(HostAndPort(defaultHostAndPort), bson["horizons"].Obj());
 
         ASSERT_TRUE(horizon.getForwardMappings() == witness.getForwardMappings())
             << "Test #" << testNumber << " Failed on bson round trip with forward map";

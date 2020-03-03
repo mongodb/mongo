@@ -35,6 +35,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/util/net/hostandport.h"
@@ -81,8 +82,7 @@ public:
     static Parameters getParameters(const Client*);
 
     explicit SplitHorizon() = default;
-    explicit SplitHorizon(const HostAndPort& host,
-                          const boost::optional<BSONElement>& horizonsElement);
+    explicit SplitHorizon(const HostAndPort& host, const boost::optional<BSONObj>& horizonsObject);
 
     // This constructor is for testing and internal use only
     explicit SplitHorizon(ForwardMapping forward);
