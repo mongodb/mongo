@@ -58,7 +58,5 @@ executor:
         enableTestCommands: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
-        logComponentVerbosity:
-          storage: 2
     num_nodes: 2
     start_initial_sync_node: True
