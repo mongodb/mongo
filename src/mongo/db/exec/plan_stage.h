@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -109,6 +110,11 @@ public:
     PlanStage(const char* typeName, ExpressionContext* expCtx)
         : _commonStats(typeName), _opCtx(expCtx->opCtx), _expCtx(expCtx) {
         invariant(expCtx);
+        if (expCtx->explain || expCtx->mayDbProfile) {
+            // Populating the field for execution time indicates that this stage should time each
+            // call to work().
+            _commonStats.executionTimeMillis.emplace(0);
+        }
     }
 
 protected:
@@ -194,7 +200,25 @@ public:
      * Stage returns StageState::ADVANCED if *out is set to the next unit of output.  Otherwise,
      * returns another value of StageState to indicate the stage's status.
      */
-    StageState work(WorkingSetID* out);
+    StageState work(WorkingSetID* out) {
+        auto optTimer(getOptTimer());
+
+        ++_commonStats.works;
+
+        StageState workResult = doWork(out);
+
+        if (StageState::ADVANCED == workResult) {
+            ++_commonStats.advanced;
+        } else if (StageState::NEED_TIME == workResult) {
+            ++_commonStats.needTime;
+        } else if (StageState::NEED_YIELD == workResult) {
+            ++_commonStats.needYield;
+        } else if (StageState::FAILURE == workResult) {
+            _commonStats.failed = true;
+        }
+
+        return workResult;
+    }
 
     /**
      * Returns true if no more work can be done on the query / out of results.
@@ -338,6 +362,15 @@ public:
      */
     virtual const SpecificStats* getSpecificStats() const = 0;
 
+    /**
+     * Force this stage to collect timing info during its execution. Must not be called after
+     * execution has started.
+     */
+    void markShouldCollectTimingInfo() {
+        invariant(!_commonStats.executionTimeMillis || *_commonStats.executionTimeMillis == 0);
+        _commonStats.executionTimeMillis.emplace(0);
+    }
+
 protected:
     /**
      * Performs one unit of work.  See comment at work() above.
@@ -386,6 +419,18 @@ protected:
 
     ExpressionContext* expCtx() const {
         return _expCtx;
+    }
+
+    /**
+     * Returns an optional timer which is used to collect time spent executing the current
+     * stage. May return boost::none if it is not necessary to collect timing info.
+     */
+    boost::optional<ScopedTimer> getOptTimer() {
+        if (_commonStats.executionTimeMillis) {
+            return {{getClock(), _commonStats.executionTimeMillis.get_ptr()}};
+        }
+
+        return boost::none;
     }
 
     Children _children;

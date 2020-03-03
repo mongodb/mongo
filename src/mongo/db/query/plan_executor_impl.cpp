@@ -165,25 +165,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                                   yieldPolicy);
 }
 
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
-    const Collection* collection,
-    YieldPolicy yieldPolicy,
-    NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
-    return PlanExecutorImpl::make(opCtx,
-                                  std::move(ws),
-                                  std::move(rt),
-                                  std::move(qs),
-                                  nullptr,
-                                  nullptr,
-                                  collection,
-                                  nss,
-                                  yieldPolicy);
-}
-
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::make(
     OperationContext* opCtx,
     unique_ptr<WorkingSet> ws,

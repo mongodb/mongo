@@ -183,7 +183,7 @@ public:
             expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
+            expCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

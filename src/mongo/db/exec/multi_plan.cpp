@@ -61,6 +61,15 @@ using std::vector;
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 
+namespace {
+void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
+    root->markShouldCollectTimingInfo();
+    for (auto&& child : root->getChildren()) {
+        markShouldCollectTimingInfoOnSubtree(child.get());
+    }
+}
+}  // namespace
+
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                const Collection* collection,
                                CanonicalQuery* cq,
@@ -79,6 +88,11 @@ void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
                              WorkingSet* ws) {
     _children.emplace_back(std::move(root));
     _candidates.push_back(CandidatePlan(std::move(solution), _children.back().get(), ws));
+
+    // Tell the new candidate plan that it must collect timing info. This timing info will
+    // later be stored in the plan cache, and may be used for explain output.
+    PlanStage* newChild = _children.back().get();
+    markShouldCollectTimingInfoOnSubtree(newChild);
 }
 
 bool MultiPlanStage::isEOF() {
@@ -201,7 +215,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
     // execution work that happens here, so this is needed for the time accounting to
     // make sense.
-    ScopedTimer timer(getClock(), &_commonStats.executionTimeMillis);
+    auto optTimer = getOptTimer();
 
     size_t numWorks = getTrialPeriodWorks(opCtx(), collection());
     size_t numResults = getTrialPeriodNumToReturn(*_query);

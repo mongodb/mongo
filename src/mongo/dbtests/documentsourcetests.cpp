@@ -228,8 +228,8 @@ TEST_F(DocumentSourceCursorTest, SerializationNoExplainLevel) {
 
 TEST_F(DocumentSourceCursorTest, SerializationQueryPlannerExplainLevel) {
     auto verb = ExplainOptions::Verbosity::kQueryPlanner;
-    createSource();
     ctx()->explain = verb;
+    createSource();
 
     auto explainResult = source()->serialize(verb);
     ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
@@ -240,8 +240,8 @@ TEST_F(DocumentSourceCursorTest, SerializationQueryPlannerExplainLevel) {
 
 TEST_F(DocumentSourceCursorTest, SerializationExecStatsExplainLevel) {
     auto verb = ExplainOptions::Verbosity::kExecStats;
-    createSource();
     ctx()->explain = verb;
+    createSource();
 
     // Execute the plan so that the source populates its internal execution stats.
     exhaustCursor();
@@ -256,8 +256,8 @@ TEST_F(DocumentSourceCursorTest, SerializationExecStatsExplainLevel) {
 
 TEST_F(DocumentSourceCursorTest, SerializationExecAllPlansExplainLevel) {
     auto verb = ExplainOptions::Verbosity::kExecAllPlans;
-    createSource();
     ctx()->explain = verb;
+    createSource();
 
     // Execute the plan so that the source populates its internal executionStats.
     exhaustCursor();
@@ -273,8 +273,8 @@ TEST_F(DocumentSourceCursorTest, SerializationExecAllPlansExplainLevel) {
 TEST_F(DocumentSourceCursorTest, ExpressionContextAndSerializeVerbosityMismatch) {
     const auto verb1 = ExplainOptions::Verbosity::kExecAllPlans;
     const auto verb2 = ExplainOptions::Verbosity::kQueryPlanner;
-    createSource();
     ctx()->explain = verb1;
+    createSource();
 
     // Execute the plan so that the source populates its internal executionStats.
     exhaustCursor();

@@ -131,7 +131,7 @@ public:
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
+            _expCtx, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -174,7 +174,7 @@ public:
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+            _expCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -590,7 +590,7 @@ public:
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+            _expCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         PlanExecutor::ExecState runnerState =

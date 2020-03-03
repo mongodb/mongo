@@ -107,7 +107,8 @@ public:
                       std::unique_ptr<CollatorInterface> collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-                      boost::optional<UUID> collUUID);
+                      boost::optional<UUID> collUUID,
+                      bool mayDbProfile = true);
 
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version
@@ -126,7 +127,8 @@ public:
                       std::unique_ptr<CollatorInterface> collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-                      boost::optional<UUID> collUUID);
+                      boost::optional<UUID> collUUID,
+                      bool mayDbProfile);
 
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including
@@ -137,7 +139,8 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       std::unique_ptr<CollatorInterface> collator,
                       const NamespaceString& ns,
-                      const boost::optional<RuntimeConstants>& runtimeConstants = boost::none);
+                      const boost::optional<RuntimeConstants>& runtimeConstants = boost::none,
+                      bool mayDbProfile = true);
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
@@ -170,7 +173,10 @@ public:
         return _collator.get();
     }
 
-    bool shouldCollectExecStats() const {
+    /**
+     * Whether to track timing information and "work" counts in the agg layer.
+     */
+    bool shouldCollectDocumentSourceExecStats() const {
         return static_cast<bool>(explain);
     }
 
@@ -351,6 +357,10 @@ public:
 
     // True if this ExpressionContext is used to parse a collection validator expression.
     bool isParsingCollectionValidator = false;
+
+    // Indicates where there is any chance this operation will be profiled. Must be set at
+    // construction.
+    const bool mayDbProfile = true;
 
 protected:
     static const int kInterruptCheckPeriod = 128;

@@ -96,7 +96,9 @@ auto makeExpressionContext(OperationContext* opCtx,
         std::move(resolvedCollator),
         MongoProcessInterface::create(opCtx),
         StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
-        uuid);
+        uuid,
+        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
+    );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     return expCtx;
 }

@@ -364,8 +364,12 @@ public:
                 }
             }
 
-            exec = uassertStatusOK(PlanExecutor::make(
-                opCtx, std::move(ws), std::move(root), nullptr, PlanExecutor::NO_YIELD, cursorNss));
+            exec = uassertStatusOK(PlanExecutor::make(expCtx,
+                                                      std::move(ws),
+                                                      std::move(root),
+                                                      nullptr,
+                                                      PlanExecutor::NO_YIELD,
+                                                      cursorNss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 Document nextDoc;

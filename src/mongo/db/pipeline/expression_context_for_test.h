@@ -75,8 +75,9 @@ public:
                             RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
-                            {},  // resolvedNamespaces
-                            {}   // collUUID
+                            {},    // resolvedNamespaces
+                            {},    // collUUID
+                            false  // mayDbProfile
           ) {
         // If there is an existing global ServiceContext, adopt it. Otherwise, create a new context.
         // Similarly, we create a new OperationContext or adopt an existing context as appropriate.
@@ -93,7 +94,6 @@ public:
 
         // Resolve the active OperationContext and set it on the ExpressionContextForTest.
         opCtx = _testOpCtx ? _testOpCtx.get() : Client::getCurrent()->getOperationContext();
-
         // As we don't have an OperationContext or TimeZoneDatabase prior to base class
         // ExpressionContext construction, we must resolve one. If there exists a TimeZoneDatabase
         // associated with the current ServiceContext, adopt it. Otherwise, create a
@@ -125,8 +125,9 @@ public:
                             RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
-                            {},  // resolvedNamespaces
-                            {}   // collUUID
+                            {},    // resolvedNamespaces
+                            {},    // collUUID
+                            false  // mayDbProfile
                             ),
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.

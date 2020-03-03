@@ -54,7 +54,11 @@ using std::vector;
 
 DocumentSource::DocumentSource(const StringData stageName,
                                const intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {}
+    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {
+    if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
+        _commonStats.executionTimeMillis.emplace(0);
+    }
+}
 
 namespace {
 struct ParserRegistration {

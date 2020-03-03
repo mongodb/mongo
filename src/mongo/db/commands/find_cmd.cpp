@@ -113,7 +113,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           std::move(collator),
                                           nullptr,  // mongoProcessInterface
                                           StringMap<ExpressionContext::ResolvedNamespace>{},
-                                          boost::none  // uuid
+                                          boost::none,                             // uuid
+                                          CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
         );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     return expCtx;

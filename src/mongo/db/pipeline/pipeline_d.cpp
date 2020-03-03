@@ -170,7 +170,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     }
 
     return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(root), coll, PlanExecutor::YIELD_AUTO);
+        expCtx, std::move(ws), std::move(root), coll, PlanExecutor::YIELD_AUTO);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(

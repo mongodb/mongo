@@ -75,7 +75,7 @@ public:
 
         auto workingSet = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
-        return unittest::assertGet(PlanExecutor::make(opCtx,
+        return unittest::assertGet(PlanExecutor::make(expCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),
                                                       nullptr,

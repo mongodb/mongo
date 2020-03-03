@@ -287,19 +287,6 @@ public:
         std::unique_ptr<QuerySolution> qs = nullptr);
 
     /**
-     * This overload is provided for executors that do not have a CanonicalQuery or an
-     * ExpressionContext, such as an aggregation command with a $listCollections stage.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        const Collection* collection,
-        YieldPolicy yieldPolicy,
-        NamespaceString nss = NamespaceString(),
-        std::unique_ptr<QuerySolution> qs = nullptr);
-
-    /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
      * automatically through a PlanExecutor::Deleter or a ClientCursor.
      */

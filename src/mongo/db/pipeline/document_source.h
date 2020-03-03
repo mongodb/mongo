@@ -255,7 +255,7 @@ public:
     GetNextResult getNext() {
         pExpCtx->checkForInterrupt();
 
-        if (MONGO_likely(!pExpCtx->shouldCollectExecStats())) {
+        if (MONGO_likely(!pExpCtx->shouldCollectDocumentSourceExecStats())) {
             return doGetNext();
         }
 
@@ -264,7 +264,8 @@ public:
         auto fcs = serviceCtx->getFastClockSource();
         invariant(fcs);
 
-        ScopedTimer timer(fcs, &_commonStats.executionTimeMillis);
+        invariant(_commonStats.executionTimeMillis);
+        ScopedTimer timer(fcs, _commonStats.executionTimeMillis.get_ptr());
         ++_commonStats.works;
 
         GetNextResult next = doGetNext();

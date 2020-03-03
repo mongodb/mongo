@@ -45,6 +45,7 @@ class ScopedTimer {
     ScopedTimer& operator=(const ScopedTimer&) = delete;
 
 public:
+    ScopedTimer(ScopedTimer&& other) = default;
     ScopedTimer(ClockSource* cs, long long* counter);
 
     ~ScopedTimer();

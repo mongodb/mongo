@@ -327,7 +327,11 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     // Some top-level exec stats get pulled out of the root stage.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob->appendNumber("nReturned", stats.common.advanced);
-        bob->appendNumber("executionTimeMillisEstimate", stats.common.executionTimeMillis);
+        // Include executionTimeMillis if it was recorded.
+        if (stats.common.executionTimeMillis) {
+            bob->appendNumber("executionTimeMillisEstimate", *stats.common.executionTimeMillis);
+        }
+
         bob->appendNumber("works", stats.common.works);
         bob->appendNumber("advanced", stats.common.advanced);
         bob->appendNumber("needTime", stats.common.needTime);
@@ -729,7 +733,8 @@ void Explain::generateSinglePlanExecutionInfo(const PlanStageStats* stats,
     if (totalTimeMillis) {
         out->appendNumber("executionTimeMillis", *totalTimeMillis);
     } else {
-        out->appendNumber("executionTimeMillisEstimate", stats->common.executionTimeMillis);
+        invariant(stats->common.executionTimeMillis);
+        out->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
     }
 
     // Flatten the stats tree into a list.
@@ -957,7 +962,6 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
     // root stage of the plan tree.
     const CommonStats* common = root->getCommonStats();
     statsOut->nReturned = common->advanced;
-    statsOut->executionTimeMillis = common->executionTimeMillis;
 
     // The other fields are aggregations over the stages in the plan tree. We flatten
     // the tree into a list and then compute these aggregations.

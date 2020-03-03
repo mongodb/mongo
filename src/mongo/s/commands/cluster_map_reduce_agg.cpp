@@ -101,7 +101,9 @@ auto makeExpressionContext(OperationContext* opCtx,
         std::make_shared<MongosProcessInterface>(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),
-        boost::none);  // uuid
+        boost::none,  // uuid
+        false         // mayDbProfile: false because mongos has no profile collection.
+    );
     expCtx->inMongos = true;
     return expCtx;
 }

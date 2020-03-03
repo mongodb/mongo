@@ -47,9 +47,6 @@ struct PlanSummaryStats {
     // The total number of documents examined by the plan.
     size_t totalDocsExamined = 0U;
 
-    // The number of milliseconds spent inside the root stage's work() method.
-    long long executionTimeMillis = 0;
-
     // The number of collection scans that occur during execution. Note that more than one
     // collection scan may happen during execution (e.g. for $lookup execution).
     long long collectionScans = 0;

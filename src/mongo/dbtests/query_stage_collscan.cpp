@@ -105,7 +105,7 @@ public:
             _expCtx.get(), collection, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+            _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -195,7 +195,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor = PlanExecutor::make(
-        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -224,7 +224,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor = PlanExecutor::make(
-        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -377,7 +377,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
 
     // Run the rest of the scan and verify the results.
     auto statusWithPlanExecutor = PlanExecutor::make(
-        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 

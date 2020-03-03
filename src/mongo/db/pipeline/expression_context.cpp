@@ -50,7 +50,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::unique_ptr<CollatorInterface> collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
-                                     boost::optional<UUID> collUUID)
+                                     boost::optional<UUID> collUUID,
+                                     bool mayDbProfile)
     : ExpressionContext(opCtx,
                         request.getExplain(),
                         request.isFromMongos(),
@@ -63,7 +64,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(collator),
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
-                        std::move(collUUID)) {
+                        std::move(collUUID),
+                        mayDbProfile) {
     if (request.getIsMapReduceCommand()) {
         // mapReduce command JavaScript invocation is only subject to the server global
         // 'jsHeapLimitMB' limit.
@@ -84,7 +86,8 @@ ExpressionContext::ExpressionContext(
     std::unique_ptr<CollatorInterface> collator,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-    boost::optional<UUID> collUUID)
+    boost::optional<UUID> collUUID,
+    bool mayDbProfile)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -98,6 +101,7 @@ ExpressionContext::ExpressionContext(
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
+      mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()),
@@ -117,7 +121,8 @@ ExpressionContext::ExpressionContext(
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::unique_ptr<CollatorInterface> collator,
                                      const NamespaceString& nss,
-                                     const boost::optional<RuntimeConstants>& runtimeConstants)
+                                     const boost::optional<RuntimeConstants>& runtimeConstants,
+                                     bool mayDbProfile)
     : ns(nss),
       opCtx(opCtx),
       mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
@@ -125,6 +130,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
+      mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()) {
@@ -182,7 +188,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     std::move(collator),
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
-                                                    uuid);
+                                                    uuid,
+                                                    mayDbProfile);
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;

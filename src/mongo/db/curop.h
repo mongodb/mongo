@@ -427,6 +427,10 @@ public:
      */
     void raiseDbProfileLevel(int dbProfileLevel);
 
+    int dbProfileLevel() const {
+        return _dbprofile;
+    }
+
     /**
      * Gets the network operation type. No lock is required if called by the thread executing
      * the operation, but the lock must be held if called from another thread.

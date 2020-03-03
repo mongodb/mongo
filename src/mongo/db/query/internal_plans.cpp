@@ -62,7 +62,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
         auto eof = std::make_unique<EOFStage>(expCtx.get());
         // Takes ownership of 'ws' and 'eof'.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(eof), nullptr, yieldPolicy, NamespaceString(ns));
+            expCtx, std::move(ws), std::move(eof), nullptr, yieldPolicy, NamespaceString(ns));
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -73,7 +73,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =
-        PlanExecutor::make(opCtx, std::move(ws), std::move(cs), collection, yieldPolicy);
+        PlanExecutor::make(expCtx, std::move(ws), std::move(cs), collection, yieldPolicy);
     invariant(statusWithPlanExecutor.isOK());
     return std::move(statusWithPlanExecutor.getValue());
 }
@@ -96,7 +96,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
 
     auto executor =
-        PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
+        PlanExecutor::make(expCtx, std::move(ws), std::move(root), collection, yieldPolicy);
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
@@ -128,7 +128,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
                                                  options);
 
     auto executor =
-        PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
+        PlanExecutor::make(expCtx, std::move(ws), std::move(root), collection, yieldPolicy);
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
@@ -163,7 +163,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
 
     auto executor =
-        PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
+        PlanExecutor::make(expCtx, std::move(ws), std::move(root), collection, yieldPolicy);
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
@@ -190,7 +190,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
                                 expCtx.get(), params, ws.get(), collection, idHackStage.release()));
 
     auto executor =
-        PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
+        PlanExecutor::make(expCtx, std::move(ws), std::move(root), collection, yieldPolicy);
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }

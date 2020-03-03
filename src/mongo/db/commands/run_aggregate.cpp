@@ -375,7 +375,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               std::move(collator),
                               MongoProcessInterface::create(opCtx),
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
-                              uuid);
+                              uuid,
+                              CurOp::get(opCtx)->dbProfileLevel() > 0);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 

@@ -492,7 +492,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     // Making a PlanExecutor chooses the best plan.
     auto exec = uassertStatusOK(PlanExecutor::make(
-        _opCtx.get(), std::move(ws), std::move(mps), ctx.getCollection(), PlanExecutor::NO_YIELD));
+        _expCtx, std::move(ws), std::move(mps), ctx.getCollection(), PlanExecutor::NO_YIELD));
 
     auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
     ASSERT_TRUE(root->bestPlanChosen());
