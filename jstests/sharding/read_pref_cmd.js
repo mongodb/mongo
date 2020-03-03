@@ -6,9 +6,16 @@
  *   requires_fcv_44,
  * ]
  */
+(function() {
+"use strict";
+
 load("jstests/replsets/rslib.js");
 
-var NODE_COUNT = 2;
+const nodeCount = 3;
+const kDbName = "read_pref_cmd";
+const kShardedCollName = "test";
+const kShardedNs = kDbName + "." + kShardedCollName;
+const kNumDocs = 10;
 
 // Checking UUID and index consistency involves reading from the config server through mongos, but
 // this test sets an invalid readPreference on the connection to the mongos.
@@ -16,117 +23,174 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 /**
- * Prepare to call testReadPreference() or assertFailure().
+ * Prepares to call testConnReadPreference(), testCursorReadPreference() or testBadMode().
  */
 var setUp = function() {
     var configDB = st.s.getDB('config');
-    assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
-    assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
+    assert.commandWorked(configDB.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
 
-    // Each time we drop the 'test' DB we have to re-enable profiling. Enable profiling on 'admin'
+    // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
     st.rs0.nodes.forEach(function(node) {
-        assert(node.getDB('test').setProfilingLevel(2));
+        assert(node.getDB(kDbName).setProfilingLevel(2));
         assert(node.getDB('admin').setProfilingLevel(2));
     });
 };
 
 /**
- * Clean up after testReadPreference() or testBadMode(), prepare to call setUp() again.
+ * Cleans up after testConnReadPreference(), testCursorReadPreference() or testBadMode(),
+ * prepares to call setUp() again.
  */
 var tearDown = function() {
-    assert.commandWorked(st.s.getDB('test').dropDatabase());
+    assert.commandWorked(st.s.getDB(kDbName).dropDatabase());
     // Hack until SERVER-7739 gets fixed
     st.rs0.awaitReplication();
 };
 
 /**
- * Performs a series of tests on commands with read preference.
- *
- * @param conn {Mongo} the connection object of which to test the read
- *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a mongos connection.
- * @param mode {string} a read preference mode like 'secondary'
- * @param tagSets {Array.<Object>} list of tag sets to use
- * @param expectedHost {string} which host should this run on: 'primary', 'secondary', or 'any'
+ * Returns a profile query object for the given query object. Assumes that all values are
+ * native types (no objects).
  */
-var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, expectedHost) {
-    var testDB = conn.getDB('test');
-    var adminDB = conn.getDB('admin');
+let formatProfileQuery = function(queryObj, isQueryOp = false) {
+    let newQueryObj = isQueryOp ? {op: "query"} : {op: "command"};
+
+    for (var field in queryObj) {
+        newQueryObj['command.' + field] = queryObj[field];
+    }
+
+    return newQueryObj;
+};
+
+/**
+ * Returns the serverStatus hedgingMetrics for the given mongos connection.
+ */
+let getHedgingMetrics = function(mongosConn) {
+    return assert.commandWorked(mongosConn.adminCommand({serverStatus: 1})).hedgingMetrics;
+};
+
+/**
+ * Returns the number of nodes in 'rsNodes' that ran the command that matches the given
+ * 'profileQuery' to completion. If 'expectedNode' is "primary" or "secondary" (and 'secOk'
+ * is true), checks that the command only ran on the specified node.
+ */
+let getNumNodesCmdRanOn = function(rsNodes, {dbName, profileQuery, expectedNode, secOk}) {
+    let numNodesCmdRanOn = 0;
+    rsNodes.forEach(function(node) {
+        let profileDB = node.getDB(dbName);
+        let result = profileDB.system.profile.findOne(profileQuery);
+
+        if (result != null) {
+            if (secOk && expectedNode == "secondary") {
+                assert(profileDB.adminCommand({isMaster: 1}).secondary);
+            } else if (expectedNode == "primary") {
+                assert(profileDB.adminCommand({isMaster: 1}).ismaster);
+            }
+            numNodesCmdRanOn += 1;
+        }
+    });
+    return numNodesCmdRanOn;
+};
+
+/**
+ * Runs the given cmdFunc to run a command and asserts that the command runs successfully
+ * on the node(s) that match the given read preference and expected node.
+ */
+let assertCmdRanOnExpectedNodes = function(conn, isMongos, rsNodes, cmdTestCase) {
+    const hedgingMetricsBefore = isMongos ? getHedgingMetrics(conn) : {};
+    cmdTestCase.cmdFunc();
+    let hedgingMetricsAfter = isMongos ? getHedgingMetrics(conn) : {};
+
+    const expectHedging = isMongos && cmdTestCase.readPref.hedge &&
+        cmdTestCase.readPref.hedge.enabled && cmdTestCase.secOk;
+
+    if (expectHedging) {
+        const numOperations =
+            hedgingMetricsAfter.numTotalOperations - hedgingMetricsBefore.numTotalOperations;
+        const numHedgedOperations = hedgingMetricsAfter.numTotalHedgedOperations -
+            hedgingMetricsBefore.numTotalHedgedOperations;
+
+        assert.eq(1, numOperations, "expect the command to be eligible for hedging");
+        if (numHedgedOperations == 0) {
+            // We did not hedge the operation and send an additional request (i.e. we did not
+            // manage to acquire a connection to the other node before the command finished).
+            assert.eq(1, getNumNodesCmdRanOn(rsNodes, cmdTestCase));
+            return;
+        }
+
+        // We did hedge the operation. Use assert.soon to give the slower node time to finish
+        // running the hedged command.
+        assert.eq(1, numHedgedOperations);
+        assert.soon(() => {
+            hedgingMetricsAfter = getHedgingMetrics(conn);
+            const numNodes = getNumNodesCmdRanOn(rsNodes, cmdTestCase);
+            return numNodes == 2;
+        }, "expect the command to be hedged and to run to completion on all target nodes");
+    } else {
+        assert.eq(1, getNumNodesCmdRanOn(rsNodes, cmdTestCase));
+    }
+};
+
+/**
+ * Sets the connection's read preference, performs a series of commands, and verifies that
+ * each command runs on the expected node.
+ *
+ * @param conn {Mongo} the connection object of which to test the read preference functionality.
+ * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param rsNodes {Array.<Mongo>} list of the replica set node members.
+ * @param readPref {Object} object containing the following keys:
+ *          mode {string} a read preference mode like "secondary".
+ *          tagSets {Array.<Object>} list of tag sets to use.
+ *          hedge {Object} hedge options of the form {enabled: <bool>}.
+ * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
+ */
+let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expectedNode}) {
+    jsTest.log(`Testing ${isMongos ? "mongos" : "mongod"} connection with readPreference mode: ${
+        readPref.mode}, tag sets: ${tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
+
+    const hedgingEnabled = readPref.hedge && readPref.hedge.enabled;
+
+    let testDB = conn.getDB(kDbName);
+    let shardedColl = conn.getCollection(kShardedNs);
     conn.setSlaveOk(false);  // purely rely on readPref
-    jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
-    conn.setReadPref(mode, tagSets);
+    conn.setReadPref(readPref.mode, readPref.tagSets, readPref.hedge);
 
     /**
      * Performs the command and checks whether the command was routed to the
-     * appropriate node.
+     * appropriate node(s).
      *
      * @param cmdObj the cmd to send.
-     * @param secOk true if command should be routed to a secondary.
+     * @param secOk true if command can be routed to a secondary.
      * @param profileQuery the query to perform agains the profile collection to
      *     look for the cmd just sent.
      * @param dbName the name of the database against which to run the command,
      *     and to which the 'system.profile' entry for this command is written.
      */
-    var cmdTest = function(cmdObj, secOk, profileQuery, dbName = "test") {
+    var cmdTest = function(cmdObj, secOk, profileQuery, dbName = kDbName) {
         jsTest.log('about to do: ' + tojson(cmdObj));
 
-        let runCmdDB = conn.getDB(dbName);
+        const cmdFunc = () => {
+            // Use runReadCommand so that the cmdObj is modified with the readPreference.
+            const cmdResult = conn.getDB(dbName).runReadCommand(cmdObj);
+            jsTest.log('cmd result: ' + tojson(cmdResult));
+            assert.commandWorked(cmdResult);
+        };
 
-        // use runReadCommand so that the cmdObj is modified with the readPreference
-        // set on the connection.
-        var cmdResult = runCmdDB.runReadCommand(cmdObj);
-        jsTest.log('cmd result: ' + tojson(cmdResult));
-        assert(cmdResult.ok);
-
-        var testedAtLeastOnce = false;
-        var query = {op: 'command'};
-        Object.extend(query, profileQuery);
-
-        hostList.forEach(function(node) {
-            var profileDB = node.getDB(dbName);
-            var result = profileDB.system.profile.findOne(query);
-
-            if (result != null) {
-                if (secOk && expectedHost == "secondary") {
-                    // The command obeys read prefs and we expect to run
-                    // commands on secondaries with this mode and tag sets
-                    assert(profileDB.adminCommand({isMaster: 1}).secondary);
-                } else if (expectedHost == "primary") {
-                    // The command does not obey read prefs, or we expect to run
-                    // commands on primary with this mode or tag sets
-                    assert(profileDB.adminCommand({isMaster: 1}).ismaster);
-                }
-
-                testedAtLeastOnce = true;
-            }
-        });
-
-        assert(testedAtLeastOnce);
-    };
-
-    /**
-     * Assumption: all values are native types (no objects)
-     */
-    var formatProfileQuery = function(queryObj) {
-        var newObj = {};
-
-        for (var field in queryObj) {
-            newObj['command.' + field] = queryObj[field];
-        }
-
-        return newObj;
+        assertCmdRanOnExpectedNodes(conn,
+                                    isMongos,
+                                    rsNodes,
+                                    {readPref, expectedNode, cmdFunc, secOk, profileQuery, dbName});
     };
 
     // Test command that can be sent to secondary
-    cmdTest(
-        {distinct: 'user', key: 'x', query: {x: 1}}, true, formatProfileQuery({distinct: 'user'}));
+    cmdTest({distinct: kShardedCollName, key: 'x', query: {x: 1}},
+            true,
+            formatProfileQuery({distinct: kShardedCollName}));
 
     // Test command that can't be sent to secondary
     cmdTest({create: 'mrIn'}, false, formatProfileQuery({create: 'mrIn'}));
     // Make sure mrIn is propagated to secondaries before proceeding
-    testDB.runCommand({getLastError: 1, w: NODE_COUNT});
+    testDB.runCommand({getLastError: 1, w: nodeCount});
 
     var mapFunc = function(doc) {};
     var reduceFunc = function(key, values) {
@@ -135,16 +199,30 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, expec
 
     // Test inline mapReduce on sharded collection.
     if (isMongos) {
-        cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
-                false,
-                formatProfileQuery({aggregate: 'user'}));
+        const comment = 'mapReduce_inline_sharded_' + ObjectId();
+        cmdTest({
+            mapreduce: kShardedCollName,
+            map: mapFunc,
+            reduce: reduceFunc,
+            out: {inline: 1},
+            comment: comment
+        },
+                true,
+                formatProfileQuery({aggregate: kShardedCollName, comment: comment}));
     }
 
     // Test inline mapReduce on unsharded collection.
     if (isMongos) {
-        cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
+        const comment = 'mapReduce_inline_unsharded_' + ObjectId();
+        cmdTest({
+            mapreduce: 'mrIn',
+            map: mapFunc,
+            reduce: reduceFunc,
+            out: {inline: 1},
+            comment: comment
+        },
                 true,
-                formatProfileQuery({aggregate: 'mrIn'}));
+                formatProfileQuery({aggregate: 'mrIn', comment: comment}));
     } else {
         cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
                 true,
@@ -152,55 +230,81 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, expec
     }
 
     // Test non-inline mapReduce on sharded collection.
-    if (isMongos) {
-        cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
-                false,
-                formatProfileQuery({aggregate: 'user'}));
+    // TODO (SERVER-46646): Re-enable this test for when hedging is disallowed for commands
+    // that can do writes.
+    if (isMongos && !hedgingEnabled) {
+        const comment = 'mapReduce_noninline_sharded_' + ObjectId();
+        cmdTest({
+            mapreduce: kShardedCollName,
+            map: mapFunc,
+            reduce: reduceFunc,
+            out: {replace: 'mrOut'},
+            comment: comment
+        },
+                true,
+                formatProfileQuery({aggregate: kShardedCollName, comment: comment}));
     }
 
     // Test non-inline mapReduce on unsharded collection.
-    if (isMongos) {
-        cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
-                false,
-                formatProfileQuery({aggregate: 'user'}));
-    } else {
+    // TODO (SERVER-46646): Re-enable this test when hedging is disallowed for commands
+    // that can do writes.
+    if (isMongos && !hedgingEnabled) {
+        const comment = 'mapReduce_noninline_unsharded_' + ObjectId();
+        cmdTest({
+            mapreduce: 'mrIn',
+            map: mapFunc,
+            reduce: reduceFunc,
+            out: {replace: 'mrOut'},
+            comment: comment
+        },
+                true,
+                formatProfileQuery({aggregate: 'mrIn', comment: comment}));
+    } else if (!isMongos) {
         cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
                 false,
                 formatProfileQuery({mapreduce: 'mrIn', 'out.replace': 'mrOut'}));
     }
 
     // Test other commands that can be sent to secondary.
-    cmdTest({count: 'user'}, true, formatProfileQuery({count: 'user'}));
-    cmdTest({collStats: 'user'}, true, formatProfileQuery({count: 'user'}));
+    cmdTest({count: kShardedCollName}, true, formatProfileQuery({count: kShardedCollName}));
+    cmdTest({collStats: kShardedCollName}, true, formatProfileQuery({collStats: kShardedCollName}));
     cmdTest({dbStats: 1}, true, formatProfileQuery({dbStats: 1}));
 
-    assert.commandWorked(testDB.user.ensureIndex({loc: '2d'}));
+    assert.commandWorked(shardedColl.ensureIndex({loc: '2d'}));
     assert.commandWorked(
-        testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10}));
+        shardedColl.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10}));
 
     // TODO: SERVER-38961 Remove when simultaneous index builds complete.
     // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous
     // completion nature of indexes on secondaries, we can guarantee an index build is complete
     // on all secondaries once all secondaries have applied this collMod command.
-    assert.commandWorked(testDB.runCommand({collMod: 'user'}));
-    assert.commandWorked(testDB.runCommand({getLastError: 1, w: NODE_COUNT}));
+    assert.commandWorked(testDB.runCommand({collMod: kShardedCollName}));
+    assert.commandWorked(testDB.runCommand({getLastError: 1, w: nodeCount}));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
     if (!isMongos) {
-        cmdTest({geoSearch: 'user', near: [1, 1], search: {type: 'restaurant'}, maxDistance: 10},
+        cmdTest({
+            geoSearch: kShardedCollName,
+            near: [1, 1],
+            search: {type: 'restaurant'},
+            maxDistance: 10
+        },
                 true,
-                formatProfileQuery({geoSearch: 'user'}));
+                formatProfileQuery({geoSearch: kShardedCollName}));
     }
 
     // Test on sharded
-    cmdTest({aggregate: 'user', pipeline: [{$project: {x: 1}}], cursor: {}},
+    cmdTest({aggregate: kShardedCollName, pipeline: [{$project: {x: 1}}], cursor: {}},
             true,
-            formatProfileQuery({aggregate: 'user'}));
+            formatProfileQuery({
+                aggregate: kShardedCollName,
+                pipeline: [isMongos ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
+            }));
 
     // Test on non-sharded
     cmdTest({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}], cursor: {}},
             true,
-            formatProfileQuery({aggregate: 'mrIn'}));
+            formatProfileQuery({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}]}));
 
     // Test $currentOp aggregation stage.
     if (!isMongos) {
@@ -224,33 +328,74 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, expec
 };
 
 /**
- * Verify that commands fail with the given combination of mode and tags.
+ * Creates a cursor with the given read preference and verifies that the 'find' command runs
+ * on the expected node.
  *
- * @param conn {Mongo} the connection object of which to test the read
- *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
+ * @param conn {Mongo} the connection object of which to test the read preference functionality.
  * @param isMongos {boolean} true if conn is a mongos connection.
- * @param mode {string} a read preference mode like 'secondary'
- * @param tagSets {Array.<Object>} list of tag sets to use
+ * @param rsNodes {Array.<Mongo>} list of the replica set node members.
+ * @param readPref {Object} object containing the following keys:
+ *          mode {string} a read preference mode like "secondary".
+ *          tagSets {Array.<Object>} list of tag sets to use.
+ *          hedge {Object} hedge options of the form {enabled: <bool>}.
+ * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
-var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
-    var failureMsg, testDB, cmdResult;
+let testCursorReadPreference = function(conn, isMongos, rsNodes, {readPref, expectedNode}) {
+    jsTest.log(`Testing cursor with readPreference mode: ${readPref.mode}, tag sets: ${
+        tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
 
-    jsTest.log('Expecting failure for mode: ' + mode + ', tag sets: ' + tojson(tagSets));
+    let testColl = conn.getCollection(kShardedNs);
+    conn.setSlaveOk(false);  // purely rely on readPref
+
+    let bulk = testColl.initializeUnorderedBulkOp();
+    for (let i = 0; i < kNumDocs; ++i) {
+        bulk.insert({_id: i, x: i});
+    }
+    assert.commandWorked(bulk.execute());
+
+    let cursor =
+        testColl.find({x: {gte: 0}}).readPref(readPref.mode, readPref.tagSets, readPref.hedge);
+    const cmdFunc = () => cursor.toArray();
+    const secOk = true;
+    const profileQuery = formatProfileQuery({find: kShardedCollName, filter: {x: {gte: 0}}}, true);
+    const dbName = kDbName;
+
+    assertCmdRanOnExpectedNodes(
+        conn, isMongos, rsNodes, {readPref, expectedNode, cmdFunc, secOk, profileQuery, dbName});
+};
+
+/**
+ * Verifies that commands fail with the given combination of mode, tags, and hedge options
+ * in 'readPref'.
+ *
+ * @param conn {Mongo} the connection object of which to test the read preference functionality.
+ * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param rsNodes {Array.<Mongo>} list of the replica set host members.
+ * @param readPref {Object} object containing the following keys:
+ *          mode {string} a read preference mode like "secondary".
+ *          tagSets {Array.<Object>} list of tag sets to use.
+ *          hedge {Object} hedge options of the form {enabled: <bool>}.
+ * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
+ */
+let testBadMode = function(conn, isMongos, rsNodes, readPref) {
+    jsTest.log(`Expecting failure for mode: ${readPref.mode}, tag sets: ${
+        tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
     // use setReadPrefUnsafe to bypass client-side validation
-    conn._setReadPrefUnsafe(mode, tagSets);
-    testDB = conn.getDB('test');
+    conn._setReadPrefUnsafe(readPref.mode, readPref.tagSets, readPref.hedge);
+    let testDB = conn.getDB(kDbName);
 
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
     if (isMongos) {
         // Command result should have ok: 0.
-        cmdResult = testDB.runReadCommand({distinct: 'user', key: 'x'});
+        const cmdResult = testDB.runReadCommand({distinct: kShardedCollName, key: 'x'});
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(!cmdResult.ok);
     } else {
+        let failureMsg;
+
         try {
             // conn should throw error
-            testDB.runReadCommand({distinct: 'user', key: 'x'});
+            testDB.runReadCommand({distinct: kShardedCollName, key: 'x'});
             failureMsg = "Unexpected success running distinct!";
         } catch (e) {
             jsTest.log(e.toString());
@@ -261,84 +406,125 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     }
 };
 
-var testAllModes = function(conn, hostList, isMongos) {
-    // The primary is tagged with { tag: 'one' } and the secondary with
-    // { tag: 'two' } so we can test the interaction of modes and tags. Test
-    // a bunch of combinations.
+var testAllModes = function(conn, rsNodes, isMongos) {
+    // The primary is tagged with { tag: "one" } and one of the secondaries is
+    // tagged with { tag: "two" }. We can use this to test the interaction between
+    // modes, tags, and hedge options. Test a bunch of combinations.
     [
-        // mode, tagSets, expectedHost
-        ['primary', undefined, "primary"],
-        ['primary', [], "primary"],
+        // readPref and expectedNode.
+        {readPref: {mode: "primary"}, expectedNode: "primary"},
+        {readPref: {mode: "primary", tagSets: []}, expectedNode: "primary"},
 
-        ['primaryPreferred', undefined, "any"],
-        ['primaryPreferred', [{tag: 'one'}], "primary"],
-        // Correctly uses primary and ignores the tag
-        ['primaryPreferred', [{tag: 'two'}], "any"],
+        {readPref: {mode: "primaryPreferred"}, expectedNode: "any"},
+        {readPref: {mode: "primaryPreferred", tagSets: [{tag: "one"}]}, expectedNode: "primary"},
+        {readPref: {mode: "primaryPreferred", tagSets: [{tag: "two"}]}, expectedNode: "any"},
+        {readPref: {mode: "primaryPreferred", hedge: {enabled: false}}, expectedNode: "any"},
 
-        ['secondary', undefined, "secondary"],
-        ['secondary', [{tag: 'two'}], "secondary"],
-        ['secondary', [{tag: 'doesntexist'}, {}], "secondary"],
-        ['secondary', [{tag: 'doesntexist'}, {tag: 'two'}], "secondary"],
+        {readPref: {mode: "secondary"}, expectedNode: "secondary"},
+        {readPref: {mode: "secondary", tagSets: [{tag: "two"}]}, expectedNode: "secondary"},
+        {
+            readPref: {mode: "secondary", tagSets: [{tag: "doesntexist"}, {}]},
+            expectedNode: "secondary"
+        },
+        {
+            readPref: {mode: "secondary", tagSets: [{tag: "doesntexist"}, {tag: "two"}]},
+            expectedNode: "secondary"
+        },
+        {readPref: {mode: "secondary", hedge: {enabled: false}}, expectedNode: "secondary"},
+        {readPref: {mode: "secondary", hedge: {enabled: true}}, expectedNode: "secondary"},
 
-        ['secondaryPreferred', undefined, "any"],
-        ['secondaryPreferred', [{tag: 'one'}], "primary"],
-        ['secondaryPreferred', [{tag: 'two'}], "any"],
+        {readPref: {mode: 'secondaryPreferred'}, expectedNode: "any"},
+        {readPref: {mode: 'secondaryPreferred', tagSets: [{tag: "one"}]}, expectedNode: "primary"},
+        {readPref: {mode: 'secondaryPreferred', tagSets: [{tag: "two"}]}, expectedNode: "any"},
+        {readPref: {mode: 'secondaryPreferred', hedge: {enabled: false}}, expectedNode: "any"},
+        {readPref: {mode: 'secondaryPreferred', hedge: {enabled: true}}, expectedNode: "any"},
 
         // We don't have a way to alter ping times so we can't predict where an
-        // untagged 'nearest' command should go, hence only test with tags.
-        ['nearest', [{tag: 'one'}], "any"],
-        ['nearest', [{tag: 'two'}], "any"]
+        // untagged "nearest" command should go, hence only test with tags.
+        {readPref: {mode: "nearest", tagSets: [{tag: "one"}]}, expectedNode: "primary"},
+        {readPref: {mode: "nearest", tagSets: [{tag: "two"}]}, expectedNode: "secondary"},
+        {readPref: {mode: "nearest", hedge: {enabled: false}}, expectedNode: "any"},
+        {readPref: {mode: "nearest", hedge: {enabled: true}}, expectedNode: "any"}
 
-    ].forEach(function(args) {
-        var mode = args[0], tagSets = args[1], expectedHost = args[2];
-
+    ].forEach(function(testCase) {
         setUp();
-        testReadPreference(conn, hostList, isMongos, mode, tagSets, expectedHost);
+
+        // Run testCursorReadPreference() first since testConnReadPreference() sets the connection's
+        // read preference.
+        testCursorReadPreference(conn, isMongos, rsNodes, testCase);
+        testConnReadPreference(conn, isMongos, rsNodes, testCase);
+
         tearDown();
     });
 
     [
-        // Tags not allowed with primary
-        ['primary', [{dc: 'doesntexist'}]],
-        ['primary', [{dc: 'ny'}]],
-        ['primary', [{dc: 'one'}]],
+        // Tags are not allowed in mode "primary".
+        {readPref: {mode: "primary", tagSets: [{dc: "doesntexist"}]}},
+        {readPref: {mode: "primary", tagSets: [{dc: "ny"}]}},
+        {readPref: {mode: "primary", tagSets: [{dc: "one"}]}},
 
-        // No matching node
-        ['secondary', [{tag: 'one'}]],
-        ['nearest', [{tag: 'doesntexist'}]],
+        // Hedging is not allowed in mode "primary".
+        {readPref: {mode: "primary", hedge: {enabled: true}}},
 
-        ['invalid-mode', undefined],
-        ['secondary', ['misformatted-tags']]
+        // No matching node.
+        {readPref: {mode: "secondary", tagSets: [{tag: "one"}]}},
+        {readPref: {mode: "nearest", tagSets: [{tag: "doesntexist"}]}},
 
-    ].forEach(function(args) {
-        var mode = args[0], tagSets = args[1];
+        // Invalid mode, tags, hedgeOptions.
+        {readPref: {mode: "invalid-mode"}},
+        {readPref: {mode: "secondary", tagSets: ["misformatted-tags"]}},
+        {readPref: {mode: "nearest", hedge: {doesnotexist: true}}},
 
+    ].forEach(function(testCase) {
         setUp();
-        testBadMode(conn, hostList, isMongos, mode, tagSets);
+        testBadMode(conn, isMongos, rsNodes, testCase.readPref);
         tearDown();
     });
 };
 
-var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT}}});
+let st = new ShardingTest({shards: {rs0: {nodes: nodeCount}}});
 st.stopBalancer();
 
 awaitRSClientHosts(st.s, st.rs0.nodes);
 
-// Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
-var primary = st.rs0.getPrimary();
-var secondary = st.rs0.getSecondary();
-var PRIMARY_TAG = {dc: 'ny', tag: 'one'};
-var SECONDARY_TAG = {dc: 'ny', tag: 'two'};
+// Tag the primary and secondaries. Set node priorities to force the primary to never change
+// during this test.
+let primary = st.rs0.getPrimary();
+let secondaries = st.rs0.getSecondaries();
+let secondary1 = secondaries[0];
+let secondary2 = secondaries[1];
+
+const kPrimaryTag = {
+    dc: "ny",
+    tag: "one"
+};
+const kSecondaryTag1 = {
+    dc: "ny",
+    tag: "two"
+};
+const kSecondaryTag2 = {
+    dc: "ny",
+    tag: 'three'
+};
 
 var rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 rsConfig.members.forEach(function(member) {
-    if (member.host == primary.host) {
-        member.tags = PRIMARY_TAG;
-    } else {
-        member.tags = SECONDARY_TAG;
-        member.priority = 0;
-        member.votes = 0;
+    switch (member.host) {
+        case primary.host:
+            member.priority = 1;
+            member.tags = kPrimaryTag;
+            break;
+        case secondary1.host:
+            member.priority = 0;
+            member.tags = kSecondaryTag1;
+            break;
+        case secondary2.host:
+            member.priority = 0;
+            member.tags = kSecondaryTag2;
+            break;
+        default:
+            throw Error("unknown host name " + member.host);
     }
 });
 
@@ -367,7 +553,8 @@ assert.soon(function() {
 });
 
 reconnect(primary);
-reconnect(secondary);
+reconnect(secondary1);
+reconnect(secondary2);
 
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
@@ -375,8 +562,9 @@ jsTest.log('got rsconf ' + tojson(rsConfig));
 var replConn = new Mongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
-_awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);
-_awaitRSHostViaRSMonitor(secondary.name, {ok: true, tags: SECONDARY_TAG}, st.rs0.name);
+_awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: kPrimaryTag}, st.rs0.name);
+_awaitRSHostViaRSMonitor(secondary1.name, {ok: true, tags: kSecondaryTag1}, st.rs0.name);
+_awaitRSHostViaRSMonitor(secondary2.name, {ok: true, tags: kSecondaryTag2}, st.rs0.name);
 
 st.rs0.nodes.forEach(function(conn) {
     assert.commandWorked(
@@ -390,6 +578,10 @@ testAllModes(replConn, st.rs0.nodes, false);
 
 jsTest.log('Starting test for mongos connection');
 
+// Force the mongos's replica set monitors to always include all the eligible nodes.
+let failPoint = configureFailPoint(st.s, "serverSelectorIgnoresLatencyWindow");
 testAllModes(st.s, st.rs0.nodes, true);
+failPoint.off();
 
 st.stop();
+})();
