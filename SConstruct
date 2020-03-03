@@ -3896,8 +3896,9 @@ if get_option('ninja') != 'disabled':
     env.NinjaRule(
         rule="TEST_LIST",
         description="Compiling test list: $out",
-        command="{}echo '$files' > '$out'".format(
-            "cmd.exe /c " if env["PLATFORM"] == "win32" else "",
+        command="{prefix}echo {flags} '$files' > '$out'".format(
+            prefix="cmd.exe /c " if env["PLATFORM"] == "win32" else "",
+            flags="-n" if env["PLATFORM"] != "win32" else "",
         ),
     )
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
