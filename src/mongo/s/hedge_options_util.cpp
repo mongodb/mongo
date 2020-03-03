@@ -37,7 +37,8 @@ boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeO
     const ReadPreferenceSetting& readPref) {
     if (gReadHedgingMode.load() == ReadHedgingMode::kOn && readPref.hedgingMode &&
         readPref.hedgingMode->getEnabled()) {
-        return executor::RemoteCommandRequestOnAny::HedgeOptions{1};
+        return executor::RemoteCommandRequestOnAny::HedgeOptions{1,
+                                                                 gMaxTimeMSForHedgedReads.load()};
     }
 
     return boost::none;

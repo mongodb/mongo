@@ -45,6 +45,7 @@ namespace executor {
 struct RemoteCommandRequestBase {
     struct HedgeOptions {
         size_t count;
+        int maxTimeMSForHedgedReads;
     };
 
     enum FireAndForgetMode { kOn, kOff };

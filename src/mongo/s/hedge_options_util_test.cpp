@@ -83,7 +83,8 @@ protected:
      */
     void checkHedgeOptions(const BSONObj& serverParameters,
                            const BSONObj& rspObj,
-                           const bool hedge) {
+                           const bool hedge,
+                           const int maxTimeMSForHedgedReads = kMaxTimeMSForHedgedReadsDefault) {
         setParameters(serverParameters);
 
         auto readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
@@ -91,6 +92,7 @@ protected:
 
         if (hedge) {
             ASSERT_TRUE(hedgeOptions.has_value());
+            ASSERT_EQ(hedgeOptions->maxTimeMSForHedgedReads, maxTimeMSForHedgedReads);
         } else {
             ASSERT_FALSE(hedgeOptions.has_value());
         }
@@ -101,8 +103,12 @@ protected:
     static inline const std::string kCollName = "testColl";
 
     static inline const std::string kReadHedgingModeFieldName = "readHedgingMode";
+    static inline const std::string kMaxTimeMSForHedgedReadsFieldName = "maxTimeMSForHedgedReads";
+    static inline const int kMaxTimeMSForHedgedReadsDefault = 10;
 
-    static inline const BSONObj kDefaultParameters = BSON(kReadHedgingModeFieldName << "on");
+    static inline const BSONObj kDefaultParameters =
+        BSON(kReadHedgingModeFieldName << "on" << kMaxTimeMSForHedgedReadsFieldName
+                                       << kMaxTimeMSForHedgedReadsDefault);
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
@@ -142,6 +148,17 @@ TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
                              << "hedge" << BSONObj());
 
     checkHedgeOptions(parameters, rspObj, false);
+}
+
+TEST_F(HedgeOptionsUtilTestFixture, MaxTimeMSForHedgedReads) {
+    const auto parameters =
+        BSON(kReadHedgingModeFieldName << "on" << kMaxTimeMSForHedgedReadsFieldName << 100);
+
+    const auto rspObj = BSON("mode"
+                             << "nearest"
+                             << "hedge" << BSONObj());
+
+    checkHedgeOptions(parameters, rspObj, true, 100);
 }
 
 }  // namespace

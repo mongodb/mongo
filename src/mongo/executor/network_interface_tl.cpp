@@ -45,6 +45,10 @@
 namespace mongo {
 namespace executor {
 
+namespace {
+static inline const std::string kMaxTimeMSOptionName = "maxTimeMS";
+}  // unnamed namespace
+
 /**
  * SynchronizedCounters is synchronized bucket of event counts for commands
  */
@@ -604,12 +608,36 @@ void NetworkInterfaceTL::RequestManager::trySend(
     LOGV2_DEBUG(4646300,
                 2,
                 "Sending request {request_id} with index {idx}",
-                "request_id"_attr = cmdState.lock()->requestOnAny.id,
+                "request_id"_attr = cmdStatePtr->requestOnAny.id,
                 "idx"_attr = idx);
 
     auto req = getNextRequest();
     if (req) {
-        req->send(std::move(swConn), {cmdStatePtr->requestOnAny, idx});
+        RemoteCommandRequest remoteReq({cmdStatePtr->requestOnAny, idx});
+        if (sentIdx.load() > 1) {  // this is a hedged read
+            invariant(remoteReq.hedgeOptions);
+            auto maxTimeMS = remoteReq.hedgeOptions->maxTimeMSForHedgedReads;
+            if (remoteReq.timeout == remoteReq.kNoTimeout ||
+                remoteReq.timeout > Milliseconds(maxTimeMS)) {
+                BSONObjBuilder updatedCmdBuilder;
+                for (const auto& elem : remoteReq.cmdObj) {
+                    if (elem.fieldNameStringData() != kMaxTimeMSOptionName) {
+                        updatedCmdBuilder.append(elem);
+                    }
+                }
+                updatedCmdBuilder.append(kMaxTimeMSOptionName, maxTimeMS);
+
+                remoteReq.cmdObj = updatedCmdBuilder.obj();
+                LOGV2_DEBUG(
+                    4647200,
+                    2,
+                    "Set  MaxTimeMS to {maxTimeMS} for request {request_id} with index {idx}",
+                    "maxTimeMS"_attr = maxTimeMS,
+                    "request_id"_attr = cmdStatePtr->requestOnAny.id,
+                    "idx"_attr = idx);
+            }
+        }
+        req->send(std::move(swConn), remoteReq);
     }
 }
 
