@@ -327,7 +327,7 @@ assert = (function() {
         if (TestData && TestData.inEvergreen) {
             timeout = timeout || 10 * 60 * 1000;
         } else {
-            timeout = timeout || 60 * 1000;
+            timeout = timeout || 90 * 1000;
         }
 
         interval = interval || 200;
