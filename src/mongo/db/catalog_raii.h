@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/views/view.h"
 
 namespace mongo {
@@ -227,6 +228,63 @@ private:
     OperationContext* _opCtx;
     RecoveryUnit::ReadSource _originalReadSource;
     Timestamp _originalReadTimestamp;
+};
+
+/**
+ * RAII-style class to acquire proper locks using special oplog locking rules for oplog accesses.
+ *
+ * If storage engine supports document-level locking, only global lock is acquired:
+ * | OplogAccessMode | Global Lock |
+ * +-----------------+-------------|
+ * | kRead           | MODE_IS     |
+ * | kWrite          | MODE_IX     |
+ *
+ * Otherwise, database and collection intent locks are also acquired:
+ * | OplogAccessMode | Global Lock | 'local' DB Lock | 'oplog.rs' Collection Lock |
+ * +-----------------+-------------+-----------------+----------------------------|
+ * | kRead           | MODE_IS     | MODE_IS         | MODE_IS                    |
+ * | kWrite          | MODE_IX     | MODE_IX         | MODE_IX                    |
+ *
+ * kLogOp is a special mode for replication operation logging and it behaves similar to kWrite. The
+ * difference between kWrite and kLogOp is that kLogOp invariants that global IX lock is already
+ * held and would only acquire database and collection locks listed above for
+ * non-document-level-locking engine only if those locks are not already held. And it is the
+ * caller's responsibility to ensure those locks already held are still valid within the lifetime of
+ * this object.
+ *
+ * Any acquired locks may be released when this object goes out of scope, therefore the oplog
+ * collection reference returned by this class should not be retained.
+ */
+enum class OplogAccessMode { kRead, kWrite, kLogOp };
+class AutoGetOplog {
+    AutoGetOplog(const AutoGetOplog&) = delete;
+    AutoGetOplog& operator=(const AutoGetOplog&) = delete;
+
+public:
+    AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline = Date_t::max());
+
+    /**
+     * Return a pointer to the per-service-context LocalOplogInfo.
+     */
+    repl::LocalOplogInfo* getOplogInfo() const {
+        return _oplogInfo;
+    }
+
+    /**
+     * Returns a pointer to the oplog collection or nullptr if the oplog collection didn't exist.
+     */
+    Collection* getCollection() const {
+        return _oplog;
+    }
+
+private:
+    ShouldNotConflictWithSecondaryBatchApplicationBlock
+        _shouldNotConflictWithSecondaryBatchApplicationBlock;
+    boost::optional<Lock::GlobalLock> _globalLock;
+    boost::optional<Lock::DBLock> _dbWriteLock;
+    boost::optional<Lock::CollectionLock> _collWriteLock;
+    repl::LocalOplogInfo* _oplogInfo;
+    Collection* _oplog;
 };
 
 }  // namespace mongo

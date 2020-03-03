@@ -43,6 +43,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -625,23 +626,15 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
 }
 
 StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opCtx) const {
-    const auto docsSW = _storageInterface->findDocuments(opCtx,
-                                                         NamespaceString::kRsOplogNamespace,
-                                                         boost::none,  // Collection scan
-                                                         StorageInterface::ScanDirection::kBackward,
-                                                         {},
-                                                         BoundInclusion::kIncludeStartKeyOnly,
-                                                         1U);
-    if (!docsSW.isOK()) {
-        return docsSW.getStatus();
+    // OplogInterfaceLocal creates a backwards iterator over the oplog collection.
+    OplogInterfaceLocal localOplog(opCtx);
+    auto localOplogIter = localOplog.makeIterator();
+    const auto topOfOplogSW = localOplogIter->next();
+    if (!topOfOplogSW.isOK()) {
+        return topOfOplogSW.getStatus();
     }
-    const auto docs = docsSW.getValue();
-    if (docs.empty()) {
-        return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
-    }
-    invariant(1U == docs.size());
-
-    return OpTime::parseFromOplogEntry(docs.front());
+    const auto topOfOplogBSON = topOfOplogSW.getValue().first;
+    return OpTime::parseFromOplogEntry(topOfOplogBSON);
 }
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
@@ -709,9 +702,6 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
     }
 
     if (stableTimestamp && !stableTimestamp->isNull() && truncatePoint <= stableTimestamp) {
-        AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
-        invariant(oplog.getCollection());
-
         LOGV2(21556,
               "The oplog truncation point ({truncatePoint}) is equal to or earlier than the stable "
               "timestamp ({stableTimestamp}), so truncating after the stable timestamp instead",

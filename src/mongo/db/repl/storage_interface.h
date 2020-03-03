@@ -150,8 +150,7 @@ public:
      * Implementations are allowed to be "fuzzy" and delete documents when the actual size is
      * slightly above or below this, so callers should not rely on its exact value.
      */
-    virtual StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
-                                               const NamespaceString& nss) = 0;
+    virtual StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx) = 0;
 
     /**
      * Creates a collection.

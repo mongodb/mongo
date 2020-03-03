@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
@@ -53,12 +54,17 @@ public:
         if (!opCtx->getServiceContext()->getStorageEngine()->supportsOplogStones()) {
             return builder.obj();
         }
-        {
-            AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString::kRsOplogNamespace);
-            Collection* oplogColl = ctx.getCollection();
-            if (oplogColl) {
-                oplogColl->getRecordStore()->getOplogTruncateStats(builder);
-            }
+        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        auto oplog = oplogRead.getCollection();
+        if (oplog) {
+            const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, "local");
+            invariant(localDb);
+            AutoStatsTracker statsTracker(opCtx,
+                                          NamespaceString::kRsOplogNamespace,
+                                          Top::LockType::ReadLocked,
+                                          AutoStatsTracker::LogMode::kUpdateTop,
+                                          localDb->getProfilingLevel());
+            oplog->getRecordStore()->getOplogTruncateStats(builder);
         }
         return builder.obj();
     }

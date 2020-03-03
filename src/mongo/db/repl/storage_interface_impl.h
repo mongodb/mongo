@@ -77,8 +77,7 @@ public:
     Status dropReplicatedDatabases(OperationContext* opCtx) override;
 
     Status createOplog(OperationContext* opCtx, const NamespaceString& nss) override;
-    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
-                                       const NamespaceString& nss) override;
+    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx) override;
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,

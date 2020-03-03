@@ -50,15 +50,13 @@ public:
     StatusWith<Value> next() override;
 
 private:
-    Lock::DBLock _dbLock;
-    Lock::CollectionLock _collectionLock;
+    AutoGetOplog _oplogRead;
     OldClientContext _ctx;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
-    : _dbLock(opCtx, NamespaceString::kRsOplogNamespace.db(), MODE_IS),
-      _collectionLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_S),
+    : _oplogRead(opCtx, OplogAccessMode::kRead),
       _ctx(opCtx, NamespaceString::kRsOplogNamespace.ns()),
       _exec(
           InternalPlanner::collectionScan(opCtx,

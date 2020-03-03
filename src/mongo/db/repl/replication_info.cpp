@@ -52,7 +52,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -269,9 +268,9 @@ public:
         // TODO(siyuan) Output term of OpTime
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
         auto earliestOplogTimestampFetch =
-            oplog.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+            oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
         Timestamp earliestOplogTimestamp;
         if (earliestOplogTimestampFetch.isOK()) {
             earliestOplogTimestamp = earliestOplogTimestampFetch.getValue();

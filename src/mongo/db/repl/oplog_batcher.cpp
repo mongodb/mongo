@@ -361,8 +361,7 @@ std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* s
     // rollback recovery we will be preparing transactions before the read timestamp, which triggers
     // an assertion in WiredTiger.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
-    auto oplogMaxSizeResult =
-        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
+    auto oplogMaxSizeResult = storageInterface->getOplogMaxSize(opCtx);
     auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
     return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));
 }

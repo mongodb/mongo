@@ -162,8 +162,7 @@ public:
         return createOplogFn(opCtx, nss);
     };
 
-    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
-                                       const NamespaceString& nss) override {
+    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx) override {
         return 1024 * 1024 * 1024;
     }
 
