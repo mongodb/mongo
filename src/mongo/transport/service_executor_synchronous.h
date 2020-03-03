@@ -37,6 +37,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 namespace transport {
@@ -66,7 +67,8 @@ private:
 
     AtomicWord<bool> _stillRunning{false};
 
-    mutable Mutex _shutdownMutex = MONGO_MAKE_LATCH("ServiceExecutorSynchronous::_shutdownMutex");
+    mutable Mutex _shutdownMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
+                                                    "ServiceExecutorSynchronous::_shutdownMutex");
     stdx::condition_variable _shutdownCondition;
 
     AtomicWord<size_t> _numRunningWorkerThreads{0};

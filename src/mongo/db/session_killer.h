@@ -41,6 +41,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -131,7 +132,7 @@ private:
 
     stdx::thread _thread;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("SessionKiller::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "SessionKiller::_mutex");
     stdx::condition_variable _callerCV;
     stdx::condition_variable _killerCV;
 

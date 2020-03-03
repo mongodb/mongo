@@ -38,6 +38,7 @@
 #include <iomanip>
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -304,6 +305,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
     }
 
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
     if (auto diagnostic = DiagnosticInfo::get(*client)) {
         BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
         waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
@@ -319,6 +321,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             */
         }
     }
+#endif
 }
 
 void CurOp::setGenericCursor_inlock(GenericCursor gc) {

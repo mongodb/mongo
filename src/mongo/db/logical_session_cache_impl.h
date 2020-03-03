@@ -34,6 +34,7 @@
 #include "mongo/db/sessions_collection.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -109,7 +110,8 @@ private:
     const std::shared_ptr<SessionsCollection> _sessionsColl;
     const ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("LogicalSessionCacheImpl::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "LogicalSessionCacheImpl::_mutex");
 
     LogicalSessionIdMap<LogicalSessionRecord> _activeSessions;
 

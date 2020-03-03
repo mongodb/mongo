@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
@@ -79,7 +80,9 @@ private:
     void _runTask(PeriodicTask* task);
 
     // _mutex protects the _shutdownRequested flag and the _tasks vector.
-    Mutex _mutex = MONGO_MAKE_LATCH("PeriodicTaskRunner::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(
+        // This mutex is held around task execution HierarchicalAcquisitionLevel(0),
+        "PeriodicTaskRunner::_mutex");
 
     // The condition variable is used to sleep for the interval between task
     // executions, and is notified when the _shutdownRequested flag is toggled.

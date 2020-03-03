@@ -44,6 +44,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/if_constexpr.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
@@ -488,8 +489,9 @@ public:
 
     // These are only used to signal completion to blocking waiters. Benchmarks showed that it was
     // worth deferring the construction of cv, so it can be avoided when it isn't necessary.
-    Mutex mx = MONGO_MAKE_LATCH("FutureResolution");  // F
-    boost::optional<stdx::condition_variable> cv;     // F (but guarded by mutex)
+
+    Mutex mx = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FutureResolution");  // F
+    boost::optional<stdx::condition_variable> cv;  // F (but guarded by mutex)
 
     // This holds the children created from a SharedSemiFuture. When this SharedState is completed,
     // the result will be copied in to each of the children. This allows their continuations to have

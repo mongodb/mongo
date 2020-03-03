@@ -35,6 +35,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 namespace executor {
@@ -67,7 +68,8 @@ private:
     NetworkInterface* const _net;
 
     // Protects all of the pool state below
-    Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceThreadPool::_mutex");
+    Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceThreadPool::_mutex");
     stdx::condition_variable _joiningCondition;
     std::vector<Task> _tasks;
     bool _started = false;

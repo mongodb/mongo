@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/mutex.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -250,7 +251,8 @@ private:
     T _value;
 
     // Mutex to guard value
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("synchronized_value::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "synchronized_value::_mutex");
 };
 
 template <class T>

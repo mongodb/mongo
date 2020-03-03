@@ -292,6 +292,7 @@ error_code("ChecksumMismatch", 288)
 error_code("WaitForMajorityServiceEarlierOpTimeAvailable", 289)
 # 290 is TransactionExceededLifetimeLimitSeconds, but not used.
 error_code("NoQueryExecutionPlans", 291)
+error_code("HierarchicalAcquisitionLevelViolation", 297)
 
 # Error codes 4000-8999 are reserved.
 

@@ -38,6 +38,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -213,7 +214,7 @@ private:
     const Options _options;
 
     // Mutex guarding all non-const member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ThreadPool::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ThreadPool::_mutex");
 
     // This variable represents the lifecycle state of the pool.
     //

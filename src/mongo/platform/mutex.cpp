@@ -29,20 +29,38 @@
 
 #include "mongo/platform/mutex.h"
 
-namespace mongo {
+#include "mongo/base/init.h"
+
+namespace mongo::latch_detail {
+
+Mutex::Mutex(std::shared_ptr<Data> data) : _data{std::move(data)} {
+    invariant(_data);
+
+    _data->counts().created.fetchAndAdd(1);
+}
+
+Mutex::~Mutex() {
+    invariant(!_isLocked);
+
+    _data->counts().destroyed.fetchAndAdd(1);
+}
 
 void Mutex::lock() {
     if (_mutex.try_lock()) {
-        _onQuickLock(_name);
+        _isLocked = true;
+        _onQuickLock();
         return;
     }
 
-    _onContendedLock(_name);
+    _onContendedLock();
     _mutex.lock();
-    _onSlowLock(_name);
+    _isLocked = true;
+    _onSlowLock();
 }
+
 void Mutex::unlock() {
-    _onUnlock(_name);
+    _onUnlock();
+    _isLocked = false;
     _mutex.unlock();
 }
 bool Mutex::try_lock() {
@@ -50,42 +68,77 @@ bool Mutex::try_lock() {
         return false;
     }
 
-    _onQuickLock(_name);
+    _isLocked = true;
+    _onQuickLock();
     return true;
 }
 
-void Mutex::addLockListener(LockListener* listener) {
-    auto& state = _getListenerState();
-
-    state.list.push_back(listener);
+StringData Mutex::getName() const {
+    return StringData(_data->identity().name());
 }
 
-void Mutex::_onContendedLock(const StringData& name) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onContendedLock(name);
+void Mutex::_onContendedLock() noexcept {
+    _data->counts().contended.fetchAndAdd(1);
+
+    auto& state = getDiagnosticListenerState();
+    if (!state.isFinalized.load()) {
+        return;
+    }
+
+    for (auto listener : state.listeners) {
+        listener->onContendedLock(_data->identity());
     }
 }
 
-void Mutex::_onQuickLock(const StringData& name) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onQuickLock(name);
+void Mutex::_onQuickLock() noexcept {
+    _data->counts().acquired.fetchAndAdd(1);
+
+    auto& state = getDiagnosticListenerState();
+    if (!state.isFinalized.load()) {
+        return;
+    }
+
+    for (auto listener : state.listeners) {
+        listener->onQuickLock(_data->identity());
     }
 }
 
-void Mutex::_onSlowLock(const StringData& name) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onSlowLock(name);
+void Mutex::_onSlowLock() noexcept {
+    _data->counts().acquired.fetchAndAdd(1);
+
+    auto& state = getDiagnosticListenerState();
+    if (!state.isFinalized.load()) {
+        return;
+    }
+
+    for (auto listener : state.listeners) {
+        listener->onSlowLock(_data->identity());
     }
 }
 
-void Mutex::_onUnlock(const StringData& name) noexcept {
-    auto& state = _getListenerState();
-    for (auto listener : state.list) {
-        listener->onUnlock(name);
+void Mutex::_onUnlock() noexcept {
+    _data->counts().released.fetchAndAdd(1);
+
+    auto& state = getDiagnosticListenerState();
+    if (!state.isFinalized.load()) {
+        return;
+    }
+
+    for (auto listener : state.listeners) {
+        listener->onUnlock(_data->identity());
     }
 }
 
-}  // namespace mongo
+/**
+ * Any MONGO_INITIALIZER that adds a DiagnosticListener will want to list
+ * FinalizeDiagnosticListeners as a dependent initializer. This means that all DiagnosticListeners
+ * are certified to be added before main and no DiagnosticListeners are ever invoked before main.
+ */
+MONGO_INITIALIZER(FinalizeDiagnosticListeners)(InitializerContext* context) {
+    auto& state = latch_detail::getDiagnosticListenerState();
+    state.isFinalized.store(true);
+
+    return Status::OK();
+}
+
+}  // namespace mongo::latch_detail

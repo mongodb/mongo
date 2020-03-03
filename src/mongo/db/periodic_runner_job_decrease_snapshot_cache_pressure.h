@@ -33,6 +33,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -59,7 +60,8 @@ private:
         ServiceContext::declareDecoration<PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded>();
 
     mutable Mutex _mutex =
-        MONGO_MAKE_LATCH("PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
+                         "PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_mutex");
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

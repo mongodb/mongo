@@ -41,6 +41,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/log.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/scopeguard.h"
@@ -191,7 +192,7 @@ protected:
         size_t target = 0;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH("LimitController::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "LimitController::_mutex");
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 

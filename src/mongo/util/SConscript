@@ -274,16 +274,32 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='diagnostic_info',
-    source= [
-        'diagnostic_info.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
+if get_option('use-diagnostic-latches') == 'on':
+    env.Library(
+        target='diagnostic_info',
+        source= [
+            'diagnostic_info.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            "$BUILD_DIR/mongo/db/service_context",
+        ],
+    )
+
+    env.Library(
+        target='latch_analyzer',
+        source= [
+            'latch_analyzer.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/db/service_context',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/commands/server_status',
+        ],
+    )
 
 env.Benchmark(
     target='clock_source_bm',
@@ -525,7 +541,7 @@ icuEnv.CppUnitTest(
         'container_size_helper_test.cpp',
         'decimal_counter_test.cpp',
         'decorable_test.cpp',
-        'diagnostic_info_test.cpp',
+        'diagnostic_info_test.cpp' if get_option('use-diagnostic-latches') == 'on' else [],
         'dns_name_test.cpp',
         'dns_query_test.cpp',
         'duration_test.cpp',
@@ -543,6 +559,7 @@ icuEnv.CppUnitTest(
         'icu_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
+        'latch_analyzer_test.cpp' if get_option('use-diagnostic-latches') == 'on' else [],
         'lockable_adapter_test.cpp',
         'lru_cache_test.cpp',
         'md5_test.cpp',
@@ -575,10 +592,12 @@ icuEnv.CppUnitTest(
         'background_job',
         'clock_source_mock',
         'clock_sources',
-        'diagnostic_info',
+        'diagnostic_info' if get_option('use-diagnostic-latches') == 'on' else [],
+        'latch_analyzer',
         'dns_query',
         'fail_point',
         'icu',
+        'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'md5',
         'periodic_runner_impl',
         'processinfo',

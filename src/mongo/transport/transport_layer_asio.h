@@ -42,6 +42,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -162,7 +163,7 @@ private:
     SSLParams::SSLModes _sslMode() const;
 #endif
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TransportLayerASIO::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TransportLayerASIO::_mutex");
 
     // There are three reactors that are used by TransportLayerASIO. The _ingressReactor contains
     // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains

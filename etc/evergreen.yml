@@ -10668,6 +10668,31 @@ buildvariants:
     distros:
     - ubuntu1604-build
 
+- name: enterprise-ubuntu-no-latch-1604-64-bit
+  display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
+  batchtime: 1440 # 1 day
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+
+- name: enterprise-ubuntu-no-latch-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
+  batchtime: 1440 # 1 day
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+
 - name: enterprise-ubuntu-task-executor-pool-size-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with {taskExecutorPoolSize: 4})"
   batchtime: 1440 # 1 day

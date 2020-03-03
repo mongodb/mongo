@@ -36,6 +36,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -191,7 +192,7 @@ private:
     AtomicWord<bool> _shardingInitialized{false};
 
     // Protects _configOpTime.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("Grid::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
 
     // Last known highest opTime from the config server that should be used when doing reads.
     // This value is updated any time a shard or mongos talks to a config server or a shard.

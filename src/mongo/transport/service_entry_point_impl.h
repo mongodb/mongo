@@ -38,6 +38,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_state_machine.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/cidr.h"
 
 namespace mongo {
@@ -81,7 +82,8 @@ private:
     ServiceContext* const _svcCtx;
     AtomicWord<std::size_t> _nWorkers;
 
-    mutable Mutex _sessionsMutex = MONGO_MAKE_LATCH("ServiceEntryPointImpl::_sessionsMutex");
+    mutable Mutex _sessionsMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceEntryPointImpl::_sessionsMutex");
     stdx::condition_variable _shutdownCondition;
     SSMList _sessions;
 

@@ -41,6 +41,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
@@ -153,7 +154,8 @@ private:
     void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
 
     // Protects the state below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SessionCatalog::_mutex");
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SessionCatalog::_mutex");
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;
