@@ -3055,11 +3055,11 @@ protected:
     }
 
     void assertPrintedExactlyOneSlowLogLine() {
-        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("transaction parameters:"));
+        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("transaction"));
     }
 
     void assertDidNotPrintSlowLogLine() {
-        ASSERT_EQUALS(0, countTextFormatLogLinesContaining("transaction parameters:"));
+        ASSERT_EQUALS(0, countTextFormatLogLinesContaining("transaction"));
     }
 
     auto routerTxnMetrics() {
@@ -3194,10 +3194,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTransactionParameters) {
 
     BSONObjBuilder lsidBob;
     getSessionId().serialize(&lsidBob);
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      str::stream() << "parameters:{ lsid: " << lsidBob.done().toString()
-                                    << ", txnNumber: " << kTxnNumber << ", autocommit: false"));
+
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("parameters" << BSON("lsid" << lsidBob.obj() << "txnNumber" << kTxnNumber
+                                                       << "autocommit" << false)))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {
@@ -3205,27 +3207,28 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {
     tickSource()->advance(Milliseconds(111));
     assertDurationIs(Milliseconds(111));
     runCommit(kDummyOkRes);
-    const auto& logs = getCapturedTextFormatLogMessages();
-    ASSERT_EQUALS(1, std::count_if(logs.begin(), logs.end(), [](const std::string& line) {
-                      return StringData(line).endsWith(" 111ms");
-                  }));
+
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("durationMillis" << 111))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTimeActiveAndInactive) {
     beginTxnWithDefaultTxnNumber();
-    tickSource()->advance(Microseconds(111));
-    assertTimeActiveIs(Microseconds(111));
+    tickSource()->advance(Microseconds(111111));
+    assertTimeActiveIs(Microseconds(111111));
 
     txnRouter().stash(operationContext());
-    tickSource()->advance(Microseconds(222));
-    assertTimeInactiveIs(Microseconds(222));
+    tickSource()->advance(Microseconds(222222));
+    assertTimeInactiveIs(Microseconds(222222));
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("timeActiveMicros:111,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("timeInactiveMicros:222,"));
+    ASSERT_EQUALS(
+        1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("timeActiveMicros" << 111111))));
+    ASSERT_EQUALS(
+        1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("timeInactiveMicros" << 222222))));
 }
 
 //
@@ -3250,7 +3253,11 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingReadConcern_Local) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(readConcern.toBSON()["readConcern"]));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("parameters"
+                           << BSON("readConcern" << readConcern.toBSON()["readConcern"].Obj())))));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("globalReadTimestamp:"));
 }
 
@@ -3261,7 +3268,11 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingReadConcern_Majority) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(readConcern.toBSON()["readConcern"]));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("parameters"
+                           << BSON("readConcern" << readConcern.toBSON()["readConcern"].Obj())))));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("globalReadTimestamp:"));
 }
 
@@ -3272,8 +3283,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingReadConcern_Snapshot) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(readConcern.toBSON()["readConcern"]));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("globalReadTimestamp:"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(
+            BSON("attr" << BSON("parameters"
+                                << BSON("readConcern" << readConcern.toBSON()["readConcern"].Obj()))
+                        << "globalReadTimestamp" << BSONUndefined)));
 }
 
 //
@@ -3284,9 +3299,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_NoShards) {
     beginSlowTxnWithDefaultTxnNumber();
     runNoShardCommit();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:noShards,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:0"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("commitType"
+                           << "noShards"
+                           << "numParticipants" << 0 << "commitDurationMicros" << BSONUndefined))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
 }
@@ -3295,9 +3313,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleShard) {
     beginSlowTxnWithDefaultTxnNumber();
     runSingleShardCommit();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:singleShard,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:1"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("commitType"
+                           << "singleShard"
+                           << "numParticipants" << 1 << "commitDurationMicros" << BSONUndefined))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
 }
@@ -3306,9 +3327,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleWriteShard) {
     beginSlowTxnWithDefaultTxnNumber();
     runSingleWriteShardCommit();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:singleWriteShard,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:2"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("commitType"
+                           << "singleWriteShard"
+                           << "numParticipants" << 2 << "commitDurationMicros" << BSONUndefined))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
 }
@@ -3317,9 +3341,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_ReadOnly) {
     beginSlowTxnWithDefaultTxnNumber();
     runReadOnlyCommit();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:readOnly,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:2"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("commitType"
+                           << "readOnly"
+                           << "numParticipants" << 2 << "commitDurationMicros" << BSONUndefined))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
 }
@@ -3328,18 +3355,23 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_TwoPhase) {
     beginSlowTxnWithDefaultTxnNumber();
     runTwoPhaseCommit();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:twoPhaseCommit,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("coordinator:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:2"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("commitType"
+                                          << "twoPhaseCommit"
+                                          << "numParticipants" << 2 << "commitDurationMicros"
+                                          << BSONUndefined << "coordinator" << BSONUndefined))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_Recovery) {
     beginSlowRecoverCommitWithDefaultTxnNumber();
     runRecoverWithTokenCommit(shard1);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:recoverWithToken,"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("commitType"
+                                          << "recoverWithToken"
+                                          << "commitDurationMicros" << BSONUndefined))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("numParticipants:"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
@@ -3362,9 +3394,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_ImplicitAbort) {
     beginSlowTxnWithDefaultTxnNumber();
     implicitAbortInProgress();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:aborted"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("abortCause:" + kDummyStatus.codeString()));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:1"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("terminationCause"
+                                          << "aborted"
+                                          << "abortCause" << kDummyStatus.codeString()
+                                          << "numParticipants" << 1))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("commitType:"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("commitDurationMicros:"));
@@ -3374,9 +3409,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_ExplicitAbort) {
     beginSlowTxnWithDefaultTxnNumber();
     explicitAbortInProgress();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:aborted"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("abortCause:abort"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:1"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("terminationCause"
+                                                                      << "aborted"
+                                                                      << "abortCause"
+                                                                      << "abort"
+                                                                      << "numParticipants" << 1))));
 
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("commitType:"));
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("commitDurationMicros:"));
@@ -3386,21 +3424,30 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_SuccessfulCommit) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:committed"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:singleShard"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:1"));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("terminationCause"
+                           << "committed"
+                           << "commitType"
+                           << "singleShard"
+                           << "numParticipants" << 1 << "commitDurationMicros" << BSONUndefined))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_FailedCommit) {
     beginSlowTxnWithDefaultTxnNumber();
     runCommit(kDummyErrorRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:aborted"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("abortCause:" + kDummyStatus.codeString()));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:1"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("terminationCause"
+                                          << "aborted"
+                                          << "abortCause" << kDummyStatus.codeString()
+                                          << "numParticipants" << 1 << "commitDurationMicros"
+                                          << BSONUndefined << "commitType" << BSONUndefined))));
+
+    // ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:"));
+    // ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
 }
 
 //
@@ -3512,9 +3559,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Success
 
     retryCommit(kDummyOkRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:committed"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("terminationCause"
+                                          << "committed"
+                                          << "commitDurationMicros" << BSONUndefined << "commitType"
+                                          << BSONUndefined))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Abort) {
@@ -3525,9 +3575,12 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Abort) 
 
     retryCommit(kDummyErrorRes);
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:aborted"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitType:"));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("commitDurationMicros:"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("terminationCause"
+                                          << "aborted"
+                                          << "commitDurationMicros" << BSONUndefined << "commitType"
+                                          << BSONUndefined))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Unknown) {

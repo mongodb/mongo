@@ -122,6 +122,7 @@ public:
          * the format: "<field1>:<value1> <field2>:<value2> ...".
          */
         std::string report() const;
+        BSONObj reportBSON() const;
 
         void report(logv2::DynamicAttributes* pAttrs) const;
 

@@ -133,11 +133,8 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     logAttrs.add("term", _term);
     logAttrs.add("dryRun", _dryRun);
 
-    auto logLine = log();
-    logLine << "VoteRequester(term " << _term << (_dryRun ? " dry run" : "") << ") ";
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
-        logLine << "failed to receive response from " << request.target << ": " << response.status;
         logAttrs.add("failReason", "failed to receive response"_sd);
         logAttrs.add("error", response.status);
         logAttrs.add("from", request.target);
@@ -155,8 +152,6 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         status = voteResponse.initialize(response.data);
     }
     if (!status.isOK()) {
-        logLine << "received an invalid response from " << request.target << ": " << status;
-        logLine << "; response message: " << response.data;
         logAttrs.add("failReason", "received an invalid response"_sd);
         logAttrs.add("error", status);
         logAttrs.add("from", request.target);
@@ -165,7 +160,6 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     }
 
     if (voteResponse.getVoteGranted()) {
-        logLine << "received a yes vote from " << request.target;
         logAttrs.add("vote", "yes"_sd);
         logAttrs.add("from", request.target);
         if (_primaryHost == request.target) {
@@ -173,8 +167,6 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         }
         _votes++;
     } else {
-        logLine << "received a no vote from " << request.target << " with reason \""
-                << voteResponse.getReason() << '"';
         logAttrs.add("vote", "no"_sd);
         logAttrs.add("from", request.target);
         logAttrs.add("reason", voteResponse.getReason());
@@ -183,7 +175,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     if (voteResponse.getTerm() > _term) {
         _staleTerm = true;
     }
-    logLine << "; response message: " << response.data;
+
     logAttrs.add("message", response.data);
 }
 

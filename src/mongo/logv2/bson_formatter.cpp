@@ -78,12 +78,12 @@ struct BSONValueExtractor {
     }
 
     // BSONObj is coming as a pointer, the generic one handles references
-    void operator()(StringData name, const BSONObj* val) {
-        _builder.append(name, *val);
+    void operator()(StringData name, const BSONObj val) {
+        _builder.append(name, val);
     }
 
-    void operator()(StringData name, const BSONArray* val) {
-        _builder.append(name, *val);
+    void operator()(StringData name, const BSONArray val) {
+        _builder.append(name, val);
     }
 
     // BSON is lacking unsigned types, so store unsigned int32 as signed int64

@@ -1333,6 +1333,7 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
 
 void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
                                                     TerminationCause terminationCause) const {
+
     logv2::DynamicAttributes attrs;
     BSONObjBuilder parametersBuilder;
 
@@ -1390,15 +1391,12 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
         commitTypeTemp = commitTypeToString(o().commitType);
         attrs.add("commitType", commitTypeTemp);
 
-        attrs.add("commitDuration",
-                  durationCount<Microseconds>(timingStats.getCommitDuration(tickSource, curTicks)));
+        attrs.add("commitDuration", timingStats.getCommitDuration(tickSource, curTicks));
     }
 
-    attrs.add("timeActive",
-              durationCount<Microseconds>(timingStats.getTimeActiveMicros(tickSource, curTicks)));
+    attrs.add("timeActive", timingStats.getTimeActiveMicros(tickSource, curTicks));
 
-    attrs.add("timeInactive",
-              durationCount<Microseconds>(timingStats.getTimeInactiveMicros(tickSource, curTicks)));
+    attrs.add("timeInactive", timingStats.getTimeInactiveMicros(tickSource, curTicks));
 
     // Total duration of the transaction. Logged at the end of the line for consistency with
     // slow command logging.
@@ -1406,12 +1404,6 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
               duration_cast<Milliseconds>(timingStats.getDuration(tickSource, curTicks)));
 
     LOGV2(51805, "transaction", attrs);
-
-    // TODO SERVER-46219: Log also with old log system to not break unit tests
-    LOGV2(22899,
-          "transaction {transactionInfoForLog_opCtx_terminationCause}",
-          "transactionInfoForLog_opCtx_terminationCause"_attr =
-              _transactionInfoForLog(opCtx, terminationCause));
 }
 
 std::string TransactionRouter::Router::_transactionInfoForLog(

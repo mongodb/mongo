@@ -2240,13 +2240,15 @@ TEST_F(OplogApplierImplTest, LogSlowOpApplicationWhenSuccessful) {
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), &entry, OplogApplication::Mode::kSecondary));
 
-    // Use a builder for easier escaping. We expect the operation to be logged.
-    StringBuilder expected;
-    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, v: 2, op: \"i\", ns: \"test.t\", "
-                "wall: new Date(0), o: "
-                "{ _id: 0 } }, took "
-             << applyDuration << "ms";
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining(expected.str()));
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("CRUD" << BSON("ts" << Timestamp(1, 1) << "t" << 1 << "v" << 2 << "op"
+                                               << "i"
+                                               << "ns"
+                                               << "test.t"
+                                               << "wall" << Date_t::fromMillisSinceEpoch(0))
+                                  << "durationMillis" << applyDuration))));
 }
 
 TEST_F(OplogApplierImplTest, DoNotLogSlowOpApplicationWhenFailed) {

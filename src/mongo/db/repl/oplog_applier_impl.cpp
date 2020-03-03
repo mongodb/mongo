@@ -113,38 +113,19 @@ Status finishAndLogApply(OperationContext* opCtx,
                                         Milliseconds(opDuration),
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            {
 
-                logv2::DynamicAttributes attrs;
+            logv2::DynamicAttributes attrs;
 
-                auto redacted = redact(entryOrGroupedInserts.toBSON());
-                if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
-                    attrs.add("command", redacted);
-                } else {
-                    attrs.add("CRUD", redacted);
-                }
-
-                attrs.add("duration", opDuration);
-
-                LOGV2(51801, "applied op", attrs);
+            auto redacted = redact(entryOrGroupedInserts.toBSON());
+            if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
+                attrs.add("command", redacted);
+            } else {
+                attrs.add("CRUD", redacted);
             }
 
-            // TODO SERVER-46219: Log also with old log system to not break unit tests
-            {
-                StringBuilder s;
-                s << "applied op: ";
+            attrs.add("duration", Milliseconds(opDuration));
 
-                if (entryOrGroupedInserts.getOp().getOpType() == OpTypeEnum::kCommand) {
-                    s << "command ";
-                } else {
-                    s << "CRUD ";
-                }
-
-                s << redact(entryOrGroupedInserts.toBSON());
-                s << ", took " << opDuration << "ms";
-
-                LOGV2(21228, "{msg}", "msg"_attr = s.str());
-            }
+            LOGV2(51801, "applied op", attrs);
         }
     }
     return finalStatus;

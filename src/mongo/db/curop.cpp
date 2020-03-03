@@ -496,10 +496,6 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         logv2::DynamicAttributes attr;
         _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), &attr);
         LOGV2(51803, "slow query", attr);
-
-        // TODO SERVER-46219: Log also with old log system to not break unit tests
-        log(logComponentV2toV1(component))
-            << _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
     // Return 'true' if this operation should also be added to the profiler.
@@ -1263,6 +1259,21 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", keysDeleted);
     OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", writeConflicts);
+}
+
+BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
+    BSONObjBuilder b;
+    OPDEBUG_APPEND_OPTIONAL("keysExamined", keysExamined);
+    OPDEBUG_APPEND_OPTIONAL("docsExamined", docsExamined);
+    OPDEBUG_APPEND_OPTIONAL("nMatched", nMatched);
+    OPDEBUG_APPEND_OPTIONAL("nModified", nModified);
+    OPDEBUG_APPEND_OPTIONAL("ninserted", ninserted);
+    OPDEBUG_APPEND_OPTIONAL("ndeleted", ndeleted);
+    OPDEBUG_APPEND_OPTIONAL("keysInserted", keysInserted);
+    OPDEBUG_APPEND_OPTIONAL("keysDeleted", keysDeleted);
+    OPDEBUG_APPEND_ATOMIC("prepareReadConflicts", prepareReadConflicts);
+    OPDEBUG_APPEND_ATOMIC("writeConflicts", writeConflicts);
+    return b.obj();
 }
 
 }  // namespace mongo

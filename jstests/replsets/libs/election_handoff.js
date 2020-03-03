@@ -79,18 +79,20 @@ var ElectionHandoffTest = (function() {
                     expectedCandidate,
                     `skipping dry run and running for election in term {newTerm}","attr":{"newTerm":${
                         term + 1}}}`);
-                checkLog.contains(
+                checkLog.checkContainsOnceJson(
                     expectedCandidate,
-                    `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
+                    51799,
+                    {"term": term + 1, vote: "yes", "from": primary.host});
             }
         } else {
             // If there are only two nodes in the set, verify that the old primary voted "yes".
             if (numNodes === 2) {
                 checkLog.contains(expectedCandidate,
                                   `skipping dry run and running for election in term ${term + 1}`);
-                checkLog.contains(
+                checkLog.checkContainsOnceJson(
                     expectedCandidate,
-                    `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
+                    51799,
+                    {"term": term + 1, vote: "yes", "from": primary.host});
             }
         }
 

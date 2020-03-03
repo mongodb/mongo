@@ -1943,19 +1943,15 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
 
     singleTransactionStats.getOpDebug()->additiveMetrics.report(pAttrs);
 
-    std::string terminationCauseString =
+    StringData terminationCauseString =
         terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
     pAttrs->add("terminationCause", terminationCauseString);
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
     auto curTick = tickSource->getTicks();
 
-    pAttrs->add("timeActive",
-                durationCount<Microseconds>(
-                    singleTransactionStats.getTimeActiveMicros(tickSource, curTick)));
-    pAttrs->add("timeInactive",
-                durationCount<Microseconds>(
-                    singleTransactionStats.getTimeInactiveMicros(tickSource, curTick)));
+    pAttrs->add("timeActive", singleTransactionStats.getTimeActiveMicros(tickSource, curTick));
+    pAttrs->add("timeInactive", singleTransactionStats.getTimeInactiveMicros(tickSource, curTick));
 
     // Number of yields is always 0 in multi-document transactions, but it is included mainly to
     // match the format with other slow operation logging messages.
@@ -1976,7 +1972,7 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     const bool txnWasPrepared = totalPreparedDuration > 0;
     pAttrs->add("wasPrepared", txnWasPrepared);
     if (txnWasPrepared) {
-        pAttrs->add("totalPreparedDuration", totalPreparedDuration);
+        pAttrs->add("totalPreparedDuration", Microseconds(totalPreparedDuration));
         pAttrs->add("prepareOpTime", o().prepareOpTime);
     }
 
@@ -1984,6 +1980,83 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     pAttrs->add(
         "duration",
         duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick)));
+}
+
+// Needs to be kept in sync with _transactionInfoForLog
+BSONObj TransactionParticipant::Participant::_transactionInfoBSONForLog(
+    OperationContext* opCtx,
+    const SingleThreadedLockStats* lockStats,
+    TerminationCause terminationCause,
+    repl::ReadConcernArgs readConcernArgs) const {
+    invariant(lockStats);
+
+    // User specified transaction parameters.
+    BSONObjBuilder parametersBuilder;
+
+    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
+    _sessionId().serialize(&lsidBuilder);
+    lsidBuilder.doneFast();
+
+    parametersBuilder.append("txnNumber", o().activeTxnNumber);
+    parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
+    readConcernArgs.appendInfo(&parametersBuilder);
+
+    BSONObjBuilder logLine;
+    {
+        BSONObjBuilder attrs = logLine.subobjStart("attr");
+        attrs.append("parameters", parametersBuilder.obj());
+
+        const auto& singleTransactionStats =
+            o().transactionMetricsObserver.getSingleTransactionStats();
+
+        attrs.append("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
+
+        attrs.appendElements(singleTransactionStats.getOpDebug()->additiveMetrics.reportBSON());
+
+        StringData terminationCauseString =
+            terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
+        attrs.append("terminationCause", terminationCauseString);
+
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
+        auto curTick = tickSource->getTicks();
+
+        attrs.append("timeActiveMicros",
+                     durationCount<Microseconds>(
+                         singleTransactionStats.getTimeActiveMicros(tickSource, curTick)));
+        attrs.append("timeInactiveMicros",
+                     durationCount<Microseconds>(
+                         singleTransactionStats.getTimeInactiveMicros(tickSource, curTick)));
+
+        // Number of yields is always 0 in multi-document transactions, but it is included mainly to
+        // match the format with other slow operation logging messages.
+        attrs.append("numYields", 0);
+        // Aggregate lock statistics.
+
+        BSONObjBuilder locks;
+        lockStats->report(&locks);
+        attrs.append("locks", locks.obj());
+
+        if (singleTransactionStats.getOpDebug()->storageStats)
+            attrs.append("storage", singleTransactionStats.getOpDebug()->storageStats->toBSON());
+
+        // It is possible for a slow transaction to have aborted in the prepared state if an
+        // exception was thrown before prepareTransaction succeeds.
+        const auto totalPreparedDuration = durationCount<Microseconds>(
+            singleTransactionStats.getPreparedDuration(tickSource, curTick));
+        const bool txnWasPrepared = totalPreparedDuration > 0;
+        attrs.append("wasPrepared", txnWasPrepared);
+        if (txnWasPrepared) {
+            attrs.append("totalPreparedDurationMicros", totalPreparedDuration);
+            attrs.append("prepareOpTime", o().prepareOpTime.toBSON());
+        }
+
+        // Total duration of the transaction.
+        attrs.append(
+            "durationMillis",
+            duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick))
+                .count());
+    }
+    return logLine.obj();
 }
 
 void TransactionParticipant::Participant::_logSlowTransaction(
@@ -2003,20 +2076,9 @@ void TransactionParticipant::Participant::_logSlowTransaction(
                                         opDuration,
                                         Milliseconds(serverGlobalParams.slowMS))
                 .first) {
-            {
-                logv2::DynamicAttributes attr;
-                _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs, &attr);
-                LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);
-            }
-            // TODO SERVER-46219: Log also with old log system to not break unit tests
-            {
-                LOGV2_OPTIONS(22523,
-                              {logv2::LogComponent::kTransaction},
-                              "transaction "
-                              "{transactionInfo}",
-                              "transactionInfo"_attr = _transactionInfoForLog(
-                                  opCtx, lockStats, terminationCause, readConcernArgs));
-            }
+            logv2::DynamicAttributes attr;
+            _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs, &attr);
+            LOGV2_OPTIONS(51802, {logv2::LogComponent::kTransaction}, "transaction", attr);
         }
     }
 }
@@ -2086,8 +2148,9 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationCo
                         TransactionState::kAbortedWithPrepare,
                         TransactionState::TransitionValidation::kRelaxTransitionValidation);
                     break;
-                // We should never be refreshing a prepared or in-progress transaction from storage
-                // since it should already be in a valid state after replication recovery.
+                // We should never be refreshing a prepared or in-progress transaction from
+                // storage since it should already be in a valid state after replication
+                // recovery.
                 case DurableTxnStateEnum::kPrepared:
                 case DurableTxnStateEnum::kInProgress:
                     MONGO_UNREACHABLE;
@@ -2161,8 +2224,8 @@ void TransactionParticipant::Participant::_resetRetryableWriteState() {
 void TransactionParticipant::Participant::_resetTransactionState(
     WithLock wl, TransactionState::StateFlag state) {
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
-    // prepared transaction for rollback. In the latter case, we will need to relax the invariant
-    // that prevents transitioning from kPrepared to kNone.
+    // prepared transaction for rollback. In the latter case, we will need to relax the
+    // invariant that prevents transitioning from kPrepared to kNone.
     if (o().txnState.isPrepared() && state == TransactionState::kNone) {
         o(wl).txnState.transitionTo(
             state, TransactionState::TransitionValidation::kRelaxTransitionValidation);

@@ -68,7 +68,7 @@ function runTests() {
                                                : "insert test.lock_acquisition_time")
             : (conn.writeMode() === "commands"
                    ? /"ns":"test.lock_acquisition_time".*"command":{"insert"/
-                   : "insert test.lock_acquisition_time"));
+                   : /"type":"insert","ns":"test.lock_acquisition_time/));
 
     // Test that update profiler/logs include lock acquisition time.
     runWithWait(hangMillis, function() {

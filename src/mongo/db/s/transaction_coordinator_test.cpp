@@ -1535,7 +1535,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     checkMetrics(expectedMetrics);
 
     LOGV2(22456,
-          "Start two-phase commit (allow the coordinator to progress to writing the participant "
+          "Start two phase commit (allow the coordinator to progress to writing the participant "
           "list).");
 
     expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
@@ -1680,7 +1680,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     stopCapturingLogMessages();
 
     // Slow log line is logged since the coordination completed successfully.
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
@@ -1725,7 +1725,7 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordinatorIsInactive) {
@@ -1768,7 +1768,7 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,
@@ -1829,7 +1829,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,
@@ -1894,7 +1894,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,
@@ -1961,7 +1961,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,
@@ -2032,7 +2032,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordinatorIsDeletingDoc) {
@@ -2109,19 +2109,19 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     stopCapturingLogMessages();
 
     // Slow log line is not logged since the coordination did not complete successfully.
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionAtLogLevelOne) {
     setMinimumLoggedSeverity(logv2::LogComponent::kTransaction, logv2::LogSeverity::Debug(1));
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionAtLogLevelZero) {
     setMinimumLoggedSeverity(logv2::LogComponent::kTransaction, logv2::LogSeverity::Log());
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold) {
@@ -2150,7 +2150,7 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
     coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(
@@ -2181,7 +2181,7 @@ TEST_F(
     coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
@@ -2210,7 +2210,7 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
     coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit parameters:"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("two-phase commit"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTransactionParameters) {
@@ -2218,17 +2218,19 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTransactionParamete
     BSONObjBuilder lsidBob;
     _lsid.serialize(&lsidBob);
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      str::stream() << "parameters:{ lsid: " << lsidBob.done().toString()
-                                    << ", txnNumber: " << _txnNumber));
+                  countBSONFormatLogLinesIsSubset(BSON(
+                      "attr" << BSON("parameters" << BSON("lsid" << lsidBob.obj() << "txnNumber"
+                                                                 << _txnNumber)))));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,
        SlowLogLineIncludesTerminationCauseAndCommitTimestampForCommitDecision) {
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "terminationCause:committed, commitTimestamp: Timestamp(1, 1)"));
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("terminationCause"
+                                          << "committed"
+                                          << "commitTimestamp" << Timestamp(1, 1).toBSON()))));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseForAbortDecision) {
@@ -2251,17 +2253,34 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     coordinator.onCompletion().get();
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("terminationCause:aborted"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("terminationCause"
+                                                                      << "aborted"))));
+
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("terminationDetails: NoSuchTransaction: from shard s1") +
-            countTextFormatLogLinesContaining(
-                "terminationDetails: NoSuchTransaction: from shard s2"));
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON(
+                "terminationDetails"
+                << BSON("code" << 251 << "codeName"
+                               << "NoSuchTransaction"
+                               << "errmsg"
+                               << "from shard s1 :: caused by :: No such transaction exists")))) +
+            countBSONFormatLogLinesIsSubset(BSON(
+                "attr" << BSON(
+                    "terminationDetails"
+                    << BSON("code" << 251 << "codeName"
+                                   << "NoSuchTransaction"
+                                   << "errmsg"
+                                   << "from shard s2 :: caused by :: No such transaction exists"))))
+
+    );
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesNumParticipants) {
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("numParticipants:2"));
+
+    ASSERT_EQUALS(1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("numParticipants" << 2))));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTotalDuration) {
@@ -2336,16 +2355,18 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
     stopCapturingLogMessages();
 
     // Note: The waiting for decision acks and deleting coordinator doc durations are not reported.
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("stepDurations:{ writingParticipantListMicros: "
-                                                    "100000, waitingForVotesMicros: 100000, "
-                                                    "writingDecisionMicros: 100000, "
-                                                    "waitingForDecisionAcksMicros: 100000, "
-                                                    "deletingCoordinatorDocMicros: 100000 }"));
-    const auto& logs = getCapturedTextFormatLogMessages();
-    ASSERT_EQUALS(1, std::count_if(logs.begin(), logs.end(), [](const std::string& line) {
-                      return StringData(line).endsWith(" 500ms");
-                  }));
+
+    ASSERT_EQUALS(
+        1,
+        countBSONFormatLogLinesIsSubset(BSON(
+            "attr" << BSON("stepDurations" << BSON(
+
+                                                  "writingParticipantListMicros"
+                                                  << 100000 << "waitingForVotesMicros" << 100000
+                                                  << "writingDecisionMicros" << 100000
+                                                  << "waitingForDecisionAcksMicros" << 100000
+                                                  << "deletingCoordinatorDocMicros" << 100000)
+                                           << "durationMillis" << 500))));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesTotalCreated) {

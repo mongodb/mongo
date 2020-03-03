@@ -585,11 +585,27 @@ protected:
      * the last call to startCapturingLogMessages() in this test.
      */
     const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
+    const std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
 
     /**
      * Returns the number of collected log lines containing "needle".
      */
     int64_t countTextFormatLogLinesContaining(const std::string& needle);
+
+    /**
+     * Returns the number of collected log lines where "needle" is a subset of a line.
+     *
+     * Does a Depth-First-Search of a BSON document. Validates each element in "needle" exists in
+     * "haystack". It ignores extra elements in "haystack".
+     *
+     * In example haystack:     { i : 1, a : { b : 1 } },
+     * a valid needles include: { i : 1}  or  {a : { b : 1}}
+     * It will not find { b: 1 } since it does not search recursively for sub-tree matches.
+     *
+     * If a BSON Element is undefined, it simply checks for its existence, not its type or value.
+     * This allows callers to test for the existence of elements in variable length log lines.
+     */
+    int64_t countBSONFormatLogLinesIsSubset(const BSONObj needle);
 
     /**
      * Prints the captured log lines.

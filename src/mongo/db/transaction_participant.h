@@ -599,6 +599,18 @@ public:
             return _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs);
         }
 
+        BSONObj getTransactionInfoBSONForLogForTest(
+            OperationContext* opCtx,
+            const SingleThreadedLockStats* lockStats,
+            bool committed,
+            const repl::ReadConcernArgs& readConcernArgs) const {
+
+            TerminationCause terminationCause =
+                committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
+            return _transactionInfoBSONForLog(opCtx, lockStats, terminationCause, readConcernArgs);
+        }
+
+
         SingleTransactionStats getSingleTransactionStatsForTest() const {
             return o().transactionMetricsObserver.getSingleTransactionStats();
         }
@@ -705,6 +717,11 @@ public:
                                     TerminationCause terminationCause,
                                     repl::ReadConcernArgs readConcernArgs,
                                     logv2::DynamicAttributes* pAttrs) const;
+
+        BSONObj _transactionInfoBSONForLog(OperationContext* opCtx,
+                                           const SingleThreadedLockStats* lockStats,
+                                           TerminationCause terminationCause,
+                                           repl::ReadConcernArgs readConcernArgs) const;
 
         // Bumps up the transaction number of this transaction and perform the necessary cleanup.
         void _setNewTxnNumber(OperationContext* opCtx, const TxnNumber& txnNumber);
