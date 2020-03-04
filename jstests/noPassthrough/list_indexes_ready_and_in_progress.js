@@ -1,13 +1,16 @@
 /**
  * Tests that the listIndexes command shows ready and in-progress indexes.
+ * @tags: [requires_replication]
  */
 (function() {
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
 
-const conn = MongoRunner.runMongod();
-assert.neq(null, conn, "mongod was unable to start up");
+const rst = new ReplSetTest({nodes: 1});
+const nodes = rst.startSet();
+rst.initiate();
+const conn = rst.getPrimary();
 
 const testDB = conn.getDB("test");
 assert.commandWorked(testDB.dropDatabase());
@@ -44,5 +47,5 @@ const exitCode = createIdx();
 assert.eq(0, exitCode, 'expected shell to exit cleanly');
 
 IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
-MongoRunner.stopMongod(conn);
+rst.stopSet();
 }());

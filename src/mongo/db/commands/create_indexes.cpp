@@ -276,9 +276,9 @@ Status validateTTLOptions(OperationContext* opCtx, const BSONObj& cmdObj) {
  * commit quorum, which consists of all the data-bearing nodes.
  */
 boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* opCtx,
+                                                             IndexBuildProtocol protocol,
                                                              const BSONObj& cmdObj) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto twoPhaseindexBuildEnabled = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild();
     auto commitQuorumEnabled = (enableIndexBuildCommitQuorum) ? true : false;
 
     if (cmdObj.hasField(kCommitQuorumFieldName)) {
@@ -288,13 +288,13 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
         uassert(ErrorCodes::BadValue,
                 str::stream() << "commitQuorum is supported only for two phase index builds with "
                                  "majority commit quorum support enabled ",
-                (twoPhaseindexBuildEnabled && commitQuorumEnabled));
+                (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
         CommitQuorumOptions commitQuorum;
         uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
         return commitQuorum;
     }
 
-    if (twoPhaseindexBuildEnabled) {
+    if (IndexBuildProtocol::kTwoPhase == protocol) {
         // Setting CommitQuorum to 0 will make the index build to opt out of voting proces.
         return (replCoord->isReplEnabled() && commitQuorumEnabled)
             ? CommitQuorumOptions(CommitQuorumOptions::kMajority)
@@ -498,7 +498,13 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
-    boost::optional<CommitQuorumOptions> commitQuorum = parseAndGetCommitQuorum(opCtx, cmdObj);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto protocol = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() &&
+            !replCoord->isOplogDisabledFor(opCtx, ns)
+        ? IndexBuildProtocol::kTwoPhase
+        : IndexBuildProtocol::kSinglePhase;
+    auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmdObj);
 
     Status validateTTL = validateTTLOptions(opCtx, cmdObj);
     uassertStatusOK(validateTTL);
@@ -565,11 +571,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                          dbProfilingLevel);
 
-    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto buildUUID = UUID::gen();
-    auto protocol = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()
-        ? IndexBuildProtocol::kTwoPhase
-        : IndexBuildProtocol::kSinglePhase;
     LOGV2(20438, "Registering index build: {buildUUID}", "buildUUID"_attr = buildUUID);
     ReplIndexBuildState::IndexCatalogStats stats;
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
