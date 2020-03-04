@@ -68,29 +68,15 @@ function runAwaitableIsMasterBeforeStepUp(topologyVersionField) {
     assert.hasFields(resAfterEnteringDrainMode, ["primary"]);
 
     // The TopologyVersion from resAfterEnteringDrainMode should now be stale since we expect
-    // the primary to increase the config term and increment the counter once again.
-    const resAfterReconfigOnStepUp = assert.commandWorked(db.runCommand({
+    // the primary to exit drain mode and increment the counter once again.
+    const resAfterExitingDrainMode = assert.commandWorked(db.runCommand({
         isMaster: 1,
         topologyVersion: resAfterEnteringDrainMode.topologyVersion,
         maxAwaitTimeMS: 99999999,
     }));
     assert.eq(resAfterEnteringDrainMode.topologyVersion.counter + 1,
-              resAfterReconfigOnStepUp.topologyVersion.counter,
-              resAfterReconfigOnStepUp);
-    assert.eq(false, resAfterReconfigOnStepUp.ismaster, resAfterReconfigOnStepUp);
-    assert.eq(true, resAfterReconfigOnStepUp.secondary, resAfterReconfigOnStepUp);
-    assert.hasFields(resAfterReconfigOnStepUp, ["primary"]);
-}
-
-function runAwaitableIsMasterAfterStepUp(topologyVersionField) {
-    // The TopologyVersion from resAfterReconfigOnStepUp should now be stale since we expect
-    // the primary to exit drain mode and increment the counter once again.
-    const resAfterExitingDrainMode = assert.commandWorked(db.runCommand({
-        isMaster: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
-    assert.eq(topologyVersionField.counter + 1, resAfterExitingDrainMode.topologyVersion.counter);
+              resAfterExitingDrainMode.topologyVersion.counter,
+              resAfterExitingDrainMode);
     assert.eq(true, resAfterExitingDrainMode.ismaster, resAfterExitingDrainMode);
     assert.eq(false, resAfterExitingDrainMode.secondary, resAfterExitingDrainMode);
     assert.hasFields(resAfterExitingDrainMode, ["primary"]);
@@ -111,13 +97,12 @@ failPoint.wait();
 assert.commandWorked(db.adminCommand({replSetStepDown: 60, force: true}));
 awaitIsMasterBeforeStepDown();
 
-let response = assert.commandWorked(node.getDB(dbName).runCommand({isMaster: 1}));
+const response = assert.commandWorked(node.getDB(dbName).runCommand({isMaster: 1}));
 assert(response.hasOwnProperty("topologyVersion"), tojson(res));
 const topologyVersionAfterStepDown = response.topologyVersion;
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
 failPoint = configureFailPoint(node, "waitForIsMasterResponse");
-const hangFailPoint = configureFailPoint(node, "hangAfterReconfigOnDrainComplete");
 // Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
 let awaitIsMasterBeforeStepUp = startParallelShell(
@@ -126,25 +111,7 @@ failPoint.wait();
 
 // Unfreezing the old primary will cause the node to step up in a single node replica set.
 assert.commandWorked(node.adminCommand({replSetFreeze: 0}));
-
-// Wait until stepup thread hangs after the reconfig.
-hangFailPoint.wait();
 awaitIsMasterBeforeStepUp();
-
-response = assert.commandWorked(node.getDB(dbName).runCommand({isMaster: 1}));
-assert(response.hasOwnProperty("topologyVersion"), tojson(res));
-const topologyVersionAfterStepUp = response.topologyVersion;
-
-// Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-failPoint = configureFailPoint(node, "waitForIsMasterResponse");
-// Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
-// topology change happens.
-let awaitIsMasterAfterStepUp = startParallelShell(
-    funWithArgs(runAwaitableIsMasterAfterStepUp, topologyVersionAfterStepUp), node.port);
-failPoint.wait();
-// Let the stepup thread to continue.
-hangFailPoint.off();
-awaitIsMasterAfterStepUp();
 
 replTest.stopSet();
 })();
