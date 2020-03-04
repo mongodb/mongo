@@ -594,8 +594,8 @@ void IndexBuildsCoordinator::_abortDatabaseIndexBuilds(stdx::unique_lock<Latch>&
                                                        const StringData& db,
                                                        const std::string& reason,
                                                        bool shouldWait) {
-    auto dbIndexBuilds = _databaseIndexBuilds[db];
-    if (!dbIndexBuilds) {
+    auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
+    if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
         return;
     }
 
@@ -603,16 +603,17 @@ void IndexBuildsCoordinator::_abortDatabaseIndexBuilds(stdx::unique_lock<Latch>&
           "About to abort all index builders running for collections in the given database",
           "database"_attr = db);
 
-    dbIndexBuilds->runOperationOnAllBuilds(
+    dbIndexBuildsIt->second->runOperationOnAllBuilds(
         lk, opCtx, &_indexBuildsManager, abortIndexBuild, reason);
 
     if (!shouldWait) {
         return;
     }
 
-    // 'dbIndexBuilds' is a shared ptr, so it can be safely waited upon without destructing before
-    // waitUntilNoIndexBuildsRemain() returns, which would cause a use-after-free memory error.
-    dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
+    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
+    // object does not destruct while we are waiting, causing a use-after-free memory error.
+    auto dbIndexBuildsSharedPtr = dbIndexBuildsIt->second;
+    dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
