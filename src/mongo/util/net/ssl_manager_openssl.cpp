@@ -903,7 +903,75 @@ StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
         std::move(ocspRequestMap), std::move(uniqueCertIds), std::move(leafResponders)};
 }
 
-using OCSPCacheVal = ReadThroughCache<OCSPCacheKey, OCSPFetchResponse>::ValueHandle;
+class OCSPCache : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
+public:
+    OCSPCache(ServiceContext* service)
+        : ReadThroughCache(_mutex, service, _threadPool, tlsOCSPCacheSize) {
+        _threadPool.startup();
+    }
+
+    static void create(ServiceContext* service) {
+        getOCSPCache(service).emplace(service);
+    }
+
+    static void destroy(ServiceContext* service) {
+        getOCSPCache(service).reset();
+    }
+
+    static OCSPCache& get(ServiceContext* service) {
+        return *getOCSPCache(service);
+    }
+
+private:
+    boost::optional<OCSPFetchResponse> lookup(OperationContext* opCtx,
+                                              const OCSPCacheKey& key) final {
+        // If there is a CRL file, we expect the CRL file to cover the certificate status
+        // information, and therefore we don't need to make a roundtrip.
+        if (!getSSLGlobalParams().sslCRLFile.empty()) {
+            return boost::none;
+        }
+
+        auto swOCSPContext =
+            extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
+        if (!swOCSPContext.isOK()) {
+            return boost::none;
+        }
+
+        auto ocspContext = std::move(swOCSPContext.getValue());
+
+        auto swResponse =
+            dispatchRequests(key.context, key.intermediateCerts, ocspContext).getNoThrow();
+        if (!swResponse.isOK()) {
+            return boost::none;
+        }
+
+        return std::move(swResponse.getValue());
+    }
+
+    static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("OCSPCache::_mutex");
+
+    ThreadPool _threadPool{[] {
+        ThreadPool::Options options;
+        options.poolName = "OCSPCache";
+        options.minThreads = 0;
+        return options;
+    }()};
+};
+
+const ServiceContext::Decoration<boost::optional<OCSPCache>> OCSPCache::getOCSPCache =
+    ServiceContext::declareDecoration<boost::optional<OCSPCache>>();
+
+ServiceContext::ConstructorActionRegisterer OCSPCacheRegisterer("CreateOCSPCache",
+                                                                [](ServiceContext* context) {
+                                                                    OCSPCache::create(context);
+                                                                },
+                                                                [](ServiceContext* context) {
+                                                                    OCSPCache::destroy(context);
+                                                                });
+
+using OCSPCacheVal = OCSPCache::ValueHandle;
 
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
@@ -1092,78 +1160,6 @@ private:
 
 }  // namespace
 
-class OCSPCache {
-
-    class OCSPCacheInternal : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
-    public:
-        OCSPCacheInternal(ServiceContext* context, ThreadPool& pool)
-            : ReadThroughCache(_ocspCacheMutex, context, pool, tlsOCSPCacheSize) {}
-
-        boost::optional<OCSPFetchResponse> lookup(OperationContext* opCtx,
-                                                  const OCSPCacheKey& key) final {
-            // If there is a CRL file, we expect the CRL file to cover the certificate
-            // status information, and therefore we don't need to make a roundtrip.
-            if (!getSSLGlobalParams().sslCRLFile.empty()) {
-                return boost::none;
-            }
-
-            auto swOCSPContext =
-                extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
-            if (!swOCSPContext.isOK()) {
-                return boost::none;
-            }
-
-            auto ocspContext = std::move(swOCSPContext.getValue());
-
-            auto swResponse =
-                dispatchRequests(key.context, key.intermediateCerts, ocspContext).getNoThrow();
-            if (!swResponse.isOK()) {
-                return boost::none;
-            }
-
-            return std::move(swResponse.getValue());
-        }
-
-        Mutex _ocspCacheMutex = MONGO_MAKE_LATCH("OCSPCacheMutex::Cache");
-    };
-
-public:
-    OCSPCache(ServiceContext* context)
-        : _pool(([] {
-              ThreadPool::Options options;
-              options.poolName = "OCSPCache";
-
-              return options;
-          }())),
-          _cache(context, _pool) {}
-
-    ~OCSPCache() = default;
-
-    static void set(ServiceContext* service, std::unique_ptr<OCSPCache> cache);
-
-    SharedSemiFuture<ReadThroughCache<OCSPCacheKey, OCSPFetchResponse>::ValueHandle> acquireAsync(
-        const OCSPCacheKey& key) {
-        std::call_once(threadPoolStartupFlag, [this]() { _pool.startup(); });
-        return _cache.acquireAsync(key);
-    };
-
-    void invalidate(const OCSPCacheKey& key) {
-        std::call_once(threadPoolStartupFlag, [this]() { _pool.startup(); });
-        _cache.invalidate(key);
-    }
-
-private:
-    std::once_flag threadPoolStartupFlag;
-    ThreadPool _pool;
-    OCSPCacheInternal _cache;
-};
-
-const auto getOCSPCache = ServiceContext::declareDecoration<std::unique_ptr<OCSPCache>>();
-
-void OCSPCache::set(ServiceContext* service, std::unique_ptr<OCSPCache> cache) {
-    getOCSPCache(service) = std::move(cache);
-}
-
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
@@ -1176,12 +1172,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
     }
     return Status::OK();
 }
-
-namespace {
-ServiceContext::ConstructorActionRegisterer OCSPCacheInitializer{
-    "CreateOCSPCache",
-    [](ServiceContext* context) { OCSPCache::set(context, std::make_unique<OCSPCache>(context)); }};
-}  // namespace
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
@@ -1654,8 +1644,10 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
                 swOcspFetchResponse.getValue()->refreshTime};
     };
 
+    auto& cache = OCSPCache::get(getGlobalServiceContext());
+
     auto refetchIfInvalidAndReturn =
-        [cacheKey, convert, validate](
+        [&cache, cacheKey, convert, validate](
             std::pair<Status, boost::optional<Date_t>> validatedResponse) mutable -> Future<void> {
         if (!validatedResponse.first.isOK() || !validatedResponse.second) {
             return validatedResponse.first;
@@ -1664,8 +1656,8 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
         auto timeNow = Date_t::now();
 
         if (validatedResponse.second.get() < timeNow) {
-            getOCSPCache(getGlobalServiceContext())->invalidate(cacheKey);
-            auto semifuture = getOCSPCache(getGlobalServiceContext())->acquireAsync(cacheKey);
+            cache.invalidate(cacheKey);
+            auto semifuture = cache.acquireAsync(cacheKey);
             return convert(std::move(semifuture))
                 .onCompletion(validate)
                 .then([](std::pair<Status, boost::optional<Date_t>> validateResult) {
@@ -1676,7 +1668,7 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
         return validatedResponse.first;
     };
 
-    auto semifuture = getOCSPCache(getGlobalServiceContext())->acquireAsync(cacheKey);
+    auto semifuture = cache.acquireAsync(cacheKey);
     return convert(std::move(semifuture)).onCompletion(validate).then(refetchIfInvalidAndReturn);
 }
 
@@ -2345,6 +2337,7 @@ Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SS
 
     return Status::OK();
 }
+
 }  // namespace
 
 Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
@@ -2561,7 +2554,6 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     return std::move(ocspFuture).then([this, peerSubject]() { return SSLPeerInfo(peerSubject); });
 }
 
-
 SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
     const SSLConnectionInterface* connInterface,
     const std::string& remoteHost,
@@ -2686,4 +2678,5 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     _flushNetworkBIO(conn);
     throwSocketError(errToThrow, conn->socket->remoteString());
 }
+
 }  // namespace mongo

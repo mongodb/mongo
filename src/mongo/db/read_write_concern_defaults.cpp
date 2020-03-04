@@ -45,7 +45,7 @@ static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
 const auto getReadWriteConcernDefaults =
     ServiceContext::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
 
-ServiceContext::ConstructorActionRegisterer destroyDestroyReadWriteConcernDefaultsRegisterer(
+ServiceContext::ConstructorActionRegisterer destroyReadWriteConcernDefaultsRegisterer(
     "DestroyReadWriteConcernDefaults",
     [](ServiceContext* service) {
         // Intentionally empty, since construction happens through different code paths depending on
