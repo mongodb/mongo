@@ -95,6 +95,11 @@ void TicketHolder::waitForTicket(OperationContext* opCtx) {
 }
 
 bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
+    // Attempt to get a ticket without waiting in order to avoid expensive time calculations.
+    if (sem_trywait(&_sem) == 0) {
+        return true;
+    }
+
     const Milliseconds intervalMs(500);
     struct timespec ts;
 
