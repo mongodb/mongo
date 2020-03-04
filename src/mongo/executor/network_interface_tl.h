@@ -199,10 +199,11 @@ private:
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
+        void continueExhaustRequest(std::shared_ptr<RequestState> requestState,
+                                    StatusWith<RemoteCommandResponse> swResponse);
+
         Promise<void> promise;
-        RemoteCommandResponse prevResponse;
-        Mutex _onReplyMutex =
-            MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_onReplyMutex");
+        Promise<RemoteCommandResponse> finalResponsePromise;
         RemoteCommandOnReplyFn onReplyFn;
     };
 

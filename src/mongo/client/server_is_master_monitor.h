@@ -40,6 +40,7 @@ class SingleServerIsMasterMonitor
 public:
     explicit SingleServerIsMasterMonitor(const MongoURI& setUri,
                                          const ServerAddress& host,
+                                         boost::optional<TopologyVersion> topologyVersion,
                                          Milliseconds heartbeatFrequencyMS,
                                          TopologyEventsPublisherPtr eventListener,
                                          std::shared_ptr<executor::TaskExecutor> executor);
@@ -65,16 +66,28 @@ public:
         const Milliseconds& expeditedRefreshPeriod,
         const Milliseconds& previousRefreshPeriod);
 
+    // Sent in the initial isMaster request when using the streamable exhaust protocol. The max
+    // duration a server should wait for a significant topology change before sending a response.
+    static constexpr Milliseconds kMaxAwaitTimeMs = Milliseconds(10000);
+
 private:
     void _scheduleNextIsMaster(WithLock, Milliseconds delay);
     void _rescheduleNextIsMaster(WithLock, Milliseconds delay);
     void _doRemoteCommand();
 
-    void _onIsMasterSuccess(IsMasterRTT latency, const BSONObj bson);
-    void _onIsMasterFailure(IsMasterRTT latency, const Status& status, const BSONObj bson);
+    // Use the awaitable isMaster protocol with the exhaust bit set. Attach _topologyVersion and
+    // kMaxAwaitTimeMS to the request.
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleStreamableIsMaster();
+
+    // Use the old isMaster protocol. Do not attach _topologyVersion or kMaxAwaitTimeMS to the
+    // request.
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleIsMaster();
+
+    void _onIsMasterSuccess(const BSONObj bson);
+    void _onIsMasterFailure(const Status& status, const BSONObj bson);
 
     Milliseconds _overrideRefreshPeriod(Milliseconds original);
-    Milliseconds _currentRefreshPeriod(WithLock);
+    Milliseconds _currentRefreshPeriod(WithLock, bool scheduleImmediately);
     void _cancelOutstandingRequest(WithLock);
 
     boost::optional<Milliseconds> _timeSinceLastCheck() const;
@@ -84,6 +97,7 @@ private:
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerIsMasterMonitor::mutex");
     ServerAddress _host;
+    boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
     Milliseconds _heartbeatFrequencyMS;

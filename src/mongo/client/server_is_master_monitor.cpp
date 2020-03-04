@@ -41,6 +41,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
+
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
@@ -52,10 +54,12 @@ const Milliseconds kZeroMs = Milliseconds{0};
 SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
     const MongoURI& setUri,
     const sdam::ServerAddress& host,
+    boost::optional<TopologyVersion> topologyVersion,
     Milliseconds heartbeatFrequencyMS,
     sdam::TopologyEventsPublisherPtr eventListener,
     std::shared_ptr<executor::TaskExecutor> executor)
     : _host(host),
+      _topologyVersion(topologyVersion),
       _eventListener(eventListener),
       _executor(executor),
       _heartbeatFrequencyMS(_overrideRefreshPeriod(heartbeatFrequencyMS)),
@@ -82,7 +86,7 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
 
     // The previous refresh period may or may not have been expedited.
     // Saving the value here before we change to expedited mode.
-    const auto previousRefreshPeriod = _currentRefreshPeriod(lock);
+    const auto previousRefreshPeriod = _currentRefreshPeriod(lock, false);
 
     if (!_isExpedited) {
         // save some log lines.
@@ -97,7 +101,7 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
     }
 
     // Get the new expedited refresh period.
-    const auto expeditedRefreshPeriod = _currentRefreshPeriod(lock);
+    const auto expeditedRefreshPeriod = _currentRefreshPeriod(lock, false);
 
     if (_isMasterOutstanding) {
         LOGV2_DEBUG(4333216,
@@ -163,7 +167,6 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
 
     invariant(!_isMasterOutstanding);
 
-    Timer timer;
     auto swCbHandle = _executor->scheduleWorkAt(
         _executor->now() + delay,
         [self = shared_from_this()](const executor::TaskExecutor::CallbackArgs& cbData) {
@@ -174,8 +177,7 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
         });
 
     if (!swCbHandle.isOK()) {
-        Microseconds latency(timer.micros());
-        _onIsMasterFailure(latency, swCbHandle.getStatus(), BSONObj());
+        _onIsMasterFailure(swCbHandle.getStatus(), BSONObj());
         return;
     }
 
@@ -183,6 +185,94 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
 }
 
 void SingleServerIsMasterMonitor::_doRemoteCommand() {
+    stdx::lock_guard lock(_mutex);
+    if (_isShutdown)
+        return;
+
+    StatusWith<executor::TaskExecutor::CallbackHandle> swCbHandle = [&]() {
+        if (_topologyVersion) {
+            return _scheduleStreamableIsMaster();
+        }
+
+        return _scheduleSingleIsMaster();
+    }();
+
+    if (!swCbHandle.isOK()) {
+        _onIsMasterFailure(swCbHandle.getStatus(), BSONObj());
+        uasserted(46156012, swCbHandle.getStatus().toString());
+    }
+
+    _isMasterOutstanding = true;
+    _remoteCommandHandle = swCbHandle.getValue();
+}
+
+StatusWith<TaskExecutor::CallbackHandle>
+SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
+    auto maxAwaitTimeMS = durationCount<Milliseconds>(kMaxAwaitTimeMs);
+    overrideMaxAwaitTimeMS.execute(
+        [&](const BSONObj&) { maxAwaitTimeMS = durationCount<Milliseconds>(Milliseconds(1000)); });
+
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+    bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
+    bob.append("topologyVersion", _topologyVersion->toBSON());
+
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+
+    _timeoutMS = SdamConfiguration::kDefaultConnectTimeoutMS + kMaxAwaitTimeMs;
+    auto request =
+        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, _timeoutMS);
+    request.sslMode = _setUri.getSSLMode();
+
+    auto swCbHandle = _executor->scheduleExhaustRemoteCommand(
+        std::move(request),
+        [self = shared_from_this()](
+            const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
+            Milliseconds nextRefreshPeriod;
+            {
+                stdx::lock_guard lk(self->_mutex);
+
+                if (self->_isShutdown) {
+                    self->_isMasterOutstanding = false;
+                    LOGV2_DEBUG(4495400,
+                                kLogLevel,
+                                "RSM {setName} not processing response: {status}",
+                                "status"_attr = result.response.status,
+                                "setName"_attr = self->_setUri.getSetName());
+                    return;
+                }
+
+                auto responseTopologyVersion = result.response.data.getField("topologyVersion");
+                if (responseTopologyVersion) {
+                    self->_topologyVersion = TopologyVersion::parse(
+                        IDLParserErrorContext("TopologyVersion"), responseTopologyVersion.Obj());
+                } else {
+                    self->_topologyVersion = boost::none;
+                }
+
+                self->_lastIsMasterAt = self->_executor->now();
+                if (!result.response.isOK() || !result.response.moreToCome) {
+                    self->_isMasterOutstanding = false;
+                    nextRefreshPeriod = self->_currentRefreshPeriod(lk, result.response.isOK());
+                    self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
+                }
+            }
+
+            if (result.response.isOK()) {
+                self->_onIsMasterSuccess(result.response.data);
+            } else {
+                self->_onIsMasterFailure(result.response.status, result.response.data);
+            }
+        });
+
+    return swCbHandle;
+}
+
+StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleSingleIsMaster() {
+    _timeoutMS = SdamConfiguration::kDefaultConnectTimeoutMS;
+
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
     if (WireSpec::instance().isInternalClient) {
@@ -193,14 +283,9 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
         executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, _timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
-    stdx::lock_guard lock(_mutex);
-    if (_isShutdown)
-        return;
-
-    Timer timer;
     auto swCbHandle = _executor->scheduleRemoteCommand(
         std::move(request),
-        [this, self = shared_from_this(), timer](
+        [self = shared_from_this()](
             const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             Milliseconds nextRefreshPeriod;
             {
@@ -212,43 +297,42 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
                                 kLogLevel,
                                 "RSM {setName} not processing response: {status}",
                                 "status"_attr = result.response.status,
-                                "setName"_attr = _setUri.getSetName());
+                                "setName"_attr = self->_setUri.getSetName());
                     return;
                 }
 
                 self->_lastIsMasterAt = self->_executor->now();
-                nextRefreshPeriod = self->_currentRefreshPeriod(lk);
 
-                LOGV2_DEBUG(4333228,
-                            kLogLevel + 1,
-                            "RSM {setName} next refresh period in {period}",
-                            "period"_attr = nextRefreshPeriod.toString(),
-                            "setName"_attr = _setUri.getSetName());
-                self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
+                auto responseTopologyVersion = result.response.data.getField("topologyVersion");
+                if (responseTopologyVersion) {
+                    self->_topologyVersion = TopologyVersion::parse(
+                        IDLParserErrorContext("TopologyVersion"), responseTopologyVersion.Obj());
+                } else {
+                    self->_topologyVersion = boost::none;
+                }
+
+                if (!result.response.isOK() || !result.response.moreToCome) {
+                    self->_isMasterOutstanding = false;
+                    nextRefreshPeriod = self->_currentRefreshPeriod(lk, result.response.isOK());
+                    self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
+                }
             }
 
-            Microseconds latency(timer.micros());
             if (result.response.isOK()) {
-                self->_onIsMasterSuccess(latency, result.response.data);
+                self->_onIsMasterSuccess(result.response.data);
             } else {
-                self->_onIsMasterFailure(latency, result.response.status, result.response.data);
+                self->_onIsMasterFailure(result.response.status, result.response.data);
             }
         });
 
-    if (!swCbHandle.isOK()) {
-        Microseconds latency(timer.micros());
-        _onIsMasterFailure(latency, swCbHandle.getStatus(), BSONObj());
-        uasserted(31448, swCbHandle.getStatus().toString());
-    }
-
-    _isMasterOutstanding = true;
-    _remoteCommandHandle = swCbHandle.getValue();
+    return swCbHandle;
 }
 
 void SingleServerIsMasterMonitor::shutdown() {
     stdx::lock_guard lock(_mutex);
-    if (std::exchange(_isShutdown, true))
+    if (std::exchange(_isShutdown, true)) {
         return;
+    }
 
     LOGV2_DEBUG(4333220,
                 kLogLevel + 1,
@@ -279,35 +363,27 @@ void SingleServerIsMasterMonitor::_cancelOutstandingRequest(WithLock) {
     _isMasterOutstanding = false;
 }
 
-void SingleServerIsMasterMonitor::_onIsMasterSuccess(sdam::IsMasterRTT latency,
-                                                     const BSONObj bson) {
+void SingleServerIsMasterMonitor::_onIsMasterSuccess(const BSONObj bson) {
     LOGV2_DEBUG(4333221,
                 kLogLevel + 1,
-                "RSM {setName} received successful isMaster for server {host} ({latency}): {bson}",
+                "RSM {setName} received successful isMaster for server {host}: {bson}",
                 "host"_attr = _host,
-                "latency"_attr = latency,
                 "setName"_attr = _setUri.getSetName(),
                 "bson"_attr = bson.toString());
 
-    _eventListener->onServerHeartbeatSucceededEvent(
-        duration_cast<Milliseconds>(latency), _host, bson);
+    _eventListener->onServerHeartbeatSucceededEvent(_host, bson);
 }
 
-void SingleServerIsMasterMonitor::_onIsMasterFailure(sdam::IsMasterRTT latency,
-                                                     const Status& status,
-                                                     const BSONObj bson) {
-    LOGV2_DEBUG(
-        4333222,
-        kLogLevel,
-        "RSM {setName} received failed isMaster for server {host}: {status} ({latency}): {bson}",
-        "host"_attr = _host,
-        "status"_attr = status.toString(),
-        "latency"_attr = latency,
-        "setName"_attr = _setUri.getSetName(),
-        "bson"_attr = bson.toString());
+void SingleServerIsMasterMonitor::_onIsMasterFailure(const Status& status, const BSONObj bson) {
+    LOGV2_DEBUG(4333222,
+                kLogLevel,
+                "RSM {setName} received failed isMaster for server {host}: {status}: {bson}",
+                "host"_attr = _host,
+                "status"_attr = status.toString(),
+                "setName"_attr = _setUri.getSetName(),
+                "bson"_attr = bson.toString());
 
-    _eventListener->onServerHeartbeatFailureEvent(
-        duration_cast<Milliseconds>(latency), status, _host, bson);
+    _eventListener->onServerHeartbeatFailureEvent(status, _host, bson);
 }
 
 Milliseconds SingleServerIsMasterMonitor::_overrideRefreshPeriod(Milliseconds original) {
@@ -324,7 +400,11 @@ Milliseconds SingleServerIsMasterMonitor::_overrideRefreshPeriod(Milliseconds or
     return r;
 }
 
-Milliseconds SingleServerIsMasterMonitor::_currentRefreshPeriod(WithLock) {
+Milliseconds SingleServerIsMasterMonitor::_currentRefreshPeriod(WithLock,
+                                                                bool scheduleImmediately) {
+    if (scheduleImmediately)
+        return Milliseconds(0);
+
     return (_isExpedited) ? sdam::SdamConfiguration::kMinHeartbeatFrequencyMS
                           : _heartbeatFrequencyMS;
 }
@@ -414,6 +494,7 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
             _singleMonitors[serverAddress] = std::make_shared<SingleServerIsMasterMonitor>(
                 _setUri,
                 serverAddress,
+                serverDescription->getTopologyVersion(),
                 _sdamConfiguration.getHeartBeatFrequency(),
                 _eventPublisher,
                 _executor);

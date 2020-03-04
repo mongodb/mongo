@@ -52,8 +52,7 @@ public:
                                                    TopologyDescriptionPtr previousDescription,
                                                    TopologyDescriptionPtr newDescription){};
 
-    virtual void onServerHeartbeatFailureEvent(IsMasterRTT durationMs,
-                                               Status errorStatus,
+    virtual void onServerHeartbeatFailureEvent(Status errorStatus,
                                                const ServerAddress& hostAndPort,
                                                const BSONObj reply){};
     /**
@@ -73,8 +72,7 @@ public:
      * hostAndPort succeeded. durationMS is the execution time of the event, including the time it
      * took to send the message and recieve the reply from the server.
      */
-    virtual void onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
-                                                 const ServerAddress& hostAndPort,
+    virtual void onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
                                                  const BSONObj reply){};
 
     /*
@@ -115,13 +113,11 @@ public:
 
     void onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
                                       const Status& status,
-                                      const BSONObj reply) override;
+                                      const BSONObj reply);
 
-    void onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
-                                         const ServerAddress& hostAndPort,
+    void onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
                                          const BSONObj reply) override;
-    void onServerHeartbeatFailureEvent(IsMasterRTT durationMs,
-                                       Status errorStatus,
+    void onServerHeartbeatFailureEvent(Status errorStatus,
                                        const ServerAddress& hostAndPort,
                                        const BSONObj reply) override;
     void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status) override;

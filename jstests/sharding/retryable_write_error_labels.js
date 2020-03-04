@@ -14,7 +14,11 @@ const dbName = "test";
 const collName = "retryable_write_error_labels";
 
 // Use ShardingTest because we need to test both mongod and mongos behaviors.
-const st = new ShardingTest({config: 1, mongos: 1, shards: 1});
+const st = new ShardingTest({
+    config: 1,
+    mongos: {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": "{'mode':'alwaysOn'}"}}},
+    shards: 1
+});
 const primary = st.rs0.getPrimary();
 
 assert.commandWorked(primary.getDB(dbName).runCommand(
@@ -201,6 +205,8 @@ runTest(ErrorCodes.WriteConcernFailed,
         false /* expectLabel */,
         true /* isWCError */,
         true /* isMongos */);
+
+st.s.adminCommand({"configureFailPoint": "overrideMaxAwaitTimeMS", "mode": "off"});
 
 st.stop();
 }());

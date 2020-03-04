@@ -353,6 +353,7 @@ error_codes:
 
     - {code: 307,name: RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist}
     - {code: 308,name: CurrentConfigNotCommittedYet}
+    - {code: 309,name: ExhaustCommandFinished}
     - {code: 310,name: PeriodicJobIsStopped,categories: [CancelationError]}
 
     # Error codes 4000-8999 are reserved.
