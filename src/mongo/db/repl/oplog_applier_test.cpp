@@ -186,6 +186,73 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
 }
 
 /**
+ * Creates oplog entries that are meant to be all parts of a mocked large transaction. This function
+ * does the following:
+ *
+ * 1. If we intend to make the first oplog entry of the transaction, we add a Null prevOptime to
+ *    denote that there is no entry that comes before this one. This entry will just be a applyOps.
+ * 2. If we intend to make the last oplog entry of the transaction, then we make a commit oplog
+ *    entry.
+ * 3. Otherwise, we create applyOps oplog entries that denote all of the intermediate oplog entries.
+ */
+OplogEntry makeLargeTransactionOplogEntries(
+    int t, bool prepared, bool isFirst, bool isLast, int curr, int count) {
+    auto nss = NamespaceString(NamespaceString::kAdminDb).getCommandNS();
+    OpTime prevWriteOpTime = isFirst ? OpTime() : OpTime(Timestamp(t - 1, 1), 1);
+    BSONObj oField;
+    if (isLast) {
+        // Makes a commit oplog entry if this is the last oplog entry we wish to create.
+        if (prepared) {
+            CommitTransactionOplogObject cmdObj;
+            cmdObj.setCount(count);
+            oField = cmdObj.toBSON();
+        } else {
+            oField = BSON("applyOps" << BSONArray() << "count" << count);
+        }
+    } else {
+        BSONObjBuilder oFieldBuilder;
+        oFieldBuilder.append("applyOps", BSONArray());
+        if (prepared && curr == count - 1) {
+            oFieldBuilder.append("prepare", true);
+        }
+        oFieldBuilder.append("partialTxn", true);
+        oField = oFieldBuilder.obj();
+    }
+    return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                      boost::none,                 // hash
+                      OpTypeEnum::kCommand,        // op type
+                      nss,                         // namespace
+                      boost::none,                 // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      oField,                      // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // upsert
+                      Date_t() + Seconds(t),       // wall clock time
+                      boost::none,                 // statement id
+                      prevWriteOpTime,  // optime of previous write within same transaction
+                      boost::none,      // pre-image optime
+                      boost::none);     // post-image optime
+}
+
+/**
+ * Generates a mock large-transaction which has more than one oplog entry.
+ */
+std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
+                                                              StringData dbName,
+                                                              bool prepared,
+                                                              int count) {
+    ASSERT_GTE(count, 2);
+    std::vector<OplogEntry> vec;
+    for (int i = 0; i < count; i++) {
+        vec.push_back(makeLargeTransactionOplogEntries(
+            t + i, prepared, i == 0, i == count - 1, i + 1, count));
+    }
+    return vec;
+}
+
+/**
  * Returns string representation of std::vector<OplogEntry>.
  */
 std::string toString(const std::vector<OplogEntry>& ops) {
@@ -399,6 +466,47 @@ TEST_F(OplogApplierTest,
     batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[1], batch[0]);
+}
+
+TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
+    std::vector<OplogEntry> srcOps;
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString(dbName, "bar")));
+
+    // Makes entries with ts from range [2, 5).
+    std::vector<OplogEntry> multiEntryTransaction =
+        makeMultiEntryTransactionOplogEntries(2, dbName, /* prepared */ false, /* num entries*/ 3);
+    for (auto entry : multiEntryTransaction) {
+        srcOps.push_back(entry);
+    }
+
+    // Push one extra operation to ensure that the last oplog entry of a large transaction
+    // is processed by itself.
+    srcOps.push_back(makeInsertOplogEntry(5, NamespaceString(dbName, "bar")));
+
+    _applier->enqueue(_opCtx.get(), srcOps.cbegin(), srcOps.cend());
+
+    // Set large enough batch limit to ensure that batcher is not batching because of limit, but
+    // rather because it encountered the final oplog entry of a large transaction.
+    _limits.ops = 10U;
+
+    // First batch: [insert, applyOps, applyOps]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(3U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+    ASSERT_EQUALS(srcOps[1], batch[1]);
+    ASSERT_EQUALS(srcOps[2], batch[2]);
+
+    // Second batch: [applyOps]. The last oplog entry of a large transaction must be processed by
+    // itself.
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[3], batch[0]);
+
+    // Third batch: [insert]. The this confirms that the last oplog entry of a large txn will be
+    // batched individually.
+    batch = unittest::assertGet(_applier->getNextApplierBatch(_opCtx.get(), _limits));
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[4], batch[0]);
 }
 
 }  // namespace
