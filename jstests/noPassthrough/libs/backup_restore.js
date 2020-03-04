@@ -225,9 +225,6 @@ var BackupRestoreTest = function(options) {
         }
         var copiedFiles;
 
-        // Compare dbHash of crudDb when possible on hidden secondary
-        var dbHash;
-
         // Perform the data backup to new secondary
         if (options.backup == 'fsyncLock') {
             rst.awaitSecondaryNodes();
@@ -239,7 +236,6 @@ var BackupRestoreTest = function(options) {
                 return;
             }
 
-            dbHash = secondary.getDB(crudDb).runCommand({dbhash: 1}).md5;
             copyDbpath(dbpathSecondary, hiddenDbpath);
             removeFile(hiddenDbpath + '/mongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
@@ -302,21 +298,6 @@ var BackupRestoreTest = function(options) {
         var hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
         var hiddenNode = rst.add(hiddenCfg);
         var hiddenHost = hiddenNode.host;
-
-        // Verify if dbHash is the same on hidden secondary for crudDb
-        // Note the dbhash can only run when the DB is inactive to get a result
-        // that can be compared, which is only in the fsyncLock/fsynUnlock case
-        if (dbHash !== undefined) {
-            assert.soon(function() {
-                try {
-                    // Need to hammer this since the node can disconnect connections as it is
-                    // starting up into REMOVED replication state.
-                    return (dbHash === hiddenNode.getDB(crudDb).runCommand({dbhash: 1}).md5);
-                } catch (e) {
-                    return false;
-                }
-            });
-        }
 
         // Add new hidden secondary to replica set
         jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');

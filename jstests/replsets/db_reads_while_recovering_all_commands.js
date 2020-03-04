@@ -113,6 +113,8 @@ const allCommands = {
     dbCheck: {skip: isPrimaryOnly},
     dbHash: {
         command: {dbHash: 1},
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NotMasterOrSecondary,
     },
     dbStats: {
         command: {dbStats: 1},
