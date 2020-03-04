@@ -6,12 +6,10 @@ load("jstests/ocsp/lib/mock_ocsp.js");
 (function() {
 "use strict";
 
-if (determineSSLProvider() != "openssl") {
-    return;
-}
-
 let mock_ocsp = new MockOCSPServer("", 1);
 mock_ocsp.start();
+
+clearOCSPCache();
 
 const ocsp_options = {
     sslMode: "requireSSL",
@@ -29,14 +27,16 @@ assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);
 });
 
-sleep(10000);
-
 mock_ocsp.stop();
+
+clearOCSPCache();
+sleep(5000);
 
 // Test Scenario when Mock OCSP Server replies stating
 // that the OCSP status of the client cert is revoked.
 mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);
 mock_ocsp.start();
+
 assert.throws(() => {
     new Mongo(conn.host);
 });

@@ -356,7 +356,7 @@ certs:
     subjectAltName:
       DNS: localhost
       IP: 127.0.0.1
-    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status/'
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status'
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth, clientAuth]
@@ -377,7 +377,7 @@ certs:
     subjectAltName:
       DNS: localhost
       IP: 127.0.0.1
-    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status/'
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status'
     mustStaple: true
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
@@ -399,7 +399,7 @@ certs:
     subjectAltName:
       DNS: localhost
       IP: 127.0.0.1
-    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status/'
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status'
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [clientAuth]
