@@ -109,11 +109,16 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  *
  * Commands, in most cases, must be processed one at a time. The exceptions to this rule are
  * unprepared applyOps and unprepared commitTransaction for transactions that only contain CRUD
- * operations. These two cases expand to CRUD operations, which can be safely batched with other
- * CRUD operations. All other command oplog entries, including unprepared applyOps/commitTransaction
- * for transactions that contain commands, must be processed in their own batch.
+ * operations and commands found within large transactions (>16MB). The prior two cases expand to
+ * CRUD operations, which can be safely batched with other CRUD operations. All other command oplog
+ * entries, including unprepared applyOps/commitTransaction for transactions that contain commands,
+ * must be processed in their own batch.
  * Note that 'unprepared applyOps' could mean a partial transaction oplog entry, an implicit commit
  * applyOps oplog entry, or an atomic applyOps oplog entry outside of a transaction.
+ *
+ * Command operations inside large transactions do not need to be processed individually as long as
+ * the final oplog entry in the transaction is processed individually, since the operations are not
+ * actually run until the commit operation is reached.
  *
  * Oplog entries on 'system.views' should also be processed one at a time. View catalog immediately
  * reflects changes for each oplog entry so we can see inconsistent view catalog if multiple oplog
@@ -121,11 +126,15 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  *
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
+ *
+ * The ends of large transactions (> 16MB) should also be processed immediately on its own in order
+ * to avoid scenarios where parts of the transaction is batched with other operations not in the
+ * transaction.
  */
 bool mustProcessIndividually(const OplogEntry& entry) {
     if (entry.isCommand()) {
         if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps || entry.shouldPrepare() ||
-            entry.isTransactionWithCommand()) {
+            entry.isSingleOplogEntryTransactionWithCommand() || entry.isEndOfLargeTransaction()) {
             return true;
         } else {
             // This branch covers unprepared CRUD applyOps and unprepared CRUD commits.
