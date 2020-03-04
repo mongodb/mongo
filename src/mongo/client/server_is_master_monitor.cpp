@@ -210,8 +210,11 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
 StatusWith<TaskExecutor::CallbackHandle>
 SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
     auto maxAwaitTimeMS = durationCount<Milliseconds>(kMaxAwaitTimeMs);
-    overrideMaxAwaitTimeMS.execute(
-        [&](const BSONObj&) { maxAwaitTimeMS = durationCount<Milliseconds>(Milliseconds(1000)); });
+    overrideMaxAwaitTimeMS.execute([&](const BSONObj& data) {
+        maxAwaitTimeMS =
+            durationCount<Milliseconds>(Milliseconds(data["maxAwaitTimeMS"].numberInt()));
+    });
+
     auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << maxAwaitTimeMS
                                        << "topologyVersion" << _topologyVersion->toBSON());
 
