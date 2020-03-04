@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
@@ -62,20 +63,19 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysUninitializedTerm) {
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 1 << "term" << (OpTime::kInitialTerm + 1)
-                                          << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1")))));
+    ASSERT_OK(config.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 1 << "term" << 999
+                                                << "protocolVersion" << 1 << "members"
+                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                         << "h1")))));
     ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
-    ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
+    ASSERT_EQUALS(config.getConfigTerm(), OpTime::kUninitializedTerm);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
