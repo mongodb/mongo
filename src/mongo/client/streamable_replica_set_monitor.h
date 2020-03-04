@@ -166,16 +166,14 @@ private:
                                            sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription) override;
 
-    void onServerHeartbeatSucceededEvent(sdam::IsMasterRTT durationMs,
-                                         const sdam::ServerAddress& hostAndPort,
+    void onServerHeartbeatSucceededEvent(const sdam::ServerAddress& hostAndPort,
                                          const BSONObj reply) override;
 
     void onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
                                       const Status& status,
                                       const BSONObj reply) override;
 
-    void onServerHeartbeatFailureEvent(IsMasterRTT durationMs,
-                                       Status errorStatus,
+    void onServerHeartbeatFailureEvent(Status errorStatus,
                                        const ServerAddress& hostAndPort,
                                        const BSONObj reply) override;
 

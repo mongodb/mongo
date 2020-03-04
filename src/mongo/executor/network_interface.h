@@ -58,8 +58,7 @@ public:
     using Response = RemoteCommandResponse;
     using RemoteCommandCompletionFn =
         unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
-    using RemoteCommandOnReplyFn =
-        unique_function<void(const TaskExecutor::ResponseOnAnyStatus&, bool isMoreToComeSet)>;
+    using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
 
     virtual ~NetworkInterface();
 

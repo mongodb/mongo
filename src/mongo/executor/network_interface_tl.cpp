@@ -881,12 +881,13 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
     state->promise = std::move(promise);
     std::move(future)
         .onError([state](Status error) {
-            stdx::lock_guard lk(state->_onReplyMutex);
             state->onReplyFn(RemoteCommandOnAnyResponse(
-                                 boost::none, std::move(error), state->stopwatch.elapsed()),
-                             false);
+                boost::none, std::move(error), state->stopwatch.elapsed()));
         })
-        .getAsync([state](Status status) { state->tryFinish(status); });
+        .getAsync([state](Status status) {
+            state->tryFinish(
+                Status{ErrorCodes::ExhaustCommandFinished, "Exhaust command finished"});
+        });
 
     {
         stdx::lock_guard lk(interface->_inProgressMutex);
@@ -904,38 +905,17 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     auto requestState = requestManager->getRequest(reqId);
     invariant(requestState);
 
-    auto clientCallback = [this, requestState](const RemoteCommandResponse& response,
-                                               bool isMoreToComeSet) {
-        // Stash this response on the command state to be used to fulfill the promise.
-        prevResponse = response;
-        auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
-        doMetadataHook(onAnyResponse);
+    setTimer();
+    requestState->getClient(requestState->conn)
+        ->beginExhaustCommandRequest(*requestState->request, baton)
+        .thenRunOn(requestState->interface()->_reactor)
+        .getAsync([this, requestState](StatusWith<RemoteCommandResponse> swResponse) mutable {
+            continueExhaustRequest(std::move(requestState), swResponse);
+        });
 
-        // If the command failed, we will call 'onReply' as a part of the future chain paired with
-        // the promise. This is to be sure that all error paths will run 'onReply' only once upon
-        // future completion.
-        if (!getStatusFromCommandResult(response.data).isOK()) {
-            // The moreToCome bit should *not* be set if the command failed
-            invariant(!isMoreToComeSet);
-            return;
-        }
-
-        // Reset the stopwatch to measure the correct duration for the folowing reply
-        stopwatch.restart();
-        setTimer();
-
-        stdx::lock_guard lk(_onReplyMutex);
-        onReplyFn(onAnyResponse, isMoreToComeSet);
-    };
-
-    return makeReadyFutureWith(
-               [this, requestState, clientCallback = std::move(clientCallback)]() mutable {
-                   setTimer();
-                   return RequestState::getClient(requestState->conn)
-                       ->runExhaustCommandRequest(
-                           *requestState->request, std::move(clientCallback), baton);
-               })
-        .then([this, requestState] { return prevResponse; });
+    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
+    finalResponsePromise = std::move(promise);
+    return std::move(future).then([this](const auto& finalResponse) { return finalResponse; });
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
@@ -950,6 +930,52 @@ void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
     }
 
     promise.emplaceValue();
+}
+
+void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
+    std::shared_ptr<RequestState> requestState, StatusWith<RemoteCommandResponse> swResponse) {
+    RemoteCommandResponse response;
+    if (!swResponse.isOK()) {
+        response = RemoteCommandResponse(std::move(swResponse.getStatus()));
+    } else {
+        response = std::move(swResponse.getValue());
+    }
+
+    if (requestState->interface()->inShutdown() ||
+        ErrorCodes::isCancelationError(response.status)) {
+        finalResponsePromise.emplaceValue(response);
+        return;
+    }
+
+    auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
+    doMetadataHook(onAnyResponse);
+
+    // If the command failed, we will call 'onReply' as a part of the future chain paired with
+    // the promise. This is to be sure that all error paths will run 'onReply' only once upon
+    // future completion.
+    if (!response.status.isOK() || !getStatusFromCommandResult(response.data).isOK()) {
+        // The moreToCome bit should *not* be set if the command failed
+        invariant(!response.moreToCome);
+
+        finalResponsePromise.emplaceValue(response);
+        return;
+    }
+
+    onReplyFn(onAnyResponse);
+
+    // Reset the stopwatch to measure the correct duration for the folowing reply
+    stopwatch.restart();
+    if (deadline != RemoteCommandRequest::kNoExpirationDate) {
+        deadline = stopwatch.start() + requestOnAny.timeout;
+    }
+    setTimer();
+
+    requestState->getClient(requestState->conn)
+        ->awaitExhaustCommand(baton)
+        .thenRunOn(requestState->interface()->_reactor)
+        .getAsync([this, requestState](StatusWith<RemoteCommandResponse> swResponse) mutable {
+            continueExhaustRequest(std::move(requestState), swResponse);
+        });
 }
 
 Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,

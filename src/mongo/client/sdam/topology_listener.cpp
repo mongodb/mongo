@@ -92,14 +92,12 @@ void TopologyEventsPublisher::onServerHandshakeFailedEvent(const sdam::ServerAdd
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
-                                                              const ServerAddress& hostAndPort,
+void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
                                                               const BSONObj reply) {
     {
         stdx::lock_guard lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::HEARTBEAT_SUCCESS;
-        event->duration = duration_cast<IsMasterRTT>(durationMs);
         event->hostAndPort = hostAndPort;
         event->reply = reply;
         _eventQueue.push_back(std::move(event));
@@ -107,15 +105,13 @@ void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(IsMasterRTT durati
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerHeartbeatFailureEvent(IsMasterRTT durationMs,
-                                                            Status errorStatus,
+void TopologyEventsPublisher::onServerHeartbeatFailureEvent(Status errorStatus,
                                                             const ServerAddress& hostAndPort,
                                                             const BSONObj reply) {
     {
         stdx::lock_guard lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::HEARTBEAT_FAILURE;
-        event->duration = duration_cast<IsMasterRTT>(durationMs);
         event->hostAndPort = hostAndPort;
         event->reply = reply;
         event->status = errorStatus;
@@ -189,14 +185,10 @@ void TopologyEventsPublisher::_nextDelivery() {
 void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Event& event) {
     switch (event.type) {
         case EventType::HEARTBEAT_SUCCESS:
-            listener->onServerHeartbeatSucceededEvent(
-                duration_cast<IsMasterRTT>(event.duration), event.hostAndPort, event.reply);
+            listener->onServerHeartbeatSucceededEvent(event.hostAndPort, event.reply);
             break;
         case EventType::HEARTBEAT_FAILURE:
-            listener->onServerHeartbeatFailureEvent(duration_cast<IsMasterRTT>(event.duration),
-                                                    event.status,
-                                                    event.hostAndPort,
-                                                    event.reply);
+            listener->onServerHeartbeatFailureEvent(event.status, event.hostAndPort, event.reply);
             break;
         case EventType::TOPOLOGY_DESCRIPTION_CHANGED:
             // TODO SERVER-46497: fix uuid or just remove

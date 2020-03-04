@@ -199,17 +199,20 @@ void StreamableReplicaSetMonitor::init() {
 }
 
 void StreamableReplicaSetMonitor::drop() {
-    stdx::lock_guard lock(_mutex);
-    if (_isDropped.swap(true)) {
-        return;
+    {
+        stdx::lock_guard lock(_mutex);
+        if (_isDropped.swap(true))
+            return;
+
+        _eventsPublisher->close();
+        _failOutstandingWithStatus(
+            lock, Status{ErrorCodes::ShutdownInProgress, "the ReplicaSetMonitor is shutting down"});
     }
+
     LOGV2(4333209, "Closing Replica Set Monitor {setName}", "setName"_attr = getName());
-    _eventsPublisher->close();
     _queryProcessor->shutdown();
     _pingMonitor->shutdown();
     _isMasterMonitor->shutdown();
-    _failOutstandingWithStatus(
-        lock, Status{ErrorCodes::ShutdownInProgress, "the ReplicaSetMonitor is shutting down"});
 
     ReplicaSetMonitorManager::get()->getNotifier().onDroppedSet(getName());
     LOGV2(4333210, "Done closing Replica Set Monitor {setName}", "setName"_attr = getName());
@@ -613,16 +616,14 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     }
 }
 
-void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(sdam::IsMasterRTT durationMs,
-                                                                  const ServerAddress& hostAndPort,
+void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
                                                                   const BSONObj reply) {
     // After the inital handshake, isMasterResponses should not update the RTT with durationMs.
     IsMasterOutcome outcome(hostAndPort, reply, boost::none);
     _topologyManager->onServerDescription(outcome);
 }
 
-void StreamableReplicaSetMonitor::onServerHeartbeatFailureEvent(IsMasterRTT durationMs,
-                                                                Status errorStatus,
+void StreamableReplicaSetMonitor::onServerHeartbeatFailureEvent(Status errorStatus,
                                                                 const ServerAddress& hostAndPort,
                                                                 const BSONObj reply) {
     _failedHost(
