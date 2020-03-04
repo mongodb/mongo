@@ -38,6 +38,11 @@ jsTestLog('Replica set A ID = ' + configA.settings.replicaSetId);
 jsTestLog('Replica set B ID = ' + configB.settings.replicaSetId);
 assert.neq(configA.settings.replicaSetId, configB.settings.replicaSetId);
 
+// Increment the config version first on this node so that its version on the next reconfig will
+// be higher than B's.
+configA.version++;
+assert.commandWorked(primaryA.adminCommand({replSetReconfig: configA}));
+
 jsTestLog("Adding replica set B's primary " + primaryB.host + " to replica set A's config");
 configA.version++;
 configA.members.push({_id: 11, host: primaryB.host});
