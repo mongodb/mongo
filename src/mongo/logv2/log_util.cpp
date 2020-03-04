@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,56 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kControl
 
+#include "mongo/logv2/log_util.h"
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/logv2/log.h"
-#include "mongo/util/log.h"
-
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/logger/ramlog.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/rotatable_file_manager.h"
-#include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"
 
-// TODO: Win32 unicode console writing (in logger/console_appender?).
-// TODO: Extra log context appending, and re-enable log_user_*.js
-// TODO: Eliminate cout/cerr.
+#include <string>
 
-namespace mongo {
+namespace mongo::logv2 {
+bool rotateLogs(bool renameFiles) {
+    // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
+    LOGV2(23166, "Log rotation initiated");
+    std::string suffix = "." + terseCurrentTime(false);
+    Status resultv2 =
+        logv2::LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
+    if (!resultv2.isOK())
+        LOGV2_WARNING(23168, "Log rotation failed", "reason"_attr = resultv2);
 
-bool logV2Enabled() {
-    return true;
-}
-
-bool logV2IsJson(logv2::LogFormat format) {
-    return format == logv2::LogFormat::kJson || format == logv2::LogFormat::kDefault;
-}
-
-static logger::ExtraLogContextFn _appendExtraLogContext;
-
-Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
-    if (!contextFn)
-        return Status(ErrorCodes::BadValue, "Cannot register a NULL log context function.");
-    if (_appendExtraLogContext) {
-        return Status(ErrorCodes::AlreadyInitialized,
-                      "Cannot call registerExtraLogContextFn multiple times.");
+    using logger::RotatableFileManager;
+    RotatableFileManager* manager = logger::globalRotatableFileManager();
+    RotatableFileManager::FileNameStatusPairVector result(manager->rotateAll(renameFiles, suffix));
+    for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
+         it != result.end();
+         it++) {
+        LOGV2_WARNING(
+            23169, "Rotating log file failed", "file"_attr = it->first, "reason"_attr = it->second);
     }
-    _appendExtraLogContext = contextFn;
-    return Status::OK();
+    return resultv2.isOK() && result.empty();
 }
-
-Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
-
-}  // namespace mongo
+}  // namespace mongo::logv2

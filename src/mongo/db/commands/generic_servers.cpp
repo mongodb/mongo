@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -38,11 +38,11 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/logv2/ramlog.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
 #include "mongo/util/log_global_settings.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/ntservice.h"
@@ -198,10 +198,11 @@ public:
                      const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate);
+        bool didRotate = logv2::rotateLogs(serverGlobalParams.logRenameOnRotate);
         if (didRotate)
             logProcessDetailsForLogRotate(opCtx->getServiceContext());
         return didRotate;
+        return true;
     }
 
 } logRotateCmd;

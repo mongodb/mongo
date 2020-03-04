@@ -202,20 +202,6 @@ inline bool shouldLogV1(logger::LogSeverity severity) {
             ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                      \
             (COMPONENT1))
 
-
-/**
- * Rotates the log files.  Returns true if all logs rotate successfully.
- *
- * renameFiles - true means we rename files, false means we expect the file to be renamed
- *               externally
- *
- * logrotate on *nix systems expects us not to rename the file, it is expected that the program
- * simply open the file again with the same name.
- * We expect logrotate to rename the existing file before we rotate, and so the next open
- * we do should result in a file create.
- */
-bool rotateLogs(bool renameFiles);
-
 extern Tee* const warnings;            // Things put here go in serverStatus
 extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
 

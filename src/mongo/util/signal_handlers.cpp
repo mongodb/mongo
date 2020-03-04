@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -44,12 +44,12 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -233,7 +233,7 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
                 return;
             rotation->previous = now;
         }
-        fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate));
+        fassert(16782, logv2::rotateLogs(serverGlobalParams.logRenameOnRotate));
         if (rotation->logFileStatus == LogFileStatus::kNeedToRotateLogFile) {
             logProcessDetailsForLogRotate(getGlobalServiceContext());
         }
