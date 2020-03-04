@@ -6,14 +6,7 @@ load("jstests/ocsp/lib/mock_ocsp.js");
 (function() {
 "use strict";
 
-if (determineSSLProvider() != "openssl") {
-    return;
-}
-
-let mock_ocsp = new MockOCSPServer("", 1);
-mock_ocsp.start();
-
-const ocsp_options = {
+var ocsp_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: OCSP_SERVER_CERT,
     sslCAFile: OCSP_CA_CERT,
@@ -24,12 +17,56 @@ const ocsp_options = {
     },
 };
 
-let conn = null;
+let mock_ocsp = new MockOCSPServer("", 1);
+mock_ocsp.start();
+
+var conn = null;
+
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);
 });
 
-sleep(10000);
+MongoRunner.stopMongod(conn);
+mock_ocsp.stop();
+
+// We need to test different certificates for revoked and not
+// revoked on OSX, so we may as well run this test on all platforms.
+Object.extend(ocsp_options, {waitForConnect: false});
+ocsp_options.sslPEMKeyFile = OCSP_SERVER_CERT_REVOKED;
+
+mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);
+mock_ocsp.start();
+
+conn = MongoRunner.runMongod(ocsp_options);
+
+waitForServer(conn);
+
+assert.throws(() => {
+    new Mongo(conn.host);
+});
+
+mock_ocsp.stop();
+MongoRunner.stopMongod(conn);
+
+// We have to search for the error code that SecureTransport emits when
+// a certificate is revoked.
+if (determineSSLProvider() === "apple") {
+    const APPLE_OCSP_ERROR_CODE = "CSSMERR_TP_CERT_REVOKED";
+    let output = rawMongoProgramOutput();
+    assert(output.search(APPLE_OCSP_ERROR_CODE));
+    return;
+}
+
+ocsp_options.sslPEMKeyFile = OCSP_SERVER_CERT;
+
+clearOCSPCache();
+
+mock_ocsp = new MockOCSPServer("", 1);
+mock_ocsp.start();
+
+assert.doesNotThrow(() => {
+    conn = MongoRunner.runMongod(ocsp_options);
+});
 
 mock_ocsp.stop();
 
@@ -37,6 +74,7 @@ mock_ocsp.stop();
 // that the OCSP status of the client cert is revoked.
 mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);
 mock_ocsp.start();
+
 assert.throws(() => {
     new Mongo(conn.host);
 });

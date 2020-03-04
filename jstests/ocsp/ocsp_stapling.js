@@ -62,9 +62,7 @@ MongoRunner.stopMongod(conn);
 Object.extend(ocsp_options, {waitForConnect: false});
 conn = MongoRunner.runMongod(ocsp_options);
 
-// Because we are not waiting to connect, we have to sleep for a bit to make
-// sure the mongod has some time to wake up.
-sleep(10000);
+waitForServer(conn);
 
 assert.throws(() => {
     new Mongo(conn.host);
