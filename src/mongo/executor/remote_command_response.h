@@ -63,15 +63,18 @@ struct RemoteCommandResponseBase {
 
     RemoteCommandResponseBase(Status s, Milliseconds millis);
 
-    RemoteCommandResponseBase(BSONObj dataObj, Milliseconds millis);
+    RemoteCommandResponseBase(BSONObj dataObj, Milliseconds millis, bool moreToCome = false);
 
-    RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
+    RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply,
+                              Milliseconds millis,
+                              bool moreToCome = false);
 
     bool isOK() const;
 
     BSONObj data;  // Always owned. May point into message.
     boost::optional<Milliseconds> elapsedMillis;
     Status status = Status::OK();
+    bool moreToCome = false;  // Whether or not the moreToCome bit is set on an exhaust message.
 
 protected:
     ~RemoteCommandResponseBase() = default;

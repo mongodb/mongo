@@ -47,19 +47,6 @@ namespace mongo {
 
 class AsyncDBClient : public std::enable_shared_from_this<AsyncDBClient> {
 public:
-    using RemoteCommandCallbackFn =
-        unique_function<void(const executor::RemoteCommandResponse&, bool isMoreToComeSet)>;
-
-    struct ExhaustRequestParameters {
-        ExhaustRequestParameters(ExhaustRequestParameters&&) = default;
-        ExhaustRequestParameters(const ExhaustRequestParameters&) = delete;
-        ExhaustRequestParameters& operator=(const ExhaustRequestParameters&) = delete;
-
-        RemoteCommandCallbackFn cb;
-        ClockSource* clkSource;
-        Date_t start;
-    };
-
     explicit AsyncDBClient(const HostAndPort& peer,
                            transport::SessionHandle session,
                            ServiceContext* svcCtx)
@@ -79,12 +66,11 @@ public:
                                         const BatonHandle& baton = nullptr,
                                         bool fireAndForget = false);
 
-    Future<void> runExhaustCommandRequest(executor::RemoteCommandRequest request,
-                                          RemoteCommandCallbackFn&& cb,
-                                          const BatonHandle& baton = nullptr);
-    Future<void> runExhaustCommand(OpMsgRequest request,
-                                   RemoteCommandCallbackFn&& cb,
-                                   const BatonHandle& baton = nullptr);
+    Future<executor::RemoteCommandResponse> beginExhaustCommandRequest(
+        executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
+    Future<executor::RemoteCommandResponse> runExhaustCommand(OpMsgRequest request,
+                                                              const BatonHandle& baton = nullptr);
+    Future<executor::RemoteCommandResponse> awaitExhaustCommand(const BatonHandle& baton = nullptr);
 
     Future<void> authenticate(const BSONObj& params);
 
@@ -108,8 +94,8 @@ public:
     const HostAndPort& local() const;
 
 private:
-    Future<void> _continueReceiveExhaustResponse(
-        ExhaustRequestParameters&& exhaustRequestParameters,
+    Future<executor::RemoteCommandResponse> _continueReceiveExhaustResponse(
+        ClockSource::StopWatch stopwatch,
         boost::optional<int32_t> msgId,
         const BatonHandle& baton = nullptr);
     Future<Message> _waitForResponse(boost::optional<int32_t> msgId,

@@ -351,6 +351,7 @@ error_codes:
     - {code: 306,name: ReadThroughCacheLookupCanceled}
 
     - {code: 307,name: RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist}
+    - {code: 308,name: ExhaustCommandFinished}
 
     # Error codes 4000-8999 are reserved.
 

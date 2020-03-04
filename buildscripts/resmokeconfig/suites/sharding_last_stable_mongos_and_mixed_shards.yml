@@ -28,8 +28,9 @@ selector:
   - jstests/sharding/test_stacked_migration_cleanup.js
   - jstests/sharding/killop.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
-  # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
+  - jstests/sharding/repl_monitor_refresh.js
+  - jstests/sharding/retryable_write_error_labels.js
   # Enable when SERVER-43310 is backported
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
 

@@ -874,10 +874,12 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
         .onError([state](Status error) {
             stdx::lock_guard lk(state->_onReplyMutex);
             state->onReplyFn(RemoteCommandOnAnyResponse(
-                                 boost::none, std::move(error), state->stopwatch.elapsed()),
-                             false);
+                boost::none, std::move(error), state->stopwatch.elapsed()));
         })
-        .getAsync([state](Status status) { state->tryFinish(status); });
+        .getAsync([state](Status status) {
+            state->tryFinish(
+                Status{ErrorCodes::ExhaustCommandFinished, "Exhaust command finished"});
+        });
 
     {
         stdx::lock_guard lk(interface->_inProgressMutex);
@@ -891,37 +893,64 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     auto requestState = requestManager->getRequest(reqId);
     invariant(requestState);
 
-    auto clientCallback = [this, requestState](const RemoteCommandResponse& response,
-                                               bool isMoreToComeSet) {
-        // Stash this response on the command state to be used to fulfill the promise.
-        prevResponse = response;
+    auto clientCallback = [this, requestState](const RemoteCommandResponse& response) {
         auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
         doMetadataHook(onAnyResponse);
 
         // If the command failed, we will call 'onReply' as a part of the future chain paired with
         // the promise. This is to be sure that all error paths will run 'onReply' only once upon
         // future completion.
-        if (!getStatusFromCommandResult(response.data).isOK()) {
+        if (!response.status.isOK() || !getStatusFromCommandResult(response.data).isOK()) {
             // The moreToCome bit should *not* be set if the command failed
-            invariant(!isMoreToComeSet);
+            invariant(!response.moreToCome);
+            return;
+        }
+
+        stdx::lock_guard lk(_onReplyMutex);
+        onReplyFn(onAnyResponse);
+    };
+
+    auto& reactor = requestState->interface()->_reactor;
+    handleExhaustResponseFn =
+        [ this, requestState, reactor, clientCallback = std::move(clientCallback) ](
+            StatusWith<RemoteCommandResponse> swResponse) mutable noexcept {
+        RemoteCommandResponse response;
+        if (!swResponse.isOK()) {
+            response = RemoteCommandResponse(std::move(swResponse.getStatus()));
+        } else {
+            response = std::move(swResponse.getValue());
+        }
+
+        clientCallback(response);
+
+        if (!response.moreToCome) {
+            finalResponsePromise.emplaceValue(response);
+            return;
+        }
+
+        if (requestState->interface()->inShutdown()) {
             return;
         }
 
         // Reset the stopwatch to measure the correct duration for the folowing reply
         stopwatch.restart();
+        if (deadline != RemoteCommandRequest::kNoExpirationDate) {
+            deadline = stopwatch.start() + requestOnAny.timeout;
+        }
         setTimer();
-
-        stdx::lock_guard lk(_onReplyMutex);
-        onReplyFn(onAnyResponse, isMoreToComeSet);
+        requestState->client()->awaitExhaustCommand(baton).thenRunOn(reactor).getAsync(
+            handleExhaustResponseFn);
     };
 
-    return makeReadyFutureWith(
-               [this, requestState, clientCallback = std::move(clientCallback)]() mutable {
-                   setTimer();
-                   return requestState->client()->runExhaustCommandRequest(
-                       *requestState->request, std::move(clientCallback), baton);
-               })
-        .then([this, requestState] { return prevResponse; });
+    setTimer();
+    requestState->client()
+        ->beginExhaustCommandRequest(*requestState->request, baton)
+        .thenRunOn(reactor)
+        .getAsync(handleExhaustResponseFn);
+
+    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
+    finalResponsePromise = std::move(promise);
+    return std::move(future).then([this](const auto& finalResponse) { return finalResponse; });
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(

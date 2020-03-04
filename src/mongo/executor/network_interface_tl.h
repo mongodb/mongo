@@ -199,10 +199,10 @@ private:
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
         Promise<void> promise;
-        RemoteCommandResponse prevResponse;
-        Mutex _onReplyMutex =
-            MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_onReplyMutex");
+        Promise<RemoteCommandResponse> finalResponsePromise;
+        Mutex _onReplyMutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::_onReplyMutex");
         RemoteCommandOnReplyFn onReplyFn;
+        std::function<void(StatusWith<RemoteCommandResponse>)> handleExhaustResponseFn;
     };
 
     enum class ConnStatus { Unset, OK, Failed };

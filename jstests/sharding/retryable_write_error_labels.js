@@ -14,7 +14,11 @@ const dbName = "test";
 const collName = "retryable_write_error_labels";
 
 // Use ShardingTest because we need to test both mongod and mongos behaviors.
-const st = new ShardingTest({config: 1, mongos: 1, shards: 1});
+const st = new ShardingTest({
+    config: 1,
+    mongos: {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": "{'mode':'alwaysOn'}"}}},
+    shards: 1
+});
 const primary = st.rs0.getPrimary();
 
 assert.commandWorked(primary.getDB(dbName).runCommand(
@@ -76,8 +80,11 @@ function runTest(errorCode, expectLabel, isWCError, isMongos) {
     // Test retryable writes.
     jsTestLog("Retryable write should return error " + errorCode + withOrWithout +
               " RetryableWriteError label");
-    let res = testDB.runCommand(
-        {insert: collName, documents: [{a: errorCode, b: "retryable"}], txnNumber: NumberLong(0)});
+    let res = testDB.runCommand({
+        insert: collName,
+        documents: [{a: errorCode, b: "retryable"}],
+        txnNumber: NumberLong(0),
+    });
     checkErrorCode(res, errorCode, isWCError);
     checkErrorLabels(res, expectLabel);
 
@@ -96,7 +103,7 @@ function runTest(errorCode, expectLabel, isWCError, isMongos) {
     res = sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        autocommit: false
+        autocommit: false,
     });
     checkErrorCode(res, errorCode, isWCError);
     checkErrorLabels(res, expectLabel);
@@ -133,7 +140,7 @@ function runTest(errorCode, expectLabel, isWCError, isMongos) {
     res = sessionDb.adminCommand({
         abortTransaction: 1,
         txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        autocommit: false
+        autocommit: false,
     });
     checkErrorCode(res, errorCode, isWCError);
     checkErrorLabels(res, expectLabel);
@@ -201,6 +208,8 @@ runTest(ErrorCodes.WriteConcernFailed,
         false /* expectLabel */,
         true /* isWCError */,
         true /* isMongos */);
+
+st.s.adminCommand({"configureFailPoint": "overrideMaxAwaitTimeMS", "mode": "off"});
 
 st.stop();
 }());
