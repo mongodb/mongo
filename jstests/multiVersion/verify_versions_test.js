@@ -40,10 +40,10 @@ function assertBinVersionComparesEqual(v1, v2) {
               "Expected \"" + v1 + "\" to compare equal to \"" + v2 + "\"");
 }
 
-// The current version is in the 4.3 series. This has to be changed very time we bump
+// The current version is in the 4.5 series. This has to be changed very time we bump
 // the major version pair, but it provides a useful test of assumptions.
-assertBinVersionsEqual("4.3", version());
-assertBinVersionComparesEqual("4.3", version());
+assertBinVersionsEqual("4.5", version());
+assertBinVersionComparesEqual("4.5", version());
 
 // "latest" is the same version as the shell, "last-stable" is not.
 assertBinVersionsEqual("latest", version());
