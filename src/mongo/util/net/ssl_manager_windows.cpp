@@ -520,9 +520,8 @@ int SSLManagerWindows::SSL_read(SSLConnectionInterface* connInterface, void* buf
             }
             default:
                 LOGV2_FATAL(23282,
-                            "Unexpected ASIO state: {state}",
-                            "Unexpected ASIO state",
-                            "state"_attr = static_cast<int>(want));
+                            "Unexpected ASIO state: {static_cast_int_want}",
+                            "static_cast_int_want"_attr = static_cast<int>(want));
                 MONGO_UNREACHABLE;
         }
     }
@@ -1359,9 +1358,9 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
         cred->dwFlags = cred->dwFlags          // flags
             | SCH_CRED_REVOCATION_CHECK_CHAIN  // Check certificate revocation
             | SCH_CRED_SNI_CREDENTIAL          // Pass along SNI creds
-            | SCH_CRED_SNI_ENABLE_OCSP         // Enable OCSP
             | SCH_CRED_NO_SYSTEM_MAPPER        // Do not map certificate to user account
             | SCH_CRED_DISABLE_RECONNECTS;     // Do not support reconnects
+
     } else {
         supportedProtocols = SP_PROT_TLS1_CLIENT | SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_1_CLIENT |
             SP_PROT_TLS1_2_CLIENT;
@@ -1371,8 +1370,8 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
             | SCH_CRED_REVOCATION_CHECK_CHAIN   // Check certificate revocation
             | SCH_CRED_NO_SERVERNAME_CHECK      // Do not validate server name against cert
             | SCH_CRED_NO_DEFAULT_CREDS         // No Default Certificate
-            | SCH_CRED_MEMORY_STORE_CERT        // Read intermediate certificates from memory store
-                                                // associated with client certificate.
+            | SCH_CRED_MEMORY_STORE_CERT        // Read intermediate certificates from memory
+                                                // store associated with client certificate.
             | SCH_CRED_MANUAL_CRED_VALIDATION;  // Validate Certificate Manually
     }
 
@@ -1929,9 +1928,9 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
             }
             return SSLPeerInfo(sni);
         } else {
-            LOGV2_ERROR(23280, "no SSL certificate provided by peer; connection rejected");
-            return Status(ErrorCodes::SSLHandshakeFailed,
-                          "no SSL certificate provided by peer; connection rejected");
+            auto msg = "no SSL certificate provided by peer; connection rejected";
+            LOGV2_ERROR(23280, "{msg}", "msg"_attr = msg);
+            return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
 
@@ -1975,7 +1974,6 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     LOGV2_DEBUG(23270,
                 2,
                 "Accepted TLS connection from peer: {peerSubjectName}",
-                "Accepted TLS connection from peer",
                 "peerSubjectName"_attr = peerSubjectName);
 
     // If this is a server and client and server certificate are the same, log a warning.
