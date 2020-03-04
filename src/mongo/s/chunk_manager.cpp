@@ -276,9 +276,20 @@ std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator>
 RoutingTableHistory::overlappingRanges(const BSONObj& min,
                                        const BSONObj& max,
                                        bool isMaxInclusive) const {
+    if (kDebugBuild) {
+        auto keyPattern = _shardKeyPattern.getKeyPattern();
+        bool minHasFullShardKey =
+            _extractKeyString(keyPattern.extendRangeBound(min, false /* makeUpperInclusive */)) ==
+            _extractKeyString(min);
+        bool maxHasFullShardKey =
+            _extractKeyString(keyPattern.extendRangeBound(max, false /* makeUpperInclusive */)) ==
+            _extractKeyString(max);
+        invariant(minHasFullShardKey);
+        invariant(maxHasFullShardKey);
+    }
 
     const auto itMin = _chunkMap.upper_bound(_extractKeyString(min));
-    const auto itMax = [this, &max, isMaxInclusive]() {
+    const auto itMax = [&]() {
         auto it = isMaxInclusive ? _chunkMap.upper_bound(_extractKeyString(max))
                                  : _chunkMap.lower_bound(_extractKeyString(max));
         return it == _chunkMap.end() ? it : ++it;
