@@ -218,8 +218,10 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
 StatusWith<TaskExecutor::CallbackHandle>
 SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
     auto maxAwaitTimeMS = durationCount<Milliseconds>(kMaxAwaitTimeMs);
-    overrideMaxAwaitTimeMS.execute(
-        [&](const BSONObj&) { maxAwaitTimeMS = durationCount<Milliseconds>(Milliseconds(1000)); });
+    overrideMaxAwaitTimeMS.execute([&](const BSONObj& data) {
+        maxAwaitTimeMS =
+            durationCount<Milliseconds>(Milliseconds(data["maxAwaitTimeMS"].numberInt()));
+    });
 
     BSONObjBuilder bob;
     bob.append("isMaster", 1);

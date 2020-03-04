@@ -13,10 +13,13 @@
 const dbName = "test";
 const collName = "retryable_write_error_labels";
 
-// Use ShardingTest because we need to test both mongod and mongos behaviors.
+// Use ShardingTest because we need to test both mongod and mongos behaviors
+let overrideMaxAwaitTimeMS = {'mode': 'alwaysOn', 'data': {maxAwaitTimeMS: 1000}};
 const st = new ShardingTest({
     config: 1,
-    mongos: {s0: {setParameter: {"failpoint.overrideMaxAwaitTimeMS": "{'mode':'alwaysOn'}"}}},
+    mongos:
+        {s0: {setParameter: "failpoint.overrideMaxAwaitTimeMS=" + tojson(overrideMaxAwaitTimeMS)}},
+
     shards: 1
 });
 const primary = st.rs0.getPrimary();
