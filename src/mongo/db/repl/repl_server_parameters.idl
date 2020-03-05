@@ -305,7 +305,7 @@ server_parameters:
     # TODO: Remove in SERVER-46541.
     enableAutomaticReconfig:
         description: >-
-            Enables the `newlyAdded` field in member configs to be set, as part of automatic
+            Enables the 'newlyAdded' field in member configs to be set, as part of automatic
             reconfig.
         set_at: startup
         test_only: true

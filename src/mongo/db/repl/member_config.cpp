@@ -137,7 +137,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     // Parse newlyAdded field.
     //
     if (mcfg.hasField(kNewlyAddedFieldName)) {
-        // If the `enableAutomaticReconfig` flag is not set, there should not be a `newlyAdded`
+        // If the 'enableAutomaticReconfig' flag is not set, there should not be a 'newlyAdded'
         // field in the obj.
         uassert(
             ErrorCodes::InvalidReplicaSetConfig,
@@ -319,6 +319,7 @@ BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
     if (_newlyAdded) {
         // We should never have _newlyAdded if automatic reconfigs aren't enabled.
         invariant(enableAutomaticReconfig);
+        invariant(_newlyAdded.get());
         configBuilder.append("newlyAdded", _newlyAdded.get());
     }
     configBuilder.append("buildIndexes", _buildIndexes);

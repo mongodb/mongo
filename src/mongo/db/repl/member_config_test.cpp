@@ -150,7 +150,7 @@ TEST(MemberConfig, ParseArbiterOnly) {
 }
 
 TEST(MemberConfig, ParseAndSetNewlyAddedField) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
     ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
@@ -160,7 +160,7 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"),
                         &tagConfig);
-        // Verify that the `newlyAdded` field is not added by default.
+        // Verify that the 'newlyAdded' field is not added by default.
         ASSERT_FALSE(mc.isNewlyAdded());
 
         mc.setNewlyAdded(true);
@@ -173,6 +173,20 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
                         &tagConfig);
         ASSERT_TRUE(mc.isNewlyAdded().get());
     }
+}
+
+TEST(MemberConfig, NewlyAddedSetToFalseShouldThrow) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                          << "h"
+                                          << "newlyAdded" << false),
+                               &tagConfig),
+                  ExceptionFor<ErrorCodes::InvalidReplicaSetConfig>);
 }
 
 TEST(MemberConfig, ParseHidden) {

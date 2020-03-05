@@ -3058,7 +3058,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         if (enableAutomaticReconfig) {
             bool addedNewlyAddedField = false;
 
-            // Set the `newlyAdded` field to true for all new voting nodes.
+            // Set the 'newlyAdded' field to true for all new voting nodes.
             for (int i = 0; i < newConfig.getNumMembers(); i++) {
                 const auto newMem = newConfig.getMemberAt(i);
                 const int newMemId = newMem.getId().getData();
@@ -3073,8 +3073,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
             if (addedNewlyAddedField) {
                 LOGV2(4634400,
-                      "Rewrote the config to add `newlyAdded` field. Nodes with the `newlyAdded` "
-                      "field will be considered to have `votes:0`. Upon transition to SECONDARY, "
+                      "Rewrote the config to add 'newlyAdded' field. Nodes with the 'newlyAdded' "
+                      "field will be considered to have 'votes:0'. Upon transition to SECONDARY, "
                       "this field will be automatically removed.",
                       "newConfigObj"_attr = newConfig.toBSON());
             }

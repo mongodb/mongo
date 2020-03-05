@@ -905,7 +905,7 @@ TEST(ReplSetConfig, ConfigServerField) {
 }
 
 TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
     ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
@@ -917,7 +917,7 @@ TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                               << "localhost:12345")))));
 
-    // The member should have its `newlyAdded` field set to false by default.
+    // The member should have its 'newlyAdded' field set to false by default.
     ASSERT_FALSE(config.findMemberByID(1)->isNewlyAdded());
 
     config.setNewlyAddedFieldForMemberAtIndex(0, true);
@@ -925,7 +925,7 @@ TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
 }
 
 TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
     ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
@@ -938,8 +938,25 @@ TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
                                                               << "localhost:12345"
                                                               << "newlyAdded" << true)))));
 
-    // The member should have its `newlyAdded` field set to true after parsing.
+    // The member should have its 'newlyAdded' field set to true after parsing.
     ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
+}
+
+TEST(ReplSetConfig, ParseFailsWithNewlyAddedSetToFalse) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                    << "localhost:12345"
+                                                                    << "newlyAdded" << false))));
+
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
 }
 
 TEST(ReplSetConfig, CannotSetNewlyAddedFieldToFalseForMemberConfig) {
@@ -949,7 +966,7 @@ TEST(ReplSetConfig, CannotSetNewlyAddedFieldToFalseForMemberConfig) {
                                      << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                               << "localhost:12345")))));
-    // Cannot set `newlyAdded` field to false.
+    // Cannot set 'newlyAdded' field to false.
     ASSERT_THROWS_CODE(config.setNewlyAddedFieldForMemberAtIndex(0, false),
                        AssertionException,
                        ErrorCodes::InvalidReplicaSetConfig);
