@@ -307,6 +307,9 @@ private:
         boost::optional<RemoteCommandRequest> request;
         HostAndPort host;
         ConnectionPool::ConnectionHandle conn;
+        bool isHedge{false};
+        bool hasHedgeOptions{false};
+        bool isSent{false};
         size_t reqId;
     };
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/client/hedging_metrics.h"
+#include "mongo/executor/hedging_metrics.h"
 
 namespace mongo {
 

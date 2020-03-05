@@ -113,6 +113,16 @@ env.Library(target='egress_tag_closer_manager',
             ])
 
 env.Library(
+    target='hedging_metrics',
+    source=[
+        'hedging_metrics.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='network_interface_tl',
     source=[
         'connection_pool_tl.cpp',
@@ -121,6 +131,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/async_client',
         '$BUILD_DIR/mongo/transport/transport_layer',
+        'hedging_metrics',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
