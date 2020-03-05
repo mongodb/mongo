@@ -429,6 +429,14 @@ TEST_F(LogTestV2, Types) {
     validateJSON(str_data.toString());
     ASSERT_EQUALS(lastBSONElement().String(), str_data);
 
+    {
+        std::string_view s = "a std::string_view";
+        LOGV2(4329200, "std::string_view {name}", "name"_attr = s);
+        ASSERT_EQUALS(text.back(), "std::string_view a std::string_view");
+        validateJSON(std::string{s});
+        ASSERT_EQUALS(lastBSONElement().String(), s);
+    }
+
     // BSONObj
     BSONObjBuilder builder;
     builder.append("int32"_sd, 1);
