@@ -5004,7 +5004,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz"]
+  tags: ["jstestfuzz", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -5075,7 +5075,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control"]
+  tags: ["jstestfuzz", "flow_control", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -5093,7 +5093,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control"]
+  tags: ["jstestfuzz", "flow_control", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -5111,7 +5111,7 @@ tasks:
 # jstestfuzz replication continuous stepdown with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "repl", "flow_control"]
+  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -5129,7 +5129,7 @@ tasks:
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "common", "repl", "flow_control"]
+  tags: ["jstestfuzz", "common", "repl", "flow_control", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -5244,7 +5244,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz"]
+  tags: ["jstestfuzz", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -9323,11 +9323,9 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams !.secondary_reads
   - name: .misc_js !.non_win_dbg
-    # Some concurrency workloads require a lot of memory, so we use machines
-    # with more RAM for these suites.
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+  - name: .concurrency .debug_only
     distros:
-      - windows-64-vs2019-large
+    - windows-64-vs2019-large
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
@@ -9337,7 +9335,6 @@ buildvariants:
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
-  - name: .logical_session_cache .one_sec
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .read_write_concern !.large
@@ -9434,7 +9431,6 @@ buildvariants:
     - name: compile_all_run_unittests_TG
       distros:
         - windows-64-vs2019-large
-    - name: .aggfuzzer
     - name: audit
     - name: auth_audit_gen
     - name: buildscripts_test
@@ -9557,8 +9553,7 @@ buildvariants:
     - windows-64-vs2019-large
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.decimal !.compat !.sharding
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
+  - name: .jstestfuzz .common !.flow_control  # Flow control jstestfuzz take longer.
   - name: .read_write_concern .linearize
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
@@ -9596,13 +9591,18 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2019-large
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .auth .gle
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common !.txn
+    # Some concurrency workloads require a lot of memory, so we use machines
+    # with more RAM for these suites.
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
+    distros:
+      - windows-64-vs2019-large
+  - name: .concurrency .common
   - name: concurrency_replication_causal_consistency
     distros:
     - windows-64-vs2019-large
@@ -9610,8 +9610,7 @@ buildvariants:
   - name: free_monitoring
   - name: .jscore .common !.auth
   - name: jsonSchema
-  - name: .jstestfuzz !.initsync
-  - name: .logical_session_cache .one_sec
+  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
   - name: .powercycle
