@@ -34,6 +34,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -128,25 +129,26 @@ public:
                                   << collType.getKeyPattern().toString(),
                     oldShardKeyPattern.isExtendedBy(newShardKeyPattern));
 
-            const auto dbType =
-                uassertStatusOK(
-                    catalogClient->getDatabase(
-                        opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel()))
-                    .value;
-            const auto primaryShardId = dbType.getPrimary();
-            const auto primaryShard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-
-            // Since createIndexIfPossible is false, we have no need for default collation and set
-            // it to boost::none.
-            shardkeyutil::validateShardKeyAgainstExistingIndexes(opCtx,
-                                                                 nss,
-                                                                 proposedKey,
-                                                                 newShardKeyPattern,
-                                                                 primaryShard,
-                                                                 boost::none,
-                                                                 collType.getUnique(),
-                                                                 false);  // createIndexIfPossible
+            // Indexes are loaded using shard versions, so validating the shard key may need to be
+            // retried on StaleConfig errors.
+            auto catalogCache = Grid::get(opCtx)->catalogCache();
+            sharded_agg_helpers::shardVersionRetry(
+                opCtx,
+                catalogCache,
+                nss,
+                "validating indexes for refineCollectionShardKey"_sd,
+                [&] {
+                    // Note a shard key index will never be created automatically for refining a
+                    // shard key, so no default collation is needed.
+                    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                        opCtx,
+                        nss,
+                        proposedKey,
+                        newShardKeyPattern,
+                        boost::none,
+                        collType.getUnique(),
+                        shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
+                });
 
             LOGV2(21922,
                   "CMD: refineCollectionShardKey: {request}",
