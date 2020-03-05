@@ -33,7 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 
 namespace mongo {
 namespace {

@@ -47,13 +47,13 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/log_version_util.h"
-#include "mongo/logger/redaction.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/errno_util.h"
 
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)

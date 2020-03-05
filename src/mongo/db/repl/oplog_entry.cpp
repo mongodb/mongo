@@ -35,7 +35,7 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

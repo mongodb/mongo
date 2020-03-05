@@ -46,7 +46,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"

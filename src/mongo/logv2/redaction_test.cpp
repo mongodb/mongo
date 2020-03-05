@@ -29,9 +29,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -43,7 +44,7 @@ const std::string kMsg = "Not initialized";
 using BSONStringPair = std::pair<BSONObj, std::string>;
 
 TEST(RedactStringTest, NoRedact) {
-    logger::globalLogDomain()->setShouldRedactLogs(false);
+    logv2::setShouldRedactLogs(false);
 
     std::string toRedact[] = {"", "abc", "*&$@!_\\\\\\\"*&$@!_\"*&$@!_\"*&$@!_"};
     for (auto s : toRedact) {
@@ -52,7 +53,7 @@ TEST(RedactStringTest, NoRedact) {
 }
 
 TEST(RedactStringTest, BasicStrings) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
 
     std::string toRedact[] = {"", "abc", "*&$@!_\\\\\\\"*&$@!_\"*&$@!_\"*&$@!_"};
     for (auto s : toRedact) {
@@ -61,31 +62,31 @@ TEST(RedactStringTest, BasicStrings) {
 }
 
 TEST(RedactStatusTest, NoRedact) {
-    logger::globalLogDomain()->setShouldRedactLogs(false);
+    logv2::setShouldRedactLogs(false);
     Status status(ErrorCodes::InternalError, kMsg);
     ASSERT_EQ(redact(status), status.toString());
 }
 
 TEST(RedactStatusTest, BasicStatus) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     Status status(ErrorCodes::InternalError, kMsg);
     ASSERT_EQ(redact(status), "InternalError: " + kRedactionDefaultMask);
 }
 
 TEST(RedactStatusTest, StatusOK) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     ASSERT_EQ(redact(Status::OK()), "OK");
 }
 
 TEST(RedactExceptionTest, NoRedact) {
-    logger::globalLogDomain()->setShouldRedactLogs(false);
+    logv2::setShouldRedactLogs(false);
     ASSERT_THROWS_WITH_CHECK([] { uasserted(ErrorCodes::InternalError, kMsg); }(),
                              DBException,
                              [](const DBException& ex) { ASSERT_EQ(redact(ex), ex.toString()); });
 }
 
 TEST(RedactExceptionTest, BasicException) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     ASSERT_THROWS_WITH_CHECK(
         [] { uasserted(ErrorCodes::InternalError, kMsg); }(),
         DBException,
@@ -93,7 +94,7 @@ TEST(RedactExceptionTest, BasicException) {
 }
 
 TEST(RedactBSONTest, NoRedact) {
-    logger::globalLogDomain()->setShouldRedactLogs(false);
+    logv2::setShouldRedactLogs(false);
     BSONObj obj = BSON("a" << 1);
     ASSERT_BSONOBJ_EQ(redact(obj), obj);
 }
@@ -105,7 +106,7 @@ void testBSONCases(std::initializer_list<BSONStringPair> testCases) {
 }
 
 TEST(RedactBSONTest, BasicBSON) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     std::vector<BSONStringPair> testCases;
 
     testBSONCases({BSONStringPair(BSONObj(), "{}"),
@@ -124,7 +125,7 @@ TEST(RedactBSONTest, BasicBSON) {
 }
 /*
 TEST(RedactBSONTest, NestedBSON) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     std::vector<BSONStringPair> testCases;
 
     testCases.push_back(BSONStringPair(BSON("a" << BSONObj()), "{ a: {} }"));
@@ -138,7 +139,7 @@ TEST(RedactBSONTest, NestedBSON) {
 }
 
 TEST(RedactBSONTest, BSONWithArrays) {
-    logger::globalLogDomain()->setShouldRedactLogs(true);
+    logv2::setShouldRedactLogs(true);
     std::vector<BSONStringPair> testCases;
 
     testCases.push_back(BSONStringPair(BSON("a" << BSONArray()), "{ a: [] }"));

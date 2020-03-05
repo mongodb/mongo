@@ -35,8 +35,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -47,7 +47,7 @@ constexpr auto kRedactionDefaultMask = "###"_sd;
 }  // namespace
 
 BSONObj redact(const BSONObj& objectToRedact) {
-    if (!logger::globalLogDomain()->shouldRedactLogs()) {
+    if (!logv2::shouldRedactLogs()) {
         return objectToRedact;
     }
 
@@ -55,7 +55,7 @@ BSONObj redact(const BSONObj& objectToRedact) {
 }
 
 StringData redact(StringData stringToRedact) {
-    if (!logger::globalLogDomain()->shouldRedactLogs()) {
+    if (!logv2::shouldRedactLogs()) {
         return stringToRedact;
     }
 
@@ -64,7 +64,7 @@ StringData redact(StringData stringToRedact) {
 }
 
 std::string redact(const Status& statusToRedact) {
-    if (!logger::globalLogDomain()->shouldRedactLogs()) {
+    if (!logv2::shouldRedactLogs()) {
         return statusToRedact.toString();
     }
 
@@ -77,7 +77,7 @@ std::string redact(const Status& statusToRedact) {
 }
 
 std::string redact(const DBException& exceptionToRedact) {
-    if (!logger::globalLogDomain()->shouldRedactLogs()) {
+    if (!logv2::shouldRedactLogs()) {
         return exceptionToRedact.toString();
     }
 

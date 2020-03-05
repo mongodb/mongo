@@ -53,7 +53,6 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/logger/redaction.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"

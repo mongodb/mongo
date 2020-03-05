@@ -42,4 +42,14 @@ namespace mongo::logv2 {
  * we do should result in a file create.
  */
 bool rotateLogs(bool renameFiles);
+
+/**
+ * Returns true if system logs should be redacted.
+ */
+bool shouldRedactLogs();
+
+/**
+ * Set the 'redact' mode of the server.
+ */
+void setShouldRedactLogs(bool enabled);
 }  // namespace mongo::logv2
