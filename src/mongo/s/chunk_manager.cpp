@@ -256,6 +256,11 @@ ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj
     return {ConstChunkIterator(), ConstChunkIterator()};
 }
 
+ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
+    auto minKey = getShardKeyPattern().getKeyPattern().globalMin();
+    return findIntersectingChunkWithSimpleCollation(minKey).getShardId();
+}
+
 void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
     std::transform(_shardVersions.begin(),
                    _shardVersions.end(),

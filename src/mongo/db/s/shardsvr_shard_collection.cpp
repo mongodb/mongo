@@ -49,6 +49,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -189,136 +190,6 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 }
 
 /**
- * Compares the proposed shard key with the collection's existing indexes on the primary shard to
- * ensure they are a legal combination.
- *
- * If the collection is empty and no index on the shard key exists, creates the required index.
- */
-void createCollectionOrValidateExisting(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const BSONObj& proposedKey,
-                                        const ShardKeyPattern& shardKeyPattern,
-                                        const ShardsvrShardCollection& request) {
-    // The proposed shard key must be validated against the set of existing indexes.
-    // In particular, we must ensure the following constraints
-    //
-    // 1. All existing unique indexes, except those which start with the _id index,
-    //    must contain the proposed key as a prefix (uniqueness of the _id index is
-    //    ensured by the _id generation process or guaranteed by the user).
-    //
-    // 2. If the collection is not empty, there must exist at least one index that
-    //    is "useful" for the proposed key.  A "useful" index is defined as follows
-    //    Useful Index:
-    //         i. contains proposedKey as a prefix
-    //         ii. is not a sparse index, partial index, or index with a non-simple collation
-    //         iii. is not multikey (maybe lift this restriction later)
-    //         iv. if a hashed index, has default seed (lift this restriction later)
-    //
-    // 3. If the proposed shard key is specified as unique, there must exist a useful,
-    //    unique index exactly equal to the proposedKey (not just a prefix).
-    //
-    // After validating these constraint:
-    //
-    // 4. If there is no useful index, and the collection is non-empty, we
-    //    must fail.
-    //
-    // 5. If the collection is empty, and it's still possible to create an index
-    //    on the proposed key, we go ahead and do so.
-    DBDirectClient localClient(opCtx);
-    std::list<BSONObj> indexes = localClient.getIndexSpecs(nss);
-
-    // 1. Verify consistency with existing unique indexes
-    for (const auto& idx : indexes) {
-        BSONObj currentKey = idx["key"].embeddedObject();
-        bool isUnique = idx["unique"].trueValue();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey << " and proposed shard key " << proposedKey
-                              << ". Uniqueness can't be maintained unless shard key is a prefix",
-                !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
-    }
-
-    // 2. Check for a useful index
-    bool hasUsefulIndexForKey = false;
-    for (const auto& idx : indexes) {
-        BSONObj currentKey = idx["key"].embeddedObject();
-        // Check 2.i. and 2.ii.
-        if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
-            proposedKey.isPrefixOf(currentKey, SimpleBSONElementComparator::kInstance)) {
-            // We can't currently use hashed indexes with a non-default hash seed
-            // Check v.
-            // Note that this means that, for sharding, we only support one hashed index
-            // per field per collection.
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "can't shard collection " << nss.ns()
-                                  << " with hashed shard key " << proposedKey
-                                  << " because the hashed index uses a non-default seed of "
-                                  << idx["seed"].numberInt(),
-                    !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
-                        idx["seed"].numberInt() == BSONElementHasher::DEFAULT_HASH_SEED);
-            hasUsefulIndexForKey = true;
-        }
-    }
-
-    // 3. If proposed key is required to be unique, additionally check for exact match.
-
-    if (hasUsefulIndexForKey && request.getUnique()) {
-        BSONObj eqQuery = BSON("key" << proposedKey);
-        BSONObj eqQueryResult;
-
-        for (const auto& idx : indexes) {
-            if (SimpleBSONObjComparator::kInstance.evaluate(idx["key"].embeddedObject() ==
-                                                            proposedKey)) {
-                eqQueryResult = idx;
-                break;
-            }
-        }
-
-        if (eqQueryResult.isEmpty()) {
-            // If no exact match, index not useful, but still possible to create one later
-            hasUsefulIndexForKey = false;
-        } else {
-            bool isExplicitlyUnique = eqQueryResult["unique"].trueValue();
-            BSONObj currKey = eqQueryResult["key"].embeddedObject();
-            bool isCurrentID = (currKey.firstElementFieldNameStringData() == "_id");
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "can't shard collection " << nss.ns() << ", " << proposedKey
-                                  << " index not unique, and unique index explicitly specified",
-                    isExplicitlyUnique || isCurrentID);
-        }
-    }
-
-    if (hasUsefulIndexForKey) {
-        // Check 2.iii Make sure that there is a useful, non-multikey index available.
-        BSONObjBuilder checkShardingIndexCmd;
-        checkShardingIndexCmd.append("checkShardingIndex", nss.ns());
-        checkShardingIndexCmd.append("keyPattern", proposedKey);
-        BSONObj res;
-        auto success = localClient.runCommand("admin", checkShardingIndexCmd.obj(), res);
-        uassert(ErrorCodes::OperationFailed, res["errmsg"].str(), success);
-    } else if (!localClient.findOne(nss.ns(), Query()).isEmpty()) {
-        // 4. if no useful index, and collection is non-empty, fail
-        uasserted(ErrorCodes::InvalidOptions,
-                  "Please create an index that starts with the proposed shard key before "
-                  "sharding the collection");
-    } else {
-        // 5. If no useful index exists, and collection empty, create one on proposedKey.
-        //    Only need to call ensureIndex on primary shard, since indexes get copied to
-        //    receiving shard whenever a migrate occurs.
-        //    If the collection has a default collation, explicitly send the simple
-        //    collation as part of the createIndex request.
-        BSONObj collation =
-            !request.getCollation()->isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
-        auto createIndexesCmd =
-            makeCreateIndexesCmd(nss, proposedKey, collation, request.getUnique());
-
-        BSONObj res;
-        localClient.runCommand(nss.db().toString(), createIndexesCmd, res);
-        uassertStatusOK(getStatusFromCommandResult(res));
-    }
-}
-
-/**
  * Compares the proposed shard key with the shard key of the collection's existing zones
  * to ensure they are a legal combination.
  */
@@ -454,7 +325,14 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
     auto proposedKey(request.getKey().getOwned());
     ShardKeyPattern shardKeyPattern(proposedKey);
 
-    createCollectionOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
+    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+        opCtx,
+        nss,
+        proposedKey,
+        shardKeyPattern,
+        request.getCollation(),
+        request.getUnique(),
+        shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
 
     auto tags = getTagsAndValidate(opCtx, nss, proposedKey, shardKeyPattern);
     auto uuid = getOrGenerateUUID(opCtx, nss, request);

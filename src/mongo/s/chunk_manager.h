@@ -367,6 +367,12 @@ public:
     }
 
     /**
+     * Finds the shard id of the shard that owns the chunk minKey belongs to, assuming the simple
+     * collation because shard keys do not support non-simple collations.
+     */
+    ShardId getMinKeyShardIdWithSimpleCollation() const;
+
+    /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
      */

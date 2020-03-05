@@ -34,9 +34,10 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 
@@ -91,7 +92,8 @@ public:
             return true;
         }
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
