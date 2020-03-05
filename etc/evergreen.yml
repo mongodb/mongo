@@ -8823,22 +8823,16 @@ buildvariants:
     multiversion_edition: enterprise
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: fle
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -8949,26 +8943,15 @@ buildvariants:
     distros:
     - ubuntu1804-power8-build
   - name: aggregation
-  - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
-    #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: fle
   - name: .jscore .common !.auth
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: .ocsp
   - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -9000,7 +8983,6 @@ buildvariants:
     - ubuntu1804-zseries-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: ssl_gen
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -9034,22 +9016,15 @@ buildvariants:
     distros:
     - ubuntu1804-zseries-build
   - name: aggregation
-  - name: aggregation_read_concern_majority_passthrough
-  - name: aggregation_sharded_collections_passthrough
   - name: audit
   - name: .auth !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: .encrypt
   - name: .integration !.audit
     distros:
     - ubuntu1804-zseries-build
   - name: .jscore .common !.auth
   - name: jsCore_op_query
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
@@ -10736,24 +10711,17 @@ buildvariants:
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: .encrypt
   - name: .integration !.audit
     distros:
     - rhel71-power8-build
   - name: .jscore .common !.auth
   - name: jsCore_op_query
-  - name: .aggfuzzer .common
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
   - name: sasl
-  - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
@@ -10794,23 +10762,17 @@ buildvariants:
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: .encrypt
   - name: .integration !.audit
     distros:
     - rhel72-zseries-build
   - name: .jscore .common !.auth
   - name: jsCore_op_query
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
   - name: sasl
-  - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
@@ -10845,21 +10807,14 @@ buildvariants:
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: .encrypt
   - name: .integration !.audit !.sharded
     distros:
     - rhel67-zseries-build
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: .logical_session_cache .one_sec
-  - name: .read_write_concern
-  - name: replica_sets
-  - name: .replica_sets .common
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
@@ -11109,18 +11064,13 @@ buildvariants:
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
   - name: .encrypt
   - name: .integration !.audit
     distros:
     - suse12-zseries-build
   - name: .jscore .common !.auth
   - name: jsCore_op_query
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
@@ -11658,21 +11608,15 @@ buildvariants:
   - name: audit
   - name: .auth !.multiversion
   - name: .misc_js
-  - name: .concurrency .common !.repl
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
   - name: .integration !.audit
     distros:
     - rhel71-power8-build
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
   - name: sasl
-  - name: secondary_reads_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion !.csrs
   - name: snmp
@@ -11698,20 +11642,12 @@ buildvariants:
   - name: .aggregation .common
   - name: .auth !.multiversion
   - name: audit
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
-    distros:
-    - rhel72-zseries-build
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel72-zseries-build
   - name: .integration !.audit
     distros:
     - rhel72-zseries-build
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
-  - name: .logical_session_cache .one_sec
   - name: .read_write_concern
   - name: replica_sets
   - name: .replica_sets .common
