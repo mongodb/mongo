@@ -506,21 +506,26 @@ shared_ptr<Shard> ShardRegistryData::_findByShardId(WithLock, ShardId const& sha
 }
 
 void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
-    // Need to copy, then sort by shardId.
-    std::vector<std::pair<ShardId, std::string>> shards;
+    std::vector<std::shared_ptr<Shard>> shards;
     {
         stdx::lock_guard<Latch> lk(_mutex);
         shards.reserve(_lookup.size());
         for (auto&& shard : _lookup) {
-            shards.emplace_back(shard.first, shard.second->getConnString().toString());
+            shards.emplace_back(shard.second);
         }
     }
 
-    std::sort(std::begin(shards), std::end(shards));
+    std::sort(std::begin(shards),
+              std::end(shards),
+              [](const std::shared_ptr<Shard>& lhs, const std::shared_ptr<Shard>& rhs) {
+                  return lhs->getId() < rhs->getId();
+              });
 
     BSONObjBuilder mapBob(result->subobjStart("map"));
     for (auto&& shard : shards) {
-        mapBob.append(shard.first, shard.second);
+        // Intentionally calling getConnString while not holding ShardRegistryData::_mutex
+        // because it can take ReplicaSetMonitor::SetState::mutex if it's ShardRemote.
+        mapBob.append(shard->getId(), shard->getConnString().toString());
     }
 }
 
