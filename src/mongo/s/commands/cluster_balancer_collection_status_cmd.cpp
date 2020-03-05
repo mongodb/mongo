@@ -98,8 +98,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::shardCollection));
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                           ActionType::enableSharding));
         }
     };
 
