@@ -183,6 +183,7 @@ public:
      */
     BOOST_LOG_API void set_global_attributes(attribute_set const& attrs);
 
+#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
     /*!
      * The method adds an attribute to the thread-specific attribute set. The attribute will be implicitly added to
      * every log record made in the current thread.
@@ -197,6 +198,7 @@ public:
      *         addition.
      */
     BOOST_LOG_API std::pair< attribute_set::iterator, bool > add_thread_attribute(attribute_name const& name, attribute const& attr);
+
     /*!
      * The method removes an attribute from the thread-specific attribute set.
      *
@@ -220,7 +222,7 @@ public:
      * \param attrs The set of attributes to be installed.
      */
     BOOST_LOG_API void set_thread_attributes(attribute_set const& attrs);
-
+#endif
     /*!
      * The method sets exception handler function. The function will be called with no arguments
      * in case if an exception occurs during either \c open_record or \c push_record method

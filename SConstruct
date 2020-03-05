@@ -3448,6 +3448,7 @@ def doConfigure(myenv):
             "BOOST_ENABLE_ASSERT_DEBUG_HANDLER",
             "BOOST_LOG_NO_SHORTHAND_NAMES",
             "BOOST_LOG_USE_NATIVE_SYSLOG",
+            "BOOST_LOG_WITHOUT_THREAD_ATTR",
             "ABSL_FORCE_ALIGNED_ACCESS",
         ]
     )
