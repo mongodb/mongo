@@ -35,7 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 
 namespace mongo {
 namespace {

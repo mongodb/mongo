@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/index_build_oplog_entry.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/logger/redaction.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {

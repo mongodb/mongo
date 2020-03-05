@@ -8,6 +8,7 @@ env.CppUnitTest(
     target='log_test_v2',
     source=[
         'log_test_v2.cpp',
+        'redaction_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

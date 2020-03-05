@@ -30,7 +30,6 @@ env.CppUnitTest(
         'log_function_test.cpp',
         'log_test.cpp',
         'parse_log_component_settings_test.cpp',
-        'redaction_test.cpp',
         'rotatable_file_writer_test.cpp',
     ],
     LIBDEPS=[

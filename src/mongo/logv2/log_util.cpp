@@ -41,6 +41,9 @@
 #include <string>
 
 namespace mongo::logv2 {
+namespace {
+AtomicWord<bool> redactionEnabled{false};
+}
 bool rotateLogs(bool renameFiles) {
     // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
     LOGV2(23166, "Log rotation initiated");
@@ -60,5 +63,13 @@ bool rotateLogs(bool renameFiles) {
             23169, "Rotating log file failed", "file"_attr = it->first, "reason"_attr = it->second);
     }
     return resultv2.isOK() && result.empty();
+}
+
+bool shouldRedactLogs() {
+    return redactionEnabled.loadRelaxed();
+}
+
+void setShouldRedactLogs(bool enabled) {
+    redactionEnabled.store(enabled);
 }
 }  // namespace mongo::logv2

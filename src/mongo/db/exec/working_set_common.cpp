@@ -41,7 +41,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logger/redaction.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {

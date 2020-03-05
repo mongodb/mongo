@@ -34,7 +34,6 @@
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/logger/redaction.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {

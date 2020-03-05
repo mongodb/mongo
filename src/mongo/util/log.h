@@ -50,7 +50,6 @@
 #include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
-#include "mongo/logger/redaction.h"
 #include "mongo/logger/tee.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
