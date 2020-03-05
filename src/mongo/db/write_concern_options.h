@@ -53,7 +53,6 @@ public:
     static const BSONObj Acknowledged;
     static const BSONObj Unacknowledged;
     static const BSONObj Majority;
-    static const BSONObj ConfigMajority;
     static const BSONObj kImplicitDefault;
 
     static constexpr StringData kWriteConcernField = "writeConcern"_sd;
