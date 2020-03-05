@@ -31,7 +31,7 @@
  * This file contains tests for mongo/db/query/query_planner.cpp
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/query/query_planner_test_lib.h"
 
