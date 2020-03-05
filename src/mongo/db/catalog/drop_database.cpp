@@ -180,6 +180,18 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                 indexBuildsCoord->abortDatabaseIndexBuildsNoWait(
                     opCtx, dbName, "dropDatabase command");
 
+                // Create a scope guard to reset the drop-pending state on the database to false if
+                // there is a replica state change that kills this operation while the locks were
+                // yielded.
+                auto dropPendingGuardWhileUnlocked = makeGuard([dbName, opCtx, &dropPendingGuard] {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    AutoGetDb autoDB(opCtx, dbName, MODE_IX);
+                    if (auto db = autoDB.getDb()) {
+                        db->setDropPending(opCtx, false);
+                    }
+                    dropPendingGuard.dismiss();
+                });
+
                 // Now that the abort signals were sent out to the active index builders for this
                 // database, we need to release the lock temporarily to allow those index builders
                 // to process the abort signal. Holding a lock here will cause the index builders to
@@ -196,6 +208,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
 
                 autoDB.emplace(opCtx, dbName, MODE_X);
                 db = autoDB->getDb();
+
+                dropPendingGuardWhileUnlocked.dismiss();
 
                 // Abandon the snapshot as the index catalog will compare the in-memory state to the
                 // disk state, which may have changed when we released the collection lock
