@@ -53,6 +53,8 @@ namespace mongo {
 
 using std::string;
 
+template class StackBufBuilderBase<KeyString::TypeBits::SmallStackSize>;
+
 namespace KeyString {
 
 

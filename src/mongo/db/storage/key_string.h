@@ -250,7 +250,7 @@ public:
     private:
         uint8_t readBit();
 
-        size_t _curBit;
+        uint32_t _curBit;
         const TypeBits& _typeBits;
     };
 
@@ -273,7 +273,7 @@ private:
 
     void appendBit(uint8_t oneOrZero);
 
-    size_t _curBit;
+    uint32_t _curBit;
     bool _isAllZeros;
 
     /**
@@ -283,7 +283,14 @@ private:
      * the TypeBits size is in long encoding range(>127), all the bytes are used for the long
      * encoding format (first byte + 4 size bytes + data bytes).
      */
-    StackBufBuilder _buf;
+
+    // TypeBits buffers are often small and at least 5 bytes. Only pre-allocate a small amount of
+    // memory despite using a StackBufBuilder, which can use cheap stack space. Because TypeBits is
+    // allowed to be allocated dynamically on the heap, so is the owned StackBufBuilder. Lower the
+    // initial buffer size so that we do not pre-allocate excessively large buffers on the heap when
+    // TypeBits is not a stack variable.
+    enum { SmallStackSize = 8 };
+    StackBufBuilderBase<SmallStackSize> _buf;
 };
 
 

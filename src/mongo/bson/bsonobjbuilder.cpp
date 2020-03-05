@@ -235,25 +235,9 @@ BSONObjBuilder::~BSONObjBuilder() {
     }
 }
 
-template <typename Alloc>
-void BasicBufBuilder<Alloc>::grow_reallocate(int minSize) {
-    if (minSize > BufferMaxSize) {
-        std::stringstream ss;
-        ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
-        msgasserted(13548, ss.str().c_str());
-    }
-
-    int a = 64;
-    while (a < minSize)
-        a = a * 2;
-
-    _buf.realloc(a);
-    size = a;
-}
-
 template class BasicBufBuilder<SharedBufferAllocator>;
-template class BasicBufBuilder<StackAllocator>;
+template class BasicBufBuilder<StackAllocator<StackSizeDefault>>;
 template class StringBuilderImpl<SharedBufferAllocator>;
-template class StringBuilderImpl<StackAllocator>;
+template class StringBuilderImpl<StackAllocator<StackSizeDefault>>;
 
 }  // namespace mongo

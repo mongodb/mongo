@@ -729,6 +729,31 @@ TEST_F(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
         31231);
 }
 
+TEST_F(KeyStringBuilderTest, ReasonableSize) {
+    // Tests that KeyString::Builders do not use an excessive amount of memory for small key
+    // generation. These upper bounds were the calculate sizes of each type at the time this
+    // test was written.
+    KeyString::Builder stackBuilder(KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
+    ASSERT_LTE(sizeof(stackBuilder), 608);
+
+    KeyString::HeapBuilder heapBuilder(
+        KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
+    ASSERT_LTE(sizeof(heapBuilder), 96);
+
+    // Test the dynamic memory usage reported to the sorter.
+    KeyString::Value value1 = stackBuilder.getValueCopy();
+    ASSERT_LTE(sizeof(value1), 24);
+    ASSERT_LTE(value1.memUsageForSorter(), 26);
+
+    KeyString::Value value2 = heapBuilder.getValueCopy();
+    ASSERT_LTE(sizeof(value2), 24);
+    ASSERT_LTE(value2.memUsageForSorter(), 26);
+
+    KeyString::Value value3 = heapBuilder.release();
+    ASSERT_LTE(sizeof(value3), 24);
+    ASSERT_LTE(value3.memUsageForSorter(), 56);
+}
+
 TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;
