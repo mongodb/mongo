@@ -10,14 +10,14 @@
 ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
     let primary = this.getPrimary();
 
-    // Upgrade secondaries first.
     this.upgradeSecondaries(primary, options, user, pwd);
+    this.upgradeArbiters(primary, options, user, pwd);
 
-    // Then upgrade the primary after stepping down.
+    // Upgrade the primary after stepping down.
     this.upgradePrimary(primary, options, user, pwd);
 };
 
-ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
+ReplSetTest.prototype.upgradeMembers = function(primary, members, options, user, pwd) {
     const noDowntimePossible = this.nodes.length > 2;
 
     // Merge new options into node settings.
@@ -25,12 +25,20 @@ ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd)
         this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
     }
 
-    for (let secondary of this.getSecondaries()) {
-        this.upgradeNode(secondary, options, user, pwd);
+    for (let member of members) {
+        this.upgradeNode(member, options, user, pwd);
 
         if (noDowntimePossible)
             assert.eq(this.getPrimary(), primary);
     }
+};
+
+ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
+    this.upgradeMembers(primary, this.getSecondaries(), options, user, pwd);
+};
+
+ReplSetTest.prototype.upgradeArbiters = function(primary, options, user, pwd) {
+    this.upgradeMembers(primary, this.getArbiters(), options, user, pwd);
 };
 
 ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
@@ -122,7 +130,6 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
 ReplSetTest.prototype.reconnect = function(node) {
     var nodeId = this.getNodeId(node);
     this.nodes[nodeId] = new Mongo(node.host);
-    var except = {};
     for (var i in node) {
         if (typeof (node[i]) == "function")
             continue;
