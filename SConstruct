@@ -4453,7 +4453,7 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
 
-resmoke_install_dir = env.subst("$DESTDIR/$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
+resmoke_install_dir = env.subst("$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
 resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
 
 # Much blood sweat and tears were shed getting to this point. Any version of

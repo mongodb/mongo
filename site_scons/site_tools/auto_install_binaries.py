@@ -487,10 +487,42 @@ def add_suffix_mapping(env, suffix, role=None):
     env[SUFFIX_MAP].update({env.subst(key): value for key, value in suffix.items()})
 
 
-def suffix_mapping(env, directory="", default_role=False):
+def suffix_mapping(env, directory=False, default_role=False):
     """Generate a SuffixMap object from source and target."""
-    directory = "$DESTDIR/" + directory
     return SuffixMap(directory=directory, default_role=default_role)
+
+
+def dest_dir_generator(initial_value=None):
+    """Memoized dest_dir_generator"""
+    dd = (None, None)
+
+    def generator(source, target, env, for_signature):
+        nonlocal dd
+
+        # SCons does not perform substitution for "sub" Dir calls on a
+        # Dir Node. Additionally we need to determine if it's an
+        # absolute path here because if it is the sub Dir call will
+        # not expand correctly.
+        prefix = env.subst("$PREFIX")
+        if prefix and prefix[0] == "/":
+            prefix = prefix[1:]
+
+        if dd[1] is not None and dd[0] == prefix:
+            return dd[1]
+
+        if initial_value is None:
+            dest_dir = env.Dir("#install")
+        elif isinstance(initial_value, str):
+            dest_dir = env.Dir(initial_value)
+        elif isinstance(initial_value, SCons.Node.FS.Dir):
+            dest_dir = initial_value
+        else:
+            raise Exception("initial DESTDIR value must be string or Dir")
+
+        dd = (prefix, dest_dir.Dir(prefix))
+        return dd[1]
+
+    return generator
 
 
 def get_auto_installed_files(env, node):
@@ -541,13 +573,12 @@ def generate(env):  # pylint: disable=too-many-statements
 
     # Matches the autoconf documentation:
     # https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
-    env["DESTDIR"] = env.Dir(env.get("DESTDIR", "#install"))
-    env["PREFIX"] = env.get("PREFIX", "")
-    env["PREFIX_BINDIR"] = env.get("PREFIX_BINDIR", "$PREFIX/bin")
-    env["PREFIX_LIBDIR"] = env.get("PREFIX_LIBDIR", "$PREFIX/lib")
-    env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$PREFIX/share")
+    env["DESTDIR"] = dest_dir_generator(env.get("DESTDIR", None))
+    env["PREFIX_BINDIR"] = env.get("PREFIX_BINDIR", "$DESTDIR/bin")
+    env["PREFIX_LIBDIR"] = env.get("PREFIX_LIBDIR", "$DESTDIR/lib")
+    env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$DESTDIR/share")
     env["PREFIX_DOCDIR"] = env.get("PREFIX_DOCDIR", "$PREFIX_SHAREDIR/doc")
-    env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$PREFIX/include")
+    env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$DESTDIR/include")
     env[SUFFIX_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
 
