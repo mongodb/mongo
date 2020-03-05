@@ -8,7 +8,6 @@ env.Library(
     target='sharding_client',
     source=[
         'shard_remote.cpp',
-        'hedging_metrics.cpp',
         'num_hosts_targeted_metrics.cpp',
          env.Idlc('shard_remote.idl')[0],
     ],
@@ -17,6 +16,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/executor/hedging_metrics',
         '$BUILD_DIR/mongo/s/grid',
         'shard_interface',
     ],

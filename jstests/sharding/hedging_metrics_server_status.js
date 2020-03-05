@@ -38,9 +38,31 @@ function checkServerStatusHedgingMetrics(mongosConn, expectedHedgingMetrics) {
               serverStatus.hedgingMetrics.numTotalOperations);
     assert.eq(expectedHedgingMetrics.numTotalHedgedOperations,
               serverStatus.hedgingMetrics.numTotalHedgedOperations);
+    assert.eq(expectedHedgingMetrics.numAdvantageouslyHedgedOperations,
+              serverStatus.hedgingMetrics.numAdvantageouslyHedgedOperations);
 }
 
-const st = new ShardingTest({shards: 2});
+function setCommandDelay(nodeConn, command, delay) {
+    assert.commandWorked(nodeConn.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failInternalCommands: true,
+            blockConnection: true,
+            blockTimeMS: delay,
+            failCommands: [command],
+        }
+    }));
+}
+
+function clearCommandDelay(nodeConn) {
+    assert.commandWorked(nodeConn.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "off",
+    }));
+}
+
+const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -48,19 +70,50 @@ const testDB = st.s.getDB(dbName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
-let expectedHedgingMetrics = {numTotalOperations: 0, numTotalHedgedOperations: 0};
+let expectedHedgingMetrics = {
+    numTotalOperations: 0,
+    numTotalHedgedOperations: 0,
+    numAdvantageouslyHedgedOperations: 0
+};
 
 assert.commandWorked(
     testDB.runCommand({query: {find: collName}, $readPreference: {mode: "primary"}}));
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
-assert.commandWorked(
-    testDB.runCommand({query: {find: collName}, $readPreference: {mode: "nearest", hedge: {}}}));
-// TODO (SERVER-45432): increment expectedHedgingMetrics.numTotalOperations and
-// expectedHedgingMetrics.numTotalHedgedOperations.
+// force an advantageous hedged read to succeed.
+// TODO: RSM may target reads differently in the future sending the first read to secondary. In this
+// case this test will fail.
+try {
+    setCommandDelay(st.rs0.getPrimary(), "find", 1000);
+    assert.commandWorked(
+        testDB.runCommand({query: {find: collName}, $readPreference: {mode: "nearest"}}));
+} finally {
+    clearCommandDelay(st.rs0.getPrimary());
+}
+
+expectedHedgingMetrics.numTotalOperations += 2;
+expectedHedgingMetrics.numTotalHedgedOperations += 1;
+expectedHedgingMetrics.numAdvantageouslyHedgedOperations += 1;
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
+// force an advantageous hedged read to hang.
+// TODO: RSM may target reads differently in the future sending the first read to secondary. In this
+// case this test will fail.
+try {
+    setCommandDelay(st.rs0.getPrimary(), "find", 10);
+    setCommandDelay(st.rs0.getSecondaries()[0], "find", 1000);
+
+    assert.commandWorked(
+        testDB.runCommand({query: {find: collName}, $readPreference: {mode: "nearest"}}));
+} finally {
+    clearCommandDelay(st.rs0.nodes[0]);
+    clearCommandDelay(st.rs0.nodes[1]);
+}
+
+expectedHedgingMetrics.numTotalOperations += 2;
+expectedHedgingMetrics.numTotalHedgedOperations += 1;
+expectedHedgingMetrics.numAdvantageouslyHedgedOperations += 0;
+checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 st.stop();
 }());
