@@ -146,14 +146,15 @@ protected:
     }
 
     /**
-     * Checks that exactly one successful ping occurs at the time this method is called and no
-     * additional pings are made before deadline.
+     * Checks that exactly one successful ping occurs at the time the method is called and ensures
+     * no additional pings are issued for at least pingFrequency.
      */
-    void checkSinglePing(Seconds deadline,
+    void checkSinglePing(Milliseconds pingFrequency,
                          const sdam::ServerAddress& hostAndPort,
                          MockReplicaSet* replSet) {
         processPingRequest(hostAndPort, replSet);
 
+        auto deadline = elapsed() + pingFrequency;
         while (elapsed() < deadline && !_topologyListener->hasPingResponse(hostAndPort)) {
             advanceTime(Milliseconds(100));
         }
@@ -169,7 +170,7 @@ protected:
      * Confirms no more ping requests are sent between elapsed() and deadline. Confirms no more ping
      * responses are received between elapsed() and deadline.
      */
-    void checkNoActivityBefore(Seconds deadline, const sdam::ServerAddress& hostAndPort) {
+    void checkNoActivityBefore(Milliseconds deadline, const sdam::ServerAddress& hostAndPort) {
         while (elapsed() < deadline) {
             ASSERT_FALSE(hasReadyRequests());
             ASSERT_FALSE(_topologyListener->hasPingResponse(hostAndPort));
@@ -224,11 +225,11 @@ protected:
         return ssPingMonitor;
     }
 
-    void checkSinglePing(Seconds deadline) {
-        ServerPingMonitorTestFixture::checkSinglePing(deadline, _hostAndPort, getReplSet());
+    void checkSinglePing(Milliseconds pingFrequency) {
+        ServerPingMonitorTestFixture::checkSinglePing(pingFrequency, _hostAndPort, getReplSet());
     }
 
-    void checkNoActivityBefore(Seconds deadline) {
+    void checkNoActivityBefore(Milliseconds deadline) {
         ServerPingMonitorTestFixture::checkNoActivityBefore(deadline, _hostAndPort);
     }
 
@@ -245,12 +246,16 @@ TEST_F(SingleServerPingMonitorTest, pingFrequencyCheck) {
     auto pingFrequency = Seconds(10);
     auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
 
-    checkSinglePing(pingFrequency * 1);
-    checkSinglePing(pingFrequency * 2);
-    checkSinglePing(pingFrequency * 3);
-    checkSinglePing(pingFrequency * 4);
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency);
 }
 
+/**
+ * Confirms that the SingleServerPingMonitor continues to try and ping a dead server at
+ * pingFrequency and successfully does so once the server is restored.
+ */
 TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
     // Kill the server before starting up the SingleServerPingMonitor.
     auto hostAndPort = getHostAndPort();
@@ -262,25 +267,36 @@ TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
     auto pingFrequency = Seconds(10);
     auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
     auto topologyListener = getTopologyListener();
-    processPingRequest();
+    auto checkSinglePingDeadServer = [&]() {
+        Milliseconds deadline = elapsed() + pingFrequency;
+        processPingRequest();
 
-    while (elapsed() < pingFrequency && !topologyListener->hasPingResponse(hostAndPort)) {
-        advanceTime(Milliseconds(100));
+        while (elapsed() < deadline && !topologyListener->hasPingResponse(hostAndPort)) {
+            advanceTime(Milliseconds(100));
+        }
+
+        ASSERT_TRUE(topologyListener->hasPingResponse(hostAndPort));
+        auto pingResponse = topologyListener->getPingResponse(hostAndPort);
+        ASSERT_EQ(ErrorCodes::HostUnreachable, pingResponse.getStatus());
+
+        checkNoActivityBefore(deadline);
+    };
+    checkSinglePingDeadServer();
+    checkSinglePingDeadServer();
+    {
+
+        NetworkInterfaceMock::InNetworkGuard ing(getNet());
+        getReplSet()->restore(hostAndPort);
     }
-
-    ASSERT_TRUE(topologyListener->hasPingResponse(hostAndPort));
-    auto pingResponse = topologyListener->getPingResponse(hostAndPort);
-    ASSERT_EQ(ErrorCodes::HostUnreachable, pingResponse.getStatus());
-
-    // Confirm no other ping requests are sent after receiving an error.
-    checkNoActivityBefore(pingFrequency * 2);
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency);
 }
 
 /**
- * After a SingleServerPingMonitor is dropped, there should be no more events published to the
- * TopologyListener and no more pings to the server.
+ * Checks that no more events are published to the TopologyListener and no more pings are issued to
+ * the server after the SingleServerPingMonitor is closed.
  */
-TEST_F(SingleServerPingMonitorTest, noPingAfterServerDrop) {
+TEST_F(SingleServerPingMonitorTest, noPingAfterSingleServerPingMonitorClosed) {
     auto pingFrequency = Seconds(10);
     auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
 
@@ -316,12 +332,12 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
     // at pingFrequency.
     serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, hostAndPort);
     checkSinglePing(pingFrequency, hostAndPort, replSet.get());
-    checkSinglePing(pingFrequency * 2 - Seconds(2), hostAndPort, replSet.get());
+    checkSinglePing(pingFrequency - Seconds(2), hostAndPort, replSet.get());
 
     // Close the SingleServerMonitor before the third ping and confirm ping activity to the server
     // is stopped.
     serverPingMonitor->onServerClosedEvent(hostAndPort, oid);
-    checkNoActivityBefore(pingFrequency * 4, hostAndPort);
+    checkNoActivityBefore(elapsed() + pingFrequency * 2, hostAndPort);
 }
 
 /**
@@ -352,52 +368,7 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
     checkNoActivityBefore(pingFrequency + host1Delay, host0);
 
     // Confirm that host1's SingleServerPingMonitor continues ping activity.
-    checkSinglePing(pingFrequency * 2, host1, replSet.get());
-}
-
-/**
- * Adds two SingleServerPingMonitors to the ServerPingMonitor. One server is dead, the other is not.
- */
-TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneDead) {
-    auto pingFrequency = Seconds(10);
-    auto serverPingMonitor = makeServerPingMonitor(pingFrequency);
-    auto replSet = std::make_unique<MockReplicaSet>(
-        "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
-
-    auto hosts = replSet->getHosts();
-    auto host0 = hosts[0].toString();
-    auto host1 = hosts[1].toString();
-
-    {
-        NetworkInterfaceMock::InNetworkGuard ing(getNet());
-        replSet->kill(host1);
-    }
-
-    auto host1Delay = Seconds(2);
-    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host0);
-    checkSinglePing(host1Delay, host0, replSet.get());
-
-    // Add host1 host1Delay after host2.
-    ASSERT_EQ(elapsed(), host1Delay);
-    serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host1);
-
-    // Confirm host1 reported HostUnreachable to the TopologyLisener.
-    processPingRequest(host1, replSet.get());
-    auto topologyListener = getTopologyListener();
-    while (elapsed() < pingFrequency && !topologyListener->hasPingResponse(host1)) {
-        advanceTime(Milliseconds(100));
-    }
-    ASSERT_LT(elapsed(), pingFrequency);
-    ASSERT_TRUE(topologyListener->hasPingResponse(host1));
-    auto pingResponse = topologyListener->getPingResponse(host1);
-    ASSERT_EQ(ErrorCodes::HostUnreachable, pingResponse.getStatus());
-
-    // Confirm host0 is still pinged at pingFrequency and host1 no longer has ping activity.
-    while (elapsed() < pingFrequency) {
-        advanceTime(Milliseconds(100));
-    }
-    checkSinglePing(pingFrequency + host1Delay, host0, replSet.get());
-    checkNoActivityBefore(pingFrequency * 2, host1);
+    checkSinglePing(pingFrequency, host1, replSet.get());
 }
 
 /**

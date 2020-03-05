@@ -132,7 +132,8 @@ void SingleServerPingMonitor::_doServerPing() {
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             if (ErrorCodes::isCancelationError(result.response.status)) {
-                // Do no more work if we're removed or canceled
+                // Do no more work if the SingleServerPingMonitor is removed or the request is
+                // canceled.
                 return;
             }
             {
@@ -144,12 +145,10 @@ void SingleServerPingMonitor::_doServerPing() {
                 if (!result.response.isOK()) {
                     anchor->_rttListener->onServerPingFailedEvent(anchor->_hostAndPort,
                                                                   result.response.status);
-                    // Don't schedule any more pings to the server once an error is encountered.
-                    return;
+                } else {
+                    auto rtt = sdam::IsMasterRTT(timer.micros());
+                    anchor->_rttListener->onServerPingSucceededEvent(rtt, anchor->_hostAndPort);
                 }
-
-                auto rtt = sdam::IsMasterRTT(timer.micros());
-                anchor->_rttListener->onServerPingSucceededEvent(rtt, anchor->_hostAndPort);
             }
             anchor->_scheduleServerPing();
         });
