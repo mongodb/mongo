@@ -235,8 +235,10 @@ public:
     //! Thread-specific data
     struct thread_data
     {
+#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
         //! Thread-specific attribute set
         attribute_set m_thread_attributes;
+#endif
         //! Random number generator for shuffling
         random::taus88 m_rng;
 
@@ -309,7 +311,9 @@ public:
         // Try a quick win first
         if (m_enabled) try
         {
+#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
             thread_data* tsd = get_thread_data();
+#endif
 
             // Lock the core to be safe against any attribute or sink set modifications
             BOOST_LOG_EXPR_IF_MT(scoped_read_lock lock(m_mutex);)
@@ -317,7 +321,11 @@ public:
             if (m_enabled)
             {
                 // Compose a view of attribute values (unfrozen, yet)
-                attribute_value_set attr_values(boost::forward< SourceAttributesT >(source_attributes), tsd->m_thread_attributes, m_global_attributes);
+                attribute_value_set attr_values(boost::forward< SourceAttributesT >(source_attributes), 
+#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
+                tsd->m_thread_attributes, 
+#endif
+                m_global_attributes);
                 if (m_filter(attr_values))
                 {
                     // The global filter passed, trying the sinks
@@ -563,6 +571,7 @@ BOOST_LOG_API void core::set_global_attributes(attribute_set const& attrs)
     m_impl->m_global_attributes = attrs;
 }
 
+#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
 //! The method adds an attribute to the thread-specific attribute set
 BOOST_LOG_API std::pair< attribute_set::iterator, bool >
 core::add_thread_attribute(attribute_name const& name, attribute const& attr)
@@ -590,6 +599,7 @@ BOOST_LOG_API void core::set_thread_attributes(attribute_set const& attrs)
     implementation::thread_data* p = m_impl->get_thread_data();
     p->m_thread_attributes = attrs;
 }
+#endif
 
 //! An internal method to set the global filter
 BOOST_LOG_API void core::set_filter(filter const& filter)
