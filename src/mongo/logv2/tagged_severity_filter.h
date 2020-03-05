@@ -51,7 +51,7 @@ public:
         using boost::log::extract;
 
         return _tag.has(extract<LogTag>(attributes::tags(), attrs).get()) &&
-            extract<LogSeverity>(attributes::severity(), attrs).get() <= _severity;
+            extract<LogSeverity>(attributes::severity(), attrs).get() >= _severity;
     }
 
 private:

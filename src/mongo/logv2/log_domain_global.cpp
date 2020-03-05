@@ -102,7 +102,7 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
         boost::shared_ptr<std::ostream>(&Console::out(), boost::null_deleter()));
     console->lockedBackend<0>()->auto_flush();
     console->setFilter<2>(
-        TaggedSeverityFilter(_parent, {LogTag::kStartupWarnings}, LogSeverity::Warning()));
+        TaggedSeverityFilter(_parent, {LogTag::kStartupWarnings}, LogSeverity::Log()));
 
     _consoleSink =
         boost::make_shared<boost::log::sinks::unlocked_sink<ConsoleBackend>>(std::move(console));
@@ -144,6 +144,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         mapping[LogSeverity::Severe()] = boost::log::sinks::syslog::alert;
 
         backend->lockedBackend<0>()->set_severity_mapper(mapping);
+        backend->setFilter<2>(
+            TaggedSeverityFilter(_parent, {LogTag::kStartupWarnings}, LogSeverity::Log()));
 
         _syslogSink =
             boost::make_shared<boost::log::sinks::unlocked_sink<SyslogBackend>>(std::move(backend));
@@ -176,6 +178,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         if (!ret.isOK())
             return ret;
         backend->lockedBackend<0>()->auto_flush(true);
+        backend->setFilter<2>(
+            TaggedSeverityFilter(_parent, {LogTag::kStartupWarnings}, LogSeverity::Log()));
 
         _rotatableFileSink =
             boost::make_shared<boost::log::sinks::unlocked_sink<RotatableFileBackend>>(backend);
