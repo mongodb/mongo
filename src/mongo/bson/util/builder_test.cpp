@@ -79,8 +79,8 @@ TEST(Builder, BooleanOstreamOperator) {
 }
 
 TEST(Builder, StackAllocatorShouldNotLeak) {
-    StackAllocator stackAlloc;
-    stackAlloc.malloc(StackAllocator::SZ + 1);  // Force heap allocation.
+    StackAllocator<StackSizeDefault> stackAlloc;
+    stackAlloc.malloc(StackSizeDefault + 1);  // Force heap allocation.
     // Let the builder go out of scope. If this leaks, it will trip the ASAN leak detector.
 }
 
