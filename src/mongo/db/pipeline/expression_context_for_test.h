@@ -95,11 +95,10 @@ public:
         opCtx = _testOpCtx ? _testOpCtx.get() : Client::getCurrent()->getOperationContext();
 
         // As we don't have an OperationContext or TimeZoneDatabase prior to base class
-        // ExpressionContext construction, we must initialize with a nullptr and set
-        // post-construction.
-        timeZoneDatabase = TimeZoneDatabase::get(getServiceContext());
-        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
-        opCtx = _testOpCtx.get();
+        // ExpressionContext construction, we must resolve one. If there exists a TimeZoneDatabase
+        // associated with the current ServiceContext, adopt it. Otherwise, create a
+        // new one.
+        _setTimeZoneDatabase();
     }
 
     /**
@@ -129,7 +128,10 @@ public:
                             {},  // resolvedNamespaces
                             {}   // collUUID
                             ),
-          _serviceContext(opCtx->getServiceContext()) {}
+          _serviceContext(opCtx->getServiceContext()) {
+        // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
+        _setTimeZoneDatabase();
+    }
 
     /**
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
@@ -138,7 +140,10 @@ public:
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
         : ExpressionContext(
               opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}),
-          _serviceContext(opCtx->getServiceContext()) {}
+          _serviceContext(opCtx->getServiceContext()) {
+        // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
+        _setTimeZoneDatabase();
+    }
 
     /**
      * Sets the resolved definition for an involved namespace.
@@ -160,6 +165,20 @@ public:
     }
 
 private:
+    // In cases when there is a ServiceContext, if there already exists a TimeZoneDatabase
+    // associated with the ServiceContext, adopt it. Otherwise, create a new one.
+    void _setTimeZoneDatabase() {
+        // In some cases, e.g. the user uses an OperationContextNoop which does _not_ provide a
+        // ServiceContext to create this ExpressionContextForTest, then it shouldn't resolve any
+        // timeZoneDatabase.
+        if (auto* serviceContext = getServiceContext()) {
+            if (!TimeZoneDatabase::get(serviceContext)) {
+                TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
+            }
+            timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
+        }
+    }
+
     stdx::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;
     ServiceContext::UniqueOperationContext _testOpCtx;
 };
