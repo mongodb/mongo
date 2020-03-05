@@ -37,6 +37,7 @@
 
 #include <boost/container/small_vector.hpp>
 #include <functional>
+#include <string_view>
 
 namespace mongo {
 namespace logv2 {
@@ -205,11 +206,15 @@ inline double mapValue(float value) {
 inline double mapValue(double value) {
     return value;
 }
+
 inline StringData mapValue(StringData value) {
     return value;
 }
 inline StringData mapValue(std::string const& value) {
     return value;
+}
+inline StringData mapValue(std::string_view value) {
+    return StringData(value.data(), value.size());
 }
 inline StringData mapValue(char* value) {
     return value;
@@ -217,6 +222,7 @@ inline StringData mapValue(char* value) {
 inline StringData mapValue(const char* value) {
     return value;
 }
+
 inline const BSONObj mapValue(BSONObj const& value) {
     return value;
 }
