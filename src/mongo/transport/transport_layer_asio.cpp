@@ -921,7 +921,22 @@ Status TransportLayerASIO::setup() {
         }
 
         GenericAcceptor acceptor(*_acceptorReactor);
-        acceptor.open(addr->protocol());
+        try {
+            acceptor.open(addr->protocol());
+        } catch (std::exception&) {
+            // Allow the server to start when "ipv6: true" and "bindIpAll: true", but the platform
+            // does not support ipv6 (e.g., ipv6 kernel module is not loaded in Linux).
+            const auto bindAllIPv6Addr = ":::"_sd + std::to_string(_listenerPort);
+            if (errno == EAFNOSUPPORT && _listenerOptions.enableIPv6 && addr.family() == AF_INET6 &&
+                addr.toString() == bindAllIPv6Addr) {
+                LOGV2_WARNING(4206501,
+                              "Failed to bind to {bind_addr} as the platform does not support ipv6",
+                              "bind_addr"_attr = addr.toString());
+                continue;
+            }
+
+            throw;
+        }
         acceptor.set_option(GenericAcceptor::reuse_address(true));
 
         std::error_code ec;
