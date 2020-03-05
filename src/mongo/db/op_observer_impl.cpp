@@ -518,8 +518,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         session->inActiveOrKilledMultiDocumentTransaction();
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
-        auto operation =
-            OplogEntry::makeDeleteOperation(nss, uuid, deletedDoc ? deletedDoc.get() : documentKey);
+        auto operation = OplogEntry::makeDeleteOperation(nss, uuid, documentKey);
         session->addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogDelete(opCtx, nss, uuid, session, stmtId, fromMigrate, deletedDoc);
