@@ -179,7 +179,7 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
                 stdx::lock_guard lk(self->_mutex);
                 self->_isMasterOutstanding = false;
 
-                if (self->_isShutdown || ErrorCodes::isCancelationError(result.response.status)) {
+                if (self->_isShutdown) {
                     LOGV2_DEBUG(4333219,
                                 kLogLevel,
                                 "RSM {setName} not processing response: {status}",
