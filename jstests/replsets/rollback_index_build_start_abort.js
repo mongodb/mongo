@@ -1,5 +1,6 @@
 /**
  * Tests different permutations of rolling-back index build start and abort oplog entries.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

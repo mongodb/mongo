@@ -21,7 +21,7 @@
  *  - reindex collection
  *  - compact collection
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [requires_fcv_44]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.

@@ -8,7 +8,7 @@
  * @tags: [
  *     uses_transactions,
  *     uses_prepare_transaction,
- *     multiversion_incompatible,
+ *     requires_fcv_44,
  * ]
  */
 (function() {

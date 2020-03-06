@@ -11,7 +11,7 @@
  * 6. B rejoins the set and goes through the rollback process.
  * 7. The contents of A and B are compare to ensure the rollback results in consistent nodes.
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [requires_fcv_44]
  */
 load("jstests/replsets/rslib.js");
 

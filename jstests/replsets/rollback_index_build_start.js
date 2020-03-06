@@ -1,6 +1,7 @@
 /**
  * Test that an index build aborted due to rollback restarts correctly, even if the none of the
  * associated oplog entries are rolled-back.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
