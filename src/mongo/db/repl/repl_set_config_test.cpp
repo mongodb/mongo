@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
@@ -901,6 +902,57 @@ TEST(ReplSetConfig, ConfigServerField) {
     serverGlobalParams.clusterRole = ClusterRole::None;
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
     ASSERT_OK(config2.validate());
+}
+
+TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "localhost:12345")))));
+
+    // The member should have its `newlyAdded` field set to false by default.
+    ASSERT_FALSE(config.findMemberByID(1)->isNewlyAdded());
+
+    config.setNewlyAddedFieldForMemberAtIndex(0, true);
+    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded().get());
+}
+
+TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "localhost:12345"
+                                                              << "newlyAdded" << true)))));
+
+    // The member should have its `newlyAdded` field set to true after parsing.
+    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
+}
+
+TEST(ReplSetConfig, CannotSetNewlyAddedFieldToFalseForMemberConfig) {
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "localhost:12345")))));
+    // Cannot set `newlyAdded` field to false.
+    ASSERT_THROWS_CODE(config.setNewlyAddedFieldForMemberAtIndex(0, false),
+                       AssertionException,
+                       ErrorCodes::InvalidReplicaSetConfig);
 }
 
 TEST(ReplSetConfig, ConfigServerFieldDefaults) {

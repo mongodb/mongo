@@ -32,6 +32,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -51,6 +52,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
     ASSERT_TRUE(mc.isVoter());
     ASSERT_FALSE(mc.isHidden());
     ASSERT_FALSE(mc.isArbiter());
+    ASSERT_FALSE(mc.isNewlyAdded());
     ASSERT_TRUE(mc.shouldBuildIndexes());
     ASSERT_EQUALS(5U, mc.getNumTags());
     ASSERT_OK(mc.validate());
@@ -144,6 +146,32 @@ TEST(MemberConfig, ParseArbiterOnly) {
                         &tagConfig);
         ASSERT_TRUE(!mc.isArbiter());
         ASSERT_EQUALS(1.0, mc.getPriority());
+    }
+}
+
+TEST(MemberConfig, ParseAndSetNewlyAddedField) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"),
+                        &tagConfig);
+        // Verify that the `newlyAdded` field is not added by default.
+        ASSERT_FALSE(mc.isNewlyAdded());
+
+        mc.setNewlyAdded(true);
+        ASSERT_TRUE(mc.isNewlyAdded().get());
+    }
+    {
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "h"
+                                   << "newlyAdded" << true),
+                        &tagConfig);
+        ASSERT_TRUE(mc.isNewlyAdded().get());
     }
 }
 

@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -48,6 +49,7 @@ const std::string MemberConfig::kHostFieldName = "host";
 const std::string MemberConfig::kHiddenFieldName = "hidden";
 const std::string MemberConfig::kSlaveDelayFieldName = "slaveDelay";
 const std::string MemberConfig::kArbiterOnlyFieldName = "arbiterOnly";
+const std::string MemberConfig::kNewlyAddedFieldName = "newlyAdded";
 const std::string MemberConfig::kBuildIndexesFieldName = "buildIndexes";
 const std::string MemberConfig::kTagsFieldName = "tags";
 const std::string MemberConfig::kHorizonsFieldName = "horizons";
@@ -65,6 +67,7 @@ const std::string kLegalMemberConfigFieldNames[] = {MemberConfig::kIdFieldName,
                                                     MemberConfig::kHiddenFieldName,
                                                     MemberConfig::kSlaveDelayFieldName,
                                                     MemberConfig::kArbiterOnlyFieldName,
+                                                    MemberConfig::kNewlyAddedFieldName,
                                                     MemberConfig::kBuildIndexesFieldName,
                                                     MemberConfig::kTagsFieldName,
                                                     MemberConfig::kHorizonsFieldName};
@@ -129,6 +132,23 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     //
     uassertStatusOK(bsonExtractBooleanFieldWithDefault(
         mcfg, kArbiterOnlyFieldName, kArbiterOnlyFieldDefault, &_arbiterOnly));
+
+    //
+    // Parse newlyAdded field.
+    //
+    if (mcfg.hasField(kNewlyAddedFieldName)) {
+        // If the `enableAutomaticReconfig` flag is not set, there should not be a `newlyAdded`
+        // field in the obj.
+        uassert(
+            ErrorCodes::InvalidReplicaSetConfig,
+            str::stream() << kNewlyAddedFieldName
+                          << " field cannot be specified if enableAutomaticReconfig is turned off",
+            enableAutomaticReconfig);
+
+        bool newlyAdded;
+        uassertStatusOK(bsonExtractBooleanField(mcfg, kNewlyAddedFieldName, &newlyAdded));
+        setNewlyAdded(newlyAdded);
+    }
 
     //
     // Parse priority field.
@@ -250,6 +270,10 @@ Status MemberConfig::validate() const {
             return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
         }
     }
+    if (!(_newlyAdded == boost::none || _newlyAdded.get())) {
+        return Status(ErrorCodes::InvalidReplicaSetConfig,
+                      str::stream() << kNewlyAddedFieldName << " field cannot be false");
+    }
     if (_slaveDelay < Seconds(0) || _slaveDelay > kMaxSlaveDelay) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -291,6 +315,12 @@ BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
     configBuilder.append("_id", _id.getData());
     configBuilder.append("host", _host().toString());
     configBuilder.append("arbiterOnly", _arbiterOnly);
+
+    if (_newlyAdded) {
+        // We should never have _newlyAdded if automatic reconfigs aren't enabled.
+        invariant(enableAutomaticReconfig);
+        configBuilder.append("newlyAdded", _newlyAdded.get());
+    }
     configBuilder.append("buildIndexes", _buildIndexes);
     configBuilder.append("hidden", _hidden);
     configBuilder.append("priority", _priority);

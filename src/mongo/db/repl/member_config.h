@@ -60,6 +60,7 @@ public:
     static const std::string kHiddenFieldName;
     static const std::string kSlaveDelayFieldName;
     static const std::string kArbiterOnlyFieldName;
+    static const std::string kNewlyAddedFieldName;
     static const std::string kBuildIndexesFieldName;
     static const std::string kTagsFieldName;
     static const std::string kHorizonsFieldName;
@@ -160,6 +161,28 @@ public:
     }
 
     /**
+     * Returns true if this member is newly added from reconfig. This indicates that this node
+     * should be treated as non-voting.
+     */
+    boost::optional<bool> isNewlyAdded() const {
+        // _newlyAdded should never have been set to false.
+        invariant(_newlyAdded == boost::none || _newlyAdded.get());
+        return _newlyAdded;
+    }
+
+    /**
+     * Set the newlyAdded field for this member.
+     */
+    void setNewlyAdded(boost::optional<bool> newlyAdded) {
+        // We should never try to set 'newlyAdded' to false.
+        uassert(ErrorCodes::InvalidReplicaSetConfig,
+                str::stream() << kNewlyAddedFieldName
+                              << " field in MemberConfig should never be set to false",
+                newlyAdded == boost::none || newlyAdded.get());
+        _newlyAdded = newlyAdded;
+    }
+
+    /**
      * Returns true if this member is hidden (not reported by isMaster, not electable).
      */
     bool isHidden() const {
@@ -221,6 +244,8 @@ private:
     double _priority;  // 0 means can never be primary
     int _votes;        // Can this member vote? Only 0 and 1 are valid.  Default 1.
     bool _arbiterOnly;
+    boost::optional<bool> _newlyAdded =
+        boost::none;  // If set, this member should be considered as a non-voting node.
     Seconds _slaveDelay;
     bool _hidden;                   // if set, don't advertise to drivers in isMaster.
     bool _buildIndexes;             // if false, do not create any non-_id indexes

@@ -301,3 +301,14 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: enableSafeReplicaSetReconfig
         default: true
+
+    # TODO: Remove in SERVER-46541.
+    enableAutomaticReconfig:
+        description: >-
+            Enables the `newlyAdded` field in member configs to be set, as part of automatic
+            reconfig.
+        set_at: startup
+        test_only: true
+        cpp_vartype: bool
+        cpp_varname: enableAutomaticReconfig
+        default: false
