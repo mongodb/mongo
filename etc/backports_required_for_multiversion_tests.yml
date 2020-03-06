@@ -59,6 +59,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
 - ticket: SERVER-32903
   test_file: jstests/replsets/initial_sync_ambiguous_index.js
+- ticket: SERVER-45143
+  test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
