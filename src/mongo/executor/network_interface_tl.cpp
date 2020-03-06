@@ -431,6 +431,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
     cmdState->baton = baton;
 
+    if (_svcCtx && cmdState->requestOnAny.hedgeOptions) {
+        auto hm = HedgingMetrics::get(_svcCtx);
+        invariant(hm);
+        hm->incrementNumTotalOperations();
+    }
+
     /**
      * It is important that onFinish() runs out of line. That said, we can't thenRunOn() arbitrarily
      * without doing extra context switches and delaying execution. The cmdState promise can be
@@ -491,6 +497,14 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     invariant(cmdState->requestManager);
     RequestManager* rm = cmdState->requestManager.get();
+
+    if (MONGO_unlikely(networkInterfaceConnectTargetHostsInAlphabeticalOrder.shouldFail())) {
+        std::sort(request.target.begin(),
+                  request.target.end(),
+                  [](const HostAndPort& target1, const HostAndPort& target2) {
+                      return target1.toString() < target2.toString();
+                  });
+    }
 
     // Attempt to get a connection to every target host
     for (size_t idx = 0; idx < request.target.size() && !rm->usedAllConn(); ++idx) {
@@ -612,9 +626,10 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
     LOGV2_DEBUG(4646300,
                 2,
-                "Sending request {request_id} with index {idx}",
+                "Sending request {request_id} with index {idx} to {target}",
                 "request_id"_attr = cmdStatePtr->requestOnAny.id,
-                "idx"_attr = idx);
+                "idx"_attr = idx,
+                "target"_attr = cmdStatePtr->requestOnAny.target[idx]);
 
     auto req = getNextRequest();
     if (req) {
@@ -639,17 +654,15 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 LOGV2_DEBUG(
                     4647200,
                     2,
-                    "Set  MaxTimeMS to {maxTimeMS} for request {request_id} with index {idx}",
+                    "Set maxTimeMS to {maxTimeMS} for request {request_id} with index {idx}",
                     "maxTimeMS"_attr = maxTimeMS,
                     "request_id"_attr = cmdStatePtr->requestOnAny.id,
                     "idx"_attr = idx);
             }
-        }
-        if (cmdStatePtr->interface->_svcCtx && remoteReq.hedgeOptions) {
-            auto hm = HedgingMetrics::get(cmdStatePtr->interface->_svcCtx);
-            invariant(hm);
-            hm->incrementNumTotalOperations();
-            if (req->isHedge) {
+
+            if (cmdStatePtr->interface->_svcCtx) {
+                auto hm = HedgingMetrics::get(cmdStatePtr->interface->_svcCtx);
+                invariant(hm);
                 hm->incrementNumTotalHedgedOperations();
             }
         }

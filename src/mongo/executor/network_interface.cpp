@@ -38,6 +38,7 @@ namespace executor {
 NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}
 
+MONGO_FAIL_POINT_DEFINE(networkInterfaceConnectTargetHostsInAlphabeticalOrder);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceHangCommandsAfterAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceAfterAcquireConn);
