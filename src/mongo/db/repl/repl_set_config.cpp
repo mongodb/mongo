@@ -984,9 +984,5 @@ bool ReplSetConfig::containsArbiter() const {
     return false;
 }
 
-void ReplSetConfig::setNewlyAddedFieldForMemberAtIndex(int memberIndex, bool newlyAdded) {
-    _members[memberIndex].setNewlyAdded(newlyAdded);
-}
-
 }  // namespace repl
 }  // namespace mongo

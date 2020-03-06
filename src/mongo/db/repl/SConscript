@@ -688,8 +688,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'local_oplog_info',
-        'repl_server_parameters',
         'split_horizon',
+        'repl_server_parameters',
     ],
 )
 
@@ -804,7 +804,6 @@ env.Library('replica_set_messages',
             ],
             LIBDEPS_PRIVATE=[
                 '$BUILD_DIR/mongo/idl/server_parameter',
-                'repl_server_parameters',
                 'split_horizon',
             ])
 
