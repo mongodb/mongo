@@ -10210,15 +10210,16 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
 
-- name: enterprise-rhel-62-64-bit-two-phase-index-build-majority-commit-quorum-on
-  display_name: "Enterprise RHEL 6.2 (2 phase index build majority commit quorum on)"
+- name: enterprise-rhel-62-64-bit-two-phase-index-build-commit-quorum-off
+  display_name: "Enterprise RHEL 6.2 (2 phase index build commit quorum off)"
   modules:
   - enterprise
   run_on:
   - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-two-phase-index-build-majority-commit-quorum-on
+  batchtime: 10080 # 7 days
+  expansions: &enterprise-rhel-62-64-bit-two-phase-index-build-commit-quorum-off
     test_flags: >-
-        --mongodSetParameters="{enableIndexBuildCommitQuorum: true}"
+        --mongodSetParameters="{enableIndexBuildCommitQuorum: false}"
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
