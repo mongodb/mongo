@@ -62,6 +62,10 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
 
     const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
 
+    // Non-replicated writes will not contribute to replication lag and can be safely excluded from
+    // Flow Control.
+    opCtx->setShouldParticipateInFlowControl(false);
+
     try {
         // A Global IX lock should be good enough to protect the oplog truncation from
         // interruptions such as restartCatalog. PBWM, database lock or collection lock is not
