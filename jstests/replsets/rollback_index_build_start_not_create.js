@@ -1,5 +1,6 @@
 /**
  * Test that rolling back an index build, but not collection creation, behaves correctly.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
