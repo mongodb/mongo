@@ -53,6 +53,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
 - ticket: SERVER-45178
   test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
+- ticket: SERVER-45143
+  test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
