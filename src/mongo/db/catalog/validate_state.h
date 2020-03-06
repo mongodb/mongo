@@ -172,6 +172,7 @@ private:
     ValidateOptions _options;
     OptionalCollectionUUID _uuid;
 
+    boost::optional<Lock::GlobalLock> _globalLock;
     boost::optional<AutoGetDb> _databaseLock;
     boost::optional<Lock::CollectionLock> _collectionLock;
 
