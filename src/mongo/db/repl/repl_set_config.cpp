@@ -190,8 +190,8 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     // Parse protocol version
     //
     status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
-    // If 'protocolVersion' field is missing for initiate, then _protocolVersion defaults to 1.
-    if (!(status.isOK() || (status == ErrorCodes::NoSuchKey && forInitiate))) {
+    // If 'protocolVersion' field is missing, then _protocolVersion defaults to 1.
+    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
         return status;
     }
 
