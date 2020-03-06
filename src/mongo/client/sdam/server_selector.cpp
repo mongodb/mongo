@@ -33,9 +33,12 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo::sdam {
+MONGO_FAIL_POINT_DEFINE(serverSelectorIgnoresLatencyWindow);
+
 ServerSelector::~ServerSelector() {}
 
 SdamServerSelector::SdamServerSelector(const ServerSelectionConfiguration& config)
@@ -154,6 +157,10 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
     _getCandidateServers(&results, topologyDescription, criteria);
 
     if (results.size()) {
+        if (MONGO_unlikely(serverSelectorIgnoresLatencyWindow.shouldFail())) {
+            return results;
+        }
+
         ServerDescriptionPtr minServer =
             *std::min_element(results.begin(), results.end(), LatencyWindow::rttCompareFn);
 
