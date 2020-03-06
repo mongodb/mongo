@@ -638,5 +638,110 @@ TEST_F(CommitChunkMigrate, AcceptMissingChunkVersionOnFCV42) {
     ASSERT_OK(result);
 }
 
+TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+    ShardType shard0;
+    shard0.setName("shard0");
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setName("shard1");
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    auto epoch = OID::gen();
+    ChunkVersion origVersion(12, 7, epoch);
+
+    ChunkType migratedChunk;
+    migratedChunk.setName(OID::gen());
+    migratedChunk.setNS(kNamespace);
+    migratedChunk.setVersion(origVersion);
+    migratedChunk.setShard(shard0.getName());
+    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    migratedChunk.setMin(BSON("a" << 1));
+    migratedChunk.setMax(BSON("a" << 10));
+
+    ChunkVersion currentChunkVersion(14, 7, epoch);
+
+    ChunkType currentChunk;
+    currentChunk.setName(OID::gen());
+    currentChunk.setNS(kNamespace);
+    currentChunk.setVersion(currentChunkVersion);
+    currentChunk.setShard(shard0.getName());
+    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    currentChunk.setMin(BSON("a" << 1));
+    currentChunk.setMax(BSON("a" << 10));
+
+    setupChunks({currentChunk});
+
+    Timestamp validAfter{101, 0};
+    auto result = ShardingCatalogManager::get(operationContext())
+                      ->commitChunkMigration(operationContext(),
+                                             kNamespace,
+                                             migratedChunk,
+                                             origVersion.epoch(),
+                                             ShardId(shard0.getName()),
+                                             ShardId(shard1.getName()),
+                                             validAfter);
+
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result, ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(CommitChunkMigrate, RejectMismatchedEpochOnFCV44) {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+    ShardType shard0;
+    shard0.setName("shard0");
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setName("shard1");
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    ChunkVersion origVersion(12, 7, OID::gen());
+
+    ChunkType migratedChunk;
+    migratedChunk.setName(OID::gen());
+    migratedChunk.setNS(kNamespace);
+    migratedChunk.setVersion(origVersion);
+    migratedChunk.setShard(shard0.getName());
+    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    migratedChunk.setMin(BSON("a" << 1));
+    migratedChunk.setMax(BSON("a" << 10));
+
+    ChunkVersion currentChunkVersion(12, 7, OID::gen());
+
+    ChunkType currentChunk;
+    currentChunk.setName(OID::gen());
+    currentChunk.setNS(kNamespace);
+    currentChunk.setVersion(currentChunkVersion);
+    currentChunk.setShard(shard0.getName());
+    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    currentChunk.setMin(BSON("a" << 1));
+    currentChunk.setMax(BSON("a" << 10));
+
+    setupChunks({currentChunk});
+
+    Timestamp validAfter{101, 0};
+    auto result = ShardingCatalogManager::get(operationContext())
+                      ->commitChunkMigration(operationContext(),
+                                             kNamespace,
+                                             migratedChunk,
+                                             origVersion.epoch(),
+                                             ShardId(shard0.getName()),
+                                             ShardId(shard1.getName()),
+                                             validAfter);
+
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result, ErrorCodes::StaleEpoch);
+}
+
 }  // namespace
 }  // namespace mongo
