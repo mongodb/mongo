@@ -369,6 +369,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+        '$BUILD_DIR/mongo/db/storage/storage_debug_util',
         '$BUILD_DIR/mongo/db/transaction',
         'index_build_block',
         'throttle_cursor',

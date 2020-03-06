@@ -161,7 +161,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/db/storage/durable_catalog_impl",
             "$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test",
             "$BUILD_DIR/mongo/db/storage/storage_engine_impl",
-            "$BUILD_DIR/mongo/db/storage/storage_unittest_debug_util",
+            "$BUILD_DIR/mongo/db/storage/storage_debug_util",
             "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger" if wiredtiger else [],
             "$BUILD_DIR/mongo/db/transaction",
             "$BUILD_DIR/mongo/shell_core",

@@ -38,6 +38,8 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/storage_debug_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -212,6 +214,15 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         // keys encountered.
         _indexKeyCount[hash]++;
         indexInfo->numRecords++;
+
+        if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+            LOGV2(46666002, "[validate](record) {hash_num}", "hash_num"_attr = hash);
+            const BSONObj& keyPatternBson = indexInfo->keyPattern;
+            auto keyStringBson = KeyString::toBsonSafe(
+                ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
+            StorageDebugUtil::printKeyString(
+                recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
+        }
     } else if (_indexKeyCount[hash]) {
         // Found a document key for a hash bucket that had mismatches.
 
@@ -246,6 +257,15 @@ void IndexConsistency::addIndexKey(const KeyString::Value& ks,
         // keys encountered.
         _indexKeyCount[hash]--;
         indexInfo->numKeys++;
+
+        if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+            LOGV2(46666003, "[validate](index) {hash_num}", "hash_num"_attr = hash);
+            const BSONObj& keyPatternBson = indexInfo->keyPattern;
+            auto keyStringBson = KeyString::toBsonSafe(
+                ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
+            StorageDebugUtil::printKeyString(
+                recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
+        }
     } else if (_indexKeyCount[hash]) {
         // Found an index key for a bucket that has inconsistencies.
         // If there is a corresponding document key for the index entry key, we remove the key from
