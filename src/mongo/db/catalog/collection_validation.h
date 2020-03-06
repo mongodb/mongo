@@ -75,7 +75,8 @@ Status validate(OperationContext* opCtx,
                 ValidateOptions options,
                 bool background,
                 ValidateResults* results,
-                BSONObjBuilder* output);
+                BSONObjBuilder* output,
+                bool turnOnExtraLoggingForTest = false);
 
 /**
  * Checks whether a failpoint has been hit in the above validate() code..

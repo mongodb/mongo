@@ -54,8 +54,13 @@ namespace CollectionValidation {
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              bool background,
-                             ValidateOptions options)
-    : _nss(nss), _background(background), _options(options), _dataThrottle(opCtx) {
+                             ValidateOptions options,
+                             bool turnOnExtraLoggingForTest)
+    : _nss(nss),
+      _background(background),
+      _options(options),
+      _dataThrottle(opCtx),
+      _extraLoggingForTest(turnOnExtraLoggingForTest) {
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (_background) {

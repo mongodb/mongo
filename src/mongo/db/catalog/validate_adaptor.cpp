@@ -69,6 +69,13 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         return exceptionToStatus();
     }
 
+    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        LOGV2(46666001,
+              "[validate](record) {record_id}, Value: {record_data}",
+              "record_id"_attr = recordId,
+              "record_data"_attr = recordBson);
+    }
+
     const Status status = validateBSON(
         recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());
     if (status.isOK()) {

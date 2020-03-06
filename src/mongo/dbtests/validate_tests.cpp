@@ -40,7 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_unittest_debug_util.h"
+#include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ValidateTests {
@@ -48,7 +48,10 @@ namespace ValidateTests {
 using std::unique_ptr;
 
 namespace {
+
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+const bool kTurnOnExtraLoggingForTest = true;
+
 }  // namespace
 
 static const char* const _ns = "unittests.validate_tests";
@@ -105,8 +108,8 @@ protected:
         ValidateResults results;
         BSONObjBuilder output;
 
-        ASSERT_OK(
-            CollectionValidation::validate(&_opCtx, _nss, options, _background, &results, &output));
+        ASSERT_OK(CollectionValidation::validate(
+            &_opCtx, _nss, options, _background, &results, &output, kTurnOnExtraLoggingForTest));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1209,7 +1212,8 @@ public:
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
                 &results,
-                &output));
+                &output,
+                kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1331,7 +1335,8 @@ public:
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
                 &results,
-                &output));
+                &output,
+                kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1429,7 +1434,8 @@ public:
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
                 &results,
-                &output));
+                &output,
+                kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);

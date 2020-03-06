@@ -212,9 +212,9 @@ env.Library(
 )
 
 env.Library(
-    target='storage_unittest_debug_util',
+    target='storage_debug_util',
     source=[
-        'storage_unittest_debug_util.cpp',
+        'storage_debug_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/db_raii',

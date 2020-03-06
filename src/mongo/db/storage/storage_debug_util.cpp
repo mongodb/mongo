@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/storage_unittest_debug_util.h"
+#include "mongo/db/storage/storage_debug_util.h"
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
@@ -41,6 +41,36 @@
 namespace mongo {
 
 namespace StorageDebugUtil {
+
+void printKeyString(const RecordId& recordId,
+                    const KeyString::Value& keyStringValue,
+                    const BSONObj& keyPatternBson,
+                    const BSONObj& keyStringBson,
+                    std::string callerLogPrefix) {
+    // We need to rehydrate the keyString to something readable.
+    auto keyPatternIter = keyPatternBson.begin();
+    auto keyStringIter = keyStringBson.begin();
+    BSONObjBuilder b;
+    while (keyPatternIter != keyPatternBson.end() && keyStringIter != keyStringBson.end()) {
+        b.appendAs(*keyStringIter, keyPatternIter->fieldName());
+        ++keyPatternIter;
+        ++keyStringIter;
+    }
+    // Wildcard index documents can have more values in the keystring.
+    while (keyStringIter != keyStringBson.end()) {
+        b.append(*keyStringIter);
+        ++keyStringIter;
+    }
+    BSONObj rehydratedKey = b.done();
+
+    LOGV2(51811,
+          "{caller} {record_id}, key: {rehydrated_key}, keystring: "
+          "{key_string}",
+          "caller"_attr = callerLogPrefix,
+          "record_id"_attr = recordId,
+          "rehydrated_key"_attr = rehydratedKey,
+          "key_string"_attr = keyStringValue);
+}
 
 void printCollectionAndIndexTableEntries(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(!opCtx->lockState()->isLocked());
@@ -53,10 +83,10 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
     RecordStore* rs = coll->getRecordStore();
     auto rsCursor = rs->getCursor(opCtx);
     boost::optional<Record> rec = rsCursor->next();
-    LOGV2(51808, "Collection table entries:");
+    LOGV2(51808, "[Debugging] Collection table entries:");
     while (rec) {
         LOGV2(51809,
-              "{record_id}, Value: {record_data}",
+              "[Debugging](record) {record_id}, Value: {record_data}",
               "record_id"_attr = rec->id,
               "record_data"_attr = rec->data.toBson());
         rec = rsCursor->next();
@@ -77,37 +107,22 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         KeyString::Builder firstKeyString(
             version, BSONObj(), ordering, KeyString::Discriminator::kExclusiveBefore);
 
-        LOGV2(51810, "{keyPattern_str} index table entries:", "keyPattern_str"_attr = keyPattern);
+        LOGV2(51810,
+              "[Debugging] {keyPattern_str} index table entries:",
+              "keyPattern_str"_attr = keyPattern);
 
         for (auto keyStringEntry = indexCursor->seekForKeyString(firstKeyString.getValueCopy());
              keyStringEntry;
              keyStringEntry = indexCursor->nextKeyString()) {
-            // We need to rehydrate the keyString to something readable.
             auto keyString = KeyString::toBsonSafe(keyStringEntry->keyString.getBuffer(),
                                                    keyStringEntry->keyString.getSize(),
                                                    ordering,
                                                    keyStringEntry->keyString.getTypeBits());
-            auto keyPatternIter = keyPattern.begin();
-            auto keyStringIter = keyString.begin();
-            BSONObjBuilder b;
-            while (keyPatternIter != keyPattern.end() && keyStringIter != keyString.end()) {
-                b.appendAs(*keyStringIter, keyPatternIter->fieldName());
-                ++keyPatternIter;
-                ++keyStringIter;
-            }
-            // Wildcard index documents can have more values in the keystring.
-            while (keyStringIter != keyString.end()) {
-                b.append(*keyStringIter);
-                ++keyStringIter;
-            }
-            BSONObj rehydratedKey = b.done();
-
-            LOGV2(51811,
-                  "{keyStringEntry_recId}, key: {rehydrated_key}, keystring: "
-                  "{keyStringEntry_keyString}",
-                  "keyStringEntry_recId"_attr = keyStringEntry->loc,
-                  "rehydrated_key"_attr = rehydratedKey,
-                  "keyStringEntry_keyString"_attr = keyStringEntry->keyString);
+            printKeyString(keyStringEntry->loc,
+                           keyStringEntry->keyString,
+                           keyPattern,
+                           keyString,
+                           "[Debugging](index)");
         }
     }
 }
