@@ -2180,31 +2180,31 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
-    // Sanity check
-    invariant(!opCtx->lockState()->isRSTLLocked());
+    // About to make network and DBDirectClient (recursive) calls, so we should not hold any locks.
+    invariant(!opCtx->lockState()->isLocked());
 
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    const auto myHostAndPort = getMyHostAndPort();
+    const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
 
-    if (getMemberState().primary()) {
-        if (canAcceptWritesForDatabase(opCtx, dbName)) {
-            // Run command using DBDirectClient to avoid tcp connection.
-            return _runCmdOnSelfOnAlternativeClient(opCtx, dbName, cmdObj);
-        }
-        // Node is primary but it's not in a state to accept non-local writes because it might be in
-        // the catchup or draining phase. So, try releasing and reacquiring RSTL lock so that we
-        // give chance for the node to finish executing signalDrainComplete() and become master.
-        uassertStatusOK(
-            Status{ErrorCodes::NotMaster, "Node is in primary state but can't accept writes."});
+    if (myHostAndPort.empty()) {
+        // Possibly because either rsconfig is uninitialized or the node got removed from config.
+        uassertStatusOK(Status{ErrorCodes::NodeNotFound, "Address unknown."});
+    }
+
+    if (primaryHostAndPort.empty()) {
+        uassertStatusOK(Status{ErrorCodes::NoConfigMaster, "Primary is unknown/down."});
+    }
+
+    auto iAmPrimary = (myHostAndPort == primaryHostAndPort) ? true : false;
+
+    if (iAmPrimary) {
+        // Run command using DBDirectClient to avoid tcp connection.
+        return _runCmdOnSelfOnAlternativeClient(opCtx, dbName, cmdObj);
     }
 
     // Node is not primary, so we will run the remote command via AsyncDBClient. To use
     // AsyncDBClient, we will be using repl task executor.
-    const auto primary = getCurrentPrimaryHostAndPort();
-    if (primary.empty()) {
-        uassertStatusOK(Status{ErrorCodes::CommandFailed, "Primary is unknown/down."});
-    }
-
-    executor::RemoteCommandRequest request(primary, dbName, cmdObj, nullptr);
+    executor::RemoteCommandRequest request(primaryHostAndPort, dbName, cmdObj, nullptr);
     executor::RemoteCommandResponse cbkResponse(
         Status{ErrorCodes::InternalError, "Uninitialized value"});
 
@@ -2218,11 +2218,6 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     CallbackHandle cbkHandle = scheduleResult.getValue();
 
     onRemoteCmdScheduled(cbkHandle);
-    // Before, we wait for the remote command response, it's important we release the rstl lock to
-    // ensure that the state transition can happen during the wait period. Else, it can lead to
-    // deadlock. Consider a case, where the remote command waits for majority write concern. But, we
-    // are not able to transition our state to secondary (steady state replication).
-    rstl.release();
 
     // Wait for the response in an interruptible mode.
     _replExecutor->wait(cbkHandle, opCtx);

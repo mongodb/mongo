@@ -1396,6 +1396,7 @@ private:
 
     /**
      * Runs the command using DBDirectClient and returns the response received for that command.
+     * Callers of this function should not hold any locks.
      */
     BSONObj _runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
                                              const std::string& dbName,

@@ -369,7 +369,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
         if (onDiskcommitQuorum == replState->commitQuorum.get()) {
             if (voteReceived >= requiredQuorumCount) {
                 LOGV2(3856201,
-                      "Index build Commit Quorum Satisfied: {indexBuildEntry}",
+                      "Index build commit quorum satisfied:",
                       "indexBuildEntry"_attr = indexBuildEntry);
                 _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
             }
@@ -414,15 +414,17 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     return false;
 }
 
-bool IndexBuildsCoordinatorMongod::_checkVoteCommitIndexCmdSucceeded(const BSONObj& response) {
+bool IndexBuildsCoordinatorMongod::_checkVoteCommitIndexCmdSucceeded(const BSONObj& response,
+                                                                     const UUID& indexBuildUUID) {
     auto commandStatus = getStatusFromCommandResult(response);
     auto wcStatus = getWriteConcernStatusFromCommandResult(response);
     if (commandStatus.isOK() && wcStatus.isOK()) {
         return true;
     }
     LOGV2(3856202,
-          "'voteCommitIndexBuild' command failed with response : {response}",
-          "response"_attr = response);
+          "'voteCommitIndexBuild' command failed.",
+          "indexBuildUUID"_attr = indexBuildUUID,
+          "responseStatus"_attr = response);
     return false;
 }
 
@@ -527,11 +529,16 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
                 uassertStatusOK(convertToNonFatalStatus(ex.toStatus()));
             }
             // All other error including network errors should be retried.
+            LOGV2_DEBUG(4666400,
+                        1,
+                        "Failed to run 'voteCommitIndexBuild' command.",
+                        "indexBuildUUID"_attr = replState->buildUUID,
+                        "errorMsg"_attr = ex);
             continue;
         }
 
         // Command error and write concern error have to be retried.
-        if (_checkVoteCommitIndexCmdSucceeded(voteCmdResponse)) {
+        if (_checkVoteCommitIndexCmdSucceeded(voteCmdResponse, replState->buildUUID)) {
             break;
         }
     }

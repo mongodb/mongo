@@ -129,7 +129,7 @@ private:
     /**
      * Process voteCommitIndexBuild command's response.
      */
-    bool _checkVoteCommitIndexCmdSucceeded(const BSONObj& response);
+    bool _checkVoteCommitIndexCmdSucceeded(const BSONObj& response, const UUID& indexBuildUUID);
 
     /**
      * Signals index builder to commit.
