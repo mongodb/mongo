@@ -4,6 +4,7 @@ selector:
   roots:
   - jstests/multiVersion/*.js
   - jstests/multiVersion/genericSetFCVUsage/*.js
+  - src/mongo/db/modules/*/jstests/hot_backups/*last_stable*.js
   exclude_files:
   # TODO: SERVER-21578
   - jstests/multiVersion/balancer_multiVersion_detect.js
