@@ -189,11 +189,12 @@ Status doSaslStep(OperationContext* opCtx,
     if (!swResponse.isOK()) {
         LOGV2(20249,
               "SASL {mechanism} authentication failed for "
-              "{principalName} on {authDB} from client "
+              "{principalName} on {authenticationDatabase} from client "
               "{client} ; {result}",
+              "Authentication failed",
               "mechanism"_attr = mechanism.mechanismName(),
               "principalName"_attr = mechanism.getPrincipalName(),
-              "authDB"_attr = mechanism.getAuthenticationDatabase(),
+              "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
               "client"_attr = opCtx->getClient()->getRemote().toString(),
               "result"_attr = redact(swResponse.getStatus()));
 
@@ -218,10 +219,11 @@ Status doSaslStep(OperationContext* opCtx,
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20250,
                   "Successfully authenticated as principal {principalName} on "
-                  "{authDB} from client "
-                  "{client}",
+                  "{authenticationDatabase} from client {client} with mechanism {mechanism}",
+                  "Successful authentication",
+                  "mechanism"_attr = mechanism.mechanismName(),
                   "principalName"_attr = mechanism.getPrincipalName(),
-                  "authDB"_attr = mechanism.getAuthenticationDatabase(),
+                  "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
                   "client"_attr = opCtx->getClient()->session()->remote());
         }
         if (session->isSpeculative()) {

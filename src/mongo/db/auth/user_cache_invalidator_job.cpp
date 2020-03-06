@@ -66,9 +66,9 @@ public:
             stdx::lock_guard<Latch> twiddle(_mutex);
             LOGV2_DEBUG(20259,
                         5,
-                        "setInterval: old={interval}, new={interval2}",
-                        "interval"_attr = _interval,
-                        "interval2"_attr = interval);
+                        "setInterval: old={previousInterval}, new={newInterval}",
+                        "previousInterval"_attr = _interval,
+                        "newInterval"_attr = interval);
             _interval = interval;
         }
         _condition.notify_all();
@@ -195,7 +195,7 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
 
     LOGV2_WARNING(20265,
                   "An error occurred while fetching initial user cache generation from config "
-                  "servers: {status}",
+                  "servers",
                   "status"_attr = swCurrentGeneration.getStatus());
     _previousGeneration = OID();
 }
@@ -210,15 +210,14 @@ void UserCacheInvalidator::run() {
         if (!swCurrentGeneration.isOK()) {
             LOGV2_WARNING(20266,
                           "An error occurred while fetching current user cache generation from "
-                          "config servers: {status}",
+                          "config servers",
                           "status"_attr = swCurrentGeneration.getStatus());
 
             // When in doubt, invalidate the cache
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                LOGV2_WARNING(
-                    20267, "Error invalidating user cache: {status}", "status"_attr = e.toStatus());
+                LOGV2_WARNING(20267, "Error invalidating user cache", "status"_attr = e.toStatus());
             }
             continue;
         }
@@ -233,8 +232,7 @@ void UserCacheInvalidator::run() {
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                LOGV2_WARNING(
-                    20268, "Error invalidating user cache: {status}", "status"_attr = e.toStatus());
+                LOGV2_WARNING(20268, "Error invalidating user cache", "status"_attr = e.toStatus());
             }
             _previousGeneration = swCurrentGeneration.getValue();
         }

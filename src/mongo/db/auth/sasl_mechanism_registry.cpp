@@ -109,8 +109,8 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
             auto& status = swUser.getStatus();
             if (status.code() == ErrorCodes::UserNotFound) {
                 LOGV2(20251,
-                      "Supported SASL mechanisms requested for unknown user '{userName}'",
-                      "userName"_attr = userName);
+                      "Supported SASL mechanisms requested for unknown user",
+                      "user"_attr = userName);
                 return;
             }
             uassertStatusOK(status);

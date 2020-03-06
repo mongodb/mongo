@@ -140,10 +140,9 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         restrictionSet.validate(RestrictionEnvironment::get(*opCtx->getClient()));
     if (!restrictionStatus.isOK()) {
         LOGV2(20240,
-              "Failed to acquire user '{userName}' because of unmet authentication restrictions: "
-              "{restrictionStatus_reason}",
-              "userName"_attr = userName,
-              "restrictionStatus_reason"_attr = restrictionStatus.reason());
+              "Failed to acquire user because of unmet authentication restrictions",
+              "user"_attr = userName,
+              "reason"_attr = restrictionStatus.reason());
         return AuthorizationManager::authenticationFailedStatus;
     }
 
@@ -557,10 +556,10 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(
             }
         }
         LOGV2(20241,
-              "Not authorized to create the first role in the system '{args_roleName}' using the "
+              "Not authorized to create the first role in the system using the "
               "localhost exception. The user needs to acquire the role through "
               "external authentication first.",
-              "args_roleName"_attr = args.roleName);
+              "role"_attr = args.roleName);
     }
 
     return false;
@@ -771,19 +770,18 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                             RestrictionEnvironment::get(*opCtx->getClient()));
                         if (!restrictionStatus.isOK()) {
                             LOGV2(20242,
-                                  "Removed user {name} with unmet authentication restrictions from "
-                                  "session cache of user information. Restriction failed because: "
-                                  "{restrictionStatus_reason}",
-                                  "name"_attr = name,
-                                  "restrictionStatus_reason"_attr = restrictionStatus.reason());
+                                  "Removed user with unmet authentication restrictions from "
+                                  "session cache of user information. Restriction failed",
+                                  "user"_attr = name,
+                                  "reason"_attr = restrictionStatus.reason());
                             // If we remove from the UserSet, we cannot increment the iterator.
                             continue;
                         }
                     } catch (...) {
                         LOGV2(20243,
-                              "Evaluating authentication restrictions for {name} resulted in an "
-                              "unknown exception. Removing user from the session cache.",
-                              "name"_attr = name);
+                              "Evaluating authentication restrictions for user resulted in an "
+                              "unknown exception. Removing user from the session cache",
+                              "user"_attr = name);
                         continue;
                     }
 
@@ -792,23 +790,23 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     _authenticatedUsers.replaceAt(it, std::move(updatedUser));
                     LOGV2_DEBUG(20244,
                                 1,
-                                "Updated session cache of user information for {name}",
-                                "name"_attr = name);
+                                "Updated session cache of user information for user",
+                                "user"_attr = name);
                     break;
                 }
                 case ErrorCodes::UserNotFound: {
                     // User does not exist anymore; remove it from _authenticatedUsers.
                     LOGV2(20245,
-                          "Removed deleted user {name} from session cache of user information.",
-                          "name"_attr = name);
+                          "Removed deleted user from session cache of user information",
+                          "user"_attr = name);
                     continue;  // No need to advance "it" in this case.
                 }
                 case ErrorCodes::UnsupportedFormat: {
                     // An auth subsystem has explicitly indicated a failure.
                     LOGV2(20246,
-                          "Removed user {name} from session cache of user information because of "
-                          "refresh failure: '{status}'.",
-                          "name"_attr = name,
+                          "Removed user from session cache of user information because of "
+                          "refresh failure",
+                          "user"_attr = name,
                           "status"_attr = status);
                     continue;  // No need to advance "it" in this case.
                 }
@@ -816,9 +814,11 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     // Unrecognized error; assume that it's transient, and continue working with the
                     // out-of-date privilege data.
                     LOGV2_WARNING(20247,
-                                  "Could not fetch updated user privilege information for {name}; "
-                                  "continuing to use old information.  Reason is {status}",
-                                  "name"_attr = name,
+                                  "Could not fetch updated user privilege information for {user}; "
+                                  "continuing to use old information. Reason is {status}",
+                                  "Could not fetch updated user privilege information, continuing "
+                                  "to use old information"
+                                  "user"_attr = name,
                                   "status"_attr = redact(status));
                     removeGuard.dismiss();
                     break;
