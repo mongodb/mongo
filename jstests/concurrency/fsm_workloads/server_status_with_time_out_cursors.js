@@ -35,13 +35,8 @@ var $config = (function() {
 
                 const c = curs.itcount();
             } catch (e) {
-                // TODO SERVER-46227: Remove "ErrorCodes.Interrupted" once we are correctly checking
-                // the OperationContext for kill reason in MozJSImplScope::kill().
-                assert.commandFailedWithCode(e, [
-                    ErrorCodes.MaxTimeMSExpired,
-                    ErrorCodes.NetworkInterfaceExceededTimeLimit,
-                    ErrorCodes.Interrupted
-                ]);
+                assert.commandFailedWithCode(
+                    e, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
             }
         },
 
