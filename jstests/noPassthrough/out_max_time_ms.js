@@ -16,7 +16,7 @@ const nDocs = 10;
  */
 function insertDocs(coll) {
     for (let i = 0; i < nDocs; i++) {
-        assert.commandWorked(coll.insert({_id: i}));
+        assert.commandWorked(coll.insert({_id: i}, {writeConcern: {w: "majority"}}));
     }
 }
 
@@ -36,43 +36,51 @@ function waitUntilServerHangsOnFailPoint(conn, fpName) {
 }
 
 /**
- * Given a mongod connection, run a $out aggregation against 'conn' which hangs on the given
- * failpoint and ensure that the $out maxTimeMS expires.
+ * Given a mongod connection, run a $out aggregation against 'conn'. Set the provided failpoint on
+ * the node specified by 'failPointConn' in order to hang during the aggregate. Ensure that the $out
+ * maxTimeMS expires on the node specified by 'maxTimeMsConn'.
  */
-function forceAggregationToHangAndCheckMaxTimeMsExpires(conn, failPointName) {
+function forceAggregationToHangAndCheckMaxTimeMsExpires(
+    failPointName, conn, failPointConn, maxTimeMsConn) {
     // Use a short maxTimeMS so that the test completes in a reasonable amount of time. We will
     // use the 'maxTimeNeverTimeOut' failpoint to ensure that the operation does not prematurely
     // time out.
     const maxTimeMS = 1000 * 2;
 
     // Enable a failPoint so that the write will hang.
-    let failpointCommand = {
+    const failpointCommand = {
         configureFailPoint: failPointName,
         mode: "alwaysOn",
     };
 
-    assert.commandWorked(conn.getDB("admin").runCommand(failpointCommand));
+    assert.commandWorked(failPointConn.getDB("admin").runCommand(failpointCommand));
 
-    // Make sure we don't run out of time before the failpoint is hit.
+    // Make sure we don't run out of time on either of the involved nodes before the failpoint is
+    // hit.
     assert.commandWorked(conn.getDB("admin").runCommand(
+        {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
+    assert.commandWorked(maxTimeMsConn.getDB("admin").runCommand(
         {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
 
     // Build the parallel shell function.
-    let shellStr = `const sourceColl = db['${kSourceCollName}'];`;
-    shellStr += `const destColl = db['${kDestCollName}'];`;
+    let shellStr = `const testDB = db.getSiblingDB('${kDBName}');`;
+    shellStr += `const sourceColl = testDB['${kSourceCollName}'];`;
+    shellStr += `const destColl = testDB['${kDestCollName}'];`;
     shellStr += `const maxTimeMS = ${maxTimeMS};`;
     const runAggregate = function() {
         const pipeline = [{$out: destColl.getName()}];
-        const err = assert.throws(() => sourceColl.aggregate(pipeline, {maxTimeMS: maxTimeMS}));
+        const err = assert.throws(
+            () => sourceColl.aggregate(
+                pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}));
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
-    waitUntilServerHangsOnFailPoint(conn, failPointName);
+    waitUntilServerHangsOnFailPoint(failPointConn, failPointName);
 
-    assert.commandWorked(
-        conn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
+    assert.commandWorked(maxTimeMsConn.getDB("admin").runCommand(
+        {configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
 
     // The aggregation running in the parallel shell will hang on the failpoint, burning
     // its time. Wait until the maxTimeMS has definitely expired.
@@ -81,17 +89,23 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(conn, failPointName) {
     // Now drop the failpoint, allowing the aggregation to proceed. It should hit an
     // interrupt check and terminate immediately.
     assert.commandWorked(
-        conn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: "off"}));
+        failPointConn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: "off"}));
 
     // Wait for the parallel shell to finish.
     assert.eq(awaitShell(), 0);
 }
 
-function runUnshardedTest(conn) {
+/**
+ * Run a $out aggregate against the node specified by 'conn' with primary 'primaryConn' (these may
+ * be the same node). Verify that maxTimeMS properly times out the aggregate on the node specified
+ * by 'maxTimeMsConn' both while hanging on the insert/update on 'primaryConn' and while hanging on
+ * the batch being built on 'conn'.
+ */
+function runUnshardedTest(conn, primaryConn, maxTimeMsConn) {
     jsTestLog("Running unsharded test");
 
     const sourceColl = conn.getDB(kDBName)[kSourceCollName];
-    const destColl = conn.getDB(kDBName)[kDestCollName];
+    const destColl = primaryConn.getDB(kDBName)[kDestCollName];
     assert.commandWorked(destColl.remove({}));
 
     // Be sure we're able to read from a cursor with a maxTimeMS set on it.
@@ -108,12 +122,14 @@ function runUnshardedTest(conn) {
 
     // Force the aggregation to hang while the batch is being written.
     const kFailPointName = "hangDuringBatchInsert";
-    forceAggregationToHangAndCheckMaxTimeMsExpires(conn, kFailPointName);
+    forceAggregationToHangAndCheckMaxTimeMsExpires(
+        kFailPointName, conn, primaryConn, maxTimeMsConn);
 
     assert.commandWorked(destColl.remove({}));
 
     // Force the aggregation to hang while the batch is being built.
-    forceAggregationToHangAndCheckMaxTimeMsExpires(conn, "hangWhileBuildingDocumentSourceOutBatch");
+    forceAggregationToHangAndCheckMaxTimeMsExpires(
+        "hangWhileBuildingDocumentSourceOutBatch", conn, conn, conn);
 }
 
 // Run on a standalone.
@@ -121,7 +137,25 @@ function runUnshardedTest(conn) {
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, 'mongod was unable to start up');
 insertDocs(conn.getDB(kDBName)[kSourceCollName]);
-runUnshardedTest(conn);
+runUnshardedTest(conn, conn, conn);
 MongoRunner.stopMongod(conn);
+})();
+
+// Run on the primary and the secondary of a replica set.
+(function() {
+const replTest = new ReplSetTest({nodes: 2});
+replTest.startSet();
+replTest.initiate();
+replTest.awaitReplication();
+const primary = replTest.getPrimary();
+const secondary = replTest.getSecondary();
+insertDocs(primary.getDB(kDBName)[kSourceCollName]);
+// Run the $out on the primary and test that the maxTimeMS times out on the primary.
+runUnshardedTest(primary, primary, primary);
+// Run the $out on the secondary and test that the maxTimeMS times out on the primary.
+runUnshardedTest(secondary, primary, primary);
+// Run the $out on the secondary and test that the maxTimeMS times out on the secondary.
+runUnshardedTest(secondary, primary, secondary);
+replTest.stopSet();
 })();
 })();

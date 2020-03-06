@@ -210,10 +210,13 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
 
 void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext* opCtx,
                                                                BSONObjBuilder* cmd) const {
-    auto writeConcern = opCtx->getWriteConcern();
-    if (!writeConcern.usedDefault) {
-        cmd->append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+    cmd->append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+
+    auto maxTimeMS = opCtx->getRemainingMaxTimeMillis();
+    if (maxTimeMS != Milliseconds::max()) {
+        cmd->append(QueryRequest::cmdOptionMaxTimeMS, durationCount<Milliseconds>(maxTimeMS));
     }
+
     logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, cmd);
 }
 
