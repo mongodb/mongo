@@ -210,7 +210,7 @@ cmd_line = " ".join(sys.argv).encode('unicode_escape')
 if env.TargetOSIs('windows'):
     cmd_line = cmd_line.replace(b'\\', b'\\')
 
-module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
+module_list = ',\n'.join(['"{0}"_sd'.format(x) for x in env['MONGO_MODULES']])
 
 # This generates a numeric representation of the version string so that
 # you can easily compare versions of MongoDB without having to parse
@@ -241,25 +241,21 @@ else:
     version_parts[3] = 0
 version_parts = [ int(x) for x in version_parts[:4]]
 
-# This turns the MONGO_BUILDINFO_ENVIRONMENT_DATA tuples into a std::vector of
-# std::tuple<string, string, bool, bool>.
-buildInfoInitializer = []
-for tup in env['MONGO_BUILDINFO_ENVIRONMENT_DATA']:
-    def pyToCXXBool(val):
+# Render the MONGO_BUILDINFO_ENVIRONMENT_DATA dict into an initializer for a
+# `std::vector<VersionInfoInterface::BuildInfoField>`.
+def fmtBuildInfo(data):
+    def fmtBool(val):
         return "true" if val else "false"
-    def wrapInQuotes(val):
-        return 'R"raw_delimiter({0})raw_delimiter"'.format(val.replace("\\", r"\\"))
-    buildInfoInitializer.append(
-        'std::make_tuple({0})'.format(', '.join(
-            (
-                wrapInQuotes(tup[0]),
-                wrapInQuotes(env.subst(tup[1])),
-                pyToCXXBool(tup[2]),
-                pyToCXXBool(tup[3]),
-            )
-        ))
-    )
-buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
+    def fmtStr(val):
+        return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
+    def fmtObj(obj):
+        return '{{{}, {}, {}, {}}}'.format(fmtStr(obj['key']),
+                                           fmtStr(env.subst(obj['value'])),
+                                           fmtBool(obj['inBuildInfo']),
+                                           fmtBool(obj['inVersion']))
+    return ',\n'.join([fmtObj(obj) for _,obj in data.items()])
+
+buildInfoInitializer = fmtBuildInfo(env['MONGO_BUILDINFO_ENVIRONMENT_DATA'])
 
 generatedVersionFile = env.Substfile(
     'util/version_constants.h.in',
