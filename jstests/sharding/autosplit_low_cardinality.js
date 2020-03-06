@@ -30,6 +30,7 @@ function insertBigDocsWithKey(key, numDocs) {
         bulk.insert({sk: key, sub: i, bs: bigString});
     }
     assert.commandWorked(bulk.execute());
+    waitForOngoingChunkSplits(st);
 }
 
 function numChunks() {
