@@ -96,7 +96,7 @@ public:
         return "unknown";
     }
 
-    std::vector<BuildInfoTuple> buildInfo() const final {
+    std::vector<BuildInfoField> buildInfo() const final {
         return {};
     }
 };
@@ -175,13 +175,12 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
 #endif
     opensslInfo.done();
 
-    BSONObjBuilder buildvarsInfo(result->subobjStart("buildEnvironment"));
-    for (auto&& envDataEntry : buildInfo()) {
-        if (std::get<2>(envDataEntry)) {
-            buildvarsInfo << std::get<0>(envDataEntry) << std::get<1>(envDataEntry);
-        }
+    {
+        BSONObjBuilder env(result->subobjStart("buildEnvironment"));
+        for (auto&& e : buildInfo())
+            if (e.inBuildInfo)
+                env.append(e.key, e.value);
     }
-    buildvarsInfo.done();
 
     *result << "bits" << (int)sizeof(void*) * 8;
     result->appendBool("debug", kDebugBuild);
@@ -218,20 +217,12 @@ void VersionInfoInterface::logBuildInfo() const {
 
     auto build = buildInfo();
 
-    auto envFilter = [](const BuildInfoTuple& bi) -> bool {
-        if (std::get<3>(bi))
-            return std::get<1>(bi).size() != 0;
-        return false;
-    };
+    auto envFilter = [](auto&& bi) { return bi.inBuildInfo && !bi.value.empty(); };
 
     auto filtered_begin = boost::make_filter_iterator(envFilter, build.begin(), build.end());
     auto filtered_end = boost::make_filter_iterator(envFilter, build.end(), build.end());
 
-    auto envFormatter = [](const BuildInfoTuple& bi) {
-        BSONObjBuilder builder;
-        builder.append(std::get<0>(bi), std::get<1>(bi));
-        return builder.obj();
-    };
+    auto envFormatter = [](auto&& bi) { return BSONObjBuilder{}.append(bi.key, bi.value).obj(); };
 
     auto begin = boost::make_transform_iterator(filtered_begin, envFormatter);
     auto end = boost::make_transform_iterator(filtered_end, envFormatter);

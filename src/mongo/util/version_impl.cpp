@@ -37,13 +37,12 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
-#define MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
 #include "mongo/util/version_constants.h"
 
 namespace mongo {
 namespace {
 
-const class : public VersionInfoInterface {
+class InterpolatedVersionInfo : public VersionInfoInterface {
 public:
     int majorVersion() const noexcept final {
         return version::kMajorVersion;
@@ -70,7 +69,7 @@ public:
     }
 
     std::vector<StringData> modules() const final {
-        return version::kModulesList;
+        return version::modulesList();
     }
 
     StringData allocator() const noexcept final {
@@ -94,17 +93,18 @@ public:
 #endif
     }
 
-    std::vector<BuildInfoTuple> buildInfo() const final {
-        return version::kBuildEnvironment;
+    std::vector<BuildInfoField> buildInfo() const final {
+        return version::buildEnvironment();
     }
+};
 
-} kInterpolatedVersionInfo{};
+const InterpolatedVersionInfo interpolatedVersionInfo;
 
 MONGO_INITIALIZER_GENERAL(EnableVersionInfo,
                           MONGO_NO_PREREQUISITES,
                           ("BeginStartupOptionRegistration", "GlobalLogManager"))
 (InitializerContext*) {
-    VersionInfoInterface::enable(&kInterpolatedVersionInfo);
+    VersionInfoInterface::enable(&interpolatedVersionInfo);
     return Status::OK();
 }
 

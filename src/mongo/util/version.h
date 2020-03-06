@@ -31,7 +31,6 @@
 #define UTIL_VERSION_HEADER
 
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -46,12 +45,21 @@ class BSONObjBuilder;
  * able to access version information.
  */
 class VersionInfoInterface {
+public:
+    struct BuildInfoField {
+        StringData key;
+        StringData value;
+        bool inBuildInfo;  // included in buildInfo BSON
+        bool inVersion;    // included in --version output
+    };
+
+    enum class NotEnabledAction {
+        kAbortProcess,
+        kFallback,
+    };
+
     VersionInfoInterface(const VersionInfoInterface&) = delete;
     VersionInfoInterface& operator=(const VersionInfoInterface&) = delete;
-
-public:
-    using BuildInfoTuple = std::tuple<StringData, StringData, bool, bool>;
-
     virtual ~VersionInfoInterface() = default;
 
     /**
@@ -59,11 +67,6 @@ public:
      * below. Ownership of the object is not transferred.
      */
     static void enable(const VersionInfoInterface* handler);
-
-    enum class NotEnabledAction {
-        kAbortProcess,
-        kFallback,
-    };
 
     /**
      * Obtain the currently configured instance of the VersionInfoInterface. By default, if this
@@ -126,9 +129,9 @@ public:
     virtual StringData targetMinOS() const noexcept = 0;
 
     /**
-     * Returns a vector of tuples describing build information (e.g. LINKFLAGS, compiler, etc.).
+     * Returns build information (e.g. LINKFLAGS, compiler, etc.).
      */
-    virtual std::vector<BuildInfoTuple> buildInfo() const = 0;
+    virtual std::vector<BuildInfoField> buildInfo() const = 0;
 
     /**
      * Returns the version of OpenSSL in use, if any, adorned with the provided prefix and suffix.

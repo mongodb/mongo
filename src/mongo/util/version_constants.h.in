@@ -27,21 +27,14 @@
  *    it in the license file.
  */
 
-#include <initializer_list>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 
-// NOTE: You almost certainly don't want to include this file directly. Instead, access this
-// information via the VersionInfoInterface singleton. To enforce this restriction we only allow
-// inclusion of this file from files that have explicitly whitelisted it. Additionally, since this
-// file is only ever included in .cpp files, it makes some sense to use an unnamed namespace here.
-
-#ifndef MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
-#error "Cannot include mongo/util/version_constants.h"
-#endif
+// This file is expanded by a Scons generator as a detail of version_impl.cpp.
+// Access this information via the VersionInfoInterface singleton.
 
 namespace mongo::version {
-namespace {
 
 constexpr auto kVersion = "@mongo_version@"_sd;
 constexpr int kMajorVersion = @mongo_version_major@;
@@ -53,10 +46,16 @@ constexpr auto kGitVersion = "@mongo_git_hash@"_sd;
 constexpr auto kAllocator = "@buildinfo_allocator@"_sd;
 constexpr auto kJsEngine = "@buildinfo_js_engine@"_sd;
 
-// TODO: Consider making these constexpr too.
-const std::initializer_list<StringData> kModulesList = @buildinfo_modules@;
-const std::initializer_list<VersionInfoInterface::BuildInfoTuple> kBuildEnvironment =
-    @buildinfo_environment_data@;
+inline std::vector<StringData> modulesList() {
+    return {
+@buildinfo_modules@
+    };
+}
 
-}  // namespace
+inline std::vector<VersionInfoInterface::BuildInfoField> buildEnvironment() {
+    return {
+@buildinfo_environment_data@
+    };
+}
+
 }  // namespace mongo::version
