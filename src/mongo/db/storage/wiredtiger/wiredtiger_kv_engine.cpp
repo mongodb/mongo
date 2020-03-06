@@ -252,6 +252,11 @@ public:
 
         // Initialize the thread's opCtx.
         _uniqueCtx.emplace(tc->makeOperationContext());
+
+        // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
+        // Non-replicated writes will not contribute to replication lag and can be safely excluded
+        // from Flow Control.
+        _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
         while (true) {
 
             pauseJournalFlusherThread.pauseWhileSet(_uniqueCtx->get());
@@ -268,6 +273,7 @@ public:
                     stdx::lock_guard<Latch> lk(_opCtxMutex);
                     _uniqueCtx.reset();
                     _uniqueCtx.emplace(tc->makeOperationContext());
+                    _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
                 });
 
                 _sessionCache->waitUntilDurable(
