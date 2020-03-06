@@ -89,10 +89,9 @@ var ElectionHandoffTest = (function() {
             if (numNodes === 2) {
                 checkLog.contains(expectedCandidate,
                                   `skipping dry run and running for election in term ${term + 1}`);
-                checkLog.checkContainsOnceJson(
+                checkLog.contains(
                     expectedCandidate,
-                    51799,
-                    {"term": term + 1, vote: "yes", "from": primary.host});
+                    `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
             }
         }
 
