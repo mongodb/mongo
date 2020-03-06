@@ -1,20 +1,20 @@
 /**
  * Tests the behavior of $merge being run on a secondary.
  *
- * @tags: [assumes_unsharded_collection, requires_replication, requires_spawning_own_processes]
+ * @tags: [assumes_unsharded_collection, requires_replication]
  */
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
-let replTest = new ReplSetTest({nodes: 2});
+const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
 replTest.awaitReplication();
 
-let primary = replTest.getPrimary().getDB("test");
-let secondary = replTest.getSecondary().getDB("test");
+const primary = replTest.getPrimary().getDB("test");
+const secondary = replTest.getSecondary().getDB("test");
 assert.commandWorked(primary.setProfilingLevel(2));
 secondary.getMongo().setReadPref("secondary");
 
@@ -29,7 +29,7 @@ assert.commandWorked(inputCollPrimary.insert({_id: 1, a: 2}, {writeConcern: {w: 
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     // Skip when whenNotMatchedMode is 'fail' since the output collection is empty, so this
     // will cause the aggregation to fail.
-    if (whenNotMatchedMode == "fail") {
+    if (whenNotMatchedMode === "fail") {
         return;
     }
 
@@ -46,7 +46,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
                              {comment: commentStr})
                   .itcount());
     assert.eq(whenNotMatchedMode === "discard" ? 0 : 2, outColl.find().itcount());
-    if (whenMatchedMode === "fail" && whenNotMatchedMode === "insert") {
+    if (whenMatchedMode === "fail") {
         assert.eq(
             1,
             primary.system.profile.find({"op": "insert", "command.comment": commentStr}).itcount());
@@ -57,6 +57,15 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
     outColl.drop();
 });
+
+// Verify that writeErrors are promoted to top-level errors.
+outColl.drop({writeConcern: {w: 2}});
+assert.commandWorked(outColl.insert({a: 2}, {writeConcern: {w: 2}}));
+const pipeline = [{$merge: {into: "outColl", whenMatched: "fail", whenNotMatched: "insert"}}];
+const res = secondary.runCommand({aggregate: outColl.getName(), pipeline: pipeline, cursor: {}});
+assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+assert(!res.hasOwnProperty("writeErrors"));
+assert(!res.hasOwnProperty("writeConcernError"));
 
 replTest.stopSet();
 })();
