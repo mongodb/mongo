@@ -24,14 +24,15 @@ if (isJsonLog(conn)) {
         const log = JSON.parse(element);
 
         return log.id === 20250 && log.attr.principalName === "root" &&
-            log.attr.authDB === "admin" && /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.client);
+            log.attr.authenticationDatabase === "admin" &&
+            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.client);
     }
 
     function checkSCRAMfail(element, index, array) {
         const log = JSON.parse(element);
 
         return log.id === 20249 && /SCRAM-SHA-\d+/.test(log.attr.mechanism) &&
-            log.attr.principalName === "root" && log.attr.authDB === "admin" &&
+            log.attr.principalName === "root" && log.attr.authenticationDatabase === "admin" &&
             /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.client);
     }
 

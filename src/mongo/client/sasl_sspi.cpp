@@ -204,13 +204,9 @@ int sspiClientMechNew(void* glob_context,
         // PTR records should point to the canonical name. If there's more than one, warn and
         // arbitrarily use the last entry.
         if (fqdns.size() > 1) {
-            std::stringstream ss;
-            ss << "Found multiple PTR records while performing reverse DNS: [ ";
-            for (const std::string& fqdn : fqdns) {
-                ss << fqdn << " ";
-            }
-            ss << "]";
-            LOGV2_WARNING(23933, "{ss_str}", "ss_str"_attr = ss.str());
+            LOGV2_WARNING(23933,
+                          "Found multiple PTR records while performing reverse DNS",
+                          "records"_attr = fqdns);
         }
         canonName = std::move(fqdns.back());
         fqdns.pop_back();

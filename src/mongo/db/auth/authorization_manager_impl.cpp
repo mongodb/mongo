@@ -467,7 +467,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     auto cachedUser = _userCache.acquire(opCtx, request);
     invariant(cachedUser);
 
-    LOGV2_DEBUG(20226, 1, "Returning user {userName} from cache", "userName"_attr = userName);
+    LOGV2_DEBUG(20226, 1, "Returning user from cache", "user"_attr = userName);
     return cachedUser;
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -544,22 +544,19 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
 
             if (!user.isValid() || !shouldPin) {
                 if (!shouldPin) {
-                    LOGV2_DEBUG(20229,
-                                2,
-                                "Unpinning user {user_getName}",
-                                "user_getName"_attr = user->getName());
+                    LOGV2_DEBUG(20229, 2, "Unpinning user", "user"_attr = user->getName());
                 } else {
                     LOGV2_DEBUG(20230,
                                 2,
-                                "Pinned user no longer valid, will re-pin {user_getName}",
-                                "user_getName"_attr = user->getName());
+                                "Pinned user no longer valid, will re-pin",
+                                "user"_attr = user->getName());
                 }
                 it = pinnedUsers.erase(it);
             } else {
                 LOGV2_DEBUG(20231,
                             3,
-                            "Pinned user is still valid and pinned {user_getName}",
-                            "user_getName"_attr = user->getName());
+                            "Pinned user is still valid and pinned",
+                            "user"_attr = user->getName());
                 ++it;
             }
         }
@@ -574,7 +571,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
             auto swUser = acquireUser(opCtx.get(), userName);
 
             if (swUser.isOK()) {
-                LOGV2_DEBUG(20232, 2, "Pinned user {userName}", "userName"_attr = userName);
+                LOGV2_DEBUG(20232, 2, "Pinned user", "user"_attr = userName);
                 pinnedUsers.emplace_back(std::move(swUser.getValue()));
             } else {
                 const auto& status = swUser.getStatus();
@@ -582,12 +579,11 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
                 // now.
                 if (status != ErrorCodes::UserNotFound) {
                     LOGV2_WARNING(20239,
-                                  "Unable to fetch pinned user {userName}: {status}",
-                                  "userName"_attr = userName.toString(),
+                                  "Unable to fetch pinned user",
+                                  "user"_attr = userName.toString(),
                                   "status"_attr = status);
                 } else {
-                    LOGV2_DEBUG(
-                        20233, 2, "Pinned user not found: {userName}", "userName"_attr = userName);
+                    LOGV2_DEBUG(20233, 2, "Pinned user not found", "user"_attr = userName);
                 }
             }
         }
@@ -599,7 +595,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
 
 void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
                                                     const UserName& userName) {
-    LOGV2_DEBUG(20235, 2, "Invalidating user {userName}", "userName"_attr = userName);
+    LOGV2_DEBUG(20235, 2, "Invalidating user", "user"_attr = userName);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     // Invalidate the named User, assuming no externally provided roles. When roles are defined
@@ -608,7 +604,7 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
-    LOGV2_DEBUG(20236, 2, "Invalidating all users from database {dbname}", "dbname"_attr = dbname);
+    LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
     _userCache.invalidateIf(
@@ -684,7 +680,7 @@ AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
 
 boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::lookup(OperationContext* opCtx,
                                                                       const UserRequest& userReq) {
-    LOGV2_DEBUG(20238, 1, "Getting user record", "userName"_attr = userReq.name);
+    LOGV2_DEBUG(20238, 1, "Getting user record", "user"_attr = userReq.name);
 
     // Number of times to retry a user document that fetches due to transient AuthSchemaIncompatible
     // errors. These errors should only ever occur during and shortly after schema upgrades.

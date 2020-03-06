@@ -66,9 +66,8 @@ SymmetricKey::SymmetricKey(const uint8_t* key,
       _initializationCount(initializationCount),
       _invocationCount(0) {
     if (_keySize < crypto::minKeySize || _keySize > crypto::maxKeySize) {
-        LOGV2_ERROR(23866,
-                    "Attempt to construct symmetric key of invalid size: {keySize}",
-                    "keySize"_attr = _keySize);
+        LOGV2_ERROR(
+            23866, "Attempt to construct symmetric key of invalid size", "size"_attr = _keySize);
         return;
     }
 }
