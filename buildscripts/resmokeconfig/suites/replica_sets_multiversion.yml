@@ -9,6 +9,8 @@ selector:
   exclude_files:
   # TODO SERVER-46534 will make this work with mirrored reads on
   - jstests/replsets/read_operations_during_step_up.js
+  # Enable when 4.4 becomes last stable
+  - jstests/replsets/no_disconnect_on_stepdown.js
 executor:
   config:
     shell_options:

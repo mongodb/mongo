@@ -26,7 +26,8 @@ testDB.runCommand({drop: collName});
 // Queries current operations until 'count' matching operations are found.
 function awaitMatchingCurrentOpCount(message, count) {
     assert.soon(() => {
-        const currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: {msg: message}}]).toArray();
+        const currentOp =
+            adminDB.aggregate([{$currentOp: {}}, {$match: {failpointMsg: message}}]).toArray();
         return (currentOp.length === count);
     });
 }

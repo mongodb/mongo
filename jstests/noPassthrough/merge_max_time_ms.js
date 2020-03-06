@@ -22,13 +22,13 @@ function insertDocs(coll) {
 }
 
 /**
- * Wait until the server sets its CurOp "msg" to the failpoint name, indicating that it's
+ * Wait until the server sets its CurOp "failpointMsg" to the failpoint name, indicating that it's
  * hanging.
  */
 function waitUntilServerHangsOnFailPoint(conn, fpName) {
     // Be sure that the server is hanging on the failpoint.
     assert.soon(function() {
-        const filter = {"msg": fpName};
+        const filter = {"failpointMsg": fpName};
         const ops = conn.getDB("admin")
                         .aggregate([{$currentOp: {allUsers: true}}, {$match: filter}])
                         .toArray();

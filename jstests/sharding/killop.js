@@ -31,9 +31,8 @@ let opId;
 assert.soon(
     function() {
         const result = runCurOp();
-
-        // Check the 'msg' field to be sure that the failpoint has been reached.
-        if (result.length === 1 && result[0].msg === kFailPointName) {
+        // Check the 'failpointMsg' field to be sure that the failpoint has been reached.
+        if (result.length === 1 && result[0].failpointMsg === kFailPointName) {
             opId = result[0].opid;
 
             return true;

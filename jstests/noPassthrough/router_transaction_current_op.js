@@ -142,7 +142,7 @@ jsTest.log("Active transaction.");
 
     // Wait until we know the failpoint has been reached.
     assert.soon(function() {
-        const filter = {"msg": "waitInFindBeforeMakingBatch"};
+        const filter = {"failpointMsg": "waitInFindBeforeMakingBatch"};
         return assert.commandWorked(st.rs0.getPrimary().getDB("admin").currentOp(filter))
                    .inprog.length === 1;
     });

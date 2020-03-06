@@ -50,7 +50,7 @@ function withPinnedCursor(
             const arr = db.getSiblingDB("admin")
                             .aggregate([
                                 {$currentOp: {localOps: true, allUsers: true}},
-                                {$match: {"msg": failPointName}}
+                                {$match: {"failpointMsg": failPointName}}
                             ])
                             .toArray();
             return arr.length > 0;

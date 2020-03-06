@@ -23,7 +23,11 @@ function waitForOp(curOpFilter) {
                 adminDB
                     .aggregate([
                         {$currentOp: {}},
-                        {$match: {$and: [curOpFilter, {msg: "hangAfterPreallocateSnapshot"}]}}
+                        {
+                            $match: {
+                                $and: [curOpFilter, {failpointMsg: "hangAfterPreallocateSnapshot"}]
+                            }
+                        }
                     ])
                     .toArray();
             if (res.length === 1) {

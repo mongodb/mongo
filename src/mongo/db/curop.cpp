@@ -641,6 +641,10 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
         }
     }
 
+    if (!_failPointMessage.empty()) {
+        builder->append("failpointMsg", _failPointMessage);
+    }
+
     if (auto n = _debug.additiveMetrics.prepareReadConflicts.load(); n > 0) {
         builder->append("prepareReadConflicts", n);
     }

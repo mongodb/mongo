@@ -182,10 +182,11 @@ auto startExhaustQuery(
 void runOneGetMore(DBClientBase* conn,
                    const std::unique_ptr<DBClientCursor>& queryCursor,
                    int nDocsReturned) {
-    const auto curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
-                                                      << queryCursor->getCursorId() << "msg"
-                                                      << "waitWithPinnedCursorDuringGetMoreBatch"
-                                                      << "cursor.nDocsReturned" << nDocsReturned);
+    const auto curOpMatch =
+        BSON("command.collection" << testNSS.coll() << "command.getMore"
+                                  << queryCursor->getCursorId() << "failpointMsg"
+                                  << "waitWithPinnedCursorDuringGetMoreBatch"
+                                  << "cursor.nDocsReturned" << nDocsReturned);
     // Confirm that the initial getMore appears in the $currentOp output.
     ASSERT(confirmCurrentOpContents(conn, curOpMatch));
 
@@ -196,7 +197,7 @@ void runOneGetMore(DBClientBase* conn,
     // Confirm that the getMore completed its batch and hit the post-getMore failpoint.
     ASSERT(confirmCurrentOpContents(
         conn,
-        BSON("command.getMore" << queryCursor->getCursorId() << "msg"
+        BSON("command.getMore" << queryCursor->getCursorId() << "failpointMsg"
                                << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch")));
 
     // Re-enable the original failpoint to catch the next getMore, and release the current one.
@@ -277,7 +278,7 @@ void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
     // The next getMore will be an exhaust getMore. Confirm that the exhaust getMore appears in the
     // $currentOp output.
     auto curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
-                                                << queryCursor->getCursorId() << "msg"
+                                                << queryCursor->getCursorId() << "failpointMsg"
                                                 << "waitWithPinnedCursorDuringGetMoreBatch"
                                                 << "cursor.nDocsReturned" << 3);
     ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch));
@@ -288,7 +289,7 @@ void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
         setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
         ASSERT(confirmCurrentOpContents(conn.get(),
                                         BSON("command.getMore"
-                                             << queryCursor->getCursorId() << "msg"
+                                             << queryCursor->getCursorId() << "failpointMsg"
                                              << "waitAfterCommandFinishesExecution")));
     }
 

@@ -36,24 +36,24 @@
 
 namespace mongo {
 
-std::string CurOpFailpointHelpers::updateCurOpMsg(OperationContext* opCtx,
-                                                  const std::string& newMsg) {
+std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opCtx,
+                                                           const std::string& newMsg) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    auto oldMsg = CurOp::get(opCtx)->getMessage();
-    CurOp::get(opCtx)->setMessage_inlock(newMsg.c_str());
+    auto oldMsg = CurOp::get(opCtx)->getFailPointMessage();
+    CurOp::get(opCtx)->setFailPointMessage_inlock(newMsg.c_str());
     return oldMsg;
 }
 
 void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                                                       OperationContext* opCtx,
-                                                      const std::string& curOpMsg,
+                                                      const std::string& failpointMsg,
                                                       const std::function<void()>& whileWaiting,
                                                       bool checkForInterrupt,
                                                       boost::optional<NamespaceString> nss) {
     invariant(failPoint);
     failPoint->executeIf(
         [&](const BSONObj& data) {
-            auto origCurOpMsg = updateCurOpMsg(opCtx, curOpMsg);
+            auto origCurOpFailpointMsg = updateCurOpFailPointMsg(opCtx, failpointMsg);
 
             const bool shouldCheckForInterrupt =
                 checkForInterrupt || data["shouldCheckForInterrupt"].booleanSafe();
@@ -77,7 +77,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                     opCtx->checkForInterrupt();
                 }
             }
-            updateCurOpMsg(opCtx, origCurOpMsg);
+            updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
         },
         [&](const BSONObj& data) {
             StringData fpNss = data.getStringField("nss");

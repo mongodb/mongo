@@ -43,7 +43,7 @@ function runTest(st, testDb, portNum) {
         targetColl.aggregate(pipeline);
     }, portNum);
 
-    waitForCurOpByFilter(testDb, {"msg": failpointName});
+    waitForCurOpByFilter(testDb, {"failpointMsg": failpointName});
     // TODO SERVER-45358 Make it easier to run commands without retrying.
     // Tests are run with an override function that retries commands that fail because of a
     // background operation. Parallel shells don't automatically have that override, so drop has to

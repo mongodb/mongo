@@ -58,8 +58,9 @@ function runYieldTest(docsToRemove) {
     // op is caught and their individual 'numYields' recorded.
     for (let childCount = 0; childCount < docsToRemove.length; childCount++) {
         // Wait for the child op to hit the first of two failpoints.
-        let childCurOp = awaitMatchingCurrentOp(
-            {$match: {ns: testColl.getFullName(), msg: "hangBeforeChildRemoveOpFinishes"}});
+        let childCurOp = awaitMatchingCurrentOp({
+            $match: {ns: testColl.getFullName(), failpointMsg: "hangBeforeChildRemoveOpFinishes"}
+        });
 
         // Add the child's yield count to the running total, and record the opid.
         assert(childOpId === null || childOpId === childCurOp.opid);
@@ -75,8 +76,9 @@ function runYieldTest(docsToRemove) {
         // Let the operation proceed to the 'hangBeforeChildRemoveOpIsPopped' failpoint.
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "off"}));
-        awaitMatchingCurrentOp(
-            {$match: {ns: testColl.getFullName(), msg: "hangBeforeChildRemoveOpIsPopped"}});
+        awaitMatchingCurrentOp({
+            $match: {ns: testColl.getFullName(), failpointMsg: "hangBeforeChildRemoveOpIsPopped"}
+        });
 
         // If this is not the final child op, re-enable the 'hangBeforeChildRemoveOpFinishes'
         // failpoint from earlier so that we don't miss the next child.
@@ -92,8 +94,10 @@ function runYieldTest(docsToRemove) {
 
     // Wait for the operation to hit the 'hangAfterAllChildRemoveOpsArePopped' failpoint, then
     // take the total number of yields recorded by the parent op.
-    const parentCurOp = awaitMatchingCurrentOp(
-        {$match: {opid: childOpId, op: "command", msg: "hangAfterAllChildRemoveOpsArePopped"}});
+    const parentCurOp = awaitMatchingCurrentOp({
+        $match:
+            {opid: childOpId, op: "command", failpointMsg: "hangAfterAllChildRemoveOpsArePopped"}
+    });
 
     // Verify that the parent's yield count equals the sum of the child ops' yields.
     assert.eq(parentCurOp.numYields, childYields);

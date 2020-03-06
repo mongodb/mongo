@@ -39,7 +39,8 @@ public:
      * Helper function which sets the 'msg' field of the opCtx's CurOp to the specified string, and
      * returns the original value of the field.
      */
-    static std::string updateCurOpMsg(OperationContext* opCtx, const std::string& newMsg);
+    static std::string updateCurOpFailPointMsg(OperationContext* opCtx,
+                                               const std::string& failpointMsg);
 
     /**
      * This helper function works much like FailPoint::pauseWhileSet(opCtx), but additionally
@@ -59,7 +60,7 @@ public:
      */
     static void waitWhileFailPointEnabled(FailPoint* failPoint,
                                           OperationContext* opCtx,
-                                          const std::string& curOpMsg,
+                                          const std::string& failpointMsg,
                                           const std::function<void()>& whileWaiting = nullptr,
                                           bool checkForInterrupt = false,
                                           boost::optional<NamespaceString> nss = boost::none);

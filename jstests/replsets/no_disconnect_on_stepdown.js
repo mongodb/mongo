@@ -56,7 +56,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
                               assert.commandWorked(db.adminCommand({ping:1}));`;
 
     const waitForShell = startParallelShell(writeCommand, primary.port);
-    waitForCurOpByFilter(primaryAdmin, {"msg": failpoint});
+    waitForCurOpByFilter(primaryAdmin, {"failpointMsg": failpoint});
     assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
     rst.waitForState(primary, ReplSetTest.State.SECONDARY);
     assert.commandWorked(primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "off"}));

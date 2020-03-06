@@ -24,7 +24,7 @@ const failingMD5Shell =
 let opId;
 assert.soon(
     () => {
-        const filter = {ns: "test.fs.chunks", "command.filemd5": 1, msg: kFailPointName};
+        const filter = {ns: "test.fs.chunks", "command.filemd5": 1, failpointMsg: kFailPointName};
         const result =
             db.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
 

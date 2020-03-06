@@ -331,7 +331,7 @@ assert.soon(function() {
 
 // Wait until we know the failpoint has been reached.
 assert.soon(function() {
-    const filter = {"msg": "waitAfterPinningCursorBeforeGetMoreBatch"};
+    const filter = {"failpointMsg": "waitAfterPinningCursorBeforeGetMoreBatch"};
     return assert.commandWorked(testDB.currentOp(filter)).inprog.length === 1;
 });
 

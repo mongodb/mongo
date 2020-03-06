@@ -578,6 +578,13 @@ public:
     void reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool truncateOps = false);
 
     /**
+     * Sets the message for FailPoints used.
+     */
+    void setFailPointMessage_inlock(StringData message) {
+        _failPointMessage = message.toString();
+    }
+
+    /**
      * Sets the message for this CurOp.
      */
     void setMessage_inlock(StringData message);
@@ -592,6 +599,14 @@ public:
     ProgressMeter& setProgress_inlock(StringData name,
                                       unsigned long long progressMeterTotal = 0,
                                       int secondsBetween = 3);
+
+    /*
+     * Gets the message for FailPoints used.
+     */
+    const std::string& getFailPointMessage() const {
+        return _failPointMessage;
+    }
+
     /**
      * Gets the message for this CurOp.
      */
@@ -682,6 +697,7 @@ private:
     BSONObj _opDescription;
     BSONObj _originatingCommand;  // Used by getMore to display original command.
     OpDebug _debug;
+    std::string _failPointMessage;  // Used to store FailPoint information.
     std::string _message;
     ProgressMeter _progressMeter;
     int _numYields{0};
