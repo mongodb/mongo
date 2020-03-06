@@ -185,10 +185,14 @@ selector:
   # Blacklists specific to this suite
   ##
 
-  # Uses getMore in the same state function as a command not supported in a transaction.
+  # Uses getMore. If a terminate happens between the time of creation of cursor (usually by calling
+  # find or aggregate) and calling getMore(), server will throw CursortNotFound exception.
+  # We currently do not retry the transaction on this exception.
   - jstests/concurrency/fsm_workloads/agg_union_with_chunk_migrations.js
   - jstests/concurrency/fsm_workloads/create_capped_collection.js
   - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
+  - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
+  - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
   - jstests/concurrency/fsm_workloads/list_indexes.js
 
   # Uses non-retryable commands in the same state function as a command not supported in a
