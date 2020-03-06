@@ -86,7 +86,7 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
         #
         # Note, this first backup is actually done before a checkpoint is taken.
         #
-        config = 'incremental=(enabled,this_id="ID1")'
+        config = 'incremental=(enabled,granularity=1M,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
 
         # Add some data that will appear in log file 3.

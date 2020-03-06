@@ -902,6 +902,19 @@ backup(Session session)
                 ": incremental backup failed: " + ex.toString());
         }
 
+        try {
+            /*! [incremental block backup]*/
+            /* Open the backup data source for incremental backup. */
+            cursor = session.open_cursor("backup:", null, "incremental=(enabled,src_id=ID0,this_id=ID1)");
+            /*! [incremental block backup]*/
+
+            ret = cursor.close();
+        }
+        catch (Exception ex) {
+            System.err.println(progname +
+                ": incremental backup failed: " + ex.toString());
+        }
+
     /*! [backup of a checkpoint]*/
     ret = session.checkpoint("drop=(from=June01),name=June01");
     /*! [backup of a checkpoint]*/

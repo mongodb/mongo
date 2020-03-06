@@ -89,7 +89,76 @@ rm -rf /path/database.backup &&
     wt -h /path/database.source backup /path/database.backup
 @endcode
 
-@section backup_incremental Incremental backup
+@section backup_incremental-block Block-based Incremental backup
+
+Once a full backup has been done, it can be rolled forward incrementally by
+copying only modified blocks and new files to the backup copy directory.
+The application is responsible for removing files that
+are no longer part of the backup when later incremental backups no longer
+return their name. This is especially important for WiredTiger log files
+that are no longer needed and must be removed before recovery is run.
+
+@copydoc doc_bulk_durability
+
+The following is the procedure for incrementally backing up a database
+using block modifications:
+
+1. Perform a full backup of the database (as described above), with the
+additional configuration \c incremental=(enabled=true,this_id=”ID1”).
+The identifier specified in \c this_id starts block tracking and that
+identifier can be used in the future as the source of an incremental
+backup.
+
+2. Begin the incremental backup by opening a backup cursor with the
+\c backup: URI and config string of \c incremental=(src_id="ID1",this_id="ID2").
+Call this \c backup_cursor. Like a normal full backup cursor,
+this cursor will return the filename as the key.  There is no associated
+value.  The information returned will be based on blocks tracked since the time of
+the previous backup designated with "ID1".  New block tracking will be started as
+"ID2" as well.  WiredTiger will maintain modifications from two IDs, the current
+and the most recent completed one. Note that all backup identifiers are subject to
+the same naming restrictions as other configuration naming. See @ref config_intro
+for details.
+
+3. For each file returned by \c backup_cursor->next(), open a duplicate
+backup cursor to do the incremental backup on that file.  The list
+returned will also include log files (prefixed by \c WiredTigerLog) that need to
+be copied. Configure that duplicate cursor with \c incremental=(file=name).
+The \c name comes from the string returned from \c backup_cursor->get_key().
+Call this incr_cursor.
+
+4. The key format for the duplicate backup cursor, \c incr_cursor, is
+\c qqq, representing a file offset and size pair plus a type indicator
+for the range given. There is no associated value. The type indicator
+will be one of \c WT_BACKUP_FILE or \c WT_BACKUP_RANGE. For \c WT_BACKUP_RANGE,
+read the block from the source database file indicated by the file offset and
+size pair and write the block to the same offset in the
+backup database file, replacing the portion of the file represented by
+the offset/size pair.  It is not an error for an offset/size pair to extend past
+the current end of the source file, and any missing file data should be ignored.
+For \c WT_BACKUP_FILE, the user can choose to copy the entire file in
+any way they choose, or to use the offset/size pair which will
+indicate the expected size WiredTiger knew at the time of the call.
+
+5. Close the duplicate backup cursor, \c incr_cursor.
+
+6. Repeat steps 3-5 as many times as necessary while \c backup_cursor->next()
+returns files to copy.
+
+7. Close the backup cursor, \c backup_cursor.
+
+8. Repeat steps 2-7 as often as desired.
+
+Full and incremental backups may be repeated as long as the backup
+database directory has not been opened and recovery run.  Once recovery
+has run in a backup directory, you can no longer back up to that
+database directory.
+
+An example of opening the backup data source for block-based incremental backup:
+
+@snippet ex_all.c incremental block backup
+
+@section backup_incremental Log-based Incremental backup
 
 Once a backup has been done, it can be rolled forward incrementally by
 adding log files to the backup copy. Adding log files to the copy

@@ -147,15 +147,7 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.log_flush('sync=on')
         self.session.checkpoint()
 
-        # Test a few error cases now.
-        # - Incremental filename must be on duplicate, not primary.
-        # - An incremental duplicate must have an incremental primary.
-        # - We cannot make multiple incremental duplcate backup cursors.
-        # - We cannot duplicate the duplicate backup cursor.
-        # - We cannot mix block incremental with a log target on the same duplicate.
-        # - Incremental ids must be on primary, not duplicate.
-        # - Incremental must be opened on a primary with a source identifier.
-        # - Force stop must be on primary, not duplicate.
+        # Test error cases now.
 
         # - Incremental filename must be on duplicate, not primary.
         # Test this first because we currently do not have a primary open.
@@ -254,6 +246,58 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(None, bkup_c, config), msg)
         bkup_c.close()
+
+        # - Test opening a primary backup with an unknown source id.
+        self.pr("Test incremental with unknown source identifier on primary")
+        self.pr("=========")
+        config = 'incremental=(enabled,src_id="ID_BAD",this_id="ID4")'
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+
+        # - Test opening a primary backup with an id in WiredTiger namespace.
+        self.pr("Test incremental with illegal src identifier using WiredTiger namespace")
+        self.pr("=========")
+        msg = '/name space may not/'
+        config = 'incremental=(enabled,src_id="WiredTiger.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id in WiredTiger namespace.
+        self.pr("Test incremental with illegal this identifier using WiredTiger namespace")
+        self.pr("=========")
+        config = 'incremental=(enabled,this_id="WiredTiger.ID")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id using illegal characters.
+        self.pr("Test incremental with illegal source identifier using illegal colon character")
+        self.pr("=========")
+        msg = '/grouping characters/'
+        config = 'incremental=(enabled,src_id="ID4:4.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id using illegal characters.
+        self.pr("Test incremental with illegal this identifier using illegal colon character")
+        self.pr("=========")
+        config = 'incremental=(enabled,this_id="ID4:4.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with the same source id and this id (new id).
+        self.pr("Test incremental with the same new source and this identifiers")
+        self.pr("=========")
+        config = 'incremental=(enabled,src_id="IDSAME",this_id="IDSAME")'
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+
+        # - Test opening a primary backup with the same source id and this id (reusing id).
+        self.pr("Test incremental with the same re-used source and this identifiers")
+        self.pr("=========")
+        msg = '/already in use/'
+        config = 'incremental=(enabled,src_id="ID2",this_id="ID2")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
 
         # After the full backup, open and recover the backup database.
         #backup_conn = self.wiredtiger_open(self.dir)

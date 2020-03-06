@@ -344,7 +344,7 @@ __wt_txn_named_snapshot_config(
         if (WT_STRING_MATCH("all", cval.str, cval.len))
             WT_RET_MSG(session, EINVAL, "Can't create snapshot with reserved \"all\" name");
 
-        WT_RET(__wt_name_check(session, cval.str, cval.len));
+        WT_RET(__wt_name_check(session, cval.str, cval.len, true));
 
         if (F_ISSET(txn, WT_TXN_RUNNING) && txn->isolation != WT_ISO_SNAPSHOT)
             WT_RET_MSG(session, EINVAL,

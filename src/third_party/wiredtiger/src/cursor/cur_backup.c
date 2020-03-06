@@ -368,6 +368,7 @@ __backup_find_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_BLKINCR **in
     u_int i;
 
     conn = S2C(session);
+    WT_RET(__wt_name_check(session, cval->str, cval->len, false));
     for (i = 0; i < WT_BLKINCR_MAX; ++i) {
         blk = &conn->incr_backups[i];
         /* If it isn't valid, skip it. */
@@ -504,8 +505,10 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
             WT_ERR_MSG(session, EINVAL,
               "Incremental identifier can only be specified on a primary backup cursor");
         ret = __backup_find_id(session, &cval, NULL);
-        if (ret != WT_NOTFOUND)
+        if (ret == 0)
             WT_ERR_MSG(session, EINVAL, "Incremental identifier already exists");
+        if (ret != WT_NOTFOUND)
+            WT_ERR(ret);
 
         WT_ERR(__backup_add_id(session, &cval));
         incremental_config = true;

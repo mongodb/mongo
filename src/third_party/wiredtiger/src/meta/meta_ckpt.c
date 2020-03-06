@@ -760,7 +760,7 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
         if (!F_ISSET(blk, WT_BLOCK_MODS_VALID))
             continue;
         WT_RET(__wt_raw_to_hex(session, blk->bitstring.data, blk->bitstring.size, &bitstring));
-        WT_RET(__wt_buf_catfmt(session, buf, "%s%s=(id=%" PRIu32 ",granularity=%" PRIu64
+        WT_RET(__wt_buf_catfmt(session, buf, "%s\"%s\"=(id=%" PRIu32 ",granularity=%" PRIu64
                                              ",nbits=%" PRIu64 ",offset=%" PRIu64 ",blocks=%.*s)",
           i == 0 ? "" : ",", blk->id_str, i, blk->granularity, blk->nbits, blk->offset,
           (int)bitstring.size, (char *)bitstring.data));

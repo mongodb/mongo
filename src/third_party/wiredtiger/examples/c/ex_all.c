@@ -1131,6 +1131,13 @@ backup(WT_SESSION *session)
     /*! [incremental backup]*/
     error_check(cursor->close(cursor));
 
+    /*! [incremental block backup]*/
+    /* Open the backup data source for block-based incremental backup. */
+    error_check(session->open_cursor(
+      session, "backup:", NULL, "incremental=(enabled,src_id=ID0,this_id=ID1)", &cursor));
+    /*! [incremental block backup]*/
+    error_check(cursor->close(cursor));
+
     /*! [backup of a checkpoint]*/
     error_check(session->checkpoint(session, "drop=(from=June01),name=June01"));
     /*! [backup of a checkpoint]*/

@@ -22,7 +22,7 @@ static int
 __checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
 {
     /* Check for characters we don't want to see in a metadata file. */
-    WT_RET(__wt_name_check(session, name, len));
+    WT_RET(__wt_name_check(session, name, len, true));
 
     /*
      * The internal checkpoint name is special, applications aren't allowed to use it. Be aggressive
