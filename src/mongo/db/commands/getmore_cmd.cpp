@@ -337,13 +337,15 @@ public:
                                     << cursor->nss().ns());
         }
 
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
+        if (serverGlobalParams.featureCompatibility.getVersionUnsafe() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
             // Ensure the lsid and txnNumber of the getMore match that of the originating command.
             // This is important to ensure that transactions are being used correctly, but exposes a
             // known issue where a 3.6 mongos can send a getMore without the appropriate session id.
             // To work around the bug on 3.6, we only enforce that the lsid and txnNumber match when
-            // we've upgraded to FCV 4.0. See SERVER-36212 for more details.
+            // we've upgraded to FCV 4.0. See SERVER-36212 for more details. Note that it is
+            // possible to reach this code path before the featureCompatibilityVersion has been
+            // created, so we must use getVersionUnsafe().
             validateLSID(opCtx, request, cursor);
             validateTxnNumber(opCtx, request, cursor);
         }
