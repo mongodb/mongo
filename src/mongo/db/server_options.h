@@ -104,8 +104,7 @@ struct ServerGlobalParams {
     int syslogFacility;             // Facility used when appending messages to the syslog.
 
 #ifndef _WIN32
-    ProcessId parentProc;  // --fork pid of initial process
-    ProcessId leaderProc;  // --fork pid of leader process
+    int forkReadyFd = -1;  // for `--fork`. Write to it and close it when daemon service is up.
 #endif
 
     /**
