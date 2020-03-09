@@ -159,6 +159,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
                                        // CRT construction and log() may not work yet.
             LOGV2(23175,
                   "getaddrinfo(\"{host}\") failed: {reason}",
+                  "getaddrinfo failed",
                   "host"_attr = _hostOrIp,
                   "reason"_attr = getAddrInfoStrError(addrErr.err));
             _isValid = false;
@@ -191,6 +192,7 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
     if (addrErr.err) {
         LOGV2(23176,
               "getaddrinfo(\"{host}\") failed: {reason}",
+              "getaddrinfo failed",
               "host"_attr = hostOrIp,
               "reason"_attr = getAddrInfoStrError(addrErr.err));
         return {};

@@ -521,8 +521,9 @@ int SSLManagerWindows::SSL_read(SSLConnectionInterface* connInterface, void* buf
             }
             default:
                 LOGV2_FATAL(23282,
-                            "Unexpected ASIO state: {static_cast_int_want}",
-                            "static_cast_int_want"_attr = static_cast<int>(want));
+                            "Unexpected ASIO state: {state}",
+                            "Unexpected ASIO state",
+                            "state"_attr = static_cast<int>(want));
                 MONGO_UNREACHABLE;
         }
     }
@@ -567,8 +568,9 @@ int SSLManagerWindows::SSL_write(SSLConnectionInterface* connInterface, const vo
             }
             default:
                 LOGV2_FATAL(23283,
-                            "Unexpected ASIO state: {static_cast_int_want}",
-                            "static_cast_int_want"_attr = static_cast<int>(want));
+                            "Unexpected ASIO state: {wantStateInt}",
+                            "Unexpected ASIO state",
+                            "wantStateInt"_attr = static_cast<int>(want));
                 MONGO_UNREACHABLE;
         }
     }
@@ -1824,18 +1826,14 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
             if (allowInvalidCertificates) {
                 LOGV2_WARNING(23274,
-                              "SSL peer certificate validation failed "
-                              "({integerToHex_certChainPolicyStatus_dwError}): "
-                              "{errnoWithDescription_certChainPolicyStatus_dwError}",
-                              "integerToHex_certChainPolicyStatus_dwError"_attr =
-                                  integerToHex(certChainPolicyStatus.dwError),
-                              "errnoWithDescription_certChainPolicyStatus_dwError"_attr =
-                                  errnoWithDescription(certChainPolicyStatus.dwError));
-                LOGV2_WARNING(23275, "{msg_ss_str}", "msg_ss_str"_attr = msg.ss.str());
+                              "SSL peer certificate validation failed ({errorCode}): {error}",
+                              "errorCode"_attr = integerToHex(certChainPolicyStatus.dwError),
+                              "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
+                LOGV2_WARNING(23275, "{msg}", "msg"_attr = msg.ss.str());
                 *peerSubjectName = SSLX509Name();
                 return Status::OK();
             } else if (allowInvalidHostnames) {
-                LOGV2_WARNING(23276, "{msg_ss_str}", "msg_ss_str"_attr = msg.ss.str());
+                LOGV2_WARNING(23276, "{msg}", "msg"_attr = msg.ss.str());
                 return Status::OK();
             } else {
                 return Status(ErrorCodes::SSLHandshakeFailed, msg);
@@ -1845,7 +1843,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
             msg << "SSL peer certificate validation failed: ("
                 << integerToHex(certChainPolicyStatus.dwError) << ")"
                 << errnoWithDescription(certChainPolicyStatus.dwError);
-            LOGV2_ERROR(23279, "{msg_ss_str}", "msg_ss_str"_attr = msg.ss.str());
+            LOGV2_ERROR(23279, "{msg}", "msg"_attr = msg.ss.str());
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
@@ -1913,9 +1911,9 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
             }
             return SSLPeerInfo(sni);
         } else {
-            auto msg = "no SSL certificate provided by peer; connection rejected";
-            LOGV2_ERROR(23280, "{msg}", "msg"_attr = msg);
-            return Status(ErrorCodes::SSLHandshakeFailed, msg);
+            LOGV2_ERROR(23280, "no SSL certificate provided by peer; connection rejected");
+            return Status(ErrorCodes::SSLHandshakeFailed,
+                          "no SSL certificate provided by peer; connection rejected");
         }
     }
 
@@ -1959,6 +1957,7 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     LOGV2_DEBUG(23270,
                 2,
                 "Accepted TLS connection from peer: {peerSubjectName}",
+                "Accepted TLS connection from peer",
                 "peerSubjectName"_attr = peerSubjectName);
 
     // If this is a server and client and server certificate are the same, log a warning.
