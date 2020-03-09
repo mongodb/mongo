@@ -261,7 +261,7 @@ void FreeMonProcessor::run() {
 
         LOGV2_WARNING(20619,
                       "Uncaught exception in '{exception}' in free monitoring subsystem. "
-                      "Shutting down the free monitoring subsystem."
+                      "Shutting down the free monitoring subsystem.",
                       "Shutting down the free monitoring subsystem.",
                       "exception"_attr = exceptionToStatus());
     }

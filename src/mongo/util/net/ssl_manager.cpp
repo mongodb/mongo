@@ -555,18 +555,18 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLog
         if (!config.clientSubjectName.empty()) {
             LOGV2_DEBUG(23214,
                         1,
-                        "Client Certificate Name: {config_clientSubjectName}",
-                        "config_clientSubjectName"_attr = config.clientSubjectName);
+                        "Client Certificate Name: {clientSubjectName}",
+                        "clientSubjectName"_attr = config.clientSubjectName);
         }
         if (!config.serverSubjectName().empty()) {
             LOGV2_DEBUG(23215,
                         1,
-                        "Server Certificate Name: {config_serverSubjectName}",
-                        "config_serverSubjectName"_attr = config.serverSubjectName());
+                        "Server Certificate Name: {serverSubjectName}",
+                        "serverSubjectName"_attr = config.serverSubjectName());
             LOGV2_DEBUG(23216,
                         1,
-                        "Server Certificate Expiration: {config_serverCertificateExpirationDate}",
-                        "config_serverCertificateExpirationDate"_attr =
+                        "Server Certificate Expiration: {serverCertificateExpirationDate}",
+                        "serverCertificateExpirationDate"_attr =
                             config.serverCertificateExpirationDate);
         }
     }
@@ -608,6 +608,7 @@ Status SSLX509Name::normalizeStrings() {
                                 1,
                                 "Certificate subject name contains unknown string type: "
                                 "{entry_type} (string value is \"{entry_value}\")",
+                                "Certificate subject name contains unknown string type",
                                 "entry_type"_attr = entry.type,
                                 "entry_value"_attr = entry.value);
                     break;
@@ -692,15 +693,18 @@ bool SSLConfiguration::isClusterMember(StringData subjectName) const {
     auto swClient = parseDN(subjectName);
     if (!swClient.isOK()) {
         LOGV2_WARNING(23219,
-                      "Unable to parse client subject name: {swClient_getStatus}",
-                      "swClient_getStatus"_attr = swClient.getStatus());
+                      "Unable to parse client subject name: {status}",
+                      "Unable to parse client subject name",
+                      "status"_attr = swClient.getStatus());
         return false;
     }
     auto& client = swClient.getValue();
     auto status = client.normalizeStrings();
     if (!status.isOK()) {
-        LOGV2_WARNING(
-            23220, "Unable to normalize client subject name: {status}", "status"_attr = status);
+        LOGV2_WARNING(23220,
+                      "Unable to normalize client subject name: {status}",
+                      "Unable to normalize client subject name",
+                      "status"_attr = status);
         return false;
     }
 

@@ -72,6 +72,7 @@ const struct WinsockInit {
         if (WSAStartup(MAKEWORD(2, 2), &d) != 0) {
             LOGV2(23201,
                   "ERROR: wsastartup failed {errnoWithDescription}",
+                  "ERROR: wsastartup failed",
                   "errnoWithDescription"_attr = errnoWithDescription());
             quickExit(EXIT_NTSERVICE_ERROR);
         }
@@ -118,8 +119,9 @@ void setSocketKeepAliveParams(int sock,
             return val ? (val.get() / 1000) : default_value;
         }
         LOGV2_ERROR(23203,
-                    "can't get KeepAlive parameter: {withval_getStatus}",
-                    "withval_getStatus"_attr = withval.getStatus());
+                    "can't get KeepAlive parameter: {status}",
+                    "can't get KeepAlive parameter",
+                    "status"_attr = withval.getStatus());
         return default_value;
     };
 
@@ -142,8 +144,9 @@ void setSocketKeepAliveParams(int sock,
                      nullptr,
                      nullptr)) {
             LOGV2_ERROR(23204,
-                        "failed setting keepalive values: {WSAGetLastError}",
-                        "WSAGetLastError"_attr = WSAGetLastError());
+                        "failed setting keepalive values: {error}",
+                        "failed setting keepalive values",
+                        "error"_attr = WSAGetLastError());
         }
     }
 #elif defined(__APPLE__) || defined(__linux__)
@@ -211,6 +214,7 @@ std::string getHostName() {
     if (ec || *buf == 0) {
         LOGV2(23202,
               "can't get this server's hostname {errnoWithDescription}",
+              "can't get this server's hostname",
               "errnoWithDescription"_attr = errnoWithDescription());
         return "";
     }

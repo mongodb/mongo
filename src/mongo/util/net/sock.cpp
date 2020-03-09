@@ -103,12 +103,12 @@ void networkWarnWithDescription(const Socket& socket, StringData call, int error
 #endif
     auto ewd = errnoWithDescription(errorCode);
     LOGV2_WARNING(23190,
-                  "Failed to connect to {socket_remoteAddr_getAddr}:{socket_remoteAddr_getPort}, "
-                  "in({call}), reason: {ewd}",
-                  "socket_remoteAddr_getAddr"_attr = socket.remoteAddr().getAddr(),
-                  "socket_remoteAddr_getPort"_attr = socket.remoteAddr().getPort(),
+                  "Failed to connect to {remoteSocketAddress}:{remoteSocketAddressPort}, "
+                  "in({call}), reason: {error}",
+                  "remoteSocketAddress"_attr = socket.remoteAddr().getAddr(),
+                  "remoteSocketAddressPort"_attr = socket.remoteAddr().getPort(),
                   "call"_attr = call,
-                  "ewd"_attr = ewd);
+                  "error"_attr = ewd);
 }
 
 const double kMaxConnectTimeoutMS = 5000;
@@ -121,16 +121,14 @@ void setSockTimeouts(int sock, double secs) {
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
     if (report && (status == SOCKET_ERROR))
         LOGV2(23177,
-              "unable to set SO_RCVTIMEO: {errnoWithDescription_WSAGetLastError}",
-              "errnoWithDescription_WSAGetLastError"_attr =
-                  errnoWithDescription(WSAGetLastError()));
+              "unable to set SO_RCVTIMEO: {wsaError}",
+              "wsaError"_attr = errnoWithDescription(WSAGetLastError()));
     status =
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
     if (kDebugBuild && report && (status == SOCKET_ERROR))
         LOGV2(23178,
-              "unable to set SO_SNDTIMEO: {errnoWithDescription_WSAGetLastError}",
-              "errnoWithDescription_WSAGetLastError"_attr =
-                  errnoWithDescription(WSAGetLastError()));
+              "unable to set SO_SNDTIMEO: {wsaError}",
+              "wsaError"_attr = errnoWithDescription(WSAGetLastError()));
 #else
     struct timeval tv;
     tv.tv_sec = (int)secs;
@@ -156,14 +154,16 @@ void disableNagle(int sock) {
 
     if (setsockopt(sock, level, TCP_NODELAY, (char*)&x, sizeof(x)))
         LOGV2_ERROR(23195,
-                    "disableNagle failed: {errnoWithDescription}",
-                    "errnoWithDescription"_attr = errnoWithDescription());
+                    "disableNagle failed: {error}",
+                    "disableNagle failed",
+                    "error"_attr = errnoWithDescription());
 
 #ifdef SO_KEEPALIVE
     if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&x, sizeof(x)))
         LOGV2_ERROR(23196,
-                    "SO_KEEPALIVE failed: {errnoWithDescription}",
-                    "errnoWithDescription"_attr = errnoWithDescription());
+                    "SO_KEEPALIVE failed: {error}",
+                    "SO_KEEPALIVE failed",
+                    "error"_attr = errnoWithDescription());
 #endif
 
     setSocketKeepAliveParams(sock);
@@ -183,10 +183,10 @@ SockAddr getLocalAddrForBoundSocketFd(int fd) {
     if (rc != 0) {
         LOGV2_WARNING(23191,
                       "Could not resolve local address for socket with fd {fd}: "
-                      "{getAddrInfoStrError_socketGetLastError}",
+                      "{socketError}",
+                      "Could not resolve local address for socket",
                       "fd"_attr = fd,
-                      "getAddrInfoStrError_socketGetLastError"_attr =
-                          getAddrInfoStrError(socketGetLastError()));
+                      "socketError"_attr = getAddrInfoStrError(socketGetLastError()));
         result = SockAddr();
     }
     return result;
@@ -357,10 +357,10 @@ bool Socket::connect(SockAddr& remote, Milliseconds connectTimeoutMillis) {
             // No activity for the full duration of the timeout.
             if (pollReturn == 0) {
                 LOGV2_WARNING(23192,
-                              "Failed to connect to {remote_getAddr}:{remote_getPort} after "
+                              "Failed to connect to {remoteAddr}:{remotePort} after "
                               "{connectTimeout} milliseconds, giving up.",
-                              "remote_getAddr"_attr = _remote.getAddr(),
-                              "remote_getPort"_attr = _remote.getPort(),
+                              "remoteAddr"_attr = _remote.getAddr(),
+                              "remotePort"_attr = _remote.getPort(),
                               "connectTimeout"_attr = connectTimeoutMillis);
                 return false;
             }
@@ -580,9 +580,9 @@ void Socket::handleSendError(int ret, const char* context) {
     } else if (mongo_errno != EINTR) {
         LOGV2_DEBUG(23182,
                     logSeverityV1toV2(_logLevel).toInt(),
-                    "Socket {context} send() {errnoWithDescription_mongo_errno} {remoteString}",
+                    "Socket {context} send() {mongoError} {remoteString}",
                     "context"_attr = context,
-                    "errnoWithDescription_mongo_errno"_attr = errnoWithDescription(mongo_errno),
+                    "mongoError"_attr = errnoWithDescription(mongo_errno),
                     "remoteString"_attr = remoteString());
         throwSocketError(SocketErrorKind::SEND_ERROR, remoteString());
     }
@@ -625,8 +625,8 @@ void Socket::handleRecvError(int ret, int len) {
 
     LOGV2_DEBUG(23185,
                 logSeverityV1toV2(_logLevel).toInt(),
-                "Socket recv() {errnoWithDescription_e} {remoteString}",
-                "errnoWithDescription_e"_attr = errnoWithDescription(e),
+                "Socket recv() {error} {remoteString}",
+                "error"_attr = errnoWithDescription(e),
                 "remoteString"_attr = remoteString());
     throwSocketError(SocketErrorKind::RECV_ERROR, remoteString());
 }
