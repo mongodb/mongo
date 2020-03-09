@@ -334,9 +334,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongos_options = self.mongos_options.copy()
         mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
-        mongos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE,
-                                                  config.DEFAULT_MONGOS_EXECUTABLE)
-        last_stable_executable = mongos_executable + "-" \
+        # The last-stable binary is currently expected to live in '/data/multiversion', which is
+        # part of the PATH.
+        last_stable_executable = config.DEFAULT_MONGOS_EXECUTABLE + "-" \
                                 + ShardedClusterFixture._LAST_STABLE_BIN_VERSION
         mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else last_stable_executable
 
@@ -366,8 +366,8 @@ class _MongoSFixture(interface.Fixture):
 
         interface.Fixture.__init__(self, logger, job_num)
 
-        # Command line options override the YAML configuration.
-        self.mongos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE, mongos_executable)
+        # Default to command line options if the YAML configuration is not passed in.
+        self.mongos_executable = utils.default_if_none(mongos_executable, config.MONGOS_EXECUTABLE)
 
         self.mongos_options = utils.default_if_none(mongos_options, {}).copy()
 
