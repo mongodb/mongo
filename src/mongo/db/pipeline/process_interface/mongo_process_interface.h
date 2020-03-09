@@ -143,6 +143,12 @@ public:
      */
     virtual bool supportsReadPreferenceForWriteOp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+    /**
+     * Advances the proxied write time associated with the client in ReplClientInfo to
+     * be at least as high as the one tracked by the OperationTimeTracker associated with the
+     * given operation context.
+     */
+    virtual void updateClientOperationTime(OperationContext* opCtx) const = 0;
 
     /**
      * Inserts 'objs' into 'ns' and returns an error Status if the insert fails. If 'targetEpoch' is

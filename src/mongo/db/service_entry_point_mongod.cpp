@@ -254,7 +254,7 @@ public:
         if (isReplSet) {
             // Attach our own last opTime.
             repl::OpTime lastOpTimeFromClient =
-                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOpTime();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
             // For commands from mongos, append some info to help getLastError(w) work.
             // TODO: refactor out of here as part of SERVER-18236

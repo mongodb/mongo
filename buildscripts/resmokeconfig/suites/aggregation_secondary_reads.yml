@@ -49,7 +49,6 @@ executor:
     shell_options:
       eval: >-
         var testingReplication = true;
-        load('jstests/libs/override_methods/set_read_preference_secondary.js');
         load('jstests/libs/override_methods/enable_causal_consistency.js');
         load('jstests/libs/override_methods/detect_spawning_own_mongod.js');
       readMode: commands

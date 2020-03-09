@@ -37,9 +37,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/operation_time_tracker.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future.h"
@@ -47,6 +48,8 @@
 namespace mongo {
 
 namespace {
+const char kOperationTimeFieldName[] = "operationTime";
+
 const auto replicaSetNodeExecutor =
     ServiceContext::declareDecoration<std::shared_ptr<executor::TaskExecutor>>();
 }  // namespace
@@ -191,6 +194,17 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     }
 
     auto rcr = std::move(response.getValue());
+
+    // Update the OperationTimeTracker associated with 'opCtx' with the operation time from the
+    // primary's response.
+    auto operationTime = rcr.response.data[kOperationTimeFieldName];
+    if (operationTime) {
+        invariant(operationTime.type() == BSONType::bsonTimestamp);
+        LogicalTime logicalTime(operationTime.timestamp());
+        auto operationTimeTracker = OperationTimeTracker::get(opCtx);
+        operationTimeTracker->updateOperationTime(logicalTime);
+    }
+
     if (!rcr.response.status.isOK()) {
         return rcr.response.status;
     }

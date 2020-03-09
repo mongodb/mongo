@@ -36,6 +36,7 @@ outColl.drop();
 assert.commandWorked(coll.insert([{_id: 0, a: {b: 1}}, {_id: 1, a: {b: 1}, c: 1}]));
 assert.commandWorked(outColl.createIndex({"a.b": 1, _id: 1}, {unique: true}));
 coll.aggregate([
+    {$sort: {_id: 1}},
     {$addFields: {_id: 0}},
     {
         $merge: {

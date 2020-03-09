@@ -392,7 +392,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
     }
 
     return LogicalTime(
-        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp().getTimestamp());
+        repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOpTime().getTimestamp());
 }
 
 /**
