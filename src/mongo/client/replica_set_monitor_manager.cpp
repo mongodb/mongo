@@ -184,7 +184,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
 
     for (auto entry : _monitors) {
         auto monitor = entry.second.lock();
-        if (monitor->contains(host)) {
+        if (monitor && monitor->contains(host)) {
             return monitor;
         }
     }
