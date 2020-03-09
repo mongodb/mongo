@@ -184,6 +184,52 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
                                str::stream() << "failed while running command " << newCmdObj);
 }
 
+BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
+    auto cachedDbInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+    auto shard = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo.primaryId()));
+
+    const BSONObj filterObj = BSON("name" << nss.coll());
+    const BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
+
+    Shard::QueryResponse resultCollections;
+    try {
+        resultCollections = uassertStatusOK(
+            shard->runExhaustiveCursorCommand(opCtx,
+                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                              nss.db().toString(),
+                                              appendDbVersionIfPresent(cmdObj, cachedDbInfo),
+                                              Milliseconds(-1)));
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        return BSONObj{};
+    }
+
+    if (resultCollections.docs.empty()) {
+        return BSONObj{};
+    }
+
+    for (const BSONObj& element : resultCollections.docs) {
+        // Return first element which matches on name and has options.
+        const BSONElement nameElement = element["name"];
+        if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
+            continue;
+        }
+
+        const BSONElement optionsElement = element["options"];
+        if (optionsElement) {
+            return optionsElement.Obj().getOwned();
+        }
+
+        invariant(resultCollections.docs.size() <= 1,
+                  str::stream() << "Expected at most one collection with the name " << nss << ": "
+                                << resultCollections.docs.size());
+    }
+
+    return BSONObj{};
+}
+
 std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                               const NamespaceString& ns,
                                                               bool includeBuildUUIDs) {
@@ -205,6 +251,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
     }
     return std::list<BSONObj>(indexes.docs.begin(), indexes.docs.end());
 }
+
 void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                                    const std::string& dbName,
                                                    const BSONObj& cmdObj) {

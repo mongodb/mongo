@@ -166,10 +166,6 @@ selector:
   - jstests/core/views/views_collation.js
   - jstests/core/wildcard_index_count.js
 
-  # $out
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/views/views_aggregation.js
-
   # $listSessions
   - jstests/core/list_all_local_sessions.js
   - jstests/core/list_all_sessions.js
@@ -331,6 +327,8 @@ selector:
   - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
+  # $out is not supported in transactions
+  - uses_$out
 
 executor:
   archive:
