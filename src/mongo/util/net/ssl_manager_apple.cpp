@@ -741,6 +741,18 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
 
     std::vector<uint8_t> pemdata((std::istreambuf_iterator<char>(pemFile)),
                                  std::istreambuf_iterator<char>());
+    if (!passphrase.empty()) {
+        // Encrypted PKCS#1 and PKCS#8 is not supported on macOS.
+        // Attempt to detect early and give a useful error message.
+        // We'll use the key marker as a tombstone to determine that we're
+        // not actually looking at a PKCS#12.
+        StringData pemDataView(reinterpret_cast<char*>(pemdata.data()), pemdata.size());
+        if (pemDataView.find("PRIVATE KEY-----") != std::string::npos) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    "Using encrypted PKCS#1/PKCS#8 PEM files is not supported on this platform"};
+        }
+    }
+
     CFUniquePtr<CFDataRef> cfdata(::CFDataCreate(nullptr, pemdata.data(), pemdata.size()));
     invariant(cfdata);
     pemdata.clear();
