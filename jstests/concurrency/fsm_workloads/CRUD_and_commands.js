@@ -1,0 +1,265 @@
+'use strict';
+
+/**
+ * Perform CRUD operations, some of which may implicitly create collections. Also perform index
+ * creations which may implicitly create collections. Performs these in parallel with collection-
+ * dropping operations.
+ */
+
+var $config = (function() {
+    const data = {numIds: 10};
+
+    const states = {
+        init: function init(db, collName) {
+            this.session = db.getMongo().startSession({causalConsistency: true});
+            this.sessionDb = this.session.getDatabase(db.getName());
+            this.docValue = "mydoc";
+        },
+
+        insertDocs: function insertDocs(db, collName) {
+            try {
+                for (let i = 0; i < 5; i++) {
+                    const res = db[collName].insert({value: this.docValue, num: 1});
+                    assertWhenOwnColl.commandWorked(res);
+                    assertWhenOwnColl.eq(1, res.nInserted);
+                }
+            } catch (e) {
+                if (e.code == ErrorCodes.ConflictingOperationInProgress) {
+                    // dropCollection in sharding can disrupt routing cache refreshes.
+                    if (TestData.runInsideTransaction) {
+                        e["errorLabels"] = ["TransientTransactionError"];
+                        throw e;
+                    }
+                }
+            }
+        },
+
+        updateDocs: function updateDocs(db, collName) {
+            for (let i = 0; i < 5; ++i) {
+                let indexToUpdate = Math.floor(Math.random() * this.numIds);
+                let res;
+                try {
+                    res =
+                        db[collName].update({_id: indexToUpdate}, {$inc: {num: 1}}, {upsert: true});
+                    assertWhenOwnColl.commandWorked(res);
+                } catch (e) {
+                    // We propagate TransientTransactionErrors to allow the state function to
+                    // automatically be retried when TestData.runInsideTransaction=true
+                    if (e.hasOwnProperty('errorLabels') &&
+                        e.errorLabels.includes('TransientTransactionError')) {
+                        throw e;
+                    } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
+                        // dropCollection in sharding can disrupt routing cache refreshes.
+                        if (TestData.runInsideTransaction) {
+                            e["errorLabels"] = ["TransientTransactionError"];
+                            throw e;
+                        }
+                    } else if (e.code == ErrorCodes.QueryPlanKilled ||
+                               e.code == ErrorCodes.OperationFailed) {
+                        // dropIndex can cause queries to throw if these queries
+                        // yield.
+                    } else {
+                        // TODO(SERVER-46651) upsert with concurrent dropCollection can result in
+                        // writeErrors if queries yield.
+                        assertAlways.writeError(res, "unexpected error: " + tojsononeline(e));
+                    }
+                }
+            }
+        },
+
+        readDocs: function readDocs(db, collName) {
+            for (let i = 0; i < 5; ++i) {
+                try {
+                    let res = db[collName].findOne({value: this.docValue});
+                    if (res !== null) {
+                        assertAlways.eq(this.docValue, res.value);
+                    }
+                } catch (e) {
+                    // We propagate TransientTransactionErrors to allow the state function to
+                    // automatically be retried when TestData.runInsideTransaction=true
+                    if (e.hasOwnProperty('errorLabels') &&
+                        e.errorLabels.includes('TransientTransactionError')) {
+                        throw e;
+                    } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
+                        // dropCollection in sharding can disrupt routing cache refreshes.
+                        if (TestData.runInsideTransaction) {
+                            e["errorLabels"] = ["TransientTransactionError"];
+                            throw e;
+                        }
+                    } else {
+                        // dropIndex can cause queries to throw if these queries yield.
+                        assertAlways.contains(
+                            e.code,
+                            [
+                                ErrorCodes.QueryPlanKilled,
+                                ErrorCodes.OperationFailed,
+                            ],
+                            'unexpected error code: ' + e.code + ': ' + e.message);
+                    }
+                }
+            }
+        },
+
+        deleteDocs: function deleteDocs(db, collName) {
+            let indexToDelete = Math.floor(Math.random() * this.numIds);
+            try {
+                db[collName].deleteOne({_id: indexToDelete});
+            } catch (e) {
+                // We propagate TransientTransactionErrors to allow the state function to
+                // automatically be retried when TestData.runInsideTransaction=true
+                if (e.hasOwnProperty('errorLabels') &&
+                    e.errorLabels.includes('TransientTransactionError')) {
+                    throw e;
+                } else if (e.code == ErrorCodes.ConflictingOperationInProgress) {
+                    if (TestData.runInsideTransaction) {
+                        e["errorLabels"] = ["TransientTransactionError"];
+                        throw e;
+                    }
+                } else {
+                    // dropIndex can cause queries to throw if these queries yield.
+                    assertAlways.contains(e.code,
+                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                }
+            }
+        },
+
+        createIndex: function createIndex(db, collName) {
+            db[collName].createIndex({value: 1});
+        },
+
+        createIdIndex: function createIdIndex(db, collName) {
+            try {
+                assertWhenOwnColl.commandWorked(db[collName].createIndex({_id: 1}));
+            } catch (e) {
+                if (e.code == ErrorCodes.ConflictingOperationInProgress) {
+                    // createIndex concurrently with dropCollection can throw.
+                    if (TestData.runInsideTransaction) {
+                        e["errorLabels"] = ["TransientTransactionError"];
+                        throw e;
+                    }
+                }
+            }
+        },
+
+        dropIndex: function dropIndex(db, collName) {
+            db[collName].dropIndex({value: 1});
+        },
+
+        dropCollection: function dropCollection(db, collName) {
+            db[collName].drop();
+        }
+    };
+
+    const transitions = {
+        init: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.10,
+        },
+        insertDocs: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        updateDocs: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        readDocs: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        deleteDocs: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        createIndex: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        createIdIndex: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        dropIndex: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.30,
+        },
+        dropCollection: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            createIndex: 0.10,
+            createIdIndex: 0.10,
+            dropIndex: 0.10,
+            dropCollection: 0.10,
+        }
+    };
+
+    function setup(db, collName, cluster) {
+        assertAlways.commandWorked(db.runCommand({create: collName}));
+        for (let i = 0; i < this.numIds; i++) {
+            const res = db[collName].insert({_id: i, value: this.docValue, num: 1});
+            assertAlways.commandWorked(res);
+            assert.eq(1, res.nInserted);
+        }
+    }
+
+    return {
+        threadCount: 5,
+        iterations: 20,
+        startState: 'init',
+        states: states,
+        transitions: transitions,
+        setup: setup,
+        data: data,
+    };
+})();
