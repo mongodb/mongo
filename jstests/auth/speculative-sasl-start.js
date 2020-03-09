@@ -92,5 +92,10 @@ test(baseOKURI + '?authMechanism=SCRAM-SHA-256', false);
 assertStats((s) => expectN(s, 'SCRAM-SHA-1', 3, 2));
 assertStats((s) => expectN(s, 'SCRAM-SHA-256', 6, 2));
 
+// Test that a user not in the admin DB can speculate
+mongod.getDB('test').createUser({user: 'alice', pwd: 'secret', roles: []});
+test('mongodb://alice:secret@localhost:' + mongod.port + '/test', true);
+assertStats((s) => expectN(s, 'SCRAM-SHA-256', 7, 3));
+
 MongoRunner.stopMongod(mongod);
 })();
