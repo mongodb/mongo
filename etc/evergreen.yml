@@ -8562,6 +8562,7 @@ buildvariants:
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_http_client
     target_resmoke_time: 15
+    max_sub_suites: 100
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.encrypt
@@ -9355,6 +9356,7 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
+    max_sub_suites: 100
     large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
@@ -9397,6 +9399,7 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
+    max_sub_suites: 100
     large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
@@ -9822,6 +9825,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
+    max_sub_suites: 100
     large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
   tasks:
@@ -11751,7 +11755,6 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     is_asan_build: true
     scons_cache_scope: shared
-    target_resmoke_time: 15
     test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
   - name: compile_all_run_unittests_TG
@@ -11841,6 +11844,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     is_asan_build: true
     scons_cache_scope: shared
+    max_sub_suites: 100
   tasks:
   - name: compile_all_run_unittests_TG
   - name: server_discovery_and_monitoring_json_test_TG
