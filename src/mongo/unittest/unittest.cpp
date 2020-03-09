@@ -196,17 +196,14 @@ struct UnitTestEnvironment {
     Test* const test;
 };
 
-}  // namespace
-
-class Test::CaptureLogs {
+class CaptureLogs {
 public:
     ~CaptureLogs() {
-        if (_isCapturingLogMessages) {
-            stopCapturingLogMessages();
-        }
+        stopCapturingLogMessagesIfNeeded();
     }
     void startCapturingLogMessages();
     void stopCapturingLogMessages();
+    void stopCapturingLogMessagesIfNeeded();
     const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
     const std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
     int64_t countTextFormatLogLinesContaining(const std::string& needle);
@@ -232,9 +229,19 @@ private:
         _captureBSONSink;
 };
 
-Test::Test() : _captureLogs(std::make_unique<CaptureLogs>()) {}
+static CaptureLogs* getCaptureLogs() {
+    static CaptureLogs* captureLogs = new CaptureLogs();
+    return captureLogs;
+}
 
-Test::~Test() {}
+}  // namespace
+
+
+Test::Test() {}
+
+Test::~Test() {
+    getCaptureLogs()->stopCapturingLogMessagesIfNeeded();
+}
 
 void Test::run() {
     UnitTestEnvironment environment(this);
@@ -285,11 +292,11 @@ private:
     logger::MessageEventDetailsEncoder _encoder;
     std::vector<std::string>* _lines;
 };
-}  // namespace
 
-void Test::CaptureLogs::startCapturingLogMessages() {
+void CaptureLogs::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
     _capturedLogMessages.clear();
+    _capturedBSONLogMessages.clear();
 
     if (logV2Enabled()) {
         if (!_captureSink) {
@@ -318,7 +325,7 @@ void Test::CaptureLogs::startCapturingLogMessages() {
     _isCapturingLogMessages = true;
 }
 
-void Test::CaptureLogs::stopCapturingLogMessages() {
+void CaptureLogs::stopCapturingLogMessages() {
     invariant(_isCapturingLogMessages);
     if (logV2Enabled()) {
         boost::log::core::get()->remove_sink(_captureSink);
@@ -332,11 +339,17 @@ void Test::CaptureLogs::stopCapturingLogMessages() {
     _isCapturingLogMessages = false;
 }
 
-const std::vector<std::string>& Test::CaptureLogs::getCapturedTextFormatLogMessages() const {
+void CaptureLogs::stopCapturingLogMessagesIfNeeded() {
+    if (_isCapturingLogMessages) {
+        stopCapturingLogMessages();
+    }
+}
+
+const std::vector<std::string>& CaptureLogs::getCapturedTextFormatLogMessages() const {
     return _capturedLogMessages;
 }
 
-const std::vector<BSONObj> Test::CaptureLogs::getCapturedBSONFormatLogMessages() const {
+const std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
     std::vector<BSONObj> objs;
     std::transform(_capturedBSONLogMessages.cbegin(),
                    _capturedBSONLogMessages.cend(),
@@ -344,7 +357,7 @@ const std::vector<BSONObj> Test::CaptureLogs::getCapturedBSONFormatLogMessages()
                    [](const std::string& str) { return BSONObj(str.c_str()); });
     return objs;
 }
-void Test::CaptureLogs::printCapturedTextFormatLogLines() const {
+void CaptureLogs::printCapturedTextFormatLogLines() const {
     LOGV2(23054,
           "****************************** Captured Lines (start) *****************************");
     for (const auto& line : getCapturedTextFormatLogMessages()) {
@@ -354,13 +367,12 @@ void Test::CaptureLogs::printCapturedTextFormatLogLines() const {
           "****************************** Captured Lines (end) ******************************");
 }
 
-int64_t Test::CaptureLogs::countTextFormatLogLinesContaining(const std::string& needle) {
+int64_t CaptureLogs::countTextFormatLogLinesContaining(const std::string& needle) {
     const auto& msgs = getCapturedTextFormatLogMessages();
     return std::count_if(
         msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
 }
 
-namespace {
 bool isSubset(BSONObj haystack, BSONObj needle) {
     for (const auto& element : needle) {
         auto foundElement = haystack[element.fieldNameStringData()];
@@ -395,34 +407,35 @@ bool isSubset(BSONObj haystack, BSONObj needle) {
 
     return true;
 }
-}  // namespace
 
-int64_t Test::CaptureLogs::countBSONFormatLogLinesIsSubset(const BSONObj needle) {
+int64_t CaptureLogs::countBSONFormatLogLinesIsSubset(const BSONObj needle) {
     const auto& msgs = getCapturedBSONFormatLogMessages();
     return std::count_if(
         msgs.begin(), msgs.end(), [&](const BSONObj s) { return isSubset(s, needle); });
 }
 
+}  // namespace
+
 void Test::startCapturingLogMessages() {
-    _captureLogs->startCapturingLogMessages();
+    getCaptureLogs()->startCapturingLogMessages();
 }
 void Test::stopCapturingLogMessages() {
-    _captureLogs->stopCapturingLogMessages();
+    getCaptureLogs()->stopCapturingLogMessages();
 }
 const std::vector<std::string>& Test::getCapturedTextFormatLogMessages() const {
-    return _captureLogs->getCapturedTextFormatLogMessages();
+    return getCaptureLogs()->getCapturedTextFormatLogMessages();
 }
 const std::vector<BSONObj> Test::getCapturedBSONFormatLogMessages() const {
-    return _captureLogs->getCapturedBSONFormatLogMessages();
+    return getCaptureLogs()->getCapturedBSONFormatLogMessages();
 }
 int64_t Test::countTextFormatLogLinesContaining(const std::string& needle) {
-    return _captureLogs->countTextFormatLogLinesContaining(needle);
+    return getCaptureLogs()->countTextFormatLogLinesContaining(needle);
 }
 int64_t Test::countBSONFormatLogLinesIsSubset(const BSONObj needle) {
-    return _captureLogs->countBSONFormatLogLinesIsSubset(needle);
+    return getCaptureLogs()->countBSONFormatLogLinesIsSubset(needle);
 }
 void Test::printCapturedTextFormatLogLines() const {
-    _captureLogs->printCapturedTextFormatLogLines();
+    getCaptureLogs()->printCapturedTextFormatLogLines();
 }
 
 Suite::Suite(ConstructorEnable, std::string name) : _name(std::move(name)) {}

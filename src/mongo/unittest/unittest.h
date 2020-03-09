@@ -617,10 +617,6 @@ private:
      * The test itself.
      */
     virtual void _doTest() = 0;
-
-
-    class CaptureLogs;
-    std::unique_ptr<CaptureLogs> _captureLogs;
 };
 
 /**
