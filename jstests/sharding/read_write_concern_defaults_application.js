@@ -746,7 +746,11 @@ function createLogLineRegularExpressionForTestCase(test, cmdName, targetId, expl
 // }
 function createProfileFilterForTestCase(test, targetId, explicitRWC) {
     let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
-    let commandProfile = {"command.comment": targetId};
+    let commandProfile = {
+        "command.comment": targetId,
+        /* Filter out failed operations */
+        errCode: {$exists: false}
+    };
     if (test.checkReadConcern) {
         commandProfile = Object.extend(
             {"readConcern.level": "majority", "readConcern.provenance": expectedProvenance},
