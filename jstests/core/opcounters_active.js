@@ -1,6 +1,4 @@
-// checks that db.serverStatus will not throw errors when metrics tree is not present
-// @tags: [
-// ]
+// checks that db.serverStatus will not throw errors when metrics tree is not present.
 
 (function() {
 "use strict";
@@ -8,12 +6,12 @@
 // Should remove the listCollections section but keep the rest
 var testInput = {
     "isMaster": {"failed": NumberLong(0), "total": NumberLong(3)},
-    "mapreduce": {"shardedfinish": {"failed": NumberLong(0), "total": NumberLong(1)}},
+    "mapreduce": {"failed": NumberLong(0), "total": NumberLong(1)},
     "listCollections": {"failed": NumberLong(0), "total": NumberLong(0)}
 };
 var testExpected = {
     "isMaster": {"failed": NumberLong(0), "total": NumberLong(3)},
-    "mapreduce": {"shardedfinish": {"failed": NumberLong(0), "total": NumberLong(1)}}
+    "mapreduce": {"failed": NumberLong(0), "total": NumberLong(1)}
 };
 var testResult = getActiveCommands(testInput);
 

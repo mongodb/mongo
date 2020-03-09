@@ -378,8 +378,6 @@ env.Library(
         "haystack.cpp",
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "map_reduce_command.cpp",
-        "map_reduce_finish_command.cpp",
-        "mr.cpp",
         "oplog_application_checks.cpp",
         "oplog_note.cpp",
         'read_write_concern_defaults_server_status.cpp',

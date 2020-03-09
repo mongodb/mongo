@@ -67,7 +67,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "insert",
     "mapReduce",
     "mapreduce",
-    "mapreduce.shardedfinish",
     "moveChunk",
     "renameCollection",
     "revokePrivilegesFromRole",

@@ -227,7 +227,6 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotMasterOrSecondary,
     },
-    "mapreduce.shardedfinish": {skip: isAnInternalCommand},
     mergeChunks: {skip: isPrimaryOnly},
     moveChunk: {skip: isPrimaryOnly},
     ping: {skip: isNotAUserDataRead},

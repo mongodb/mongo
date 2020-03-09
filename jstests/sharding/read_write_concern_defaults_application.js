@@ -481,7 +481,6 @@ let testCases = {
     logout: {skip: "does not accept read or write concern"},
     makeSnapshot: {skip: "does not accept read or write concern"},
     mapReduce: {skip: "does not accept read or write concern"},
-    "mapreduce.shardedfinish": {skip: "internal command"},
     mergeChunks: {skip: "does not accept read or write concern"},
     moveChunk: {
         skip:

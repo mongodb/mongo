@@ -404,7 +404,6 @@ let viewsCommandTests = {
             {mapReduce: "view", map: function() {}, reduce: function(key, vals) {}, out: "out"},
         expectFailure: true
     },
-    "mapreduce.shardedfinish": {skip: isAnInternalCommand},
     mergeChunks: {
         command: {mergeChunks: "test.view", bounds: [{x: 0}, {x: 10}]},
         skipStandalone: true,

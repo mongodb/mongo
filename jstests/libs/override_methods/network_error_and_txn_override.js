@@ -111,7 +111,6 @@ const kNonRetryableCommands = new Set([
     "grantPrivilegesToRole",
     "grantRolesToRole",
     "grantRolesToUser",
-    "mapreduce.shardedfinish",
     "renameCollection",
     "revokePrivilegesFromRole",
     "revokeRolesFromRole",

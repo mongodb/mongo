@@ -26,13 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-/**
- * This file contains tests for mongo/db/commands/mr.h
- */
-
-#include "mongo/db/commands/mr.h"
-
 #include <functional>
 #include <memory>
 #include <string>
@@ -45,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/commands/mr_common.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
@@ -64,11 +58,7 @@ namespace mongo {
 namespace {
 
 /**
- * Tests for mr::Config
- */
-
-/**
- * Helper function to verify field of mr::Config::OutputOptions.
+ * Helper function to verify field of map_reduce_common::OutputOptions.
  */
 template <typename T>
 void _compareOutputOptionField(const std::string& dbname,
@@ -234,45 +224,6 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   "",
                                   true,
                                   OutputType::InMemory);
-}
-
-TEST(ConfigTest, ParseCollation) {
-    std::string dbname = "myDB";
-    BSONObj collation = BSON("locale"
-                             << "en_US");
-    BSONObjBuilder bob;
-    bob.append("mapReduce", "myCollection");
-    bob.appendCode("map", "function() { emit(0, 1); }");
-    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
-    bob.append("out", "outCollection");
-    bob.append("collation", collation);
-    BSONObj cmdObj = bob.obj();
-    mr::Config config(dbname, cmdObj);
-    ASSERT_BSONOBJ_EQ(config.collation, collation);
-}
-
-TEST(ConfigTest, ParseNoCollation) {
-    std::string dbname = "myDB";
-    BSONObjBuilder bob;
-    bob.append("mapReduce", "myCollection");
-    bob.appendCode("map", "function() { emit(0, 1); }");
-    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
-    bob.append("out", "outCollection");
-    BSONObj cmdObj = bob.obj();
-    mr::Config config(dbname, cmdObj);
-    ASSERT_BSONOBJ_EQ(config.collation, BSONObj());
-}
-
-TEST(ConfigTest, CollationNotAnObjectFailsToParse) {
-    std::string dbname = "myDB";
-    BSONObjBuilder bob;
-    bob.append("mapReduce", "myCollection");
-    bob.appendCode("map", "function() { emit(0, 1); }");
-    bob.appendCode("reduce", "function(k, v) { return {count: 0}; }");
-    bob.append("out", "outCollection");
-    bob.append("collation", "en_US");
-    BSONObj cmdObj = bob.obj();
-    ASSERT_THROWS(mr::Config(dbname, cmdObj), AssertionException);
 }
 
 /**
