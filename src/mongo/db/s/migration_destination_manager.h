@@ -206,7 +206,7 @@ private:
     // FCV 4.4 protocol are in use and the disableResumableRangeDeleter option is off.
     bool _enableResumableRangeDeleter{true};
 
-    UUID _migrationId;
+    boost::optional<UUID> _migrationId;
     LogicalSessionId _lsid;
     TxnNumber _txnNumber;
     NamespaceString _nss;
