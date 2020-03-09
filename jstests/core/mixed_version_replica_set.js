@@ -1,7 +1,6 @@
 /**
  * Tests initializing a mixed version replica set through resmoke.
  *
- * @tags: [multiversion_sanity_check]
  */
 
 (function() {

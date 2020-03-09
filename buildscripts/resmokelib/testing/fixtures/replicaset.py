@@ -131,14 +131,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
 
-        if self.mixed_bin_versions:
-            for i in range(self.num_nodes):
-                if self.nodes[i].mongod_executable != self.mixed_bin_versions[i]:
-                    msg = (f"Executable of node{i}: {self.nodes[i].mongod_executable} does not "
-                           f"match the executable assigned by mixedBinVersions: "
-                           f"{self.mixed_bin_versions[i]}.")
-                    raise errors.ServerFailure(msg)
-
         # We need only to wait to connect to the first node of the replica set because we first
         # initiate it as a single node replica set.
         self.nodes[0].await_ready()
