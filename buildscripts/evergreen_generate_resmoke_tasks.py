@@ -68,6 +68,7 @@ REQUIRED_CONFIG_KEYS = {
 DEFAULT_CONFIG_VALUES = {
     "generated_config_dir": "generated_resmoke_config",
     "max_tests_per_suite": 100,
+    "max_sub_suites": 10,
     "resmoke_args": "",
     "resmoke_repeat_suites": 1,
     "run_multiple_jobs": "true",
