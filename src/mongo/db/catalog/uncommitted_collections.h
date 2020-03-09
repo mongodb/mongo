@@ -80,9 +80,7 @@ public:
 
     static UncommittedCollections& get(OperationContext* opCtx);
 
-    static void addToTxn(OperationContext* opCtx,
-                         std::unique_ptr<Collection> coll,
-                         Timestamp createTime);
+    static void addToTxn(OperationContext* opCtx, std::unique_ptr<Collection> coll);
 
     static Collection* getForTxn(OperationContext* opCtx, const NamespaceStringOrUUID& nss);
     static Collection* getForTxn(OperationContext* opCtx, const NamespaceString& nss);
@@ -94,10 +92,7 @@ public:
      * This method also clears the entries for the collection identified by `uuid` from
      * UncommittedCollections.
      */
-    static void commit(OperationContext* opCtx,
-                       UUID uuid,
-                       Timestamp createTs,
-                       UncommittedCollectionsMap* map);
+    static void commit(OperationContext* opCtx, UUID uuid, UncommittedCollectionsMap* map);
 
     /**
      * Deregisters the collection with uuid `uuid` from the CollectionCatalog, and re-adds the
