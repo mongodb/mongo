@@ -9,7 +9,8 @@
  *         requires_non_retryable_commands,
  *         # Requires FCV 4.4 because the test checks explain() output, and in 4.4 the conditions
  *         # under which sorts are pushed down were changed. Also uses $unionWith.
- *         requires_fcv_44]
+ *         requires_fcv_44,
+ *         uses_$out]
  */
 (function() {
 "use strict";

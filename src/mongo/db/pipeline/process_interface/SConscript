@@ -103,11 +103,13 @@ env.CppUnitTest(
     target='process_interface_test',
     source=[
         'mongos_process_interface_test.cpp',
+        'shardsvr_process_interface_test.cpp',
         'standalone_process_interface_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         'mongos_process_interface',
         'shardsvr_process_interface',
     ]

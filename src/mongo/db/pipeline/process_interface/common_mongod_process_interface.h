@@ -75,7 +75,7 @@ public:
     Status appendQueryExecStats(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final override;
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
