@@ -94,7 +94,7 @@ BSONObj BSONElement::jsonStringBuffer(JsonStringFormat format,
     if (format == ExtendedCanonicalV2_0_0)
         return withGenerator(ExtendedCanonicalV200Generator());
     else if (format == ExtendedRelaxedV2_0_0)
-        return withGenerator(ExtendedRelaxedV200Generator());
+        return withGenerator(ExtendedRelaxedV200Generator(dateFormatIsLocalTimezone()));
     else if (format == LegacyStrict) {
         return withGenerator(LegacyStrictGenerator());
     } else {

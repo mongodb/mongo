@@ -36,6 +36,8 @@
 #include <iostream>
 #include <string>
 
+#include <fmt/compile.h>
+
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
@@ -178,7 +180,10 @@ void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
     dassert(0 < pos);
     char* cur = buf + pos;
     int bufRemaining = bufSize - pos;
-    pos = snprintf(cur, bufRemaining, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
+    static const auto fmt_str_millis = fmt::compile<int32_t>(".{:03}");
+    pos = fmt::format_to_n(
+              cur, bufRemaining, fmt_str_millis, static_cast<int32_t>(date.asInt64() % 1000))
+              .size;
     dassert(bufRemaining > pos && pos > 0);
     cur += pos;
     bufRemaining -= pos;
@@ -199,12 +204,13 @@ void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
         const long tzOffsetSeconds = msTimeZone * (tzIsWestOfUTC ? 1 : -1);
         const long tzOffsetHoursPart = tzOffsetSeconds / 3600;
         const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
-        snprintf(cur,
-                 localTzSubstrLen + 1,
-                 "%c%02ld%02ld",
-                 tzIsWestOfUTC ? '-' : '+',
-                 tzOffsetHoursPart,
-                 tzOffsetMinutesPart);
+        static const auto fmt_str_time = fmt::compile<char, long, long>("{}{:02}{:02}");
+        fmt::format_to_n(cur,
+                         localTzSubstrLen + 1,
+                         fmt_str_time,
+                         tzIsWestOfUTC ? '-' : '+',
+                         tzOffsetHoursPart,
+                         tzOffsetMinutesPart);
 #else
         strftime(cur, bufRemaining, "%z", &t);
 #endif

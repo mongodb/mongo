@@ -36,6 +36,9 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+namespace {
+bool localTimeZoneForDate = false;
+}
 using namespace fmt::literals;
 
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
@@ -205,6 +208,13 @@ bool isValidBinDataType(int type) {
         default:
             return false;
     }
+}
+
+void setDateFormatIsLocalTimezone(bool localTimeZone) {
+    localTimeZoneForDate = localTimeZone;
+}
+bool dateFormatIsLocalTimezone() {
+    return localTimeZoneForDate;
 }
 
 }  // namespace mongo

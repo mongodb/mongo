@@ -268,6 +268,13 @@ struct FormatKind : std::integral_constant<BSONType, value> {};
 template <typename T>
 struct BSONObjAppendFormat;
 
+/**
+ * Returns whether conversion to JSON should format the Date type as local timezone.
+ * This is a global setting set by the systemLog.timeStampFormat server option.
+ */
+void setDateFormatIsLocalTimezone(bool localTimeZone);
+bool dateFormatIsLocalTimezone();
+
 namespace bsontype_detail {
 
 /* BSONObjFallbackFormat is the trait that BSONObjAppendFormat falls back to in case there is

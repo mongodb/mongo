@@ -183,7 +183,8 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
                                       fmt::memory_buffer& buffer,
                                       size_t writeLimit) const {
     if (isEmpty()) {
-        fmt::format_to(buffer, "{}", isArray ? "[]" : "{}");
+        const auto empty = isArray ? "[]"_sd : "{}"_sd;
+        buffer.append(empty.rawData(), empty.rawData() + empty.size());
         return BSONObj();
     }
     buffer.push_back(isArray ? '[' : '{');
@@ -259,7 +260,7 @@ BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
     if (format == ExtendedCanonicalV2_0_0) {
         return withGenerator(ExtendedCanonicalV200Generator());
     } else if (format == ExtendedRelaxedV2_0_0) {
-        return withGenerator(ExtendedRelaxedV200Generator());
+        return withGenerator(ExtendedRelaxedV200Generator(dateFormatIsLocalTimezone()));
     } else if (format == LegacyStrict) {
         return withGenerator(LegacyStrictGenerator());
     } else {
