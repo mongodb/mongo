@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands_in_multi_doc_txn_params_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -225,6 +226,12 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 << "Cannot create namespace " << ns.ns()
                 << " in multi-document transaction unless featureCompatibilityVersion is 4.4.",
             isFullyUpgradedTo44 || !inTransaction);
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot create namespace " << ns.ns()
+                          << "because creation of collections and indexes inside "
+                             "multi-document transactions is disabled.",
+            !inTransaction || gShouldMultiDocTxnCreateCollectionAndIndexes.load());
 
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
