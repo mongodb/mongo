@@ -11,7 +11,7 @@
 
 load("jstests/libs/create_collection_txn_helpers.js");
 
-function runCollectionCreateTest(explicitCreate) {
+function runCollectionCreateTest(explicitCreate, upsert) {
     const session = db.getMongo().startSession({causalConsistency: false});
     const collName = "create_new_collection";
     const secondCollName = collName + "_second";
@@ -24,7 +24,14 @@ function runCollectionCreateTest(explicitCreate) {
 
     jsTest.log("Testing createCollection in a transaction");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    session.commitTransaction();
+    assert.eq(sessionColl.find({}).itcount(), 1);
+
+    jsTest.log("Testing createCollection in a transaction, implicitly creating database");
+    assert.commandWorked(sessionDB.dropDatabase());
+    session.startTransaction({writeConcern: {w: "majority"}});
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
 
@@ -32,8 +39,8 @@ function runCollectionCreateTest(explicitCreate) {
 
     jsTest.log("Testing multiple createCollections in a transaction");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);
-    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate, upsert);
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.find({}).itcount(), 1);
@@ -43,15 +50,15 @@ function runCollectionCreateTest(explicitCreate) {
 
     jsTest.log("Testing createCollection in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
     assert.commandWorked(session.abortTransaction_forTesting());
 
     assert.eq(sessionColl.find({}).itcount(), 0);
 
     jsTest.log("Testing multiple createCollections in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate);
-    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate, upsert);
     session.abortTransaction();
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(secondSessionColl.find({}).itcount(), 0);
@@ -63,7 +70,7 @@ function runCollectionCreateTest(explicitCreate) {
         "Testing createCollection on an existing collection in a transaction (SHOULD ABORT)");
     assert.commandWorked(sessionDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, secondCollName, explicitCreate, upsert);
     assert.commandFailedWithCode(sessionDB.runCommand({create: collName}),
                                  ErrorCodes.NamespaceExists);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
@@ -75,6 +82,8 @@ function runCollectionCreateTest(explicitCreate) {
     session.endSession();
 }
 
-runCollectionCreateTest(true /*explicitCreate*/);
-runCollectionCreateTest(false /*explicitCreate*/);
+runCollectionCreateTest(true /*explicitCreate*/, true /*upsert*/);
+runCollectionCreateTest(false /*explicitCreate*/, false /*upsert*/);
+runCollectionCreateTest(true /*explicitCreate*/, false /*upsert*/);
+runCollectionCreateTest(false /*explicitCreate*/, true /*upsert*/);
 }());
