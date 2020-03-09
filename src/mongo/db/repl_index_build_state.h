@@ -138,6 +138,8 @@ public:
                   bool skipCheck,
                   boost::optional<Timestamp> timestamp = boost::none,
                   boost::optional<std::string> abortReason = boost::none) {
+        // TODO SERVER-46560: Should remove the hard-coded value skipCheck 'true'.
+        skipCheck = true;
         if (!skipCheck) {
             invariant(checkIfValidTransition(state),
                       str::stream() << "current state :" << toString(_state)
