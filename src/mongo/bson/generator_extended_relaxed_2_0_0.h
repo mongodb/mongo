@@ -34,6 +34,8 @@
 namespace mongo {
 class ExtendedRelaxedV200Generator : private ExtendedCanonicalV200Generator {
 public:
+    // Use date with local timezone, otherwise UTC.
+    explicit ExtendedRelaxedV200Generator(bool localDate) : _localDate(localDate) {}
     using ExtendedCanonicalV200Generator::writeBinData;
     using ExtendedCanonicalV200Generator::writeBool;
     using ExtendedCanonicalV200Generator::writeCode;
@@ -52,17 +54,20 @@ public:
     using ExtendedCanonicalV200Generator::writeUndefined;
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
-        fmt::format_to(buffer, R"({})", val);
+        fmt::format_int str(val);
+        appendTo(buffer, str);
     }
 
     void writeInt64(fmt::memory_buffer& buffer, int64_t val) const {
-        fmt::format_to(buffer, R"({})", val);
+        fmt::format_int str(val);
+        appendTo(buffer, str);
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
+        static const auto fmt_str = fmt::compile<double>(R"({})");
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            fmt::format_to(buffer, R"({})", val);
+            compiled_format_to(buffer, fmt_str, val);
         else {
             ExtendedCanonicalV200Generator::writeDouble(buffer, val);
         }
@@ -76,10 +81,18 @@ public:
         // handles both the case where Date_t::millis is too large, and the case where
         // Date_t::millis is negative (before the epoch).
         if (val.isFormattable()) {
-            fmt::format_to(buffer, R"({{"$date":"{}"}})", dateToISOStringLocal(val));
+            appendTo(buffer, R"({"$date":")"_sd);
+            if (_localDate)
+                outputDateAsISOStringLocal(buffer, val);
+            else
+                outputDateAsISOStringUTC(buffer, val);
+            appendTo(buffer, R"("})");
         } else {
             ExtendedCanonicalV200Generator::writeDate(buffer, val);
         }
     }
+
+private:
+    bool _localDate;
 };
 }  // namespace mongo

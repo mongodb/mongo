@@ -313,9 +313,11 @@ Status storeBaseOptions(const moe::Environment& params) {
         if (formatterName == "iso8601-utc") {
             MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringUTC);
             serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601UTC;
+            setDateFormatIsLocalTimezone(false);
         } else if (formatterName == "iso8601-local") {
             MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringLocal);
             serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601Local;
+            setDateFormatIsLocalTimezone(true);
         } else {
             StringBuilder sb;
             sb << "Value of logTimestampFormat must be one of iso8601-utc "
