@@ -109,6 +109,14 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         BSONObj spec =
             durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
+
+        if (spec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
+            LOGV2_OPTIONS(4670602,
+                          {logv2::LogTag::kStartupWarnings},
+                          "Found an existing geoHaystack index in the catalog. Support for "
+                          "geoHaystack indexes has been deprecated. Instead create a 2d index. See "
+                          "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
+        }
         auto descriptor =
             std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
@@ -311,6 +319,9 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
     }
 }
 
+namespace {
+std::string lastHaystackIndexLogged = "";
+}
 StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opCtx,
                                                            const BSONObj& original) const {
     auto swValidatedAndFixed = _validateAndFixIndexSpec(opCtx, original);
@@ -319,15 +330,29 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
             str::stream() << "Error in specification " << original.toString());
     }
 
+    auto validatedSpec = swValidatedAndFixed.getValue();
+    auto indexName = validatedSpec.getField("name").String();
+    // This gets hit twice per index, so we keep track of what we last logged to avoid logging the
+    // same line for the same index twice.
+    if (validatedSpec.hasField(IndexDescriptor::kGeoHaystackBucketSize) &&
+        lastHaystackIndexLogged.compare(indexName) != 0) {
+        LOGV2_OPTIONS(4670601,
+                      {logv2::LogTag::kStartupWarnings},
+                      "Support for "
+                      "geoHaystack indexes has been deprecated. Instead create a 2d index. See "
+                      "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
+        lastHaystackIndexLogged = indexName;
+    }
+
     // Check whether this is a non-_id index and there are any settings disallowing this server
     // from building non-_id indexes.
-    Status status = _isNonIDIndexAndNotAllowedToBuild(opCtx, swValidatedAndFixed.getValue());
+    Status status = _isNonIDIndexAndNotAllowedToBuild(opCtx, validatedSpec);
     if (!status.isOK()) {
         return status;
     }
 
     // First check against only the ready indexes for conflicts.
-    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue(), false);
+    status = _doesSpecConflictWithExisting(opCtx, validatedSpec, false);
     if (!status.isOK()) {
         return status;
     }
@@ -337,7 +362,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
     // The index catalog cannot currently iterate over only in-progress indexes. So by previously
     // checking against only ready indexes without error, we know that any errors encountered
     // checking against all indexes occurred due to an in-progress index.
-    status = _doesSpecConflictWithExisting(opCtx, swValidatedAndFixed.getValue(), true);
+    status = _doesSpecConflictWithExisting(opCtx, validatedSpec, true);
     if (!status.isOK()) {
         if (ErrorCodes::IndexAlreadyExists == status.code()) {
             // Callers need to be able to distinguish conflicts against ready indexes versus
@@ -347,7 +372,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
         return status;
     }
 
-    return swValidatedAndFixed.getValue();
+    return validatedSpec;
 }
 
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
