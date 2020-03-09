@@ -178,6 +178,11 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
         _done = nextInput.getStatus() == GetNextResult::ReturnStatus::kEOF;
         return nextInput;
     } else {
+        // Ensure that the client's operationTime reflects the latest write even if the command
+        // fails.
+        ON_BLOCK_EXIT(
+            [&] { pExpCtx->mongoProcessInterface->updateClientOperationTime(pExpCtx->opCtx); });
+
         if (!_initialized) {
             initialize();
             _initialized = true;

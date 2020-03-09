@@ -107,11 +107,9 @@ function runCommandWithReadPreferenceSecondary(
     }
 
     let shouldForceReadPreference = kCommandsSupportingReadPreference.has(commandName);
-    if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObjUnwrapped)) {
-        // An aggregation with a $out stage must be sent to the primary.
-        shouldForceReadPreference = false;
-    } else if ((commandName === "mapReduce" || commandName === "mapreduce") &&
-               !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
+
+    if ((commandName === "mapReduce" || commandName === "mapreduce") &&
+        !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
         // A map-reduce operation with non-inline output must be sent to the primary.
         shouldForceReadPreference = false;
     } else if ((conn.isMongos() && kDatabasesOnConfigServers.has(dbName)) || conn._isConfigServer) {

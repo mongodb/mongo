@@ -58,6 +58,26 @@ public:
     }
 
     /**
+     * Stores the operation time of the latest proxy write, that is, a write that was forwarded
+     * to and executed on a different node instead of being executed locally.
+     */
+    void setLastProxyWriteOpTimeForward(const OpTime& opTime) {
+        // Only advance the operation time of the latest proxy write if it is greater than the one
+        // currently stored.
+        if (opTime > _lastProxyWriteOpTime) {
+            _lastProxyWriteOpTime = opTime;
+        }
+    }
+
+    /**
+     * Returns the greater of the times set by 'setLastOp()' and
+     * 'setLastProxiedWriteOpTimeForward()'.
+     */
+    OpTime getMaxKnownOpTime() const {
+        return _lastOp > _lastProxyWriteOpTime ? _lastOp : _lastProxyWriteOpTime;
+    }
+
+    /**
      * Returns true when either setLastOp() or setLastOpToSystemLastOpTime() was called to set the
      * opTime under the current OperationContext.
      */
@@ -88,6 +108,8 @@ private:
     static const long long kUninitializedTerm = -1;
 
     OpTime _lastOp = OpTime();
+
+    OpTime _lastProxyWriteOpTime;
 };
 
 }  // namespace repl
