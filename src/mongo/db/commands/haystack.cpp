@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <vector>
@@ -47,6 +49,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/logv2/log.h"
+
 
 /**
  * Examines all documents in a given radius of a given point.
@@ -57,7 +61,10 @@
  * Don't use when you want to find the closest open restaurants.
  */
 namespace mongo {
-
+namespace {
+Rarely geoSearchDeprecationSampler;  // Used to occasionally log deprecation messages.
+bool loggedStartupWarning = false;
+}  // namespace
 using std::string;
 using std::vector;
 
@@ -99,6 +106,20 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
+        if (!loggedStartupWarning) {
+            LOGV2_OPTIONS(4670603,
+                          {logv2::LogTag::kStartupWarnings},
+                          "Support for geoSearch has been deprecated. Instead, create a 2d index "
+                          "and use $geoNear or $geoWithin. See "
+                          "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
+            loggedStartupWarning = true;
+            geoSearchDeprecationSampler.tick();
+        } else if (geoSearchDeprecationSampler.tick()) {
+            LOGV2_WARNING(4670604,
+                          "Support for geoSearch has been deprecated. Instead, create a 2d index "
+                          "and use $geoNear or $geoWithin. See "
+                          "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
+        }
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
