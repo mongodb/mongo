@@ -335,6 +335,7 @@ public:
     /**
      * Returns true if an index build is in progress on the specified collection.
      */
+    bool inProgForCollection(const UUID& collectionUUID, IndexBuildProtocol protocol) const;
     bool inProgForCollection(const UUID& collectionUUID) const;
 
     /**
