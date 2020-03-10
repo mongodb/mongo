@@ -35,6 +35,7 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
+        transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
       verbose: ''
     # TODO: SERVER-43927 Make jstestfuzz_sharded and jstestfuzz_sharded_session suite start
