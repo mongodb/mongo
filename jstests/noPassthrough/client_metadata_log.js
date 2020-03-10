@@ -17,14 +17,14 @@ let checkLog = function(conn) {
     let predicate = null;
     if (isJsonLog(conn)) {
         predicate =
-            /received client metadata from .*:.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
+            /"id":51800,.*"msg":"client metadata","attr":.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
     } else {
         predicate =
             /received client metadata from .*: {"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
     }
 
     assert(predicate.test(log),
-           "'received client metadata' log line missing in log file!\n" +
+           "'client metadata' log line missing in log file!\n" +
                "Log file contents: " + conn.fullOptions.logFile +
                "\n************************************************************\n" + log +
                "\n************************************************************");

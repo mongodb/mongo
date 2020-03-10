@@ -244,9 +244,9 @@ TEST_F(LogTestV2, Basic) {
     t4.serialize(buffer);
     ASSERT_EQUALS(lines.back(), fmt::to_string(buffer));
 
-    // Text formatter selects format string
+    // Message string is selected when using API that also take a format string
     LOGV2(20084, "fmtstr {name}", "msgstr", "name"_attr = 1);
-    ASSERT_EQUALS(lines.back(), "fmtstr 1");
+    ASSERT_EQUALS(lines.back(), "msgstr");
 
     // Test that logging exceptions does not propagate out to user code in release builds
     if (!kDebugBuild) {
