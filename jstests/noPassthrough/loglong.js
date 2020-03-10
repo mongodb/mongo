@@ -1,9 +1,5 @@
 // test for SERVER-5013
 // make sure very long long lines get truncated
-// TODO: Handle JSON logs. See SERVER-45140
-// @tags: [
-//  requires_text_logs,
-// ]
 
 (function() {
 "use strict";
