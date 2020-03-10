@@ -63,6 +63,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -442,10 +443,9 @@ void runCommand(OperationContext* opCtx,
         }
 
         bool supportsWriteConcern = invocation->supportsWriteConcern();
-        if (!supportsWriteConcern && !wc.usedDefault) {
+        if (!supportsWriteConcern &&
+            request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
             // This command doesn't do writes so it should not be passed a writeConcern.
-            // If we did not use the default writeConcern, one was provided when it shouldn't have
-            // been by the user.
             auto responseBuilder = replyBuilder->getBodyBuilder();
             CommandHelpers::appendCommandStatusNoThrow(
                 responseBuilder,
