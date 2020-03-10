@@ -121,7 +121,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -627,8 +627,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                                                    ConnectionString::forLocal(),
                                                    kDistLockProcessIdForConfigServer);
 
-            Balancer::create(startupOpCtx->getServiceContext());
-
             ShardingCatalogManager::create(
                 startupOpCtx->getServiceContext(),
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
@@ -1073,12 +1071,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     MirrorMaestro::shutdown(serviceContext);
 
     WaitForMajorityService::get(serviceContext).shutDown();
-
-    // Terminate the balancer thread so it doesn't leak memory.
-    if (auto balancer = Balancer::get(serviceContext)) {
-        balancer->interruptBalancer();
-        balancer->waitForBalancerToStop();
-    }
 
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {

@@ -88,6 +88,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern.h"
@@ -3845,10 +3846,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _externalState->closeConnections();
         /* FALLTHROUGH */
         case kActionSteppedDown:
-            // This code must be safe to run on node rollback and node removal!
-            _externalState->shardingOnStepDownHook();
-            _externalState->stopNoopWriter();
-            _externalState->stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
+            _externalState->onStepDownHook();
             break;
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of

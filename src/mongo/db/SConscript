@@ -415,6 +415,16 @@ env.Library(
 )
 
 env.Library(
+    target='replica_set_aware_service',
+    source=[
+        'replica_set_aware_service.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_context',
+    ],
+)
+
+env.Library(
     target='service_context',
     source=[
         'baton.cpp',
@@ -1875,6 +1885,7 @@ envWithAsio.CppUnitTest(
         'read_write_concern_defaults_test.cpp',
         'read_write_concern_provenance_test.cpp',
         'record_id_test.cpp',
+        'replica_set_aware_service_test.cpp',
         'server_options_test.cpp',
         'session_catalog_mongod_test.cpp',
         'session_catalog_test.cpp',
@@ -1941,6 +1952,7 @@ envWithAsio.CppUnitTest(
         'repl/repl_coordinator_interface',
         'repl/storage_interface_impl',
         'repl/replmocks',
+        'replica_set_aware_service',
         'server_options_servers',
         'service_context',
         'service_context_d',

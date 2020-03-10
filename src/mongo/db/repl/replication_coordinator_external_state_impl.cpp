@@ -76,6 +76,7 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -417,7 +418,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     if (!storageGlobalParams.readOnly &&
         _replicationProcess->getConsistencyMarkers()
             ->isOplogTruncateAfterPointBeingUsedForPrimary()) {
-        stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
+        _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
     }
 }
 
@@ -469,12 +470,7 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
         _oplogBuffer->exitDrainMode();
     }
 
-    // If this is a config server node becoming a primary, ensure the balancer is ready to start.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        // We must ensure the balancer has stopped because it may still be in the process of
-        // stopping if this node was previously primary.
-        Balancer::get(opCtx)->waitForBalancerToStop();
-    }
+    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx);
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
@@ -531,6 +527,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
 
     _shardingOnTransitionToPrimaryHook(opCtx);
+    ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx);
 
     _dropAllTempCollections(opCtx);
 
@@ -743,9 +740,15 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
     _service->getServiceEntryPoint()->endAllSessions(transport::Session::kKeepOpen);
 }
 
-void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
+void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
+    ReplicaSetAwareServiceRegistry::get(_service).onStepDown();
+    _shardingOnStepDownHook();
+    stopNoopWriter();
+    _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
+}
+
+void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        Balancer::get(_service)->interruptBalancer();
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
         TransactionCoordinatorService::get(_service)->onStepDown();
     } else if (ShardingState::get(_service)->enabled()) {
@@ -767,7 +770,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() {
+void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() {
     auto opCtx = cc().getOperationContext();
     // Temporarily turn off flow control ticketing. Getting a ticket can stall on a ticket being
     // available, which may have to wait for the ticket refresher to run, which in turn blocks on
@@ -840,9 +843,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // Free any leftover locks from previous instantiations.
         auto distLockManager = Grid::get(opCtx)->catalogClient()->getDistLockManager();
         distLockManager->unlockAll(opCtx, distLockManager->getProcessID());
-
-        // If this is a config server node becoming a primary, start the balancer
-        Balancer::get(opCtx)->initiateBalancer(opCtx);
 
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);

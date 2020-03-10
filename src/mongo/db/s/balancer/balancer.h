@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/migration_manager.h"
@@ -53,25 +54,13 @@ class Status;
  * there is an imbalance by checking the difference in chunks between the most and least
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
-class Balancer {
+class Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
     Balancer(const Balancer&) = delete;
     Balancer& operator=(const Balancer&) = delete;
 
 public:
-    Balancer(ServiceContext* serviceContext);
+    Balancer();
     ~Balancer();
-
-    /**
-     * Instantiates an instance of the balancer and installs it on the specified service context.
-     * This method is not thread-safe and must be called only once when the service is starting.
-     */
-    static void create(ServiceContext* serviceContext);
-
-    /**
-     * Retrieves the per-service instance of the Balancer.
-     */
-    static Balancer* get(ServiceContext* serviceContext);
-    static Balancer* get(OperationContext* operationContext);
 
     /**
      * Invoked when the config server primary enters the 'PRIMARY' state and is invoked while the
@@ -168,6 +157,13 @@ private:
         kRunning,   // kStopping | kStopped
         kStopping,  // kStopped
     };
+
+    /**
+     * ReplicaSetAwareService entry points.
+     */
+    void onStepUpBegin(OperationContext* opCtx) final;
+    void onStepUpComplete(OperationContext* opCtx) final;
+    void onStepDown() final;
 
     /**
      * The main balancer loop, which runs in a separate thread.

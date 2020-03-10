@@ -84,8 +84,7 @@ public:
     bool oplogExists(OperationContext* opCtx) override;
     virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx);
     virtual void closeConnections();
-    virtual void shardingOnStepDownHook();
-    virtual void stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() override;
+    virtual void onStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();

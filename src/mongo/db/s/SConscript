@@ -210,6 +210,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         'sharding_logging',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/replica_set_aware_service',
+    ],
 )
 
 env.Library(

@@ -228,9 +228,7 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
     _connectionsClosed = true;
 }
 
-void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
-
-void ReplicationCoordinatorExternalStateMock::stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() {}
+void ReplicationCoordinatorExternalStateMock::onStepDownHook() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 

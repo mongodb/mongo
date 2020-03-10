@@ -479,6 +479,7 @@ mongod = env.Program(
     ],
     LIBDEPS_PRIVATE=[
         'db/index/index_access_methods',
+        'db/replica_set_aware_service',
     ],
     AIB_COMPONENT="mongod",
     AIB_COMPONENTS_EXTRA=[

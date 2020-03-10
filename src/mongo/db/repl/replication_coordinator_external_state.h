@@ -220,25 +220,10 @@ public:
     virtual void closeConnections() = 0;
 
     /**
-     * Resets any active sharding metadata on this server and stops any sharding-related threads
-     * (such as the balancer). It is called after stepDown to ensure that if the node becomes
-     * primary again in the future it will recover its state from a clean slate.
+     * Called after this node has stepped down. This includes stepDowns caused by rollback or node
+     * removal, so this function must also be able to handle those situations.
      */
-    virtual void shardingOnStepDownHook() = 0;
-
-    /**
-     * Stops asynchronous updates to and then clears the oplogTruncateAfterPoint.
-     *
-     * Safe to call when there are no oplog writes, and therefore no oplog holes that must be
-     * tracked by the oplogTruncateAfterPoint.
-     *
-     * Only primaries update the truncate point asynchronously; other replication states update the
-     * truncate point manually as necessary. This function should be called whenever replication
-     * leaves state PRIMARY: stepdown; and shutdown while in state PRIMARY. Otherwise, we might
-     * leave a stale oplogTruncateAfterPoint set and cause unnecessary oplog truncation during
-     * startup if the server gets restarted.
-     */
-    virtual void stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() = 0;
+    virtual void onStepDownHook() = 0;
 
     /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.

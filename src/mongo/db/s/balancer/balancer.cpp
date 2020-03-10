@@ -79,8 +79,6 @@ const Seconds kBalanceRoundDefaultInterval(10);
 // not being able to establish a stable shard version.
 const Seconds kShortBalanceRoundInterval(1);
 
-const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balancer>>();
-
 /**
  * Balancer status response
  */
@@ -158,33 +156,38 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
                   "shardVersions"_attr = shardVersions.done());
 }
 
+ReplicaSetAwareServiceRegistry::Registerer<Balancer> balancerRegisterer("Balancer");
+
 }  // namespace
 
-Balancer::Balancer(ServiceContext* serviceContext)
+Balancer::Balancer()
     : _balancedLastTime(0),
       _random(std::random_device{}()),
       _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
-      _migrationManager(serviceContext) {}
+      _migrationManager(getServiceContext()) {}
+
 
 Balancer::~Balancer() {
-    // The balancer thread must have been stopped
-    stdx::lock_guard<Latch> scopedLock(_mutex);
-    invariant(_state == kStopped);
+    // Terminate the balancer thread so it doesn't leak memory.
+    interruptBalancer();
+    waitForBalancerToStop();
 }
 
-void Balancer::create(ServiceContext* serviceContext) {
-    invariant(!getBalancer(serviceContext));
-    getBalancer(serviceContext) = std::make_unique<Balancer>(serviceContext);
+void Balancer::onStepUpBegin(OperationContext* opCtx) {
+    // Before starting step-up, ensure the balancer is ready to start. Specifically, that the
+    // balancer is actually stopped, because it may still be in the process of stopping if this
+    // node was previously primary.
+    waitForBalancerToStop();
 }
 
-Balancer* Balancer::get(ServiceContext* serviceContext) {
-    return getBalancer(serviceContext).get();
+void Balancer::onStepUpComplete(OperationContext* opCtx) {
+    initiateBalancer(opCtx);
 }
 
-Balancer* Balancer::get(OperationContext* operationContext) {
-    return get(operationContext->getServiceContext());
+void Balancer::onStepDown() {
+    interruptBalancer();
 }
 
 void Balancer::initiateBalancer(OperationContext* opCtx) {
