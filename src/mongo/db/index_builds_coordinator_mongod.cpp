@@ -637,6 +637,7 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                             << " , abort reason:"
                             << replState->indexBuildState.getAbortReason().get_value_or("")));
                 }
+                break;
             case IndexBuildAction::kSinglePhaseSecondaryCommit:
                 invariant(replState->protocol == IndexBuildProtocol::kSinglePhase);
                 if (isMaster) {
