@@ -33,14 +33,33 @@
 
 namespace mongo {
 
+namespace {
+// Only hedge commands that cannot trigger writes.
+const std::set<std::string> supportedCmds{"collStats",
+                                          "count",
+                                          "dataSize",
+                                          "dbStats",
+                                          "distinct",
+                                          "filemd5",
+                                          "find",
+                                          "listCollections",
+                                          "listIndexes",
+                                          "planCacheListFilters"};
+}  // namespace
+
 boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
-    const ReadPreferenceSetting& readPref) {
-    if (gReadHedgingMode.load() == ReadHedgingMode::kOn && readPref.hedgingMode &&
-        readPref.hedgingMode->getEnabled()) {
+    const BSONObj& cmdObj, const ReadPreferenceSetting& readPref) {
+    if (!(gReadHedgingMode.load() == ReadHedgingMode::kOn && readPref.hedgingMode &&
+          readPref.hedgingMode->getEnabled())) {
+        return boost::none;
+    }
+
+    auto cmdName(cmdObj.firstElement().fieldNameStringData().toString());
+
+    if (supportedCmds.count(cmdName)) {
         return executor::RemoteCommandRequestOnAny::HedgeOptions{1,
                                                                  gMaxTimeMSForHedgedReads.load()};
     }
-
     return boost::none;
 }
 

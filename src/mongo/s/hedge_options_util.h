@@ -36,10 +36,10 @@
 namespace mongo {
 
 /**
- * Constructs and returns hedge options based on the given read preference setting.
- * If no hedging should be performed, returns boost::none.
+ * Constructs and returns hedge options based on the given cmd object and read preference
+ * setting. If no hedging should be performed, returns boost::none.
  */
 boost::optional<executor::RemoteCommandRequestOnAny::HedgeOptions> extractHedgeOptions(
-    const ReadPreferenceSetting& readPref);
+    const BSONObj& cmdObj, const ReadPreferenceSetting& readPref);
 
 }  // namespace mongo
