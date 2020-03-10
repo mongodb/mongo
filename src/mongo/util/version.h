@@ -140,12 +140,6 @@ public:
     std::string openSSLVersion(StringData prefix = "", StringData suffix = "") const;
 
     /**
-     * Returns true if the running version has the same major and minor version as the provided
-     * string. Note that the minor version is checked, despite the name of this function.
-     */
-    bool isSameMajorVersion(const char* otherVersion) const noexcept;
-
-    /**
      * Uses the provided text to make a pretty representation of the version.
      */
     std::string makeVersionString(StringData binaryName) const;

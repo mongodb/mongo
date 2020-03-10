@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <pcrecpp.h>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -135,29 +136,26 @@ private:
  * in the cluster.
  */
 void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
+    static const auto& majorMinorRE = *new pcrecpp::RE(R"re(^(\d+)\.(\d+)\.)re");
     auto&& vii = VersionInfoInterface::instance();
-
-    bool isMultiVersion = false;
-    for (const auto& stat : clusterStats) {
-        if (!vii.isSameMajorVersion(stat.mongoVersion.c_str())) {
-            isMultiVersion = true;
-            break;
-        }
-    }
+    auto hasMyVersion = [&](auto&& stat) {
+        int major;
+        int minor;
+        return majorMinorRE.PartialMatch(pcrecpp::StringPiece(stat.mongoVersion), &major, &minor) &&
+            major == vii.majorVersion() && minor == vii.minorVersion();
+    };
 
     // If we're all the same version, don't message
-    if (!isMultiVersion)
+    if (std::all_of(clusterStats.begin(), clusterStats.end(), hasMyVersion))
         return;
 
-    StringBuilder sb;
-    sb << "Multi version cluster detected. Local version: " << vii.version()
-       << ", shard versions: ";
-
-    for (const auto& stat : clusterStats) {
-        sb << stat.shardId << " is at " << stat.mongoVersion << "; ";
-    }
-
-    LOGV2_WARNING(21875, "{sb_str}", "sb_str"_attr = sb.str());
+    BSONObjBuilder shardVersions;
+    for (const auto& stat : clusterStats)
+        shardVersions << stat.shardId << stat.mongoVersion;
+    LOGV2_WARNING(21875,
+                  "Multiversion cluster detected",
+                  "localVersion"_attr = vii.version(),
+                  "shardVersions"_attr = shardVersions.done());
 }
 
 }  // namespace

@@ -55,6 +55,10 @@
 namespace mongo {
 namespace {
 
+std::string formatVersionString(StringData versioned, const VersionInfoInterface& provider) {
+    return format(FMT_STRING("{} version v{}"), versioned, provider.version());
+}
+
 class FallbackVersionInfo : public VersionInfoInterface {
 public:
     int majorVersion() const noexcept final {
@@ -124,21 +128,8 @@ const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction acti
     LOGV2_FATAL(40278, "Terminating because valid version info has not been configured");
 }
 
-bool VersionInfoInterface::isSameMajorVersion(const char* otherVersion) const noexcept {
-    int major = -1, minor = -1;
-    pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
-    ver_regex.PartialMatch(otherVersion, &major, &minor);
-
-    if (major == -1 || minor == -1)
-        return false;
-
-    return (major == majorVersion() && minor == minorVersion());
-}
-
 std::string VersionInfoInterface::makeVersionString(StringData binaryName) const {
-    std::stringstream ss;
-    ss << binaryName << " v" << version();
-    return ss.str();
+    return format(FMT_STRING("{} v{}"), binaryName, version());
 }
 
 void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
@@ -226,21 +217,15 @@ void VersionInfoInterface::logBuildInfo(std::ostream* os) const {
 }
 
 std::string mongoShellVersion(const VersionInfoInterface& provider) {
-    std::stringstream ss;
-    ss << "MongoDB shell version v" << provider.version();
-    return ss.str();
+    return formatVersionString("MongoDB shell", provider);
 }
 
 std::string mongosVersion(const VersionInfoInterface& provider) {
-    std::stringstream ss;
-    ss << "mongos version v" << provider.version();
-    return ss.str();
+    return formatVersionString("mongos", provider);
 }
 
 std::string mongodVersion(const VersionInfoInterface& provider) {
-    std::stringstream ss;
-    ss << "db version v" << provider.version();
-    return ss.str();
+    return formatVersionString("db", provider);
 }
 
 }  // namespace mongo
