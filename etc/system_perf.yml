@@ -1182,6 +1182,7 @@ buildvariants:
     - name: smoke_test
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    - name: ycsb_60GB
 
 - name: linux-1-node-replSet-ese-gcm
   display_name: Linux 1-Node ReplSet ESE GCM
@@ -1206,6 +1207,7 @@ buildvariants:
     - name: smoke_test
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    - name: ycsb_60GB
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
