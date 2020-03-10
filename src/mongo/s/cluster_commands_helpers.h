@@ -349,4 +349,14 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
 StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     OperationContext* opCtx, const NamespaceString& nss);
 
+/**
+ * Loads all of the indexes for the given namespace from the appropriate shard. For unsharded
+ * collections will read from the primary shard and for sharded collections will read from the shard
+ * that owns the chunk containing the minimum key for the collection's shard key.
+ *
+ * Will not retry on StaleConfig or StaleDbVersion errors.
+ */
+StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
+                                                                   const NamespaceString& nss);
+
 }  // namespace mongo

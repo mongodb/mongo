@@ -286,17 +286,12 @@ bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
-    const auto opCtx = expCtx->opCtx;
-    const auto routingInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-
-    // Run an exhaustive listIndexes against the primary shard only.
-    auto response = routingInfo.db().primary()->runExhaustiveCursorCommand(
-        opCtx,
-        ReadPreferenceSetting::get(opCtx),
-        nss.db().toString(),
-        BSON("listIndexes" << nss.coll()),
-        opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
+    // Get a list of indexes from a shard with correct indexes for the namespace. For an unsharded
+    // collection, this is the current primary shard for the database, and for a sharded collection,
+    // this is any shard that currently owns at least one chunk. This helper sends database and/or
+    // shard versions to ensure this router is not stale, but will not automatically retry if either
+    // version is stale.
+    auto response = loadIndexesFromAuthoritativeShard(expCtx->opCtx, nss);
 
     // If the namespace does not exist, then the field paths *must* be _id only.
     if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
