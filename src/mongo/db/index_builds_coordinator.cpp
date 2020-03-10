@@ -241,7 +241,8 @@ void abortIndexBuild(WithLock lk,
     stdx::unique_lock<Latch> replStateLock(replIndexBuildState->mutex);
     if (replIndexBuildState->waitForNextAction->getFuture().isReady()) {
         const auto nextAction = replIndexBuildState->waitForNextAction->getFuture().get();
-        invariant(nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
+        invariant(nextAction == IndexBuildAction::kSinglePhaseCommit ||
+                  nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
                   nextAction == IndexBuildAction::kPrimaryAbort);
         // Index build coordinator already received a signal to commit or abort. So, it's ok
         // to return and wait for the index build to complete. The index build coordinator
@@ -528,8 +529,8 @@ std::string IndexBuildsCoordinator::_indexBuildActionToString(IndexBuildAction a
         return "Rollback abort";
     } else if (action == IndexBuildAction::kPrimaryAbort) {
         return "Primary abort";
-    } else if (action == IndexBuildAction::kSinglePhaseSecondaryCommit) {
-        return "Single-phase secondary commit";
+    } else if (action == IndexBuildAction::kSinglePhaseCommit) {
+        return "Single-phase commit";
     } else if (action == IndexBuildAction::kCommitQuorumSatisfied) {
         return "Commit quorum Satisfied";
     }
@@ -917,7 +918,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
         stdx::unique_lock<Latch> lk(replState->mutex);
         if (replState->waitForNextAction->getFuture().isReady()) {
             const auto nextAction = replState->waitForNextAction->getFuture().get(opCtx);
-            invariant(nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
+            invariant(nextAction == IndexBuildAction::kSinglePhaseCommit ||
+                      nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
                       nextAction == IndexBuildAction::kPrimaryAbort);
 
             // Index build coordinator already received a signal to commit or abort. So, it's ok

@@ -84,9 +84,9 @@ enum class IndexBuildAction {
      */
     kPrimaryAbort,
     /**
-     * Commit signal set by an index build on a secondary for a single-phase build.
+     * Commit signal set by an index build for a single-phase build.
      */
-    kSinglePhaseSecondaryCommit,
+    kSinglePhaseCommit,
     /**
      * Commit signal set by "voteCommitIndexBuild" cmd and step up.
      */

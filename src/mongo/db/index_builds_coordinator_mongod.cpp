@@ -397,20 +397,32 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     // TODO SERVER-46557: Revisit this logic to see if we can check replState->commitQuorum for
     // value to be zero to determine whether commit quorum is enabled or not for this index build.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    // Single-phase and standalones don't support commit quorum, but they must go through the
-    // process of updating their state to synchronize with concurrent abort operations.
-    bool singlePhaseOrStandalone = replState->protocol == IndexBuildProtocol::kSinglePhase ||
-        !replCoord->getSettings().usingReplSets();
-    if (!enableIndexBuildCommitQuorum || singlePhaseOrStandalone) {
+
+    if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
+        // Single-phase builds don't support commit quorum, but they must go through the process of
+        // updating their state to synchronize with concurrent abort operations.
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (replState->waitForNextAction->getFuture().isReady()) {
+            // If the signal action has been set, it should only be because a concurrent operation
+            // already aborted the index build.
+            auto action = replState->waitForNextAction->getFuture().get(opCtx);
+            invariant(action == IndexBuildAction::kPrimaryAbort,
+                      str::stream() << "action: " << _indexBuildActionToString(action)
+                                    << ", buildUUID: " << replState->buildUUID);
+            LOGV2(4639700,
+                  "Not committing single-phase build because it has already been aborted",
+                  "buildUUID"_attr = replState->buildUUID);
+            return true;
+        }
+        replState->waitForNextAction->emplaceValue(IndexBuildAction::kSinglePhaseCommit);
+        return true;
+    } else if (!enableIndexBuildCommitQuorum) {
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-        stdx::unique_lock<Latch> lk(replState->mutex);
         if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID) || onStepup) {
             // Node is primary here.
+            stdx::unique_lock<Latch> lk(replState->mutex);
             _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
-        } else if (replState->protocol == IndexBuildProtocol::kSinglePhase) {
-            replState->waitForNextAction->emplaceValue(
-                IndexBuildAction::kSinglePhaseSecondaryCommit);
         }
         // No-op for secondaries.
         return true;
@@ -581,6 +593,8 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
 
         stdx::unique_lock<Latch> lk(replState->mutex);
         switch (nextAction) {
+            case IndexBuildAction::kNoAction:
+                break;
             case IndexBuildAction::kOplogCommit:
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
 
@@ -619,6 +633,7 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                       "abortTimestamp"_attr = replState->indexBuildState.getTimestamp().get(),
                       "abortReason"_attr = replState->indexBuildState.getAbortReason().get(),
                       "collectionUUID"_attr = replState->collectionUUID);
+                break;
             case IndexBuildAction::kRollbackAbort:
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
                 // Currently, We abort the index build before transitioning the state to rollback.
@@ -629,7 +644,11 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                 // coordinator, So, we missed marking the index build aborted on manager. So, it's
                 // important, we exit from here if we are still primary. Otherwise, the index build
                 // gets committed, though our index build was marked aborted.
-                if (isMaster) {
+
+                // Single-phase builds do not replicate abort oplog entries. We do not need to be
+                // primary to abort the index build, and we must continue aborting even in the event
+                // of a state transition because this build will not receive another signal.
+                if (isMaster || IndexBuildProtocol::kSinglePhase == replState->protocol) {
                     uassertStatusOK(Status(
                         ErrorCodes::IndexBuildAborted,
                         str::stream()
@@ -637,17 +656,9 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                             << " , abort reason:"
                             << replState->indexBuildState.getAbortReason().get_value_or("")));
                 }
-                break;
-            case IndexBuildAction::kSinglePhaseSecondaryCommit:
-                invariant(replState->protocol == IndexBuildProtocol::kSinglePhase);
-                if (isMaster) {
-                    LOGV2_FATAL(
-                        4639700,
-                        "Primary while trying to commit single-phase build that was started on a "
-                        "secondary");
-                    fassertFailed(4639701);
-                }
-                break;
+                // Intentionally continue to next case. If we are no longer primary while processing
+                // kPrimaryAbort, fall back to the kCommitQuorumSatisfied case and reset our
+                // 'waitForNextAction'.
             case IndexBuildAction::kCommitQuorumSatisfied:
                 if (!isMaster) {
                     // Reset the promise as the node has stepped down,
@@ -662,8 +673,9 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                     needsToRetryWait = true;
                 }
                 break;
-            default:
-                MONGO_UNREACHABLE;
+            case IndexBuildAction::kSinglePhaseCommit:
+                invariant(replState->protocol == IndexBuildProtocol::kSinglePhase);
+                break;
         }
 
         if (!needsToRetryWait) {
