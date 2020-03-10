@@ -2253,12 +2253,20 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getInd
 }
 
 std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuilds() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto filter = [](const auto& replState) { return true; };
+    return _filterIndexBuilds_inlock(lk, filter);
+}
+
+std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_filterIndexBuilds_inlock(
+    WithLock lk, IndexBuildFilterFn indexBuildFilter) const {
     std::vector<std::shared_ptr<ReplIndexBuildState>> indexBuilds;
-    {
-        stdx::unique_lock<Latch> lk(_mutex);
-        for (auto pair : _allIndexBuilds) {
-            indexBuilds.push_back(pair.second);
+    for (auto pair : _allIndexBuilds) {
+        auto replState = pair.second;
+        if (!indexBuildFilter(*replState)) {
+            continue;
         }
+        indexBuilds.push_back(replState);
     }
     return indexBuilds;
 }
