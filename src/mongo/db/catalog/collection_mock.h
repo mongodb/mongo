@@ -279,6 +279,14 @@ public:
         return _uuid;
     }
 
+    bool isCommitted() const final {
+        return _committed;
+    }
+
+    void setCommitted(bool val) final {
+        _committed = val;
+    }
+
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
         std::abort();
     }
@@ -288,6 +296,7 @@ private:
     NamespaceString _ns;
     RecordId _catalogId{0};
     std::unique_ptr<IndexCatalog> _indexCatalog;
+    bool _committed = true;
 };
 
 }  // namespace mongo
