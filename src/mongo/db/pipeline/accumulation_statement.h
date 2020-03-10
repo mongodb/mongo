@@ -45,10 +45,16 @@ namespace mongo {
  * you would add this line:
  * REGISTER_ACCUMULATOR(foo, AccumulatorFoo::create);
  */
-#define REGISTER_ACCUMULATOR(key, factory)                                     \
-    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) { \
-        AccumulationStatement::registerAccumulator("$" #key, (factory));       \
-        return Status::OK();                                                   \
+#define REGISTER_ACCUMULATOR(key, factory)                                            \
+    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {        \
+        AccumulationStatement::registerAccumulator("$" #key, (factory), boost::none); \
+        return Status::OK();                                                          \
+    }
+
+#define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion)                \
+    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {         \
+        AccumulationStatement::registerAccumulator("$" #key, (factory), (minVersion)); \
+        return Status::OK();                                                           \
     }
 
 /**
@@ -162,13 +168,19 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_ACCUMULATOR macro defined in this
      * file.
      */
-    static void registerAccumulator(std::string name, Parser parser);
+    static void registerAccumulator(
+        std::string name,
+        Parser parser,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
 
     /**
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if
-     * there is no such AccumulatorState registered.
+     * there is no such Parser registered, or the Parser is registered under an FCV greater than the
+     * specified maximum allowed FCV.
      */
-    static Parser& getParser(StringData name);
+    static Parser& getParser(
+        StringData name,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> allowedMaxVersion);
 
     // The field name is used to store the results of the accumulation in a result document.
     std::string fieldName;

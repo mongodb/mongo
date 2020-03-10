@@ -40,6 +40,23 @@ const pipelinesWithNewFeatures = [
     [{$unionWith: {coll: "A", pipeline: [{$match: {b: 1}}]}}],
     [{$lookup: {from: "A", pipeline: [{$unionWith: "B"}], as: "result"}}],
     [{$facet: {sub_pipe_invalid: [{$unionWith: "B"}], sub_pipe_valid: [{$match: {b: 1}}]}}],
+    [{
+        $group: {
+            _id: 1,
+            v: {
+                $accumulator: {
+                    init: function() {},
+                    accumulate: function() {},
+                    accumulateArgs: [],
+                    merge: function() {},
+                    lang: "js"
+                }
+            }
+        }
+    }],
+    [{$group: {_id: 1, v: {$_internalJsReduce: {eval: function() {}, data: {}}}}}],
+    [{$project: {v: {$_internalJsEmit: {eval: function() {}, this: {}}}}}],
+    [{$project: {v: {$function: {body: function() {}, args: [], lang: "js"}}}}],
 ];
 
 let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});

@@ -35,7 +35,10 @@
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseInternalJsReduce);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    _internalJsReduce,
+    AccumulatorInternalJsReduce::parseInternalJsReduce,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
 AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONElement elem, VariablesParseState vps) {
@@ -186,7 +189,10 @@ Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression>
     return DOC(getOpName() << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
 }
 
-REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    accumulator,
+    AccumulatorJs::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorJs::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
