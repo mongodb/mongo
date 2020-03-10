@@ -1323,7 +1323,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 1440 # 24 hours
+  batchtime: 2880  # 48 hours
   modules: *modules
   expansions:
     setup: replica
@@ -1429,7 +1429,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 1440 # 24 hours
+  batchtime: 2880  # 48 hours
   modules: *modules
   expansions:
     setup: replica-2node
