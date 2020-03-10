@@ -3061,6 +3061,20 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             // Set the 'newlyAdded' field to true for all new voting nodes.
             for (int i = 0; i < newConfig.getNumMembers(); i++) {
                 const auto newMem = newConfig.getMemberAt(i);
+
+                // If this is a safe reconfig, the 'newlyAdded' flag should never already be set for
+                // this member. If it is set, throw an error.
+                if (!args.force && newMem.isNewlyAdded()) {
+                    str::stream errmsg;
+                    errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
+                           << " field to member config during safe reconfig.";
+                    LOGV2_ERROR(
+                        4634900,
+                        "Initializing 'newlyAdded' field to member has failed with bad status.",
+                        "errmsg"_attr = std::string(errmsg));
+                    return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+                }
+
                 const int newMemId = newMem.getId().getData();
                 const bool newMemberIdNotInOldConfig =
                     (oldConfig.findMemberByID(newMemId) == nullptr);

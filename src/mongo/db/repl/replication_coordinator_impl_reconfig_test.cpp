@@ -1141,6 +1141,67 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldSetToFalse) {
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 }
 
+TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafeReconfig) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    init();
+    auto configVersion = 1;
+    assertStartSuccess(
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // `newlyAdded` should only be set to true if the repl set goes through reconfig.
+    ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
+    ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    // Ensure that this is a non-force reconfig.
+    args.force = false;
+    // Do a reconfig that tries to add a new member with 'newlyAdded' field passed in.
+    args.newConfigObj =
+        configWithMembers(2,
+                          0,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "n3:1"
+                                                                     << "newlyAdded" << true)));
+
+    startCapturingLogMessages();
+    ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig,
+              getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    stopCapturingLogMessages();
+
+    // Verify that an error message was created when the user provides a 'newlyAdded' field during a
+    // non-force reconfig.
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Initializing 'newlyAdded' field to member has failed with bad status."));
+
+    // Verify that a log message was not created for rewritting the new config, since we did not add
+    // a`newlyAdded` field.
+    ASSERT_EQUALS(
+        0, countTextFormatLogLinesContaining("Rewrote the config to add `newlyAdded` field"));
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo
