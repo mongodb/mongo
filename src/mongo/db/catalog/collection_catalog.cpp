@@ -405,7 +405,13 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
         auto dbName = iter->first.first;
         if (iter->second->isCommitted()) {
             ret.push_back(dbName);
+        } else {
+            // If the first collection found for `dbName` is not yet committed, increment the
+            // iterator to find the next visible collection (possibly under a different `dbName`).
+            iter++;
+            continue;
         }
+        // Move on to the next database after `dbName`.
         iter = _orderedCollections.upper_bound(std::make_pair(dbName, maxUuid));
     }
     return ret;

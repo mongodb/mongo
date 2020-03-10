@@ -608,6 +608,65 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     catalog.deregisterAllCollections();
 }
 
+TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommittedCollections) {
+    NamespaceString aColl("dbA", "collA");
+    NamespaceString b1Coll("dbB", "collB1");
+    NamespaceString b2Coll("dbB", "collB2");
+    NamespaceString cColl("dbC", "collC");
+    NamespaceString d1Coll("dbD", "collD1");
+    NamespaceString d2Coll("dbD", "collD2");
+    NamespaceString d3Coll("dbD", "collD3");
+
+    std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
+    for (auto& nss : nsss) {
+        std::unique_ptr<Collection> newColl = std::make_unique<CollectionMock>(nss);
+        auto uuid = CollectionUUID::gen();
+        catalog.registerCollection(uuid, &newColl);
+    }
+
+    // One dbName with only an invisible collection does not appear in dbNames.
+    auto invisibleCollA = catalog.lookupCollectionByNamespace(&opCtx, aColl);
+    invisibleCollA->setCommitted(false);
+
+    auto res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbA");
+    ASSERT(res.empty());
+
+    std::vector<std::string> dbNames = {"dbB", "dbC", "dbD", "testdb"};
+    ASSERT(catalog.getAllDbNames() == dbNames);
+
+    // One dbName with both visible and invisible collections is still visible.
+    std::vector<NamespaceString> dbDNss = {d1Coll, d2Coll, d3Coll};
+    for (auto& nss : dbDNss) {
+        // Test each combination of one collection in dbD being invisible while the other two are
+        // visible.
+        std::vector<NamespaceString> dCollList = dbDNss;
+        dCollList.erase(std::find(dCollList.begin(), dCollList.end(), nss));
+
+        auto invisibleCollD = catalog.lookupCollectionByNamespace(&opCtx, nss);
+        invisibleCollD->setCommitted(false);
+
+        res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbD");
+        std::sort(res.begin(), res.end());
+        ASSERT(res == dCollList);
+
+        ASSERT(catalog.getAllDbNames() == dbNames);
+        invisibleCollD->setCommitted(true);
+    }
+
+    invisibleCollA->setCommitted(true);  // reset visibility.
+
+    // If all dbNames consist only of invisible collections, none of these dbs is visible.
+    for (auto& nss : nsss) {
+        auto invisibleColl = catalog.lookupCollectionByNamespace(&opCtx, nss);
+        invisibleColl->setCommitted(false);
+    }
+
+    std::vector<std::string> dbList = {"testdb"};
+    ASSERT(catalog.getAllDbNames() == dbList);
+
+    catalog.deregisterAllCollections();
+}
+
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
 public:
     void createTestData() {
