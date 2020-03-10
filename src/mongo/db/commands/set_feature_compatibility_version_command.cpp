@@ -74,7 +74,6 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-4
 MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
-MONGO_FAIL_POINT_DEFINE(allowFCVDowngradeWithCompoundHashedShardKey);
 
 /**
  * Deletes the persisted default read/write concern document.
@@ -260,35 +259,6 @@ public:
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
                 return true;
-            }
-
-            // Compound hashed shard keys are only allowed in 4.4. If the user tries to downgrade
-            // the cluster to FCV42, they must first drop all the collections with compound hashed
-            // shard key. If we find any existing collections, we uassert.
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                const auto grid = Grid::get(opCtx);
-                auto allDbs = uassertStatusOK(grid->catalogClient()->getAllDBs(
-                                                  opCtx, repl::ReadConcernLevel::kLocalReadConcern))
-                                  .value;
-                for (const auto& db : allDbs) {
-                    auto collections = uassertStatusOK(grid->catalogClient()->getCollections(
-                        opCtx, &db.getName(), nullptr, repl::ReadConcernLevel::kLocalReadConcern));
-                    for (const auto& coll : collections) {
-                        if (coll.getDropped()) {
-                            continue;
-                        }
-                        auto shardKeyPattern = coll.getKeyPattern().toBSON();
-                        uassert(31411,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there is an existing "
-                                       "collection with compound hashed shard key. Please drop the "
-                                       "collection "
-                                    << coll.getNs() << " and re-initiate the downgrade process",
-                                allowFCVDowngradeWithCompoundHashedShardKey.shouldFail() ||
-                                    !ShardKeyPattern::extractHashedField(shardKeyPattern) ||
-                                    shardKeyPattern.nFields() == 1);
-                    }
-                }
             }
 
             // Two phase index builds are only supported in 4.4. If the user tries to downgrade the

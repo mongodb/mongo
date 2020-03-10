@@ -283,39 +283,18 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithV
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV44) {
-    ServerGlobalParams::FeatureCompatibility fcv;
-    fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
+TEST(IndexKeyValidateTest, CompoundHashedIndex) {
     // Validation succeeds with hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv));
+        nullptr,
+        fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"),
+        ServerGlobalParams::FeatureCompatibility()));
 
     // Validation succeeds with non-hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}"), fcv));
-}
-
-TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV42) {
-    ServerGlobalParams::FeatureCompatibility fcv;
-
-    // Validate that an uninitalized FCV does not allow compound hashed index.
-    auto status = index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.getStatus().code(), 16763);
-
-    fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
-
-    // Validation succeeds with single field hashed index.
-    ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed'}, name: 'index'}"), fcv));
-
-    // Validation fails with compound hashed index.
-    status = index_key_validate::validateIndexSpec(
-        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.getStatus().code(), 16763);
+        nullptr,
+        fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}"),
+        ServerGlobalParams::FeatureCompatibility()));
 }
 
 }  // namespace

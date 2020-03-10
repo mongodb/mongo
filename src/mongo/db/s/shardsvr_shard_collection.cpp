@@ -641,14 +641,6 @@ UUID shardCollection(OperationContext* opCtx,
         return *collectionOptional->getUUID();
     }
 
-    bool isFCV44 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
-    uassert(ErrorCodes::BadValue,
-            "Compound hashed shard key can only be used when FCV is fully upgraded to 4.4",
-            isFCV44 || !ShardKeyPattern::extractHashedField(request.getKey()) ||
-                request.getKey().nFields() == 1);
-
     std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
     boost::optional<ShardCollectionTargetState> targetState;
