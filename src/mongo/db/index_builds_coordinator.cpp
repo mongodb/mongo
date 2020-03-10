@@ -1105,6 +1105,16 @@ void IndexBuildsCoordinator::dump(std::ostream& ss) const {
     }
 }
 
+bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID,
+                                                 IndexBuildProtocol protocol) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto indexBuildFilter = [=](const auto& replState) {
+        return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
+    };
+    auto indexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+    return !indexBuilds.empty();
+}
+
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID) const {
     stdx::unique_lock<Latch> lk(_mutex);
     return _collectionIndexBuilds.find(collectionUUID) != _collectionIndexBuilds.end();
