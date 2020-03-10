@@ -972,6 +972,38 @@ TEST(ReplSetConfig, CannotSetNewlyAddedFieldToFalseForMemberConfig) {
                        ErrorCodes::InvalidReplicaSetConfig);
 }
 
+TEST(ReplSetConfig, NodeWithNewlyAddedFieldHasVotesZero) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    // Create a config for a three-node set with one arbiter and one node with 'newlyAdded: true'.
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "n1:1"
+                                                              << "newlyAdded" << true)
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "n2:1")
+                                                   << BSON("_id" << 3 << "host"
+                                                                 << "n3:1"
+                                                                 << "arbiterOnly" << true)))));
+
+    // Verify that the member had its 'newlyAdded' field set to true after parsing.
+    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
+    // Verify that the member is considered a non-voting node.
+    ASSERT_FALSE(config.findMemberByID(1)->isVoter());
+
+    // Verify that the rest of the counts were updated correctly.
+    ASSERT_EQ(2, config.getTotalVotingMembers());
+    ASSERT_EQ(2, config.getMajorityVoteCount());
+    ASSERT_EQ(1, config.getWriteMajority());
+    ASSERT_EQ(1, config.getWritableVotingMembersCount());
+}
+
 TEST(ReplSetConfig, ConfigServerFieldDefaults) {
     serverGlobalParams.clusterRole = ClusterRole::None;
 
@@ -1136,8 +1168,9 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
-        a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
-        a.getNumTags() == b.getNumTags() && a.getHorizonMappings() == b.getHorizonMappings() &&
+        a.isNewlyAdded() == b.isNewlyAdded() && a.isHidden() == b.isHidden() &&
+        a.shouldBuildIndexes() == b.shouldBuildIndexes() && a.getNumTags() == b.getNumTags() &&
+        a.getHorizonMappings() == b.getHorizonMappings() &&
         a.getHorizonReverseHostMappings() == b.getHorizonReverseHostMappings();
 }
 

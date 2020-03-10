@@ -999,6 +999,10 @@ bool ReplSetConfig::containsArbiter() const {
 
 void ReplSetConfig::setNewlyAddedFieldForMemberAtIndex(int memberIndex, bool newlyAdded) {
     _members[memberIndex].setNewlyAdded(newlyAdded);
+
+    // We must recalculate the majority, since nodes with the 'newlyAdded' field set
+    // should be treated as non-voting nodes.
+    _calculateMajorities();
 }
 
 }  // namespace repl

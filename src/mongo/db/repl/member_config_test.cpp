@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -187,6 +188,31 @@ TEST(MemberConfig, NewlyAddedSetToFalseShouldThrow) {
                                           << "newlyAdded" << false),
                                &tagConfig),
                   ExceptionFor<ErrorCodes::InvalidReplicaSetConfig>);
+}
+
+TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVote) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'newlyAdded: true'.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "newlyAdded" << true),
+                    &tagConfig);
+    ASSERT_TRUE(mc.isNewlyAdded().get());
+
+    // Nodes with newly added field set should transiently not be allowed to vote.
+    ASSERT_FALSE(mc.isVoter());
+
+    // Verify that the member is still a voting node.
+    const auto obj = mc.toBSON(tagConfig);
+    long long votes;
+    uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
+    ASSERT_EQ(1, votes);
 }
 
 TEST(MemberConfig, ParseHidden) {

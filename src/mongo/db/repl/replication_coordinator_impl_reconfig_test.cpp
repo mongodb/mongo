@@ -1534,6 +1534,43 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
                       "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
+TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a reconfig that adds a new member to the config.
+    args.newConfigObj = configWithMembers(
+        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    startCapturingLogMessages();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    stopCapturingLogMessages();
+
+    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
+
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+
+    // Verify that the newly added node is not considered a voting node.
+    ASSERT_EQUALS(2, rsConfig.getTotalVotingMembers());
+
+    // Verify that the rest of the majorities and counts were updated correctly.
+    ASSERT_EQUALS(2, rsConfig.getMajorityVoteCount());
+    ASSERT_EQUALS(2, rsConfig.getWriteMajority());
+    ASSERT_EQUALS(2, rsConfig.getWritableVotingMembersCount());
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo

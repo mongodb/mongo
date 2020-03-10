@@ -143,7 +143,8 @@ public:
      * Returns true if this member may vote in elections.
      */
     bool isVoter() const {
-        return _votes != 0;
+        const bool isNewlyAddedFieldSet = isNewlyAdded().get_value_or(false);
+        return (_votes != 0 && !isNewlyAddedFieldSet);
     }
 
     /**
