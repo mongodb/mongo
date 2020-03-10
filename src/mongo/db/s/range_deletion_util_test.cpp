@@ -782,5 +782,33 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
     cleanupComplete.get();
 }
 
+TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoesNotExist) {
+    auto queriesComplete = SemiFuture<void>::makeReady();
+    const std::string kNoShardKeyIndexMsg("Unable to find shard key index for");
+    auto logCountBefore = countTextFormatLogLinesContaining(kNoShardKeyIndexMsg);
+
+    auto cleanupComplete =
+        removeDocumentsInRange(executor(),
+                               std::move(queriesComplete),
+                               kNss,
+                               uuid(),
+                               BSON("x" << 1) /* shard key pattern */,
+                               ChunkRange(BSON("x" << 0), BSON("x" << 10)),
+                               10 /* numDocsToRemovePerBatch*/,
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
+                               Milliseconds(0) /* delayBetweenBatches */);
+
+    // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run
+    // a few iterations and then create the index to make it exit the retry loop.
+    while (countTextFormatLogLinesContaining(kNoShardKeyIndexMsg) < logCountBefore) {
+        sleepmicros(100);
+    }
+
+    DBDirectClient client(operationContext());
+    client.createIndex(kNss.ns(), BSON("x" << 1));
+
+    cleanupComplete.get();
+}
+
 }  // namespace
 }  // namespace mongo
