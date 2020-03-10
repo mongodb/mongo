@@ -382,18 +382,18 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // This blocking behavior can also introduce a deadlock with two-phase index builds on
     // a secondary if a prepared transaction blocks on an index build, but the index build can't
     // re-acquire its X lock because of the transaction.
-    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-        for (const auto& op : ops) {
-            auto ns = op.getNss();
-            auto uuid = *op.getUuid();
-            if (BackgroundOperation::inProgForNs(ns)) {
-                LOGV2_WARNING(21849,
-                              "blocking replication until index builds are finished on {ns}, due "
-                              "to prepared transaction",
-                              "ns"_attr = redact(ns.toString()));
-                BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-                IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
-            }
+    for (const auto& op : ops) {
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+        auto ns = op.getNss();
+        auto uuid = *op.getUuid();
+        if (indexBuildsCoord->inProgForCollection(uuid, IndexBuildProtocol::kSinglePhase)) {
+            LOGV2_WARNING(21849,
+                          "blocking replication until single-phase index builds are finished on "
+                          "collection, due to prepared transaction",
+                          "ns"_attr = redact(ns.toString()),
+                          "uuid"_attr = uuid);
+            indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
+                opCtx, uuid, IndexBuildProtocol::kSinglePhase);
         }
     }
 
