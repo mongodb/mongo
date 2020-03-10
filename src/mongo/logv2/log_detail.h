@@ -68,8 +68,7 @@ void doLog(int32_t id,
            S const& fmtmsg,
            const char (&msg)[N],
            const fmt::internal::named_arg<Args, char>&... args) {
-    // TODO: When using JSON formatter, use 'msg' instead of 'fmtmsg' below.
-    doLog(id, severity, options, fmtmsg, args...);
+    doLog(id, severity, options, msg, args...);
 }
 
 template <typename S>
