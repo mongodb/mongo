@@ -106,7 +106,6 @@ selector:
   - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
   - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
   - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-  - jstests/concurrency/fsm_workloads/sharded_moveChunk_drop_shard_key_index.js
   - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
   - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
