@@ -99,6 +99,10 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
+#include <fmt/format.h>
+
+using namespace fmt::literals;
+
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
@@ -781,11 +785,16 @@ bool runCommandImpl(OperationContext* opCtx,
 
         // With the exception of getMores inheriting the WriteConcern from the originating command,
         // nothing in run() should change the writeConcern.
-        dassert(command->getLogicalOp() == LogicalOp::opGetMore
-                    ? !extractedWriteConcern
-                    : (extractedWriteConcern &&
-                       SimpleBSONObjComparator::kInstance.evaluate(
-                           opCtx->getWriteConcern().toBSON() == extractedWriteConcern->toBSON())));
+        if (command->getLogicalOp() == LogicalOp::opGetMore) {
+            dassert(!extractedWriteConcern,
+                    "opGetMore contained unexpected extracted write concern");
+        } else {
+            dassert(extractedWriteConcern, "no extracted write concern");
+            dassert(opCtx->getWriteConcern() == extractedWriteConcern,
+                    "opCtx wc: {} extracted wc: {}"_format(
+                        opCtx->getWriteConcern().toBSON().jsonString(),
+                        extractedWriteConcern->toBSON().jsonString()));
+        }
     } else {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         if (shouldCheckOutSession) {
