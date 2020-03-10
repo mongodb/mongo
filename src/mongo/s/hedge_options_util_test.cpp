@@ -82,13 +82,14 @@ protected:
      * before returning.
      */
     void checkHedgeOptions(const BSONObj& serverParameters,
+                           const BSONObj& cmdObj,
                            const BSONObj& rspObj,
                            const bool hedge,
                            const int maxTimeMSForHedgedReads = kMaxTimeMSForHedgedReadsDefault) {
         setParameters(serverParameters);
 
         auto readPref = uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(rspObj));
-        auto hedgeOptions = extractHedgeOptions(readPref);
+        auto hedgeOptions = extractHedgeOptions(cmdObj, readPref);
 
         if (hedge) {
             ASSERT_TRUE(hedgeOptions.has_value());
@@ -101,6 +102,8 @@ protected:
     }
 
     static inline const std::string kCollName = "testColl";
+    static inline const StringData mapJavascript = "map!"_sd;
+    static inline const StringData reduceJavascript = "reduce!"_sd;
 
     static inline const std::string kReadHedgingModeFieldName = "readHedgingMode";
     static inline const std::string kMaxTimeMSForHedgedReadsFieldName = "maxTimeMSForHedgedReads";
@@ -117,48 +120,90 @@ private:
 
 TEST_F(HedgeOptionsUtilTestFixture, ExplicitOperationHedging) {
     const auto parameters = BSONObj();
+    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "primaryPreferred"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, rspObj, true);
+    checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedging) {
     const auto parameters = BSONObj();
+    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest");
 
-    checkHedgeOptions(parameters, rspObj, true);
+    checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, OperationHedgingDisabled) {
+TEST_F(HedgeOptionsUtilTestFixture, BlacklistAggregate) {
     const auto parameters = BSONObj();
-    const auto rspObj = BSON("mode"
-                             << "nearest"
-                             << "hedge" << BSON("enabled" << false));
-
-    checkHedgeOptions(parameters, rspObj, false);
-}
-
-TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
-    const auto parameters = BSON(kReadHedgingModeFieldName << "off");
+    const auto cmdObj =
+        BSON("aggregate" << kCollName << "pipeline" << BSONObj() << "cursor" << BSONObj());
     const auto rspObj = BSON("mode"
                              << "nearest"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, rspObj, false);
+    checkHedgeOptions(parameters, cmdObj, rspObj, false);
+}
+
+TEST_F(HedgeOptionsUtilTestFixture, BlacklistMapReduce) {
+    const auto parameters = BSONObj();
+    const auto rspObj = BSON("mode"
+                             << "nearest"
+                             << "hedge" << BSONObj());
+
+    {
+        const auto cmdObj = BSON("mapreduce"
+                                 << "sourceColl"
+                                 << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                                 << "targetColl"
+                                 << "$db"
+                                 << "db");
+        checkHedgeOptions(parameters, cmdObj, rspObj, false);
+    }
+
+    {
+        const auto cmdObj = BSON("mapReduce"
+                                 << "sourceColl"
+                                 << "map" << mapJavascript << "reduce" << reduceJavascript << "out"
+                                 << "targetColl"
+                                 << "$db"
+                                 << "db");
+        checkHedgeOptions(parameters, cmdObj, rspObj, false);
+    }
+}
+
+TEST_F(HedgeOptionsUtilTestFixture, OperationHedgingDisabled) {
+    const auto parameters = BSONObj();
+    const auto cmdObj = BSON("find" << kCollName);
+    const auto rspObj = BSON("mode"
+                             << "nearest"
+                             << "hedge" << BSON("enabled" << false));
+
+    checkHedgeOptions(parameters, cmdObj, rspObj, false);
+}
+
+TEST_F(HedgeOptionsUtilTestFixture, ReadHedgingModeOff) {
+    const auto parameters = BSON(kReadHedgingModeFieldName << "off");
+    const auto cmdObj = BSON("find" << kCollName);
+    const auto rspObj = BSON("mode"
+                             << "nearest"
+                             << "hedge" << BSONObj());
+
+    checkHedgeOptions(parameters, cmdObj, rspObj, false);
 }
 
 TEST_F(HedgeOptionsUtilTestFixture, MaxTimeMSForHedgedReads) {
     const auto parameters =
         BSON(kReadHedgingModeFieldName << "on" << kMaxTimeMSForHedgedReadsFieldName << 100);
-
+    const auto cmdObj = BSON("find" << kCollName);
     const auto rspObj = BSON("mode"
                              << "nearest"
                              << "hedge" << BSONObj());
 
-    checkHedgeOptions(parameters, rspObj, true, 100);
+    checkHedgeOptions(parameters, cmdObj, rspObj, true, 100);
 }
 
 }  // namespace

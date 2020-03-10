@@ -182,7 +182,7 @@ SemiFuture<std::vector<HostAndPort>> AsyncRequestsSender::RemoteData::resolveSha
 
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndPort>&& hostAndPorts)
     -> SemiFuture<RemoteCommandOnAnyCallbackArgs> {
-    auto hedgeOptions = extractHedgeOptions(_ars->_readPreference);
+    auto hedgeOptions = extractHedgeOptions(_cmdObj, _ars->_readPreference);
     executor::RemoteCommandRequestOnAny request(std::move(hostAndPorts),
                                                 _ars->_db,
                                                 _cmdObj,
