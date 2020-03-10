@@ -941,8 +941,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         if (!usingIndexToSort) {
             for (size_t i = 0; i < fullIndexList.size(); ++i) {
                 const IndexEntry& index = fullIndexList[i];
-                // Only regular (non-plugin) indexes can be used to provide a sort, and only
-                // non-sparse indexes can be used to provide a sort.
+                // Only a regular index or the non-hashed prefix of a compound hashed index can be
+                // used to provide a sort. In addition, the index needs to be a non-sparse index.
                 //
                 // TODO: Sparse indexes can't normally provide a sort, because non-indexed
                 // documents could potentially be missing from the result set.  However, if the
@@ -955,7 +955,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
                 //   2dsphereIndexVersion=2) should be able to provide a sort for
                 //   find({b: GEO}).sort({a:1}).  SERVER-10801.
-                if (index.type != INDEX_BTREE) {
+                if (index.type != INDEX_BTREE && index.type != INDEX_HASHED) {
                     continue;
                 }
                 if (index.sparse) {

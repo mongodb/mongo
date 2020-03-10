@@ -560,6 +560,11 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
                   << "hashed"
                   << "y" << -1 << "z" << 1));
 
+    // Verify that sort on a hashed field results in collection scan.
+    runQueryAsCommand(fromjson("{filter: {}, sort: {x: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: {cscan: {dir: 1}} }}");
+
     // Verify that a list of exact match predicates on hashed field (prefix) and sort with an
     // immediate range field can use 'SORT_MERGE'.
     runQueryAsCommand(fromjson("{filter: {x: {$in: [1, 2]}}, sort: {y: 1}}"));
@@ -598,6 +603,12 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
     addIndex(BSON("x" << 1 << "y" << -1 << "z"
                       << "hashed"
                       << "a" << 1));
+
+    // Verify that sort on a hashed field results in collection scan.
+    runQueryAsCommand(fromjson("{filter: {}, sort: {x: 1, y: -1, z: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {x: 1, y: -1, z: 1}, limit: 0, node: {cscan: {dir: 1}} }}");
 
     // Verify that a list of exact match predicates on range field (prefix) and sort with an
     // immediate range field can use 'SORT_MERGE'.
@@ -644,6 +655,45 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
         "{fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: 1}, "
         "bounds: {x: [[3,3,true,true]], y: [['MaxKey','MinKey',true,true]], z: "
         "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }} }}");
+}
+
+TEST_F(QueryPlannerHashedTest, SortWithMissingOrIrrelevantQueryPredicate) {
+    addIndex(BSON("x" << 1 << "y" << -1 << "z"
+                      << "hashed"
+                      << "a" << 1));
+
+    // Verify that a sort on non-hashed fields doesn't require any additional sort stages. The
+    // entire operation can be answered by the index. Also verify that if the projection only
+    // includes non-hashed index fields, plan does not use a fetch stage.
+    runQueryAsCommand(
+        fromjson("{filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, y: 1, a: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1, y: 1, a: 1}, node: {ixscan: {pattern: {x: 1, y: -1, z: "
+        "'hashed', a: 1}, bounds: {x: [['MinKey','MaxKey',true,true]], y: "
+        "[['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]], a: "
+        "[['MinKey','MaxKey',true,true]]} }} }}");
+
+    // Verify that a sort on non-hashed fields with a query predicate on fields irrelevant to the
+    // index, doesn't require any additional sort stages.
+    runQueryAsCommand(fromjson("{filter: {p: 5}, sort: {x: 1, y: -1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {p: {$eq: 5}}, node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: "
+        "1}, bounds: {x: [['MinKey','MaxKey',true,true]], y: [['MaxKey','MinKey',true,true]], z: "
+        "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }}");
+
+    // Verify that a sort on non-hashed fields doesn't require any additional sort stages. The
+    // entire operation can be answered by the index. Also verify that if the projection includes
+    // hashed fields, the operation will require a fetch stage.
+    runQueryAsCommand(
+        fromjson("{filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, z: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1, z: 1}, node: {fetch: {filter: null, node: {ixscan: "
+        "{pattern: {x: 1, y: -1, z: 'hashed', a: 1}, bounds: {x: [['MinKey','MaxKey',true,true]], "
+        "y: [['MaxKey','MinKey',true,true]], z: [['MinKey','MaxKey',true,true]], a: "
+        "[['MinKey','MaxKey',true,true]]} }} }} }}");
 }
 
 //
@@ -918,7 +968,6 @@ TEST_F(QueryPlannerHashedTest, MinMaxParameter) {
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: 5}}, node: {ixscan: {filter: null, pattern: {x: 'hashed', y: "
         "1} }}}}");
-
 
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"));
