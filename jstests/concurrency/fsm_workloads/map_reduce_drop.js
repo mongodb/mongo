@@ -53,12 +53,17 @@ var $config = (function() {
             // be dropped by another thread, some mapReduce commands should end up
             // running on non-empty collections by virtue of the number of
             // iterations and threads in this workload.
-            var bulk = mapReduceDb[collName].initializeUnorderedBulkOp();
-            for (var i = 0; i < this.numDocs; ++i) {
-                bulk.insert({key: Random.randInt(10000)});
+            try {
+                var bulk = mapReduceDb[collName].initializeUnorderedBulkOp();
+                for (var i = 0; i < this.numDocs; ++i) {
+                    bulk.insert({key: Random.randInt(10000)});
+                }
+                var res = bulk.execute();
+                assertAlways.commandWorked(res);
+            } catch (ex) {
+                assert.eq(true, ex instanceof BulkWriteError);
+                assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
             }
-            var res = bulk.execute();
-            assertAlways.commandWorked(res);
 
             var options = {
                 finalize: function finalize(key, reducedValue) {
