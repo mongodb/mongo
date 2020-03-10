@@ -101,23 +101,20 @@ void printMongodHelp(const moe::OptionSection& options) {
 };
 
 namespace {
-void sysRuntimeInfo() {
+
+void appendSysInfo(BSONObjBuilder* obj) {
+    auto o = BSONObjBuilder(obj->subobjStart("sysinfo"));
 #if defined(_SC_PAGE_SIZE)
-    LOGV2(20873,
-          "  page size: {int_sysconf_SC_PAGE_SIZE}",
-          "int_sysconf_SC_PAGE_SIZE"_attr = (int)sysconf(_SC_PAGE_SIZE));
+    o.append("_SC_PAGE_SIZE", (long long)sysconf(_SC_PAGE_SIZE));
 #endif
 #if defined(_SC_PHYS_PAGES)
-    LOGV2(20874,
-          "  _SC_PHYS_PAGES: {sysconf_SC_PHYS_PAGES}",
-          "sysconf_SC_PHYS_PAGES"_attr = sysconf(_SC_PHYS_PAGES));
+    o.append("_SC_PHYS_PAGES", (long long)sysconf(_SC_PHYS_PAGES));
 #endif
 #if defined(_SC_AVPHYS_PAGES)
-    LOGV2(20875,
-          "  _SC_AVPHYS_PAGES: {sysconf_SC_AVPHYS_PAGES}",
-          "sysconf_SC_AVPHYS_PAGES"_attr = sysconf(_SC_AVPHYS_PAGES));
+    o.append("_SC_AVPHYS_PAGES", (long long)sysconf(_SC_AVPHYS_PAGES));
 #endif
 }
+
 }  // namespace
 
 bool handlePreValidationMongodOptions(const moe::Environment& params,
@@ -126,24 +123,16 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
         printMongodHelp(moe::startupOptions);
         return false;
     }
-
-    auto setPlainLogFormat = []() {
-        auto& globalDomain = logv2::LogManager::global().getGlobalDomainInternal();
-        logv2::LogDomainGlobal::ConfigurationOptions config = globalDomain.config();
-        config.format = logv2::LogFormat::kPlain;
-        invariant(globalDomain.configure(config).isOK());
-    };
-
     if (params.count("version") && params["version"].as<bool>() == true) {
-        setPlainLogFormat();
         auto&& vii = VersionInfoInterface::instance();
-        LOGV2(20876, "{mongodVersion_vii}", "mongodVersion_vii"_attr = mongodVersion(vii));
-        vii.logBuildInfo();
+        std::cout << mongodVersion(vii) << std::endl;
+        vii.logBuildInfo(&std::cout);
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
-        setPlainLogFormat();
-        sysRuntimeInfo();
+        BSONObjBuilder obj;
+        appendSysInfo(&obj);
+        std::cout << tojson(obj.done(), ExtendedRelaxedV2_0_0, true) << std::endl;
         return false;
     }
 
