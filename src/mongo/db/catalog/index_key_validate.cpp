@@ -316,8 +316,7 @@ StatusWith<BSONObj> validateIndexSpec(
                 (IndexNames::findPluginName(indexSpecElem.embeddedObject()) ==
                  IndexNames::HASHED)) {
                 return {ErrorCodes::Error(16763),
-                        "Compound hashed indexes can only be created with FCV 4.4 and with test "
-                        "commands enabled "};
+                        "Compound hashed indexes can only be created with FCV 4.4"};
             }
 
             hasKeyPatternField = true;
