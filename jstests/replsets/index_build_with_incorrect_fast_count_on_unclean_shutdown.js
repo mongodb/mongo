@@ -2,7 +2,9 @@
  * Test that index builder doesn't skip building index when the fast count value is incorrect
  * on unclean shutdowns.
  *
- *  @tags: [requires_persistence]
+ *  @tags: [requires_persistence,
+ *          # Restarting a node after an unclean shutdown is not supported in multiversion testing.
+ *          multiversion_incompatible]
  */
 (function() {
 
