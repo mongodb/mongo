@@ -30,6 +30,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -680,6 +681,14 @@ protected:
      * it is fine to examine the returned index builds without re-locking 'mutex'.
      */
     std::vector<std::shared_ptr<ReplIndexBuildState>> _getIndexBuilds() const;
+
+    /**
+     * Returns a list of index builds matching the criteria 'indexBuildFilter'.
+     * Requires caller to lock '_mutex'.
+     */
+    using IndexBuildFilterFn = std::function<bool(const ReplIndexBuildState& replState)>;
+    std::vector<std::shared_ptr<ReplIndexBuildState>> _filterIndexBuilds_inlock(
+        WithLock lk, IndexBuildFilterFn indexBuildFilter) const;
 
     /**
      * Helper for 'abortCollectionIndexBuilds' and 'abortCollectionIndexBuildsNoWait'. Returns the
