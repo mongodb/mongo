@@ -233,6 +233,8 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
 std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                               const NamespaceString& ns,
                                                               bool includeBuildUUIDs) {
+    // Note that 'ns' must be an unsharded collection. The indexes for a sharded collection must be
+    // read from a shard with a chunk instead of the primary shard.
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     auto shard = uassertStatusOK(

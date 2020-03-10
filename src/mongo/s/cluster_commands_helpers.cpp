@@ -758,4 +758,40 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     return catalogCache->getCollectionRoutingInfoAt(opCtx, nss, atClusterTime.asTimestamp());
 }
 
+StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
+    const auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+    auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
+        auto cmdNoVersion = applyReadWriteConcern(
+            opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
+        if (routingInfo.cm()) {
+            // For a sharded collection we must load indexes from a shard with chunks. For
+            // consistency with cluster listIndexes, load from the shard that owns the minKey chunk.
+            const auto minKeyShardId = routingInfo.cm()->getMinKeyShardIdWithSimpleCollation();
+            auto minKeyShard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId));
+            return {minKeyShard,
+                    appendShardVersion(cmdNoVersion, routingInfo.cm()->getVersion(minKeyShardId))};
+        } else {
+            // For an unsharded collection, the primary shard will have correct indexes. We attach
+            // unsharded shard version to detect if the collection has become sharded.
+            const auto cmdObjWithShardVersion =
+                (routingInfo.db().primaryId() != ShardRegistry::kConfigServerShardId)
+                ? appendShardVersion(cmdNoVersion, ChunkVersion::UNSHARDED())
+                : cmdNoVersion;
+            return {routingInfo.db().primary(),
+                    appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo.db())};
+        }
+    }();
+
+    return indexShard->runExhaustiveCursorCommand(
+        opCtx,
+        ReadPreferenceSetting::get(opCtx),
+        nss.db().toString(),
+        listIndexesCmd,
+        opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
+}
+
 }  // namespace mongo
