@@ -67,7 +67,8 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.StaleConfig,
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
-            ErrorCodes.PreparedTransactionInProgress
+            ErrorCodes.PreparedTransactionInProgress,
+            ErrorCodes.ShardInvalidatedForTargeting
         ];
 
         // Failed in the document shard key path, but not with a duplicate key error
