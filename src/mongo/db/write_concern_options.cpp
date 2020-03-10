@@ -256,4 +256,10 @@ bool WriteConcernOptions::needToWaitForOtherNodes() const {
     return !wMode.empty() || wNumNodes > 1;
 }
 
+bool WriteConcernOptions::operator==(const WriteConcernOptions& other) const {
+    return syncMode == other.syncMode && wMode == other.wMode && wNumNodes == other.wNumNodes &&
+        wDeadline == other.wDeadline && wTimeout == other.wTimeout &&
+        _provenance == other._provenance;
+}
+
 }  // namespace mongo

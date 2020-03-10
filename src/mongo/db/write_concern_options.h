@@ -114,6 +114,12 @@ public:
     // Warning: does not return the same object passed on the last parse() call.
     BSONObj toBSON() const;
 
+    bool operator==(const WriteConcernOptions& other) const;
+
+    bool operator!=(const WriteConcernOptions& other) const {
+        return !operator==(other);
+    }
+
     SyncMode syncMode;
 
     // The w parameter for this write concern. The wMode represents the string format and

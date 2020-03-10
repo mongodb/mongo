@@ -136,9 +136,17 @@ public:
     void serialize(BSONObjBuilder* builder) const;
 
     /**
-     * Convenience function.
+     * Convenience functions.
      */
     static StringData sourceToString(boost::optional<Source> source);
+
+    bool operator==(const ReadWriteConcernProvenance& other) const {
+        return getSource() == other.getSource();
+    }
+
+    bool operator!=(const ReadWriteConcernProvenance& other) const {
+        return !operator==(other);
+    }
 };
 
 }  // namespace mongo
