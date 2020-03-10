@@ -42,7 +42,7 @@
 namespace mongo {
 namespace executor {
 
-extern FailPoint networkInterfaceConnectTargetHostsInAlphabeticalOrder;
+extern FailPoint networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder;
 extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
 extern FailPoint networkInterfaceHangCommandsAfterAcquireConn;
 extern FailPoint networkInterfaceAfterAcquireConn;

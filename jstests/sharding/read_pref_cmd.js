@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
 
 const nodeCount = 3;
@@ -135,7 +136,8 @@ let assertCmdRanOnExpectedNodes = function(conn, isMongos, rsNodes, cmdTestCase)
 
         // We did hedge the operation. That is, we did acquire a connection to one other eligible
         // node and try to send an additional request. So if the request had already been sent
-        // when the command finished, that other node could also run the command to completion.
+        // when the command finished and the remote killOp did not occur quickly enough, that
+        // other node could also run the command to completion.
         assert.eq(numHedgedOperations, 1);
         assert.gte(getNumNodesCmdRanOn(rsNodes, cmdTestCase), 1);
     } else {
