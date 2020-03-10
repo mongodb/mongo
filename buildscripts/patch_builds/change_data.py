@@ -1,5 +1,6 @@
 """Tools for detecting changes in a commit."""
-from typing import Any, Set
+from itertools import chain
+from typing import Any, Set, Iterable
 import os
 
 from git import Repo, DiffIndex
@@ -70,3 +71,14 @@ def find_changed_files(repo: Repo) -> Set[str]:
         os.path.relpath(f"{repo.working_dir}/{os.path.normpath(path)}", os.getcwd())
         for path in paths
     ]
+
+
+def find_changed_files_in_repos(repos: Iterable[Repo]) -> Set[str]:
+    """
+    Find the changed files.
+
+    Use git to find which files have changed in this patch.
+    :param repos: List of repos containing changed files.
+    :returns: Set of changed files.
+    """
+    return set(chain.from_iterable([find_changed_files(repo) for repo in repos]))
