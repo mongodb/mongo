@@ -298,6 +298,13 @@ TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV44) {
 
 TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV42) {
     ServerGlobalParams::FeatureCompatibility fcv;
+
+    // Validate that an uninitalized FCV does not allow compound hashed index.
+    auto status = index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.getStatus().code(), 16763);
+
     fcv.setVersion(ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
 
     // Validation succeeds with single field hashed index.
@@ -305,7 +312,7 @@ TEST(IndexKeyValidateTest, CompoundHashedIndexWithFCV42) {
         nullptr, fromjson("{key: {a : 'hashed'}, name: 'index'}"), fcv));
 
     // Validation fails with compound hashed index.
-    auto status = index_key_validate::validateIndexSpec(
+    status = index_key_validate::validateIndexSpec(
         nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"), fcv);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.getStatus().code(), 16763);
