@@ -127,6 +127,8 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion)
         return {kUnshardedCollection};
+    invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion),
+              "getOwnershipFilter called with an operationContext that has shard version IGNORED");
 
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);

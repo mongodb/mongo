@@ -176,7 +176,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     bool docWasModified = false;
 
     auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-    auto collDesc = css->getCollectionDescription();
+    const auto collDesc = css->getCollectionDescription();
     Status status = Status::OK();
     const bool validateForStorage = opCtx()->writesAreReplicated() && _enforceOkForStorage;
     const bool isInsert = false;
@@ -708,9 +708,8 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
-    // If the shard key fields remain unchanged by this update or if this document is an orphan and
-    // so does not belong to this shard, we can skip the rest of the checks.
-    if ((newShardKey.woCompare(oldShardKey) == 0) || !collDesc->keyBelongsToMe(oldShardKey)) {
+    // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
+    if (newShardKey.woCompare(oldShardKey) == 0) {
         return false;
     }
 
@@ -725,7 +724,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
     // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
     // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
     // shard key fields.
-    const auto& shardKeyPathsVector = collDesc->getKeyPatternFields();
+    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
     pathsupport::EqualityMatches equalities;
     uassert(31025,
             "Shard key update is not allowed without specifying the full shard key in the query",
@@ -748,7 +747,20 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
             "retryWrites: true.",
             opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
 
-    if (!collDesc->keyBelongsToMe(newShardKey)) {
+    // At this point we already asserted that the complete shardKey have been specified in the
+    // query, this implies that mongos is not doing a broadcast update and that it attached a
+    // shardVersion to the command. Thus it is safe to call getOwnershipFilter
+    const auto collFilter =
+        CollectionShardingState::get(opCtx(), collection()->ns())
+            ->getOwnershipFilter(opCtx(),
+                                 CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
+
+    // If this document does not belong anymore to this shard
+    if (!collFilter.keyBelongsToMe(oldShardKey)) {
+        return false;
+    }
+
+    if (!collFilter.keyBelongsToMe(newShardKey)) {
         if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
             LOGV2(20605, "Hit hangBeforeThrowWouldChangeOwningShard failpoint");
             hangBeforeThrowWouldChangeOwningShard.pauseWhileSet(opCtx());

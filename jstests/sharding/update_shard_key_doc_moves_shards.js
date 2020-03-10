@@ -422,55 +422,5 @@ assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 1}).toArray().length);
 
 mongos.getDB(kDbName).foo.drop();
 
-// ----Assert correct behavior when update is sent directly to a shard----
-
-shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-
-//
-// For Op-style updates.
-//
-
-// An update sent directly to a shard cannot change the shard key.
-assert.commandFailedWithCode(
-    st.rs1.getPrimary().getDB(kDbName).foo.update({"x": 500}, {$set: {"x": 2}}),
-    ErrorCodes.ImmutableField);
-assert.commandFailedWithCode(
-    st.rs1.getPrimary().getDB(kDbName).foo.update({"x": 1000}, {$set: {"x": 2}}, {upsert: true}),
-    ErrorCodes.ImmutableField);
-assert.commandFailedWithCode(
-    st.rs0.getPrimary().getDB(kDbName).foo.update({"x": 1000}, {$set: {"x": 2}}, {upsert: true}),
-    ErrorCodes.ImmutableField);
-
-// The query will not match a doc and upsert is false, so this will not fail but will be a
-// no-op.
-res = assert.commandWorked(
-    st.rs0.getPrimary().getDB(kDbName).foo.update({"x": 500}, {$set: {"x": 2}}));
-assert.eq(0, res.nMatched);
-assert.eq(0, res.nModified);
-assert.eq(0, res.nUpserted);
-
-//
-// For Replacement style updates.
-//
-
-// An update sent directly to a shard cannot change the shard key.
-assert.commandFailedWithCode(st.rs1.getPrimary().getDB(kDbName).foo.update({"x": 500}, {"x": 2}),
-                             ErrorCodes.ImmutableField);
-assert.commandFailedWithCode(
-    st.rs1.getPrimary().getDB(kDbName).foo.update({"x": 1000}, {"x": 2}, {upsert: true}),
-    ErrorCodes.ImmutableField);
-assert.commandFailedWithCode(
-    st.rs0.getPrimary().getDB(kDbName).foo.update({"x": 1000}, {"x": 2}, {upsert: true}),
-    ErrorCodes.ImmutableField);
-
-// The query will not match a doc and upsert is false, so this will not fail but will be a
-// no-op.
-res = assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).foo.update({"x": 500}, {"x": 2}));
-assert.eq(0, res.nMatched);
-assert.eq(0, res.nModified);
-assert.eq(0, res.nUpserted);
-
-mongos.getDB(kDbName).foo.drop();
-
 st.stop();
 })();
