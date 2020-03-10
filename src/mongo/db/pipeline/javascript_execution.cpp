@@ -49,7 +49,7 @@ JsExecution* JsExecution::get(OperationContext* opCtx,
                               boost::optional<int> jsHeapLimitMB) {
     auto& exec = getExec(opCtx);
     if (!exec) {
-        exec = std::make_unique<JsExecution>(scope, jsHeapLimitMB);
+        exec = std::make_unique<JsExecution>(opCtx, scope, jsHeapLimitMB);
         exec->getScope()->setLocalDB(database);
         if (loadStoredProcedures) {
             exec->getScope()->loadStored(opCtx, true);
@@ -66,9 +66,6 @@ JsExecution* JsExecution::get(OperationContext* opCtx,
 Value JsExecution::callFunction(ScriptingFunction func,
                                 const BSONObj& params,
                                 const BSONObj& thisObj) {
-    _scope->registerOperation(Client::getCurrent()->getOperationContext());
-    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
     int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, false);
     uassert(
         31439, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);
@@ -81,9 +78,6 @@ Value JsExecution::callFunction(ScriptingFunction func,
 void JsExecution::callFunctionWithoutReturn(ScriptingFunction func,
                                             const BSONObj& params,
                                             const BSONObj& thisObj) {
-    _scope->registerOperation(Client::getCurrent()->getOperationContext());
-    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
     int err = _scope->invoke(func, &params, &thisObj, _fnCallTimeoutMillis, true);
     uassert(
         31470, str::stream() << "js function failed to execute: " << _scope->getError(), err == 0);

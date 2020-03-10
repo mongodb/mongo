@@ -67,6 +67,7 @@
 #include "mongo/scripting/mozjs/timestamp.h"
 #include "mongo/scripting/mozjs/uri.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace mozjs {
@@ -412,6 +413,7 @@ private:
     WrapType<GlobalInfo> _globalProto;
     JS::HandleObject _global;
     std::vector<JS::PersistentRootedValue> _funcs;
+    StringMap<ScriptingFunction> _funcCodeToHandleMap;
     InternedStringTable _internedStrings;
     Status _killStatus;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MozJSImplScope::_mutex");

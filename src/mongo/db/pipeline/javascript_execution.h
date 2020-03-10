@@ -61,16 +61,23 @@ public:
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */
-    explicit JsExecution(const BSONObj& scopeVars, boost::optional<int> jsHeapLimitMB = boost::none)
+    JsExecution(OperationContext* opCtx,
+                const BSONObj& scopeVars,
+                boost::optional<int> jsHeapLimitMB = boost::none)
         : _scope(getGlobalScriptEngine()->newScopeForCurrentThread(jsHeapLimitMB)) {
         _scopeVars = scopeVars.getOwned();
         _scope->init(&_scopeVars);
         _fnCallTimeoutMillis = internalQueryJavaScriptFnTimeoutMillis.load();
+        _scope->registerOperation(opCtx);
     }
 
+    ~JsExecution() {
+        _scope->unregisterOperation();
+    };
+
     /**
-     * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
-     * input object 'thisObj'.
+     * Invokes the javascript function given by 'func' with the arguments 'params' and input object
+     * 'thisObj'.
      *
      * This method assumes that the desired function to execute does not return a value.
      */
@@ -79,12 +86,19 @@ public:
                                    const BSONObj& thisObj);
 
     /**
-     * Registers and invokes the javascript function given by 'func' with the arguments 'params' and
-     * input object 'thisObj'.
+     * Invokes the javascript function given by 'func' with the arguments 'params' and input object
+     * 'thisObj'.
      *
      * Returns the value returned by the function.
      */
     Value callFunction(ScriptingFunction func, const BSONObj& params, const BSONObj& thisObj);
+
+    /**
+     * Creates a function in the owned Scope* if it hasn't been created yet.
+     */
+    ScriptingFunction createFunction(std::string funcCode) {
+        return _scope->createFunction(funcCode.c_str());
+    };
 
     /**
      * Injects the given function 'emitFn' as a native JS function named 'emit', callable from

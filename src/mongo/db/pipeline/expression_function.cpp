@@ -111,6 +111,8 @@ Value ExpressionFunction::evaluate(const Document& root, Variables* variables) c
     auto jsExec = getExpressionContext()->getJsExecWithScope(_assignFirstArgToThis);
     auto scope = jsExec->getScope();
 
+    // createFunction is memoized in MozJSImplScope, so it's ok to call this for each
+    // eval call.
     ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
     uassert(31265, "The body function did not evaluate", func);
 
