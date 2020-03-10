@@ -211,52 +211,41 @@ private:
         RequestManager(size_t numHedges, std::shared_ptr<CommandStateBase> cmdState_)
             : connStatus(cmdState_->requestOnAny.target.size(), ConnStatus::Unset),
               requests(numHedges),
-              cmdState(cmdState_),
-              isHedging(numHedges > 1) {}
+              cmdState(cmdState_){};
 
-        std::shared_ptr<RequestState> makeRequest(RequestManager* mgr) {
-            auto req = std::make_shared<RequestState>(mgr, cmdState.lock());
-            req->reqId = requestCnt.load();
-            requests[requestCnt.fetchAndAdd(1)] = req;
-            return req;
-        }
-
-        std::shared_ptr<RequestState> getRequest(size_t requestId);
+        std::shared_ptr<RequestState> makeRequest();
+        std::shared_ptr<RequestState> getRequest(size_t reqId);
         std::shared_ptr<RequestState> getNextRequest();
 
         void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
         void cancelRequests();
+        void killOperationsForPendingRequests();
 
-        bool sentAll() const {
-            return sentIdx.load() == requests.size();
-        }
+        bool sentNone() const;
+        bool sentAll() const;
 
-        bool sentNone() const {
-            return sentIdx.load() == 0;
-        }
-
-        bool usedAllConn() const {
-            return std::count(connStatus.begin(), connStatus.end(), ConnStatus::Unset) == 0;
-        }
+        ConnStatus getConnStatus(size_t reqId);
+        bool usedAllConn() const;
 
         std::vector<ConnStatus> connStatus;
         std::vector<std::weak_ptr<RequestState>> requests;
         std::weak_ptr<CommandStateBase> cmdState;
 
-        // number of sent requests
+        // Number of sent requests.
         AtomicWord<size_t> sentIdx{0};
-        // number of all requests
-        AtomicWord<size_t> requestCnt{0};
-        // blocks sending requests
+
+        // Number of requests to send.
+        AtomicWord<size_t> requestCount{0};
+
+        // Set to true when the command finishes or is canceled to block remaining requests.
         bool isLocked{false};
-        bool isHedging{false};
 
         Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
     };
 
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
-        RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_)
-            : cmdState{std::move(cmdState_)}, requestManager(mgr) {}
+        RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_, size_t id)
+            : cmdState{std::move(cmdState_)}, requestManager(mgr), reqId(id) {}
 
         ~RequestState();
 
@@ -307,10 +296,17 @@ private:
         boost::optional<RemoteCommandRequest> request;
         HostAndPort host;
         ConnectionPool::ConnectionHandle conn;
-        bool isHedge{false};
-        bool hasHedgeOptions{false};
-        bool isSent{false};
+
+        // Internal id of this request as tracked by the RequestManager.
         size_t reqId;
+
+        // True if this request is an additional request sent to hedge the operation.
+        bool isHedge{false};
+
+        // Set to true if the response to the request is used to fulfill the command's
+        // promise (i.e. arrives before the responses to all other requests and is not
+        // a MaxTimeMSExpired error response if this is a hedged request).
+        bool fulfilledPromise{false};
     };
 
     struct AlarmState {

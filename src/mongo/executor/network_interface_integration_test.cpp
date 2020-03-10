@@ -188,6 +188,47 @@ public:
                            << "bar");
     }
 
+    BSONObj makeSleepCmdObj() {
+        return BSON("sleep" << 1 << "lock"
+                            << "none"
+                            << "secs" << 1000000000);
+    }
+
+    /**
+     * Returns true if the given command is still running.
+     */
+    bool isCommandRunning(const std::string command) {
+        const auto cmdObj =
+            BSON("aggregate" << 1 << "pipeline"
+                             << BSON_ARRAY(BSON("$currentOp" << BSON("localOps" << true))
+                                           << BSON("$match" << BSON(("command." + command)
+                                                                    << BSON("$exists" << true))))
+                             << "cursor" << BSONObj());
+        auto cs = fixture();
+        RemoteCommandRequest request{
+            cs.getServers().front(), "admin", cmdObj, BSONObj(), nullptr, kNoTimeout};
+        auto res = runCommandSync(request);
+
+        ASSERT_OK(res.status);
+        ASSERT_OK(getStatusFromCommandResult(res.data));
+        return !res.data["cursor"]["firstBatch"].Array().empty();
+    }
+
+    /**
+     * Repeatedly runs currentOp to check if the given command is running, and blocks until
+     * the command finishes running or the wait timeout is reached, and returns the number
+     * times of currentOp is run.
+     */
+    uint64_t waitForCommand(const std::string command, Milliseconds timeout) {
+        ClockSource::StopWatch stopwatch;
+        uint64_t numCurrentOpRan = 0;
+        do {
+            sleepmillis(100);
+            numCurrentOpRan++;
+        } while (isCommandRunning(command) && stopwatch.elapsed() < timeout);
+
+        return numCurrentOpRan;
+    }
 
     struct IsMasterData {
         BSONObj request;
@@ -310,14 +351,17 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
         return deferred;
     }();
 
-    // Wait for the operation to complete, assert that it was canceled.
+    // Wait for the command to return, assert that it was canceled.
     auto result = deferred.get();
     ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
 
-    // We have one canceled operation (echo) and two succeeded operations (configureFailPoint
-    // and _killOperations).
-    assertNumOps(1u, 0u, 0u, 2u);
+    // Wait for the operation to be killed on the remote host.
+    auto numCurrentOpRan = waitForCommand("echo", kMaxWait);
+
+    // We have one canceled operation (echo), and two other succeeded operations
+    // on top of the currentOp operations (configureFailPoint and _killOperations).
+    assertNumOps(1u, 0u, 0u, 2u + numCurrentOpRan);
 }
 
 TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
@@ -364,14 +408,17 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
         return deferred;
     }();
 
-    // Wait for op to complete, assert that it was canceled.
+    // Wait for the command to return, assert that it was canceled.
     auto result = deferred.get();
-    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
 
-    // We have two timedout operations (echo and _killOperations), and one succeeded operation
-    // (configureFailPoint).
-    assertNumOps(0u, 2u, 0u, 1u);
+    // Wait for _killOperations for 'echo' to time out.
+    auto numCurrentOpRan = waitForCommand("_killOperations", kMaxWait);
+
+    // We have one canceled operation (echo), one timedout operation (_killOperations),
+    // and one other succeeded operation on top of the currentOp operations (configureFailPoint)
+    assertNumOps(1u, 1u, 0u, 1u + numCurrentOpRan);
 }
 
 TEST_F(NetworkInterfaceTest, ImmediateCancel) {
@@ -416,10 +463,7 @@ TEST_F(NetworkInterfaceTest, LateCancel) {
 TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();
-    auto request = makeTestCommand(Milliseconds{1000}, makeEchoCmdObj());
-    request.cmdObj = BSON("sleep" << 1 << "lock"
-                                  << "none"
-                                  << "secs" << 1000000000);
+    auto request = makeTestCommand(Milliseconds{1000}, makeSleepCmdObj());
     auto deferred = runCommand(cb, request);
 
     waitForIsMaster();
@@ -438,9 +482,6 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
 TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     // Kick off operation
     auto cb = makeCallbackHandle();
-    auto cmdObj = BSON("sleep" << 1 << "lock"
-                               << "none"
-                               << "secs" << 1000000000);
 
     constexpr auto opCtxDeadline = Milliseconds{600};
     constexpr auto requestTimeout = Milliseconds{1000};
@@ -450,7 +491,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
 
-    auto request = makeTestCommand(requestTimeout, cmdObj, opCtx.get());
+    auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
     auto deferred = runCommand(cb, request);
 
@@ -476,9 +517,6 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
 TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     // Kick off operation
     auto cb = makeCallbackHandle();
-    auto cmdObj = BSON("sleep" << 1 << "lock"
-                               << "none"
-                               << "secs" << 1000000000);
 
     constexpr auto opCtxDeadline = Milliseconds{1000};
     constexpr auto requestTimeout = Milliseconds{600};
@@ -487,7 +525,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     auto client = serviceContext->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
-    auto request = makeTestCommand(requestTimeout, cmdObj, opCtx.get());
+    auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
     auto deferred = runCommand(cb, request);
 

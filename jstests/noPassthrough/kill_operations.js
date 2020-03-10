@@ -6,10 +6,13 @@
 
 const kDbName = "kill_operations";
 const kCollName = "test";
+const kNumDocs = 10;
+const kBatchSize = 2;
 
 const kOpKey1 = "57710eee-37cf-4c68-a3ac-0b0b900c15d2";
 const kOpKey2 = "488f6050-e331-4483-b356-230a41ec477e";
 const kOpKey3 = "c3eb12fc-4638-4464-8f51-312724ad1710";
+const kOpKey4 = "c7148048-fcf8-4caa-9756-59728052d6a7";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 const shardConn = st.rs0.getPrimary();
@@ -82,13 +85,19 @@ function threadRoutine({connStr, dbName, collName, opKey}) {
         limit: 1,
         clientOperationKey: uuidOpKey,
     });
-    assert.commandFailed(ret);
+    assert.commandFailedWithCode(ret, ErrorCodes.Interrupted);
 }
 
 function runTest(conn) {
     const db = conn.getDB(kDbName);
+    const coll = db.getCollection(kCollName);
+
     assert.commandWorked(db.dropDatabase());
-    assert.commandWorked(db.getCollection(kCollName).insert({x: 1}));
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < kNumDocs; ++i) {
+        bulk.insert({x: i});
+    }
+    assert.commandWorked(bulk.execute());
 
     // Kill one missing opKey
     killOpKey(conn, [kOpKey1]);
@@ -140,6 +149,19 @@ function runTest(conn) {
     } finally {
         unblockFinds();
     }
+
+    // Test that _killOperations does not kill the cursors associated with each operationKey.
+    // TODO (SERVER-46648): test that _killOperations does kill the cursors.
+    const res = assert.commandWorked(db.runCommand({
+        find: kCollName,
+        filter: {x: {$gte: 0}},
+        batchSize: kBatchSize,
+        clientOperationKey: UUID(kOpKey4),
+    }));
+    const cursorId = res.cursor.id;
+    assert.neq(0, cursorId);
+    killOpKey(conn, [kOpKey4]);
+    assert.commandWorked(db.runCommand({getMore: cursorId, collection: kCollName}));
 }
 
 // Test killOp against mongod.
