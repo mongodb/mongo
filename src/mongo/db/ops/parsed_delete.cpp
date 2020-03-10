@@ -37,7 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
@@ -54,11 +54,11 @@ Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());
     // It is invalid to request that the DeleteStage return the deleted document during a
     // multi-remove.
-    invariant(!(_request->shouldReturnDeleted() && _request->isMulti()));
+    invariant(!(_request->getReturnDeleted() && _request->getMulti()));
 
     // It is invalid to request that a ProjectionStage be applied to the DeleteStage if the
     // DeleteStage would not return the deleted document.
-    invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
+    invariant(_request->getProj().isEmpty() || _request->getReturnDeleted());
 
     std::unique_ptr<CollatorInterface> collator(nullptr);
     if (!_request->getCollation().isEmpty()) {
@@ -70,10 +70,8 @@ Status ParsedDelete::parseRequest() {
         }
         collator = uassertStatusOK(std::move(statusWithCollator));
     }
-    _expCtx = make_intrusive<ExpressionContext>(_opCtx,
-                                                std::move(collator),
-                                                _request->getNamespaceString(),
-                                                _request->getRuntimeConstants());
+    _expCtx = make_intrusive<ExpressionContext>(
+        _opCtx, std::move(collator), _request->getNsString(), _request->getRuntimeConstants());
 
     if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
@@ -85,15 +83,15 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNsString());
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto qr = std::make_unique<QueryRequest>(_request->getNamespaceString());
+    auto qr = std::make_unique<QueryRequest>(_request->getNsString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
     qr->setCollation(_request->getCollation());
-    qr->setExplain(_request->isExplain());
+    qr->setExplain(_request->getIsExplain());
     qr->setHint(_request->getHint());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
@@ -102,7 +100,7 @@ Status ParsedDelete::parseQueryToCQ() {
     // deleted out from under it, but a limit could inhibit that and give an EOF when the delete
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
-    if (!_request->isMulti() && !_request->getSort().isEmpty()) {
+    if (!_request->getMulti() && !_request->getSort().isEmpty()) {
         qr->setLimit(1);
     }
 
@@ -130,7 +128,7 @@ const DeleteRequest* ParsedDelete::getRequest() const {
 }
 
 PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
-    return _request->isGod() ? PlanExecutor::NO_YIELD : _request->getYieldPolicy();
+    return _request->getGod() ? PlanExecutor::NO_YIELD : _request->getYieldPolicy();
 }
 
 bool ParsedDelete::hasParsedQuery() const {

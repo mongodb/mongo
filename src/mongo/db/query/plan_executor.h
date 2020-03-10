@@ -146,6 +146,52 @@ public:
         ALWAYS_MARK_KILLED,
     };
 
+    static std::string serializeYieldPolicy(YieldPolicy yieldPolicy) {
+        switch (yieldPolicy) {
+            case YIELD_AUTO:
+                return "YIELD_AUTO";
+            case WRITE_CONFLICT_RETRY_ONLY:
+                return "WRITE_CONFLICT_RETRY_ONLY";
+            case YIELD_MANUAL:
+                return "YIELD_MANUAL";
+            case NO_YIELD:
+                return "NO_YIELD";
+            case INTERRUPT_ONLY:
+                return "INTERRUPT_ONLY";
+            case ALWAYS_TIME_OUT:
+                return "ALWAYS_TIME_OUT";
+            case ALWAYS_MARK_KILLED:
+                return "ALWAYS_MARK_KILLED";
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    static YieldPolicy parseFromBSON(const StringData& element) {
+        const std::string& yieldPolicy = element.toString();
+        if (yieldPolicy == "YIELD_AUTO") {
+            return YIELD_AUTO;
+        }
+        if (yieldPolicy == "WRITE_CONFLICT_RETRY_ONLY") {
+            return WRITE_CONFLICT_RETRY_ONLY;
+        }
+        if (yieldPolicy == "YIELD_MANUAL") {
+            return YIELD_MANUAL;
+        }
+        if (yieldPolicy == "NO_YIELD") {
+            return NO_YIELD;
+        }
+        if (yieldPolicy == "INTERRUPT_ONLY") {
+            return INTERRUPT_ONLY;
+        }
+        if (yieldPolicy == "ALWAYS_TIME_OUT") {
+            return ALWAYS_TIME_OUT;
+        }
+        if (yieldPolicy == "ALWAYS_MARK_KILLED") {
+            return ALWAYS_MARK_KILLED;
+        }
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
      */

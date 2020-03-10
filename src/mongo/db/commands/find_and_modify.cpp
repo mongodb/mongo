@@ -50,7 +50,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -150,7 +150,7 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setCollation(args.getCollation());
     requestOut->setMulti(false);
     requestOut->setReturnDeleted(true);  // Always return the old value.
-    requestOut->setExplain(explain);
+    requestOut->setIsExplain(explain);
 
     requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
                                                                    : PlanExecutor::YIELD_AUTO);
@@ -258,7 +258,8 @@ public:
         OpDebug* const opDebug = &curOp->debug();
 
         if (args.isRemove()) {
-            DeleteRequest request(nsString);
+            auto request = DeleteRequest{};
+            request.setNsString(nsString);
             const bool isExplain = true;
             makeDeleteRequest(opCtx, args, isExplain, &request);
 
@@ -364,7 +365,8 @@ public:
         // return the document under concurrency, if a matching document exists.
         return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
             if (args.isRemove()) {
-                DeleteRequest request(nsString);
+                auto request = DeleteRequest{};
+                request.setNsString(nsString);
                 const bool isExplain = false;
                 makeDeleteRequest(opCtx, args, isExplain, &request);
 

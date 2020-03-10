@@ -64,7 +64,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/get_executor.h"
@@ -998,14 +998,15 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
 Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const BSONObj& filter) {
-    DeleteRequest request(nss);
+    auto request = DeleteRequest{};
+    request.setNsString(nss);
     request.setQuery(filter);
     request.setMulti(true);
     request.setYieldPolicy(PlanExecutor::NO_YIELD);
 
     // This disables the isLegalClientSystemNS() check in getExecutorDelete() which is used to
     // disallow client deletes from unrecognized system collections.
-    request.setGod();
+    request.setGod(true);
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::deleteByFilter", nss.ns(), [&] {
         // ParsedDelete needs to be inside the write conflict retry loop because it may create a

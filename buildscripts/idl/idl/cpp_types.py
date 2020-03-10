@@ -602,7 +602,7 @@ def _call_method_or_global_function(expression, method_name):
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
         return common.template_args('${method_name}(${expression})', expression=expression,
-                                    method_name=short_method_name)
+                                    method_name=method_name)
 
     return common.template_args('${expression}.${method_name}()', expression=expression,
                                 method_name=short_method_name)

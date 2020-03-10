@@ -52,7 +52,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -878,7 +878,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.ensureStarted();
     }
 
-    DeleteRequest request(ns);
+    auto request = DeleteRequest{};
+    request.setNsString(ns);
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
