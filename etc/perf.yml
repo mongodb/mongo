@@ -531,7 +531,7 @@ tasks:
       vars:
         includeFilter1: "aggregation"
         includeFilter2: "regression"
-        excludeFilter: "none"
+        excludeFilter: "js"
         threads: "1"
         readCmd: false
     - func: "analyze"
@@ -571,7 +571,23 @@ tasks:
     - func: "analyze"
       vars:
         reports_analysis: true
-
+- name: javascript
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "git get project"
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "js"
+        includeFilter2: "aggregation"
+        excludeFilter: "none"
+        threads: "1 2 4 8"
+        readCmd: true
+    - func: "analyze"
+      vars:
+        reports_analysis: true
 buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux inMemory
@@ -622,6 +638,7 @@ buildvariants:
   - name: misc
   - name: singleThreaded
   - name: pipeline-updates
+  - name: javascript
 
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory

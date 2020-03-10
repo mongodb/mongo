@@ -630,9 +630,14 @@ bool hasFunctionIdentifier(StringData code) {
 ScriptingFunction MozJSImplScope::_createFunction(const char* raw) {
     return _runSafely([&] {
         JS::RootedValue fun(_context);
+        auto it = _funcCodeToHandleMap.find(StringData(raw));
+        if (it != _funcCodeToHandleMap.end()) {
+            return it->second;
+        }
         _MozJSCreateFunction(raw, &fun);
         _funcs.emplace_back(_context, fun.get());
-        return _funcs.size();
+        _funcCodeToHandleMap.emplace(raw, _funcs.size());
+        return ScriptingFunction(_funcs.size());
     });
 }
 

@@ -37,7 +37,8 @@ namespace mongo {
 // it as a JS function.
 ScriptingFunction makeJsFunc(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const std::string& func) {
-    auto jsExec = expCtx->getJsExecWithScope();
+    auto jsExec =
+        expCtx->getJsExecWithScope();  // default arg forceLoadOfStoredProcedures is false here.
     ScriptingFunction parsedFunc = jsExec->getScope()->createFunction(func.c_str());
     uassert(
         31247, "The user-defined function failed to parse in the javascript engine", parsedFunc);
