@@ -80,7 +80,8 @@ NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
     } else if (spec.type() == BSONType::Object) {
         auto nsObj = spec.Obj();
         uassert(16994,
-                str::stream() << kStageName << " $out must have only db and coll string arguments",
+                str::stream() << "If an object is passed to " << kStageName
+                              << " it must have exactly 2 fields: 'db' and 'coll'",
                 nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
         return NamespaceString(nsObj["db"].String(), nsObj["coll"].String());
     } else {
