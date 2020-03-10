@@ -1162,6 +1162,19 @@ void IndexBuildsCoordinator::awaitIndexBuildFinished(const UUID& collectionUUID,
     collIndexBuildsSharedPtr->waitUntilIndexBuildFinished(lk, buildUUID);
 }
 
+void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                                      const UUID& collectionUUID,
+                                                                      IndexBuildProtocol protocol) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto noIndexBuildsPred = [&, this]() {
+        auto indexBuilds = _filterIndexBuilds_inlock(lk, [&](const auto& replState) {
+            return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
+        });
+        return indexBuilds.empty();
+    };
+    opCtx->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, noIndexBuildsPred);
+}
+
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
     const UUID& collectionUUID) const {
     stdx::unique_lock<Latch> lk(_mutex);
@@ -1378,6 +1391,8 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
 
     invariant(_allIndexBuilds.emplace(replIndexBuildState->buildUUID, replIndexBuildState).second);
 
+    _indexBuildsCondVar.notify_all();
+
     return Status::OK();
 }
 
@@ -1398,6 +1413,8 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
     }
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
+
+    _indexBuildsCondVar.notify_all();
 }
 
 Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(

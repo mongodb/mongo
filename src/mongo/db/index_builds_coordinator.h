@@ -366,6 +366,9 @@ public:
     /**
      * Waits for all index builds on a specified collection to finish.
      */
+    void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                  const UUID& collectionUUID,
+                                                  IndexBuildProtocol protocol);
     void awaitNoIndexBuildInProgressForCollection(const UUID& collectionUUID) const;
 
     /**
@@ -731,6 +734,9 @@ protected:
 
     // Build UUID to index build information map.
     stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash> _allIndexBuilds;
+
+    // Waiters are notified whenever one of the three maps above has something added or removed.
+    stdx::condition_variable _indexBuildsCondVar;
 
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;
