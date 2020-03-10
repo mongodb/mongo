@@ -218,6 +218,8 @@ functions:
             tfvars:
               # This is currently only used by initialsync-logkeeper. It is empty and not used for other tests.
               mongod_seeded_ebs_snapshot_id: ${snapshotId}
+              # Initially used by sb_large_scale to override expire-on-delta to allow longer runtime on otherwise standard variants
+              ${additional_tfvars|}
           workload_setup:
             local_repos:
               workloads: ../src/workloads/workloads
@@ -856,6 +858,28 @@ tasks:
         files:
           - src/genny/genny/build/patch_tasks.json
 
+- name: sb_large_scale
+  priority: 5
+  exec_timeout_secs: 43200 # 12 hours
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "sb_large_scale"
+        additional_tfvars: "tags: {expire-on-delta: 12}"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: sb_timeseries
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "sb_timeseries"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 #######################################
 #               Modules               #
 #######################################
@@ -1012,6 +1036,8 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
     - name: industry_benchmarks_wmajority
+    - name: sb_large_scale
+    - name: sb_timeseries
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -1341,6 +1367,8 @@ buildvariants:
     - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    - name: sb_large_scale
+    - name: sb_timeseries
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
