@@ -15,7 +15,6 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/logv2_helpers.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 const replTest = new ReplSetTest({nodes: 2});
@@ -112,13 +111,7 @@ assert.commandWorked(secondary.adminCommand(
 // Unblock index build.
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Wait for log message.
-    if (isJsonLog(secondary)) {
-        checkLog.containsJson(secondary, 21849, {ns: testColl.getFullName()});
-    } else {
-        checkLog.contains(secondary,
-                          "blocking replication until index builds are finished on " +
-                              testColl.getFullName() + ", due to prepared transaction");
-    }
+    checkLog.containsJson(secondary, 21849, {ns: testColl.getFullName()});
 
     // Let the secondary finish its index build.
     IndexBuildTest.resumeIndexBuilds(secondary);
