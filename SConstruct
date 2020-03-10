@@ -4185,7 +4185,7 @@ if get_option('lint-scope') == 'changed':
             "buildscripts/eslint.py",
             patch_file,
         ],
-        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+        action="$PYTHON ${SOURCES[0]} lint-git-diff ${SOURCES[1]}"
     )
 
 else:

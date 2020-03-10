@@ -10,6 +10,7 @@ There is also a -d mode that assumes you only want to run one copy of ESLint per
 parameter supplied. This lets ESLint search for candidate files to lint.
 """
 
+import logging
 import os
 import shutil
 import string
@@ -18,21 +19,23 @@ import sys
 import tarfile
 import tempfile
 import threading
+from typing import Optional
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
+from git import Repo
+import structlog
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.resmokelib.utils import globstar  # pylint: disable=wrong-import-position
-
 from buildscripts.linter import git  # pylint: disable=wrong-import-position
 from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
+from buildscripts.patch_builds.change_data import find_changed_files_in_repos  # pylint: disable=wrong-import-position
 
 ##############################################################################
 #
@@ -54,6 +57,8 @@ ESLINT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/eslin
 
 # Path in the tarball to the ESLint binary.
 ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$platform-$arch")
+
+LOGGER = structlog.get_logger(__name__)
 
 
 def callo(args):
@@ -223,6 +228,25 @@ def lint_patch(eslint, infile):
     return True
 
 
+def lint_git_diff(eslint: Optional[str]) -> bool:
+    """
+    Lint the files that have changes since the last git commit.
+
+    :param eslint: Path to eslint command.
+    :return: True if lint was successful.
+    """
+    repos = [Repo(path) for path in git.get_module_paths()]
+    candidate_files = find_changed_files_in_repos(repos)
+    LOGGER.info("Found candidate_files", candidate_files=candidate_files)
+    files = [filename for filename in candidate_files if is_interesting_file(filename)]
+    LOGGER.info("Found files to lint", files=files)
+
+    # Patch may have files that we do not want to check which is fine
+    if files:
+        return _lint_files(eslint, files)
+    return True
+
+
 def lint(eslint, dirmode, glob):
     """Lint files command entry point."""
     if dirmode and glob:
@@ -267,7 +291,6 @@ def main():
                   "fix runs ESLint with --fix on provided patterns "\
                   "or files under jstests/ and src/mongo."
     epilog = "*Unless you specify -d a separate ESLint process will be launched for every file"
-    parser = OptionParser()
     parser = OptionParser(usage=usage, description=description, epilog=epilog)
     parser.add_option(
         "-e",
@@ -281,6 +304,9 @@ def main():
                            "against each pattern",)
 
     (options, args) = parser.parse_args(args=sys.argv)
+
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
     if len(args) > 1:
         command = args[1]
@@ -296,6 +322,8 @@ def main():
                 print("You must provide the patch's fully qualified file name with lint-patch")
             else:
                 success = lint_patch(options.eslint, searchlist)
+        elif command == "lint-git-diff":
+            success = lint_git_diff(options.eslint)
         elif command == "fix":
             success = autofix_func(options.eslint, options.dirmode, searchlist)
         else:

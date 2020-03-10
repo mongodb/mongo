@@ -1,9 +1,10 @@
 """Git Utility functions."""
+from __future__ import annotations
 
 import itertools
 import os
 import re
-from typing import Any, Callable, List, Tuple
+from typing import Callable, List
 
 from buildscripts.linter import git_base as _git
 from buildscripts import moduleconfig
@@ -29,20 +30,23 @@ def get_base_dir():
         return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-def get_repos():
-    # type: () -> List[Repo]
-    """Get a list of Repos to check linters for."""
+def get_module_paths() -> List[str]:
+    """Get a list of paths that contain modules."""
     base_dir = get_base_dir()
 
     # Get a list of modules
-    # TODO: how do we filter rocks, does it matter?
     mongo_modules = moduleconfig.discover_module_directories(
         os.path.join(base_dir, MODULE_DIR), None)
 
     paths = [os.path.join(base_dir, MODULE_DIR, m) for m in mongo_modules]
-
     paths.append(base_dir)
 
+    return paths
+
+
+def get_repos() -> List[Repo]:
+    """Get a list of Repos to check linters for."""
+    paths = get_module_paths()
     return [Repo(p) for p in paths]
 
 
@@ -162,6 +166,22 @@ def get_files_to_check_working_tree(filter_function):
     return valid_files
 
 
+def get_valid_files_from_candidates(candidates, filter_fn: Callable[[str], bool]):
+    """
+    Get the valid files from the list of candidate files.
+
+    :param candidates: List of candidate files.
+    :param filter_fn: Function to filter files.
+    :return: List of valid files.
+    """
+    repos = get_repos()
+
+    valid_files = list(
+        itertools.chain.from_iterable([r.get_candidates(candidates, filter_fn) for r in repos]))
+
+    return valid_files
+
+
 def get_files_to_check(files, filter_function):
     # type: (List[str], Callable[[str], bool]) -> List[str]
     """Get a list of files that need to be checked based on which files are managed by git."""
@@ -172,11 +192,7 @@ def get_files_to_check(files, filter_function):
     if files and not candidates:
         raise ValueError("Globs '%s' did not find any files with glob." % (files))
 
-    repos = get_repos()
-
-    valid_files = list(
-        itertools.chain.from_iterable(
-            [r.get_candidates(candidates, filter_function) for r in repos]))
+    valid_files = get_valid_files_from_candidates(candidates, filter_function)
 
     if files and not valid_files:
         raise ValueError("Globs '%s' did not find any files with glob in git." % (files))
@@ -199,12 +215,7 @@ def get_files_to_check_from_patch(patches, filter_function):
 
     candidates = [check.match(line).group(1) for line in lines if check.match(line)]
 
-    repos = get_repos()
-
-    valid_files = list(
-        itertools.chain.from_iterable(
-            [r.get_candidates(candidates, filter_function) for r in repos]))
-
+    valid_files = get_valid_files_from_candidates(candidates, filter_function)
     return valid_files
 
 
