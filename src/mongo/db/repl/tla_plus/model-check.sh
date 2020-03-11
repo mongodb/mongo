@@ -19,8 +19,14 @@ if ! [ -f "$1/$TLA_FILE" ]; then
   exit 1
 fi
 
+# Count CPUs. Linux has cpuinfo, Mac has sysctl, otherwise use a default.
+if [ -e "/proc/cpuinfo" ]; then
+  WORKERS=$(grep -c processor /proc/cpuinfo)
+elif ! WORKERS=$(sysctl -n hw.logicalcpu); then
+  WORKERS=8 # default
+fi
+
 echo "Downloading tla2tools.jar"
 curl -LO tla.msr-inria.inria.fr/tlatoolbox/dist/tla2tools.jar
 cd "$1"
-# Note, cpuinfo is only available on Linux.
-java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -workers $(grep -c processor /proc/cpuinfo) "$TLA_FILE"
+java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -workers "$WORKERS" "$TLA_FILE"
