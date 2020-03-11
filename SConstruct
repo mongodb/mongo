@@ -4503,7 +4503,7 @@ if get_option("install-mode") != "hygienic":
 if should_dagger:
     dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
     # Require everything to be built before trying to extract build dependency information
-    env.Requires(dependencyDb, allTargets)
+    env.Requires(dependencyDb, 'all')
 
 # Declare the cache prune target
 cachePrune = env.Command(
