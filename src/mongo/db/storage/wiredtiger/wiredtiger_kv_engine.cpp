@@ -1029,23 +1029,6 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         return;
     }
 
-    // Arbiters do not replicate the FCV document. Due to arbiter FCV semantics on 4.0, shutting
-    // down a 4.0 arbiter may either downgrade the data files to WT compatibility 2.9 or 3.0. Thus,
-    // 4.2 binaries must allow starting up on 2.9 and 3.0 files.
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.0.0\")";
-    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
-    if (!ret) {
-        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_36};
-        return;
-    }
-
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"2.9.0\")";
-    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
-    if (!ret) {
-        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_34};
-        return;
-    }
-
     LOGV2_WARNING(22347, "Failed to start up WiredTiger under any compatibility version.");
     if (ret == EINVAL) {
         fassertFailedNoTrace(28561);
