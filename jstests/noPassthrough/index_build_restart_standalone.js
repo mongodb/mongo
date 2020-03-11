@@ -60,7 +60,22 @@ rst.stopSet(/*signal=*/null, /*forRestart=*/true);
 TestData.skipCheckDBHashes = false;
 
 function restartStandalone(node) {
-    return rst.restart(node, {noReplSet: true});
+    // Startup a mongod process on the nodes data files with recoverFromOplogAsStandalone=true. This
+    // parameter ensures that when the standalone starts up, it applies all unapplied oplog entries
+    // since the last shutdown.
+    const recoveryMongod = MongoRunner.runMongod({
+        dbpath: node.dbpath,
+        noReplSet: true,
+        noCleanData: true,
+        setParameter: 'recoverFromOplogAsStandalone=true'
+    });
+
+    // We need to shutdown this instance of mongod as using the recoverFromOplogAsStandalone=true
+    // parameter puts the server into read-only mode, but we need to be able to perform writes for
+    // this test.
+    MongoRunner.stopMongod(recoveryMongod);
+
+    return MongoRunner.runMongod({dbpath: node.dbpath, noReplSet: true, noCleanData: true});
 }
 
 (function restartPrimaryAsStandaloneAndCreate() {
