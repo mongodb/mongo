@@ -209,7 +209,6 @@ function secondaryToStandaloneTest() {
     let primary = replSet.getPrimary();
     let secondary = replSet.getSecondary();
 
-    // TODO(SERVER-44468): Re-enable when standalone startup works with two-phase builds.
     if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
         jsTestLog(
             '[secondaryToStandaloneTest] Two phase index builds not supported, skipping test.');
