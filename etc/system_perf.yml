@@ -4,6 +4,24 @@ command_type: system
 pre:
 
 post:
+    # Do cluster teardown first to ensure runtime is below Evergreen's post timeout. Other post tasks
+    # will not have been run if the timeout is exceeded.
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+            mark_idle.sh
+          fi
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -v
+          source ./dsienv.sh
+          ../src/dsi/dsi/run-dsi infrastructure_teardown.py
     - command: shell.exec
       params:
         working_dir: work
@@ -37,15 +55,6 @@ post:
       params:
          name: "perf"
          file: "work/perf.json"
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          source ./dsienv.sh
-          if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            mark_idle.sh
-          fi
-
     - command: shell.exec
       params:
         working_dir: src
