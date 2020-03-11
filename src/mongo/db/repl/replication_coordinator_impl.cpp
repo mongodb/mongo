@@ -3055,10 +3055,9 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCt
     }
 
     // If we are in the middle of an initial sync, do a resync.
-    if (result.isOK() && initialSyncerCopy && initialSyncerCopy->isActive()) {
-        return resyncData(opCtx, false);
+    if (result.isOK() && initialSyncerCopy) {
+        initialSyncerCopy->cancelCurrentAttempt();
     }
-
     return result;
 }
 
