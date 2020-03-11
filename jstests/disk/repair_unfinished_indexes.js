@@ -48,7 +48,13 @@ replSet.stop(secondary);
 // Confirm that the secondary node leaves the index as unfinished.
 (function startAsStandalone() {
     jsTestLog("Starting secondary as standalone");
-    const mongod = startMongodOnExistingPath(secondaryDbpath);
+    const mongod = startMongodOnExistingPath(
+        secondaryDbpath,
+        // This parameter ensures that when the standalone starts up, it applies all unapplied oplog
+        // entries since the last shutdown. This "smooths out" a race condition in this test where
+        // the secondary can shut down without fully applying the 'startIndexBuild' oplog entry, and
+        // not advancing the stable timestamp to the top of the oplog.
+        {setParameter: 'recoverFromOplogAsStandalone=true'});
     IndexBuildTest.assertIndexes(mongod.getDB(dbName).getCollection(collName),
                                  2,
                                  ["_id_"],
