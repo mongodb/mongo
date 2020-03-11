@@ -3076,10 +3076,15 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                 }
 
                 const int newMemId = newMem.getId().getData();
-                const bool newMemberIdNotInOldConfig =
-                    (oldConfig.findMemberByID(newMemId) == nullptr);
+                const auto oldMem = oldConfig.findMemberByID(newMemId);
 
-                if (newMemberIdNotInOldConfig && newMem.isVoter()) {
+                const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
+                const bool isCurrentlyNewlyAdded = (oldMem != nullptr && oldMem->isNewlyAdded());
+
+                // Append the 'newlyAdded' field if the node:
+                // 1) Is a new, voting node
+                // 2) Already has a 'newlyAdded' field in the old config
+                if (isNewVotingMember || isCurrentlyNewlyAdded) {
                     newConfig.setNewlyAddedFieldForMemberAtIndex(i, true);
                     addedNewlyAddedField = true;
                 }
@@ -3087,10 +3092,12 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
             if (addedNewlyAddedField) {
                 LOGV2(4634400,
-                      "Rewrote the config to add 'newlyAdded' field. Nodes with the 'newlyAdded' "
-                      "field will be considered to have 'votes:0'. Upon transition to SECONDARY, "
-                      "this field will be automatically removed.",
-                      "newConfigObj"_attr = newConfig.toBSON());
+                      "Appended the 'newlyAdded' field to a node in the new config. Nodes with the "
+                      "'newlyAdded' field will be considered to have 'votes:0'. Upon transition to "
+                      "SECONDARY, this field will be automatically removed.",
+                      "newConfigObj"_attr = newConfig.toBSON(),
+                      "userProvidedConfig"_attr = args.newConfigObj,
+                      "oldConfig"_attr = oldConfig.toBSON());
             }
         }
 
