@@ -157,10 +157,6 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         // there will only be one sort key format for changes streams, so there will be no need to
         // set this flag anymore. This flag has no effect on pipelines without a change stream.
         cmdForShards[AggregationRequest::kUse44SortKeys] = Value(true);
-        // TODO SERVER-44884: We set this flag to indicate that the shards should always use the new
-        // upsert mechanism when executing relevant $merge modes. After branching for 4.5, supported
-        // upgrade versions will all use the new mechanism, and we can remove this flag.
-        cmdForShards[AggregationRequest::kUseNewUpsert] = Value(true);
     }
 
     return cmdForShards.freeze().toBson();

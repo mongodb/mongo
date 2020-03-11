@@ -212,16 +212,11 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             }
 
             request.setUse44SortKeys(elem.boolean());
-        } else if (fieldName == kUseNewUpsert) {
-            // TODO SERVER-44884: After branching for 4.5, we will continue to accept this option
-            // for upgrade purposes but will ignore it, as any supported version will be capable of
-            // using the new upsert mechanism. In 4.7 we will completely remove this parameter.
-            if (elem.type() != BSONType::Bool) {
-                return {ErrorCodes::TypeMismatch,
-                        str::stream() << kUseNewUpsert << " must be a boolean, not a "
-                                      << typeName(elem.type())};
-            }
-            request.setUseNewUpsert(elem.boolean());
+        } else if (fieldName == "useNewUpsert"_sd) {
+            // TODO SERVER-46751: we must retain the ability to ingest the 'useNewUpsert' field for
+            // 4.6 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
+            // shards. We do nothing with it because useNewUpsert will be automatically used in 4.6
+            // when appropriate. Remove this final vestige of useNewUpsert during the 4.7 dev cycle.
         } else if (fieldName == kIsMapReduceCommand) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -328,7 +323,6 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
         {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
-        {kUseNewUpsert, _useNewUpsert ? Value(true) : Value()},
         {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
     };
 }

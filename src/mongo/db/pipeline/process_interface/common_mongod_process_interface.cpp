@@ -598,9 +598,8 @@ Update CommonMongodProcessInterface::buildUpdateOp(
                 entry.setU(std::move(u));
                 entry.setC(std::move(c));
                 entry.setUpsert(upsert != UpsertType::kNone);
-                // TODO SERVER-44884: after branching for 4.5, remove the 'useNewUpsert' flag.
-                entry.setUpsertSupplied({{entry.getUpsert() && expCtx->useNewUpsert,
-                                          upsert == UpsertType::kInsertSuppliedDoc}});
+                entry.setUpsertSupplied(
+                    {{entry.getUpsert(), upsert == UpsertType::kInsertSuppliedDoc}});
                 entry.setMulti(multi);
                 return entry;
             }());

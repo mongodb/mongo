@@ -352,11 +352,6 @@ public:
     // other than the "k44SortKey" format, so this will be removed.
     SortKeyFormat sortKeyFormat = SortKeyFormat::k44SortKey;
 
-    // True if this context is associated with a pipeline which is permitted to use the new
-    // upsertSupplied mechanism for applicable $merge modes.
-    // TODO SERVER-44884: remove this when we branch for 4.5.
-    bool useNewUpsert = false;
-
     // True if this ExpressionContext is used to parse a view definition pipeline.
     bool isParsingViewDefinition = false;
 
