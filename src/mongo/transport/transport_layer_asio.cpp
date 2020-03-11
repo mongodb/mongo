@@ -729,7 +729,7 @@ bool trySetSockOpt(int level, int opt, int val) {
     void* pval = &val;
 #endif
 
-    const auto ret = ::setsockopt(sock, IPPROTO_TCP, TCP_FASTOPEN, pval, sizeof(val));
+    const auto ret = ::setsockopt(sock, level, opt, pval, sizeof(val));
 
 #ifdef _WIN32
     closesocket(sock);
