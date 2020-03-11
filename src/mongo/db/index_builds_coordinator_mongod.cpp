@@ -604,27 +604,57 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     return;
 }
 
+IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIsAvailable(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    auto future = [&] {
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        invariant(replState->waitForNextAction);
+        return replState->waitForNextAction->getFuture();
+    }();
+
+    // Waits until the promise is fulfilled or the deadline expires.
+    IndexBuildAction nextAction;
+    auto waitUntilNextActionIsReady = [&]() {
+        // Don't perform a blocking wait while holding locks or storage engine resources.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        Lock::TempRelease release(opCtx->lockState());
+
+        auto deadline = Date_t::now() + Milliseconds(1000);
+        auto timeoutError = opCtx->getTimeoutError();
+
+        try {
+            nextAction =
+                opCtx->runWithDeadline(deadline, timeoutError, [&] { return future.get(opCtx); });
+        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>& e) {
+            if (e.code() == timeoutError) {
+                return false;
+            }
+            throw;
+        }
+        return true;
+    };
+
+    // Continuously drain incoming writes until the future is ready. This is an optimization that
+    // allows the critical section of committing, which must drain the remainder of the side writes,
+    // to be as short as possible.
+    while (!waitUntilNextActionIsReady()) {
+        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    }
+    return nextAction;
+}
+
 Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     Timestamp commitIndexBuildTimestamp;
-
-    // Yield locks and storage engine resources before blocking.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    Lock::TempRelease release(opCtx->lockState());
 
     LOGV2(3856203,
           "Index build waiting for next action before completing final phase: {buildUUID}",
           "buildUUID"_attr = replState->buildUUID);
 
     while (true) {
-        // Future wait should ignore state transition.
-        invariant(!opCtx->lockState()->isRSTLLocked(),
-                  str::stream()
-                      << "failed to yield locks for index build while waiting for commit or abort: "
-                      << replState->buildUUID);
-
-        // future wait should get interrupted if the node shutdowns.
-        const auto nextAction = replState->waitForNextAction->getFuture().get(opCtx);
+        // Future wait can be interrupted. This function will yield locks while waiting for the
+        // future to be fulfilled.
+        const auto nextAction = _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
         LOGV2(3856204,
               "Index build received signal for build uuid: {buildUUID} , action: {action}",
               "buildUUID"_attr = replState->buildUUID,
@@ -632,8 +662,11 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
 
         bool needsToRetryWait = false;
 
-        // Reacquire RSTL lock
+        // Ensure RSTL is acquired before checking replication state. This is only necessary for
+        // single-phase builds on secondaries. Everywhere else, the RSTL is already held and this is
+        // should never block.
         repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);

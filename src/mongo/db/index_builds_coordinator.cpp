@@ -1973,6 +1973,7 @@ void IndexBuildsCoordinator::_buildIndexSinglePhase(
     boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _insertKeysFromSideTablesBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
     _waitForNextIndexBuildAction(opCtx, replState);
     _insertKeysFromSideTablesAndCommit(
@@ -1987,6 +1988,7 @@ void IndexBuildsCoordinator::_buildIndexTwoPhase(
 
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState, exclusiveCollectionLock);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _insertKeysFromSideTablesBlockingWrites(opCtx, replState);
 
     _signalPrimaryForCommitReadiness(opCtx, replState);
     auto commitIndexBuildTimestamp = _waitForNextIndexBuildAction(opCtx, replState);
@@ -2064,7 +2066,10 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         LOGV2(20666, "Hanging after index build first drain");
         hangAfterIndexBuildFirstDrain.pauseWhileSet();
     }
-
+}
+void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
