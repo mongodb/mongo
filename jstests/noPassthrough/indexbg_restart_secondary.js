@@ -89,7 +89,22 @@ if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
 }
 
 MongoRunner.stopMongod(second);
-replTest.start(second, {}, /*restart=*/true, /*wait=*/true);
+
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    replTest.start(
+        second,
+        {
+            setParameter:
+                {"failpoint.hangAfterSettingUpIndexBuildUnlocked": tojson({mode: "alwaysOn"})}
+        },
+        /*restart=*/true,
+        /*wait=*/true);
+} else {
+    replTest.start(second,
+                   {},
+                   /*restart=*/true,
+                   /*wait=*/true);
+}
 
 // Make sure secondary comes back.
 try {
@@ -102,6 +117,19 @@ try {
         }
     }, "secondary didn't restart", 30000, 1000);
 } finally {
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+        // Verify that we do not wait for the index build to complete on startup.
+        assert.eq(size, secondDB.getCollection(collectionName).find({}).itcount());
+
+        // Verify that only the _id index is ready.
+        checkLog.containsJson(second, 4585201);
+        IndexBuildTest.assertIndexes(secondDB.getCollection(collectionName), 2, ["_id_"], ["i_1"], {
+            includeBuildUUIDS: true
+        });
+        assert.commandWorked(second.adminCommand(
+            {configureFailPoint: 'hangAfterSettingUpIndexBuildUnlocked', mode: 'off'}));
+    }
+
     // Let index build complete on primary, which replicates a commitIndexBuild to the secondary.
     IndexBuildTest.resumeIndexBuilds(primaryDB);
 }
