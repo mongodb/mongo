@@ -39,12 +39,14 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace repl {
@@ -989,6 +991,233 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
 
         ASSERT_EQUALS(commitPoint, getReplCoord()->getLastCommittedOpTime());
     }
+}
+
+/**
+ * Test a concurrent stepdown and reconfig. The stepdown is triggered by a heartbeat response with
+ * a higher term, the reconfig is triggered either by a heartbeat with a new config, or by a user
+ * replSetReconfig command.
+ *
+ * In setUp, the replication coordinator is initialized so "self" is the primary of a 3-node set.
+ * The coordinator schedules heartbeats to the other nodes but this test doesn't respond to those
+ * heartbeats. Instead, it creates heartbeat responses that have no associated requests, and injects
+ * the responses via handleHeartbeatResponse_forTest.
+ *
+ * Each subclass of HBStepdownAndReconfigTest triggers some sequence of stepdown and reconfig steps.
+ * The exact sequences are nondeterministic, since we don't use failpoints or NetworkInterfaceMock
+ * to force a specific order. All subclasses check the same post-conditions: the stepdown and
+ * reconfig have both completed.
+ */
+class HBStepdownAndReconfigTest : public ReplCoordHBV1Test {
+protected:
+    void setUp() override;
+    void tearDown() override;
+    void sendHBResponse(int targetIndex,
+                        long long term,
+                        long long configVersion,
+                        bool includeConfig);
+    void sendHBResponseWithNewConfig();
+    void sendHBResponseWithNewTerm();
+    Future<void> startReconfigCommand();
+    void acknowledgeReconfigCommand();
+    void checkPostConditions();
+
+    OpTime _commitPoint = OpTime(Timestamp(100, 1), 0);
+    Date_t _wallTime = Date_t() + Seconds(100);
+    std::unique_ptr<ThreadPool> _threadPool;
+};
+
+void HBStepdownAndReconfigTest::setUp() {
+    ReplCoordHBV1Test::setUp();
+
+    // We need one thread to run processReplSetReconfig, use a pool for convenience.
+    _threadPool = std::make_unique<ThreadPool>(ThreadPool::Options());
+    _threadPool->startup();
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node0:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node1:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 2))
+                            << "protocolVersion" << 1),
+                       HostAndPort("node0", 12345));
+
+
+    auto replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(_commitPoint, _wallTime);
+    replCoordSetMyLastDurableOpTime(_commitPoint, _wallTime);
+    simulateSuccessfulV1Election();
+
+    // New term.
+    ASSERT_EQUALS(1, replCoord->getTerm());
+    _wallTime = _wallTime + Seconds(1);
+    _commitPoint = OpTime(Timestamp(200, 2), 1);
+
+    // To complete a reconfig from Config 1 to Config 2 requires:
+    // Oplog Commitment: last write in previous Config 0 is majority-committed.
+    // Config Replication: Config 2 gossipped by heartbeat response to majority of Config 2 members.
+    //
+    // Catch up all members to the same OpTime to ensure Oplog Commitment in all tests.
+    // In tests that require it, we ensure Config Replication with acknowledgeReconfigCommand().
+    for (auto i = 0; i < 3; ++i) {
+        ASSERT_OK(replCoord->setLastAppliedOptime_forTest(2, i, _commitPoint, _wallTime));
+        ASSERT_OK(replCoord->setLastDurableOptime_forTest(2, i, _commitPoint, _wallTime));
+    }
+
+    setMinimumLoggedSeverity(logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(2));
+}
+
+void HBStepdownAndReconfigTest::tearDown() {
+    clearMinimumLoggedSeverity(logv2::LogComponent::kReplication);
+    _threadPool.reset();
+    ReplCoordHBV1Test::tearDown();
+}
+
+void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
+                                               long long term,
+                                               long long configVersion,
+                                               bool includeConfig) {
+    auto replCoord = getReplCoord();
+    auto config = replCoord->getConfig();
+    OpTime opTime(Timestamp(), 0);
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName(config.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setTerm(term);
+    hbResp.setConfigVersion(configVersion);
+    hbResp.setConfigTerm(config.getConfigTerm());
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t()});
+
+    if (includeConfig) {
+        auto configDoc = MutableDocument(Document(config.toBSON()));
+        configDoc["version"] = Value(configVersion);
+        ReplSetConfig newConfig;
+        ASSERT_OK(newConfig.initialize(configDoc.freeze().toBson()));
+        hbResp.setConfig(newConfig);
+    }
+
+    BSONObjBuilder responseBuilder;
+    responseBuilder.appendElements(hbResp.toBSON());
+    replCoord->handleHeartbeatResponse_forTest(responseBuilder.obj(), targetIndex);
+}
+
+void HBStepdownAndReconfigTest::sendHBResponseWithNewConfig() {
+    // Send a heartbeat response from a secondary, with newer config.
+    sendHBResponse(2 /* targetIndex */,
+                   1 /* term */,
+                   getReplCoord()->getConfig().getConfigVersion() + 1,
+                   true /* includeConfig */);
+}
+
+void HBStepdownAndReconfigTest::sendHBResponseWithNewTerm() {
+    // Send a heartbeat response from a secondary, with higher term.
+    sendHBResponse(1 /* targetIndex */,
+                   2 /* term */,
+                   getReplCoord()->getConfig().getConfigVersion(),
+                   false /* includeConfig */);
+}
+
+Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {
+    auto [promise, future] = makePromiseFuture<void>();
+
+    // Send a user replSetReconfig command.
+    auto coord = getReplCoord();
+    auto config = coord->getConfig();
+    auto newConfig = MutableDocument(Document(config.toBSON()));
+    newConfig["version"] = Value(config.getConfigVersion() + 1);
+    ReplicationCoordinator::ReplSetReconfigArgs args{
+        newConfig.freeze().toBson(), false /* force */
+    };
+
+    auto opCtx = ReplCoordHBV1Test::makeOperationContext();
+
+    _threadPool->schedule([promise = std::move(promise), coord, args, opCtx = std::move(opCtx)](
+                              Status) mutable {
+        // Avoid the need to respond to quorum-check heartbeats sent to the other two members.
+        FailPointEnableBlock omitConfigQuorumCheck("omitConfigQuorumCheck");
+        BSONObjBuilder result;
+        try {
+            // We permit processReplSetReconfig to return or throw PrimarySteppedDown or succeed.
+            auto status = coord->processReplSetReconfig(opCtx.get(), args, &result);
+            if (!status.isOK()) {
+                ASSERT_EQUALS(status.code(), ErrorCodes::PrimarySteppedDown);
+                LOGV2(463816, "processReplSetReconfig returned expected error PrimarySteppedDown");
+            }
+        } catch (const ExceptionFor<ErrorCodes::PrimarySteppedDown>&) {
+            LOGV2(463817, "processReplSetReconfig threw expected error PrimarySteppedDown");
+        }
+
+        promise.emplaceValue();
+    });
+
+    return std::move(future);
+}
+
+void HBStepdownAndReconfigTest::acknowledgeReconfigCommand() {
+    // A secondary acknowledges the replSetReconfig command's new config so it's
+    // majority-replicated.
+    sendHBResponse(2 /* targetIndex */,
+                   1 /* term */,
+                   getReplCoord()->getConfig().getConfigVersion() + 1,
+                   false /* includeConfig */);
+}
+
+void HBStepdownAndReconfigTest::checkPostConditions() {
+    auto replCoord = getReplCoord();
+    while (replCoord->getTerm() == 1) {
+        LOGV2(463811, "Waiting for term to increase from 1 to 2");
+        // The clock is mocked, we don't actually sleep.
+        sleepFor(Seconds(1));
+    }
+
+    // Primary stepped down.
+    ASSERT_EQUALS(2, replCoord->getTerm());
+    assertMemberState(MemberState::RS_SECONDARY);
+
+    // The new config is stored.
+    ASSERT_EQUALS(ConfigVersionAndTerm(3, 1), replCoord->getConfig().getConfigVersionAndTerm());
+}
+
+TEST_F(HBStepdownAndReconfigTest, HBStepdownThenHBReconfig) {
+    // A node has started to step down then learns about a new config via heartbeat.
+    sendHBResponseWithNewTerm();
+    sendHBResponseWithNewConfig();
+    checkPostConditions();
+}
+
+TEST_F(HBStepdownAndReconfigTest, HBReconfigThenHBStepdown) {
+    // A node has started to reconfig then learns about a new term via heartbeat.
+    sendHBResponseWithNewConfig();
+    sendHBResponseWithNewTerm();
+    checkPostConditions();
+}
+
+TEST_F(HBStepdownAndReconfigTest, HBStepdownThenReconfigCommand) {
+    // A node has started to step down then someone calls replSetReconfig.
+    sendHBResponseWithNewTerm();
+    auto future = startReconfigCommand();
+    acknowledgeReconfigCommand();
+    future.get();
+    checkPostConditions();
+}
+
+TEST_F(HBStepdownAndReconfigTest, ReconfigCommandThenHBStepdown) {
+    // Someone calls replSetReconfig then the node learns about a new term via heartbeat.
+    auto future = startReconfigCommand();
+    sendHBResponseWithNewTerm();
+    acknowledgeReconfigCommand();
+    future.get();
+    checkPostConditions();
 }
 
 }  // namespace
