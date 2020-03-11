@@ -138,7 +138,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(operationContext()));
+    testFilterFn(css->getOwnershipFilter(
+        operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
 // Verifies that a different set of documents is visible for a timestamp in the past
@@ -161,7 +162,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(operationContext()));
+    testFilterFn(css->getOwnershipFilter(
+        operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
 // Verifies that when accessing too far into the past we get the stale error
@@ -192,7 +194,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
-    testFilterFn(css->getOwnershipFilter(operationContext()));
+    testFilterFn(css->getOwnershipFilter(
+        operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
 }  // namespace

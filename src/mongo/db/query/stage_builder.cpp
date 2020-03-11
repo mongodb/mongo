@@ -297,7 +297,11 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
 
             auto css = CollectionShardingState::get(opCtx, collection->ns());
             return std::make_unique<ShardFilterStage>(
-                expCtx, css->getOwnershipFilter(opCtx), ws, std::move(childStage));
+                expCtx,
+                css->getOwnershipFilter(
+                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
+                ws,
+                std::move(childStage));
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);

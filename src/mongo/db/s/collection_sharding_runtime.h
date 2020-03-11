@@ -82,7 +82,8 @@ public:
                                const UUID& collectionUuid,
                                ChunkRange orphanRange);
 
-    ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx) override;
+    ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
+                                              OrphanCleanupPolicy orphanCleanupPolicy) override;
 
     ScopedCollectionDescription getCollectionDescription() override;
 

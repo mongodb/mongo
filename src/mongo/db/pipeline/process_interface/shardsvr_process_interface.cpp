@@ -140,7 +140,10 @@ BSONObj ShardServerProcessInterface::attachCursorSourceAndExplain(
 std::unique_ptr<ShardFilterer> ShardServerProcessInterface::getShardFilterer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     auto collectionFilter =
-        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)->getOwnershipFilter(expCtx->opCtx);
+        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)
+            ->getOwnershipFilter(
+                expCtx->opCtx,
+                CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
     return std::make_unique<ShardFiltererImpl>(std::move(collectionFilter));
 }
 

@@ -55,7 +55,8 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     if (!repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())
         return;
 
-    const auto collectionFilter = csr->getOwnershipFilter(opCtx);
+    const auto collectionFilter = csr->getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
     if (!collectionFilter.isSharded())
         return;
 

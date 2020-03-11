@@ -122,7 +122,8 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
-ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(OperationContext* opCtx) {
+ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
+    OperationContext* opCtx, OrphanCleanupPolicy orphanCleanupPolicy) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion)
         return {kUnshardedCollection};

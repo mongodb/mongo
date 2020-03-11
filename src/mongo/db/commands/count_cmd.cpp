@@ -168,7 +168,10 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getOwnershipFilter(opCtx);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, nss)
+                ->getOwnershipFilter(
+                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
 
         auto expCtx = makeExpressionContextForGetExecutor(
             opCtx, request.getCollation().value_or(BSONObj()), nss);
@@ -228,7 +231,10 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getOwnershipFilter(opCtx);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, nss)
+                ->getOwnershipFilter(
+                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
 
         auto statusWithPlanExecutor =
             getExecutorCount(makeExpressionContextForGetExecutor(
