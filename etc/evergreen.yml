@@ -97,7 +97,7 @@ variables:
 
 - &jstestfuzz_config_vars
   num_files: 15
-  num_tasks: 10
+  num_tasks: 1
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
   resmoke_jobs_max: 1
   should_shuffle: false
@@ -4677,8 +4677,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 15
+      num_files: 20
+      num_tasks: 1
       npm_command: initsync-fuzzer
       suite: initial_sync_multiversion_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4692,8 +4692,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
+      num_files: 20
+      num_tasks: 1
       npm_command: initsync-fuzzer
       suite: initial_sync_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4707,8 +4707,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
@@ -4723,8 +4723,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 15
+      num_tasks: 1
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
@@ -4739,8 +4739,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --diffTestingMode optimization
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4755,8 +4755,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --diffTestingMode optimization
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4771,8 +4771,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --diffTestingMode wildcard
       npm_command: agg-fuzzer
       suite: generational_fuzzer
@@ -4787,8 +4787,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --diffTestingMode standalone
       npm_command: query-fuzzer
       suite: generational_fuzzer
@@ -4803,8 +4803,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --diffTestingMode sharded
       npm_command: query-fuzzer
       suite: generational_fuzzer
@@ -4819,8 +4819,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       npm_command: update-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4835,8 +4835,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       npm_command: update-fuzzer
       suite: generational_fuzzer_replication
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -4851,8 +4851,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 3
-      num_tasks: 5
+      num_files: 5
+      num_tasks: 1
       npm_command: rollback-fuzzer
       suite: rollback_multiversion_fuzzer
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
@@ -4869,8 +4869,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 3
-      num_tasks: 5
+      num_files: 8
+      num_tasks: 1
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
@@ -4886,8 +4886,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 1
-      num_tasks: 4
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_clean_shutdowns
@@ -4904,8 +4904,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 1
-      num_tasks: 4
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_unclean_shutdowns
@@ -4937,7 +4937,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -4952,7 +4952,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -4967,7 +4967,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_session
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -4982,7 +4982,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -4997,7 +4997,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_causal_consistency
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -5012,7 +5012,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -5027,7 +5027,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_session
       resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
@@ -5067,8 +5067,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 30
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_interrupt_replication
       resmoke_args: "--flowControlTicketOverride=1 --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -5082,8 +5082,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: >-
@@ -5100,8 +5100,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 2
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: >-
@@ -5118,8 +5118,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 30
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_continuous_stepdown
       resmoke_args: >-
@@ -5136,8 +5136,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
+      num_files: 2
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_continuous_stepdown
       resmoke_args: >-
@@ -5182,8 +5182,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 8
-      num_tasks: 10
+      num_files: 15
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_initsync
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -5251,8 +5251,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 10
+      num_files: 10
+      num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
