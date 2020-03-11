@@ -5129,7 +5129,7 @@ tasks:
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "common", "repl", "flow_control", "stepdowns"]
+  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
