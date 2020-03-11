@@ -154,6 +154,9 @@ private:
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
+    IndexBuildAction _drainSideWritesUntilNextActionIsAvailable(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) override;
+
     Timestamp _waitForNextIndexBuildAction(OperationContext* opCtx,
                                            std::shared_ptr<ReplIndexBuildState> replState) override;
 
