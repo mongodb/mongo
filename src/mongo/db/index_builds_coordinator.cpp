@@ -102,7 +102,8 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
  * bypass the index build registration.
  */
 bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
-                                                     Collection* collection) {
+                                                     Collection* collection,
+                                                     IndexBuildProtocol protocol) {
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), str::stream() << nss);
 
@@ -111,6 +112,14 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
     // Check whether the replica set member's config has {buildIndexes:false} set, which means
     // we are not allowed to build non-_id indexes on this server.
     if (!replCoord->buildsIndexes()) {
+        return false;
+    }
+
+    // Secondaries should not bypass index build registration (and _runIndexBuild()) for two phase
+    // index builds because they need to report index build progress to the primary per commit
+    // quorum.
+    if (IndexBuildProtocol::kTwoPhase == protocol && replCoord->getSettings().usingReplSets() &&
+        !replCoord->canAcceptWritesFor(opCtx, nss)) {
         return false;
     }
 
@@ -1485,7 +1494,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
     }
 
     // Bypass the thread pool if we are building indexes on an empty collection.
-    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection)) {
+    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection, protocol)) {
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
         indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
         try {
