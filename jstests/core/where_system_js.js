@@ -5,6 +5,8 @@
 //     # $where, which may not be the case if it is implicitly sharded in a passthrough.
 //     assumes_unsharded_collection,
 //     requires_scripting,
+//     # $where in 4.2 accepts CodeWithScope whereas >= 4.4 does not.
+//     requires_fcv_44,
 // ]
 (function() {
 "use strict";
