@@ -28,6 +28,12 @@ assert.eq(db.foo.count(), 0, '2.3');
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard0.shardName);
 
+assert.commandWorked(s.s0.adminCommand({enablesharding: "samePrimary"}));
+s.ensurePrimaryShard('samePrimary', s.shard0.shardName);
+
+assert.commandWorked(s.s0.adminCommand({enablesharding: "otherPrimary"}));
+s.ensurePrimaryShard('otherPrimary', s.shard1.shardName);
+
 // Ensure renaming to or from a sharded collection fails.
 jsTest.log('Testing renaming sharded collections');
 assert.commandWorked(
@@ -38,6 +44,14 @@ assert.commandFailed(db.shardedColl.renameCollection('somethingElse'));
 
 // Renaming to a sharded collection
 assert.commandFailed(db.bar.renameCollection('shardedColl'));
+
+// Renaming unsharded collection to a different db with different primary shard.
+db.unSharded.insert({x: 1});
+assert.commandFailedWithCode(
+    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherPrimary.foo'}), 13137);
+
+// Renaming unsharded collection to a different db with same primary shard.
+assert.commandWorked(db.adminCommand({renameCollection: 'test.unSharded', to: 'samePrimary.foo'}));
 
 const dropTarget = true;
 assert.commandFailed(db.bar.renameCollection('shardedColl', dropTarget));

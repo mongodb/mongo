@@ -1,5 +1,8 @@
 // @tags: [requires_non_retryable_commands, requires_fastcount,
-// requires_collstats, requires_capped]
+// requires_collstats, requires_capped, assumes_against_mongod_not_mongos]
+//
+// Note: should not run againts mongos because primary shard for database can land in different
+// shards and rename across different primary shards is not allowed.
 
 // ***************************************************************
 // rename7.js
