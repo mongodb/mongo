@@ -66,8 +66,8 @@ public:
      * subsequent migration operations will return ConflictingOperationInProgress until the unlock()
      * method is called.
      */
-    void lock(OperationContext* opCtx);
-    void unlock();
+    void lock(OperationContext* opCtx, StringData reason);
+    void unlock(StringData reason);
 
     /**
      * If there are no migrations running on this shard, registers an active migration with the
@@ -80,7 +80,8 @@ public:
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
+    StatusWith<ScopedDonateChunk> registerDonateChunk(OperationContext* opCtx,
+                                                      const MoveChunkRequest& args);
 
     /**
      * If there are no migrations running on this shard, registers an active receive operation with
@@ -89,7 +90,8 @@ public:
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
+    StatusWith<ScopedReceiveChunk> registerReceiveChunk(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
                                                         const ChunkRange& chunkRange,
                                                         const ShardId& fromShardId);
 
@@ -175,18 +177,21 @@ private:
 
 class MigrationBlockingGuard {
 public:
-    MigrationBlockingGuard(OperationContext* opCtx, ActiveMigrationsRegistry& registry)
-        : _opCtx(opCtx), _registry(registry) {
-        _registry.lock(_opCtx);
+    MigrationBlockingGuard(OperationContext* opCtx, std::string reason)
+        : _registry(ActiveMigrationsRegistry::get(opCtx)), _reason(std::move(reason)) {
+        // Ensure any thread attempting to use a MigrationBlockingGuard will be interrupted by
+        // a stepdown.
+        invariant(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+        _registry.lock(opCtx, _reason);
     }
 
     ~MigrationBlockingGuard() {
-        _registry.unlock();
+        _registry.unlock(_reason);
     }
 
 private:
-    OperationContext* _opCtx{nullptr};
     ActiveMigrationsRegistry& _registry;
+    std::string _reason;
 };
 
 /**

@@ -735,9 +735,18 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
         });
 }
 
-void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
+void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
     LOGV2(22037, "Starting migration coordinator stepup recovery thread.");
 
+    // Don't allow migrations to start until the recovery is complete. Otherwise, the
+    // migration may end up inserting a migrationCoordinator doc that the recovery thread
+    // reads and attempts to recovery the decision for by bumping the chunkVersion, which
+    // will cause the migration to abort on trying to commit anyway.
+    // Store it as shared_ptr so that it can be captured in the async recovery task below.
+    const auto migrationBlockingGuard =
+        std::make_shared<MigrationBlockingGuard>(opCtx, "migration coordinator stepup recovery");
+
+    const auto serviceContext = opCtx->getServiceContext();
     ExecutorFuture<void>(getMigrationUtilExecutor())
         .then([serviceContext] {
             ThreadClient tc("MigrationCoordinatorStepupRecovery", serviceContext);
@@ -864,7 +873,7 @@ void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext) {
             ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
                 migrationRecoveryCount);
         })
-        .getAsync([](const Status& status) {
+        .getAsync([migrationBlockingGuard](const Status& status) {
             if (!status.isOK()) {
                 LOGV2(22041,
                       "Failed to resume coordinating migrations on stepup {causedBy_status}",
