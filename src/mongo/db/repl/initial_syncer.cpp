@@ -318,6 +318,22 @@ Status InitialSyncer::shutdown() {
     return Status::OK();
 }
 
+void InitialSyncer::cancelCurrentAttempt() {
+    stdx::lock_guard lk(_mutex);
+    if (_isActive_inlock()) {
+        LOGV2_DEBUG(4427201,
+                    1,
+                    "Cancelling the current initial sync attempt.",
+                    "currentAttempt"_attr = _stats.failedInitialSyncAttempts + 1);
+        _cancelRemainingWork_inlock();
+    } else {
+        LOGV2_DEBUG(4427202,
+                    1,
+                    "There is no initial sync attempt to cancel because the initial syncer is not "
+                    "currently active.");
+    }
+}
+
 void InitialSyncer::_cancelRemainingWork_inlock() {
     _cancelHandle_inlock(_startInitialSyncAttemptHandle);
     _cancelHandle_inlock(_chooseSyncSourceHandle);

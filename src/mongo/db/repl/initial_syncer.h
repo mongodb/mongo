@@ -258,6 +258,11 @@ public:
     BSONObj getInitialSyncProgress() const;
 
     /**
+     * Cancels the current initial sync attempt if the initial syncer is active.
+     */
+    void cancelCurrentAttempt();
+
+    /**
      *
      * Overrides how the initial syncer creates the client.
      *
