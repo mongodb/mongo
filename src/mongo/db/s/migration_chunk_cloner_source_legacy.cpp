@@ -91,8 +91,8 @@ BSONObj createRequestWithSessionId(StringData commandName,
     return builder.obj();
 }
 
-const BSONObj& getDocumentKeyFromReplOperation(repl::ReplOperation replOperation,
-                                               repl::OpTypeEnum opType) {
+BSONObj getDocumentKeyFromReplOperation(repl::ReplOperation replOperation,
+                                        repl::OpTypeEnum opType) {
     switch (opType) {
         case repl::OpTypeEnum::kInsert:
         case repl::OpTypeEnum::kDelete:
