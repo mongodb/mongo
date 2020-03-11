@@ -114,7 +114,8 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         *stoppedAtKey = targetRange->getMax();
 
-        cleanupCompleteFuture = css->cleanUpRange(*targetRange, CollectionShardingRuntime::kNow);
+        cleanupCompleteFuture =
+            css->cleanUpRange(*targetRange, boost::none, CollectionShardingRuntime::kNow);
     }
 
     // Sleep waiting for our own deletion. We don't actually care about any others, so there is no

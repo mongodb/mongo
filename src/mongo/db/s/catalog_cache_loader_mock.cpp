@@ -111,13 +111,19 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
                 uassertStatusOK(_swCollectionReturnValue);
                 uassertStatusOK(_swChunksReturnValue);
 
+                // We swap the chunks out of _swChunksReturnValue to ensure if this task is
+                // scheduled multiple times that we don't inform the ChunkManager about a chunk it
+                // has already updated.
+                std::vector<ChunkType> chunks;
+                _swChunksReturnValue.getValue().swap(chunks);
+
                 return CollectionAndChangedChunks(
                     _swCollectionReturnValue.getValue().getUUID(),
                     _swCollectionReturnValue.getValue().getEpoch(),
                     _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                     _swCollectionReturnValue.getValue().getDefaultCollation(),
                     _swCollectionReturnValue.getValue().getUnique(),
-                    _swChunksReturnValue.getValue());
+                    std::move(chunks));
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }

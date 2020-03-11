@@ -30,6 +30,8 @@
 
 #include <list>
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -68,6 +70,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
     const ChunkRange& range,
+    boost::optional<UUID> migrationId,
     int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete,
     Milliseconds delayBetweenBatches);

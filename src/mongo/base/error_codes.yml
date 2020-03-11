@@ -350,6 +350,8 @@ error_codes:
     - {code: 305,name: ReadThroughCacheKeyNotFound}
     - {code: 306,name: ReadThroughCacheLookupCanceled}
 
+    - {code: 307,name: RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
