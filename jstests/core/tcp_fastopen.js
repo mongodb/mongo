@@ -23,24 +23,26 @@ printjson(initial);
 print("/proc/net/netstat:");
 print(cat("/proc/net/netstat"));
 
-const confused = "proc file suggests this kernel is capable, but setsockopt failed";
-assert.eq(true, initial.serverSupported, confused);
-assert.eq(true, initial.clientSupported, confused);
+if (!initial.serverSupported || !initial.clientSupported) {
+    print("==Skipping test, one or both setsockopt() calls failed");
+    return;
+}
+
+function tryShell() {
+    const conn = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
+    print("/proc/net/netstat:");
+    print(cat("/proc/net/netstat"));
+    assert.eq(0, conn);
+}
 
 // Initial connect to be sure a TFO cookie is requested and received.
-const netConn1 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
-print("/proc/net/netstat:");
-print(cat("/proc/net/netstat"));
-assert.eq(0, netConn1);
+tryShell();
 
 const first = db.serverStatus().network.tcpFastOpen;
 printjson(first);
 
 // Second connect using the TFO cookie.
-const netConn2 = runMongoProgram('mongo', '--port', myPort(), '--eval', ';');
-print("/proc/net/netstat:");
-print(cat("/proc/net/netstat"));
-assert.eq(0, netConn2);
+tryShell();
 
 const second = db.serverStatus().network.tcpFastOpen;
 printjson(second);
