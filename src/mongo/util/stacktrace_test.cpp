@@ -54,7 +54,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_json.h"
 
@@ -159,11 +158,6 @@ TEST(StackTrace, PosixFormat) {
         return;
     }
 
-    if (kDebugBuild) {
-        // TODO SERVER-46403 will make the regex below work with opt=off dbg=on
-        return;
-    }
-
     std::string trace;
     stack_trace_test_detail::RecursionParam param{3, [&] {
                                                       StringStackTraceSink sink{trace};
@@ -175,17 +169,22 @@ TEST(StackTrace, PosixFormat) {
         tlog() << "trace:{" << trace << "}";
     }
 
+    // Expect log to be a "BACKTRACE:" 1-line record, followed by some "Frame:" lines.
+    // Each "Frame:" line holds a full json object, but we only examine its "a" field here.
     std::string jsonLine;
-    std::string traceBody;
-    ASSERT_TRUE(pcrecpp::RE(R"re(BACKTRACE: (\{.*\})\n)re"
-                            R"re(((?:.|\n)*))re")
-                    .FullMatch(trace, &jsonLine, &traceBody))
-        << "trace: {}"_format(trace);
-
-    if (kSuperVerbose) {
-        tlog() << "jsonLine:{" << jsonLine << "}";
-        tlog() << "traceBody:{" << traceBody << "}";
+    std::vector<uintptr_t> humanAddrs;
+    pcrecpp::StringPiece in{trace};
+    static const pcrecpp::RE jsonLineRE(R"re(BACKTRACE: (\{.*\})\n?)re");
+    ASSERT_TRUE(jsonLineRE.Consume(&in, &jsonLine)) << "\"" << in.as_string() << "\"";
+    while (true) {
+        std::string frameLine;
+        static const pcrecpp::RE frameRE(R"re(  Frame: (\{.*\})\n?)re");
+        if (!frameRE.Consume(&in, &frameLine))
+            break;
+        BSONObj frameObj = fromjson(frameLine);  // throwy
+        humanAddrs.push_back(fromHex(frameObj["a"].String()));
     }
+    ASSERT_TRUE(in.empty()) << "must be consumed fully: \"" << in.as_string() << "\"";
 
     BSONObj jsonObj = fromjson(jsonLine);  // throwy
     ASSERT_TRUE(jsonObj.hasField("backtrace"));
@@ -209,14 +208,6 @@ TEST(StackTrace, PosixFormat) {
     }
 
     // Sanity check: make sure all BACKTRACE addrs are represented in the Frame section.
-    std::vector<uintptr_t> humanAddrs;
-
-    static const pcrecpp::RE re(R"re(  Frame: (?:\{"a":"(.*?)",.*\})\n?)re");
-    pcrecpp::StringPiece traceBodyPiece(traceBody);
-    for (uintptr_t addr; re.Consume(&traceBodyPiece, pcrecpp::Hex(&addr));) {
-        humanAddrs.push_back(addr);
-    }
-
     std::vector<uintptr_t> btAddrs;
     for (const auto& btElem : jsonObj["backtrace"].embeddedObject()) {
         btAddrs.push_back(fromHex(btElem.embeddedObject()["a"].String()));
