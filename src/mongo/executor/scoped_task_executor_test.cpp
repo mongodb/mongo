@@ -256,7 +256,7 @@ TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdown) {
     getNet()->exitNetwork();
 
     ASSERT_EQUALS(resultPf.future.getNoThrow(), ErrorCodes::ShutdownInProgress);
-    ASSERT_TRUE(getExecutor()->joinAsync().isReady());
+    ASSERT_OK(getExecutor()->joinAsync().getNoThrow());
 }
 
 // ScheduleRemoteCommand on the underlying, but are shut down when we execute our wrapping callback
