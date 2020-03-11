@@ -46,18 +46,8 @@ private:
 public:
     typedef boost::optional<RetryingOperation> RetryableOperation;
 
-    InitialSyncSharedData(ServerGlobalParams::FeatureCompatibility::Version FCV,
-                          int rollBackId,
-                          Milliseconds allowedOutageDuration,
-                          ClockSource* clock)
-        : _FCV(FCV),
-          _rollBackId(rollBackId),
-          _clock(clock),
-          _allowedOutageDuration(allowedOutageDuration) {}
-
-    ServerGlobalParams::FeatureCompatibility::Version getFCV() const {
-        return _FCV;
-    }
+    InitialSyncSharedData(int rollBackId, Milliseconds allowedOutageDuration, ClockSource* clock)
+        : _rollBackId(rollBackId), _clock(clock), _allowedOutageDuration(allowedOutageDuration) {}
 
     int getRollBackId() const {
         return _rollBackId;
@@ -200,9 +190,6 @@ private:
     }
 
     // The const members above the mutex may be accessed without the mutex.
-
-    // Sync source FCV at start of initial sync.
-    const ServerGlobalParams::FeatureCompatibility::Version _FCV;
 
     // Rollback ID at start of initial sync
     const int _rollBackId;

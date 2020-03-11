@@ -1062,8 +1062,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     // - oplog fetcher
     // - data cloning and applier
     _sharedData =
-        std::make_unique<InitialSyncSharedData>(version,
-                                                _rollbackChecker->getBaseRBID(),
+        std::make_unique<InitialSyncSharedData>(_rollbackChecker->getBaseRBID(),
                                                 _allowedOutageDuration,
                                                 getGlobalServiceContext()->getFastClockSource());
     _client = _createClientFn();
