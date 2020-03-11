@@ -3955,42 +3955,6 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
     ASSERT_FALSE(response.getVoteGranted());
 }
 
-// TODO: Remove this test in 4.6 when we can remove references to "lastCommittedOp" (SERVER-46090).
-TEST_F(TopoCoordTest, ParseLastAppliedOpTimeWithCorrectFieldName) {
-    const OpTime lastOpTimeApplied = OpTime(Timestamp(4, 0), 0);
-
-    const auto reqVotesObjWithLastAppliedOpTimeField =
-        BSON("replSetRequestVotes" << 1 << "setName"
-                                   << "rs0"
-                                   << "dryRun" << true << "term" << 1LL << "candidateIndex" << 1LL
-                                   << "configVersion" << 1LL << "configTerm" << 1LL
-                                   << "lastAppliedOpTime" << lastOpTimeApplied);
-    ReplSetRequestVotesArgs reqVotesArgsWithLastAppliedOpTimeField;
-    ASSERT_OK(
-        reqVotesArgsWithLastAppliedOpTimeField.initialize(reqVotesObjWithLastAppliedOpTimeField));
-
-    // Verify we successfully parse the args with 'lastAppliedOpTime' as the field name.
-    ASSERT_EQUALS(lastOpTimeApplied, reqVotesArgsWithLastAppliedOpTimeField.getLastAppliedOpTime());
-    // Verify that the request serializes correctly.
-    ASSERT_EQUALS(reqVotesObjWithLastAppliedOpTimeField.toString(),
-                  reqVotesObjWithLastAppliedOpTimeField.toString());
-
-    const auto reqVotesObjWithLastCommittedOpField =
-        BSON("replSetRequestVotes" << 1 << "setName"
-                                   << "rs1"
-                                   << "dryRun" << true << "term" << 1LL << "candidateIndex" << 1LL
-                                   << "configVersion" << 1LL << "configTerm" << 1LL
-                                   << "lastCommittedOp" << lastOpTimeApplied);
-    ReplSetRequestVotesArgs reqVotesArgsWithLastCommittedOpField;
-    ASSERT_OK(reqVotesArgsWithLastCommittedOpField.initialize(reqVotesObjWithLastCommittedOpField));
-
-    // Verify we successfully parse the args with 'lastCommittedOp' as the field name.
-    ASSERT_EQUALS(lastOpTimeApplied, reqVotesArgsWithLastCommittedOpField.getLastAppliedOpTime());
-    // Verify that the request serializes correctly.
-    ASSERT_EQUALS(reqVotesObjWithLastCommittedOpField.toString(),
-                  reqVotesArgsWithLastCommittedOpField.toString());
-}
-
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
