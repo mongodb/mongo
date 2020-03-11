@@ -131,6 +131,7 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -1049,6 +1050,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                       "Failed to stepDown in non-command initiated shutdown path {e}",
                       "e"_attr = e.toString());
             }
+
+            // Even if the replCoordinator failed to step down, ensure we still shut down the
+            // TransactionCoordinatorService (see SERVER-45009)
+            TransactionCoordinatorService::get(serviceContext)->onStepDown();
         }
     }
 
