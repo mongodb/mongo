@@ -56,10 +56,19 @@ function runTest(testOptions) {
     },
                                           testOptions));
 
-    assert.commandFailed(res, "creating a document larger than 16MB didn't fail");
-    assert.lte(0,
-               res.errmsg.indexOf("object to insert too large"),
-               "map-reduce command failed for a reason other than inserting a large document");
+    // In most cases we expect this to fail because it tries to insert a document that is too large.
+    // In some cases we may see the javascript execution interrupted because it takes longer than
+    // our default time limit, so we allow that possibility.
+    assert.commandFailedWithCode(res,
+                                 [ErrorCodes.BadValue, ErrorCodes.Interrupted],
+                                 "creating a document larger than 16MB didn't fail");
+    if (res.code != ErrorCodes.Interrupted) {
+        assert.lte(
+            0,
+            res.errmsg.indexOf("object to insert too large"),
+            "map-reduce command failed for a reason other than inserting a large document: " +
+                tojson(res));
+    }
 }
 
 runTest({reduce: createBigDocument});
