@@ -203,7 +203,7 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
-void resumeMigrationCoordinationsOnStepUp(ServiceContext* serviceContext);
+void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
 
 }  // namespace migrationutil
 }  // namespace mongo

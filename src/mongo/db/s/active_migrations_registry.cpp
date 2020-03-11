@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/active_migrations_registry.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -58,7 +61,7 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
-void ActiveMigrationsRegistry::lock(OperationContext* opCtx) {
+void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) {
     stdx::unique_lock<Latch> lock(_mutex);
 
     // This wait is to hold back additional lock requests while there is already one in
@@ -66,6 +69,7 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx) {
     opCtx->waitForConditionOrInterrupt(_lockCond, lock, [this] { return !_migrationsBlocked; });
 
     // Setting flag before condvar returns to block new migrations from starting. (Favoring writers)
+    LOGV2(4675601, "Going to start blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = true;
 
     // Wait for any ongoing migrations to complete.
@@ -73,22 +77,23 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx) {
         _lockCond, lock, [this] { return !(_activeMoveChunkState || _activeReceiveChunkState); });
 }
 
-void ActiveMigrationsRegistry::unlock() {
+void ActiveMigrationsRegistry::unlock(StringData reason) {
     stdx::lock_guard<Latch> lock(_mutex);
 
+    LOGV2(4675602, "Going to stop blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = false;
 
     _lockCond.notify_all();
 }
 
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
-    const MoveChunkRequest& args) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    OperationContext* opCtx, const MoveChunkRequest& args) {
+    stdx::unique_lock<Latch> lk(_mutex);
 
-    if (_migrationsBlocked)
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "blocking all migrations."};
+    if (_migrationsBlocked) {
+        LOGV2(4675603, "Register donate chunk waiting for migrations to be unblocked");
+        opCtx->waitForConditionOrInterrupt(_lockCond, lk, [this] { return !_migrationsBlocked; });
+    }
 
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
@@ -108,13 +113,16 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
 }
 
 StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
-    const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ChunkRange& chunkRange,
+    const ShardId& fromShardId) {
+    stdx::unique_lock<Latch> lk(_mutex);
 
-    if (_migrationsBlocked)
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "blocking all migrations."};
+    if (_migrationsBlocked) {
+        LOGV2(4675604, "Register receive chunk waiting for migrations to be unblocked");
+        opCtx->waitForConditionOrInterrupt(_lockCond, lk, [this] { return !_migrationsBlocked; });
+    }
 
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();

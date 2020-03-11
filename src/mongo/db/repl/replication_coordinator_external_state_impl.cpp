@@ -878,7 +878,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // ShardingStateRecovery::recover above, because they may trigger filtering metadata
         // refreshes which should use the recovered configOpTime.
         migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-        migrationutil::resumeMigrationCoordinationsOnStepUp(_service);
+        migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
 
     } else {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {

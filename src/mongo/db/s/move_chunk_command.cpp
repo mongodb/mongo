@@ -135,7 +135,7 @@ public:
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
         auto scopedMigration = uassertStatusOK(
-            ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(moveChunkRequest));
+            ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, moveChunkRequest));
 
         // Check if there is an existing migration running and if so, join it
         if (scopedMigration.mustExecute()) {

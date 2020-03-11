@@ -4,6 +4,9 @@
 //
 // Note: don't use coll1 in this test after a coll1 migration is interrupted -- the distlock isn't
 // released promptly when interrupted.
+//
+// Uses the disableResumableRangeDeleter parameter, which was introduced in v4.4.
+// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -12,7 +15,10 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-var st = new ShardingTest({shards: 3, rs: {nodes: 2}});
+// This test only makes sense if resumable range deletion is off, because when it is on, it is not
+// possible for the donor to begin a new migration before having completed the previous one.
+var st = new ShardingTest(
+    {shards: 3, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
 
 var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
     ns2 = dbName + ".bar", coll1 = mongos.getCollection(ns1), coll2 = mongos.getCollection(ns2),
@@ -58,39 +64,9 @@ waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 killRunningMoveChunk(admin);
 
 unpauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
-if (jsTestOptions().mongosBinVersion == "last-stable") {
-    assert.throws(function() {
-        joinMoveChunk();
-    });
-} else {
-    jsTestLog("Waiting for donor to write an abort decision.");
-    // In FCV 4.4, check the migration coordinator document, because the moveChunk command itself
-    // will hang on trying to bump the txn number on the recipient until the recipient has completed
-    // and checked the session back in.
-    assert.soon(() => {
-        return st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").findOne({
-            nss: ns1,
-            decision: "aborted",
-        }) != null;
-    });
-
-    // This is necessary to allow the following moveChunk to succeed, since the original primary
-    // will stay blocked trying to advance the transaction number on the recipient.
-    jsTestLog("Electing a new primary for the donor shard.");
-    let newPrimary = st.rs0.getSecondary();
-    st.rs0.stepUpNoAwaitReplication(newPrimary);
-    // This is needed because stepUpNoAwaitReplication does not wait for step-up to complete before
-    // returning - only for a new primary to be decided.
-    st.rs0.awaitReplication();
-    // This is necessary to avoid NotMaster errors on the subsequent moveChunk request, which goes
-    // through the config server.
-    awaitRSClientHosts(st.configRS.getPrimary(), st.rs0.getPrimary(), {ok: true, ismaster: true});
-    jsTestLog("Finished electing a new primary for the donor shard.");
-
-    shard0 = newPrimary;
-    shard0Coll1 = shard0.getCollection(ns1);
-    shard0Coll2 = shard0.getCollection(ns2);
-}
+assert.throws(function() {
+    joinMoveChunk();
+});
 
 // Start coll2 migration to shard2, pause recipient after delete step.
 pauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
@@ -108,12 +84,6 @@ assert.soon(function() {
 assert.eq(1, shard0Coll1.find().itcount(), "donor shard0 completed a migration that it aborted.");
 assert.eq(
     0, shard1Coll1.find().itcount(), "shard1 cloned documents despite donor migration abortion.");
-
-if (jsTestOptions().mongosBinVersion != "last-stable") {
-    assert.throws(function() {
-        joinMoveChunk();
-    });
-}
 
 jsTest.log('Finishing coll2 migration, which should succeed....');
 unpauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
