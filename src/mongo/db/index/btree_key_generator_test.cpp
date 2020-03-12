@@ -94,6 +94,16 @@ bool keysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKe
     return true;
 }
 
+bool containsArrayElement(const BSONObj& obj) {
+    for (auto&& elem : obj) {
+        if (elem.type() == BSONType::Array ||
+            (elem.type() == BSONType::Object && containsArrayElement(elem.Obj()))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool testKeygen(const BSONObj& kp,
                 const BSONObj& obj,
                 const KeyStringSet& expectedKeys,
@@ -103,8 +113,7 @@ bool testKeygen(const BSONObj& kp,
     invariant(expectedMultikeyPaths.size() == static_cast<size_t>(kp.nFields()));
 
     //
-    // Step 1: construct the btree key generator object, using the
-    // index key pattern.
+    // Construct the btree key generator object, using the index key pattern.
     //
     vector<const char*> fieldNames;
     vector<BSONElement> fixed;
@@ -123,39 +132,53 @@ bool testKeygen(const BSONObj& kp,
                                                       KeyString::Version::kLatestVersion,
                                                       Ordering::make(BSONObj()));
 
-    //
-    // Step 2: ask 'keyGen' to generate index keys for the object 'obj' and report any prefixes of
-    // the indexed fields that would cause the index to be multikey as a result of inserting
-    // 'actualKeys'.
-    //
-    KeyStringSet actualKeys;
-    MultikeyPaths actualMultikeyPaths;
-    keyGen->getKeys(obj, &actualKeys, &actualMultikeyPaths);
+    auto runTest = [&](bool skipMultikey) {
+        //
+        // Ask 'keyGen' to generate index keys for the object 'obj' and report any prefixes of the
+        // indexed fields that would cause the index to be multikey as a result of inserting
+        // 'actualKeys'.
+        //
+        KeyStringSet actualKeys;
+        MultikeyPaths actualMultikeyPaths;
+        keyGen->getKeys(obj, skipMultikey, &actualKeys, &actualMultikeyPaths);
 
-    //
-    // Step 3: check that the results match the expected result.
-    //
-    bool match = keysetsEqual(expectedKeys, actualKeys);
-    if (!match) {
-        LOGV2(20647,
-              "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
-              "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
-              "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
-        return false;
+        //
+        // Check that the results match the expected result.
+        //
+        bool match = keysetsEqual(expectedKeys, actualKeys);
+        if (!match) {
+            LOGV2(20647,
+                  "Expected: {dumpKeyset_expectedKeys}, Actual: {dumpKeyset_actualKeys}",
+                  "dumpKeyset_expectedKeys"_attr = dumpKeyset(expectedKeys),
+                  "dumpKeyset_actualKeys"_attr = dumpKeyset(actualKeys));
+            return false;
+        }
+
+        match = (expectedMultikeyPaths == actualMultikeyPaths);
+        if (!match) {
+            LOGV2(20648,
+                  "Expected: {dumpMultikeyPaths_expectedMultikeyPaths}, Actual: "
+                  "{dumpMultikeyPaths_actualMultikeyPaths}",
+                  "dumpMultikeyPaths_expectedMultikeyPaths"_attr =
+                      dumpMultikeyPaths(expectedMultikeyPaths),
+                  "dumpMultikeyPaths_actualMultikeyPaths"_attr =
+                      dumpMultikeyPaths(actualMultikeyPaths));
+            return false;
+        }
+
+        return true;
+    };
+
+    // If it is correct to do so, then test that the fast key generation path for the non-multikey
+    // case works as expected.
+    if (!containsArrayElement(obj)) {
+        if (!runTest(true)) {
+            return false;
+        }
     }
 
-    match = (expectedMultikeyPaths == actualMultikeyPaths);
-    if (!match) {
-        LOGV2(20648,
-              "Expected: {dumpMultikeyPaths_expectedMultikeyPaths}, Actual: "
-              "{dumpMultikeyPaths_actualMultikeyPaths}",
-              "dumpMultikeyPaths_expectedMultikeyPaths"_attr =
-                  dumpMultikeyPaths(expectedMultikeyPaths),
-              "dumpMultikeyPaths_actualMultikeyPaths"_attr =
-                  dumpMultikeyPaths(actualMultikeyPaths));
-    }
-
-    return match;
+    // Test that fully general key generation path works as expected.
+    return runTest(false);
 }
 
 //

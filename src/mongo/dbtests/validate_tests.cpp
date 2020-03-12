@@ -887,7 +887,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                         IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1302,7 +1302,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                         IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1535,7 +1535,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                         IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1571,7 +1571,7 @@ public:
             KeyStringSet keys;
             iam->getKeys(actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                         IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1686,7 +1686,7 @@ public:
                 KeyStringSet keys;
                 iam->getKeys(dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                             IndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -1718,7 +1718,7 @@ public:
                 InsertResult result;
                 iam->getKeys(dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                             IndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,

@@ -68,8 +68,15 @@ public:
      * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
      * element with the prefixes of the indexed field that would cause this index to be multikey as
      * a result of inserting 'keys'.
+     *
+     * If the caller is certain that the current index is not multikey, and the insertion of 'obj'
+     * will not turn the index into a multikey, then the 'skipMultikey' parameter can be set to
+     * 'true' to be able to use an optimized algorithm for the index key generation. Otherwise,
+     * this parameter must be set to 'false'. In this case a generic algorithm will be used, which
+     * can handle both multikey and non-multikey indexes.
      */
     void getKeys(const BSONObj& obj,
+                 bool skipMultikey,
                  KeyStringSet* keys,
                  MultikeyPaths* multikeyPaths,
                  boost::optional<RecordId> id = boost::none) const;
@@ -148,6 +155,14 @@ private:
                            const std::vector<PositionalPathInfo>& positionalInfo,
                            MultikeyPaths* multikeyPaths,
                            boost::optional<RecordId> id) const;
+
+    /**
+     * An optimized version of the key generation algorithm to be used when it is known that 'obj'
+     * doesn't contain an array value in any of the fields in the key pattern.
+     */
+    void _getKeysWithoutArray(const BSONObj& obj,
+                              boost::optional<RecordId> id,
+                              KeyStringSet* keys) const;
 
     /**
      * A call to _getKeysWithArray() begins by calling this for each field in the key pattern. It

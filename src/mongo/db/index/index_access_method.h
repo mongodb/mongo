@@ -276,10 +276,10 @@ public:
     };
 
     /**
-     * Specifies whether getKeys is being used in the context of creating new keys or deleting
-     * existing keys.
+     * Specifies whether getKeys is being used in the context of creating new keys, deleting
+     * or validating existing keys.
      */
-    enum class GetKeysContext { kRemovingKeys, kReadOrAddKeys };
+    enum class GetKeysContext { kRemovingKeys, kAddingKeys, kValidatingKeys };
 
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
