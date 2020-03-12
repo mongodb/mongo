@@ -132,7 +132,10 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
             auto* cursor = it->second;
             if (cursorShouldTimeout_inlock(cursor, now)) {
                 toDisposeWithoutMutex.emplace_back(cursor);
-                lockedPartition->erase(it++);
+                // Advance the iterator first since erasing from the lockedPartition will
+                // invalidate any references to it.
+                ++it;
+                removeCursorFromMap(lockedPartition, cursor);
             } else {
                 ++it;
             }
@@ -283,6 +286,18 @@ stdx::unordered_set<CursorId> CursorManager::getCursorsForSession(LogicalSession
     return cursors;
 }
 
+stdx::unordered_set<CursorId> CursorManager::getCursorsForOpKeys(
+    std::vector<OperationKey> opKeys) const {
+    stdx::unordered_set<CursorId> cursors;
+
+    stdx::lock_guard<Latch> lk(_opKeyMutex);
+    for (auto opKey : opKeys) {
+        if (auto it = _opKeyMap.find(opKey); it != _opKeyMap.end())
+            cursors.insert(it->second);
+    }
+    return cursors;
+}
+
 size_t CursorManager::numCursors() const {
     return _cursorMap->size();
 }
@@ -345,11 +360,18 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     auto partition = _cursorMap->lockOnePartition(cursorId);
     ClientCursor* unownedCursor = clientCursor.release();
     partition->emplace(cursorId, unownedCursor);
+
+    // If set, store the mapping of OperationKey to the generated CursorID.
+    if (auto opKey = opCtx->getOperationKey()) {
+        stdx::lock_guard<Latch> lk(_opKeyMutex);
+        _opKeyMap.emplace(*opKey, cursorId);
+    }
+
     return ClientCursorPin(opCtx, unownedCursor, this);
 }
 
 void CursorManager::deregisterCursor(ClientCursor* cursor) {
-    _cursorMap->erase(cursor->cursorid());
+    removeCursorFromMap(_cursorMap, cursor);
 }
 
 void CursorManager::deregisterAndDestroyCursor(
@@ -358,7 +380,7 @@ void CursorManager::deregisterAndDestroyCursor(
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     {
         auto lockWithRestrictedScope = std::move(lk);
-        lockWithRestrictedScope->erase(cursor->cursorid());
+        removeCursorFromMap(lockWithRestrictedScope, cursor.get());
     }
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did

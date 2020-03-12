@@ -1256,6 +1256,133 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnsUnderlyingCursorTxnNumber) {
     ASSERT_EQ(txnNumber, *pinnedCursor.getValue()->getTxnNumber());
 }
 
+TEST_F(ClusterCursorManagerTest, CursorsWithoutOperationKeys) {
+    ASSERT_OK(getManager()->registerCursor(_opCtx.get(),
+                                           allocateMockCursor(),
+                                           nss,
+                                           ClusterCursorManager::CursorType::SingleTarget,
+                                           ClusterCursorManager::CursorLifetime::Mortal,
+                                           UserNameIterator()));
+
+    ASSERT_EQ(getManager()->getCursorsForOpKeys({UUID::gen()}).size(), size_t(0));
+}
+
+TEST_F(ClusterCursorManagerTest, OneCursorWithAnOperationKey) {
+    auto opKey = UUID::gen();
+    _opCtx->setOperationKey(opKey);
+    auto cursorId =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    // Retrieve all cursors for this operation key - should be just ours.
+    auto cursors = getManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(cursorId) != cursors.end());
+
+    // Remove the cursor from the manager.
+    ASSERT_OK(getManager()->killCursor(_opCtx.get(), nss, cursorId));
+
+    // There should be no more cursor entries for this operation key.
+    ASSERT(getManager()->getCursorsForOpKeys({opKey}).empty());
+}
+
+TEST_F(ClusterCursorManagerTest, GetCursorByOpKeyWhileCheckedOut) {
+    auto opKey = UUID::gen();
+    _opCtx->setOperationKey(opKey);
+    auto cursorId =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    // Check the cursor out then look it up by operation key.
+    auto res = getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
+    ASSERT(res.isOK());
+
+    auto cursors = getManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(1));
+}
+
+TEST_F(ClusterCursorManagerTest, MultipleCursorsWithSameOperationKey) {
+    auto opKey = UUID::gen();
+    _opCtx->setOperationKey(opKey);
+    auto cursorId1 =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+    auto cursorId2 =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    // Retrieve all cursors for the operation key - should be both cursors.
+    auto cursors = getManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(2));
+    ASSERT(cursors.find(cursorId1) != cursors.end());
+    ASSERT(cursors.find(cursorId2) != cursors.end());
+
+    // Remove one cursor from the manager.
+    ASSERT_OK(getManager()->killCursor(_opCtx.get(), nss, cursorId1));
+
+    // Should still be able to retrieve remaining cursor by session.
+    cursors = getManager()->getCursorsForOpKeys({opKey});
+    ASSERT_EQ(cursors.size(), size_t(1));
+    ASSERT(cursors.find(cursorId2) != cursors.end());
+}
+
+TEST_F(ClusterCursorManagerTest, MultipleCursorsMultipleOperationKeys) {
+    auto opKey1 = UUID::gen();
+    auto opKey2 = UUID::gen();
+    _opCtx->setOperationKey(opKey1);
+
+    auto client2 = getServiceContext()->makeClient("client2");
+    auto opCtx2 = client2->makeOperationContext();
+    opCtx2->setOperationKey(opKey2);
+
+    // Register two cursors with different operation keys.
+    CursorId cursor1 =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    CursorId cursor2 =
+        assertGet(getManager()->registerCursor(opCtx2.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    // Retrieve cursors for each operation key.
+    auto cursors1 = getManager()->getCursorsForOpKeys({opKey1});
+    ASSERT_EQ(cursors1.size(), size_t(1));
+    ASSERT(cursors1.find(cursor1) != cursors1.end());
+
+    auto cursors2 = getManager()->getCursorsForOpKeys({opKey2});
+    ASSERT_EQ(cursors2.size(), size_t(1));
+
+    // Retrieve cursors for both operation keys.
+    auto cursors = getManager()->getCursorsForOpKeys({opKey1, opKey2});
+    ASSERT_EQ(cursors.size(), size_t(2));
+    ASSERT(cursors.find(cursor1) != cursors.end());
+    ASSERT(cursors.find(cursor2) != cursors.end());
+}
+
 }  // namespace
 
 }  // namespace mongo

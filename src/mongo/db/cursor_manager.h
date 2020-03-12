@@ -43,6 +43,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -167,6 +168,11 @@ public:
      */
     stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
 
+    /*
+     * Returns a list of all open cursors for the given set of OperationKeys.
+     */
+    stdx::unordered_set<CursorId> getCursorsForOpKeys(std::vector<OperationKey>) const;
+
     /**
      * Returns the number of ClientCursors currently registered.
      */
@@ -199,6 +205,17 @@ private:
 
     bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
 
+    template <class T>
+    void removeCursorFromMap(T& map, ClientCursor* cursor) {
+        // Remove from the opKey map first since erasing from the map may free the pointer for
+        // 'cursor'.
+        if (auto opKey = cursor->getOperationKey()) {
+            stdx::lock_guard<Latch> lk(_opKeyMutex);
+            _opKeyMap.erase(*opKey);
+        }
+        map->erase(cursor->cursorid());
+    }
+
     // A CursorManager holds a pointer to all open ClientCursors. ClientCursors are owned by the
     // CursorManager, except when they are in use by a ClientCursorPin. When in use by a pin, an
     // unowned pointer remains to ensure they still receive kill notifications while in use.
@@ -218,5 +235,11 @@ private:
     std::unique_ptr<PseudoRandom> _random;
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
         _cursorMap;
+
+    // A mapping from client OperationKey to corresponding CursorID. Note that it's possible that
+    // cursors in the map above are not present in this map, since OperationKey is not required when
+    // registering a cursor.
+    mutable Mutex _opKeyMutex = MONGO_MAKE_LATCH("CursorManager::_opKeyMutex");
+    stdx::unordered_map<OperationKey, CursorId, UUID::Hash> _opKeyMap;
 };
 }  // namespace mongo

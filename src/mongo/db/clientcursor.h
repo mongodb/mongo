@@ -326,6 +326,10 @@ public:
         return cursor->cursorid();
     }
 
+    boost::optional<OperationKey> getOperationKey() const {
+        return _opKey;
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
@@ -457,6 +461,9 @@ private:
     // Commit point at the time the last batch was returned. This is only used by internal exhaust
     // oplog fetching. Also see lastKnownCommittedOpTime in GetMoreRequest.
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
+
+    // The client OperationKey associated with this cursor.
+    boost::optional<OperationKey> _opKey;
 };
 
 /**
