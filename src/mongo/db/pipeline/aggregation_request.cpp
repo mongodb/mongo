@@ -195,11 +195,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
-        } else if (fieldName == "mergeByPBRT"_sd) {
-            // TODO SERVER-41900: we must retain the ability to ingest the 'mergeByPBRT' field for
-            // 4.4 upgrade purposes, since a 4.2 mongoS will always send {mergeByPBRT:true} to the
-            // shards. We do nothing with it because mergeByPBRT is the only mode available in 4.4.
-            // Remove this final vestige of mergeByPBRT during the 4.5 development cycle.
         } else if (fieldName == kUse44SortKeys) {
             // TODO (SERVER-43361): After branching for 4.5, we will accept this option but ignore
             // it, as we will be able to assume that any supported mongoS will be recent enough to
