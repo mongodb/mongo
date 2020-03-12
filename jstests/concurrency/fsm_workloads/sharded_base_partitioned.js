@@ -139,7 +139,7 @@ var $config = (function() {
             Object.freeze(this.partition);
 
             // Verify that there is exactly 1 chunk in our partition.
-            var config = ChunkHelper.getPrimary(connCache.config);
+            var config = connCache.rsConns.config;
             var numChunks = ChunkHelper.getNumChunks(
                 config, ns, this.partition.chunkLower, this.partition.chunkUpper);
             var chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);

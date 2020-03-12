@@ -205,6 +205,7 @@ var workerThread = (function() {
                     passConnectionCache: config.passConnectionCache,
                     startState: config.startState,
                     states: config.states,
+                    tid: args.tid,
                     transitions: config.transitions
                 };
             });

@@ -107,7 +107,6 @@ const kNonRetryableCommands = new Set([
     "grantRolesToRole",
     "grantRolesToUser",
     "mapreduce.shardedfinish",
-    "moveChunk",
     "renameCollection",
     "revokePrivilegesFromRole",
     "revokeRolesFromRole",
@@ -126,6 +125,7 @@ const kAcceptableNonRetryableCommands = new Set([
     "drop",
     "dropDatabase",  // Already ignores NamespaceNotFound errors, so not handled below.
     "dropIndexes",
+    "moveChunk",
 ]);
 
 // Returns if the given failed response is a safe response to ignore when retrying the
@@ -204,6 +204,19 @@ function isRetryableShardCollectionResponse(res) {
         // _cloneCollectionsOptionsFromPrimaryShard, which may fail with the following code if
         // interupted by a failover.
         res.code === ErrorCodes.CallbackCanceled;
+}
+
+// Returns true if the given response could have come from moveChunk being interrupted by a
+// failover.
+function isRetryableMoveChunkResponse(res) {
+    return res.code === ErrorCodes.OperationFailed &&
+        (RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
+         // The transaction number is bumped by the migration coordinator when its commit or abort
+         // decision is being made durable.
+         res.errmsg.includes("TransactionTooOld") ||
+         // The range deletion task may have been interrupted. This error can occur even when
+         // _waitForDelete=false.
+         res.errmsg.includes("operation was interrupted"));
 }
 
 function hasError(res) {
@@ -830,6 +843,12 @@ function shouldRetryWithNetworkErrorOverride(
         // Check for the retryable error codes from an interrupted shardCollection.
         if (cmdName === "shardCollection" && isRetryableShardCollectionResponse(res)) {
             logError("Retrying interrupted shardCollection");
+            return kContinue;
+        }
+
+        // Check for the retryable error codes from an interrupted moveChunk.
+        if (cmdName === "moveChunk" && isRetryableMoveChunkResponse(res)) {
+            logError("Retrying interrupted moveChunk");
             return kContinue;
         }
 

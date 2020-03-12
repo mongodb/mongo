@@ -1,6 +1,18 @@
 'use strict';
 
 var fsm = (function() {
+    const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
+
+    function forceRunningOutsideTransaction(data) {
+        if (data[kIsRunningInsideTransaction]) {
+            const err =
+                new Error('Intentionally thrown to stop state function from running inside of a' +
+                          ' multi-statement transaction');
+            err.isNotSupported = true;
+            throw err;
+        }
+    }
+
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
@@ -9,6 +21,7 @@ var fsm = (function() {
     // args.startState = name of initial state function
     // args.states = state functions of the form
     //               { stateName: function(db, collName) { ... } }
+    // args.tid = the thread identifier
     // args.transitions = transitions between state functions of the form
     //                    { stateName: { nextState1: probability,
     //                                   nextState2: ... } }
@@ -40,14 +53,41 @@ var fsm = (function() {
                 return conn;
             };
 
-            connCache = {mongos: [], config: [], shards: {}};
+            const getReplSetName = (conn) => {
+                const res = assert.commandWorked(conn.getDB('admin').runCommand({isMaster: 1}));
+                assert.eq('string',
+                          typeof res.setName,
+                          () => `not connected to a replica set: ${tojson(res)}`);
+                return res.setName;
+            };
+
+            const makeReplSetConnWithExistingSession = (connStrList, replSetName) => {
+                const conn = makeNewConnWithExistingSession(`mongodb://${
+                    connStrList.join(',')}/?appName=tid:${args.tid}&replicaSet=${replSetName}`);
+
+                return conn;
+            };
+
+            connCache =
+                {mongos: [], config: [], shards: {}, rsConns: {config: undefined, shards: {}}};
             connCache.mongos = args.cluster.mongos.map(makeNewConnWithExistingSession);
             connCache.config = args.cluster.config.map(makeNewConnWithExistingSession);
+            connCache.rsConns.config = makeReplSetConnWithExistingSession(
+                args.cluster.config, getReplSetName(connCache.config[0]));
+
+            // We set _isConfigServer=true on the Mongo connection object so
+            // set_read_preference_secondary.js knows to avoid overriding the read preference as the
+            // concurrency suite may be running with a 1-node CSRS.
+            connCache.rsConns.config._isConfigServer = true;
 
             var shardNames = Object.keys(args.cluster.shards);
 
-            shardNames.forEach(name => (connCache.shards[name] = args.cluster.shards[name].map(
-                                            makeNewConnWithExistingSession)));
+            shardNames.forEach(name => {
+                connCache.shards[name] =
+                    args.cluster.shards[name].map(makeNewConnWithExistingSession);
+                connCache.rsConns.shards[name] = makeReplSetConnWithExistingSession(
+                    args.cluster.shards[name], getReplSetName(connCache.shards[name][0]));
+            });
         }
 
         for (var i = 0; i < args.iterations; ++i) {
@@ -63,8 +103,10 @@ var fsm = (function() {
                     let data;
                     withTxnAndAutoRetry(args.db.getSession(), () => {
                         data = TransactionsUtil.deepCopyObject({}, args.data);
+                        data[kIsRunningInsideTransaction] = true;
                         fn.call(data, args.db, args.collName, connCache);
                     });
+                    delete data[kIsRunningInsideTransaction];
                     args.data = data;
                 } catch (e) {
                     // Retry state functions that threw OperationNotSupportedInTransaction or
@@ -128,5 +170,9 @@ var fsm = (function() {
         assert(false, 'not reached');
     }
 
-    return {run: runFSM, _getWeightedRandomChoice: getWeightedRandomChoice};
+    return {
+        forceRunningOutsideTransaction,
+        run: runFSM,
+        _getWeightedRandomChoice: getWeightedRandomChoice,
+    };
 })();

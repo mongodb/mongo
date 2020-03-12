@@ -158,9 +158,7 @@ selector:
 
   # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
   - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
-  - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
   - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-  - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
   - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
   # These workloads frequently time out waiting for the distributed lock to drop a sharded
@@ -199,13 +197,11 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_merge_when_not_matched_insert.js
   - jstests/concurrency/fsm_workloads/agg_merge_when_matched_replace_with_new.js
 
-  # TODO SERVER-40713 moveChunk is not considered retryable by the network retry override.
-  - jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_broadcast_delete_transaction.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_broadcast_update_transaction.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_delete_transaction.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_update_transaction.js
+  # TODO SERVER-42192: Re-evaluate if the moveChunk + refineCollectionShardKey workloads can be
+  # enabled after SERVER-46386 has been addressed.
+  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key*.js
+
+  # Uses the collMod command, which isn't considered to be retryable.
   - jstests/concurrency/fsm_workloads/random_moveChunk_index_operations.js
 
   # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't

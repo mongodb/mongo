@@ -21,14 +21,9 @@ var ChunkHelper = (function() {
         return Math.min(curSleep, MAX_BACKOFF_SLEEP);
     }
 
-    function runCommandWithRetries(db, cmd, acceptableErrorCodes) {
+    function runCommandWithRetries(db, cmd, didAcceptableErrorOccurFn) {
         const INITIAL_BACKOFF_SLEEP = 500;  // milliseconds
         const MAX_RETRIES = 5;
-
-        var acceptableErrorOccurred = function acceptableErrorOccurred(errorCode,
-                                                                       acceptableErrorCodes) {
-            return acceptableErrorCodes.indexOf(errorCode) > -1;
-        };
 
         var res;
         var retries = 0;
@@ -41,12 +36,15 @@ var ChunkHelper = (function() {
                 return res;
             }
             // Assert command worked or acceptable error occurred.
-            var msg = tojson({command: cmd, res: res});
-            assertWhenOwnColl(acceptableErrorOccurred(res.code, acceptableErrorCodes), msg);
+            if (didAcceptableErrorOccurFn(res)) {
+                // When an acceptable error occurs, sleep and then retry.
+                sleep(backoffSleep);
+                backoffSleep = getNextBackoffSleep(backoffSleep);
+                continue;
+            }
 
-            // When an acceptable error occurs, sleep and then retry.
-            sleep(backoffSleep);
-            backoffSleep = getNextBackoffSleep(backoffSleep);
+            // Throw an exception if the command errored for any other reason.
+            assertWhenOwnColl.commandWorked(res, cmd);
         }
 
         return res;
@@ -54,14 +52,12 @@ var ChunkHelper = (function() {
 
     function splitChunkAtPoint(db, collName, splitPoint) {
         var cmd = {split: db[collName].getFullName(), middle: {_id: splitPoint}};
-        var acceptableErrorCodes = [ErrorCodes.LockBusy];
-        return runCommandWithRetries(db, cmd, acceptableErrorCodes);
+        return runCommandWithRetries(db, cmd, res => res.code === ErrorCodes.LockBusy);
     }
 
     function splitChunkWithBounds(db, collName, bounds) {
         var cmd = {split: db[collName].getFullName(), bounds: bounds};
-        var acceptableErrorCodes = [ErrorCodes.LockBusy];
-        return runCommandWithRetries(db, cmd, acceptableErrorCodes);
+        return runCommandWithRetries(db, cmd, res => res.code === ErrorCodes.LockBusy);
     }
 
     function moveChunk(db, collName, bounds, toShard, waitForDelete) {
@@ -71,15 +67,28 @@ var ChunkHelper = (function() {
             to: toShard,
             _waitForDelete: waitForDelete
         };
-        var acceptableErrorCodes =
-            [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.ChunkRangeCleanupPending];
-        return runCommandWithRetries(db, cmd, acceptableErrorCodes);
+
+        const runningWithStepdowns =
+            TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+
+        return runCommandWithRetries(
+            db,
+            cmd,
+            res => (res.code === ErrorCodes.ConflictingOperationInProgress ||
+                    res.code === ErrorCodes.ChunkRangeCleanupPending ||
+                    // The chunk migration has surely been aborted if the startCommit of the
+                    // procedure was interrupted by a stepdown.
+                    (runningWithStepdowns && res.code === ErrorCodes.CommandFailed &&
+                     res.errmsg.includes("startCommit")) ||
+                    // The chunk migration has surely been aborted if the recipient shard didn't
+                    // believe there was an active chunk migration.
+                    (runningWithStepdowns && res.code === ErrorCodes.OperationFailed &&
+                     res.errmsg.includes("NotYetInitialized"))));
     }
 
     function mergeChunks(db, collName, bounds) {
         var cmd = {mergeChunks: db[collName].getFullName(), bounds: bounds};
-        var acceptableErrorCodes = [ErrorCodes.LockBusy];
-        return runCommandWithRetries(db, cmd, acceptableErrorCodes);
+        return runCommandWithRetries(db, cmd, res => res.code === ErrorCodes.LockBusy);
     }
 
     // Take a set of connections to a shard (replica set or standalone mongod),
@@ -141,11 +150,19 @@ var ChunkHelper = (function() {
         return {shards: shards, explain: res, query: query, shardVersion: shardVersion};
     }
 
+    function itcount(collection, query) {
+        // We project out all of the fields in order to greatly reduce the likelihood a cursor would
+        // actually be returned. This is acceptable because we're only interested in how many
+        // documents there were and not any of their contents. The network_error_and_txn_override.js
+        // override would throw an exception if we attempted to use the getMore command.
+        return collection.find(query, {_id: 0, nonExistingField: 1}).itcount();
+    }
+
     // Return the number of docs in [lower, upper) as seen by conn.
     function getNumDocs(conn, collName, lower, upper) {
         var coll = conn.getCollection(collName);
         var query = {$and: [{_id: {$gte: lower}}, {_id: {$lt: upper}}]};
-        return coll.find(query).itcount();
+        return itcount(coll, query);
     }
 
     // Intended for use on config or mongos connections only.
@@ -157,7 +174,7 @@ var ChunkHelper = (function() {
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
         var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
-        return conn.getDB('config').chunks.find(query).itcount();
+        return itcount(conn.getDB('config').chunks, query);
     }
 
     // Intended for use on config or mongos connections only.

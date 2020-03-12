@@ -89,6 +89,11 @@ function runCommandWithReadAndWriteConcerns(
     } else if (OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
         // A writeConcern can only be used with non-inline output.
         shouldForceWriteConcern = false;
+    } else if (commandName === "moveChunk") {
+        // The moveChunk command automatically waits for majority write concern regardless of the
+        // user-supplied write concern. Omitting the writeConcern option obviates the need to
+        // specify the _secondaryThrottle=true option as well.
+        shouldForceWriteConcern = false;
     }
 
     if (kCommandsOnlySupportingReadConcernSnapshot.has(commandName) &&
