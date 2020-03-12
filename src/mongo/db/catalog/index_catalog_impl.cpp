@@ -1386,7 +1386,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
 
         index->accessMethod()->getKeys(*bsonRecord.docPtr,
                                        options.getKeysMode,
-                                       IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                                       IndexAccessMethod::GetKeysContext::kAddingKeys,
                                        &keys,
                                        &multikeyMetadataKeys,
                                        &multikeyPaths,

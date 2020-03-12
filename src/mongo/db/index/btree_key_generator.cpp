@@ -53,6 +53,38 @@ const BSONElement nullElt = nullObj.firstElement();
 const BSONObj undefinedObj = BSON("" << BSONUndefined);
 const BSONElement undefinedElt = undefinedObj.firstElement();
 
+/**
+ * Returns the non-array element at the specified path. This function returns an empty BSON element
+ * if the path doesn't exist.
+ *
+ * The 'path' can be specified using a dotted notation in order to traverse through embedded
+ * objects.
+ *
+ * This function must only be used when there is no an array element along the 'path'. The caller is
+ * responsible to ensure this invariant holds.
+ */
+BSONElement extractNonArrayElementAtPath(const BSONObj& obj, StringData path) {
+    static const auto kEmptyElt = BSONElement{};
+
+    auto&& [elt, tail] = [&]() -> std::pair<BSONElement, StringData> {
+        if (auto dotOffset = path.find("."); dotOffset != std::string::npos) {
+            return {obj.getField(path.substr(0, dotOffset)), path.substr(dotOffset + 1)};
+        }
+        return {obj.getField(path), ""_sd};
+    }();
+    invariant(elt.type() != BSONType::Array);
+
+    if (elt.eoo()) {
+        return kEmptyElt;
+    } else if (tail.empty()) {
+        return elt;
+    } else if (elt.type() == BSONType::Object) {
+        return extractNonArrayElementAtPath(elt.embeddedObject(), tail);
+    }
+    // We found a scalar element, but there is more path to traverse, e.g. {a: 1} with a path of
+    // "a.b".
+    return kEmptyElt;
+}
 }  // namespace
 
 BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
@@ -157,6 +189,7 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(std::vector<const char*>* fieldNames
 }
 
 void BtreeKeyGenerator::getKeys(const BSONObj& obj,
+                                bool skipMultikey,
                                 KeyStringSet* keys,
                                 MultikeyPaths* multikeyPaths,
                                 boost::optional<RecordId> id) const {
@@ -190,6 +223,14 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj,
         if (multikeyPaths) {
             multikeyPaths->resize(1);
         }
+    } else if (skipMultikey) {
+        // This index doesn't contain array values. We therefore always set 'multikeyPaths' as
+        // [[ ], [], ...].
+        if (multikeyPaths) {
+            invariant(multikeyPaths->empty());
+            multikeyPaths->resize(_fieldNames.size());
+        }
+        _getKeysWithoutArray(obj, id, keys);
     } else {
         if (multikeyPaths) {
             invariant(multikeyPaths->empty());
@@ -200,9 +241,42 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj,
         _getKeysWithArray(
             _fieldNames, _fixed, obj, keys, 0, _emptyPositionalInfo, multikeyPaths, id);
     }
+
     if (keys->empty() && !_isSparse) {
         keys->insert(_nullKeyString);
     }
+}
+
+void BtreeKeyGenerator::_getKeysWithoutArray(const BSONObj& obj,
+                                             boost::optional<RecordId> id,
+                                             KeyStringSet* keys) const {
+
+    KeyString::HeapBuilder keyString{_keyStringVersion, _ordering};
+    size_t numNotFound{0};
+
+    for (auto&& fieldName : _fieldNames) {
+        auto elem = extractNonArrayElementAtPath(obj, fieldName);
+        if (elem.eoo()) {
+            ++numNotFound;
+        }
+
+        if (_collator) {
+            keyString.appendBSONElement(elem, [&](StringData stringData) {
+                return _collator->getComparisonString(stringData);
+            });
+        } else {
+            keyString.appendBSONElement(elem);
+        }
+    }
+
+    if (_isSparse && numNotFound == _fieldNames.size()) {
+        return;
+    }
+
+    if (id) {
+        keyString.appendRecordId(*id);
+    }
+    keys->insert(keyString.release());
 }
 
 void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,

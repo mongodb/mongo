@@ -105,7 +105,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         MultikeyPaths multikeyPaths;
         iam->getKeys(recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                     IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
+                     IndexAccessMethod::GetKeysContext::kAddingKeys,
                      &documentKeySet,
                      &multikeyMetadataKeys,
                      &multikeyPaths,

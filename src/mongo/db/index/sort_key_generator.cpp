@@ -165,7 +165,8 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
         // multikey when getting the index keys for sorting.
         MultikeyPaths* multikeyPaths = nullptr;
-        _indexKeyGen->getKeys(obj, &keys, multikeyPaths);
+        const auto skipMultikey = false;
+        _indexKeyGen->getKeys(obj, skipMultikey, &keys, multikeyPaths);
     } catch (const AssertionException& e) {
         // Probably a parallel array.
         if (ErrorCodes::CannotIndexParallelArrays == e.code()) {

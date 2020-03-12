@@ -71,7 +71,9 @@ void BtreeAccessMethod::doGetKeys(const BSONObj& obj,
                                   KeyStringSet* multikeyMetadataKeys,
                                   MultikeyPaths* multikeyPaths,
                                   boost::optional<RecordId> id) const {
-    _keyGenerator->getKeys(obj, keys, multikeyPaths, id);
+    const auto skipMultikey =
+        context == IndexAccessMethod::GetKeysContext::kValidatingKeys && !_descriptor->isMultikey();
+    _keyGenerator->getKeys(obj, skipMultikey, keys, multikeyPaths, id);
 }
 
 }  // namespace mongo
