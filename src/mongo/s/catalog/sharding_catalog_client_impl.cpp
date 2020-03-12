@@ -862,30 +862,28 @@ void ShardingCatalogClientImpl::insertConfigDocumentsAsRetryableWrite(
 
     std::vector<BSONObj> workingBatch;
     size_t workingBatchItemSize = 0;
-
-    int workingBatchDocSize = kRetryableBatchWriteBSONSizeOverhead;
+    int workingBatchDocSize = 0;
 
     while (!docs.empty()) {
         BSONObj toAdd = docs.back();
         docs.pop_back();
 
-        int docSize = toAdd.objsize();
-        bool batchAtSizeLimit = (workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
-            (workingBatchDocSize + docSize > BSONObjMaxUserSize);
-
-        if (batchAtSizeLimit) {
+        const int docSizePlusOverhead = toAdd.objsize() + kRetryableBatchWriteBSONSizeOverhead;
+        // Check if pushing this object will exceed the batch size limit or the max object size
+        if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
+            (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {
             sendRetryableWriteBatchRequestToConfig(
                 asr.opCtx(), nss, workingBatch, currentTxnNumber, writeConcern);
             ++currentTxnNumber;
 
             workingBatch.clear();
             workingBatchItemSize = 0;
-            workingBatchDocSize = kRetryableBatchWriteBSONSizeOverhead;
+            workingBatchDocSize = 0;
         }
 
         workingBatch.push_back(toAdd);
         ++workingBatchItemSize;
-        workingBatchDocSize += docSize;
+        workingBatchDocSize += docSizePlusOverhead;
     }
 
     if (!workingBatch.empty()) {
