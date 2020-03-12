@@ -183,6 +183,14 @@ bool Client::hasAnyActiveCurrentOp() const {
     return false;
 }
 
+void Client::setKilled() noexcept {
+    stdx::lock_guard<Client> lk(*this);
+    _killed.store(true);
+    if (_opCtx) {
+        _serviceContext->killOperation(lk, _opCtx, ErrorCodes::ClientMarkedKilled);
+    }
+}
+
 ThreadClient::ThreadClient(ServiceContext* serviceContext)
     : ThreadClient(getThreadName(), serviceContext, nullptr) {}
 

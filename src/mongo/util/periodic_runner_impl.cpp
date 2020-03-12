@@ -54,7 +54,7 @@ auto PeriodicRunnerImpl::makeJob(PeriodicJob job) -> JobAnchor {
 PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
                                                      ClockSource* source,
                                                      ServiceContext* svc)
-    : _job(std::move(job)), _clockSource(source), _serviceContext(svc) {}
+    : _job(std::move(job)), _clockSource(source), _serviceContext(svc), _client(nullptr) {}
 
 void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
     auto [startPromise, startFuture] = makePromiseFuture<void>();
@@ -66,46 +66,54 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
 
 
     _thread = stdx::thread([this, startPromise = std::move(startPromise)]() mutable {
-        auto guard = makeGuard([this] { _stopPromise.emplaceValue(); });
+        ON_BLOCK_EXIT([this] { _stopPromise.emplaceValue(); });
 
-        Client::initThread(_job.name, _serviceContext, nullptr);
-
-        // Let start() know we're running
+        ThreadClient client(_job.name, _serviceContext, nullptr);
         {
-            stdx::lock_guard lk(_mutex);
-            _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
-        }
-        startPromise.emplaceValue();
+            // This ensures client object is not destructed so long as others can access it.
+            ON_BLOCK_EXIT([this] {
+                stdx::lock_guard lk(_mutex);
+                _client = nullptr;
+            });
 
-        stdx::unique_lock<Latch> lk(_mutex);
-        while (_execStatus != ExecutionStatus::CANCELED) {
-            // Wait until it's unpaused or canceled
-            _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
-            if (_execStatus == ExecutionStatus::CANCELED) {
-                return;
+            // Let start() know we're running
+            {
+                stdx::lock_guard lk(_mutex);
+                _client = client.get();
+                _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
             }
+            startPromise.emplaceValue();
 
-            auto start = _clockSource->now();
-
-            // Unlock while job is running so we can pause/cancel concurrently
-            lk.unlock();
-            _job.job(Client::getCurrent());
-            lk.lock();
-
-            auto getDeadlineFromInterval = [&] { return start + _job.interval; };
-
-            do {
-                auto deadline = getDeadlineFromInterval();
-
-                if (_clockSource->waitForConditionUntil(_condvar, lk, deadline, [&] {
-                        return _execStatus == ExecutionStatus::CANCELED ||
-                            getDeadlineFromInterval() != deadline;
-                    })) {
-                    if (_execStatus == ExecutionStatus::CANCELED) {
-                        return;
-                    }
+            stdx::unique_lock<Latch> lk(_mutex);
+            while (_execStatus != ExecutionStatus::CANCELED) {
+                // Wait until it's unpaused or canceled
+                _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
+                if (_execStatus == ExecutionStatus::CANCELED) {
+                    return;
                 }
-            } while (_clockSource->now() < getDeadlineFromInterval());
+
+                auto start = _clockSource->now();
+
+                // Unlock while job is running so we can pause/cancel concurrently
+                lk.unlock();
+                _job.job(client.get());
+                lk.lock();
+
+                auto getDeadlineFromInterval = [&] { return start + _job.interval; };
+
+                do {
+                    auto deadline = getDeadlineFromInterval();
+
+                    if (_clockSource->waitForConditionUntil(_condvar, lk, deadline, [&] {
+                            return _execStatus == ExecutionStatus::CANCELED ||
+                                getDeadlineFromInterval() != deadline;
+                        })) {
+                        if (_execStatus == ExecutionStatus::CANCELED) {
+                            return;
+                        }
+                    }
+                } while (_clockSource->now() < getDeadlineFromInterval());
+            }
         }
     });
 
@@ -146,15 +154,29 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
         return;
     }
 
+    auto stopFuture = _stopPromise.getFuture();
+
     // Only join once
     if (lastExecStatus != ExecutionStatus::CANCELED) {
         LOGV2_DEBUG(23324, 2, "Stopping periodic job {job_name}", "job_name"_attr = _job.name);
 
         _condvar.notify_one();
+
+        // Kill the client thread and its opCtx (if any) before joining.
+        // So long as `_job` returns upon receiving the kill signal, the following ensures liveness
+        // (i.e., this method will eventually return).
+        if (!stopFuture.isReady()) {
+            stdx::lock_guard<Latch> lk(_mutex);
+            // Check if the client thread has already returned.
+            if (_client) {
+                _client->setKilled();
+            }
+        }
+
         _thread.join();
     }
 
-    _stopPromise.getFuture().get();
+    stopFuture.get();
 }
 
 Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {

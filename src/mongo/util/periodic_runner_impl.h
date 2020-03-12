@@ -79,6 +79,7 @@ private:
         ClockSource* _clockSource;
         ServiceContext* _serviceContext;
 
+        Client* _client;
         stdx::thread _thread;
         SharedPromise<void> _stopPromise;
 
