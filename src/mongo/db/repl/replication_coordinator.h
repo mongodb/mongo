@@ -292,6 +292,12 @@ public:
         const CommitQuorumOptions& commitQuorum) const = 0;
 
     /**
+     * Checks if the 'members' list can satisfy the 'commitQuorum'.
+     */
+    virtual bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
+                                         const std::vector<mongo::HostAndPort>& members) const = 0;
+
+    /**
      * Returns Status::OK() if it is valid for this node to serve reads on the given collection
      * and an errorcode indicating why the node cannot if it cannot.
      */

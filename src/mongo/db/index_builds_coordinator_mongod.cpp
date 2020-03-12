@@ -353,21 +353,17 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
         invariant(voteMemberList,
                   str::stream() << "'" << IndexBuildEntry::kCommitReadyMembersFieldName
                                 << "' list is empty for index build: " << replState->buildUUID);
-        int voteReceived = voteMemberList->size();
-
         auto onDiskcommitQuorum = indexBuildEntry.getCommitQuorum();
-        int requiredQuorumCount = onDiskcommitQuorum.numNodes;
-        if (onDiskcommitQuorum.mode == CommitQuorumOptions::kMajority) {
-            requiredQuorumCount =
-                repl::ReplicationCoordinator::get(opCtx)->getConfig().getWriteMajority();
-        }
+        bool commitQuorumSatisfied =
+            repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(onDiskcommitQuorum,
+                                                                              voteMemberList.get());
 
         stdx::unique_lock<Latch> lk(replState->mutex);
         invariant(replState->commitQuorum,
                   str::stream() << "Commit quorum is missing for index build: "
                                 << replState->buildUUID);
         if (onDiskcommitQuorum == replState->commitQuorum.get()) {
-            if (voteReceived >= requiredQuorumCount) {
+            if (commitQuorumSatisfied) {
                 LOGV2(3856201,
                       "Index build commit quorum satisfied:",
                       "indexBuildEntry"_attr = indexBuildEntry);

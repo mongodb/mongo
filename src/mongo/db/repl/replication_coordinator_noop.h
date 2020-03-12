@@ -113,6 +113,9 @@ public:
 
     Status checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const final;
 
+    bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
+                                 const std::vector<mongo::HostAndPort>& members) const final;
+
     void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,

@@ -49,10 +49,12 @@ class CommitQuorumOptions {
 public:
     static const StringData kCommitQuorumField;  // = "commitQuorum"
     static const char kMajority[];               // = "majority"
+    static const char kAll[];                    // = "all"
 
     static const int kUninitializedNumNodes = -1;
     static const int kDisabled = 0;
     static const BSONObj Majority;  // = {"commitQuorum": "majority"}
+    static const BSONObj all;       // = {"commitQuorum": "all"}
 
     CommitQuorumOptions() {
         reset();

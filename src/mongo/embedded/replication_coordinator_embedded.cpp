@@ -390,6 +390,11 @@ Status ReplicationCoordinatorEmbedded::checkIfCommitQuorumCanBeSatisfied(
     UASSERT_NOT_IMPLEMENTED;
 }
 
+bool ReplicationCoordinatorEmbedded::isCommitQuorumSatisfied(
+    const CommitQuorumOptions& commitQuorum, const std::vector<mongo::HostAndPort>& members) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::checkReplEnabledForCommand(BSONObjBuilder*) {
     return Status(ErrorCodes::NoReplicationEnabled, "no replication on embedded");
 }

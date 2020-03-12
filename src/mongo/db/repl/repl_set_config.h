@@ -118,6 +118,7 @@ public:
     static const std::string kVersionFieldName;
     static const std::string kTermFieldName;
     static constexpr char kMajorityWriteConcernModeName[] = "$majority";
+    static constexpr char kAllWriteConcernModeName[] = "$all";
     static constexpr char kConfigMajorityWriteConcernModeName[] = "$configMajority";
     static constexpr char kConfigAllWriteConcernName[] = "$configAll";
 
@@ -426,7 +427,7 @@ public:
     /**
      *  Returns the number of voting data-bearing members.
      */
-    int getWritableVotingMembersCount() {
+    int getWritableVotingMembersCount() const {
         return _writableVotingMembersCount;
     }
 

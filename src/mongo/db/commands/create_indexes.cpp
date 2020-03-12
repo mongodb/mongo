@@ -291,6 +291,7 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
                 (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
         CommitQuorumOptions commitQuorum;
         uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
+        uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum));
         return commitQuorum;
     }
 
