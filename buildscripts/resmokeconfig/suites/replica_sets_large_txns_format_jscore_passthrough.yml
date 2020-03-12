@@ -42,4 +42,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         maxNumberOfTransactionOperationsInSingleOplogEntry: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
     num_nodes: 2

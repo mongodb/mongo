@@ -54,6 +54,7 @@ executor:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
         periodicNoopIntervalSecs: 1
         writePeriodicNoops: true
     # This test suite doesn't actually shard any collections, but enabling sharding will prevent

@@ -77,6 +77,24 @@ public:
 
     BSONObj getObj() const;
 
+    // These opcounters record operations that would fail if we were fully enforcing our consistency
+    // constraints in steady-state oplog application mode.
+    void gotInsertOnExistingDoc() {
+        _checkWrap(&OpCounters::_insertOnExistingDoc, 1);
+    }
+    void gotUpdateOnMissingDoc() {
+        _checkWrap(&OpCounters::_updateOnMissingDoc, 1);
+    }
+    void gotDeleteWasEmpty() {
+        _checkWrap(&OpCounters::_deleteWasEmpty, 1);
+    }
+    void gotDeleteFromMissingNamespace() {
+        _checkWrap(&OpCounters::_deleteFromMissingNamespace, 1);
+    }
+    void gotAcceptableErrorInCommand() {
+        _checkWrap(&OpCounters::_acceptableErrorInCommand, 1);
+    }
+
     // thse are used by snmp, and other things, do not remove
     const AtomicWord<long long>* getInsert() const {
         return &_insert;
@@ -96,6 +114,21 @@ public:
     const AtomicWord<long long>* getCommand() const {
         return &_command;
     }
+    const AtomicWord<long long>* getInsertOnExistingDoc() const {
+        return &_insertOnExistingDoc;
+    }
+    const AtomicWord<long long>* getUpdateOnMissingDoc() const {
+        return &_updateOnMissingDoc;
+    }
+    const AtomicWord<long long>* getDeleteWasEmpty() const {
+        return &_deleteWasEmpty;
+    }
+    const AtomicWord<long long>* getDeleteFromMissingNamespace() const {
+        return &_deleteFromMissingNamespace;
+    }
+    const AtomicWord<long long>* getAcceptableErrorInCommand() const {
+        return &_acceptableErrorInCommand;
+    }
 
 private:
     // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
@@ -107,6 +140,12 @@ private:
     CacheAligned<AtomicWord<long long>> _delete;
     CacheAligned<AtomicWord<long long>> _getmore;
     CacheAligned<AtomicWord<long long>> _command;
+
+    CacheAligned<AtomicWord<long long>> _insertOnExistingDoc;
+    CacheAligned<AtomicWord<long long>> _updateOnMissingDoc;
+    CacheAligned<AtomicWord<long long>> _deleteWasEmpty;
+    CacheAligned<AtomicWord<long long>> _deleteFromMissingNamespace;
+    CacheAligned<AtomicWord<long long>> _acceptableErrorInCommand;
 };
 
 extern OpCounters globalOpCounters;

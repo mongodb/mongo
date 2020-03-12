@@ -71,4 +71,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
     num_shards: 2

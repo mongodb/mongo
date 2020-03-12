@@ -41,6 +41,7 @@ env.Library(
         'dbcheck',
         'local_oplog_info',
         'repl_coordinator_interface',
+        'repl_server_parameters',
         'repl_settings',
         'timestamp_block',
         '$BUILD_DIR/mongo/base',
@@ -563,6 +564,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
+        'repl_server_parameters',
         'replication_auth',
     ],
 )

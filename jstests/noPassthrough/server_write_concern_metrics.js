@@ -83,14 +83,17 @@ const collName = "server_write_concern_metrics";
 const testDB = primary.getDB(dbName);
 const testColl = testDB[collName];
 
-function resetCollection() {
+function resetCollection(setupCommand) {
     testColl.drop();
     assert.commandWorked(testDB.createCollection(collName));
+    if (setupCommand) {
+        assert.commandWorked(testDB.runCommand(setupCommand));
+    }
 }
 
-function testWriteConcernMetrics(cmd, opName, inc) {
+function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     // Run command with no writeConcern.
-    resetCollection();
+    resetCollection(setupCommand);
     let serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(testDB.runCommand(cmd));
@@ -101,7 +104,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {j: true}. This should be counted as having no 'w' value.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -113,7 +116,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {w: "majority"}.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -125,7 +128,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {w: 0}.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -137,7 +140,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {w: 1}.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -149,7 +152,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {w: 2}.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -161,7 +164,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // Run command with writeConcern {w: "myTag"}.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
@@ -173,7 +176,7 @@ function testWriteConcernMetrics(cmd, opName, inc) {
                              inc);
 
     // writeConcern metrics are not tracked on the secondary.
-    resetCollection();
+    resetCollection(setupCommand);
     serverStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(testDB.runCommand(cmd));
@@ -198,15 +201,18 @@ testWriteConcernMetrics(
 testWriteConcernMetrics(
     {delete: collName, deletes: [{q: {}, limit: 1}, {q: {}, limit: 1}]}, "delete", 2);
 
-// Test applyOps.
+// Test applyOps.  All sequences of setup + command must be idempotent in steady-state oplog
+// application, as testWriteConcernMetrics will run them multiple times.
 testWriteConcernMetrics(
     {applyOps: [{op: "i", ns: testColl.getFullName(), o: {_id: 0}}]}, "insert", 1);
 testWriteConcernMetrics(
     {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 1}}}]},
     "update",
     1);
-testWriteConcernMetrics(
-    {applyOps: [{op: "d", ns: testColl.getFullName(), o: {_id: 0}}]}, "delete", 1);
+testWriteConcernMetrics({applyOps: [{op: "d", ns: testColl.getFullName(), o: {_id: 0}}]},
+                        "delete",
+                        1,
+                        {insert: collName, documents: [{_id: 0}]});
 
 rst.stopSet();
 }());

@@ -61,4 +61,5 @@ executor:
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
     num_nodes: 2

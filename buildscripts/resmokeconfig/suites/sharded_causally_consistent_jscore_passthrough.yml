@@ -155,6 +155,7 @@ executor:
             asio: 2
           replication:
             heartbeats: 2
+        oplogApplicationEnforcesSteadyStateConstraints: true
     num_rs_nodes_per_shard: 2
     enable_sharding:
     - test

@@ -1169,6 +1169,15 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            // New mongod-specific option in 4.3.x.
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 430) {
+                if (!argArrayContainsSetParameterValue(
+                        'oplogApplicationEnforcesSteadyStateConstraints=')) {
+                    argArray.push(...['--setParameter',
+                                      'oplogApplicationEnforcesSteadyStateConstraints=true']);
+                }
+            }
+
             // New mongod-specific options in 4.0.x
             if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
                 if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {

@@ -44,7 +44,9 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/insert_group.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
@@ -948,17 +950,16 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                             db);
                     OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
 
-                    // We convert updates to upserts when not in initial sync because after rollback
-                    // and during startup we may replay an update after a delete and crash since we
-                    // do not ignore errors. In initial sync we simply ignore these update errors so
-                    // there is no reason to upsert.
+                    // We convert updates to upserts in secondary mode when the
+                    // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid
+                    // failing on the constraint that updates in steady state mode always update
+                    // an existing document.
                     //
-                    // TODO (SERVER-21700): Never upsert during oplog application unless an external
-                    // applyOps wants to. We should ignore these errors intelligently while in
-                    // RECOVERING and STARTUP mode (similar to initial sync) instead so we do not
-                    // accidentally ignore real errors.
-                    bool shouldAlwaysUpsert =
-                        (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
+                    // In initial sync and recovery modes we always ignore errors about missing
+                    // documents on update, so there is no reason to convert the updates to upsert.
+
+                    bool shouldAlwaysUpsert = !oplogApplicationEnforcesSteadyStateConstraints &&
+                        oplogApplicationMode == OplogApplication::Mode::kSecondary;
                     Status status = applyOperation_inlock(opCtx,
                                                           db,
                                                           entryOrGroupedInserts,
@@ -970,12 +971,16 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                     }
                     return status;
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                    // Delete operations on non-existent namespaces can be treated as successful for
-                    // idempotency reasons.
-                    // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
-                    // storage does not wait for drops to be checkpointed (SERVER-33161).
-                    if (opType == OpTypeEnum::kDelete ||
-                        oplogApplicationMode == OplogApplication::Mode::kRecovering) {
+                    // This can happen in initial sync or recovery modes (when a delete of the
+                    // namespace appears later in the oplog), but we will ignore it in the caller.
+                    //
+                    // When we're not enforcing steady-state constraints, the error is ignored
+                    // only for deletes, on the grounds that deleting from a non-existent collection
+                    // is a no-op.
+                    if (opType == OpTypeEnum::kDelete &&
+                        !oplogApplicationEnforcesSteadyStateConstraints &&
+                        oplogApplicationMode == OplogApplication::Mode::kSecondary) {
+                        replOpCounters.gotDeleteFromMissingNamespace();
                         return Status::OK();
                     }
 
@@ -1050,7 +1055,8 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                     // Tried to apply an update operation but the document is missing, there must be
                     // a delete operation for the document later in the oplog.
                     if (status == ErrorCodes::UpdateOperationFailed &&
-                        oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
+                        (oplogApplicationMode == OplogApplication::Mode::kInitialSync ||
+                         oplogApplicationMode == OplogApplication::Mode::kRecovering)) {
                         continue;
                     }
 

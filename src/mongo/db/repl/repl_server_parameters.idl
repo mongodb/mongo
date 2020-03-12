@@ -312,3 +312,12 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: enableAutomaticReconfig
         default: false
+
+    oplogApplicationEnforcesSteadyStateConstraints:
+        description: >-
+            Whether or not secondary oplog application enforces (by fassert) consistency
+            constraints that apply if an oplog entry is to be applied exactly once and in order.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: oplogApplicationEnforcesSteadyStateConstraints
+        default: false

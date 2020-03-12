@@ -60,6 +60,8 @@ function testInvalidWriteConcern(wc) {
     jsTest.log("Testing invalid write concern " + tojson(wc));
 
     applyOpsReq.writeConcern = wc;
+    dropTestCollection();
+    assert.commandWorked(coll.insert({_id: 1, x: "a"}));
     var res = coll.runCommand(applyOpsReq);
     assertApplyOpsCommandWorked(res);
     assertWriteConcernError(res);
@@ -89,7 +91,7 @@ function testMajorityWriteConcerns(wc) {
     dropTestCollection();
 
     // applyOps with a full replica set should succeed.
-    coll.insert({_id: 1, x: "a"});
+    assert.commandWorked(coll.insert({_id: 1, x: "a"}));
     var res = db.runCommand(applyOpsReq);
 
     assertApplyOpsCommandWorked(res);
@@ -103,7 +105,7 @@ function testMajorityWriteConcerns(wc) {
         {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
     // applyOps should succeed with only 1 node not replicating.
-    coll.insert({_id: 1, x: "a"});
+    assert.commandWorked(coll.insert({_id: 1, x: "a"}));
     res = db.runCommand(applyOpsReq);
 
     assertApplyOpsCommandWorked(res);
@@ -118,7 +120,7 @@ function testMajorityWriteConcerns(wc) {
         {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
     // applyOps should fail after two nodes have stopped replicating.
-    coll.insert({_id: 1, x: "a"});
+    assert.commandWorked(coll.insert({_id: 1, x: "a"}));
     applyOpsReq.writeConcern.wtimeout = 5000;
     res = db.runCommand(applyOpsReq);
 

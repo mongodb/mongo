@@ -78,4 +78,5 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
     num_nodes: 3

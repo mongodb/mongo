@@ -36,6 +36,7 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
       verbose: ''

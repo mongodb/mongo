@@ -91,6 +91,11 @@ public:
                   const boost::optional<BSONObj>& deletedDoc) override;
 
     /**
+     * This function is called whenever OplogApplierImpl updates a document in a collection.
+     */
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
+
+    /**
      * Called when OplogApplierImpl creates a collection.
      */
     void onCreateCollection(OperationContext* opCtx,
@@ -112,6 +117,8 @@ public:
                        bool,
                        const boost::optional<BSONObj>&)>
         onDeleteFn;
+
+    std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;
 
     std::function<void(OperationContext*,
                        Collection*,

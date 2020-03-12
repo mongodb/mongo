@@ -49,7 +49,7 @@ function dropTestCollection() {
 var commands = [];
 
 commands.push({
-    req: {applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 1}}]},
+    req: {applyOps: [{op: "u", ns: coll.getFullName(), o: {_id: 1}, o2: {_id: 1}}]},
     setupFunc: function() {
         assert.commandWorked(coll.insert({_id: 1}));
     },

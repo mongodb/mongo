@@ -32,5 +32,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
         disableLogicalSessionCacheRefresh: false
         logicalSessionRefreshMillis: 10000

@@ -18,4 +18,5 @@ executor:
       auditDestination: console
       set_parameters:
         enableTestCommands: 1
+        oplogApplicationEnforcesSteadyStateConstraints: true
         auditAuthorizationSuccess: 1

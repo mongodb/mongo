@@ -79,6 +79,7 @@
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -648,6 +649,9 @@ using OpApplyFn = std::function<Status(
 
 struct ApplyOpMetadata {
     OpApplyFn applyFunc;
+    // acceptableErrors are errors we accept for idempotency reasons.  Except for IndexNotFound,
+    // they are only valid in non-steady-state oplog application modes.  IndexNotFound is always
+    // allowed because index builds are not necessarily synchronized between secondary and primary.
     std::set<ErrorCodes::Error> acceptableErrors;
 
     ApplyOpMetadata(OpApplyFn fun) {
@@ -760,7 +764,15 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");
           }
-          IndexBuildsCoordinator::get(opCtx)->applyCommitIndexBuild(opCtx, swOplogEntry.getValue());
+          try {
+              IndexBuildsCoordinator::get(opCtx)->applyCommitIndexBuild(opCtx,
+                                                                        swOplogEntry.getValue());
+          } catch (ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
+              // TODO(SERVER-46656): We sometimes do two-phase builds of empty collections on
+              // the primary, but treat them as one-phase on the secondary.  This will result
+              // in an IndexAlreadyExists when we commit.  When SERVER-46656 is fixed we should
+              // no longer catch and ignore this error.
+          }
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
@@ -1112,13 +1124,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // 1. Insert if
                 //   a) we do not have a wrapping WriteUnitOfWork, which implies we are not part of
                 //      an "applyOps" command, OR
-                //   b) we are part of a multi-document transaction[1].
+                //   b) we are part of a multi-document transaction[1], OR
                 //
                 // 2. Upsert[2] if
                 //   a) we have a wrapping WriteUnitOfWork AND we are not part of a transaction,
                 //      which implies we are part of an "applyOps" command, OR
-                //   b) the previous insert failed with a DuplicateKey error AND we are not part of
-                //      a transaction.
+                //   b) the previous insert failed with a DuplicateKey error AND we are not part
+                //      a transaction AND either we are not in steady state replication mode OR
+                //      the oplogApplicationEnforcesSteadyStateConstraints parameter is false.
                 //
                 // [1] Transactions should not convert inserts to upserts because on secondaries
                 //     they will perform a lookup that never occurred on the primary. This may cause
@@ -1161,6 +1174,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // key error.
                         if (inTxn) {
                             return status;
+                        }
+                        if (mode == OplogApplication::Mode::kSecondary) {
+                            opCounters->gotInsertOnExistingDoc();
+                            if (oplogApplicationEnforcesSteadyStateConstraints) {
+                                return status;
+                            }
                         }
                         // Continue to the next block to retry the operation as an upsert.
                         needToDoUpsert = true;
@@ -1227,7 +1246,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // IDHACK.
             BSONObj updateCriteria = idField.wrap();
 
-            const bool upsert = alwaysUpsert || op.getUpsert().value_or(false);
+            const bool upsertOplogEntry = op.getUpsert().value_or(false);
+            const bool upsert = alwaysUpsert || upsertOplogEntry;
             UpdateRequest request(requestNss);
             request.setQuery(updateCriteria);
             request.setUpdateModification(o);
@@ -1248,7 +1268,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 UpdateResult ur = update(opCtx, db, request);
                 if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
-                    if (ur.modifiers) {
+                    if (collection && collection->isCapped() &&
+                        mode == OplogApplication::Mode::kSecondary) {
+                        // We can't assume there was a problem when the collection is capped,
+                        // because the item may have been deleted by the cappedDeleter.  This only
+                        // matters for steady-state mode, because all errors on missing updates are
+                        // ignored at a higher level for recovery and initial sync.
+                        LOGV2_DEBUG(2170003,
+                                    2,
+                                    "couldn't find doc in capped collection",
+                                    "op"_attr = redact(op.toBSON()));
+                    } else if (ur.modifiers) {
                         if (updateCriteria.nFields() == 1) {
                             // was a simple { _id : ... } update criteria
                             string msg = str::stream()
@@ -1287,6 +1317,18 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             return Status(ErrorCodes::UpdateOperationFailed, msg);
                         }
                     }
+                } else if (mode == OplogApplication::Mode::kSecondary && !upsertOplogEntry &&
+                           !ur.upserted.isEmpty() && !(collection && collection->isCapped())) {
+                    // This indicates we upconverted an update to an upsert, and it did indeed
+                    // upsert.  In steady state mode this is unexpected.
+                    LOGV2_WARNING(2170001,
+                                  "update needed to be converted to upsert",
+                                  "op"_attr = redact(op.toBSON()));
+                    opCounters->gotUpdateOnMissingDoc();
+
+                    // We shouldn't be doing upserts in secondary mode when enforcing steady state
+                    // constraints.
+                    invariant(!oplogApplicationEnforcesSteadyStateConstraints);
                 }
 
                 wuow.commit();
@@ -1331,7 +1373,24 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                 }
-                deleteObjects(opCtx, collection, requestNss, deleteCriteria, true /* justOne */);
+                auto nDeleted = deleteObjects(
+                    opCtx, collection, requestNss, deleteCriteria, true /* justOne */);
+                if (nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {
+                    LOGV2_WARNING(2170002,
+                                  "Applied a delete which did not delete anything in steady state "
+                                  "replication",
+                                  "op"_attr = redact(op.toBSON()));
+                    if (collection)
+                        opCounters->gotDeleteWasEmpty();
+                    else
+                        opCounters->gotDeleteFromMissingNamespace();
+                    // This error is fatal when we are enforcing steady state constraints.
+                    uassert(collection ? ErrorCodes::NoSuchKey : ErrorCodes::NamespaceNotFound,
+                            str::stream() << "Applied a delete which did not delete anything in "
+                                             "steady state replication : "
+                                          << redact(op.toBSON()),
+                            !oplogApplicationEnforcesSteadyStateConstraints);
+                }
                 wuow.commit();
             });
 
@@ -1523,7 +1582,17 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 break;
             }
             default: {
-                if (!curOpToApply.acceptableErrors.count(status.code())) {
+                // Even when enforcing steady state constraints, we must allow IndexNotFound as
+                // an index may not have been built on a secondary when a command dropping it
+                // comes in.
+                //
+                // TODO(SERVER-46550): We should be able to enforce constraints on "dropDatabase"
+                // once we're no longer able to create databases on the primary without an oplog
+                // entry.
+                if ((mode == OplogApplication::Mode::kSecondary &&
+                     oplogApplicationEnforcesSteadyStateConstraints &&
+                     status.code() != ErrorCodes::IndexNotFound && op->first != "dropDatabase") ||
+                    !curOpToApply.acceptableErrors.count(status.code())) {
                     LOGV2_ERROR(21262,
                                 "Failed command {o} on {db} with status {status} during oplog "
                                 "application",
@@ -1533,13 +1602,22 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     return status;
                 }
 
-                LOGV2_DEBUG(51776,
-                            1,
-                            "Acceptable error during oplog application on db '{db}' with status "
-                            "'{status}' from oplog entry {entry}",
-                            "db"_attr = nss.db(),
-                            "status"_attr = status,
-                            "entry"_attr = redact(entry.toBSON()));
+                if (mode == OplogApplication::Mode::kSecondary &&
+                    status.code() != ErrorCodes::IndexNotFound) {
+                    LOGV2_WARNING(2170000,
+                                  "Acceptable error during oplog application",
+                                  "db"_attr = nss.db(),
+                                  "status"_attr = status,
+                                  "oplogEntry"_attr = redact(entry.toBSON()));
+                    opCounters->gotAcceptableErrorInCommand();
+                } else {
+                    LOGV2_DEBUG(51776,
+                                1,
+                                "Acceptable error during oplog application",
+                                "db"_attr = nss.db(),
+                                "status"_attr = status,
+                                "oplogEntry"_attr = redact(entry.toBSON()));
+                }
             }
             // fallthrough
             case ErrorCodes::OK:

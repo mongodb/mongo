@@ -169,6 +169,9 @@ public:
     }
 
 protected:
+    virtual OplogApplication::Mode getOplogApplicationMode() {
+        return OplogApplication::Mode::kSecondary;
+    }
     static const char* ns() {
         return "unittests.repltests";
     }
@@ -250,7 +253,7 @@ protected:
                 repl::UnreplicatedWritesBlock uwb(&_opCtx);
                 auto entry = uassertStatusOK(OplogEntry::parse(*i));
                 uassertStatusOK(applyOperation_inlock(
-                    &_opCtx, ctx.db(), &entry, false, OplogApplication::Mode::kSecondary));
+                    &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode()));
             }
         }
     }
@@ -364,7 +367,16 @@ protected:
     virtual void reset() const = 0;
 };
 
-class InsertTimestamp : public Base {
+// Some operations are only idempotent when in RECOVERING, not in SECONDARY.  This includes
+// duplicate inserts and deletes.
+class Recovering : public Base {
+protected:
+    virtual OplogApplication::Mode getOplogApplicationMode() {
+        return OplogApplication::Mode::kRecovering;
+    }
+};
+
+class InsertTimestamp : public Recovering {
 public:
     void doIt() const {
         BSONObjBuilder b;
@@ -386,7 +398,7 @@ private:
     mutable Date_t date_;
 };
 
-class InsertAutoId : public Base {
+class InsertAutoId : public Recovering {
 public:
     InsertAutoId() : o_(fromjson("{\"a\":\"b\"}")) {}
     void doIt() const {
@@ -414,7 +426,7 @@ public:
     }
 };
 
-class InsertTwo : public Base {
+class InsertTwo : public Recovering {
 public:
     InsertTwo() : o_(fromjson("{'_id':1,a:'b'}")), t_(fromjson("{'_id':2,c:'d'}")) {}
     void doIt() const {
@@ -437,7 +449,7 @@ private:
     BSONObj t_;
 };
 
-class InsertTwoIdentical : public Base {
+class InsertTwoIdentical : public Recovering {
 public:
     InsertTwoIdentical() : o_(fromjson("{\"a\":\"b\"}")) {}
     void doIt() const {
@@ -697,7 +709,7 @@ protected:
 };
 
 
-class UpsertInsertIdMod : public Base {
+class UpsertInsertIdMod : public Recovering {
 public:
     UpsertInsertIdMod()
         : q_(fromjson("{'_id':5,a:4}")),
@@ -718,7 +730,7 @@ protected:
     BSONObj q_, u_, ou_;
 };
 
-class UpsertInsertSet : public Base {
+class UpsertInsertSet : public Recovering {
 public:
     UpsertInsertSet()
         : q_(fromjson("{a:5}")), u_(fromjson("{$set:{a:7}}")), ou_(fromjson("{a:7}")) {}
@@ -738,7 +750,7 @@ protected:
     BSONObj o_, q_, u_, ou_;
 };
 
-class UpsertInsertInc : public Base {
+class UpsertInsertInc : public Recovering {
 public:
     UpsertInsertInc()
         : q_(fromjson("{a:5}")), u_(fromjson("{$inc:{a:3}}")), ou_(fromjson("{a:8}")) {}
@@ -757,7 +769,7 @@ protected:
     BSONObj o_, q_, u_, ou_;
 };
 
-class MultiInc : public Base {
+class MultiInc : public Recovering {
 public:
     string s() const {
         stringstream ss;
@@ -823,7 +835,7 @@ protected:
     BSONObj o_, u_, ot_;
 };
 
-class Remove : public Base {
+class Remove : public Recovering {
 public:
     Remove()
         : o1_(f("{\"_id\":\"010101010101010101010101\",\"a\":\"b\"}")),
@@ -854,7 +866,7 @@ class RemoveOne : public Remove {
     }
 };
 
-class FailingUpdate : public Base {
+class FailingUpdate : public Recovering {
 public:
     FailingUpdate() : o_(fromjson("{'_id':1,a:'b'}")), u_(fromjson("{'_id':1,c:'d'}")) {}
     void doIt() const {

@@ -27,3 +27,4 @@ executor:
         enableTestCommands: 1
         failpoint.disablePipelineOptimization:
           mode: alwaysOn
+        oplogApplicationEnforcesSteadyStateConstraints: true

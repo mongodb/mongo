@@ -33,3 +33,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         enableLocalhostAuthBypass: false
+        oplogApplicationEnforcesSteadyStateConstraints: true
