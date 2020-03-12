@@ -72,7 +72,9 @@ startParallelShell(funWithArgs(function(config) {
 
 // Reconnect the 4th node to the secondaries.
 node4.reconnect([node1, node3]);
-node3.adminCommand({replSetStepUp: 1});
+// Make sure the config has been replicated to all connected voters so that stepup can succeed.
+waitForConfigReplication(node3, [node1, node3, node4]);
+assert.commandWorked(node3.adminCommand({replSetStepUp: 1}));
 rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node1, node3, node4]);
 jsTestLog("Current replica set topology: [Primary-Secondary-Secondary] [Primary]");
 assert.soon(function() {
