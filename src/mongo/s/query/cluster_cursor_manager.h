@@ -360,6 +360,11 @@ public:
      */
     stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
 
+    /*
+     * Returns a list of all open cursors for the given set of OperationKeys.
+     */
+    stdx::unordered_set<CursorId> getCursorsForOpKeys(std::vector<OperationKey>) const;
+
     /**
      * Returns the namespace associated with the given cursor id, by examining the 'namespace
      * prefix' portion of the cursor id.  A cursor with the given cursor id need not actually exist.
@@ -461,12 +466,14 @@ private:
                     CursorType cursorType,
                     CursorLifetime cursorLifetime,
                     Date_t lastActive,
-                    UserNameIterator authenticatedUsersIter)
+                    UserNameIterator authenticatedUsersIter,
+                    boost::optional<OperationKey> opKey)
             : _cursor(std::move(cursor)),
               _cursorType(cursorType),
               _cursorLifetime(cursorLifetime),
               _lastActive(lastActive),
               _lsid(_cursor->getLsid()),
+              _opKey(std::move(opKey)),
               _authenticatedUsers(
                   userNameIteratorToContainer<std::vector<UserName>>(authenticatedUsersIter)) {
             invariant(_cursor);
@@ -501,6 +508,10 @@ private:
 
         boost::optional<LogicalSessionId> getLsid() const {
             return _lsid;
+        }
+
+        boost::optional<OperationKey> getOperationKey() const {
+            return _opKey;
         }
 
         /**
@@ -558,6 +569,9 @@ private:
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
         boost::optional<LogicalSessionId> _lsid;
+
+        // The client OperationKey from the OperationContext at the time of registering a cursor.
+        boost::optional<OperationKey> _opKey;
 
         // Current operation using the cursor. Non-null if the cursor is checked out.
         OperationContext* _operationUsingCursor = nullptr;
