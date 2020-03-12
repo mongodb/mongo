@@ -116,6 +116,9 @@ public:
     Status checkIfCommitQuorumCanBeSatisfied(
         const CommitQuorumOptions& commitQuorum) const override;
 
+    bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
+                                 const std::vector<mongo::HostAndPort>& members) const override;
+
     void setMyLastAppliedOpTimeAndWallTime(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTime(

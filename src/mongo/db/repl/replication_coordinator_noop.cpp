@@ -365,6 +365,11 @@ Status ReplicationCoordinatorNoOp::checkIfCommitQuorumCanBeSatisfied(
     MONGO_UNREACHABLE;
 }
 
+bool ReplicationCoordinatorNoOp::isCommitQuorumSatisfied(
+    const CommitQuorumOptions& commitQuorum, const std::vector<mongo::HostAndPort>& members) const {
+    MONGO_UNREACHABLE;
+}
+
 Status ReplicationCoordinatorNoOp::checkReplEnabledForCommand(BSONObjBuilder*) {
     return Status(ErrorCodes::NoReplicationEnabled, "no replication on embedded");
 }

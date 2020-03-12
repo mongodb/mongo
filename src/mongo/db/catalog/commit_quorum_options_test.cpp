@@ -50,6 +50,23 @@ TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsNotNumber
     ASSERT_EQUALS("commitQuorum has to be a number or a string", status.reason());
 }
 
+TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsANegativeNumber) {
+    BSONObj obj = BSON("commitQuorum" << -1);
+    auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 50",
+                  status.reason());
+}
+
+TEST(CommitQuorumOptionsTest,
+     ParseReturnsFailedToParseIfCommitQuorumIsGreaterThanMaxReplSetMembersSize) {
+    BSONObj obj = BSON("commitQuorum" << 70);
+    auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_EQUALS("commitQuorum has to be a non-negative number and not greater than 50",
+                  status.reason());
+}
+
 TEST(CommitQuorumOptionsTest, ParseSetsNumNodesIfCommitQuorumIsANumber) {
     CommitQuorumOptions options;
     BSONObj obj = BSON("commitQuorum" << 3);
@@ -58,12 +75,20 @@ TEST(CommitQuorumOptionsTest, ParseSetsNumNodesIfCommitQuorumIsANumber) {
     ASSERT_EQUALS("", options.mode);
 }
 
-TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIsAString) {
+TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIskMajorityString) {
     CommitQuorumOptions options;
     BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kMajority);
     ASSERT_OK(options.parse(obj.getField("commitQuorum")));
     ASSERT_EQUALS(-1, options.numNodes);
     ASSERT_EQUALS(CommitQuorumOptions::kMajority, options.mode);
+}
+
+TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIskAllString) {
+    CommitQuorumOptions options;
+    BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kAll);
+    ASSERT_OK(options.parse(obj.getField("commitQuorum")));
+    ASSERT_EQUALS(-1, options.numNodes);
+    ASSERT_EQUALS(CommitQuorumOptions::kAll, options.mode);
 }
 
 TEST(CommitQuorumOptionsTest, ToBSON) {

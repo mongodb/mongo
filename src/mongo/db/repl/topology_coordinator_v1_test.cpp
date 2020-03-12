@@ -5521,95 +5521,37 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
                             << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6))))));
     getTopoCoord().updateConfig(configA, -1, Date_t());
 
-    std::vector<MemberConfig> memberConfig;
-    for (auto it = configA.membersBegin(); it != configA.membersEnd(); it++) {
-        memberConfig.push_back(*it);
-    }
+    CommitQuorumOptions validNumberCQ;
+    validNumberCQ.numNodes = 5;
+    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberCQ));
 
-    // Consider all the replica set members.
-    {
-        CommitQuorumOptions validNumberWC;
-        validNumberWC.numNodes = 5;
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberWC, memberConfig));
+    CommitQuorumOptions invalidNumberCQ;
+    invalidNumberCQ.numNodes = 6;
+    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNumberCQ));
 
-        CommitQuorumOptions invalidNumberWC;
-        invalidNumberWC.numNodes = 6;
-        ASSERT_FALSE(
-            getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNumberWC, memberConfig));
+    CommitQuorumOptions majorityCQ;
+    majorityCQ.mode = "majority";
+    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityCQ));
 
-        CommitQuorumOptions majorityWC;
-        majorityWC.mode = "majority";
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityWC, memberConfig));
+    CommitQuorumOptions allCQ;
+    allCQ.mode = "all";
+    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(allCQ));
 
-        CommitQuorumOptions validModeWC;
-        validModeWC.mode = "valid";
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validModeWC, memberConfig));
+    CommitQuorumOptions validModeCQ;
+    validModeCQ.mode = "valid";
+    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validModeCQ));
 
-        CommitQuorumOptions invalidModeWC;
-        invalidModeWC.mode = "invalidNotEnoughNodes";
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidModeWC, memberConfig));
+    CommitQuorumOptions invalidNotEnoughNodesCQ;
+    invalidNotEnoughNodesCQ.mode = "invalidNotEnoughNodes";
+    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughNodesCQ));
 
-        CommitQuorumOptions fakeModeWC;
-        fakeModeWC.mode = "fake";
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(fakeModeWC, memberConfig));
-    }
+    CommitQuorumOptions invalidNotEnoughValuesCQ;
+    invalidNotEnoughValuesCQ.mode = "invalidNotEnoughValues";
+    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughValuesCQ));
 
-    // Use a list of commit ready members that is not a majority.
-    {
-        std::vector<MemberConfig> commitReadyMembersNoMajority;
-        commitReadyMembersNoMajority.push_back(*configA.findMemberByID(0));
-        commitReadyMembersNoMajority.push_back(*configA.findMemberByID(1));
-        commitReadyMembersNoMajority.push_back(*configA.findMemberByID(2));
-
-        CommitQuorumOptions validNumberWC;
-        validNumberWC.numNodes = 3;
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberWC,
-                                                                     commitReadyMembersNoMajority));
-
-        CommitQuorumOptions invalidNumberWC;
-        invalidNumberWC.numNodes = 4;
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(
-            invalidNumberWC, commitReadyMembersNoMajority));
-
-        CommitQuorumOptions majorityWC;
-        majorityWC.mode = "majority";
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(
-            majorityWC, commitReadyMembersNoMajority));
-
-        CommitQuorumOptions invalidModeWC;
-        invalidModeWC.mode = "valid";
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(
-            invalidModeWC, commitReadyMembersNoMajority));
-    }
-
-    // Use a list of commit ready members that is a majority.
-    {
-        std::vector<MemberConfig> commitReadyMembersMajority;
-        commitReadyMembersMajority.push_back(*configA.findMemberByID(0));
-        commitReadyMembersMajority.push_back(*configA.findMemberByID(1));
-        commitReadyMembersMajority.push_back(*configA.findMemberByID(2));
-        commitReadyMembersMajority.push_back(*configA.findMemberByID(3));
-
-        CommitQuorumOptions validNumberWC;
-        validNumberWC.numNodes = 4;
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberWC,
-                                                                     commitReadyMembersMajority));
-
-        CommitQuorumOptions invalidNumberWC;
-        invalidNumberWC.numNodes = 5;
-        ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNumberWC,
-                                                                      commitReadyMembersMajority));
-
-        CommitQuorumOptions majorityWC;
-        majorityWC.mode = "majority";
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityWC,
-                                                                     commitReadyMembersMajority));
-
-        CommitQuorumOptions invalidModeWC;
-        invalidModeWC.mode = "valid";
-        ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidModeWC,
-                                                                     commitReadyMembersMajority));
-    }
+    CommitQuorumOptions fakeModeCQ;
+    fakeModeCQ.mode = "fake";
+    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(fakeModeCQ));
 }
 
 TEST_F(TopoCoordTest, AdvanceCommittedOpTimeDisregardsWallTimeOrder) {

@@ -35,15 +35,18 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 const StringData CommitQuorumOptions::kCommitQuorumField = "commitQuorum"_sd;
 const char CommitQuorumOptions::kMajority[] = "majority";
+const char CommitQuorumOptions::kAll[] = "all";
 
 const BSONObj CommitQuorumOptions::Majority(BSON(kCommitQuorumField
                                                  << CommitQuorumOptions::kMajority));
+const BSONObj CommitQuorumOptions::all(BSON(kCommitQuorumField << CommitQuorumOptions::kAll));
 
 CommitQuorumOptions::CommitQuorumOptions(int numNodesOpts) {
     reset();
@@ -61,7 +64,16 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
     reset();
 
     if (commitQuorumElement.isNumber()) {
-        numNodes = commitQuorumElement.numberInt();
+        auto cNumNodes = commitQuorumElement.safeNumberLong();
+        if (cNumNodes < 0 ||
+            cNumNodes > static_cast<decltype(cNumNodes)>(repl::ReplSetConfig::kMaxMembers)) {
+            return Status(
+                ErrorCodes::FailedToParse,
+                str::stream()
+                    << "commitQuorum has to be a non-negative number and not greater than "
+                    << repl::ReplSetConfig::kMaxMembers);
+        }
+        numNodes = static_cast<decltype(numNodes)>(cNumNodes);
     } else if (commitQuorumElement.type() == String) {
         mode = commitQuorumElement.valuestrsafe();
     } else {

@@ -3186,8 +3186,9 @@ TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestartPerMember() const {
 }
 
 bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
-    const CommitQuorumOptions& commitQuorum, const std::vector<MemberConfig>& members) const {
-    if (!commitQuorum.mode.empty() && commitQuorum.mode != CommitQuorumOptions::kMajority) {
+    const CommitQuorumOptions& commitQuorum) const {
+    if (!commitQuorum.mode.empty() && commitQuorum.mode != CommitQuorumOptions::kMajority &&
+        commitQuorum.mode != CommitQuorumOptions::kAll) {
         StatusWith<ReplSetTagPattern> tagPatternStatus =
             _rsConfig.findCustomWriteMode(commitQuorum.mode);
         if (!tagPatternStatus.isOK()) {
@@ -3195,7 +3196,7 @@ bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         }
 
         ReplSetTagMatch matcher(tagPatternStatus.getValue());
-        for (auto&& member : members) {
+        for (auto&& member : _rsConfig.members()) {
             for (MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
                 if (matcher.update(*it)) {
                     return true;
@@ -3206,25 +3207,26 @@ bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
         // Even if all the nodes in the set had a given write it still would not satisfy this
         // commit quorum.
         return false;
-    } else {
-        int nodesRemaining = 0;
-        if (!commitQuorum.mode.empty()) {
-            invariant(commitQuorum.mode == CommitQuorumOptions::kMajority);
-            nodesRemaining = _rsConfig.getWriteMajority();
-        } else {
-            nodesRemaining = commitQuorum.numNodes;
-        }
+    }
 
-        for (auto&& member : members) {
-            if (!member.isArbiter()) {  // Only count data-bearing nodes
-                --nodesRemaining;
-                if (nodesRemaining <= 0) {
-                    return true;
-                }
+    int nodesRemaining = commitQuorum.numNodes;
+    if (!commitQuorum.mode.empty()) {
+        if (commitQuorum.mode == CommitQuorumOptions::kMajority) {
+            nodesRemaining = _rsConfig.getWriteMajority();
+        } else if (commitQuorum.mode == CommitQuorumOptions::kAll) {
+            nodesRemaining = _rsConfig.getWritableVotingMembersCount();
+        }
+    }
+
+    for (auto&& member : _rsConfig.members()) {
+        if (!member.isArbiter()) {  // Only count data-bearing nodes
+            --nodesRemaining;
+            if (nodesRemaining <= 0) {
+                return true;
             }
         }
-        return false;
     }
+    return false;
 }
 
 }  // namespace repl

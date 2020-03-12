@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/operation_context_noop.h"
@@ -7160,6 +7161,246 @@ TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
     ASSERT_NOT_OK(r);
     ASSERT_EQUALS("In the process of shutting down", r.reason());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, r.code());
+}
+
+TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
+    // Set up a 5-node replica set config.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "node0:100"
+                                                     << "tags"
+                                                     << BSON("dc"
+                                                             << "NA"
+                                                             << "rack"
+                                                             << "rackNA1"))
+                                          << BSON("_id" << 1 << "host"
+                                                        << "node1:101"
+                                                        << "tags"
+                                                        << BSON("dc"
+                                                                << "NA"
+                                                                << "rack"
+                                                                << "rackNA2"))
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:102"
+                                                        << "tags"
+                                                        << BSON("dc"
+                                                                << "NA"
+                                                                << "rack"
+                                                                << "rackNA3"))
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:103"
+                                                        << "tags"
+                                                        << BSON("dc"
+                                                                << "EU"
+                                                                << "rack"
+                                                                << "rackEU1"))
+                                          << BSON("_id" << 4 << "host"
+                                                        << "node4:104"
+                                                        << "votes" << 0 << "priority" << 0 << "tags"
+                                                        << BSON("dc"
+                                                                << "EU"
+                                                                << "rack"
+                                                                << "rackEU2"))
+                                          << BSON("_id" << 5 << "host"
+                                                        << "node5:105"
+                                                        << "arbiterOnly" << true))
+                            << "settings"
+                            << BSON("getLastErrorModes" << BSON(
+                                        "valid" << BSON("dc" << 2 << "rack" << 2)
+                                                << "invalidNotEnoughValues" << BSON("dc" << 3)
+                                                << "invalidNotEnoughNodes" << BSON("rack" << 6)))),
+                       HostAndPort("node0", 100));
+
+    auto replCoord = getReplCoord();
+    {
+        // Quorum contains a node which is not part of the replica set config.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node100", 100)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains two nodes from same data center.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node0", 100),
+                                                    HostAndPort("node1", 101)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains two nodes from different data center.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node1", 101),
+                                                    HostAndPort("node3", 103)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains majority of voting data bearing nodes.
+        std::vector<HostAndPort> commitReadyMembers{
+            HostAndPort("node1", 101), HostAndPort("node2", 102), HostAndPort("node3", 103)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains all voting data bearing nodes.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node0", 100),
+                                                    HostAndPort("node1", 101),
+                                                    HostAndPort("node2", 102),
+                                                    HostAndPort("node3", 103)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains all data bearing nodes.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node0", 100),
+                                                    HostAndPort("node1", 101),
+                                                    HostAndPort("node2", 102),
+                                                    HostAndPort("node3", 103),
+                                                    HostAndPort("node4", 104)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allNodesCQ;
+        allNodesCQ.numNodes = 5;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(allNodesCQ, commitReadyMembers));
+    }
+
+    {
+        // Quorum contains arbiter.
+        std::vector<HostAndPort> commitReadyMembers{HostAndPort("node1", 101),
+                                                    HostAndPort("node2", 102),
+                                                    HostAndPort("node3", 103),
+                                                    HostAndPort("node5", 105)};
+
+        CommitQuorumOptions singleNodeCQ;
+        singleNodeCQ.numNodes = 1;
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(singleNodeCQ, commitReadyMembers));
+
+        CommitQuorumOptions vaildModeCQ;
+        vaildModeCQ.mode = "valid";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(vaildModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions majorityModeCQ;
+        majorityModeCQ.mode = "majority";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions allModeCQ;
+        allModeCQ.mode = "all";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+
+        CommitQuorumOptions numNodesCQ;
+        numNodesCQ.numNodes = 4;
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(numNodesCQ, commitReadyMembers));
+    }
 }
 
 // TODO(schwerin): Unit test election id updating

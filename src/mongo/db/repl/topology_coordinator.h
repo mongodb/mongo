@@ -735,13 +735,10 @@ public:
         const;
 
     /**
-     * Checks if the 'commitQuorum' can be satisifed by 'members'. Returns true if it can be
-     * satisfied.
-     *
-     * 'members' must be part of the replica set configuration.
+     * Checks if the 'commitQuorum' can be satisifed by the current replica set config. Returns true
+     * if it can be satisfied.
      */
-    bool checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum,
-                                           const std::vector<MemberConfig>& members) const;
+    bool checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
 
     /**
      * Returns nullptr if there is no primary, or the MemberConfig* for the current primary.

@@ -828,6 +828,19 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
         fassert(28693, status);
     }
 
+    // $all: all voting data-bearing nodes.
+    pattern = _tagConfig.makePattern();
+    status = _tagConfig.addTagCountConstraintToPattern(
+        &pattern, MemberConfig::kInternalVoterTagName, _writableVotingMembersCount);
+
+    if (status.isOK()) {
+        _customWriteConcernModes[kAllWriteConcernModeName] = pattern;
+    } else if (status != ErrorCodes::NoSuchKey) {
+        // NoSuchKey means we have no $voter-tagged nodes in this config;
+        // other errors are unexpected.
+        fassert(46712003, status);
+    }
+
     // $stepDownCheck: one electable node plus ourselves
     pattern = _tagConfig.makePattern();
     status = _tagConfig.addTagCountConstraintToPattern(

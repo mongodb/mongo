@@ -422,6 +422,11 @@ Status ReplicationCoordinatorMock::checkIfCommitQuorumCanBeSatisfied(
     return Status::OK();
 }
 
+bool ReplicationCoordinatorMock::isCommitQuorumSatisfied(
+    const CommitQuorumOptions& commitQuorum, const std::vector<mongo::HostAndPort>& members) const {
+    return true;
+}
+
 WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
     return WriteConcernOptions();
 }

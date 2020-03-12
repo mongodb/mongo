@@ -120,6 +120,9 @@ public:
 
     virtual Status checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
 
+    virtual bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
+                                         const std::vector<mongo::HostAndPort>& members) const;
+
     virtual Status checkCanServeReadsFor(OperationContext* opCtx,
                                          const NamespaceString& ns,
                                          bool slaveOk);
