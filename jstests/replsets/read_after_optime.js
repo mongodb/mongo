@@ -47,6 +47,8 @@ var runTest = function(testDB, primaryConn) {
     }
 
     checkLog.containsWithCount(testDB.getMongo(), msg, 1);
+    // Clear the log to not fill up the ramlog
+    assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
 
     // Read concern timed out message should not be logged.
     runTimeoutTest();
@@ -55,7 +57,7 @@ var runTest = function(testDB, primaryConn) {
     runTimeoutTest();
     testDB.setLogLevel(0, 'command');
 
-    checkLog.containsWithCount(testDB.getMongo(), msg, 2);
+    checkLog.containsWithCount(testDB.getMongo(), msg, 1);
 
     // Test read on future afterOpTime that will eventually occur.
     primaryConn.getDB(dbName).parallelShellStarted.drop();
