@@ -93,8 +93,9 @@ Status BaseCloner::run() {
     if (!_sharedData->getInitialSyncStatus(lk).isOK()) {
         LOGV2(21065,
               "Failing data clone because initial sync failed outside data clone: "
-              "{status}",
-              "status"_attr = _sharedData->getInitialSyncStatus(lk));
+              "{error}",
+              "Failing data clone because initial sync failed outside data clone",
+              "error"_attr = _sharedData->getInitialSyncStatus(lk));
     }
     return _sharedData->getInitialSyncStatus(lk);
 }
@@ -120,12 +121,13 @@ void BaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
             // it there.
             LOGV2(21066,
                   "Collection Cloner scheduled a remote command on the {stage}",
+                  "Collection Cloner scheduled a remote command",
                   "stage"_attr = describeForFuzzer(stage));
-            LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled.");
+            LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
             initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
 
             if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
-                LOGV2(21068, "initialSyncFuzzerSynchronizationPoint2 fail point enabled.");
+                LOGV2(21068, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
                 initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
             }
         }
@@ -136,6 +138,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     LOGV2_DEBUG(21069,
                 1,
                 "Cloner {cloner} running stage {stage}",
+                "Cloner running stage",
                 "cloner"_attr = getClonerName(),
                 "stage"_attr = stage->getName());
     pauseForFuzzer(stage);
@@ -146,6 +149,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
         [&](const BSONObj& data) {
             LOGV2(21070,
                   "Cloner {cloner} hanging before running stage {stage}",
+                  "Cloner hanging before running stage",
                   "cloner"_attr = getClonerName(),
                   "stage"_attr = stage->getName());
             while (!mustExit() && hangBeforeClonerStage.shouldFail(isThisStageFailPoint)) {
@@ -158,6 +162,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
         [&](const BSONObj& data) {
             LOGV2(21071,
                   "Cloner {cloner} hanging after running stage {stage}",
+                  "Cloner hanging after running stage",
                   "cloner"_attr = getClonerName(),
                   "stage"_attr = stage->getName());
             while (!mustExit() && hangAfterClonerStage.shouldFail(isThisStageFailPoint)) {
@@ -168,6 +173,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     LOGV2_DEBUG(21072,
                 1,
                 "Cloner {cloner} finished running stage {stage}",
+                "Cloner finished running stage",
                 "cloner"_attr = getClonerName(),
                 "stage"_attr = stage->getName());
     return afterStageBehavior;
@@ -183,10 +189,10 @@ Status BaseCloner::checkRollBackIdIsUnchanged() {
         getClient()->simpleCommand("admin", &info, "replSetGetRBID");
     } catch (DBException& e) {
         if (ErrorCodes::isRetriableError(e)) {
-            auto status = e.toStatus().withContext(
-                ": failed while attempting to retrieve rollBackId after re-connect");
-            LOGV2_DEBUG(21073, 1, "{status}", "status"_attr = status);
-            return status;
+            static constexpr char errorMsg[] =
+                "Failed while attempting to retrieve rollBackId after re-connect";
+            LOGV2_DEBUG(21073, 1, errorMsg, "error"_attr = e);
+            return e.toStatus().withContext(errorMsg);
         }
         throw;
     }
@@ -217,6 +223,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     [&](const BSONObj& data) {
                         LOGV2(21074,
                               "Cloner {cloner} hanging before retrying stage {stage}",
+                              "Cloner hanging before retrying stage",
                               "cloner"_attr = getClonerName(),
                               "stage"_attr = stage->getName());
                         while (!mustExit() &&
@@ -227,10 +234,11 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     isThisStageFailPoint);
                 LOGV2(21075,
                       "Initial Sync retrying {cloner} stage {stage} due to "
-                      "{lastError}",
+                      "{error}",
+                      "Initial Sync retrying cloner stage due to error",
                       "cloner"_attr = getClonerName(),
                       "stage"_attr = stage->getName(),
-                      "lastError"_attr = lastError);
+                      "error"_attr = lastError);
                 bool shouldRetry = [&] {
                     stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
                     return _sharedData->shouldRetryOperation(lk, &_retryableOp);
@@ -249,6 +257,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                         LOGV2(21076,
                               "Cloner {cloner} hanging before checking rollBackId for stage "
                               "{stage}",
+                              "Cloner hanging before checking rollBackId",
                               "cloner"_attr = getClonerName(),
                               "stage"_attr = stage->getName());
                         while (!mustExit() &&
@@ -272,20 +281,22 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
             lastError = e.toStatus();
             if (!stage->isTransientError(lastError)) {
                 LOGV2(21077,
-                      "Non-retryable error occured during cloner "
-                      "{cloner} stage {stage}: {lastError}",
+                      "Non-retryable error occurred during cloner "
+                      "{cloner} stage {stage}: {error}",
+                      "Non-retryable error occurred during cloner stage",
                       "cloner"_attr = getClonerName(),
                       "stage"_attr = stage->getName(),
-                      "lastError"_attr = lastError);
+                      "error"_attr = lastError);
                 throw;
             }
             LOGV2_DEBUG(21078,
                         1,
-                        "Transient error occured during cloner "
-                        "{cloner} stage {stage}: {lastError}",
+                        "Transient error occurred during cloner "
+                        "{cloner} stage {stage}: {error}",
+                        "Transient error occurred during cloner stage",
                         "cloner"_attr = getClonerName(),
                         "stage"_attr = stage->getName(),
-                        "lastError"_attr = lastError);
+                        "error"_attr = lastError);
         }
     }
 }

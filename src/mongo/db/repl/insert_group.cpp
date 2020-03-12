@@ -133,15 +133,24 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     } catch (...) {
         // The group insert failed, log an error and fall through to the
         // application of an individual op.
+        static constexpr char message[] =
+            "Error applying inserts in bulk. Trying first insert as a lone insert";
         auto status = exceptionToStatus().withContext(
-            str::stream() << "Error applying inserts in bulk: " << redact(groupedInserts.toBSON())
-                          << ". Trying first insert as a lone insert: " << redact(entry.getRaw()));
+            str::stream() << message << ". Grouped inserts: " << redact(groupedInserts.toBSON())
+                          << ". First insert: " << redact(entry.getRaw()));
 
         // It's not an error during initial sync to encounter DuplicateKey errors.
         if (Mode::kInitialSync == _mode && ErrorCodes::DuplicateKey == status) {
-            LOGV2_DEBUG(21203, 2, "{status}", "status"_attr = status);
+            LOGV2_DEBUG(21203,
+                        2,
+                        message,
+                        "groupedInserts"_attr = redact(groupedInserts.toBSON()),
+                        "firstInsert"_attr = redact(entry.getRaw()));
         } else {
-            LOGV2_ERROR(21204, "{status}", "status"_attr = status);
+            LOGV2_ERROR(21204,
+                        message,
+                        "groupedInserts"_attr = redact(groupedInserts.toBSON()),
+                        "firstInsert"_attr = redact(entry.getRaw()));
         }
 
         // Avoid quadratic run time from failed insert by not retrying until we

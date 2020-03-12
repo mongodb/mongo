@@ -56,7 +56,7 @@ BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
 Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     const executor::RemoteCommandResponse& isMasterReply) {
     if (!isMasterReply.isOK()) {
-        LOGV2(21054, "Cannot reconnect because isMaster command failed.");
+        LOGV2(21054, "Cannot reconnect because isMaster command failed");
         return isMasterReply.status;
     }
     if (isMasterReply.data["ismaster"].trueValue() || isMasterReply.data["secondary"].trueValue())
@@ -108,6 +108,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
                         1,
                         "Excluding database due to the 'listDatabases' response not containing a "
                         "'name' field for this entry: {db}",
+                        "Excluding database due to the 'listDatabases' response not containing a "
+                        "'name' field for this entry",
                         "db"_attr = dbBSON);
             continue;
         }
@@ -116,6 +118,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
             LOGV2_DEBUG(21056,
                         1,
                         "Excluding database from the 'listDatabases' response: {db}",
+                        "Excluding database from the 'listDatabases' response",
                         "db"_attr = dbBSON);
             continue;
         } else {
@@ -154,21 +157,23 @@ void AllDatabaseCloner::postStage() {
             LOGV2_DEBUG(21057,
                         1,
                         "Database clone for '{dbName}' finished: {status}",
+                        "Database clone finished",
                         "dbName"_attr = dbName,
                         "status"_attr = dbStatus);
         } else {
             LOGV2_WARNING(21060,
-                          "database '{dbName}' ({number} of {total}) "
-                          "clone failed due to {status}",
+                          "database '{dbName}' ({dbNumber} of {totalDbs}) "
+                          "clone failed due to {error}",
+                          "Database clone failed",
                           "dbName"_attr = dbName,
-                          "number"_attr = (_stats.databasesCloned + 1),
-                          "total"_attr = _databases.size(),
-                          "status"_attr = dbStatus.toString());
+                          "dbNumber"_attr = (_stats.databasesCloned + 1),
+                          "totalDbs"_attr = _databases.size(),
+                          "error"_attr = dbStatus.toString());
             setInitialSyncFailedStatus(dbStatus);
             return;
         }
         if (StringData(dbName).equalCaseInsensitive("admin")) {
-            LOGV2_DEBUG(21058, 1, "Finished the 'admin' db, now validating it.");
+            LOGV2_DEBUG(21058, 1, "Finished the 'admin' db, now validating it");
             // Do special checks for the admin database because of auth. collections.
             auto adminStatus = Status(ErrorCodes::NotYetInitialized, "");
             {
@@ -183,8 +188,9 @@ void AllDatabaseCloner::postStage() {
             if (!adminStatus.isOK()) {
                 LOGV2_DEBUG(21059,
                             1,
-                            "Validation failed on 'admin' db due to {adminStatus}",
-                            "adminStatus"_attr = adminStatus);
+                            "Validation failed on 'admin' db due to {error}",
+                            "Validation failed on 'admin' db",
+                            "error"_attr = adminStatus);
                 setInitialSyncFailedStatus(adminStatus);
                 return;
             }

@@ -212,7 +212,11 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 Status CollectionBulkLoaderImpl::commit() {
     return _runTaskReleaseResourcesOnFailure([&] {
         _stats.startBuildingIndexes = Date_t::now();
-        LOGV2_DEBUG(21130, 2, "Creating indexes for ns: {ns}", "ns"_attr = _nss.ns());
+        LOGV2_DEBUG(21130,
+                    2,
+                    "Creating indexes for ns: {namespace}",
+                    "Creating indexes",
+                    "namespace"_attr = _nss.ns());
         UnreplicatedWritesBlock uwb(_opCtx.get());
 
         // Commit before deleting dups, so the dups will be removed from secondary indexes when
@@ -311,8 +315,9 @@ Status CollectionBulkLoaderImpl::commit() {
         _stats.endBuildingIndexes = Date_t::now();
         LOGV2_DEBUG(21131,
                     2,
-                    "Done creating indexes for ns: {ns}, stats: {stats}",
-                    "ns"_attr = _nss.ns(),
+                    "Done creating indexes for ns: {namespace}, stats: {stats}",
+                    "Done creating indexes",
+                    "namespace"_attr = _nss.ns(),
                     "stats"_attr = _stats.toString());
 
         _releaseResources();

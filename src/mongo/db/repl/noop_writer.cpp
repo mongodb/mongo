@@ -150,7 +150,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
     Lock::GlobalLock lock(
         opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kLeaveUnlocked);
     if (!lock.isLocked()) {
-        LOGV2_DEBUG(21219, 1, "Global lock is not available skipping noopWrite");
+        LOGV2_DEBUG(21219, 1, "Global lock is not available, skipping the noop write");
         return;
     }
 
@@ -169,6 +169,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
                     1,
                     "Not scheduling a noop write. Last known OpTime: {lastKnownOpTime} != last "
                     "primary OpTime: {lastAppliedOpTime}",
+                    "Not scheduling a noop write. Last known OpTime != last primary OpTime",
                     "lastKnownOpTime"_attr = _lastKnownOpTime,
                     "lastAppliedOpTime"_attr = lastAppliedOpTime);
     } else {
@@ -178,6 +179,8 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
                         logSeverityV1toV2(logLevel).toInt(),
                         "Writing noop to oplog as there has been no writes to this replica set in "
                         "over {writeInterval}",
+                        "Writing noop to oplog as there has been no writes to this replica set "
+                        "within write interval",
                         "writeInterval"_attr = _writeInterval);
             writeConflictRetry(
                 opCtx, "writeNoop", NamespaceString::kRsOplogNamespace.ns(), [&opCtx] {
@@ -193,6 +196,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
     LOGV2_DEBUG(21223,
                 1,
                 "Set last known op time to {lastKnownOpTime}",
+                "Set last known op time",
                 "lastKnownOpTime"_attr = _lastKnownOpTime);
 }
 

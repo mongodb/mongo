@@ -325,7 +325,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
     if (_inShutdown) {
         LOGV2(21305,
-              "Not starting replication storage threads because replication is shutting down.");
+              "Not starting replication storage threads because replication is shutting down");
         return;
     }
 
@@ -934,7 +934,11 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         // replica set members.
         if (*it == "local")
             continue;
-        LOGV2_DEBUG(21309, 2, "Removing temporary collections from {db}", "db"_attr = *it);
+        LOGV2_DEBUG(21309,
+                    2,
+                    "Removing temporary collections from {db}",
+                    "Removing temporary collections",
+                    "db"_attr = *it);
         AutoGetDb autoDb(opCtx, *it, MODE_IX);
         invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
         autoDb.getDb()->clearTmpCollections(opCtx);
@@ -983,6 +987,8 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
                               "fail point dropPendingCollectionReaperHang enabled. "
                               "Blocking until fail point is disabled. "
                               "committedOpTime: {committedOpTime}",
+                              "fail point dropPendingCollectionReaperHang enabled. "
+                              "Blocking until fail point is disabled",
                               "committedOpTime"_attr = committedOpTime);
                         dropPendingCollectionReaperHang.pauseWhileSet();
                     }

@@ -193,8 +193,9 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
     LOGV2_DEBUG(21753,
                 2,
-                "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {ns}",
-                "ns"_attr = nss.ns());
+                "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {namespace}",
+                "StorageInterfaceImpl::createCollectionForBulkLoading called",
+                "namespace"_attr = nss.ns());
 
     class StashClient {
     public:
@@ -401,7 +402,10 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     std::vector<std::string> dbNames =
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
     invariant(!dbNames.empty());
-    LOGV2(21754, "dropReplicatedDatabases - dropping {num} databases", "num"_attr = dbNames.size());
+    LOGV2(21754,
+          "dropReplicatedDatabases - dropping {numDatabases} databases",
+          "dropReplicatedDatabases - dropping databases",
+          "numDatabases"_attr = dbNames.size());
 
     ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
 
@@ -421,12 +425,17 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
                 LOGV2(21755,
                       "dropReplicatedDatabases - database disappeared after retrieving list of "
                       "database names but before drop: {dbName}",
+                      "dropReplicatedDatabases - database disappeared after retrieving list of "
+                      "database names but before drop",
                       "dbName"_attr = dbName);
             }
         });
     }
     invariant(hasLocalDatabase, "local database missing");
-    LOGV2(21756, "dropReplicatedDatabases - dropped {num} databases", "num"_attr = dbNames.size());
+    LOGV2(21756,
+          "dropReplicatedDatabases - dropped {numDatabases} databases",
+          "dropReplicatedDatabases - dropped databases",
+          "numDatabases"_attr = dbNames.size());
 
     return Status::OK();
 }

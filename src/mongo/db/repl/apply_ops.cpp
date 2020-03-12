@@ -266,7 +266,10 @@ Status _applyOps(OperationContext* opCtx,
 
         ab.append(status.isOK());
         if (!status.isOK()) {
-            LOGV2(21064, "applyOps error applying: {status}", "status"_attr = status);
+            LOGV2(21064,
+                  "applyOps error applying: {error}",
+                  "applyOps error applying",
+                  "error"_attr = status);
             errors++;
         }
 

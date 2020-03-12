@@ -102,7 +102,7 @@ function finishTest({failPoint, expectedLog, expectedLogId, waitForDrop, createN
     if (isJsonLog(primaryColl.getMongo())) {
         if (expectedLogId) {
             let attrValues = {
-                "ns": nss,
+                "namespace": nss,
                 "uuid": function(attr) {
                     return UUID(attr.uuid.$uuid).toString() === uuid.toString();
                 }

@@ -497,8 +497,7 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Cannot roll back op with no _id. ns: test.t,"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Cannot roll back op with no _id"));
     ASSERT_FALSE(rollbackSource.called);
 }
 
@@ -534,11 +533,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
         _coordinator,
         _replicationProcess.get()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      str::stream()
-                      << "Dropped index in rollback for collection: " << nss.toString()
-                      << ", UUID: " << options.uuid->toString() << ", index: a_1"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Dropped index in rollback"));
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
@@ -577,8 +572,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
                            _coordinator,
                            _replicationProcess.get()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Rollback failed to drop index a_1 in test.t"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Rollback failed to drop index"));
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
@@ -786,16 +780,8 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
-        ASSERT_EQUALS(1,
-                      countTextFormatLogLinesContaining(
-                          str::stream()
-                          << "Dropped index in rollback for collection: " << nss.toString()
-                          << ", UUID: " << options.uuid->toString() << ", index: a_1"));
-        ASSERT_EQUALS(1,
-                      countTextFormatLogLinesContaining(
-                          str::stream()
-                          << "Created index in rollback for collection: " << nss.toString()
-                          << ", UUID: " << options.uuid->toString() << ", index: a_1"));
+        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Dropped index in rollback"));
+        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Created index in rollback"));
         std::vector<const IndexDescriptor*> indexes;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("a" << 1), false, &indexes);
         ASSERT(indexes.size() == 1);
@@ -843,7 +829,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
     ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
-                      "Missing index name in createIndexes operation on rollback, document: "));
+                      "Missing index name in createIndexes operation on rollback"));
 }
 
 // Generators of standard index keys and names given an index 'id'.
@@ -2767,17 +2753,14 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
              _replicationProcess.get());
     stopCapturingLogMessages();
 
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Cannot transition from SECONDARY to ROLLBACK"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining("Cannot perform replica set state transition"));
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY), _coordinator->getMemberState());
 }
 
-DEATH_TEST_REGEX_F(
-    RSRollbackTest,
-    RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
-    "Unable to complete rollback. A full resync may be needed:.*"
-    "UnrecoverableRollbackError: need to rollback, but unable to determine common point "
-    "between local and remote oplog: InvalidSyncSource: remote oplog empty or unreadable") {
+DEATH_TEST_REGEX_F(RSRollbackTest,
+                   RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
+                   "Unable to complete rollback. A full resync may be needed") {
     // rollback() should abort on getting UnrecoverableRollbackError from syncRollback(). An empty
     // local oplog will make syncRollback() return the intended error.
     OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
@@ -2840,8 +2823,7 @@ DEATH_TEST_F(RSRollbackTest,
 DEATH_TEST_REGEX_F(
     RSRollbackTest,
     RollbackTriggersFatalAssertionOnFailingToTransitionToRecoveringAfterSyncRollbackReturns,
-    "Failed to transition into.*; expected to be in state.*; found self "
-    "in.*RECOVERING.*ROLLBACK.*ROLLBACK") {
+    "Failed to perform replica set state transition") {
     auto commonOperation = makeNoopOplogEntryAndRecordId(Seconds(1));
     OplogInterfaceMock localOplog({commonOperation});
     RollbackSourceMock rollbackSource(

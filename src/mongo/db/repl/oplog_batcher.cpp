@@ -179,11 +179,17 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
 
         // Check for oplog version change.
         if (entry.getVersion() != OplogEntry::kOplogVersion) {
-            std::string message = str::stream()
-                << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
-                << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
-            LOGV2_FATAL(21240, "{message}", "message"_attr = message);
-            return {ErrorCodes::BadValue, message};
+            static constexpr char message[] = "Unexpected oplog version";
+            LOGV2_FATAL(21240,
+                        message,
+                        "expectedVersion"_attr = OplogEntry::kOplogVersion,
+                        "foundVersion"_attr = entry.getVersion(),
+                        "oplogEntry"_attr = redact(entry.toBSON()));
+            return {ErrorCodes::BadValue,
+                    str::stream() << message << ", expected oplog version "
+                                  << OplogEntry::kOplogVersion << ", found version "
+                                  << entry.getVersion()
+                                  << ", oplog entry: " << redact(entry.toBSON())};
         }
 
         if (batchLimits.slaveDelayLatestTimestamp) {
@@ -330,6 +336,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);
                 LOGV2(21239,
                       "Oplog buffer has been drained in term {term}",
+                      "Oplog buffer has been drained",
                       "term"_attr = termWhenBufferIsEmpty);
             } else {
                 // Don't emit empty batches.

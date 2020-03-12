@@ -77,8 +77,7 @@ var ElectionHandoffTest = (function() {
             if (numNodes === 2) {
                 checkLog.contains(
                     expectedCandidate,
-                    `skipping dry run and running for election in term {newTerm}","attr":{"newTerm":${
-                        term + 1}}}`);
+                    `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`);
                 checkLog.checkContainsOnceJson(
                     expectedCandidate,
                     51799,

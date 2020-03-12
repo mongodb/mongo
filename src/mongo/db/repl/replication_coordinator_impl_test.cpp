@@ -194,7 +194,9 @@ TEST_F(ReplCoordTest, NodeEntersRemovedStateWhenStartingUpWithALocalConfigWhichL
                                                         << "node2:54321"))),
                        HostAndPort("node3", 12345));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("NodeNotFound"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining("Locally stored replica set configuration does "
+                                                    "not have a valid entry for the current node"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 
@@ -209,7 +211,9 @@ TEST_F(ReplCoordTest,
                                                      << "node1:12345"))),
                        HostAndPort("node1", 12345));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("reports set name of notMySet,"));
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining("Local replica set configuration document set "
+                                                    "name differs from command line set name"));
     ASSERT_EQUALS(MemberState::RS_REMOVED, getReplCoord()->getMemberState().s);
 }
 

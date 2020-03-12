@@ -92,6 +92,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
         LOGV2_FATAL(21156,
                     "Failed to add drop-pending collection {dropPendingNamespace} with drop optime "
                     "{dropOpTime}: duplicate optime and namespace pair.",
+                    "Failed to add drop-pending collection: duplicate optime and namespace pair",
                     "dropPendingNamespace"_attr = dropPendingNamespace,
                     "dropOpTime"_attr = dropOpTime);
         fassertFailedNoTrace(40448);
@@ -141,9 +142,10 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
         if (it == upperBound) {
             LOGV2_WARNING(21154,
                           "Cannot find drop-pending namespace at OpTime {opTime} for collection "
-                          "{collectionNamespace} to roll back.",
+                          "{namespace} to roll back.",
+                          "Cannot find drop-pending namespace to roll back",
                           "opTime"_attr = opTime,
-                          "collectionNamespace"_attr = collectionNamespace);
+                          "namespace"_attr = collectionNamespace);
             return false;
         }
 
@@ -151,11 +153,13 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
     }
 
     LOGV2(21152,
-          "Rolling back collection drop for {pendingNs} with drop OpTime {dropOpTime} to namespace "
-          "{collectionNamespace}",
-          "pendingNs"_attr = pendingNss,
+          "Rolling back collection drop for {pendingNamespace} with drop OpTime {dropOpTime} to "
+          "namespace "
+          "{namespace}",
+          "Rolling back collection drop",
+          "pendingNamespace"_attr = pendingNss,
           "dropOpTime"_attr = opTime,
-          "collectionNamespace"_attr = collectionNamespace);
+          "namespace"_attr = collectionNamespace);
 
     return true;
 }
@@ -185,11 +189,12 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
             const auto& dropOpTime = opTimeAndNamespace.first;
             const auto& nss = opTimeAndNamespace.second;
             LOGV2(21153,
-                  "Completing collection drop for {ns} with drop optime {dropOpTime} "
-                  "(notification optime: {opTime})",
-                  "ns"_attr = nss,
+                  "Completing collection drop for {namespace} with drop optime {dropOpTime} "
+                  "(notification optime: {notificationOpTime})",
+                  "Completing collection drop",
+                  "namespace"_attr = nss,
                   "dropOpTime"_attr = dropOpTime,
-                  "opTime"_attr = opTime);
+                  "notificationOpTime"_attr = opTime);
             Status status = Status::OK();
             try {
                 // dropCollection could throw an interrupt exception, since it acquires db locks.
@@ -198,13 +203,15 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
                 status = exceptionToStatus();
             }
             if (!status.isOK()) {
-                LOGV2_WARNING(21155,
-                              "Failed to remove drop-pending collection {ns} with drop optime "
-                              "{dropOpTime} (notification optime: {opTime}): {status}",
-                              "ns"_attr = nss,
-                              "dropOpTime"_attr = dropOpTime,
-                              "opTime"_attr = opTime,
-                              "status"_attr = status);
+                LOGV2_WARNING(
+                    21155,
+                    "Failed to remove drop-pending collection {namespace} with drop optime "
+                    "{dropOpTime} (notification optime: {notificationOpTime}): {error}",
+                    "Failed to remove drop-pending collection ",
+                    "namespace"_attr = nss,
+                    "dropOpTime"_attr = dropOpTime,
+                    "notificationOpTime"_attr = opTime,
+                    "error"_attr = status);
             }
         }
     }

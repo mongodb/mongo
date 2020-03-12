@@ -93,7 +93,10 @@ public:
             return status.getStatus();
         }
 
-        LOGV2(22916, "Processing bridge command: {cmdName}", "cmdName"_attr = cmdName);
+        LOGV2(22916,
+              "Processing bridge command: {cmdName}",
+              "Processing bridge command",
+              "cmdName"_attr = cmdName);
 
         BridgeCommand* command = status.getValue();
         return command->run(cmdObj, &_settingsMutex, &_settings);
@@ -291,9 +294,10 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
                 auto status = sws.getStatus();
                 if (!status.isOK()) {
                     LOGV2_WARNING(22924,
-                                  "Unable to establish connection to {destAddr}: {status}",
-                                  "destAddr"_attr = destAddr,
-                                  "status"_attr = status);
+                                  "Unable to establish connection to {remoteAddress}: {error}",
+                                  "Unable to establish connection",
+                                  "remoteAddress"_attr = destAddr,
+                                  "error"_attr = status);
                     now = getGlobalServiceContext()->getFastClockSource()->now();
                 } else {
                     return std::move(sws.getValue());
@@ -324,10 +328,11 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         LOGV2_DEBUG(22917,
                     1,
                     "Received \"{commandName}\" command with arguments "
-                    "{arguments} from {dest}",
+                    "{arguments} from {remote}",
+                    "Received command",
                     "commandName"_attr = cmdRequest->getCommandName(),
                     "arguments"_attr = cmdRequest->body,
-                    "dest"_attr = dest);
+                    "remote"_attr = dest);
     }
 
     // Handle a message intended to configure the mongobridge and return a response.
@@ -354,8 +359,9 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         // Close the connection to 'dest'.
         case HostSettings::State::kHangUp:
             LOGV2(22918,
-                  "Rejecting connection from {dest}, end connection {source}",
-                  "dest"_attr = dest,
+                  "Rejecting connection from {remote}, end connection {source}",
+                  "Rejecting connection",
+                  "remote"_attr = dest,
                   "source"_attr = source->remote().toString());
             source->end();
             return {Message()};
@@ -367,12 +373,14 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
                     LOGV2(22919,
                           "Discarding \"{commandName}\" command with arguments "
                           "{arguments} from {hostName}",
+                          "Discarding command from host",
                           "commandName"_attr = cmdRequest->getCommandName(),
                           "arguments"_attr = cmdRequest->body,
                           "hostName"_attr = hostName);
                 } else {
                     LOGV2(22920,
                           "Discarding {operation} from {hostName}",
+                          "Discarding operation from host",
                           "operation"_attr = networkOpToString(request.operation()),
                           "hostName"_attr = hostName);
                 }
@@ -419,8 +427,9 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         // connections from 'host', then do so now.
         if (hostSettings.state == HostSettings::State::kHangUp) {
             LOGV2(22921,
-                  "Closing connection from {dest}, end connection {source}",
-                  "dest"_attr = dest,
+                  "Closing connection from {remote}, end connection {source}",
+                  "Closing connection",
+                  "remote"_attr = dest,
                   "source"_attr = source->remote());
             source->end();
             return {Message()};
