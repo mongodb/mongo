@@ -126,11 +126,13 @@ bool shouldBuildInForeground(OperationContext* opCtx,
                              const NamespaceString& indexNss,
                              repl::OplogApplication::Mode mode) {
     if (mode == OplogApplication::Mode::kRecovering) {
-        LOGV2_DEBUG(21241,
-                    3,
-                    "apply op: building background index {index} in the foreground because the "
-                    "node is in recovery",
-                    "index"_attr = index);
+        LOGV2_DEBUG(
+            21241,
+            3,
+            "apply op: building background index {index} in the foreground because the "
+            "node is in recovery",
+            "Apply op: building background index in the foreground because the node is in recovery",
+            "index"_attr = index);
         return true;
     }
 
@@ -143,6 +145,8 @@ bool shouldBuildInForeground(OperationContext* opCtx,
                     3,
                     "apply op: not building background index {index} in a background thread "
                     "because this is a primary",
+                    "Apply op: not building background index in a background thread because this "
+                    "is a primary",
                     "index"_attr = index);
         return true;
     }
@@ -267,7 +271,10 @@ void _logOpsInner(OperationContext* opCtx,
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
     if (!result.isOK()) {
-        LOGV2_FATAL(17322, "write to oplog failed: {result}", "result"_attr = result.toString());
+        LOGV2_FATAL(17322,
+                    "write to oplog failed: {error}",
+                    "Write to oplog failed",
+                    "error"_attr = result.toString());
     }
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
@@ -283,7 +290,7 @@ void _logOpsInner(OperationContext* opCtx,
 
             // Optionally hang before advancing lastApplied.
             if (MONGO_unlikely(hangBeforeLogOpAdvancesLastApplied.shouldFail())) {
-                LOGV2(21243, "hangBeforeLogOpAdvancesLastApplied fail point enabled.");
+                LOGV2(21243, "hangBeforeLogOpAdvancesLastApplied fail point enabled");
                 hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
             }
 
@@ -422,12 +429,14 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
         auto numMillis = data["waitForMillis"].numberInt();
         LOGV2(21244,
-              "Sleeping for {numMillis}ms after receiving {count} optimes from {first} to "
-              "{last}",
-              "numMillis"_attr = numMillis,
-              "count"_attr = count,
-              "first"_attr = opTimes.front(),
-              "last"_attr = opTimes.back());
+              "Sleeping for {sleepMillis}ms after receiving {numOpTimesReceived} optimes from "
+              "{firstOpTime} to "
+              "{lastOpTime}",
+              "Sleeping due to sleepBetweenInsertOpTimeGenerationAndLogOp failpoint",
+              "sleepMillis"_attr = numMillis,
+              "numOpTimesReceived"_attr = count,
+              "firstOpTime"_attr = opTimes.front(),
+              "lastOpTime"_attr = opTimes.back());
         sleepmillis(numMillis);
     });
 
@@ -479,7 +488,11 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
     ProcessInfo pi;
     if (pi.getAddrSize() == 32) {
         const auto sz = 50LL * 1024LL * 1024LL;
-        LOGV2_DEBUG(21245, 3, "32bit system; choosing {sz} bytes oplog", "sz"_attr = sz);
+        LOGV2_DEBUG(21245,
+                    3,
+                    "32bit system; choosing {oplogSizeBytes} bytes oplog",
+                    "Choosing oplog size for 32bit system",
+                    "oplogSizeBytes"_attr = sz);
         return sz;
     }
     // First choose a minimum size.
@@ -487,7 +500,11 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 #if defined(__APPLE__)
     // typically these are desktops (dev machines), so keep it smallish
     const auto sz = 192 * 1024 * 1024;
-    LOGV2_DEBUG(21246, 3, "Apple system; choosing {sz} bytes oplog", "sz"_attr = sz);
+    LOGV2_DEBUG(21246,
+                3,
+                "Apple system; choosing {oplogSizeBytes} bytes oplog",
+                "Choosing oplog size for Apple system",
+                "oplogSizeBytes"_attr = sz);
     return sz;
 #else
     long long lowerBound = 0;
@@ -496,22 +513,25 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
         // in memory: 50MB minimum size
         lowerBound = 50LL * 1024 * 1024;
         bytes = pi.getMemSizeMB() * 1024 * 1024;
-        LOGV2_DEBUG(
-            21247,
-            3,
-            "Ephemeral storage system; lowerBound: {lowerBound} bytes, {bytes} bytes total memory",
-            "lowerBound"_attr = lowerBound,
-            "bytes"_attr = bytes);
+        LOGV2_DEBUG(21247,
+                    3,
+                    "Ephemeral storage system; lowerBound: {lowerBoundBytes} bytes, "
+                    "{totalMemoryBytes} bytes total memory",
+                    "Ephemeral storage system",
+                    "lowerBoundBytes"_attr = lowerBound,
+                    "totalMemoryBytes"_attr = bytes);
     } else {
         // disk: 990MB minimum size
         lowerBound = 990LL * 1024 * 1024;
         bytes = File::freeSpace(storageGlobalParams.dbpath);  //-1 if call not supported.
         LOGV2_DEBUG(21248,
                     3,
-                    "Disk storage system; lowerBound: {lowerBound} bytes, {bytes} bytes free space "
+                    "Disk storage system; lowerBound: {lowerBoundBytes} bytes, {freeSpaceBytes} "
+                    "bytes free space "
                     "on device",
-                    "lowerBound"_attr = lowerBound,
-                    "bytes"_attr = bytes);
+                    "Disk storage system",
+                    "lowerBoundBytes"_attr = lowerBound,
+                    "freeSpaceBytes"_attr = bytes);
     }
     long long fivePct = static_cast<long long>(bytes * 0.05);
     auto sz = std::max(fivePct, lowerBound);
@@ -545,11 +565,14 @@ void createOplog(OperationContext* opCtx,
             int o = (int)(oplogOpts.cappedSize / (1024 * 1024));
             int n = (int)(replSettings.getOplogSizeBytes() / (1024 * 1024));
             if (n != o) {
-                stringstream ss;
-                ss << "cmdline oplogsize (" << n << ") different than existing (" << o
-                   << ") see: http://dochub.mongodb.org/core/increase-oplog";
-                LOGV2(21249, "{msg}", "msg"_attr = ss.str());
-                uasserted(13257, ss.str());
+                static constexpr char message[] =
+                    "Command line oplog size different than existing. See "
+                    "http://dochub.mongodb.org/core/increase-oplog";
+                LOGV2(
+                    21249, message, "commandLineOplogSize"_attr = n, "existingOplogSize"_attr = o);
+                uasserted(13257,
+                          str::stream() << message << ". Command line oplog size: " << n
+                                        << ", existing oplog size: " << o);
             }
         }
         acquireOplogCollectionForLogging(opCtx);
@@ -561,10 +584,10 @@ void createOplog(OperationContext* opCtx,
     /* create an oplog collection, if it doesn't yet exist. */
     const auto sz = getNewOplogSizeBytes(opCtx, replSettings);
 
-    LOGV2(21250, "******");
     LOGV2(21251,
-          "creating replication oplog of size: {size}MB...",
-          "size"_attr = (int)(sz / (1024 * 1024)));
+          "creating replication oplog of size: {oplogSizeMegabytes}MB...",
+          "Creating replication oplog",
+          "oplogSizeMB"_attr = (int)(sz / (1024 * 1024)));
 
     CollectionOptions options;
     options.capped = true;
@@ -583,8 +606,6 @@ void createOplog(OperationContext* opCtx,
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
-
-    LOGV2(21252, "******");
 }
 
 void createOplog(OperationContext* opCtx) {
@@ -803,10 +824,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto nss = extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd);
           if (nss.isDropPendingNamespace()) {
               LOGV2(21253,
-                    "applyCommand: {ns} : collection is already in a drop-pending state: ignoring "
-                    "collection drop: {cmd}",
-                    "ns"_attr = nss,
-                    "cmd"_attr = redact(cmd));
+                    "applyCommand: {namespace} : collection is already in a drop-pending state: "
+                    "ignoring collection drop: {command}",
+                    "applyCommand: collection is already in a drop-pending state, ignoring "
+                    "collection drop",
+                    "namespace"_attr = nss,
+                    "command"_attr = redact(cmd));
               return Status::OK();
           }
           // Parse optime from oplog entry unless we are applying this command in standalone or on a
@@ -945,9 +968,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
     LOGV2_DEBUG(21254,
                 3,
                 "applying op (or grouped inserts): {op}, oplog application mode: "
-                "{mode}",
+                "{oplogApplicationMode}",
+                "Applying op (or grouped inserts)",
                 "op"_attr = redact(opOrGroupedInserts.toBSON()),
-                "mode"_attr = OplogApplication::modeToString(mode));
+                "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated. Atomic applyOps command is an exception, which runs
@@ -1250,10 +1274,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     if (ur.modifiers) {
                         if (updateCriteria.nFields() == 1) {
                             // was a simple { _id : ... } update criteria
-                            string msg = str::stream()
-                                << "failed to apply update: " << redact(op.toBSON());
-                            LOGV2_ERROR(21258, "{msg}", "msg"_attr = msg);
-                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                            static constexpr char msg[] = "Failed to apply update";
+                            LOGV2_ERROR(21258, msg, "op"_attr = redact(op.toBSON()));
+                            return Status(ErrorCodes::UpdateOperationFailed,
+                                          str::stream() << msg << ": " << redact(op.toBSON()));
                         }
 
                         // Need to check to see if it isn't present so we can exit early with a
@@ -1267,10 +1291,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             // capped collections won't have an _id index
                             (!indexCatalog->haveIdIndex(opCtx) &&
                              Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
-                            string msg = str::stream()
-                                << "couldn't find doc: " << redact(op.toBSON());
-                            LOGV2_ERROR(21259, "{msg}", "msg"_attr = msg);
-                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                            static constexpr char msg[] = "Couldn't find document";
+                            LOGV2_ERROR(21259, msg, "op"_attr = redact(op.toBSON()));
+                            return Status(ErrorCodes::UpdateOperationFailed,
+                                          str::stream() << msg << ": " << redact(op.toBSON()));
                         }
 
                         // Otherwise, it's present; zero objects were updated because of additional
@@ -1280,10 +1304,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // (because we are idempotent), if a regular non-mod update fails the item
                         // is (presumably) missing.
                         if (!upsert) {
-                            string msg = str::stream()
-                                << "update of non-mod failed: " << redact(op.toBSON());
-                            LOGV2_ERROR(21260, "{msg}", "msg"_attr = msg);
-                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                            static constexpr char msg[] = "Update of non-mod failed";
+                            LOGV2_ERROR(21260, msg, "op"_attr = redact(op.toBSON()));
+                            return Status(ErrorCodes::UpdateOperationFailed,
+                                          str::stream() << msg << ": " << redact(op.toBSON()));
                         }
                     }
                 }
@@ -1353,10 +1377,11 @@ Status applyCommand_inlock(OperationContext* opCtx,
                            OplogApplication::Mode mode) {
     LOGV2_DEBUG(21255,
                 3,
-                "applying command op: {entry}, oplog application mode: "
-                "{mode}",
-                "entry"_attr = redact(entry.toBSON()),
-                "mode"_attr = OplogApplication::modeToString(mode));
+                "applying command op: {oplogEntry}, oplog application mode: "
+                "{oplogApplicationMode}",
+                "Applying command op",
+                "oplogEntry"_attr = redact(entry.toBSON()),
+                "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
 
     // Only commands are processed here.
     invariant(entry.getOpType() == OpTypeEnum::kCommand);
@@ -1484,9 +1509,11 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 LOGV2_DEBUG(51774,
                             1,
                             "Acceptable error during oplog application: background operation in "
-                            "progress for DB '{db}' from oplog entry {entry}",
+                            "progress for DB '{db}' from oplog entry {oplogEntry}",
+                            "Acceptable error during oplog application: background operation in "
+                            "progress for database",
                             "db"_attr = nss.db(),
-                            "entry"_attr = redact(entry.toBSON()));
+                            "oplogEntry"_attr = redact(entry.toBSON()));
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -1500,11 +1527,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString();
                 auto swUUID = entry.getUuid();
                 if (!swUUID) {
-                    LOGV2_ERROR(
-                        21261,
-                        "Failed command {o} on {ns}during oplog application. Expected a UUID.",
-                        "o"_attr = redact(o),
-                        "ns"_attr = ns);
+                    LOGV2_ERROR(21261,
+                                "Failed command {command} on {namespace} during oplog application. "
+                                "Expected a UUID.",
+                                "Failed command during oplog application. Expected a UUID",
+                                "command"_attr = redact(o),
+                                "namespace"_attr = ns);
                 }
                 BackgroundOperation::awaitNoBgOpInProgForNs(ns);
                 IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
@@ -1516,29 +1544,31 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 LOGV2_DEBUG(51775,
                             1,
                             "Acceptable error during oplog application: background operation in "
-                            "progress for ns '{ns}' from oplog entry {entry}",
-                            "ns"_attr = ns,
-                            "entry"_attr = redact(entry.toBSON()));
+                            "progress for ns '{namespace}' from oplog entry {oplogEntry}",
+                            "Acceptable error during oplog application: background operation in "
+                            "progress for namespace",
+                            "namespace"_attr = ns,
+                            "oplogEntry"_attr = redact(entry.toBSON()));
                 break;
             }
             default: {
                 if (!curOpToApply.acceptableErrors.count(status.code())) {
                     LOGV2_ERROR(21262,
-                                "Failed command {o} on {db} with status {status} during oplog "
+                                "Failed command {command} on {db} with status {error} during oplog "
                                 "application",
-                                "o"_attr = redact(o),
+                                "Failed command during oplog application",
+                                "command"_attr = redact(o),
                                 "db"_attr = nss.db(),
-                                "status"_attr = status);
+                                "error"_attr = status);
                     return status;
                 }
 
                 LOGV2_DEBUG(51776,
                             1,
-                            "Acceptable error during oplog application on db '{db}' with status "
-                            "'{status}' from oplog entry {entry}",
+                            "Acceptable error during oplog application",
                             "db"_attr = nss.db(),
-                            "status"_attr = status,
-                            "entry"_attr = redact(entry.toBSON()));
+                            "error"_attr = status,
+                            "oplogEntry"_attr = redact(entry.toBSON()));
             }
             // fallthrough
             case ErrorCodes::OK:

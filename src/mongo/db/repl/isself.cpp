@@ -120,9 +120,10 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
     if (err) {
         LOGV2_WARNING(21207,
-                      "getaddrinfo(\"{host}\") failed: {err}",
+                      "getaddrinfo(\"{host}\") failed: {error}",
+                      "getaddrinfo() failed",
                       "host"_attr = iporhost,
-                      "err"_attr = stringifyError(err));
+                      "error"_attr = stringifyError(err));
         return out;
     }
 
@@ -136,8 +137,10 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
             err = getnameinfo(
                 addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, nullptr, 0, NI_NUMERICHOST);
             if (err) {
-                LOGV2_WARNING(
-                    21208, "getnameinfo() failed: {err}", "err"_attr = stringifyError(err));
+                LOGV2_WARNING(21208,
+                              "getnameinfo() failed: {error}",
+                              "getnameinfo() failed",
+                              "error"_attr = stringifyError(err));
                 continue;
             }
             out.push_back(host);
@@ -145,12 +148,12 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
     }
 
     if (shouldLog(logv2::LogSeverity::Debug(2))) {
-        StringBuilder builder;
-        builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
-        for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
-            builder << " [ " << *o << "]";
-        }
-        LOGV2_DEBUG(21205, 2, "{msg}", "msg"_attr = builder.str());
+        LOGV2_DEBUG(21205,
+                    2,
+                    "getAddrsForHost()",
+                    "host"_attr = iporhost,
+                    "port"_attr = port,
+                    "result"_attr = out);
     }
 
     return out;
@@ -214,9 +217,10 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
         return me;
     } catch (const std::exception& e) {
         LOGV2_WARNING(21209,
-                      "couldn't check isSelf ({hostAndPort}) {exception}",
+                      "couldn't check isSelf ({hostAndPort}) {error}",
+                      "Couldn't check isSelf",
                       "hostAndPort"_attr = hostAndPort,
-                      "exception"_attr = e.what());
+                      "error"_attr = e.what());
     }
 
     return false;
@@ -235,7 +239,10 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 
     int err = getifaddrs(&addrs);
     if (err) {
-        LOGV2_WARNING(21210, "getifaddrs failure: {err}", "err"_attr = errnoWithDescription(err));
+        LOGV2_WARNING(21210,
+                      "getifaddrs failure: {error}",
+                      "getifaddrs() failed",
+                      "error"_attr = errnoWithDescription(err));
         return out;
     }
     ON_BLOCK_EXIT([&] { freeifaddrs(addrs); });
@@ -257,7 +264,10 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 0,
                 NI_NUMERICHOST);
             if (err) {
-                LOGV2_WARNING(21211, "getnameinfo() failed: {err}", "err"_attr = gai_strerror(err));
+                LOGV2_WARNING(21211,
+                              "getnameinfo() failed: {error}",
+                              "getnameinfo() failed",
+                              "error"_attr = gai_strerror(err));
                 continue;
             }
             out.push_back(host);
@@ -294,8 +304,10 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
     }
 
     if (err != NO_ERROR) {
-        LOGV2_WARNING(
-            21212, "GetAdaptersAddresses() failed: {err}", "err"_attr = errnoWithDescription(err));
+        LOGV2_WARNING(21212,
+                      "GetAdaptersAddresses() failed: {error}",
+                      "GetAdaptersAddresses() failed",
+                      "error"_attr = errnoWithDescription(err));
         return out;
     }
 
@@ -314,8 +326,9 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                     AF_INET, &(sock->sin_addr), addrstr, INET_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21213,
-                                  "inet_ntop failed during IPv4 address conversion: {message}",
-                                  "message"_attr = ec.message());
+                                  "inet_ntop failed during IPv4 address conversion: {error}",
+                                  "inet_ntop failed during IPv4 address conversion",
+                                  "error"_attr = ec.message());
                     continue;
                 }
                 out.push_back(addrstr);
@@ -328,8 +341,9 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                     AF_INET6, &(sock->sin6_addr), addrstr, INET6_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21214,
-                                  "inet_ntop failed during IPv6 address conversion: {message}",
-                                  "message"_attr = ec.message());
+                                  "inet_ntop failed during IPv6 address conversion: {error}",
+                                  "inet_ntop failed during IPv6 address conversion",
+                                  "error"_attr = ec.message());
                     continue;
                 }
                 out.push_back(addrstr);
@@ -340,12 +354,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 #endif  // defined(_WIN32)
 
     if (shouldLog(logv2::LogSeverity::Debug(2))) {
-        StringBuilder builder;
-        builder << "getBoundAddrs():";
-        for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
-            builder << " [ " << *o << "]";
-        }
-        LOGV2_DEBUG(21206, 2, "{msg}", "msg"_attr = builder.str());
+        LOGV2_DEBUG(21206, 2, "getBoundAddrs()", "result"_attr = out);
     }
     return out;
 }

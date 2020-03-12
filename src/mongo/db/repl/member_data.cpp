@@ -71,9 +71,10 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
     if (_lastResponse.getState() != hbResponse.getState()) {
         LOGV2_OPTIONS(21215,
                       {logv2::LogTag::kRS},
-                      "Member {hostAndPort} is now in state {state}",
+                      "Member {hostAndPort} is now in state {newState}",
+                      "Member is in new state",
                       "hostAndPort"_attr = _hostAndPort.toString(),
-                      "state"_attr = hbResponse.getState().toString());
+                      "newState"_attr = hbResponse.getState().toString());
     }
 
     bool opTimeAdvanced =
@@ -105,6 +106,7 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
         LOGV2_OPTIONS(21216,
                       {logv2::LogTag::kRS},
                       "Member {hostAndPort} is now in state RS_DOWN - {heartbeatMessage}",
+                      "Member is now in state RS_DOWN",
                       "hostAndPort"_attr = _hostAndPort.toString(),
                       "heartbeatMessage"_attr = redact(heartbeatMessage));
     }
@@ -132,6 +134,7 @@ void MemberData::setAuthIssue(Date_t now) {
             21217,
             {logv2::LogTag::kRS},
             "Member {hostAndPort} is now in state RS_UNKNOWN due to authentication issue.",
+            "Member is now in state RS_UNKNOWN due to authentication issue",
             "hostAndPort"_attr = _hostAndPort.toString());
     }
 
@@ -162,6 +165,7 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
               "({lastAppliedOpTime}. This is likely due to a "
               "rollback. memberid: {memberId}{hostAndPort} previous durable progress: "
               "{lastDurableOpTime}",
+              "Durable progress is ahead of the applied progress. This is likely due to a rollback",
               "durableOpTime"_attr = opTime.opTime,
               "lastAppliedOpTime"_attr = _lastAppliedOpTime,
               "memberId"_attr = _memberId,

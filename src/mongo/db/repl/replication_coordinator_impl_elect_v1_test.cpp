@@ -273,7 +273,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
     ASSERT_EQ(1, lastVote.getValue().getTerm());
 
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("election succeeded"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
 
     // Check that the numElectionTimeoutsCalled and the numElectionTimeoutsSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -327,7 +327,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
     ASSERT_EQ(1, lastVote.getValue().getTerm());
 
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("election succeeded"));
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun) {
@@ -400,7 +400,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
-                      "not running for primary, we received insufficient votes"));
+                      "Not running for primary, we received insufficient votes"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
     // election and will not become primary.
@@ -471,7 +471,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
-                      "not running for primary, we have been superseded already"));
+                      "Not running for primary, we have been superseded already"));
 }
 
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
@@ -650,7 +650,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("not becoming primary, we received insufficient votes"));
+        countTextFormatLogLinesContaining("Not becoming primary, we received insufficient votes"));
 }
 
 TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
@@ -747,7 +747,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("not becoming primary, we have been superseded already"));
+        countTextFormatLogLinesContaining("Not becoming primary, we have been superseded already"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the actual
     // election and will not become primary.
@@ -790,7 +790,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
-                      "not running for primary, we have been superseded already during dry run"));
+                      "Not running for primary, we have been superseded already during dry run"));
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
@@ -845,7 +845,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("not becoming primary, we have been superseded already"));
+        countTextFormatLogLinesContaining("Not becoming primary, we have been superseded already"));
 }
 
 class TakeoverTest : public ReplCoordTest {
@@ -937,7 +937,7 @@ public:
                 1,
                 countTextFormatLogLinesContaining("Starting an election for a priority takeover"));
         }
-        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("election succeeded"));
+        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
     }
 
 private:
@@ -1180,7 +1180,7 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
                       "I can take over the primary because I have a higher priority, "
-                      "the highest priority in the replica set, and fresher data."));
+                      "the highest priority in the replica set, and fresher data"));
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
@@ -1623,7 +1623,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     // Make sure an election wasn't called for and that we are still secondary.
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
-                      "not running for primary, the current primary responded no in the dry run"));
+                      "Not running for primary, the current primary responded no in the dry run"));
     ASSERT(replCoord->getMemberState().secondary());
 }
 
@@ -1923,9 +1923,12 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("Not standing for election because member is not "
-                                          "caught up enough to the most up-to-date member to "
-                                          "call for priority takeover"));
+        countBSONFormatLogLinesIsSubset(
+            BSON("attr" << BSON(
+                     "reason"
+                     << "Not standing for election because member is not "
+                        "caught up enough to the most up-to-date member to "
+                        "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover
@@ -2008,9 +2011,12 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_EQUALS(
         1,
-        countTextFormatLogLinesContaining("Not standing for election because member is not "
-                                          "caught up enough to the most up-to-date member to "
-                                          "call for priority takeover"));
+        countBSONFormatLogLinesIsSubset(
+            BSON("attr" << BSON(
+                     "reason"
+                     << "Not standing for election because member is not "
+                        "caught up enough to the most up-to-date member to "
+                        "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover

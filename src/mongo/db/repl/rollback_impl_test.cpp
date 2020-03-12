@@ -873,8 +873,7 @@ TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
 
 DEATH_TEST_REGEX_F(RollbackImplTest,
                    RollbackTriggersFatalAssertionOnFailingToTransitionFromRollbackToSecondary,
-                   "Failed to transition into .*; expected to be in state .*; found self in "
-                   ".*.*SECONDARY.*ROLLBACK.*ROLLBACK") {
+                   "Failed to perform replica set state transition") {
     _coordinator->failSettingFollowerMode(MemberState::RS_SECONDARY, ErrorCodes::IllegalOperation);
 
     auto op = makeOpAndRecordId(1);

@@ -140,7 +140,7 @@ let expectedLogFor3and4 =
 if (isJsonLogNoConn()) {
     // Double escape the backslash as eval will do unescaping
     expectedLogFor3and4 =
-        '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`';
+        '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`';
 }
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
@@ -150,7 +150,7 @@ if (isJsonLogNoConn()) {
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
     if (isJsonLogNoConn()) {
         expectedLogFor3and4 =
-            '`Initial Sync retrying {cloner} stage {stage} due to {lastError}","attr":{"cloner":"CollectionCloner","stage":"query","lastError":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}`';
+            '`Initial Sync retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}`';
     } else {
         expectedLogFor3and4 =
             "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
@@ -185,7 +185,7 @@ runDropTest({
     waitForDrop: true,
     // Double escape the backslash as eval will do unescaping
     expectedLog: isJsonLogNoConn()
-        ? '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
+        ? '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
         : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`"
 });
 
@@ -197,7 +197,7 @@ runDropTest({
     waitForDrop: true,
     // Double escape the backslash as eval will do unescaping
     expectedLog: isJsonLogNoConn()
-        ? '`CollectionCloner ns: \'{ns}\' uuid: UUID(\\\\"{uuid}\\\\") stopped because collection was dropped on source.","attr":{"ns":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
+        ? '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
         : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`",
     createNew: true
 });

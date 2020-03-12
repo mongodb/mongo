@@ -90,11 +90,16 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
             LOGV2_DEBUG(21146,
                         1,
-                        "Skipping 'system' collection: {collection}",
-                        "collection"_attr = collectionNamespace.ns());
+                        "Skipping 'system' collection: {namespace}",
+                        "Database cloner skipping 'system' collection",
+                        "namespace"_attr = collectionNamespace.ns());
             continue;
         }
-        LOGV2_DEBUG(21147, 2, "Allowing cloning of collectionInfo: {info}", "info"_attr = info);
+        LOGV2_DEBUG(21147,
+                    2,
+                    "Allowing cloning of collectionInfo: {info}",
+                    "Allowing cloning of collectionInfo",
+                    "info"_attr = info);
 
         bool isDuplicate = seen.insert(result.getName().toString()).second;
         uassert(51005,
@@ -140,13 +145,17 @@ void DatabaseCloner::postStage() {
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
-            LOGV2_DEBUG(
-                21148, 1, "collection clone finished: {namespace}", "namespace"_attr = sourceNss);
+            LOGV2_DEBUG(21148,
+                        1,
+                        "collection clone finished: {namespace}",
+                        "Collection clone finished",
+                        "namespace"_attr = sourceNss);
         } else {
             LOGV2_ERROR(21149,
-                        "collection clone for '{namespace}' failed due to {status}",
+                        "collection clone for '{namespace}' failed due to {error}",
+                        "Collection clone failed",
                         "namespace"_attr = sourceNss,
-                        "status"_attr = collStatus.toString());
+                        "error"_attr = collStatus.toString());
             setInitialSyncFailedStatus(
                 {ErrorCodes::InitialSyncFailure,
                  collStatus

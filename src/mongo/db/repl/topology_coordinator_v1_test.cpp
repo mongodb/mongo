@@ -1958,9 +1958,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
     ASSERT(result.reason().find("repl set names do not match"))
         << "Actual string was \"" << result.reason() << '"';
-    ASSERT_EQUALS(1,
-                  countLogLinesContaining("replSet set names do not match, ours: rs0; remote "
-                                          "node's: rs1"));
+    ASSERT_EQUALS(1, countLogLinesContaining("replSet set names do not match"));
     // only protocolVersion should be set in this failure case
     ASSERT_EQUALS("", response.getReplicaSetName());
 }
@@ -6656,7 +6654,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
     ASSERT_NO_ACTION(action.getAction());
     ASSERT_EQUALS(1,
                   countLogLinesContaining("Config from heartbeat response was "
-                                          "same as ours."));
+                                          "same as ours"));
 }
 
 TEST_F(HeartbeatResponseHighVerbosityTestV1,
@@ -6679,7 +6677,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
         StatusWith<ReplSetHeartbeatResponse>(memberMissingResponse));
     stopCapturingLogMessages();
     ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(1, countLogLinesContaining("Could not find host5:27017 in current config"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Could not find target in current config"));
 }
 
 }  // namespace

@@ -125,7 +125,7 @@ Status finishAndLogApply(OperationContext* opCtx,
 
             attrs.add("duration", Milliseconds(opDuration));
 
-            LOGV2(51801, "applied op", attrs);
+            LOGV2(51801, "Applied op", attrs);
         }
     }
     return finalStatus;
@@ -436,7 +436,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
             LOGV2(21229,
                   "Oplog Applier - rsSyncApplyStop fail point enabled. Blocking until fail "
-                  "point is disabled.");
+                  "point is disabled");
             rsSyncApplyStop.pauseWhileSet(&opCtx);
         }
 
@@ -603,7 +603,11 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                                       std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
 
-    LOGV2_DEBUG(21230, 2, "replication batch size is {size}", "size"_attr = ops.size());
+    LOGV2_DEBUG(21230,
+                2,
+                "replication batch size is {size}",
+                "Replication batch size",
+                "size"_attr = ops.size());
 
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
     // entries from the oplog until we finish writing.
@@ -656,7 +660,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         if (MONGO_unlikely(pauseBatchApplicationAfterWritingOplogEntries.shouldFail())) {
             LOGV2(21231,
                   "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. Blocking "
-                  "until fail point is disabled.");
+                  "until fail point is disabled");
             pauseBatchApplicationAfterWritingOplogEntries.pauseWhileSet(opCtx);
         }
 
@@ -704,14 +708,16 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                     LOGV2_FATAL_CONTINUE(
                         21235,
                         "Failed to apply batch of operations. Number of operations in "
-                        "batch: {size}. First operation: {first}. Last operation: "
-                        "{last}. Oplog application failed in writer thread "
-                        "{thread}: {status}",
-                        "size"_attr = ops.size(),
-                        "first"_attr = redact(ops.front().toBSON()),
-                        "last"_attr = redact(ops.back().toBSON()),
-                        "thread"_attr = std::distance(statusVector.cbegin(), it),
-                        "status"_attr = redact(status));
+                        "batch: {numOperationsInBatch}. First operation: {firstOperation}. "
+                        "Last operation: "
+                        "{lastOperation}. Oplog application failed in writer thread "
+                        "{failedWriterThread}: {error}",
+                        "Failed to apply batch of operations",
+                        "numOperationsInBatch"_attr = ops.size(),
+                        "firstOperation"_attr = redact(ops.front().toBSON()),
+                        "lastOperation"_attr = redact(ops.back().toBSON()),
+                        "failedWriterThread"_attr = std::distance(statusVector.cbegin(), it),
+                        "error"_attr = redact(status));
                     return status;
                 }
             }
@@ -730,7 +736,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
         LOGV2(21232,
               "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
-              "point is disabled.");
+              "point is disabled");
         while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
             if (inShutdown()) {
                 LOGV2_FATAL_NOTRACE(
@@ -916,7 +922,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
         LOGV2(21233,
               "applyOplogEntryOrGroupedInserts - fail point "
               "hangAfterRecordingOpApplicationStartTime "
-              "enabled. Blocking until fail point is disabled. ");
+              "enabled. Blocking until fail point is disabled");
         hangAfterRecordingOpApplicationStartTime.pauseWhileSet();
     }
 
@@ -1056,9 +1062,10 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                     }
 
                     LOGV2_FATAL_CONTINUE(21237,
-                                         "Error applying operation ({entry}): {status}",
-                                         "entry"_attr = redact(entry.toBSON()),
-                                         "status"_attr = causedBy(redact(status)));
+                                         "Error applying operation ({oplogEntry}): {error}",
+                                         "Error applying operation",
+                                         "oplogEntry"_attr = redact(entry.toBSON()),
+                                         "error"_attr = causedBy(redact(status)));
                     return status;
                 }
             } catch (const DBException& e) {
@@ -1070,9 +1077,10 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                 }
 
                 LOGV2_FATAL_CONTINUE(21238,
-                                     "writer worker caught exception: {e} on: {entry}",
-                                     "e"_attr = redact(e),
-                                     "entry"_attr = redact(entry.toBSON()));
+                                     "writer worker caught exception: {error} on: {oplogEntry}",
+                                     "Writer worker caught exception",
+                                     "error"_attr = redact(e),
+                                     "oplogEntry"_attr = redact(entry.toBSON()));
                 return e.toStatus();
             }
         }

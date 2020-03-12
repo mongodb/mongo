@@ -193,8 +193,9 @@ Status Reporter::trigger() {
         LOGV2_DEBUG(
             21585,
             2,
-            "Reporter failed to schedule callback to prepare and send update command: {status}",
-            "status"_attr = _status);
+            "Reporter failed to schedule callback to prepare and send update command: {error}",
+            "Reporter failed to schedule callback to prepare and send update command",
+            "error"_attr = _status);
         return _status;
     }
 
@@ -217,8 +218,9 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
     if (!prepareResult.isOK()) {
         LOGV2_DEBUG(21586,
                     2,
-                    "Reporter failed to prepare update command with status: {status}",
-                    "status"_attr = prepareResult.getStatus());
+                    "Reporter failed to prepare update command with status: {error}",
+                    "Reporter failed to prepare update command",
+                    "error"_attr = prepareResult.getStatus());
         _status = prepareResult.getStatus();
         return _status;
     }
@@ -230,6 +232,7 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeo
     LOGV2_DEBUG(21587,
                 2,
                 "Reporter sending oplog progress to upstream updater {target}: {commandRequest}",
+                "Reporter sending oplog progress to upstream updater",
                 "target"_attr = _target,
                 "commandRequest"_attr = commandRequest);
 
@@ -241,8 +244,11 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeo
 
     _status = scheduleResult.getStatus();
     if (!_status.isOK()) {
-        LOGV2_DEBUG(
-            21588, 2, "Reporter failed to schedule with status: {status}", "status"_attr = _status);
+        LOGV2_DEBUG(21588,
+                    2,
+                    "Reporter failed to schedule with status: {error}",
+                    "Reporter failed to schedule",
+                    "error"_attr = _status);
         if (_status != ErrorCodes::ShutdownInProgress) {
             fassert(34434, _status);
         }
@@ -281,10 +287,12 @@ void Reporter::_processResponseCallback(
         // sync target.
         if (_status == ErrorCodes::InvalidReplicaSetConfig &&
             _isTargetConfigNewerThanRequest(commandResult, rcbd.request.cmdObj)) {
-            LOGV2_DEBUG(21589,
-                        1,
-                        "Reporter found newer configuration on sync source: {target}. Retrying.",
-                        "target"_attr = _target);
+            LOGV2_DEBUG(
+                21589,
+                1,
+                "Reporter found newer configuration on sync source: {syncSource}. Retrying.",
+                "Reporter found newer configuration on sync source. Retrying",
+                "syncSource"_attr = _target);
             _status = Status::OK();
             // Do not resend update command immediately.
             _isWaitingToSendReporter = false;

@@ -117,8 +117,9 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
 
     LOGV2_FOR_HEARTBEATS(4615670,
                          2,
-                         "Sending heartbeat (requestId: {request_id}) to {target} {heartbeatObj}",
-                         "request_id"_attr = request.id,
+                         "Sending heartbeat (requestId: {requestId}) to {target} {heartbeatObj}",
+                         "Sending heartbeat",
+                         "requestId"_attr = request.id,
                          "target"_attr = target,
                          "heartbeatObj"_attr = heartbeatObj);
     _trackHeartbeatHandle_inlock(_replExecutor->scheduleRemoteCommand(request, callback));
@@ -129,9 +130,10 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
                                                                    Date_t when) {
     LOGV2_FOR_HEARTBEATS(4615618,
                          2,
-                         "Scheduling heartbeat to {target} at {dateToISOStringUTC_when}",
+                         "Scheduling heartbeat to {target} at {when}",
+                         "Scheduling heartbeat",
                          "target"_attr = target,
-                         "dateToISOStringUTC_when"_attr = dateToISOStringUTC(when));
+                         "when"_attr = when);
     _trackHeartbeatHandle_inlock(_replExecutor->scheduleWorkAt(
         when, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
             _doMemberHeartbeat(cbData, target, targetIndex);
@@ -153,9 +155,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     if (responseStatus == ErrorCodes::CallbackCanceled) {
         LOGV2_FOR_HEARTBEATS(4615619,
                              2,
-                             "Received response to heartbeat (requestId: {cbData_request_id}) from "
+                             "Received response to heartbeat (requestId: {requestId}) from "
                              "{target} but the heartbeat was cancelled.",
-                             "cbData_request_id"_attr = cbData.request.id,
+                             "Received response to heartbeat, but the heartbeat was cancelled",
+                             "requestId"_attr = cbData.request.id,
                              "target"_attr = target);
         return;
     }
@@ -171,10 +174,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         LOGV2_FOR_HEARTBEATS(
             4615620,
             2,
-            "Received response to heartbeat (requestId: {cbData_request_id}) from {target}, {resp}",
-            "cbData_request_id"_attr = cbData.request.id,
+            "Received response to heartbeat (requestId: {requestId}) from {target}, {response}",
+            "Received response to heartbeat",
+            "requestId"_attr = cbData.request.id,
             "target"_attr = target,
-            "resp"_attr = resp);
+            "response"_attr = resp);
 
         // Reject heartbeat responses (and metadata) from nodes with mismatched replica set IDs.
         // It is problematic to perform this check in the heartbeat reconfiguring logic because it
@@ -230,11 +234,12 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     } else {
         LOGV2_FOR_HEARTBEATS(4615621,
                              2,
-                             "Error in heartbeat (requestId: {cbData_request_id}) to {target}, "
-                             "response status: {responseStatus}",
-                             "cbData_request_id"_attr = cbData.request.id,
+                             "Error in heartbeat (requestId: {requestId}) to {target}, "
+                             "response status: {error}",
+                             "Error in heartbeat",
+                             "requestId"_attr = cbData.request.id,
                              "target"_attr = target,
-                             "responseStatus"_attr = responseStatus);
+                             "error"_attr = responseStatus);
 
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
     }
@@ -317,8 +322,9 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
                 _priorityTakeoverWhen = _replExecutor->now() + priorityTakeoverDelay + randomOffset;
                 LOGV2_FOR_ELECTION(4615601,
                                    0,
-                                   "Scheduling priority takeover at {priorityTakeoverWhen}",
-                                   "priorityTakeoverWhen"_attr = _priorityTakeoverWhen);
+                                   "Scheduling priority takeover at {when}",
+                                   "Scheduling priority takeover",
+                                   "when"_attr = _priorityTakeoverWhen);
                 _priorityTakeoverCbh = _scheduleWorkAt(
                     _priorityTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(StartElectionReasonEnum::kPriorityTakeover);
@@ -333,8 +339,9 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
                 _catchupTakeoverWhen = _replExecutor->now() + catchupTakeoverDelay;
                 LOGV2_FOR_ELECTION(4615648,
                                    0,
-                                   "Scheduling catchup takeover at {catchupTakeoverWhen}",
-                                   "catchupTakeoverWhen"_attr = _catchupTakeoverWhen);
+                                   "Scheduling catchup takeover at {when}",
+                                   "Scheduling catchup takeover",
+                                   "when"_attr = _catchupTakeoverWhen);
                 _catchupTakeoverCbh = _scheduleWorkAt(
                     _catchupTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(StartElectionReasonEnum::kCatchupTakeover);
@@ -361,13 +368,15 @@ void remoteStepdownCallback(const executor::TaskExecutor::RemoteCommandCallbackA
                     1,
                     "stepdown of primary({primary}) succeeded with response -- "
                     "{response}",
+                    "Stepdown of primary succeeded",
                     "primary"_attr = cbData.request.target,
                     "response"_attr = cbData.response.data);
     } else {
         LOGV2_WARNING(21486,
-                      "stepdown of primary({primary}) failed due to {status}",
+                      "stepdown of primary({primary}) failed due to {error}",
+                      "Stepdown of primary failed",
                       "primary"_attr = cbData.request.target,
-                      "status"_attr = cbData.response.status);
+                      "error"_attr = cbData.response.status);
     }
 }
 }  // namespace
@@ -471,11 +480,12 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     switch (_rsConfigState) {
         case kConfigUninitialized:
         case kConfigSteady:
-            LOGV2_FOR_HEARTBEATS(
-                4615622,
-                1,
-                "Received new config via heartbeat with {newConfig_getConfigVersionAndTerm}",
-                "newConfig_getConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
+            LOGV2_FOR_HEARTBEATS(4615622,
+                                 1,
+                                 "Received new config via heartbeat with {newConfigVersionAndTerm}",
+                                 "Received new config via heartbeat",
+                                 "newConfigVersionAndTerm"_attr =
+                                     newConfig.getConfigVersionAndTerm());
             break;
         case kConfigInitiating:
         case kConfigReconfiguring:
@@ -483,9 +493,11 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
             LOGV2_FOR_HEARTBEATS(
                 4615623,
                 1,
-                "Ignoring new configuration with {newConfig_getConfigVersionAndTerm} because "
+                "Ignoring new configuration with {newConfigVersionAndTerm} because "
                 "already in the midst of a configuration process.",
-                "newConfig_getConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
+                "Ignoring new configuration because we are already in the midst of a configuration "
+                "process",
+                "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
             return;
         case kConfigPreStart:
         case kConfigStartingUp:
@@ -493,6 +505,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
             LOGV2_FATAL(18807,
                         "Reconfiguration request occurred while _rsConfigState == "
                         "{_rsConfigState}; aborting.",
+                        "Aborting reconfiguration request",
                         "_rsConfigState"_attr = int(_rsConfigState));
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
@@ -502,9 +515,10 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
         LOGV2_FOR_HEARTBEATS(
             4615624,
             2,
-            "Rescheduling heartbeat reconfig to config with {newConfig_getConfigVersionAndTerm} to "
+            "Rescheduling heartbeat reconfig to config with {newConfigVersionAndTerm} to "
             "be processed after election is cancelled.",
-            "newConfig_getConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
+            "Rescheduling heartbeat reconfig to be processed after election is cancelled",
+            "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
 
         _replExecutor
             ->onEvent(electionFinishedEvent,
@@ -528,6 +542,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         LOGV2(21480,
               "The callback to persist the replica set configuration was canceled - the "
               "configuration was not persisted but was used: {newConfig}",
+              "The callback to persist the replica set configuration was canceled - the "
+              "configuration was not persisted but was used",
               "newConfig"_attr = newConfig.toBSON());
         return;
     }
@@ -555,15 +571,17 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     if (!myIndex.getStatus().isOK() && myIndex.getStatus() != ErrorCodes::NodeNotFound) {
         LOGV2_WARNING(21487,
                       "Not persisting new configuration in heartbeat response to disk because "
-                      "it is invalid: {status}",
-                      "status"_attr = myIndex.getStatus());
+                      "it is invalid: {error}",
+                      "Not persisting new configuration in heartbeat response to disk because "
+                      "it is invalid",
+                      "error"_attr = myIndex.getStatus());
     } else {
         LOGV2_FOR_HEARTBEATS(4615626,
                              2,
-                             "Config with {newConfig_getConfigVersionAndTerm} validated for "
+                             "Config with {newConfigVersionAndTerm} validated for "
                              "reconfig; persisting to disk.",
-                             "newConfig_getConfigVersionAndTerm"_attr =
-                                 newConfig.getConfigVersionAndTerm());
+                             "Config validated for reconfig; persisting to disk",
+                             "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
 
         auto opCtx = cc().makeOperationContext();
         auto status = _externalState->storeLocalConfigDocument(opCtx.get(), newConfig.toBSON());
@@ -574,8 +592,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             if (!status.isOK()) {
                 LOGV2_ERROR(21488,
                             "Ignoring new configuration in heartbeat response because we failed to"
-                            " write it to stable storage; {status}",
-                            "status"_attr = status);
+                            " write it to stable storage; {error}",
+                            "Ignoring new configuration in heartbeat response because we failed to"
+                            " write it to stable storage",
+                            "error"_attr = status);
                 invariant(_rsConfigState == kConfigHBReconfiguring);
                 if (isFirstConfig) {
                     _setConfigState_inlock(kConfigUninitialized);
@@ -600,12 +620,13 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             shouldStartDataReplication = true;
         }
 
-        LOGV2_FOR_HEARTBEATS(4615627,
-                             2,
-                             "New configuration with {newConfig_getConfigVersionAndTerm} persisted "
-                             "to local storage; installing new config in memory",
-                             "newConfig_getConfigVersionAndTerm"_attr =
-                                 newConfig.getConfigVersionAndTerm());
+        LOGV2_FOR_HEARTBEATS(
+            4615627,
+            2,
+            "New configuration with {newConfigVersionAndTerm} persisted "
+            "to local storage; installing new config in memory",
+            "New configuration persisted to local storage; installing new config in memory",
+            "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
     }
 
     _heartbeatReconfigFinish(cbd, newConfig, myIndex);
@@ -631,7 +652,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         LOGV2_FOR_HEARTBEATS(4615628,
                              0,
                              "blockHeartbeatReconfigFinish fail point enabled. Rescheduling "
-                             "_heartbeatReconfigFinish until fail point is disabled.");
+                             "_heartbeatReconfigFinish until fail point is disabled");
         _replExecutor
             ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
                              [=](const executor::TaskExecutor::CallbackArgs& cbData) {
@@ -651,8 +672,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             LOGV2_FOR_HEARTBEATS(4615629,
                                  0,
                                  "Waiting for election to complete before finishing reconfig to "
-                                 "config with {newConfig_getConfigVersionAndTerm}",
-                                 "newConfig_getConfigVersionAndTerm"_attr =
+                                 "config with {newConfigVersionAndTerm}",
+                                 "Waiting for election to complete before finishing reconfig",
+                                 "newConfigVersionAndTerm"_attr =
                                      newConfig.getConfigVersionAndTerm());
             // Wait for the election to complete and the node's Role to be set to follower.
             _replExecutor
@@ -682,7 +704,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         if (_topCoord->isSteppingDownUnconditionally()) {
             invariant(opCtx->lockState()->isRSTLExclusive());
             LOGV2(21481,
-                  "stepping down from primary, because we received a new config via heartbeat");
+                  "Stepping down from primary, because we received a new config via heartbeat");
             // We need to release the mutex before yielding locks for prepared transactions, which
             // might check out sessions, to avoid deadlocks with checked-out sessions accessing
             // this mutex.
@@ -716,20 +738,25 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             case ErrorCodes::NodeNotFound:
                 LOGV2(21482,
                       "Cannot find self in new replica set configuration; I must be removed; "
-                      "{status}",
-                      "status"_attr = myIndex.getStatus());
+                      "{error}",
+                      "Cannot find self in new replica set configuration; I must be removed",
+                      "error"_attr = myIndex.getStatus());
                 break;
             case ErrorCodes::InvalidReplicaSetConfig:
                 LOGV2_ERROR(21489,
                             "Several entries in new config represent this node; "
-                            "Removing self until an acceptable configuration arrives; {status}",
-                            "status"_attr = myIndex.getStatus());
+                            "Removing self until an acceptable configuration arrives; {error}",
+                            "Several entries in new config represent this node; "
+                            "Removing self until an acceptable configuration arrives",
+                            "error"_attr = myIndex.getStatus());
                 break;
             default:
                 LOGV2_ERROR(21490,
                             "Could not validate configuration received from remote node; "
-                            "Removing self until an acceptable configuration arrives; {status}",
-                            "status"_attr = myIndex.getStatus());
+                            "Removing self until an acceptable configuration arrives; {error}",
+                            "Could not validate configuration received from remote node; "
+                            "Removing self until an acceptable configuration arrives",
+                            "error"_attr = myIndex.getStatus());
                 break;
         }
         myIndex = StatusWith<int>(-1);
@@ -767,7 +794,7 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(
 }
 
 void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
-    LOGV2_FOR_HEARTBEATS(4615630, 2, "Cancelling all heartbeats.");
+    LOGV2_FOR_HEARTBEATS(4615630, 2, "Cancelling all heartbeats");
 
     for (const auto& handle : _heartbeatHandles) {
         _replExecutor->cancel(handle);
@@ -841,8 +868,11 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
     }
 
     auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
-    LOGV2_DEBUG(
-        21483, 3, "scheduling next check at {nextTimeout}", "nextTimeout"_attr = nextTimeout);
+    LOGV2_DEBUG(21483,
+                3,
+                "scheduling next check at {nextTimeout}",
+                "Scheduling next check",
+                "nextTimeout"_attr = nextTimeout);
 
     // It is possible we will schedule the next timeout in the past.
     // ThreadPoolTaskExecutor::_scheduleWorkAt() schedules its work immediately if it's given a
@@ -915,8 +945,9 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     if (wasActive) {
         LOGV2_FOR_ELECTION(4615649,
                            logSeverityV1toV2(cancelAndRescheduleLogLevel).toInt(),
-                           "Canceling election timeout callback at {handleElectionTimeoutWhen}",
-                           "handleElectionTimeoutWhen"_attr = _handleElectionTimeoutWhen);
+                           "Canceling election timeout callback at {when}",
+                           "Canceling election timeout callback",
+                           "when"_attr = _handleElectionTimeoutWhen);
         _replExecutor->cancel(_handleElectionTimeoutCbh);
         _handleElectionTimeoutCbh = CallbackHandle();
         _handleElectionTimeoutWhen = Date_t();
@@ -933,10 +964,14 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         LOGV2_FOR_ELECTION(4615650,
                            logSeverityV1toV2(cancelAndRescheduleLogLevel).toInt(),
                            "Rescheduling election timeout callback at {when}",
+                           "Rescheduling election timeout callback",
                            "when"_attr = when);
     } else {
-        LOGV2_FOR_ELECTION(
-            4615651, 4, "Scheduling election timeout callback at {when}", "when"_attr = when);
+        LOGV2_FOR_ELECTION(4615651,
+                           4,
+                           "Scheduling election timeout callback at {when}",
+                           "Scheduling election timeout callback",
+                           "when"_attr = when);
     }
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh =
@@ -983,37 +1018,46 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
                 LOGV2_FOR_ELECTION(
                     4615655,
                     0,
-                    "Not starting an election, since we are not electable due to: {status_reason}",
-                    "status_reason"_attr = status.reason());
+                    "Not starting an election, since we are not electable due to: {reason}",
+                    "Not starting an election, since we are not electable",
+                    "reason"_attr = status.reason());
                 break;
             case StartElectionReasonEnum::kPriorityTakeover:
                 LOGV2_FOR_ELECTION(4615656,
                                    0,
                                    "Not starting an election for a priority takeover, since we are "
-                                   "not electable due to: {status_reason}",
-                                   "status_reason"_attr = status.reason());
+                                   "not electable due to: {reason}",
+                                   "Not starting an election for a priority takeover, since we are "
+                                   "not electable",
+                                   "reason"_attr = status.reason());
                 break;
             case StartElectionReasonEnum::kStepUpRequest:
             case StartElectionReasonEnum::kStepUpRequestSkipDryRun:
                 LOGV2_FOR_ELECTION(4615657,
                                    0,
                                    "Not starting an election for a replSetStepUp request, since we "
-                                   "are not electable due to: {status_reason}",
-                                   "status_reason"_attr = status.reason());
+                                   "are not electable due to: {reason}",
+                                   "Not starting an election for a replSetStepUp request, since we "
+                                   "are not electable",
+                                   "reason"_attr = status.reason());
                 break;
             case StartElectionReasonEnum::kCatchupTakeover:
                 LOGV2_FOR_ELECTION(4615658,
                                    0,
                                    "Not starting an election for a catchup takeover, since we are "
-                                   "not electable due to: {status_reason}",
-                                   "status_reason"_attr = status.reason());
+                                   "not electable due to: {reason}",
+                                   "Not starting an election for a catchup takeover, since we are "
+                                   "not electable",
+                                   "reason"_attr = status.reason());
                 break;
             case StartElectionReasonEnum::kSingleNodePromptElection:
                 LOGV2_FOR_ELECTION(4615653,
                                    0,
                                    "Not starting an election for a single node replica set prompt "
-                                   "election, since we are not electable due to: {status_reason}",
-                                   "status_reason"_attr = status.reason());
+                                   "election, since we are not electable due to: {reason}",
+                                   "Not starting an election for a single node replica set prompt "
+                                   "election, since we are not electable",
+                                   "reason"_attr = status.reason());
                 break;
             default:
                 MONGO_UNREACHABLE;
@@ -1023,12 +1067,13 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
 
     switch (reason) {
         case StartElectionReasonEnum::kElectionTimeout:
-            LOGV2_FOR_ELECTION(4615652,
-                               0,
-                               "Starting an election, since we've seen no PRIMARY in the past "
-                               "{rsConfig_getElectionTimeoutPeriod}",
-                               "rsConfig_getElectionTimeoutPeriod"_attr =
-                                   _rsConfig.getElectionTimeoutPeriod());
+            LOGV2_FOR_ELECTION(
+                4615652,
+                0,
+                "Starting an election, since we've seen no PRIMARY in the past "
+                "{electionTimeoutPeriod}",
+                "Starting an election, since we've seen no PRIMARY in election timeout period",
+                "electionTimeoutPeriod"_attr = _rsConfig.getElectionTimeoutPeriod());
             break;
         case StartElectionReasonEnum::kPriorityTakeover:
             LOGV2_FOR_ELECTION(4615660, 0, "Starting an election for a priority takeover");

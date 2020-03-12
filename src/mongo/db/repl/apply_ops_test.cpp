@@ -316,7 +316,9 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
                        cmdObj,
                        OplogApplication::Mode::kInitialSync,
                        &resultBuilder));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("oplog application mode: InitialSync"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("oplogApplicationMode"
+                                                                      << "InitialSync"))));
 
     auto docToInsert1 = BSON("_id" << 1);
     cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, docToInsert1);
@@ -326,7 +328,9 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
                        cmdObj,
                        OplogApplication::Mode::kSecondary,
                        &resultBuilder));
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("oplog application mode: Secondary"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("oplogApplicationMode"
+                                                                      << "Secondary"))));
 
     stopCapturingLogMessages();
 }

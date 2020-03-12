@@ -53,8 +53,8 @@ function checkLogForCollectionClonerMsg(node, commandName, dbname, contains, col
         "Collection Cloner scheduled a remote command on the " + dbname + " db: { " + commandName;
 
     if (isJsonLog(node)) {
-        msg = 'Collection Cloner scheduled a remote command on the {stage}","attr":{"stage":"' +
-            dbname + " db: { " + commandName;
+        msg = 'Collection Cloner scheduled a remote command","attr":{"stage":"' + dbname +
+            " db: { " + commandName;
     }
 
     if (commandName === "listIndexes" && contains) {

@@ -80,20 +80,26 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                  oplogApplicationMode == repl::OplogApplication::Mode::kRecovering);
 
             if (!ignoreException) {
-                LOGV2_DEBUG(21845,
-                            1,
-                            "Error applying operation in transaction. {ex}- oplog entry: {op}",
-                            "ex"_attr = redact(ex),
-                            "op"_attr = redact(op.toBSON()));
+                LOGV2_DEBUG(
+                    21845,
+                    1,
+                    "Error applying operation in transaction. {error}- oplog entry: {oplogEntry}",
+                    "Error applying operation in transaction",
+                    "error"_attr = redact(ex),
+                    "oplogEntry"_attr = redact(op.toBSON()));
                 return exceptionToStatus();
             }
             LOGV2_DEBUG(21846,
                         1,
-                        "Encountered but ignoring error: {ex} while applying operations for "
+                        "Encountered but ignoring error: {error} while applying operations for "
                         "transaction because we are either in initial "
-                        "sync or recovering mode - oplog entry: {op}",
-                        "ex"_attr = redact(ex),
-                        "op"_attr = redact(op.toBSON()));
+                        "sync or recovering mode - oplog entry: {oplogEntry}",
+                        "Encountered but ignoring error while applying operations for transaction "
+                        "because we are either in initial sync or recovering mode",
+                        "error"_attr = redact(ex),
+                        "oplogEntry"_attr = redact(op.toBSON()),
+                        "oplogApplicationMode"_attr =
+                            repl::OplogApplication::modeToString(oplogApplicationMode));
         }
     }
     return Status::OK();
@@ -388,9 +394,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         auto uuid = *op.getUuid();
         if (indexBuildsCoord->inProgForCollection(uuid, IndexBuildProtocol::kSinglePhase)) {
             LOGV2_WARNING(21849,
-                          "blocking replication until single-phase index builds are finished on "
+                          "Blocking replication until single-phase index builds are finished on "
                           "collection, due to prepared transaction",
-                          "ns"_attr = redact(ns.toString()),
+                          "namespace"_attr = redact(ns.toString()),
                           "uuid"_attr = uuid);
             indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
                 opCtx, uuid, IndexBuildProtocol::kSinglePhase);
@@ -474,7 +480,7 @@ Status applyPrepareTransaction(OperationContext* opCtx,
                     21850,
                     "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
                     "set to false. Restart the server with --enableMajorityReadConcern=true "
-                    "to complete recovery.");
+                    "to complete recovery");
                 fassertFailed(51146);
             }
 
