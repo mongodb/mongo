@@ -42,6 +42,17 @@ function makePatternForSetFCV(targetVersion) {
         "g");
 }
 
+function makePatternForSetParameter(paramName) {
+    if (isJsonLogNoConn()) {
+        return new RegExp(
+            `slow query.*"appName":"MongoDB Shell","command":{"setParameter":1\\.0,"${paramName}":`,
+            "g");
+    }
+    return new RegExp("COMMAND.*command.*appName: \"MongoDB Shell\" command: setParameter" +
+                          " { setParameter: 1\\.0, " + paramName + ":",
+                      "g");
+}
+
 function countMatches(pattern, output) {
     assert(pattern.global, "the 'g' flag must be used to find all matches");
 
@@ -95,7 +106,7 @@ function testStandalone(additionalSetupFn, {
         }
     });
 
-    const pattern = makePatternForValidate("test", "mycoll");
+    let pattern = makePatternForValidate("test", "mycoll");
     assert.eq(1,
               countMatches(pattern, output),
               "expected to find " + tojson(pattern) + " from mongod in the log output");
@@ -111,6 +122,11 @@ function testStandalone(additionalSetupFn, {
                    countMatches(pattern, output),
                    "expected to find " + tojson(pattern) + " from mongod in the log output");
     }
+
+    pattern = makePatternForSetParameter("transactionLifetimeLimitSeconds");
+    assert.eq(2,
+              countMatches(pattern, output),
+              "expected to find " + tojson(pattern) + " from mongod in the log output twice");
 }
 
 function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {

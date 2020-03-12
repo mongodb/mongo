@@ -10,14 +10,11 @@ assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 
 const hostList = [];
-let setFCVHost;
 
 if (topology.type === Topology.kStandalone) {
     hostList.push(topology.mongod);
-    setFCVHost = topology.mongod;
 } else if (topology.type === Topology.kReplicaSet) {
     hostList.push(...topology.nodes);
-    setFCVHost = topology.primary;
 } else if (topology.type === Topology.kShardedCluster) {
     hostList.push(...topology.configsvr.nodes);
 
@@ -32,11 +29,53 @@ if (topology.type === Topology.kStandalone) {
             throw new Error('Unrecognized topology format: ' + tojson(topology));
         }
     }
-    // Any of the mongos instances can be used for setting FCV.
-    setFCVHost = topology.mongos.nodes[0];
 } else {
     throw new Error('Unrecognized topology format: ' + tojson(topology));
 }
 
-new CollectionValidator().validateNodes(hostList, setFCVHost);
+const adminDB = db.getSiblingDB('admin');
+const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+
+let originalFCV;
+let originalTransactionLifetimeLimitSeconds;
+
+if (requiredFCV) {
+    // Running the setFeatureCompatibilityVersion command may implicitly involve running a
+    // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
+    // 24 hours to avoid spurious failures from it having been set to a lower value.
+    originalTransactionLifetimeLimitSeconds = hostList.map(hostStr => {
+        const conn = new Mongo(hostStr);
+        const res = assert.commandWorked(
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}));
+        return {conn, originalValue: res.was};
+    });
+
+    originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+
+    if (originalFCV.targetVersion) {
+        // If a previous FCV upgrade or downgrade was interrupted, then we run the
+        // setFeatureCompatibilityVersion command to complete it before attempting to set the
+        // feature compatibility version to 'requiredFCV'.
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.targetVersion}));
+        checkFCV(adminDB, originalFCV.targetVersion);
+    }
+
+    // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
+    // the 'requiredFCV' is set.
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
+}
+
+new CollectionValidator().validateNodes(hostList);
+
+if (originalFCV && originalFCV.version !== requiredFCV) {
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version}));
+}
+
+if (originalTransactionLifetimeLimitSeconds) {
+    for (let {conn, originalValue} of originalTransactionLifetimeLimitSeconds) {
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
+    }
+}
 })();
