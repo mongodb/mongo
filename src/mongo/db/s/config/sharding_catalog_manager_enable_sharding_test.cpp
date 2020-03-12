@@ -115,23 +115,67 @@ TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {
 }
 
 TEST_F(EnableShardingTest, dbExists) {
-    ShardType shard;
-    shard.setName("shard0");
-    shard.setHost("shard0:12");
+    const std::string dbname = "db4";
+    ShardType shard{"shard0", "shard0:12"};
     setupShards({shard});
-    setupDatabase("db4", shard.getName(), false);
-    ShardingCatalogManager::get(operationContext())
-        ->enableSharding(operationContext(), "db4", ShardId());
+    setupDatabase(dbname, shard.getName(), false);
+
+    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort{shard.getHost()}), [&] {
+        auto targeter = std::make_unique<RemoteCommandTargeterMock>();
+        targeter->setFindHostReturnValue(HostAndPort{shard.getHost()});
+        return targeter;
+    }());
+
+    // Prime the shard registry with information about the existing shard
+    shardRegistry()->reload(operationContext());
+
+    auto future = launchAsync([this, dbname] {
+        ThreadClient tc("Test", getServiceContext());
+        auto opCtx = tc->makeOperationContext();
+        ShardingCatalogManager::get(opCtx.get())->enableSharding(opCtx.get(), dbname, ShardId());
+    });
+
+    // Return OK for _flushDatabaseCacheUpdates
+    onCommand([&](const RemoteCommandRequest& request) {
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("_flushDatabaseCacheUpdates", cmdName);
+
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
 }
 
 TEST_F(EnableShardingTest, succeedsWhenTheDatabaseIsAlreadySharded) {
-    ShardType shard;
-    shard.setName("shard0");
-    shard.setHost("shard0:12");
+    const std::string dbname = "db5";
+    ShardType shard{"shard0", "shard0:12"};
     setupShards({shard});
-    setupDatabase("db5", shard.getName(), true);
-    ShardingCatalogManager::get(operationContext())
-        ->enableSharding(operationContext(), "db5", ShardId());
+    setupDatabase(dbname, shard.getName(), true);
+
+    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort{shard.getHost()}), [&] {
+        auto targeter = std::make_unique<RemoteCommandTargeterMock>();
+        targeter->setFindHostReturnValue(HostAndPort{shard.getHost()});
+        return targeter;
+    }());
+
+    // Prime the shard registry with information about the existing shard
+    shardRegistry()->reload(operationContext());
+
+    auto future = launchAsync([this, dbname] {
+        ThreadClient tc("Test", getServiceContext());
+        auto opCtx = tc->makeOperationContext();
+        ShardingCatalogManager::get(opCtx.get())->enableSharding(opCtx.get(), dbname, ShardId());
+    });
+
+    // Return OK for _flushDatabaseCacheUpdates
+    onCommand([&](const RemoteCommandRequest& request) {
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("_flushDatabaseCacheUpdates", cmdName);
+
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
 }
 
 TEST_F(EnableShardingTest, dbExistsInvalidFormat) {

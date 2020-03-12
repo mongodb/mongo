@@ -99,6 +99,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     }
 
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
@@ -118,44 +119,62 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                     1))
                     .value;
 
-    if (!docs.empty()) {
-        auto actualDb = uassertStatusOK(DatabaseType::fromBSON(docs.front()));
+    auto const [primaryShardPtr, database] = [&] {
+        if (!docs.empty()) {
+            auto actualDb = uassertStatusOK(DatabaseType::fromBSON(docs.front()));
 
-        uassert(ErrorCodes::DatabaseDifferCase,
-                str::stream() << "can't have 2 databases that just differ on case "
-                              << " have: " << actualDb.getName()
-                              << " want to add: " << dbName.toString(),
-                actualDb.getName() == dbName.toString());
+            uassert(ErrorCodes::DatabaseDifferCase,
+                    str::stream() << "can't have 2 databases that just differ on case "
+                                  << " have: " << actualDb.getName()
+                                  << " want to add: " << dbName.toString(),
+                    actualDb.getName() == dbName.toString());
 
-        uassert(ErrorCodes::NamespaceExists,
+            uassert(
+                ErrorCodes::NamespaceExists,
                 str::stream() << "database already created on a primary which is different from: "
                               << primaryShard,
                 !primaryShard.isValid() || actualDb.getPrimary() == primaryShard);
 
-        // We did a local read of the database entry above and found that the database already
-        // exists. However, the data may not be majority committed (a previous createDatabase
-        // attempt may have failed with a writeConcern error).
-        // Since the current Client doesn't know the opTime of the last write to the database entry,
-        // make it wait for the last opTime in the system when we wait for writeConcern.
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return actualDb;
-    }
+            // We did a local read of the database entry above and found that the database already
+            // exists. However, the data may not be majority committed (a previous createDatabase
+            // attempt may have failed with a writeConcern error).
+            // Since the current Client doesn't know the opTime of the last write to the database
+            // entry, make it wait for the last opTime in the system when we wait for writeConcern.
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            replClient.setLastOpToSystemLastOpTime(opCtx);
 
-    // The database does not exist. Insert an entry for the new database into the sharding catalog.
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto shardPtr = uassertStatusOK(shardRegistry->getShard(
-        opCtx,
-        primaryShard.isValid() ? primaryShard : selectShardForNewDatabase(opCtx, shardRegistry)));
+            WriteConcernResult unusedResult;
+            uassertStatusOK(waitForWriteConcern(opCtx,
+                                                replClient.getLastOp(),
+                                                ShardingCatalogClient::kMajorityWriteConcern,
+                                                &unusedResult));
+            return std::make_pair(
+                uassertStatusOK(shardRegistry->getShard(opCtx, actualDb.getPrimary())), actualDb);
+        } else {
+            // The database does not exist. Insert an entry for the new database into the sharding
+            // catalog.
+            auto const shardPtr = uassertStatusOK(shardRegistry->getShard(
+                opCtx,
+                primaryShard.isValid() ? primaryShard
+                                       : selectShardForNewDatabase(opCtx, shardRegistry)));
 
-    // Pick a primary shard for the new database.
-    DatabaseType db(dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
+            // Pick a primary shard for the new database.
+            DatabaseType db(
+                dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
 
-    LOGV2(21938, "Registering new database {db} in sharding catalog", "db"_attr = db);
+            LOGV2(21938, "Registering new database {db} in sharding catalog", "db"_attr = db);
 
-    // Do this write with majority writeConcern to guarantee that the shard sees the write when it
-    // receives the _flushDatabaseCacheUpdates.
-    uassertStatusOK(catalogClient->insertConfigDocument(
-        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
+            // Do this write with majority writeConcern to guarantee that the shard sees the write
+            // when it receives the _flushDatabaseCacheUpdates.
+            uassertStatusOK(
+                catalogClient->insertConfigDocument(opCtx,
+                                                    DatabaseType::ConfigNS,
+                                                    db.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+            return std::make_pair(shardPtr, db);
+        }
+    }();
 
     // Note, making the primary shard refresh its databaseVersion here is not required for
     // correctness, since either:
@@ -170,7 +189,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     // would fail with StaleDbVersion. Making the primary shard refresh here allows that first
     // transaction to succeed. This allows our transaction passthrough suites and transaction demos
     // to succeed without additional special logic.
-    auto cmdResponse = uassertStatusOK(shardPtr->runCommandWithFixedRetryAttempts(
+    auto cmdResponse = uassertStatusOK(primaryShardPtr->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
@@ -186,7 +205,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
         uassertStatusOK(cmdResponse.commandStatus);
     }
 
-    return db;
+    return database;
 }
 
 void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
