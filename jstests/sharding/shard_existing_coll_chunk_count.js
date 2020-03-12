@@ -8,7 +8,6 @@
 'use strict';
 load('jstests/sharding/autosplit_include.js');
 
-// TODO (SERVER-37699): Lower logging verbosity.
 var s = new ShardingTest({
     name: "shard_existing_coll_chunk_count",
     shards: 1,
