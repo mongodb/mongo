@@ -29,12 +29,8 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
@@ -79,41 +80,27 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
-    auto routingInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-    try {
-        for (int tries = 0;; ++tries) {
-            const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
-            try {
-                scatterGatherVersionedTargetByRoutingTable(
-                    opCtx,
-                    nss.db(),
-                    nss,
-                    routingInfo,
-                    SessionsCollection::generateCreateIndexesCmd(),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kNoRetry,
-                    BSONObj() /* query */,
-                    BSONObj() /* collation */);
-                return;
-            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-                LOGV2(21980,
-                      "Attempt {tries} to generate TTL index for {nss} received StaleShardVersion "
-                      "error{causedBy_ex}",
-                      "tries"_attr = tries,
-                      "nss"_attr = nss,
-                      "causedBy_ex"_attr = causedBy(ex));
-                if (canRetry) {
-                    continue;
-                }
-                throw;
-            }
-        }
-    } catch (DBException& ex) {
-        ex.addContext(str::stream() << "Failed to generate TTL index for " << nss);
-        throw;
-    }
+    sharded_agg_helpers::shardVersionRetry(
+        opCtx,
+        Grid::get(opCtx)->catalogCache(),
+        nss,
+        "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
+        [&] {
+            auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+            scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                nss.db(),
+                nss,
+                routingInfo,
+                SessionsCollection::generateCreateIndexesCmd(),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kNoRetry,
+                BSONObj() /* query */,
+                BSONObj() /* collation */);
+        });
 }
 
 void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* opCtx) {

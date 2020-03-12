@@ -1335,6 +1335,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
     ]
 )
 
