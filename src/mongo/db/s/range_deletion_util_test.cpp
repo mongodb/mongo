@@ -891,6 +891,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
                                uuid(),
                                BSON("x" << 1) /* shard key pattern */,
                                ChunkRange(BSON("x" << 0), BSON("x" << 10)),
+                               boost::none,
                                10 /* numDocsToRemovePerBatch*/,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
                                Milliseconds(0) /* delayBetweenBatches */);
