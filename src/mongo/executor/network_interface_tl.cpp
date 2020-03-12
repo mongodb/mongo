@@ -327,6 +327,12 @@ void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept 
 
     auto connToReturn = std::exchange(conn, {});
 
+    LOGV2_DEBUG(4651200,
+                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                "Returning a  connection to the pool",
+                "status"_attr = status.toString(),
+                "is_hedge"_attr = isHedge);
+
     if (!status.isOK()) {
         connToReturn->indicateFailure(std::move(status));
         return;
@@ -429,7 +435,11 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
     }
-    cmdState->baton = baton;
+
+    // TODO: SERVER-46821
+    if (!cmdState->requestOnAny.hedgeOptions) {
+        cmdState->baton = baton;
+    }
 
     if (_svcCtx && cmdState->requestOnAny.hedgeOptions) {
         auto hm = HedgingMetrics::get(_svcCtx);

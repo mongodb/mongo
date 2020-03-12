@@ -92,10 +92,21 @@ void ConnectionPool::ConnectionInterface::indicateUsed() {
 }
 
 void ConnectionPool::ConnectionInterface::indicateSuccess() {
+    LOGV2_DEBUG(4651201,
+                4,
+                "Success indicated for connection",
+                "getHostAndPort"_attr = getHostAndPort(),
+                "generation"_attr = getGeneration());
     _status = Status::OK();
 }
 
 void ConnectionPool::ConnectionInterface::indicateFailure(Status status) {
+    LOGV2_DEBUG(4651202,
+                4,
+                "Failure indicated for connection",
+                "getHostAndPort"_attr = getHostAndPort(),
+                "generation"_attr = getGeneration(),
+                "status"_attr = status.toString());
     _status = std::move(status);
 }
 
