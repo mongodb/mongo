@@ -131,7 +131,7 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
         // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
         assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
         assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
     } else {
         // If the command does not participate in database versioning, none of the nodes' view of
         // the dbVersion should have changed:
@@ -212,7 +212,7 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
         // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
         assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
         assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
     } else {
         // If the command does not participate in database versioning, none of the nodes' view of
         // the dbVersion should have changed:
