@@ -253,12 +253,6 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-    c->incrementCommandsExecuted();
-
-    if (c->shouldAffectCommandCounter()) {
-        globalOpCounters.gotCommand();
-    }
-
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         uassert(ErrorCodes::InvalidOptions,
@@ -622,6 +616,13 @@ void runCommand(OperationContext* opCtx,
         // Remember whether or not this operation is starting a transaction, in case something later
         // in the execution needs to adjust its behavior based on this.
         opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
+
+        command->incrementCommandsExecuted();
+
+        if (command->shouldAffectCommandCounter()) {
+            globalOpCounters.gotCommand();
+        }
+
 
         for (int tries = 0;; ++tries) {
             // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
