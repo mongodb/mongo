@@ -41,6 +41,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
@@ -229,6 +230,19 @@ public:
         return _prng;
     }
 
+    /**
+     * Signal the client's OperationContext that it has been killed.
+     * Any future OperationContext on this client will also receive a kill signal.
+     */
+    void setKilled() noexcept;
+
+    /**
+     * Get the state for killing the client's OperationContext.
+     */
+    bool getKilled() const noexcept {
+        return _killed.loadRelaxed();
+    }
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;
@@ -258,6 +272,8 @@ private:
     bool _systemOperationKillable = false;
 
     PseudoRandom _prng;
+
+    AtomicWord<bool> _killed{false};
 };
 
 /**

@@ -30,8 +30,10 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/util/periodic_runner_impl.h"
@@ -444,6 +446,43 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
         stdx::unique_lock<Latch> lk(mutex);
         cv.wait(lk, [&] { return timesCalled == 3ul; });
     }
+
+    tearDown();
+}
+
+TEST_F(PeriodicRunnerImplTest, StopProperlyInterruptsOpCtx) {
+    Milliseconds interval{5};
+    unittest::Barrier barrier(2);
+    AtomicWord<bool> killed{false};
+
+    PeriodicRunner::PeriodicJob job(
+        "job",
+        [&barrier, &killed](Client* client) {
+            stdx::condition_variable cv;
+            auto mutex = MONGO_MAKE_LATCH();
+            barrier.countDownAndWait();
+
+            try {
+                auto opCtx = client->makeOperationContext();
+                stdx::unique_lock<Latch> lk(mutex);
+                opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+                ASSERT_EQ(e.code(), ErrorCodes::ClientMarkedKilled);
+                killed.store(true);
+                return;
+            }
+
+            MONGO_UNREACHABLE;
+        },
+        interval);
+
+    auto jobAnchor = runner().makeJob(std::move(job));
+    jobAnchor.start();
+
+    barrier.countDownAndWait();
+
+    jobAnchor.stop();
+    ASSERT(killed.load());
 
     tearDown();
 }
