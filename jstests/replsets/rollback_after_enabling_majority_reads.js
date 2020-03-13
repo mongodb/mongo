@@ -52,13 +52,27 @@
     let allowedExitCode = 14;
 
     try {
-        rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "false"}, allowedExitCode);
+        rollbackTest.restartNode(0,
+                                 15,
+                                 {
+                                   enableMajorityReadConcern: "false",
+                                   setParameter: 'failpoint.hangAfterTransitionToSecondary=' +
+                                       tojson({mode: 'alwaysOn'})
+                                 },
+                                 allowedExitCode);
     } catch (e) {
         if ((e.name === "StopError") && (e.returnCode === -6)) {
             // Retry once if we get error -6 instead of 14. This can happen if we get an fassert
             // while already in the middle of crashing from the expected fassert above.
             allowedExitCode = 0;
-            rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "false"}, allowedExitCode);
+            rollbackTest.restartNode(0,
+                                     15,
+                                     {
+                                       enableMajorityReadConcern: "false",
+                                       setParameter: 'failpoint.hangAfterTransitionToSecondary=' +
+                                           tojson({mode: 'alwaysOn'})
+                                     },
+                                     allowedExitCode);
         } else {
             throw e;
         }
@@ -67,7 +81,16 @@
     // Fix counts for "local.startup_log", since they are corrupted by this rollback.
     // transitionToSteadyStateOperations() checks collection counts.
     replTest.waitForState(rollbackNode, ReplSetTest.State.SECONDARY);
+
+    // Hang the node to prevent any state transition from occurring before the validate command
+    // executes.
+    checkLog.contains(rollbackNode, "fail point hangAfterTransitionToSecondary enabled.");
     assert.commandWorked(rollbackNode.getDB("local").runCommand({validate: "startup_log"}));
+
+    // Turn off the fail point to allow the node to proceed.
+    assert.commandWorked(rollbackNode.adminCommand(
+        {configureFailPoint: 'hangAfterTransitionToSecondary', mode: 'off'}));
+
     rollbackTest.transitionToSteadyStateOperations();
 
     assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert(
@@ -78,7 +101,10 @@
 
     jsTest.log(
         "Test that rollback succeeds with enableMajorityReadConcern=true once we have set a stable timestamp.");
-    rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "true"});
+
+    // Since 'restartNode' carries previous startup params, we set 'setParameter' to an empty obj to
+    // avoid turning on 'hangAfterTransitionToSecondary' again.
+    rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "true", setParameter: {}});
 
     // Make sure node 0 is the primary.
     let node = replTest.nodes[0];
