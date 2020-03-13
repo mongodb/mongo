@@ -14,7 +14,7 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-for to_remove in ['-Werror', '-Wall', '-W', '/W3']:
+for to_remove in ['-Werror', '-Wall', '-W', '/W3', '-Wsign-compare']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 # See what -D's show up in make.  The AB_CD one might change, but we're little
@@ -71,6 +71,7 @@ else:
         CXXFLAGS=[
             '-Wno-non-virtual-dtor',
             '-Wno-invalid-offsetof',
+            '-Wno-sign-compare',
         ],
     )
 
