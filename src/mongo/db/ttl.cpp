@@ -79,8 +79,6 @@ public:
         return "TTLMonitor";
     }
 
-    static std::string secondsExpireField;
-
     virtual void run() {
         ThreadClient tc(name(), _serviceContext);
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
@@ -147,7 +145,15 @@ private:
             auto uuid = ttlInfo.first;
             auto indexName = ttlInfo.second;
 
-            auto nss = CollectionCatalog::get(opCtxPtr.get()).lookupNSSByUUID(&opCtx, uuid);
+            // Skip collections that have not been made visible yet. The TTLCollectionCache already
+            // has the index information available, so we want to avoid removing it until the
+            // collection is visible.
+            const CollectionCatalog& collectionCatalog = CollectionCatalog::get(opCtxPtr.get());
+            if (collectionCatalog.isCollectionAwaitingVisibility(uuid)) {
+                continue;
+            }
+
+            auto nss = collectionCatalog.lookupNSSByUUID(&opCtx, uuid);
             if (!nss) {
                 ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;
@@ -168,7 +174,7 @@ private:
 
             BSONObj spec = DurableCatalog::get(opCtxPtr.get())
                                ->getIndexSpec(&opCtx, coll->getCatalogId(), indexName);
-            if (!spec.hasField(secondsExpireField)) {
+            if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
                 ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;
             }
@@ -271,13 +277,13 @@ private:
             return;
         }
 
-        BSONElement secondsExpireElt = idx[secondsExpireField];
+        BSONElement secondsExpireElt = idx[IndexDescriptor::kExpireAfterSecondsFieldName];
         if (!secondsExpireElt.isNumber()) {
             LOGV2_ERROR(
                 22542,
                 "ttl indexes require the {secondsExpireField} field to be numeric but received a "
                 "type of {typeName_secondsExpireElt_type}, skipping ttl job for: {idx}",
-                "secondsExpireField"_attr = secondsExpireField,
+                "secondsExpireField"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
                 "typeName_secondsExpireElt_type"_attr = typeName(secondsExpireElt.type()),
                 "idx"_attr = idx);
             return;
@@ -349,5 +355,4 @@ void startTTLBackgroundJob(ServiceContext* serviceContext) {
     ttlMonitor->go();
 }
 
-std::string TTLMonitor::secondsExpireField = "expireAfterSeconds";
 }  // namespace mongo
