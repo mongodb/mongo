@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ttl_collection_cache.h"
@@ -34,8 +36,12 @@
 #include <algorithm>
 
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangTTLCollectionCacheAfterRegisteringInfo);
 
 namespace {
 const auto getTTLCollectionCache = ServiceContext::declareDecoration<TTLCollectionCache>();
@@ -46,8 +52,15 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
 }
 
 void TTLCollectionCache::registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo) {
-    stdx::lock_guard<Latch> lock(_ttlInfosLock);
-    _ttlInfos.push_back(std::move(ttlInfo));
+    {
+        stdx::lock_guard<Latch> lock(_ttlInfosLock);
+        _ttlInfos.push_back(std::move(ttlInfo));
+    }
+
+    if (MONGO_unlikely(hangTTLCollectionCacheAfterRegisteringInfo.shouldFail())) {
+        LOGV2(4664000, "Hanging due to hangTTLCollectionCacheAfterRegisteringInfo fail point");
+        hangTTLCollectionCacheAfterRegisteringInfo.pauseWhileSet();
+    }
 }
 
 void TTLCollectionCache::deregisterTTLInfo(const std::pair<UUID, std::string>& ttlInfo) {

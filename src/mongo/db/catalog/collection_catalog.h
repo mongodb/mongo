@@ -146,6 +146,12 @@ public:
     void makeCollectionVisible(CollectionUUID uuid);
 
     /**
+     * Returns true if the collection has been registered in the CollectionCatalog but not yet made
+     * visible.
+     */
+    bool isCollectionAwaitingVisibility(CollectionUUID uuid) const;
+
+    /**
      * This function gets the Collection pointer that corresponds to the NamespaceString.
      * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer may no longer be valid when the call returns.

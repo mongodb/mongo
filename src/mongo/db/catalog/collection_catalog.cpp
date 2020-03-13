@@ -268,6 +268,12 @@ void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
     coll->setCommitted(true);
 }
 
+bool CollectionCatalog::isCollectionAwaitingVisibility(CollectionUUID uuid) const {
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto coll = _lookupCollectionByUUID(lock, uuid);
+    return coll && !coll->isCommitted();
+}
+
 Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID uuid) const {
     auto foundIt = _catalog.find(uuid);
     return foundIt == _catalog.end() ? nullptr : foundIt->second.get();
