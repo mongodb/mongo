@@ -96,6 +96,11 @@ x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
 x509_options2 = Object.merge(common_options,
                              {sslClusterFile: "jstests/libs/smoke.pem", clusterAuthMode: "x509"});
 var replTest = new ReplSetTest({nodes: {node0: x509_options1, node1: x509_options2}});
+
+// We don't want to invoke the hang analyzer because we
+// expect this test to fail by timing out
+MongoRunner.runHangAnalyzer.disable();
+
 var conns = replTest.startSet();
 assert.throws(function() {
     replTest.initiate();
