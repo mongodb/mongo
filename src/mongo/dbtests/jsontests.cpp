@@ -394,13 +394,13 @@ TEST(JsonStringTest, Date) {
                        built.jsonString(ExtendedCanonicalV2_0_0));
     bool prev = dateFormatIsLocalTimezone();
     setDateFormatIsLocalTimezone(true);
-    ASSERT_JSON_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-0500" } })",
+    ASSERT_JSON_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-05:00" } })",
                        built.jsonString(ExtendedRelaxedV2_0_0));
     setDateFormatIsLocalTimezone(false);
     ASSERT_JSON_EQUALS(R"({ "a" : { "$date" : "1970-01-01T00:00:00.000Z" } })",
                        built.jsonString(ExtendedRelaxedV2_0_0));
     setDateFormatIsLocalTimezone(prev);
-    ASSERT_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-0500" } })",
+    ASSERT_EQUALS(R"({ "a" : { "$date" : "1969-12-31T19:00:00.000-05:00" } })",
                   built.jsonString(LegacyStrict));
 
     // Test dates above our maximum formattable date.  See SERVER-13760.

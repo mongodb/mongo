@@ -146,10 +146,10 @@ struct JSONValueExtractor {
     void operator()(StringData name, const Duration<Period>& value) {
         // A suffix is automatically prepended
         dassert(!name.endsWith(value.mongoUnitSuffix()));
-        static const auto fmt_str =
-            fmt::compile<StringData, StringData, StringData, int64_t>(R"({}"{}{}":{})");
+        static const auto& fmtStr =
+            *new auto(fmt::compile<StringData, StringData, StringData, int64_t>(R"({}"{}{}":{})"));
         compiled_format_to(
-            _buffer, fmt_str, _separator, name, value.mongoUnitSuffix(), value.count());
+            _buffer, fmtStr, _separator, name, value.mongoUnitSuffix(), value.count());
         _separator = ","_sd;
     }
 
@@ -168,22 +168,23 @@ struct JSONValueExtractor {
 
 private:
     void storeUnquoted(StringData name) {
-        static const auto fmt_str = fmt::compile<StringData, StringData>(R"({}"{}":)");
-        compiled_format_to(_buffer, fmt_str, _separator, name);
+        static const auto& fmtStr = *new auto(fmt::compile<StringData, StringData>(R"({}"{}":)"));
+        compiled_format_to(_buffer, fmtStr, _separator, name);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeUnquotedValue(StringData name, const T& value) {
-        static const auto fmt_str = fmt::compile<StringData, StringData, T>(R"({}"{}":{})");
-        compiled_format_to(_buffer, fmt_str, _separator, name, value);
+        static const auto& fmtStr =
+            *new auto(fmt::compile<StringData, StringData, T>(R"({}"{}":{})"));
+        compiled_format_to(_buffer, fmtStr, _separator, name, value);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeQuoted(StringData name, const T& value) {
-        static const auto fmt_str = fmt::compile<StringData, StringData>(R"({}"{}":")");
-        compiled_format_to(_buffer, fmt_str, _separator, name);
+        static const auto& fmtStr = *new auto(fmt::compile<StringData, StringData>(R"({}"{}":")"));
+        compiled_format_to(_buffer, fmtStr, _separator, name);
         std::size_t before = _buffer.size();
         str::escapeForJSON(_buffer, value);
         if (_attributeMaxSize != 0) {
@@ -240,9 +241,9 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
     fmt::memory_buffer buffer;
 
     // Put all fields up until the message value
-    static const auto fmt_str_open = fmt::compile<StringData>(R"({{)"
-                                                              R"("{}":{{"$date":")");
-    compiled_format_to(buffer, fmt_str_open, constants::kTimestampFieldName);
+    static const auto& fmtStrOpen = *new auto(fmt::compile<StringData>(R"({{)"
+                                                                       R"("{}":{{"$date":")"));
+    compiled_format_to(buffer, fmtStrOpen, constants::kTimestampFieldName);
     Date_t date = extract<Date_t>(attributes::timeStamp(), rec).get();
     switch (_timestampFormat) {
         case LogTimestampFormat::kISO8601UTC:
@@ -252,7 +253,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
             outputDateAsISOStringLocal(buffer, date);
             break;
     };
-    static const auto fmt_str_body =
+    static const auto& fmtStrBody = *new auto(
         fmt::compile<StringData,
                      StringData,
                      StringData,
@@ -271,10 +272,10 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
                                  R"("{}":{},)"          // id
                                  R"("{}":"{}",)"        // context
                                  R"("{}":")"            // message
-        );
+                                 ));
     compiled_format_to(
         buffer,
-        fmt_str_body,
+        fmtStrBody,
         // severity, left align the comma and add padding to create fixed column width
         constants::kSeverityFieldName,
         severity,
@@ -297,10 +298,10 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
     str::escapeForJSON(buffer, extract<StringData>(attributes::message(), rec).get());
     buffer.push_back('"');
 
-    static const auto fmt_str_attr = fmt::compile<StringData>(R"(,"{}":{{)");
-    static const auto fmt_str_truncated = fmt::compile<StringData>(R"(,"{}":)");
+    static const auto& fmtStrAttr = *new auto(fmt::compile<StringData>(R"(,"{}":{{)"));
+    static const auto& fmtStrTruncated = *new auto(fmt::compile<StringData>(R"(,"{}":)"));
     if (!attrs.empty()) {
-        compiled_format_to(buffer, fmt_str_attr, constants::kAttributesFieldName);
+        compiled_format_to(buffer, fmtStrAttr, constants::kAttributesFieldName);
         // comma separated list of attributes (no opening/closing brace are added here)
         size_t attributeMaxSize = 0;
         if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {
@@ -314,22 +315,22 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
         buffer.push_back('}');
 
         if (BSONObj truncated = extractor.truncated(); !truncated.isEmpty()) {
-            compiled_format_to(buffer, fmt_str_truncated, constants::kTruncatedFieldName);
+            compiled_format_to(buffer, fmtStrTruncated, constants::kTruncatedFieldName);
             truncated.jsonStringBuffer(
                 JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer, 0);
         }
 
         if (BSONObj truncatedSizes = extractor.truncatedSizes(); !truncatedSizes.isEmpty()) {
-            compiled_format_to(buffer, fmt_str_truncated, constants::kTruncatedSizeFieldName);
+            compiled_format_to(buffer, fmtStrTruncated, constants::kTruncatedSizeFieldName);
             truncatedSizes.jsonStringBuffer(
                 JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer, 0);
         }
     }
 
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
-    static const auto fmt_str_tags = fmt::compile<StringData>(R"(,"{}":)");
+    static const auto& fmtStrTags = *new auto(fmt::compile<StringData>(R"(,"{}":)"));
     if (tags != LogTag::kNone) {
-        compiled_format_to(buffer, fmt_str_tags, constants::kTagsFieldName);
+        compiled_format_to(buffer, fmtStrTags, constants::kTagsFieldName);
         tags.toBSONArray().jsonStringBuffer(
             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
     }

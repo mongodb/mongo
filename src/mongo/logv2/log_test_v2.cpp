@@ -486,13 +486,22 @@ TEST_F(LogTestV2, Types) {
            bsonObj.getField("int32"_sd).Int());
 
     // Date_t
-    Date_t date = Date_t::now();
-    LOGV2(20023, "Date_t {name}", "name"_attr = date);
-    ASSERT_EQUALS(text.back(), std::string("Date_t ") + date.toString());
-    ASSERT_EQUALS(
-        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("name").Date(),
-        date);
-    ASSERT_EQUALS(lastBSONElement().Date(), date);
+    bool prevIsLocalTimezone = dateFormatIsLocalTimezone();
+    for (auto localTimezone : {true, false}) {
+        setDateFormatIsLocalTimezone(localTimezone);
+        Date_t date = Date_t::now();
+        LOGV2(20023, "Date_t {name}", "name"_attr = date);
+        ASSERT_EQUALS(text.back(), std::string("Date_t ") + date.toString());
+        ASSERT_EQUALS(mongo::fromjson(json.back())
+                          .getField(kAttributesFieldName)
+                          .Obj()
+                          .getField("name")
+                          .Date(),
+                      date);
+        ASSERT_EQUALS(lastBSONElement().Date(), date);
+    }
+
+    setDateFormatIsLocalTimezone(prevIsLocalTimezone);
 
     // Decimal128
     LOGV2(20024, "Decimal128 {name}", "name"_attr = Decimal128::kPi);

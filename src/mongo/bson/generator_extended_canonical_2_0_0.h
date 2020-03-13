@@ -60,20 +60,20 @@ public:
     }
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
-        static const auto fmt_str = fmt::compile<int32_t>(R"({{"$numberInt":"{}"}})");
-        compiled_format_to(buffer, fmt_str, val);
+        static const auto& fmtStr = *new auto(fmt::compile<int32_t>(R"({{"$numberInt":"{}"}})"));
+        compiled_format_to(buffer, fmtStr, val);
     }
 
     void writeInt64(fmt::memory_buffer& buffer, int64_t val) const {
-        static const auto fmt_str = fmt::compile<int64_t>(R"({{"$numberLong":"{}"}})");
-        compiled_format_to(buffer, fmt_str, val);
+        static const auto& fmtStr = *new auto(fmt::compile<int64_t>(R"({{"$numberLong":"{}"}})"));
+        compiled_format_to(buffer, fmtStr, val);
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
-        static const auto fmt_str = fmt::compile<double>(R"({{"$numberDouble":"{}"}})");
+        static const auto& fmtStr = *new auto(fmt::compile<double>(R"({{"$numberDouble":"{}"}})"));
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            compiled_format_to(buffer, fmt_str, val);
+            compiled_format_to(buffer, fmtStr, val);
         else if (std::isnan(val))
             appendTo(buffer, R"({"$numberDouble":"NaN"})"_sd);
         else if (std::isinf(val)) {
@@ -89,24 +89,24 @@ public:
     }
 
     void writeDecimal128(fmt::memory_buffer& buffer, Decimal128 val) const {
-        static const auto fmt_str_infinite =
-            fmt::compile<StringData>(R"({{"$numberDecimal":"{}"}})");
-        static const auto fmt_str_decimal =
-            fmt::compile<std::string>(R"({{"$numberDecimal":"{}"}})");
+        static const auto& fmtStrInfinite =
+            *new auto(fmt::compile<StringData>(R"({{"$numberDecimal":"{}"}})"));
+        static const auto& fmtStrDecimal =
+            *new auto(fmt::compile<std::string>(R"({{"$numberDecimal":"{}"}})"));
         if (val.isNaN())
             appendTo(buffer, R"({"$numberDecimal":"NaN"})"_sd);
         else if (val.isInfinite())
             compiled_format_to(
-                buffer, fmt_str_infinite, val.isNegative() ? "-Infinity"_sd : "Infinity"_sd);
+                buffer, fmtStrInfinite, val.isNegative() ? "-Infinity"_sd : "Infinity"_sd);
         else {
-            compiled_format_to(buffer, fmt_str_decimal, val.toString());
+            compiled_format_to(buffer, fmtStrDecimal, val.toString());
         }
     }
 
     void writeDate(fmt::memory_buffer& buffer, Date_t val) const {
-        static const auto fmt_str =
-            fmt::compile<long long>(R"({{"$date":{{"$numberLong":"{}"}}}})");
-        compiled_format_to(buffer, fmt_str, val.toMillisSinceEpoch());
+        static const auto& fmtStr =
+            *new auto(fmt::compile<long long>(R"({{"$date":{{"$numberLong":"{}"}}}})"));
+        compiled_format_to(buffer, fmtStr, val.toMillisSinceEpoch());
     }
 
     void writeDBRef(fmt::memory_buffer& buffer, StringData ref, OID id) const {
@@ -115,29 +115,29 @@ public:
         str::escapeForJSON(buffer, ref);
 
         // OID is a hex string and does not need to be escaped
-        static const auto fmt_str = fmt::compile<std::string>(R"(","$id":"{}"}})");
-        compiled_format_to(buffer, fmt_str, id.toString());
+        static const auto& fmtStr = *new auto(fmt::compile<std::string>(R"(","$id":"{}"}})"));
+        compiled_format_to(buffer, fmtStr, id.toString());
     }
 
     void writeOID(fmt::memory_buffer& buffer, OID val) const {
         // OID is a hex string and does not need to be escaped
-        static const auto fmt_str = fmt::compile<uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t,
-                                                 uint8_t>(
-            R"({{"$oid":"{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})");
+        static const auto& fmtStr = *new auto(fmt::compile<uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t,
+                                                           uint8_t>(
+            R"({{"$oid":"{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})"));
         static_assert(OID::kOIDSize == 12);
         const uint8_t* data = reinterpret_cast<const uint8_t*>(val.view().view());
         compiled_format_to(buffer,
-                           fmt_str,
+                           fmtStr,
                            data[0],
                            data[1],
                            data[2],
@@ -153,33 +153,34 @@ public:
     }
 
     void writeTimestamp(fmt::memory_buffer& buffer, Timestamp val) const {
-        static const auto fmt_str =
-            fmt::compile<unsigned int, unsigned int>(R"({{"$timestamp":{{"t":{},"i":{}}}}})");
-        compiled_format_to(buffer, fmt_str, val.getSecs(), val.getInc());
+        static const auto& fmtStr = *new auto(
+            fmt::compile<unsigned int, unsigned int>(R"({{"$timestamp":{{"t":{},"i":{}}}}})"));
+        compiled_format_to(buffer, fmtStr, val.getSecs(), val.getInc());
     }
 
     void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
-        static const auto fmt_str_uuid = fmt::compile<uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t,
-                                                      uint8_t>(
-            R"({{"$uuid":"{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})");
-        static const auto fmt_str_subtype = fmt::compile<BinDataType>(R"(","subType":"{:x}"}}}})");
+        static const auto& fmtStrUuid = *new auto(fmt::compile<uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t,
+                                                               uint8_t>(
+            R"({{"$uuid":"{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})"));
+        static const auto& fmtStrSubtype =
+            *new auto(fmt::compile<BinDataType>(R"(","subType":"{:x}"}}}})"));
         if (type == newUUID && data.size() == 16) {
             compiled_format_to(buffer,
-                               fmt_str_uuid,
+                               fmtStrUuid,
                                static_cast<uint8_t>(data[0]),
                                static_cast<uint8_t>(data[1]),
                                static_cast<uint8_t>(data[2]),
@@ -199,7 +200,7 @@ public:
         } else {
             appendTo(buffer, R"({"$binary":{"base64":")"_sd);
             base64::encode(buffer, data);
-            compiled_format_to(buffer, fmt_str_subtype, type);
+            compiled_format_to(buffer, fmtStrSubtype, type);
         }
     }
 
