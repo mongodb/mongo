@@ -4,7 +4,7 @@
  *   - The hint option should support both the name of the index, and the object spec of the
  *     index.
  *
- * @tags: [assumes_unsharded_collection, requires_non_retryable_writes]
+ * @tags: [assumes_unsharded_collection, requires_non_retryable_writes, requires_fcv_44]
  */
 
 (function() {
