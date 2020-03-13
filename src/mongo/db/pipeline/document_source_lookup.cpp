@@ -306,7 +306,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
 std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     const Document& inputDoc) {
     // Copy all 'let' variables into the foreign pipeline's expression context.
-    copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
+    _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
 
     assertIsValidCollectionState(_fromExpCtx);
 
@@ -656,13 +656,6 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
     return output.freeze();
 }
 
-void DocumentSourceLookUp::copyVariablesToExpCtx(const Variables& vars,
-                                                 const VariablesParseState& vps,
-                                                 ExpressionContext* expCtx) {
-    expCtx->variables = vars;
-    expCtx->variablesParseState = vps.copyWith(expCtx->variables.useIdGenerator());
-}
-
 void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variables* variables) {
     invariant(variables);
 
@@ -673,7 +666,7 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
 }
 
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
-    copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
+    _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
     _resolvedIntrospectionPipeline =
         Pipeline::parse(_resolvedPipeline, _fromExpCtx, lookupPipeValidator);
 }

@@ -258,6 +258,12 @@ private:
     // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
     // field, tracking how many results we've returned so far for the current input document.
     long long _outputIndex;
+
+    // Holds variables defined both in this stage and in parent pipelines. These are copied to the
+    // '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use in the
+    // '_fromPipeline' execution.
+    Variables _variables;
+    VariablesParseState _variablesParseState;
 };
 
 }  // namespace mongo

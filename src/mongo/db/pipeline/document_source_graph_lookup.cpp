@@ -219,6 +219,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             pipelineOpts.attachCursorSource = true;
             // By default, $graphLookup doesn't support a sharded 'from' collection.
             pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
+            _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
             auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
@@ -469,7 +470,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
       _cache(pExpCtx->getValueComparator()),
-      _unwind(unwindSrc) {
+      _unwind(unwindSrc),
+      _variables(expCtx->variables),
+      _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
     _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
 

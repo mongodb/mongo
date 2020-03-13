@@ -243,13 +243,6 @@ private:
     GetNextResult unwindResult();
 
     /**
-     * Copies 'vars' and 'vps' to the Variables and VariablesParseState objects in 'expCtx'. These
-     * copies provide access to 'let' defined variables in sub-pipeline execution.
-     */
-    static void copyVariablesToExpCtx(const Variables& vars,
-                                      const VariablesParseState& vps,
-                                      ExpressionContext* expCtx);
-    /**
      * Resolves let defined variables against 'localDoc' and stores the results in 'variables'.
      */
     void resolveLetVariables(const Document& localDoc, Variables* variables);

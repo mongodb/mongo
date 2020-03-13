@@ -38,6 +38,8 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+class ExpressionContext;
+class VariablesParseState;
 
 /**
  * The state used as input and working space for Expressions.
@@ -117,8 +119,10 @@ public:
      * Returns whether a constant value for 'id' has been defined using setConstantValue().
      */
     bool hasConstantValue(Variables::Id id) const {
-
-        return _valueList.size() > static_cast<size_t>(id) && _valueList[id].isConstant;
+        if (auto it = _values.find(id); it != _values.end() && it->second.isConstant) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -146,6 +150,17 @@ public:
      */
     void setDefaultRuntimeConstants(OperationContext* opCtx);
 
+    /**
+     * Copies this Variables and 'vps' to the Variables and VariablesParseState objects in 'expCtx'.
+     * The VariablesParseState's 'idGenerator' in 'expCtx' is replaced with the pointer to the
+     * 'idGenerator' in the new copy of the Variables instance.
+     *
+     * Making such a copy is a way to ensure that variables visible to a new "scope" (a subpipeline)
+     * end up with lexical scoping and do not leak into the execution of the parent pipeline at
+     * runtime.
+     */
+    void copyToExpCtx(const VariablesParseState& vps, ExpressionContext* expCtx) const;
+
 private:
     struct ValueAndState {
         ValueAndState() = default;
@@ -168,7 +183,7 @@ private:
     }
 
     IdGenerator _idGenerator;
-    std::vector<ValueAndState> _valueList;
+    stdx::unordered_map<Id, ValueAndState> _values;
     stdx::unordered_map<Id, Value> _runtimeConstants;
 };
 
@@ -230,5 +245,4 @@ private:
     StringMap<Variables::Id> _variables;
     Variables::Id _lastSeen = -1;
 };
-
 }  // namespace mongo
