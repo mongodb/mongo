@@ -641,7 +641,7 @@ jsTest.log("Abandoned transaction.");
 jsTest.log("Active transaction.");
 (() => {
     assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn", data: {nss: ns}}));
 
     const txnThread = new Thread(function(host, dbName, collName) {
         const mongosConn = new Mongo(host);
