@@ -432,31 +432,51 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
     };
 
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto inTxn = txnParticipant && opCtx->inMultiDocumentTransaction();
+    bool shouldProceedWithBatchInsert = true;
+
     try {
         acquireCollection();
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto inTxn = txnParticipant && opCtx->inMultiDocumentTransaction();
-        if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
-            // First try doing it all together. If all goes well, this is all we need to do.
-            // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
-            lastOpFixer->startingOp();
-            insertDocuments(
-                opCtx, collection->getCollection(), batch.begin(), batch.end(), fromMigrate);
-            lastOpFixer->finishedOpSuccessfully();
-            globalOpCounters.gotInserts(batch.size());
-            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
-                opCtx->getWriteConcern(), batch.size());
-            SingleWriteResult result;
-            result.setN(1);
-
-            std::fill_n(std::back_inserter(out->results), batch.size(), std::move(result));
-            curOp.debug().additiveMetrics.incrementNinserted(batch.size());
-            return true;
-        }
-    } catch (const DBException&) {
-        // Ignore this failure and behave as if we never tried to do the combined batch
-        // insert. The loop below will handle reporting any non-transient errors.
+    } catch (const DBException& ex) {
         collection.reset();
+        if (inTxn) {
+            // It is not safe to ignore errors from collection creation while inside a
+            // multi-document transaction.
+            auto canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), out);
+            invariant(!canContinue);
+            return false;
+        }
+        // Otherwise, proceed as though the batch insert block failed, since the batch insert block
+        // assumes `acquireCollection` is successful.
+        shouldProceedWithBatchInsert = false;
+    }
+
+    if (shouldProceedWithBatchInsert) {
+        try {
+            if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
+                // First try doing it all together. If all goes well, this is all we need to do.
+                // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
+                lastOpFixer->startingOp();
+                insertDocuments(
+                    opCtx, collection->getCollection(), batch.begin(), batch.end(), fromMigrate);
+                lastOpFixer->finishedOpSuccessfully();
+                globalOpCounters.gotInserts(batch.size());
+                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
+                    opCtx->getWriteConcern(), batch.size());
+                SingleWriteResult result;
+                result.setN(1);
+
+                std::fill_n(std::back_inserter(out->results), batch.size(), std::move(result));
+                curOp.debug().additiveMetrics.incrementNinserted(batch.size());
+                return true;
+            }
+        } catch (const DBException&) {
+            // Ignore this failure and behave as if we never tried to do the combined batch
+            // insert. The loop below will handle reporting any non-transient errors.
+            collection.reset();
+        }
     }
 
     // Try to insert the batch one-at-a-time. This path is executed for singular batches,

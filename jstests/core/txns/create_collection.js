@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/libs/create_collection_txn_helpers.js");
+load("jstests/libs/fixture_helpers.js");  // for isMongos
 
 function runCollectionCreateTest(explicitCreate, upsert) {
     const session = db.getMongo().startSession();
@@ -78,6 +79,24 @@ function runCollectionCreateTest(explicitCreate, upsert) {
 
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(secondSessionColl.find({}).itcount(), 0);
+
+    sessionColl.drop({writeConcern: {w: "majority"}});
+
+    // mongos does not support throwWCEDuringTxnCollCreate
+    if (!FixtureHelpers.isMongos(db)) {
+        jsTest.log(
+            "Testing createCollection with writeConflict errors in a transaction (SHOULD ABORT");
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "alwaysOn"}));
+        session.startTransaction({writeConcern: {w: "majority"}});
+        assertCollCreateFailedWithCode(
+            sessionDB, collName, explicitCreate, upsert, ErrorCodes.WriteConflict);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+        assert.eq(sessionColl.find({}).itcount(), 0);
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "off"}));
+    }
 
     session.endSession();
 }
