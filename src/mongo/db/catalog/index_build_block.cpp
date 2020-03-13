@@ -81,11 +81,6 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
 
     _indexName = descriptor->indexName();
 
-    if (_spec.hasField("expireAfterSeconds")) {
-        TTLCollectionCache::get(getGlobalServiceContext())
-            .registerTTLInfo(std::make_pair(collection->uuid(), _indexName));
-    }
-
     bool isBackgroundIndex =
         _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kBackground;
     bool isBackgroundSecondaryBuild = false;
@@ -186,8 +181,11 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     collection->indexBuildSuccess(opCtx, _indexCatalogEntry);
     auto svcCtx = opCtx->getClient()->getServiceContext();
 
-    opCtx->recoveryUnit()->onCommit([svcCtx, entry = _indexCatalogEntry, coll = collection](
-                                        boost::optional<Timestamp> commitTime) {
+    opCtx->recoveryUnit()->onCommit([svcCtx,
+                                     indexName = _indexName,
+                                     spec = _spec,
+                                     entry = _indexCatalogEntry,
+                                     coll = collection](boost::optional<Timestamp> commitTime) {
         // Note: this runs after the WUOW commits but before we release our X lock on the
         // collection. This means that any snapshot created after this must include the full
         // index, and no one can try to read this index before we set the visibility.
@@ -203,6 +201,12 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         // This prevents reads in the past from reading inconsistent metadata. We should be
         // able to remove this when the catalog is versioned.
         coll->setMinimumVisibleSnapshot(commitTime.get());
+
+        // Add the index to the TTLCollectionCache upon successfully committing the index build.
+        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+            TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                std::make_pair(coll->uuid(), indexName));
+        }
     });
 }
 

@@ -109,8 +109,8 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
             std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
-        if (spec.hasField("expireAfterSeconds")) {
-            TTLCollectionCache::get(getGlobalServiceContext())
+        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+            TTLCollectionCache::get(opCtx->getServiceContext())
                 .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
         }
 
