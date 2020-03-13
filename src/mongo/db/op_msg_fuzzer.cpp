@@ -77,8 +77,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         localExternalState = std::make_unique<mongo::AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
         localAuthzManager = std::make_unique<mongo::AuthorizationManagerImpl>(
-            std::move(localExternalState),
-            mongo::AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
+            serviceContext, std::move(localExternalState));
 
         authzManager = localAuthzManager.get();
         externalState->setAuthorizationManager(authzManager);
