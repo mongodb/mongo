@@ -53,6 +53,9 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx)
         _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
+    // Make sure we don't silently proceed after a previous WriteUnitOfWork under the same parent
+    // WriteUnitOfWork fails.
+    invariant(_opCtx->_ruState != RecoveryUnitState::kFailedUnitOfWork);
 }
 
 WriteUnitOfWork::~WriteUnitOfWork() {

@@ -25,3 +25,24 @@ const createCollAndCRUDInTxn = function(sessionDB, collName, explicitCreate, ups
     assert.commandWorked(sessionColl.deleteOne({_id: 2}));
     assert.eq(sessionColl.find({}).itcount(), 1);
 };
+
+const assertCollCreateFailedWithCode = function(sessionDB, collName, explicitCreate, upsert, code) {
+    if (undefined === explicitCreate) {
+        doassert('assertWriteConflictForCollCreate called with undefined explicitCreate');
+    }
+    if (undefined === upsert) {
+        doassert('assertWriteConflictForCollCreate called with undefined upsert');
+    }
+    if (undefined === code) {
+        doassert('assertWriteConflictForCollCreate called with undefined code');
+    }
+    let sessionColl = sessionDB[collName];
+    if (explicitCreate) {
+        assert.commandFailedWithCode(sessionDB.createCollection(collName), code);
+    } else if (upsert) {
+        assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {a: 1}}, {upsert: true}),
+                                     code);
+    } else {
+        assert.commandFailedWithCode(sessionColl.insert({a: 1}), code);
+    }
+};

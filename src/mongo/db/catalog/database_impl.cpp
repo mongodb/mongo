@@ -82,6 +82,7 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
@@ -572,6 +573,14 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             throw WriteConflictException();
         }
     }
+
+    if (MONGO_unlikely(throwWCEDuringTxnCollCreate.shouldFail()) &&
+        opCtx->inMultiDocumentTransaction()) {
+        LOGV2(4696600,
+              "Throwing WriteConflictException due to failpoint 'throwWCEDuringTxnCollCreate'");
+        throw WriteConflictException();
+    }
+
 
     uassert(17320,
             str::stream() << "cannot do createCollection on namespace with a $ in it: " << nss,
