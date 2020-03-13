@@ -74,10 +74,6 @@ static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open
 static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
                                                                 &cursorStatsTimedOut);
 
-long long ClientCursor::totalOpen() {
-    return cursorStatsOpen.get();
-}
-
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorId cursorId,
                            OperationContext* operationUsingCursor,

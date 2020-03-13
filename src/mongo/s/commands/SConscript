@@ -60,6 +60,7 @@ env.Library(
         'cluster_is_master_cmd.cpp',
         'cluster_kill_op.cpp',
         'cluster_killcursors_cmd.cpp',
+        'cluster_killoperations_cmd.cpp',
         'cluster_list_databases_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
         'cluster_map_reduce_agg.cpp',

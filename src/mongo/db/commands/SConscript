@@ -101,7 +101,6 @@ env.Library(
         'kill_all_sessions_by_pattern_command.cpp',
         'kill_all_sessions_command.cpp',
         'kill_sessions_command.cpp',
-        'kill_operations_command.cpp',
         'parameters.cpp',
         'refresh_logical_session_cache_now.cpp',
         'refresh_sessions_command.cpp',
@@ -109,7 +108,6 @@ env.Library(
         'start_session_command.cpp',
         env.Idlc('parameters.idl')[0],
         env.Idlc('sessions_commands.idl')[0],
-        env.Idlc('kill_operations.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -123,7 +121,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/mongohasher',
-        '$BUILD_DIR/mongo/db/operation_killer',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
@@ -270,6 +267,7 @@ env.Library(
         "index_filter_commands.cpp",
         "kill_op.cpp",
         "killcursors_cmd.cpp",
+        "killoperations_cmd.cpp",
         "lock_info.cpp",
         "list_collections.cpp",
         "list_databases.cpp",
@@ -449,7 +447,8 @@ env.Library(
     target='kill_common',
     source=[
         'killcursors_common.cpp',
-        'kill_op_cmd_base.cpp'
+        'kill_op_cmd_base.cpp',
+        env.Idlc('kill_operations.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',

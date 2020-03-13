@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -49,27 +49,30 @@
 
 namespace mongo {
 
-class KillOperationsCommand final : public TypedCommand<KillOperationsCommand> {
+template <typename Derived>
+class KillOperationsCmdBase : public TypedCommand<Derived> {
 public:
     using Request = KillOperationsRequest;
 
-    class Invocation final : public InvocationBase {
+    class Invocation final : public TypedCommand<Derived>::InvocationBase {
     public:
-        using InvocationBase::InvocationBase;
+        using Base = typename TypedCommand<Derived>::InvocationBase;
+        using Base::Base;
 
         void typedRun(OperationContext* opCtx) {
             auto opKiller = OperationKiller(opCtx->getClient());
-            for (auto& opKey : request().getOperationKeys()) {
-                LOGV2(46156011,
-                      "Attempting to kill operation with OperationKey '{operationKey}'",
-                      "operationKey"_attr = opKey);
+            auto opKeys = Base::request().getOperationKeys();
+
+            for (auto& opKey : opKeys) {
+                LOGV2(46156011, "Attempting to kill operation", "operationKey"_attr = opKey);
                 opKiller.killOperation(OperationKey(opKey));
             }
+            Derived::killCursors(opCtx, opKeys);
         }
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(Base::request().getDbName(), "");
         }
 
         bool supportsWriteConcern() const override {
@@ -97,8 +100,8 @@ public:
     };
 
 private:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {
@@ -108,6 +111,6 @@ private:
     std::string help() const override {
         return "Internal command -- Kill operations on the target server by OperationKey.";
     }
-} killOperationsCmd;
+};
 
 }  // namespace mongo

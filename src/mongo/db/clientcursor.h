@@ -316,12 +316,6 @@ public:
         _lastKnownCommittedOpTime = std::move(lastCommittedOpTime);
     }
 
-    /**
-     * Returns the server-wide the count of living cursors. Such a cursor is called an "open
-     * cursor".
-     */
-    static long long totalOpen();
-
     friend std::size_t partitionOf(const ClientCursor* cursor) {
         return cursor->cursorid();
     }
