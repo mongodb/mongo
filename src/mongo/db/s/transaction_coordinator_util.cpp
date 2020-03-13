@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
@@ -183,6 +184,7 @@ Future<repl::OpTime> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
         [&scheduler, lsid, txnNumber, participants] {
             return scheduler.scheduleWork([lsid, txnNumber, participants](OperationContext* opCtx) {
+                FlowControl::Bypass flowControlBypass(opCtx);
                 getTransactionCoordinatorWorkerCurOpRepository()->set(
                     opCtx, lsid, txnNumber, CoordinatorAction::kWritingParticipantList);
                 return persistParticipantListBlocking(opCtx, lsid, txnNumber, participants);
@@ -376,6 +378,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
         [&scheduler, lsid, txnNumber, participants, decision] {
             return scheduler.scheduleWork(
                 [lsid, txnNumber, participants, decision](OperationContext* opCtx) {
+                    FlowControl::Bypass flowControlBypass(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumber, CoordinatorAction::kWritingDecision);
                     return persistDecisionBlocking(opCtx, lsid, txnNumber, participants, decision);
@@ -527,6 +530,7 @@ Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
         [](const Status& s) { return s == ErrorCodes::Interrupted; },
         [&scheduler, lsid, txnNumber] {
             return scheduler.scheduleWork([lsid, txnNumber](OperationContext* opCtx) {
+                FlowControl::Bypass flowControlBypass(opCtx);
                 getTransactionCoordinatorWorkerCurOpRepository()->set(
                     opCtx, lsid, txnNumber, CoordinatorAction::kDeletingCoordinatorDoc);
                 deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);

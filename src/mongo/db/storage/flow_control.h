@@ -53,6 +53,8 @@ namespace mongo {
  */
 class FlowControl : public ServerStatusSection {
 public:
+    class Bypass;
+
     FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord);
 
     /**
@@ -143,6 +145,24 @@ private:
     std::uint64_t _startWaitTime = 0;
 
     PeriodicJobAnchor _jobAnchor;
+};
+
+class FlowControl::Bypass {
+    Bypass(const Bypass&) = delete;
+    Bypass& operator=(const Bypass&) = delete;
+
+public:
+    Bypass(OperationContext* opCtx)
+        : _opCtx(opCtx), _origValue(opCtx->shouldParticipateInFlowControl()) {
+        _opCtx->setShouldParticipateInFlowControl(false);
+    }
+    ~Bypass() {
+        _opCtx->setShouldParticipateInFlowControl(_origValue);
+    }
+
+private:
+    OperationContext* _opCtx;
+    bool _origValue;
 };
 
 }  // namespace mongo
