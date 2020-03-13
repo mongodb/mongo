@@ -62,6 +62,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -615,6 +616,13 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _inRepairMode(repair),
       _readOnly(readOnly),
       _keepDataHistory(serverGlobalParams.enableMajorityReadConcern) {
+    // For queryable backup mode, if the 'recoverToOplogTimestamp' startup parameter is missing,
+    // then set the durable flag to false. This is the desired behavior to maintain backwards
+    // compatibility for versions of ops manager released prior to MongoDB 4.2.5.
+    if (_readOnly && recoverToOplogTimestamp.empty()) {
+        _durable = false;
+    }
+
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
     if (_durable) {
@@ -668,6 +676,13 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
               ->getTableCreateConfig("system");
     ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
     ss << extraOpenOptions;
+
+    // For queryable backup mode, if the 'recoverToOplogTimestamp' startup parameter is missing,
+    // then start WiredTiger is read only mode. This is the desired behavior to maintain backwards
+    // compatibility for versions of ops manager released prior to MongoDB 4.2.5.
+    if (_readOnly && recoverToOplogTimestamp.empty()) {
+        ss << ",readonly=true,";
+    }
 
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
