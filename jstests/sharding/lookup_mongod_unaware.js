@@ -38,6 +38,11 @@ const st = new ShardingTest({
     rs: {nodes: 1},
 });
 
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
+st._configServers.forEach(
+    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+
 // Set the parameter allowing sharded $lookup on all nodes.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),
                        "internalQueryAllowShardedLookup",
