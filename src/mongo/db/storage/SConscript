@@ -109,11 +109,25 @@ env.Library(
     target='oplog_hack',
     source=[
         'oplog_hack.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        ]
-    )
+    ],
+)
+
+env.Library(
+    target='storage_control',
+    source=[
+        'control/storage_control.cpp',
+    ],
+    LIBDEPS=[
+        'journal_flusher',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
 
 env.Library(
     target='oplog_cap_maintainer_thread',
@@ -122,6 +136,7 @@ env.Library(
     ],
     LIBDEPS=[
     	'$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/db/namespace_string',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -130,7 +145,21 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='journal_flusher',
+    source=[
+        'control/journal_flusher.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/background_job',
+    ],
+    LIBDEPS_PRIVATE=[
+        'storage_options',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )
@@ -274,6 +303,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        'storage_control',
         'storage_engine_lock_file',
         'storage_repair_observer',
         'storage_engine_metadata',

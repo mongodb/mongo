@@ -89,6 +89,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/system_index.h"
@@ -802,13 +803,13 @@ void ReplicationCoordinatorExternalStateImpl::stopAsyncUpdatesOfAndClearOplogTru
     //
     // This makes sure the JournalFlusher is not stuck waiting for a lock that stepdown might hold
     // before doing an update write to the truncate point.
-    _service->getStorageEngine()->interruptJournalFlusherForReplStateChange();
+    StorageControl::interruptJournalFlusherForReplStateChange(_service);
 
     // Wait for another round of journal flushing. This will ensure that we wait for the current
     // round to completely finish and have no chance of racing with unsetting the truncate point
     // below. It is possible that the JournalFlusher will not check for the interrupt signaled
     // above, if writing is imminent, so we must make sure that the code completes fully.
-    _service->getStorageEngine()->waitForJournalFlush(opCtx);
+    StorageControl::waitForJournalFlush(opCtx);
 
     // Writes to non-replicated collections do not need concurrency control with the OplogApplier
     // that never accesses them. Skip taking the PBWM.

@@ -45,6 +45,7 @@
 #include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/fail_point.h"
@@ -739,8 +740,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     // new writes with timestamps associated with those oplog entries will show up in the future. We
     // want to flush the journal as soon as possible in order to free ops waiting with 'j' write
     // concern.
-    const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->triggerJournalFlush();
+    StorageControl::triggerJournalFlush(opCtx->getServiceContext());
 
     // Use this fail point to hold the PBWM lock and prevent the batch from completing.
     if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {

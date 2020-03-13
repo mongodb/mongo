@@ -370,7 +370,7 @@ private:
      * Recovers to the stable timestamp while holding the global exclusive lock.
      * Returns the stable timestamp that the storage engine recovered to.
      */
-    StatusWith<Timestamp> _recoverToStableTimestamp(OperationContext* opCtx);
+    Timestamp _recoverToStableTimestamp(OperationContext* opCtx);
 
     /**
      * Process a single oplog entry that is getting rolled back and update the necessary rollback

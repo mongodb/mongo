@@ -118,7 +118,6 @@ MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
 MONGO_FAIL_POINT_DEFINE(pauseCheckpointThread);
-MONGO_FAIL_POINT_DEFINE(pauseJournalFlusherThread);
 
 }  // namespace
 
@@ -237,177 +236,6 @@ private:
     // The session sweeper thread idles on this condition variable for a particular time duration
     // between cleaning up expired sessions. It can be triggered early to expediate shutdown.
     stdx::condition_variable _condvar;
-};
-
-class WiredTigerKVEngine::WiredTigerJournalFlusher : public BackgroundJob {
-public:
-    explicit WiredTigerJournalFlusher(WiredTigerSessionCache* sessionCache)
-        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
-
-    virtual string name() const {
-        return "WTJournalFlusher";
-    }
-
-    virtual void run() {
-        ThreadClient tc(name(), getGlobalServiceContext());
-        LOGV2_DEBUG(22305, 1, "starting {name} thread", "name"_attr = name());
-
-        // Initialize the thread's opCtx.
-        _uniqueCtx.emplace(tc->makeOperationContext());
-
-        // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
-        // Non-replicated writes will not contribute to replication lag and can be safely excluded
-        // from Flow Control.
-        _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
-        while (true) {
-
-            pauseJournalFlusherThread.pauseWhileSet(_uniqueCtx->get());
-
-            try {
-                ON_BLOCK_EXIT([&] {
-                    // We do not want to miss an interrupt for the next round. Therefore, the opCtx
-                    // will be reset after a flushing round finishes.
-                    //
-                    // It is fine if the opCtx is signaled between finishing and resetting because
-                    // state changes will be seen before the next round. We want to catch any
-                    // interrupt signals that occur after state is checked at the start of a round:
-                    // the time during or before the next flush.
-                    stdx::lock_guard<Latch> lk(_opCtxMutex);
-                    _uniqueCtx.reset();
-                    _uniqueCtx.emplace(tc->makeOperationContext());
-                    _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
-                });
-
-                _sessionCache->waitUntilDurable(
-                    _uniqueCtx->get(),
-                    WiredTigerSessionCache::Fsync::kJournal,
-                    WiredTigerSessionCache::UseJournalListener::kUpdate);
-
-                // Signal the waiters that a round completed.
-                _currentSharedPromise->emplaceValue();
-            } catch (const AssertionException& e) {
-                invariant(ErrorCodes::isShutdownError(e.code()) ||
-                              e.code() == ErrorCodes::InterruptedDueToReplStateChange,
-                          e.toString());
-
-                // Signal the waiters that the fsync was interrupted.
-                _currentSharedPromise->setError(e.toStatus());
-            }
-
-            // Wait until either journalCommitIntervalMs passes or an immediate journal flush is
-            // requested (or shutdown).
-
-            auto deadline =
-                Date_t::now() + Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
-
-            stdx::unique_lock<Latch> lk(_stateMutex);
-
-            MONGO_IDLE_THREAD_BLOCK;
-            _flushJournalNowCV.wait_until(lk, deadline.toSystemTimePoint(), [&] {
-                return _flushJournalNow || _shuttingDown;
-            });
-
-            _flushJournalNow = false;
-
-            if (_shuttingDown) {
-                LOGV2_DEBUG(22306, 1, "stopping {name} thread", "name"_attr = name());
-                invariant(!_shutdownReason.isOK());
-                _nextSharedPromise->setError(_shutdownReason);
-                stdx::lock_guard<Latch> lk(_opCtxMutex);
-                _uniqueCtx.reset();
-                return;
-            }
-
-            // Take the next promise as current and reset the next promise.
-            _currentSharedPromise =
-                std::exchange(_nextSharedPromise, std::make_unique<SharedPromise<void>>());
-        }
-    }
-
-    /**
-     * Signals the thread to quit and then waits until it does. The given 'reason' is returned to
-     * any operations that were waiting for the journal to flush.
-     */
-    void shutdown(const Status& reason) {
-        {
-            stdx::lock_guard<Latch> lk(_stateMutex);
-            _shuttingDown = true;
-            _shutdownReason = reason;
-            _flushJournalNowCV.notify_one();
-        }
-        wait();
-    }
-
-    /**
-     * Signals an immediate journal flush and leaves.
-     */
-    void triggerJournalFlush() {
-        stdx::lock_guard<Latch> lk(_stateMutex);
-        if (!_flushJournalNow) {
-            _flushJournalNow = true;
-            _flushJournalNowCV.notify_one();
-        }
-    }
-
-    /**
-     * Signals an immediate journal flush and waits for it to complete before returning.
-     *
-     * Will throw ShutdownInProgress if the flusher thread is being stopped.
-     * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
-     */
-    void waitForJournalFlush() {
-        auto myFuture = [&]() {
-            stdx::unique_lock<Latch> lk(_stateMutex);
-            if (!_flushJournalNow) {
-                _flushJournalNow = true;
-                _flushJournalNowCV.notify_one();
-            }
-            return _nextSharedPromise->getFuture();
-        }();
-        // Throws on error if the catalog is closed or the flusher round is interrupted by stepdown.
-        myFuture.get();
-    }
-
-    /**
-     * Interrupts the journal flusher thread via its operation context with an
-     * InterruptedDueToReplStateChange error.
-     */
-    void interruptJournalFlusherForReplStateChange() {
-        stdx::lock_guard<Latch> lk(_opCtxMutex);
-        if (_uniqueCtx) {
-            stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
-            _uniqueCtx->get()->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
-        }
-    }
-
-private:
-    WiredTigerSessionCache* _sessionCache;
-
-    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("WiredTigerJournalFlusherOpCtxMutex");
-
-    // Saves a reference to the flusher thread's operation context so it can be interrupted if the
-    // flusher is active.
-    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
-
-    // Protects the state below.
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("WiredTigerJournalFlusherStateMutex");
-
-    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
-    // _flushJournalNow or _shuttingDown is set and flush or stop accordingly.
-    mutable stdx::condition_variable _flushJournalNowCV;
-
-    bool _flushJournalNow = false;
-    bool _shuttingDown = false;
-    Status _shutdownReason = Status::OK();
-
-    // New callers get a future from nextSharedPromise. The JournalFlusher thread will swap that to
-    // currentSharedPromise at the start of every round of flushing, and reset nextSharedPromise
-    // with a new shared promise.
-    std::unique_ptr<SharedPromise<void>> _currentSharedPromise =
-        std::make_unique<SharedPromise<void>>();
-    std::unique_ptr<SharedPromise<void>> _nextSharedPromise =
-        std::make_unique<SharedPromise<void>>();
 };
 
 std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult& r) {
@@ -1013,10 +841,6 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 
 void WiredTigerKVEngine::startAsyncThreads() {
     if (!_ephemeral) {
-        if (_durable) {
-            _journalFlusher = std::make_unique<WiredTigerJournalFlusher>(_sessionCache.get());
-            _journalFlusher->go();
-        }
         if (!_readOnly) {
             _checkpointThread =
                 std::make_unique<WiredTigerCheckpointThread>(this, _sessionCache.get());
@@ -1153,12 +977,6 @@ void WiredTigerKVEngine::cleanShutdown() {
         LOGV2(22318, "Shutting down session sweeper thread");
         _sessionSweeper->shutdown();
         LOGV2(22319, "Finished shutting down session sweeper thread");
-    }
-    if (_journalFlusher) {
-        LOGV2(22320, "Shutting down journal flusher thread");
-        _journalFlusher->shutdown(
-            {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
-        LOGV2(22321, "Finished shutting down journal flusher thread");
     }
     if (_checkpointThread) {
         LOGV2(22322, "Shutting down checkpoint thread");
@@ -2276,14 +2094,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
 
     if (!_ephemeral) {
         LOGV2_FOR_ROLLBACK(
-            23990,
-            2,
-            "WiredTiger::RecoverToStableTimestamp shutting down journal and checkpoint threads.");
+            23990, 2, "WiredTiger::RecoverToStableTimestamp shutting down checkpoint thread.");
         // Shutdown WiredTigerKVEngine owned accesses into the storage engine.
-        if (_durable) {
-            _journalFlusher->shutdown(
-                {ErrorCodes::InterruptedDueToReplStateChange, "Rollback in progress."});
-        }
         _checkpointThread->shutdown();
     }
 
@@ -2304,10 +2116,6 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     }
 
     if (!_ephemeral) {
-        if (_durable) {
-            _journalFlusher = std::make_unique<WiredTigerJournalFlusher>(_sessionCache.get());
-            _journalFlusher->go();
-        }
         _checkpointThread = std::make_unique<WiredTigerCheckpointThread>(this, _sessionCache.get());
         _checkpointThread->go();
     }
@@ -2499,27 +2307,6 @@ void WiredTigerKVEngine::haltOplogManager() {
     _oplogManagerCount--;
     if (_oplogManagerCount == 0) {
         _oplogManager->haltVisibilityThread();
-    }
-}
-
-void WiredTigerKVEngine::triggerJournalFlush() const {
-    if (_journalFlusher) {
-        _journalFlusher->triggerJournalFlush();
-    }
-}
-
-void WiredTigerKVEngine::waitForJournalFlush(OperationContext* opCtx) const {
-    if (_journalFlusher) {
-        _journalFlusher->waitForJournalFlush();
-    } else {
-        opCtx->recoveryUnit()->waitUntilDurable(opCtx);
-    }
-}
-
-
-void WiredTigerKVEngine::interruptJournalFlusherForReplStateChange() const {
-    if (_journalFlusher) {
-        _journalFlusher->interruptJournalFlusherForReplStateChange();
     }
 }
 

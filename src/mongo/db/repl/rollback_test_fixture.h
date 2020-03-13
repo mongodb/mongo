@@ -151,18 +151,18 @@ public:
     }
 
     /**
-     * If '_recoverToTimestampStatus' is non-empty, returns it. If '_recoverToTimestampStatus' is
+     * If '_recoverToTimestampStatus' is non-empty, fasserts. If '_recoverToTimestampStatus' is
      * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns the new value
      * of '_currTimestamp'.
      */
-    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override {
+    Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
         stdx::lock_guard<Latch> lock(_mutex);
         if (_recoverToTimestampStatus) {
-            return _recoverToTimestampStatus.get();
-        } else {
-            _currTimestamp = _stableTimestamp;
-            return _currTimestamp;
+            fassert(4584700, _recoverToTimestampStatus.get());
         }
+
+        _currTimestamp = _stableTimestamp;
+        return _currTimestamp;
     }
 
     bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {

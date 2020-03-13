@@ -227,6 +227,7 @@ env.Library(
         'repl_server_parameters',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/storage/oplog_cap_maintainer_thread',
+        '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/db/logical_clock',
     ],
 )
@@ -558,6 +559,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
+        '$BUILD_DIR/mongo/db/storage/storage_control',
         'replication_auth',
     ],
 )
@@ -1187,9 +1189,10 @@ env.Library(
         'rollback_source_impl',
     ],
     LIBDEPS_PRIVATE=[
-        'local_oplog_info',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/storage/storage_control',
+        'local_oplog_info',
         'repl_server_parameters',
     ],
 )

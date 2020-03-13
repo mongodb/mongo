@@ -987,6 +987,7 @@ env.Library(
         "commands/server_status_core",
         "s/sharding_api_d",
         "shared_request_handling",
+        "$BUILD_DIR/mongo/db/storage/storage_control",
     ],
 )
 
@@ -1680,6 +1681,7 @@ env.Library(
         'index/index_access_methods',
         'index_builds_coordinator_mongod',
         'service_context_d',
+        'storage/storage_control',
         'storage/devnull/storage_devnull',
         'storage/ephemeral_for_test/storage_ephemeral_for_test',
         'storage/storage_options',

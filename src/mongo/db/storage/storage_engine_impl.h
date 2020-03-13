@@ -173,12 +173,6 @@ public:
 
     bool supportsTwoPhaseIndexBuild() const final;
 
-    void triggerJournalFlush() const final;
-
-    void waitForJournalFlush(OperationContext* opCtx) const final;
-
-    void interruptJournalFlusherForReplStateChange() const final;
-
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;

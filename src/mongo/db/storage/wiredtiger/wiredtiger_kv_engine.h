@@ -263,12 +263,6 @@ public:
 
     bool supportsOplogStones() const final override;
 
-    void triggerJournalFlush() const override;
-
-    void waitForJournalFlush(OperationContext* opCtx) const override;
-
-    void interruptJournalFlusherForReplStateChange() const override;
-
     bool isCacheUnderPressure(OperationContext* opCtx) const override;
 
     bool supportsReadConcernMajority() const final;
@@ -307,7 +301,7 @@ public:
      * `waitForAllEarlierOplogWritesToBeVisible`, is advised to first see if the oplog manager is
      * running with a call to `isRunning`.
      *
-     * A caller that simply wants to call `triggerJournalFlush` may do so without concern.
+     * A caller that simply wants to call `triggerOplogVisibilityUpdate` may do so without concern.
      */
     WiredTigerOplogManager* getOplogManager() const {
         return _oplogManager.get();
@@ -360,7 +354,6 @@ public:
 
 private:
     class WiredTigerSessionSweeper;
-    class WiredTigerJournalFlusher;
     class WiredTigerCheckpointThread;
 
     /**
@@ -450,7 +443,6 @@ private:
     const bool _keepDataHistory = true;
 
     std::unique_ptr<WiredTigerSessionSweeper> _sessionSweeper;
-    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
     std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
 
     std::string _rsOptions;

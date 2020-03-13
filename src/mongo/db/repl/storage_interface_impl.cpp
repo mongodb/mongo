@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/logv2/log.h"
@@ -1205,8 +1206,17 @@ void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
     serviceCtx->getStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 
-StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx) {
-    return opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
+Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx) {
+    auto serviceContext = opCtx->getServiceContext();
+
+    StorageControl::stopStorageControls(serviceContext);
+
+    auto swStableTimestamp = serviceContext->getStorageEngine()->recoverToStableTimestamp(opCtx);
+    fassert(31049, swStableTimestamp);
+
+    StorageControl::startStorageControls(serviceContext);
+
+    return swStableTimestamp.getValue();
 }
 
 bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const {
