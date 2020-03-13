@@ -49,6 +49,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
@@ -105,6 +106,7 @@ int runDbTests(int argc, char** argv) {
     globalServiceContext->setPeriodicRunner(std::move(runner));
 
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
+    StorageControl::startStorageControls(globalServiceContext);
     DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(globalServiceContext,
                                   std::make_unique<IndexAccessMethodFactoryImpl>());

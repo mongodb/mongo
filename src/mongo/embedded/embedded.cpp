@@ -57,6 +57,7 @@
 #include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl.h"
@@ -239,6 +240,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     setUpCatalog(serviceContext);
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
+    StorageControl::startStorageControls(serviceContext);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.

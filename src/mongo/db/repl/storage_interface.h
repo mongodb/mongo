@@ -371,8 +371,10 @@ public:
      * "local.replset.minvalid" which should be reverted to the last stable timestamp.
      *
      * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
+     *
+     * Returns the stable timestamp to which it reverted the data.
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) = 0;
+    virtual Timestamp recoverToStableTimestamp(OperationContext* opCtx) = 0;
 
     /**
      * Returns whether the storage engine supports "recover to stable timestamp".

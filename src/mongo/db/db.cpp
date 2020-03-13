@@ -140,6 +140,7 @@
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
@@ -352,6 +353,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+    StorageControl::startStorageControls(serviceContext);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(serviceContext)->restartRequired()) {

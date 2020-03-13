@@ -164,7 +164,7 @@ public:
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
-    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
+    Timestamp recoverToStableTimestamp(OperationContext* opCtx) override;
 
     bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override;
 

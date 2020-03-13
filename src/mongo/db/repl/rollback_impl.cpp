@@ -507,11 +507,10 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     }
 
     // Recover to the stable timestamp.
-    auto stableTimestampSW = _recoverToStableTimestamp(opCtx);
-    fassert(31049, stableTimestampSW);
+    auto stableTimestamp = _recoverToStableTimestamp(opCtx);
 
-    _rollbackStats.stableTimestamp = stableTimestampSW.getValue();
-    _listener->onRecoverToStableTimestamp(stableTimestampSW.getValue());
+    _rollbackStats.stableTimestamp = stableTimestamp;
+    _listener->onRecoverToStableTimestamp(stableTimestamp);
 
     // Log the total number of insert and update operations that have been rolled back as a
     // result of recovering to the stable timestamp.
@@ -555,8 +554,7 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     _resetDropPendingState(opCtx);
 
     // Run the recovery process.
-    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx,
-                                                                    stableTimestampSW.getValue());
+    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     _listener->onRecoverFromOplog();
 
     // Sets the correct post-rollback counts on any collections whose counts changed during the
@@ -1178,7 +1176,7 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
     _listener->onRollbackFileWrittenForNamespace(std::move(uuid), std::move(nss));
 }
 
-StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
+Timestamp RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
     // Recover to the stable timestamp while holding the global exclusive lock. This may throw,
     // which the caller must handle.
     Lock::GlobalWrite globalWrite(opCtx);

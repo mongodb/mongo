@@ -45,6 +45,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
@@ -83,6 +84,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     initializeStorageEngine(serviceContext,
                             StorageEngineInitFlags::kAllowNoLockFile |
                                 StorageEngineInitFlags::kSkipMetadataFile);
+    StorageControl::startStorageControls(serviceContext);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
