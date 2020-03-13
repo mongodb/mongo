@@ -89,6 +89,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/system_index.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -773,9 +774,7 @@ void ReplicationCoordinatorExternalStateImpl::clearOplogVisibilityStateForStepDo
     // available, which may have to wait for the ticket refresher to run, which in turn blocks on
     // the repl _mutex to check whether we are primary or not: this is a deadlock because stepdown
     // already holds the repl _mutex!
-    auto originalFlowControlSetting = opCtx->shouldParticipateInFlowControl();
-    ON_BLOCK_EXIT([&] { opCtx->setShouldParticipateInFlowControl(originalFlowControlSetting); });
-    opCtx->setShouldParticipateInFlowControl(false);
+    FlowControl::Bypass flowControlBypass(opCtx);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go back to
     // using last applied to update repl's durable timestamp instead of the truncate point.
