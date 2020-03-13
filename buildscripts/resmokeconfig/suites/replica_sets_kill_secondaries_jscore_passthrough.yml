@@ -51,7 +51,6 @@ executor:
             rollback: 2
           storage:
             recovery: 2
-        oplogApplicationEnforcesSteadyStateConstraints: true
     num_nodes: 2
     voting_secondaries: false
     replset_config_options:

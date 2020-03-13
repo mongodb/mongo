@@ -41,7 +41,6 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         # Enable aggressive WiredTiger eviction.
         wiredTigerEvictionDebugMode: true
     num_nodes: 3

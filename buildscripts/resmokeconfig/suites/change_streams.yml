@@ -54,5 +54,4 @@ executor:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
     num_nodes: 1

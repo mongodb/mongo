@@ -32,4 +32,3 @@ executor:
       encryptionKeyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true

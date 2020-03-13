@@ -38,7 +38,6 @@ executor:
         disableLogicalSessionCacheRefresh: false
         enableElectionHandoff: 0
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
     all_nodes_electable: true

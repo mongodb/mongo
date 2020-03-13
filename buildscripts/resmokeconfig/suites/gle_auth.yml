@@ -38,5 +38,4 @@ executor:
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         enableLocalhostAuthBypass: false

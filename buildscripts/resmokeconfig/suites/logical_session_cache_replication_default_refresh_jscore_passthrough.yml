@@ -53,6 +53,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         disableLogicalSessionCacheRefresh: false
     num_nodes: 3

@@ -54,7 +54,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         writePeriodicNoops: 1
       enableMajorityReadConcern: ''
     # This suite requires w="majority" writes to be applied on all secondaries. By using a 2-node

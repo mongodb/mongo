@@ -55,7 +55,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         writePeriodicNoops: 1
       enableMajorityReadConcern: ''
     num_nodes: 2

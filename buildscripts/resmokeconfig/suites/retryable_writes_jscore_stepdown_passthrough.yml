@@ -156,7 +156,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         enableElectionHandoff: 0
-        oplogApplicationEnforcesSteadyStateConstraints: true
     all_nodes_electable: true
     num_nodes: 3
     replset_config_options:

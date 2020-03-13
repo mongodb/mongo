@@ -34,6 +34,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         maxNumberOfTransactionOperationsInSingleOplogEntry: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
     # Use a 1-node replica set.
     num_nodes: 1

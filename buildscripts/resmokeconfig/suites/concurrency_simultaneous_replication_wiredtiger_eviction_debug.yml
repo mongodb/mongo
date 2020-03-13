@@ -87,7 +87,6 @@ executor:
         # when there is a delay in lock acquisition during a getMore command.
         cursorTimeoutMillis: 3600000
         enableTestCommands: 1
-        oplogApplicationEnforcesSteadyStateConstraints: true
         # Enable aggressive WiredTiger eviction.
         wiredTigerEvictionDebugMode: true
     num_nodes: 3

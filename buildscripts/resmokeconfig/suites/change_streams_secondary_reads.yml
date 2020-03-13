@@ -69,7 +69,6 @@ executor:
           command: 1
           query: 1
           replication: 3
-        oplogApplicationEnforcesSteadyStateConstraints: true
     # This suite requires w:"majority" writes to be applied on all shard secondaries.
     # By setting shards to two node replsets, the majority is all voting nodes.
     num_rs_nodes_per_shard: 2
