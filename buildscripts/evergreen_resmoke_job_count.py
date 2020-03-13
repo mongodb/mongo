@@ -27,6 +27,28 @@ MACHINE_TASK_FACTOR_OVERRIDES = {"aarch64": TASKS_FACTORS}
 
 PLATFORM_TASK_FACTOR_OVERRIDES = {"win32": TASKS_FACTORS, "cygwin": TASKS_FACTORS}
 
+# Apply factor for a task everywhere it is run.
+GLOBAL_TASK_FACTOR_OVERRIDES = {
+    r"logical_session_cache.*_refresh_jscore_passthrough.*": 0.25,
+    r"multi_shard_.*multi_stmt_txn_.*jscore_passthrough.*": 0.125,
+}
+
+
+def global_task_factor(task_name, overrides, factor):
+    """
+    Check for a global task override and return factor.
+
+    :param task_name: Name of task to check for.
+    :param overrides: Global override data.
+    :param factor: Default factor if there is no override.
+    :return: Factor that should be used based on global overrides.
+    """
+    for task_re, task_factor in overrides.items():
+        if re.compile(task_re).match(task_name):
+            return task_factor
+
+    return factor
+
 
 def get_task_factor(task_name, overrides, override_type, factor):
     """Check for task override and return factor."""
@@ -43,6 +65,7 @@ def determine_factor(task_name, variant, factor):
         get_task_factor(task_name, MACHINE_TASK_FACTOR_OVERRIDES, PLATFORM_MACHINE, factor))
     factors.append(get_task_factor(task_name, PLATFORM_TASK_FACTOR_OVERRIDES, SYS_PLATFORM, factor))
     factors.append(get_task_factor(task_name, VARIANT_TASK_FACTOR_OVERRIDES, variant, factor))
+    factors.append(global_task_factor(task_name, GLOBAL_TASK_FACTOR_OVERRIDES, factor))
     return min(factors)
 
 
