@@ -37,7 +37,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo::sdam {
-MONGO_FAIL_POINT_DEFINE(serverSelectorIgnoresLatencyWindow);
+MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);
 
 ServerSelector::~ServerSelector() {}
 
@@ -157,7 +157,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
     _getCandidateServers(&results, topologyDescription, criteria);
 
     if (results.size()) {
-        if (MONGO_unlikely(serverSelectorIgnoresLatencyWindow.shouldFail())) {
+        if (MONGO_unlikely(sdamServerSelectorIgnoreLatencyWindow.shouldFail())) {
             return results;
         }
 

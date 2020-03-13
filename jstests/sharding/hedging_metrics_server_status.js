@@ -74,8 +74,13 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 // Force the mongos's replica set monitors to always include all the eligible nodes.
-let ignoreLatencyFailPoint = configureFailPoint(st.s, "serverSelectorIgnoresLatencyWindow");
-
+const replicaSetMonitorProtocol =
+    assert.commandWorked(st.s.adminCommand({getParameter: 1, replicaSetMonitorProtocol: 1}))
+        .replicaSetMonitorProtocol;
+let serverSelectorFailPoint = configureFailPoint(st.s,
+                                                 replicaSetMonitorProtocol === "scanning"
+                                                     ? "scanningServerSelectorIgnoreLatencyWindow"
+                                                     : "sdamServerSelectorIgnoreLatencyWindow");
 // Force the mongos to connect to eligible hosts in alphabetical order of host names.
 let targetHostsInAlphabeticalOrderFailPoint =
     configureFailPoint(st.s, "networkInterfaceConnectTargetHostsInAlphabeticalOrder");
@@ -127,7 +132,7 @@ expectedHedgingMetrics.numTotalHedgedOperations += 1;
 expectedHedgingMetrics.numAdvantageouslyHedgedOperations += 0;
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
-ignoreLatencyFailPoint.off();
+serverSelectorFailPoint.off();
 targetHostsInAlphabeticalOrderFailPoint.off();
 st.stop();
 }());
