@@ -8576,7 +8576,7 @@ buildvariants:
 - &linux-64-debug-template
   name: linux-64-debug
   display_name: "! Linux DEBUG"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   run_on:
   - rhel62-large
   expansions:
@@ -8617,6 +8617,7 @@ buildvariants:
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
+  batchtime: 1440 # 1 day
   modules:
   - wtdevelop
   expansions:
@@ -9294,7 +9295,7 @@ buildvariants:
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   run_on:
   - windows-64-vs2019-small
   expansions:
@@ -9400,7 +9401,7 @@ buildvariants:
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
     - enterprise
   run_on:
@@ -10324,7 +10325,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -10441,6 +10442,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0 (Dagger)"
+  batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -10454,6 +10456,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
+  batchtime: 1440  # 1 day
   run_on:
   - rhel70
   expansions:
@@ -10470,6 +10473,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
+  batchtime: 10080  # 1 week
   run_on:
   - rhel70
   expansions:
@@ -10508,7 +10512,7 @@ buildvariants:
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   run_on:
   - ubuntu1604-test
   expansions:
@@ -10963,7 +10967,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang
   display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -10985,7 +10989,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -11001,7 +11005,7 @@ buildvariants:
 
 - name: ubuntu-dynamic-1604-clang
   display_name: "* Shared Library Ubuntu 16.04 (Clang)"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   run_on:
    - ubuntu1604-test
   expansions:
@@ -11851,7 +11855,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -11947,7 +11951,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
-  batchtime: 180 # 3 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   expansions:
