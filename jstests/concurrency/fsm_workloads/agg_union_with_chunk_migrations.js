@@ -11,8 +11,13 @@
  * collection of the aggregation itself).
  * $config.state.aggregate: function to execute the aggregation.
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
- * requires_non_retryable_writes]
+ * @tags: [
+ *   requires_sharding,
+ *   assumes_balancer_off,
+ *   assumes_autosplit_off,
+ *   requires_non_retryable_writes,
+ *   requires_fcv_4.4,  # Uses $unionWith.
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for $config
