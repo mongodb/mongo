@@ -13,9 +13,13 @@ load("jstests/replsets/rslib.js");
 
 const nodeCount = 3;
 const kDbName = "read_pref_cmd";
-const kShardedCollName = "test";
+
+const kShardedCollName = "testCollSharded";
 const kShardedNs = kDbName + "." + kShardedCollName;
 const kNumDocs = 10;
+
+const kUnshardedCollName = "testCollUnsharded";
+const kUnshardedNs = kDbName + "." + kUnshardedCollName;
 
 const allowedOnSecondary = Object.freeze({kNever: 0, kAlways: 1});
 
@@ -51,17 +55,20 @@ var tearDown = function() {
 };
 
 /**
- * Returns a profile query object for the given query object. Assumes that all values are
- * native types (no objects).
+ * Returns a profile query for the given namespace and command query. Assumes that all values
+ * are native types (no objects).
  */
-let formatProfileQuery = function(queryObj, isQueryOp = false) {
-    let newQueryObj = isQueryOp ? {op: "query"} : {op: "command"};
-
-    for (var field in queryObj) {
-        newQueryObj['command.' + field] = queryObj[field];
+let formatProfileQuery = function(ns, cmdQuery, isQueryOp = false) {
+    let profileQuery = {op: isQueryOp ? "query" : "command", errCode: {$exists: false}};
+    if (ns) {
+        profileQuery["ns"] = ns;
     }
 
-    return newQueryObj;
+    for (const field in cmdQuery) {
+        profileQuery["command." + field] = cmdQuery[field];
+    }
+
+    return profileQuery;
 };
 
 /**
@@ -117,24 +124,22 @@ let assertCmdRanOnExpectedNodes = function(conn, isMongos, rsNodes, cmdTestCase)
         const numHedgedOperations = hedgingMetricsAfter.numTotalHedgedOperations -
             hedgingMetricsBefore.numTotalHedgedOperations;
 
-        assert.eq(1, numOperations, "expect the command to be eligible for hedging");
+        assert.eq(numOperations, 1, "expect the command to be eligible for hedging");
         if (numHedgedOperations == 0) {
-            // We did not hedge the operation and send an additional request (i.e. we did not
-            // manage to acquire a connection to the other node before the command finished).
+            // We did not hedge the operation That is, we did not manage to acquire a connection
+            // to one other eligible node and send out an additional request before the command
+            // finished.
             assert.eq(1, getNumNodesCmdRanOn(rsNodes, cmdTestCase));
             return;
         }
 
-        // We did hedge the operation. Use assert.soon to give the slower node time to finish
-        // running the hedged command.
-        assert.eq(1, numHedgedOperations);
-        assert.soon(() => {
-            hedgingMetricsAfter = getHedgingMetrics(conn);
-            const numNodes = getNumNodesCmdRanOn(rsNodes, cmdTestCase);
-            return numNodes == 2;
-        }, "expect the command to be hedged and to run to completion on all target nodes");
+        // We did hedge the operation. That is, we did acquire a connection to one other eligible
+        // node and try to send an additional request. So if the request had already been sent
+        // when the command finished, that other node could also run the command to completion.
+        assert.eq(numHedgedOperations, 1);
+        assert.gte(getNumNodesCmdRanOn(rsNodes, cmdTestCase), 1);
     } else {
-        assert.eq(1, getNumNodesCmdRanOn(rsNodes, cmdTestCase));
+        assert.eq(getNumNodesCmdRanOn(rsNodes, cmdTestCase), 1);
     }
 };
 
@@ -196,12 +201,14 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
     cmdTest({distinct: kShardedCollName, key: 'x', query: {x: 1}},
             allowedOnSecondary.kAlways,
             true,
-            formatProfileQuery({distinct: kShardedCollName}));
+            formatProfileQuery(kShardedNs, {distinct: kShardedCollName}));
 
     // Test command that can't be sent to secondary
-    cmdTest(
-        {create: 'mrIn'}, allowedOnSecondary.kNever, false, formatProfileQuery({create: 'mrIn'}));
-    // Make sure mrIn is propagated to secondaries before proceeding
+    cmdTest({create: kUnshardedCollName},
+            allowedOnSecondary.kNever,
+            false,
+            formatProfileQuery(kUnshardedNs, {create: kUnshardedCollName}));
+    // Make sure the unsharded collection is propagated to secondaries before proceeding.
     testDB.runCommand({getLastError: 1, w: nodeCount});
 
     var mapFunc = function(doc) {};
@@ -221,27 +228,28 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
         },
                 allowedOnSecondary.kAlways,
                 false,
-                formatProfileQuery({aggregate: kShardedCollName, comment: comment}));
+                formatProfileQuery(kShardedNs, {aggregate: kShardedCollName, comment: comment}));
     }
 
     // Test inline mapReduce on unsharded collection.
     if (isMongos) {
         const comment = 'mapReduce_inline_unsharded_' + ObjectId();
-        cmdTest({
-            mapreduce: 'mrIn',
-            map: mapFunc,
-            reduce: reduceFunc,
-            out: {inline: 1},
-            comment: comment
-        },
-                allowedOnSecondary.kAlways,
-                false,
-                formatProfileQuery({aggregate: 'mrIn', comment: comment}));
+        cmdTest(
+            {
+                mapreduce: kUnshardedCollName,
+                map: mapFunc,
+                reduce: reduceFunc,
+                out: {inline: 1},
+                comment: comment
+            },
+            allowedOnSecondary.kAlways,
+            false,
+            formatProfileQuery(kUnshardedNs, {aggregate: kUnshardedCollName, comment: comment}));
     } else {
-        cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
+        cmdTest({mapreduce: kUnshardedCollName, map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
                 allowedOnSecondary.kAlways,
                 false,
-                formatProfileQuery({mapreduce: 'mrIn', 'out.inline': 1}));
+                formatProfileQuery(kUnshardedNs, {mapreduce: kUnshardedCollName, 'out.inline': 1}));
     }
 
     // Test non-inline mapReduce on sharded collection.
@@ -256,39 +264,47 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
         },
                 allowedOnSecondary.kAlways,
                 false,
-                formatProfileQuery({aggregate: kShardedCollName, comment: comment}));
+                formatProfileQuery(kShardedNs, {aggregate: kShardedCollName, comment: comment}));
     }
 
     // Test non-inline mapReduce on unsharded collection.
     if (isMongos) {
         const comment = 'mapReduce_noninline_unsharded_' + ObjectId();
+        cmdTest(
+            {
+                mapreduce: kUnshardedCollName,
+                map: mapFunc,
+                reduce: reduceFunc,
+                out: {replace: 'mrOut'},
+                comment: comment
+            },
+            allowedOnSecondary.kAlways,
+            false,
+            formatProfileQuery(kUnshardedNs, {aggregate: kUnshardedCollName, comment: comment}));
+    } else {
         cmdTest({
-            mapreduce: 'mrIn',
+            mapreduce: kUnshardedCollName,
             map: mapFunc,
             reduce: reduceFunc,
-            out: {replace: 'mrOut'},
-            comment: comment
+            out: {replace: 'mrOut'}
         },
-                allowedOnSecondary.kAlways,
-                false,
-                formatProfileQuery({aggregate: 'mrIn', comment: comment}));
-    } else {
-        cmdTest({mapreduce: 'mrIn', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
                 allowedOnSecondary.kNever,
                 false,
-                formatProfileQuery({mapreduce: 'mrIn', 'out.replace': 'mrOut'}));
+                formatProfileQuery(kUnshardedNs,
+                                   {mapreduce: kUnshardedCollName, 'out.replace': 'mrOut'}));
     }
 
     // Test other commands that can be sent to secondary.
     cmdTest({count: kShardedCollName},
             allowedOnSecondary.kAlways,
             true,
-            formatProfileQuery({count: kShardedCollName}));
+            formatProfileQuery(kShardedNs, {count: kShardedCollName}));
     cmdTest({collStats: kShardedCollName},
             allowedOnSecondary.kAlways,
             true,
-            formatProfileQuery({collStats: kShardedCollName}));
-    cmdTest({dbStats: 1}, allowedOnSecondary.kAlways, true, formatProfileQuery({dbStats: 1}));
+            formatProfileQuery(kShardedNs, {collStats: kShardedCollName}));
+    cmdTest(
+        {dbStats: 1}, allowedOnSecondary.kAlways, true, formatProfileQuery(kDbName, {dbStats: 1}));
 
     assert.commandWorked(shardedColl.ensureIndex({loc: '2d'}));
     assert.commandWorked(
@@ -311,23 +327,24 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
         },
                 allowedOnSecondary.kAlways,
                 true,
-                formatProfileQuery({geoSearch: kShardedCollName}));
+                formatProfileQuery(kShardedNs, {geoSearch: kShardedCollName}));
     }
 
     // Test on sharded
     cmdTest({aggregate: kShardedCollName, pipeline: [{$project: {x: 1}}], cursor: {}},
             allowedOnSecondary.kAlways,
             false,
-            formatProfileQuery({
+            formatProfileQuery(kShardedNs, {
                 aggregate: kShardedCollName,
                 pipeline: [isMongos ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
             }));
 
     // Test on non-sharded
-    cmdTest({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}], cursor: {}},
+    cmdTest({aggregate: kUnshardedCollName, pipeline: [{$project: {x: 1}}], cursor: {}},
             allowedOnSecondary.kAlways,
             false,
-            formatProfileQuery({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}]}));
+            formatProfileQuery(kUnshardedNs,
+                               {aggregate: kUnshardedCollName, pipeline: [{$project: {x: 1}}]}));
 
     // Test $currentOp aggregation stage.
     if (!isMongos) {
@@ -346,7 +363,7 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
         },
                 allowedOnSecondary.kAlways,
                 false,
-                formatProfileQuery({comment: curOpComment}),
+                formatProfileQuery(undefined, {comment: curOpComment}),
                 "admin");
     }
 };
@@ -381,11 +398,12 @@ let testCursorReadPreference = function(conn, isMongos, rsNodes, {readPref, expe
         isHedgingExpected(isMongos, readPref.hedge, allowedOnSecondary.kAlways, true);
 
     let cursor =
-        testColl.find({x: {gte: 0}}).readPref(readPref.mode, readPref.tagSets, readPref.hedge);
+        testColl.find({x: {$gte: 0}}).readPref(readPref.mode, readPref.tagSets, readPref.hedge);
     const cmdFunc = () => cursor.toArray();
     const secOk = allowedOnSecondary.kAlways;
 
-    const profileQuery = formatProfileQuery({find: kShardedCollName, filter: {x: {gte: 0}}}, true);
+    const profileQuery =
+        formatProfileQuery(kShardedNs, {find: kShardedCollName, filter: {x: {$gte: 0}}}, true);
     const dbName = kDbName;
 
     assertCmdRanOnExpectedNodes(
@@ -610,7 +628,13 @@ testAllModes(replConn, st.rs0.nodes, false);
 jsTest.log('Starting test for mongos connection');
 
 // Force the mongos's replica set monitors to always include all the eligible nodes.
-let failPoint = configureFailPoint(st.s, "serverSelectorIgnoresLatencyWindow");
+const replicaSetMonitorProtocol =
+    assert.commandWorked(st.s.adminCommand({getParameter: 1, replicaSetMonitorProtocol: 1}))
+        .replicaSetMonitorProtocol;
+let failPoint = configureFailPoint(st.s,
+                                   replicaSetMonitorProtocol === "scanning"
+                                       ? "scanningServerSelectorIgnoreLatencyWindow"
+                                       : "sdamServerSelectorIgnoreLatencyWindow");
 testAllModes(st.s, st.rs0.nodes, true);
 failPoint.off();
 

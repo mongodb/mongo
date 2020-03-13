@@ -65,6 +65,7 @@ using std::string;
 using std::vector;
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(scanningServerSelectorIgnoreLatencyWindow);
 
 // Pull nested types to top-level scope
 typedef ScanningReplicaSetMonitor::IsMasterReply IsMasterReply;
@@ -1227,13 +1228,17 @@ std::vector<HostAndPort> SetState::getMatchingHosts(const ReadPreferenceSetting&
             // If there are multiple nodes satisfying the minOpTime, next order by latency
             // and don't consider hosts further than a threshold from the closest.
             std::sort(allMatchingNodes.begin(), allMatchingNodes.end(), compareLatencies);
-            for (size_t i = 1; i < allMatchingNodes.size(); i++) {
-                int64_t distance =
-                    allMatchingNodes[i]->latencyMicros - allMatchingNodes[0]->latencyMicros;
-                if (distance >= latencyThresholdMicros) {
-                    // this node and all remaining ones are too far away
-                    allMatchingNodes.erase(allMatchingNodes.begin() + i, allMatchingNodes.end());
-                    break;
+
+            if (!MONGO_unlikely(scanningServerSelectorIgnoreLatencyWindow.shouldFail())) {
+                for (size_t i = 1; i < allMatchingNodes.size(); i++) {
+                    int64_t distance =
+                        allMatchingNodes[i]->latencyMicros - allMatchingNodes[0]->latencyMicros;
+                    if (distance >= latencyThresholdMicros) {
+                        // this node and all remaining ones are too far away
+                        allMatchingNodes.erase(allMatchingNodes.begin() + i,
+                                               allMatchingNodes.end());
+                        break;
+                    }
                 }
             }
 
