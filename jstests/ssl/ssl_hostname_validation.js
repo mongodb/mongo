@@ -87,11 +87,19 @@ ssl_options = {
 };
 
 replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
+
+// We don't want to invoke the hang analyzer because we
+// expect this test to fail by timing out
+MongoRunner.runHangAnalyzer.disable();
+
 replTest.startSet();
 assert.throws(function() {
     replTest.initiate();
 });
 replTest.stopSet();
+
+// Re-enable the hang analyzer for the test
+MongoRunner.runHangAnalyzer.enable();
 
 TestData.skipCheckDBHashes = false;
 
