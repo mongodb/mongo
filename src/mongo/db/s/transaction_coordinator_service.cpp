@@ -35,6 +35,7 @@
 
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
@@ -198,6 +199,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                             WriteConcernOptions::kNoTimeout},
                         &unusedWCResult));
 
+                    FlowControl::Bypass flowControlBypass(opCtx);
                     auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
 
                     LOGV2(22452,

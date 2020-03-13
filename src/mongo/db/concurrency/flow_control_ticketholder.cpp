@@ -97,7 +97,7 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
         return;
     }
 
-    LOGV2_DEBUG(20519, 4, "Taking ticket. Available: {tickets}", "tickets"_attr = _tickets);
+    LOGV2_DEBUG(20519, 4, "Taking ticket.", "Available"_attr = _tickets);
     if (_tickets == 0) {
         ++stats->acquireWaitCount;
     }
