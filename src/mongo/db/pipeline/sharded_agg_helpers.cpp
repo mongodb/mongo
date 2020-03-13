@@ -1072,6 +1072,8 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
+    // The pipeline is going to be explained on the shards, and we don't want to send a
+    // mergeCursors stage.
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
     invariant(expCtx->explain);

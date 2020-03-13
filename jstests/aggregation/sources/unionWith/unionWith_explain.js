@@ -102,4 +102,19 @@ testPipeline([{
         }
     }
 }]);
+
+// Ensure that both agg with the explain argument and the explain command work.
+assert.commandWorked(testDB.runCommand({
+    aggregate: collA.getName(),
+    pipeline: [{$unionWith: collB.getName()}],
+    cursor: {},
+    explain: true
+}));
+assert.commandWorked(testDB.runCommand({
+    explain: {
+        aggregate: collA.getName(),
+        pipeline: [{$unionWith: collB.getName()}],
+        cursor: {},
+    }
+}));
 })();
