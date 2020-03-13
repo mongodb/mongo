@@ -64,10 +64,10 @@ public:
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
-        static const auto fmt_str = fmt::compile<double>(R"({})");
+        static const auto& fmtStr = *new auto(fmt::compile<double>(R"({})"));
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            compiled_format_to(buffer, fmt_str, val);
+            compiled_format_to(buffer, fmtStr, val);
         else {
             ExtendedCanonicalV200Generator::writeDouble(buffer, val);
         }

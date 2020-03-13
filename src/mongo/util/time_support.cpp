@@ -188,7 +188,7 @@ void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
     cur += pos;
     bufRemaining -= pos;
     if (local) {
-        static const int localTzSubstrLen = 5;
+        static const int localTzSubstrLen = 6;
         dassert(bufRemaining >= localTzSubstrLen + 1);
 #ifdef _WIN32
         // NOTE(schwerin): The value stored by _get_timezone is the value one adds to local time
@@ -204,15 +204,19 @@ void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
         const long tzOffsetSeconds = msTimeZone * (tzIsWestOfUTC ? 1 : -1);
         const long tzOffsetHoursPart = tzOffsetSeconds / 3600;
         const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
-        static const auto fmt_str_time = fmt::compile<char, long, long>("{}{:02}{:02}");
+        static const auto& fmtStrTime = *new auto(fmt::compile<char, long, long>("{}{:02}:{:02}"));
         fmt::format_to_n(cur,
                          localTzSubstrLen + 1,
-                         fmt_str_time,
+                         fmtStrTime,
                          tzIsWestOfUTC ? '-' : '+',
                          tzOffsetHoursPart,
                          tzOffsetMinutesPart);
 #else
-        strftime(cur, bufRemaining, "%z", &t);
+        // ISO 8601 requires the timezone to be in hh:mm format which strftime can't produce
+        // See https://tools.ietf.org/html/rfc3339#section-5.6
+        strftime(cur, bufRemaining, "%z:", &t);
+        // cur will be written as +hhmm:, transform to +hh:mm
+        std::rotate(cur + 3, cur + 5, cur + 6);
 #endif
         cur += localTzSubstrLen;
     } else {
@@ -364,7 +368,11 @@ Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
         } else if (tzStr[0] == '+' || tzStr[0] == '-') {
-            if (tzStr.size() != 5 || !isOnlyDigits(tzStr.substr(1, 4))) {
+            // See https://tools.ietf.org/html/rfc3339#section-5.6
+            bool validLegacyFormat = tzStr.size() == 5 && isOnlyDigits(tzStr.substr(1, 4));
+            bool validISO8601Format = tzStr.size() == 6 && isOnlyDigits(tzStr.substr(1, 2)) &&
+                tzStr[3] == ':' && isOnlyDigits(tzStr.substr(4, 2));
+            if (!validLegacyFormat && !validISO8601Format) {
                 StringBuilder sb;
                 sb << "Time zone adjustment string should be four digits:  " << tzStr;
                 return Status(ErrorCodes::BadValue, sb.str());
@@ -385,7 +393,8 @@ Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
 
-            StringData tzMinutesStr = tzStr.substr(3, 2);
+            size_t minStart = validISO8601Format ? 4 : 3;
+            StringData tzMinutesStr = tzStr.substr(minStart, 2);
             int tzAdjMinutes = 0;
             status = NumberParser().base(10)(tzMinutesStr, &tzAdjMinutes);
             if (!status.isOK()) {
