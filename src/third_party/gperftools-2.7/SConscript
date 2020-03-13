@@ -64,6 +64,9 @@ else:
     else:
         files += ['src/debugallocation.cc']
 
+    # gperftools has some sloppy write calls that emit warnings
+    env.Append(CXXFLAGS=["-Wno-unused-result"])
+
 env.Append(
     CPPDEFINES=["NO_HEAP_CHECK"],
 )
