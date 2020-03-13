@@ -10,23 +10,14 @@ assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 
 const hostList = [];
-let setFCVHost;
+let configPrimary;
 
 if (topology.type === Topology.kStandalone) {
     hostList.push(topology.mongod);
-    setFCVHost = topology.mongod;
 } else if (topology.type === Topology.kReplicaSet) {
     hostList.push(...topology.nodes);
-    setFCVHost = topology.primary;
 } else if (topology.type === Topology.kShardedCluster) {
     hostList.push(...topology.configsvr.nodes);
-
-    // Set the fail point on config server to allow FCV downgrade even in the presence of a
-    // collection sharded on a compound hashed key.
-    // TODO SERVER-45489: Delete this logic after branching for 4.4.
-    const configSvrConn = new Mongo(topology.configsvr.primary);
-    assert.commandWorked(configSvrConn.getDB('admin').runCommand(
-        {configureFailPoint: "allowFCVDowngradeWithCompoundHashedShardKey", mode: "alwaysOn"}));
 
     for (let shardName of Object.keys(topology.shards)) {
         const shard = topology.shards[shardName];
@@ -39,18 +30,68 @@ if (topology.type === Topology.kStandalone) {
             throw new Error('Unrecognized topology format: ' + tojson(topology));
         }
     }
-    // Any of the mongos instances can be used for setting FCV.
-    setFCVHost = topology.mongos.nodes[0];
+
+    configPrimary = new Mongo(topology.configsvr.primary);
 } else {
     throw new Error('Unrecognized topology format: ' + tojson(topology));
 }
 
-new CollectionValidator().validateNodes(hostList, setFCVHost);
+// Set the fail point on config server to allow FCV downgrade even in the presence of a
+// collection sharded on a compound hashed key.
+if (configPrimary) {
+    assert.commandWorked(configPrimary.getDB('admin').runCommand(
+        {configureFailPoint: 'allowFCVDowngradeWithCompoundHashedShardKey', mode: 'alwaysOn'}));
+}
+
+const adminDB = db.getSiblingDB('admin');
+const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+
+let originalFCV;
+let originalTransactionLifetimeLimitSeconds;
+
+if (requiredFCV) {
+    // Running the setFeatureCompatibilityVersion command may implicitly involve running a
+    // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
+    // 24 hours to avoid spurious failures from it having been set to a lower value.
+    originalTransactionLifetimeLimitSeconds = hostList.map(hostStr => {
+        const conn = new Mongo(hostStr);
+        const res = assert.commandWorked(
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}));
+        return {conn, originalValue: res.was};
+    });
+
+    originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+
+    if (originalFCV.targetVersion) {
+        // If a previous FCV upgrade or downgrade was interrupted, then we run the
+        // setFeatureCompatibilityVersion command to complete it before attempting to set the
+        // feature compatibility version to 'requiredFCV'.
+        assert.commandWorked(
+            adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.targetVersion}));
+        checkFCV(adminDB, originalFCV.targetVersion);
+    }
+
+    // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
+    // the 'requiredFCV' is set.
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
+}
+
+new CollectionValidator().validateNodes(hostList);
+
+if (originalFCV && originalFCV.version !== requiredFCV) {
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version}));
+}
+
+if (originalTransactionLifetimeLimitSeconds) {
+    for (let {conn, originalValue} of originalTransactionLifetimeLimitSeconds) {
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
+    }
+}
 
 // Disable the failpoint that was set earlier on sharded clusters.
-if (topology.type === Topology.kShardedCluster) {
-    const configSvrConn = new Mongo(topology.configsvr.primary);
-    assert.commandWorked(configSvrConn.getDB('admin').runCommand(
-        {configureFailPoint: "allowFCVDowngradeWithCompoundHashedShardKey", mode: "off"}));
+if (configPrimary) {
+    assert.commandWorked(configPrimary.getDB('admin').runCommand(
+        {configureFailPoint: 'allowFCVDowngradeWithCompoundHashedShardKey', mode: 'off'}));
 }
 })();
