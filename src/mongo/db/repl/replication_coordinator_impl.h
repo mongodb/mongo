@@ -435,6 +435,7 @@ public:
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTimeAndWallTime>* candidates,
                                                OpTimeAndWallTime stableOpTime);
     std::set<OpTimeAndWallTime> getStableOpTimeCandidates_forTest();
+    void handleHeartbeatResponse_forTest(BSONObj response, int targetIndex);
 
     /**
      * Non-blocking version of updateTerm.
