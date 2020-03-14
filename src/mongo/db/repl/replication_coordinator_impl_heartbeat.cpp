@@ -308,7 +308,7 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
             // Update the cached member state if different than the current topology member state
             if (_memberState != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
-                    _updateMemberStateFromTopologyCoordinator(lock, nullptr);
+                    _updateMemberStateFromTopologyCoordinator(lock);
                 lock.unlock();
                 _performPostMemberStateUpdateAction(postUpdateAction);
                 lock.lock();
@@ -465,7 +465,11 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
 
     _topCoord->finishUnconditionalStepDown();
-    const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
+
+    // Update _canAcceptNonLocalWrites.
+    _updateWriteAbilityFromTopologyCoordinator(lk, opCtx.get());
+
+    const auto action = _updateMemberStateFromTopologyCoordinator(lk);
     if (_pendingTermUpdateDuringStepDown) {
         TopologyCoordinator::UpdateTermResult result;
         _updateTerm_inlock(*_pendingTermUpdateDuringStepDown, &result);
@@ -731,6 +735,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
+
+            // Update _canAcceptNonLocalWrites.
+            _updateWriteAbilityFromTopologyCoordinator(lk, opCtx.get());
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
