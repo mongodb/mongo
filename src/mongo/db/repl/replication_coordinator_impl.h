@@ -1033,18 +1033,19 @@ private:
     void _fulfillTopologyChangePromise(OperationContext* opCtx, WithLock);
 
     /**
+     * Update _canAcceptNonLocalWrites based on _topCoord->canAcceptWrites().
+     */
+    void _updateWriteAbilityFromTopologyCoordinator(WithLock lk, OperationContext* opCtx);
+
+    /**
      * Updates the cached value, _memberState, to match _topCoord's reported
      * member state, from getMemberState().
      *
      * Returns an enum indicating what action to take after releasing _mutex, if any.
      * Call performPostMemberStateUpdateAction on the return value after releasing
      * _mutex.
-     *
-     * Note: opCtx may be null as currently not all paths thread an OperationContext all the way
-     * down, but it must be non-null for any calls that change _canAcceptNonLocalWrites.
      */
-    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator(WithLock lk,
-                                                                          OperationContext* opCtx);
+    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator(WithLock lk);
 
     /**
      * Performs a post member-state update action.  Do not call while holding _mutex.

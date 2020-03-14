@@ -1031,7 +1031,13 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
 
     _topCoord->setFollowerMode(newState.s);
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
+    if (opCtx && _memberState.secondary() && newState == MemberState::RS_ROLLBACK) {
+        // If we are switching out of SECONDARY and to ROLLBACK, we must make sure that we hold the
+        // RSTL in mode X to prevent readers that have the RSTL in intent mode from reading.
+        _readWriteAbility->setCanServeNonLocalReads(opCtx, 0U);
+    }
+
+    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 
@@ -1156,8 +1162,9 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _updateLastCommittedOpTimeAndWallTime(lk);
     _wakeReadyWaiters(lk);
 
-    // Update _canAcceptNonLocalWrites
-    _updateMemberStateFromTopologyCoordinator(lk, opCtx);
+    // Update _canAcceptNonLocalWrites.
+    _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
+    _updateMemberStateFromTopologyCoordinator(lk);
 
     LOGV2_OPTIONS(21331,
                   {logv2::LogTag::kRS},
@@ -2473,16 +2480,18 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // of a stepdown attempt.  This will prevent us from accepting writes so that if our stepdown
     // attempt fails later we can release the RSTL and go to sleep to allow secondaries to
     // catch up without allowing new writes in.
-    auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
+    _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
+    auto action = _updateMemberStateFromTopologyCoordinator(lk);
     invariant(action == PostMemberStateUpdateAction::kActionNone);
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
 
-    // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
     auto updateMemberState = [&] {
         invariant(lk.owns_lock());
         invariant(opCtx->lockState()->isRSTLExclusive());
 
-        auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
+        // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
+        _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
+        auto action = _updateMemberStateFromTopologyCoordinator(lk);
         lk.unlock();
 
         if (MONGO_unlikely(stepdownHangBeforePerformingPostMemberStateUpdateActions.shouldFail())) {
@@ -3029,8 +3038,7 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
         return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
     }
 
-    const PostMemberStateUpdateAction action =
-        _updateMemberStateFromTopologyCoordinator(lk, nullptr);
+    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     return Status::OK();
@@ -3314,6 +3322,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
             // Clear the node's election candidate metrics since it is no longer primary.
             ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
+
+            // Update _canAcceptNonLocalWrites.
+            _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
@@ -3565,24 +3576,20 @@ void ReplicationCoordinatorImpl::incrementTopologyVersion(OperationContext* opCt
     _fulfillTopologyChangePromise(opCtx, lk);
 }
 
-ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk,
-                                                                      OperationContext* opCtx) {
-    {
-        // We have to do this check even if our current and target state are the same as we might
-        // have just failed a stepdown attempt and thus are staying in PRIMARY state but restoring
-        // our ability to accept writes.
-        bool canAcceptWrites = _topCoord->canAcceptWrites();
-        _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
-    }
+void ReplicationCoordinatorImpl::_updateWriteAbilityFromTopologyCoordinator(
+    WithLock lk, OperationContext* opCtx) {
+    bool canAcceptWrites = _topCoord->canAcceptWrites();
+    _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
+}
 
+ReplicationCoordinatorImpl::PostMemberStateUpdateAction
+ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk) {
     // We want to respond to any waiting isMasters even if our current and target state are the
     // same as it is possible writes have been disabled during a stepDown but the primary has yet
     // to transition to SECONDARY state.
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized()) {
-            _fulfillTopologyChangePromise(opCtx, lk);
-            // Use the global ServiceContext here in case the current opCtx is null.
+            _fulfillTopologyChangePromise(nullptr, lk);
             IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
         }
     });
@@ -3608,7 +3615,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _opTimeWaiterList.setErrorAll_inlock(
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
-        // _canAcceptNonLocalWrites should already be set above.
+        // _canAcceptNonLocalWrites should already be set.
         invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
 
         serverGlobalParams.validateFeaturesAsMaster.store(false);
@@ -3636,12 +3643,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _externalState->startProducerIfStopped();
     }
 
-    if (_memberState.secondary() && newState.rollback()) {
-        // If we are switching out of SECONDARY and to ROLLBACK, we must make sure that we hold the
-        // RSTL in mode X to prevent readers that have the RSTL in intent mode from reading.
-        _readWriteAbility->setCanServeNonLocalReads(opCtx, 0U);
-    } else if (_memberState.secondary() && !newState.primary()) {
-        // Switching out of SECONDARY, but not to PRIMARY or ROLLBACK.
+    if (_memberState.secondary() && !newState.primary() && !newState.rollback()) {
+        // Switching out of SECONDARY, but not to PRIMARY or ROLLBACK. Note that ROLLBACK case is
+        // handled separately and requires RSTL lock held, see setFollowerModeStrict.
         _readWriteAbility->setCanServeNonLocalReads_UNSAFE(0U);
     } else if (!_memberState.primary() && newState.secondary()) {
         // Switching into SECONDARY, but not from PRIMARY.
@@ -3756,8 +3760,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
     _electionId = OID::fromTerm(_topCoord->getTerm());
     auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
     _topCoord->processWinElection(_electionId, ts);
-    const PostMemberStateUpdateAction nextAction =
-        _updateMemberStateFromTopologyCoordinator(lk, nullptr);
+    const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 
     invariant(nextAction == kActionFollowerModeStateChange,
               str::stream() << "nextAction == " << static_cast<int>(nextAction));
@@ -4101,7 +4104,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     _cancelPriorityTakeover_inlock();
     _cancelAndRescheduleElectionTimeout_inlock();
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
+    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
@@ -5059,15 +5062,13 @@ bool ReplicationCoordinatorImpl::setContainsArbiter() const {
 
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(
     WithLock lk, OperationContext* opCtx, bool canAcceptWrites) {
+    // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
+    invariant(opCtx);
+    invariant(opCtx->lockState()->isRSTLExclusive());
     if (canAcceptWrites == canAcceptNonLocalWrites(lk)) {
         return;
     }
-
-    // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
-    invariant(opCtx);
-    if (opCtx->lockState()->isRSTLExclusive()) {
-        _canAcceptNonLocalWrites.store(canAcceptWrites);
-    }
+    _canAcceptNonLocalWrites.store(canAcceptWrites);
 }
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(WithLock) const {
