@@ -105,11 +105,11 @@ __cm_fingerprint(const uint8_t *p)
 }
 
 /*
- * wiredtiger_calc_modify --
+ * __wt_calc_modify --
  *     Calculate a set of WT_MODIFY operations to represent an update.
  */
 int
-wiredtiger_calc_modify(WT_SESSION *wt_session, const WT_ITEM *oldv, const WT_ITEM *newv,
+__wt_calc_modify(WT_SESSION_IMPL *wt_session, const WT_ITEM *oldv, const WT_ITEM *newv,
   size_t maxdiff, WT_MODIFY *entries, int *nentriesp)
 {
     WT_CM_MATCH match;
@@ -190,4 +190,15 @@ end:
         WT_RET(__cm_add_modify(&cms, cms.used2, cms.e1, cms.e2, entries, nentriesp));
 
     return (0);
+}
+
+/*
+ * wiredtiger_calc_modify --
+ *     Calculate a set of WT_MODIFY operations to represent an update.
+ */
+int
+wiredtiger_calc_modify(WT_SESSION *wt_session, const WT_ITEM *oldv, const WT_ITEM *newv,
+  size_t maxdiff, WT_MODIFY *entries, int *nentriesp)
+{
+    return __wt_calc_modify((WT_SESSION_IMPL *)wt_session, oldv, newv, maxdiff, entries, nentriesp);
 }

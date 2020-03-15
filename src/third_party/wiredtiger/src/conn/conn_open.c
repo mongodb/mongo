@@ -204,7 +204,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * Run recovery.
      * NOTE: This call will start (and stop) eviction if recovery is
-     * required.  Recovery must run before the lookaside table is created
+     * required.  Recovery must run before the history store table is created
      * (because recovery will update the metadata), and before eviction is
      * started for real.
      */
@@ -220,11 +220,12 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     /* Initialize metadata tracking, required before creating tables. */
     WT_RET(__wt_meta_track_init(session));
 
-    /* Create the lookaside table. */
-    WT_RET(__wt_las_create(session, cfg));
+    /* Create the history store table. */
+    WT_RET(__wt_hs_create(session, cfg));
 
     /*
-     * Start eviction threads. NOTE: Eviction must be started after the lookaside table is created.
+     * Start eviction threads. NOTE: Eviction must be started after the history store table is
+     * created.
      */
     WT_RET(__wt_evict_create(session));
 

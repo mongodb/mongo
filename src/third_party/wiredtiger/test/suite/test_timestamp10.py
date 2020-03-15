@@ -31,7 +31,7 @@
 #
 
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 from wtscenario import make_scenarios
 
 def timestamp_str(t):
@@ -119,7 +119,7 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         # Run the wt command some number of times to get some runs in that do
         # not use timestamps. Make sure the recovery checkpoint is maintained.
         for i in range(0, self.run_wt):
-            self.runWt(['-h', '.', '-R', 'list', '-v'], outfilename="list.out")
+            self.runWt(['-C', 'config_base=false,create,log=(enabled)', '-h', '.', '-R', 'list', '-v'], outfilename="list.out")
 
         self.open_conn()
         q = self.conn.query_timestamp('get=recovery')

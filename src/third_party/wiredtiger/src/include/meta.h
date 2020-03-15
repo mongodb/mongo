@@ -30,8 +30,8 @@
 #define WT_METAFILE_SLVG "WiredTiger.wt.orig" /* Metadata copy */
 #define WT_METAFILE_URI "file:WiredTiger.wt"  /* Metadata table URI */
 
-#define WT_LAS_FILE "WiredTigerLAS.wt"     /* Lookaside table */
-#define WT_LAS_URI "file:WiredTigerLAS.wt" /* Lookaside table URI*/
+#define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
+#define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
 
 #define WT_SYSTEM_PREFIX "system:"             /* System URI prefix */
 #define WT_SYSTEM_CKPT_URI "system:checkpoint" /* Checkpoint URI */

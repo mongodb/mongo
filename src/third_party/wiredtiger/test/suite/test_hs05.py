@@ -34,10 +34,10 @@ from wtdataset import SimpleDataSet
 def timestamp_str(t):
     return '%x' % t
 
-# test_las05.py
-# Verify lookaside_score reflects cache pressure due to history
-# even if we're not yet actively pushing into the lookaside file.
-class test_las05(wttest.WiredTigerTestCase):
+# test_hs05.py
+# Verify hs_score reflects cache pressure due to history
+# even if we're not yet actively pushing into the history store file.
+class test_hs05(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,statistics=(fast)'
     session_config = 'isolation=snapshot'
@@ -50,24 +50,24 @@ class test_las05(wttest.WiredTigerTestCase):
         return val
 
     def large_updates(self, session, uri, value, ds, nrows, nops):
-        # Update a large number of records, we'll hang if the lookaside table
+        # Update a large number of records, we'll hang if the history store table
         # isn't doing its thing.
         cursor = session.open_cursor(uri)
-        score_start = self.get_stat(stat.conn.cache_lookaside_score)
+        score_start = self.get_stat(stat.conn.cache_hs_score)
         for i in range(nrows + 1, nrows + nops + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
             session.commit_transaction('commit_timestamp=' + timestamp_str(self.stable + i))
         cursor.close()
-        score_end = self.get_stat(stat.conn.cache_lookaside_score)
+        score_end = self.get_stat(stat.conn.cache_hs_score)
         score_diff = score_end - score_start
         self.pr("After large updates score start: " + str(score_start))
         self.pr("After large updates score end: " + str(score_end))
-        self.pr("After large updates lookaside score diff: " + str(score_diff))
+        self.pr("After large updates hs score diff: " + str(score_diff))
 
-    def test_checkpoint_las_reads(self):
+    def test_checkpoint_hs_reads(self):
         # Create a small table.
-        uri = "table:test_las05"
+        uri = "table:test_hs05"
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
@@ -86,31 +86,31 @@ class test_las05(wttest.WiredTigerTestCase):
         # Pin the oldest timestamp so that all history has to stay.
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
         # Loop a couple times, partly filling the cache but not
-        # overfilling it to see the lookaside score value change
-        # even if lookaside is not yet in use.
+        # overfilling it to see the history store score value change
+        # even if the history store is not yet in use.
         #
         # Use smaller values, 50 bytes and fill 8 times, under full cache.
         valstr='abcdefghijklmnopqrstuvwxyz'
-        loop_start = self.get_stat(stat.conn.cache_lookaside_score)
+        loop_start = self.get_stat(stat.conn.cache_hs_score)
         for i in range(1, 9):
             bigvalue2 = valstr[i].encode() * 50
             self.conn.set_timestamp('stable_timestamp=' + timestamp_str(self.stable))
-            entries_start = self.get_stat(stat.conn.cache_lookaside_entries)
-            score_start = self.get_stat(stat.conn.cache_lookaside_score)
+            entries_start = self.get_stat(stat.conn.cache_hs_insert)
+            score_start = self.get_stat(stat.conn.cache_hs_score)
             self.pr("Update iteration: " + str(i) + " Value: " + str(bigvalue2))
             self.pr("Update iteration: " + str(i) + " Score: " + str(score_start))
             self.large_updates(self.session, uri, bigvalue2, ds, nrows, nrows)
             self.stable += nrows
-            score_end = self.get_stat(stat.conn.cache_lookaside_score)
-            entries_end = self.get_stat(stat.conn.cache_lookaside_entries)
-            # We expect to see the lookaside score increase but not writing
-            # any new entries to lookaside.
+            score_end = self.get_stat(stat.conn.cache_hs_score)
+            entries_end = self.get_stat(stat.conn.cache_hs_insert)
+            # We expect to see the history store score increase but not writing
+            # any new entries to the history store.
             self.assertGreaterEqual(score_end, score_start)
             self.assertEqual(entries_end, entries_start)
 
         # While each iteration may or may not increase the score, we expect the
         # score to have strictly increased from before the loop started.
-        loop_end = self.get_stat(stat.conn.cache_lookaside_score)
+        loop_end = self.get_stat(stat.conn.cache_hs_score)
         self.assertGreater(loop_end, loop_start)
 
         # Now move oldest timestamp forward and insert a couple large updates
@@ -127,7 +127,7 @@ class test_las05(wttest.WiredTigerTestCase):
             self.conn.set_timestamp('stable_timestamp=' + timestamp_str(self.stable))
             self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(self.stable))
             self.stable += nrows
-        score_end = self.get_stat(stat.conn.cache_lookaside_score)
+        score_end = self.get_stat(stat.conn.cache_hs_score)
         self.assertLess(score_end, score_start)
         self.assertEqual(score_end, 0)
 

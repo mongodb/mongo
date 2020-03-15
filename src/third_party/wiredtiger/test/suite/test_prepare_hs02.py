@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_prepare_lookaside02.py
+# test_prepare_hs02.py
 #   Prepare updates can be resolved for both commit // rollback operations.
 #
 
@@ -39,7 +39,7 @@ from wtscenario import make_scenarios
 def timestamp_str(t):
     return '%x' % t
 
-class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
+class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_cursor'
     uri = 'table:' + tablename
     txn_config = 'isolation=snapshot'

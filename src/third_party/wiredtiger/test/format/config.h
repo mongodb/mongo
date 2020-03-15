@@ -260,8 +260,8 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"timing_stress_checkpoint", "stress checkpoints", /* 2% */
     C_BOOL, 2, 0, 0, &g.c_timing_stress_checkpoint, NULL},
 
-  {"timing_stress_lookaside_sweep", "stress lookaside sweep", /* 2% */
-    C_BOOL, 2, 0, 0, &g.c_timing_stress_lookaside_sweep, NULL},
+  {"timing_stress_hs_sweep", "stress history store sweep", /* 2% */
+    C_BOOL, 2, 0, 0, &g.c_timing_stress_hs_sweep, NULL},
 
   {"timing_stress_split_1", "stress splits (#1)", /* 2% */
     C_BOOL, 2, 0, 0, &g.c_timing_stress_split_1, NULL},

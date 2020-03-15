@@ -155,8 +155,8 @@ struct __wt_btree {
     uint8_t original; /* Newly created: bulk-load possible
                          (want a bool but needs atomic cas) */
 
-    bool lookaside_entries; /* Has entries in the lookaside table */
-    bool lsm_primary;       /* Handle is/was the LSM primary */
+    bool hs_entries;  /* Has entries in the history store table */
+    bool lsm_primary; /* Handle is/was the LSM primary */
 
     WT_BM *bm;          /* Block manager reference */
     u_int block_header; /* WT_PAGE_HEADER_BYTE_SIZE */
@@ -164,6 +164,7 @@ struct __wt_btree {
     uint64_t write_gen;   /* Write generation */
     uint64_t rec_max_txn; /* Maximum txn seen (clean trees) */
     wt_timestamp_t rec_max_timestamp;
+    uint64_t hs_counter; /* History store counter */
 
     uint64_t checkpoint_gen;       /* Checkpoint generation */
     WT_SESSION_IMPL *sync_session; /* Syncing session */
@@ -192,7 +193,7 @@ struct __wt_btree {
 
     /*
      * The maximum bytes allowed to be used for the table on disk. This is currently only used for
-     * the lookaside table.
+     * the history store table.
      */
     uint64_t file_max;
 
@@ -238,7 +239,7 @@ struct __wt_btree {
 #define WT_BTREE_CLOSED 0x000400u        /* Handle closed */
 #define WT_BTREE_IGNORE_CACHE 0x000800u  /* Cache-resident object */
 #define WT_BTREE_IN_MEMORY 0x001000u     /* Cache-resident object */
-#define WT_BTREE_LOOKASIDE 0x002000u     /* Look-aside table */
+#define WT_BTREE_HS 0x002000u            /* History store table */
 #define WT_BTREE_NO_CHECKPOINT 0x004000u /* Disable checkpoints */
 #define WT_BTREE_NO_LOGGING 0x008000u    /* Disable logging */
 #define WT_BTREE_READONLY 0x010000u      /* Handle is readonly */

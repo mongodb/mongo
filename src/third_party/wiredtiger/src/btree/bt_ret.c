@@ -70,11 +70,102 @@ __key_return(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __value_return --
- *     Change the cursor to reference an internal original-page return value.
+ * __time_pairs_init --
+ *     Initialize the time pairs to globally visible.
  */
-static inline int
-__value_return(WT_CURSOR_BTREE *cbt)
+static inline void
+__time_pairs_init(WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+{
+    start->txnid = WT_TXN_NONE;
+    start->timestamp = WT_TS_NONE;
+    stop->txnid = WT_TXN_MAX;
+    stop->timestamp = WT_TS_MAX;
+}
+
+/*
+ * __time_pairs_set --
+ *     Set the time pairs.
+ */
+static inline void
+__time_pairs_set(WT_TIME_PAIR *start, WT_TIME_PAIR *stop, WT_CELL_UNPACK *unpack)
+{
+    start->timestamp = unpack->start_ts;
+    start->txnid = unpack->start_txn;
+    stop->timestamp = unpack->stop_ts;
+    stop->txnid = unpack->stop_txn;
+}
+
+/*
+ * __wt_read_cell_time_pairs --
+ *     Read the time pairs from the cell.
+ */
+void
+__wt_read_cell_time_pairs(
+  WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+{
+    WT_PAGE *page;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    page = ref->page;
+
+    WT_ASSERT(session, start != NULL && stop != NULL);
+
+    /* Take the value from the original page cell. */
+    if (page->type == WT_PAGE_ROW_LEAF) {
+        __wt_read_row_time_pairs(session, page, &page->pg_row[cbt->slot], start, stop);
+    } else if (page->type == WT_PAGE_COL_VAR) {
+        __wt_read_col_time_pairs(
+          session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), start, stop);
+    } else {
+        /* WT_PAGE_COL_FIX: return the default time pairs. */
+        __time_pairs_init(start, stop);
+    }
+}
+
+/*
+ * __wt_read_col_time_pairs --
+ *     Retrieve the time pairs from a column store cell.
+ */
+void
+__wt_read_col_time_pairs(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+{
+    WT_CELL_UNPACK unpack;
+
+    __wt_cell_unpack(session, page, cell, &unpack);
+    __time_pairs_set(start, stop, &unpack);
+}
+
+/*
+ * __wt_read_row_time_pairs --
+ *     Retrieve the time pairs from a row.
+ */
+void
+__wt_read_row_time_pairs(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+{
+    WT_CELL_UNPACK unpack;
+
+    __time_pairs_init(start, stop);
+    /*
+     * If a value is simple and is globally visible at the time of reading a page into cache, we set
+     * the time pairs as globally visible.
+     */
+    if (__wt_row_leaf_value_exists(rip))
+        return;
+
+    __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+    __time_pairs_set(start, stop, &unpack);
+}
+
+/*
+ * __wt_value_return_buf --
+ *     Change a buffer to reference an internal original-page return value.
+ */
+int
+__wt_value_return_buf(
+  WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
@@ -88,39 +179,61 @@ __value_return(WT_CURSOR_BTREE *cbt)
     session = (WT_SESSION_IMPL *)cbt->iface.session;
     btree = S2BT(session);
 
-    page = cbt->ref->page;
+    page = ref->page;
     cursor = &cbt->iface;
+
+    if (start != NULL && stop != NULL)
+        __time_pairs_init(start, stop);
+
+    /* Must provide either both start and stop as output parameters or neither. */
+    WT_ASSERT(session, (start != NULL && stop != NULL) || (start == NULL && stop == NULL));
 
     if (page->type == WT_PAGE_ROW_LEAF) {
         rip = &page->pg_row[cbt->slot];
 
-        /* Simple values have their location encoded in the WT_ROW. */
-        if (__wt_row_leaf_value(page, rip, &cursor->value))
+        /*
+         * If a value is simple and is globally visible at the time of reading a page into cache, we
+         * encode its location into the WT_ROW.
+         */
+        if (__wt_row_leaf_value(page, rip, buf))
             return (0);
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-        return (__wt_page_cell_data_ref(session, page, &unpack, &cursor->value));
+        if (start != NULL && stop != NULL)
+            __time_pairs_set(start, stop, &unpack);
+
+        return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
     if (page->type == WT_PAGE_COL_VAR) {
         /* Take the value from the original page cell. */
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack(session, page, cell, &unpack);
-        return (__wt_page_cell_data_ref(session, page, &unpack, &cursor->value));
+        if (start != NULL && stop != NULL)
+            __time_pairs_set(start, stop, &unpack);
+
+        return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
-    /* WT_PAGE_COL_FIX: Take the value from the original page. */
-    v = __bit_getv_recno(cbt->ref, cursor->recno, btree->bitcnt);
-    return (__wt_buf_set(session, &cursor->value, &v, 1));
+    /*
+     * WT_PAGE_COL_FIX: Take the value from the original page.
+     *
+     * FIXME-PM-1523: Should also check visibility here
+     */
+    v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
+    return (__wt_buf_set(session, buf, &v, 1));
 }
 
 /*
- * When threads race modifying a record, we can end up with more than the usual maximum number of
- * modifications in an update list. We'd prefer not to allocate memory in a return path, so add a
- * few additional slots to the array we use to build up a list of modify records to apply.
+ * __value_return --
+ *     Change the cursor to reference an internal original-page return value.
  */
-#define WT_MODIFY_ARRAY_SIZE (WT_MAX_MODIFY_UPDATE + 10)
+static inline int
+__value_return(WT_CURSOR_BTREE *cbt)
+{
+    return (__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, NULL, NULL));
+}
 
 /*
  * __wt_value_return_upd --
@@ -131,14 +244,13 @@ __wt_value_return_upd(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
+    WT_MODIFY_VECTOR modifies;
     WT_SESSION_IMPL *session;
-    WT_UPDATE **listp, *list[WT_MODIFY_ARRAY_SIZE];
-    size_t allocated_bytes;
-    u_int i;
+    WT_TIME_PAIR start, stop;
 
     cursor = &cbt->iface;
     session = (WT_SESSION_IMPL *)cbt->iface.session;
-    allocated_bytes = 0;
+    __wt_modify_vector_init(session, &modifies);
 
     /*
      * We're passed a "standard" or "modified" update that's visible to us. Our caller should have
@@ -147,8 +259,14 @@ __wt_value_return_upd(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
      * Fast path if it's a standard item, assert our caller's behavior.
      */
     if (upd->type == WT_UPDATE_STANDARD) {
-        cursor->value.data = upd->data;
-        cursor->value.size = upd->size;
+        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK)) {
+            /* Copy an external update, and delete after using it */
+            WT_RET(__wt_buf_set(session, &cursor->value, upd->data, upd->size));
+            __wt_free_update_list(session, &upd);
+        } else {
+            cursor->value.data = upd->data;
+            cursor->value.size = upd->size;
+        }
         return (0);
     }
     WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
@@ -156,33 +274,15 @@ __wt_value_return_upd(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
     /*
      * Find a complete update.
      */
-    for (i = 0, listp = list; upd != NULL; upd = upd->next) {
+    for (; upd != NULL; upd = upd->next) {
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
-
-        if (upd->type == WT_UPDATE_BIRTHMARK) {
-            upd = NULL;
-            break;
-        }
 
         if (WT_UPDATE_DATA_VALUE(upd))
             break;
 
-        if (upd->type == WT_UPDATE_MODIFY) {
-            /*
-             * Update lists are expected to be short, but it's not guaranteed. There's sufficient
-             * room on the stack to avoid memory allocation in normal cases, but we have to handle
-             * the edge cases too.
-             */
-            if (i >= WT_MODIFY_ARRAY_SIZE) {
-                if (i == WT_MODIFY_ARRAY_SIZE)
-                    listp = NULL;
-                WT_ERR(__wt_realloc_def(session, &allocated_bytes, i + 1, &listp));
-                if (i == WT_MODIFY_ARRAY_SIZE)
-                    memcpy(listp, list, sizeof(list));
-            }
-            listp[i++] = upd;
-        }
+        if (upd->type == WT_UPDATE_MODIFY)
+            WT_ERR(__wt_modify_vector_push(&modifies, upd));
     }
 
     /*
@@ -198,21 +298,28 @@ __wt_value_return_upd(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
          */
         WT_ASSERT(session, cbt->slot != UINT32_MAX);
 
-        WT_ERR(__value_return(cbt));
-    } else if (upd->type == WT_UPDATE_TOMBSTONE)
-        WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
-    else
+        WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, &start, &stop));
+        /*
+         * Applying modifies on top of a tombstone is invalid. So if we're using the onpage value,
+         * the stop time pair should be unset.
+         */
+        WT_ASSERT(session, stop.txnid == WT_TXN_MAX && stop.timestamp == WT_TS_MAX);
+    } else {
+        /* The base update must not be a tombstone. */
+        WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
         WT_ERR(__wt_buf_set(session, &cursor->value, upd->data, upd->size));
+    }
 
     /*
      * Once we have a base item, roll forward through any visible modify updates.
      */
-    while (i > 0)
-        WT_ERR(__wt_modify_apply(cursor, listp[--i]->data));
+    while (modifies.size > 0) {
+        __wt_modify_vector_pop(&modifies, &upd);
+        WT_ERR(__wt_modify_apply(cursor, upd->data));
+    }
 
 err:
-    if (allocated_bytes != 0)
-        __wt_free(session, listp);
+    __wt_modify_vector_free(&modifies);
     return (ret);
 }
 

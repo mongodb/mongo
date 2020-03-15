@@ -163,7 +163,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
             entry_cnt += __wt_cell_rle(unpack);
         }
         rle_cnt += __wt_cell_rle(unpack) - 1;
-        if (unpack->ovfl)
+        if (F_ISSET(unpack, WT_CELL_UNPACK_OVERFLOW))
             ++ovfl_cnt;
 
         /*

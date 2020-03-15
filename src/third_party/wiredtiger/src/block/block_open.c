@@ -316,6 +316,16 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
     if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         return (0);
 
+    /*
+     * If a data file is smaller than the allocation size, we're not going to be able to read the
+     * descriptor block. We should treat this as if the file has been deleted; that is, to log an
+     * error but continue on.
+     */
+    if (block->size < allocsize)
+        WT_RET_MSG(session, ENOENT,
+          "File %s is smaller than allocation size; file size=%" PRId64 ", alloc size=%" PRIu32,
+          block->name, block->size, allocsize);
+
     /* Use a scratch buffer to get correct alignment for direct I/O. */
     WT_RET(__wt_scr_alloc(session, allocsize, &buf));
 

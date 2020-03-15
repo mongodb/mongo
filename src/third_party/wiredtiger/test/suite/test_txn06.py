@@ -44,12 +44,17 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
         # Populate a table
         SimpleDataSet(self, self.source_uri, self.nrows).populate()
 
-        # Now scan the table and copy the rows into a new table
+        # Now scan the table and copy the rows into a new table. The cursor will keep the snapshot
+        # in self.session pinned while the inserts cause new IDs to be allocated.
         c_src = self.session.create(self.uri, "key_format=S,value_format=S")
         c_src = self.session.open_cursor(self.source_uri)
-        c = self.session.open_cursor(self.uri)
+        insert_session = self.conn.open_session()
+        c = insert_session.open_cursor(self.uri)
         for k, v in c_src:
             c[k] = v
+
+        # We were trying to generate a message matching this pattern.
+        self.captureout.checkAdditionalPattern(self, "old snapshot")
 
 if __name__ == '__main__':
     wttest.run()

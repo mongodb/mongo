@@ -73,19 +73,6 @@ found:
 }
 
 /*
- * __ref_is_leaf --
- *     Check if a reference is for a leaf page.
- */
-static inline bool
-__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-    bool is_leaf;
-
-    __wt_ref_info_lock(session, ref, NULL, NULL, &is_leaf);
-    return (is_leaf);
-}
-
-/*
  * __ref_ascend --
  *     Ascend the tree one level.
  */
@@ -258,7 +245,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
     WT_PAGE_INDEX *pindex;
     WT_REF *couple, *ref, *ref_orig;
     uint64_t restart_sleep, restart_yield;
-    uint32_t current_state, slot;
+    uint32_t slot;
+    uint8_t current_state;
     bool empty_internal, prev, skip;
 
     btree = S2BT(session);
@@ -443,12 +431,7 @@ descend:
                 /*
                  * Only look at unlocked pages in memory: fast-path some common cases.
                  */
-                if (LF_ISSET(WT_READ_NO_WAIT) && current_state != WT_REF_MEM &&
-                  current_state != WT_REF_LIMBO)
-                    break;
-
-                /* Skip lookaside pages if not requested. */
-                if (current_state == WT_REF_LOOKASIDE && !LF_ISSET(WT_READ_LOOKASIDE))
+                if (LF_ISSET(WT_READ_NO_WAIT) && current_state != WT_REF_MEM)
                     break;
             } else if (LF_ISSET(WT_READ_TRUNCATE)) {
                 /*
@@ -482,7 +465,7 @@ descend:
                 couple = NULL;
 
                 /* Return leaf pages to our caller. */
-                if (!WT_PAGE_IS_INTERNAL(ref->page)) {
+                if (F_ISSET(ref, WT_REF_FLAG_LEAF)) {
                     *refp = ref;
                     goto done;
                 }
@@ -589,7 +572,7 @@ __tree_walk_skip_count_callback(WT_SESSION_IMPL *session, WT_REF *ref, void *con
      */
     if (ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, false))
         *skipp = true;
-    else if (*skipleafcntp > 0 && __ref_is_leaf(session, ref)) {
+    else if (*skipleafcntp > 0 && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
         --*skipleafcntp;
         *skipp = true;
     } else

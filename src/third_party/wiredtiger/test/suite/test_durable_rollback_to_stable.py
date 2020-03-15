@@ -27,7 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wiredtiger, wttest, unittest
+from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -37,13 +38,14 @@ def timestamp_str(t):
 # test_durable_rollback_to_stable.py
 #    Checking visibility and durability of updates with durable_timestamp and
 #    with rollback to stable.
-class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
+class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-string', dict(keyfmt='S')),
         ('row-int', dict(keyfmt='i')),
-        ('column-store', dict(keyfmt='r')),
+    # The commented columnar tests needs to be enabled once rollback to stable for columnar is fixed in (WT-5548).
+    #    ('column-store', dict(keyfmt='r')),
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
@@ -111,7 +113,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.next(), 0)
         session.commit_transaction()
 
-        # Check that latest value is same as first  update value.
+        # Check that latest value is same as first update value.
         self.assertEquals(cursor.reset(), 0)
         session.begin_transaction()
         self.assertEquals(cursor.next(), 0)
@@ -164,6 +166,12 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase):
         for i in range(1, 50):
             self.assertEquals(cursor.get_value(), ds.value(111))
             self.assertEquals(cursor.next(), 0)
+
+        # Use util to verify that second updates values have been flushed.
+        errfilename = "verifyrollbackerr.out"
+        self.runWt(["verify", "-s", uri],
+            errfilename=errfilename, failure=False)
+        self.check_empty_file(errfilename)
 
 if __name__ == '__main__':
     wttest.run()

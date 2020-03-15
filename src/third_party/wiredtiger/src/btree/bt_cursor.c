@@ -58,7 +58,6 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
 {
     WT_CURSOR *cursor;
     WT_SESSION_IMPL *session;
-    uint32_t current_state;
 
     cursor = &cbt->iface;
     session = (WT_SESSION_IMPL *)cursor->session;
@@ -100,17 +99,7 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
     if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
         return (false);
 
-    /*
-     * We need a page with history: updates need complete update lists and a read might be based on
-     * a different timestamp than the one that brought the page into memory. Release the page and
-     * read it again with history if required. Eviction may be locking the page, wait until we see a
-     * "normal" state and then test against that state (eviction may have already locked the page
-     * again).
-     */
-    while ((current_state = cbt->ref->state) == WT_REF_LOCKED)
-        __wt_yield();
-    WT_ASSERT(session, current_state == WT_REF_LIMBO || current_state == WT_REF_MEM);
-    return (current_state == WT_REF_MEM);
+    return (true);
 }
 
 /*
@@ -156,34 +145,6 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
           session, ret, "item size of %" WT_SIZET_FMT " refused by block manager", kv->size);
 
     return (0);
-}
-
-/*
- * __cursor_disable_bulk --
- *     Disable bulk loads into a tree.
- */
-static inline void
-__cursor_disable_bulk(WT_SESSION_IMPL *session, WT_BTREE *btree)
-{
-    /*
-     * Once a tree (other than the LSM primary) is no longer empty, eviction should pay attention to
-     * it, and it's no longer possible to bulk-load into it.
-     */
-    if (!btree->original)
-        return;
-    if (btree->lsm_primary) {
-        btree->original = 0; /* Make the next test faster. */
-        return;
-    }
-
-    /*
-     * We use a compare-and-swap here to avoid races among the first inserts into a tree. Eviction
-     * is disabled when an empty tree is opened, and it must only be enabled once.
-     */
-    if (__wt_atomic_cas8(&btree->original, 1, 0)) {
-        btree->evict_disabled_open = false;
-        __wt_evict_file_exclusive_off(session);
-    }
 }
 
 /*
@@ -271,12 +232,16 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
      * update that's been deleted is not a valid key/value pair).
      */
     if (cbt->ins != NULL) {
-        WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
+        WT_RET(__wt_txn_read_upd_list(session, cbt->ins->upd, &upd));
         if (upd != NULL) {
-            if (upd->type == WT_UPDATE_TOMBSTONE)
+            if (upd->type == WT_UPDATE_TOMBSTONE) {
+                WT_ASSERT(session, !F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK));
                 return (0);
+            }
             if (updp != NULL)
                 *updp = upd;
+            else if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
+                __wt_free_update_list(session, &upd);
             *valid = true;
             return (0);
         }
@@ -298,6 +263,7 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
         if (cbt->recno >= cbt->ref->ref_recno + page->entries)
             return (0);
 
+        *valid = true;
         /*
          * An update would have appeared as an "insert" object; no further checks to do.
          */
@@ -328,6 +294,24 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
         cell = WT_COL_PTR(page, cip);
         if (__wt_cell_type(cell) == WT_CELL_DEL)
             return (0);
+
+        /*
+         * Check for an update ondisk or in the history store. For column store, an insert object
+         * can have the same key as an on-page or history store object.
+         */
+        WT_RET(__wt_txn_read(session, cbt, NULL, NULL, &upd));
+        if (upd != NULL) {
+            if (upd->type == WT_UPDATE_TOMBSTONE) {
+                if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
+                    __wt_free_update_list(session, &upd);
+                return (0);
+            }
+            if (updp != NULL)
+                *updp = upd;
+            else if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
+                __wt_free_update_list(session, &upd);
+            *valid = true;
+        }
         break;
     case BTREE_ROW:
         /* The search function doesn't check for empty pages. */
@@ -347,18 +331,25 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
             return (0);
 
         /* Check for an update. */
-        if (page->modify != NULL && page->modify->mod_row_update != NULL) {
-            WT_RET(__wt_txn_read(session, page->modify->mod_row_update[cbt->slot], &upd));
-            if (upd != NULL) {
-                if (upd->type == WT_UPDATE_TOMBSTONE)
-                    return (0);
-                if (updp != NULL)
-                    *updp = upd;
+        WT_RET(__wt_txn_read(session, cbt,
+          (page->modify != NULL && page->modify->mod_row_update != NULL) ?
+            page->modify->mod_row_update[cbt->slot] :
+            NULL,
+          NULL, &upd));
+        if (upd != NULL) {
+            if (upd->type == WT_UPDATE_TOMBSTONE) {
+                if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
+                    __wt_free_update_list(session, &upd);
+                return (0);
             }
+            if (updp != NULL)
+                *updp = upd;
+            else if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
+                __wt_free_update_list(session, &upd);
+            *valid = true;
         }
         break;
     }
-    *valid = true;
     return (0);
 }
 
@@ -477,14 +468,12 @@ __wt_btcur_search_uncommitted(WT_CURSOR *cursor, WT_UPDATE **updp)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
-    WT_SESSION_IMPL *session;
     WT_UPDATE *upd;
 
     *updp = NULL;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     btree = cbt->btree;
-    session = (WT_SESSION_IMPL *)cursor->session;
     upd = NULL; /* -Wuninitialized */
 
     /*
@@ -499,24 +488,43 @@ __wt_btcur_search_uncommitted(WT_CURSOR *cursor, WT_UPDATE **updp)
                                       __cursor_col_search(cbt, NULL, NULL));
 
     /*
-     * Ideally exact match should be found, as this transaction has searched for updates done by
-     * itself. But, we cannot be sure of finding one, as pre processing of this prepared transaction
-     * updates could have happened as part of resolving earlier transaction operations.
+     * Ideally an exact match will be found, as this transaction is searching for updates done by
+     * itself. But, we cannot be sure of finding one, as pre-processing of the updates could have
+     * happened as part of resolving earlier transaction operations.
      */
     if (cbt->compare != 0)
         return (0);
 
-    /*
-     * Get the uncommitted update from the cursor. For column store there will be always a insert
-     * structure for updates irrespective of fixed length or variable length.
-     */
-    if (cbt->ins != NULL)
-        upd = cbt->ins->upd;
-    else if (cbt->btree->type == BTREE_ROW) {
-        WT_ASSERT(session, cbt->btree->type == BTREE_ROW && cbt->ref->page->modify != NULL &&
-            cbt->ref->page->modify->mod_row_update != NULL);
-        upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+    /* Get any uncommitted update from the in-memory page. */
+    switch (cbt->btree->type) {
+    case BTREE_ROW:
+        /*
+         * Any update must be either in the insert list, in which case search will have returned a
+         * pointer for us, or as an update in a particular key's update list, in which case the slot
+         * will be returned to us. In either case, we want the most recent update (any update
+         * attempted after the prepare would have failed).
+         */
+        if (cbt->ins != NULL)
+            upd = cbt->ins->upd;
+        else if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
+            upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+        break;
+    case BTREE_COL_FIX:
+    case BTREE_COL_VAR:
+        /*
+         * Any update must be in the insert list and we want the most recent update (any update
+         * attempted after the prepare would have failed).
+         */
+        if (cbt->ins != NULL)
+            upd = cbt->ins->upd;
+        break;
     }
+
+    /*
+     * Like regular uncommitted updates, pages with prepared updates are pinned to the cache and can
+     * never be written to the history store. Therefore, there is no need to do a search here for
+     * uncommitted updates.
+     */
 
     *updp = upd;
     return (0);
@@ -795,8 +803,11 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
         WT_RET(__cursor_size_chk(session, &cursor->key));
     WT_RET(__cursor_size_chk(session, &cursor->value));
 
+    WT_RET_ASSERT(
+      session, S2BT(session) == btree, WT_PANIC, "btree differs unexpectedly from session's btree");
+
     /* It's no longer possible to bulk-load into the tree. */
-    __cursor_disable_bulk(session, btree);
+    __wt_cursor_disable_bulk(session);
 
     /*
      * Insert a new record if WT_CURSTD_APPEND configured, (ignoring any application set record
@@ -924,20 +935,27 @@ static int
 __curfile_update_check(WT_CURSOR_BTREE *cbt)
 {
     WT_BTREE *btree;
+    WT_PAGE *page;
     WT_SESSION_IMPL *session;
+    WT_UPDATE *upd;
 
     btree = cbt->btree;
+    page = cbt->ref->page;
     session = (WT_SESSION_IMPL *)cbt->iface.session;
+    upd = NULL;
 
     if (cbt->compare != 0)
         return (0);
-    if (cbt->ins != NULL)
-        return (__wt_txn_update_check(session, cbt->ins->upd));
 
-    if (btree->type == BTREE_ROW && cbt->ref->page->modify != NULL &&
-      cbt->ref->page->modify->mod_row_update != NULL)
-        return (__wt_txn_update_check(session, cbt->ref->page->modify->mod_row_update[cbt->slot]));
-    return (0);
+    if (cbt->ins != NULL)
+        upd = cbt->ins->upd;
+    else if (btree->type == BTREE_ROW && page->modify != NULL &&
+      page->modify->mod_row_update != NULL)
+        upd = page->modify->mod_row_update[cbt->slot];
+    else if (btree->type != BTREE_COL_VAR)
+        return (0);
+
+    return (__wt_txn_update_check(session, cbt, upd));
 }
 
 /*
@@ -1199,8 +1217,11 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     session = (WT_SESSION_IMPL *)cursor->session;
     yield_count = sleep_usecs = 0;
 
+    WT_RET_ASSERT(
+      session, S2BT(session) == btree, WT_PANIC, "btree differs unexpectedly from session's btree");
+
     /* It's no longer possible to bulk-load into the tree. */
-    __cursor_disable_bulk(session, btree);
+    __wt_cursor_disable_bulk(session);
 
     /* Save the cursor state. */
     __cursor_state_save(cursor, &state);
@@ -1335,7 +1356,6 @@ done:
              */
             ret = __wt_key_return(cbt);
             break;
-        case WT_UPDATE_BIRTHMARK:
         case WT_UPDATE_TOMBSTONE:
         default:
             return (__wt_illegal_value(session, modify_type));
@@ -1453,7 +1473,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
     if (!F_ISSET(cursor, WT_CURSTD_KEY_INT) || !F_ISSET(cursor, WT_CURSTD_VALUE_INT))
         WT_ERR(__wt_btcur_search(cbt));
 
-    WT_ERR(__wt_modify_pack(cursor, &modify, entries, nentries));
+    WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify));
 
     orig = cursor->value.size;
     WT_ERR(__wt_modify_apply(cursor, modify->data));
@@ -1863,9 +1883,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
     session = (WT_SESSION_IMPL *)cbt->iface.session;
 
     /*
-     * The in-memory split and lookaside table code creates low-level btree cursors to search/modify
-     * leaf pages. Those cursors don't hold hazard pointers, nor are they counted in the session
-     * handle's cursor count. Skip the usual cursor tear-down in that case.
+     * The in-memory split and history store table code creates low-level btree cursors to
+     * search/modify leaf pages. Those cursors don't hold hazard pointers, nor are they counted in
+     * the session handle's cursor count. Skip the usual cursor tear-down in that case.
      */
     if (!lowlevel)
         ret = __cursor_reset(cbt);

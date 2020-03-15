@@ -395,10 +395,10 @@ restart:
     /* Search the internal pages of the tree. */
     current = &btree->root;
     for (;;) {
-        page = current->page;
-        if (!WT_PAGE_IS_INTERNAL(page))
+        if (F_ISSET(current, WT_REF_FLAG_LEAF))
             break;
 
+        page = current->page;
         WT_INTL_INDEX_GET(session, page, pindex);
         entries = pindex->entries;
 
@@ -420,15 +420,13 @@ restart:
         descent = NULL;
         for (i = 0; i < entries; ++i) {
             descent = pindex->index[__wt_random(&session->rnd) % entries];
-            if (descent->state == WT_REF_DISK || descent->state == WT_REF_LIMBO ||
-              descent->state == WT_REF_LOOKASIDE || descent->state == WT_REF_MEM)
+            if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
                 break;
         }
         if (i == entries)
             for (i = 0; i < entries; ++i) {
                 descent = pindex->index[i];
-                if (descent->state == WT_REF_DISK || descent->state == WT_REF_LIMBO ||
-                  descent->state == WT_REF_LOOKASIDE || descent->state == WT_REF_MEM)
+                if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
                     break;
             }
         if (i == entries || descent == NULL) {

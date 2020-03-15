@@ -38,6 +38,14 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     upd = upd_arg;
     append = logged = false;
 
+    /*
+     * We should have EITHER:
+     * - A full update list to instantiate with.
+     * - An update to append the existing update list with.
+     * - A key/value pair to create an update with and append to the update list.
+     */
+    WT_ASSERT(session, (value == NULL && upd_arg != NULL) || (value != NULL && upd_arg == NULL));
+
     if (upd_arg == NULL) {
         if (modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) {
             /*
@@ -65,9 +73,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
             cbt->ins_head = NULL;
         }
     }
-
-    /* We're going to modify the page, we should have loaded history. */
-    WT_ASSERT(session, cbt->ref->state != WT_REF_LIMBO);
 
     /* If we don't yet have a modify structure, we'll need one. */
     WT_RET(__wt_page_modify_init(session, page));
@@ -118,19 +123,19 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
      * it into place.
      */
     if (cbt->compare == 0 && cbt->ins != NULL) {
-        /*
-         * If we are restoring updates that couldn't be evicted, the key must not exist on the new
-         * page.
-         */
-        WT_ASSERT(session, upd_arg == NULL);
+        old_upd = cbt->ins->upd;
+        if (upd_arg == NULL) {
+            /* Make sure the update can proceed. */
+            WT_ERR(__wt_txn_update_check(session, cbt, old_upd));
 
-        /* Make sure the update can proceed. */
-        WT_ERR(__wt_txn_update_check(session, old_upd = cbt->ins->upd));
-
-        /* Allocate a WT_UPDATE structure and transaction ID. */
-        WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size, modify_type));
-        WT_ERR(__wt_txn_modify(session, upd));
-        logged = true;
+            /* Allocate a WT_UPDATE structure and transaction ID. */
+            WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size, modify_type));
+            WT_ERR(__wt_txn_modify(session, upd));
+            logged = true;
+        } else {
+            upd = upd_arg;
+            upd_size = WT_UPDATE_MEMSIZE(upd);
+        }
 
         /* Avoid a data copy in WT_CURSOR.update. */
         cbt->modify_update = upd;
@@ -142,7 +147,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         upd->next = old_upd;
 
         /* Serialize the update. */
-        WT_ERR(__wt_update_serial(session, page, &cbt->ins->upd, &upd, upd_size, false));
+        WT_ERR(__wt_update_serial(session, cbt, page, &cbt->ins->upd, &upd, upd_size, false));
     } else {
         /* Allocate the append/update list reference as necessary. */
         if (append) {

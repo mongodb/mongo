@@ -270,14 +270,15 @@ functions:
         rm -rf "wiredtiger"
         rm -rf "wiredtiger.tgz"
 
-  "checkpoint test":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/build_posix/test/checkpoint"
-      script: |
-        set -o errexit
-        set -o verbose
-        ./t ${checkpoint_args} 2>&1
+  # Temporarily disabled
+  # "checkpoint test":
+  #   command: shell.exec
+  #   params:
+  #     working_dir: "wiredtiger/build_posix/test/checkpoint"
+  #     script: |
+  #       set -o errexit
+  #       set -o verbose
+  #       ./t ${checkpoint_args} 2>&1
 
   "checkpoint stress test":
     command: shell.exec
@@ -553,16 +554,17 @@ tasks:
         vars:
           directory: test/bloom
 
-  - name: checkpoint-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/checkpoint
+  # Temporarily disabled
+  # - name: checkpoint-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "make check directory"
+  #       vars:
+  #         directory: test/checkpoint
 
   - name: cursor-order-test
     tags: ["pull_request"]
@@ -575,27 +577,29 @@ tasks:
         vars:
           directory: test/cursor_order
 
-  - name: fops-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/fops
+  # Temporarily disabled
+  # - name: fops-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "make check directory"
+  #       vars:
+  #         directory: test/fops
 
-  - name: format-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/format
+  # Temporarily disabled
+  # - name: format-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "make check directory"
+  #       vars:
+  #         directory: test/format
 
   - name: huge-test
     tags: ["pull_request"]
@@ -695,7 +699,23 @@ tasks:
 
   # Start of csuite test tasks
 
-  - name: csuite-import-test
+  # Temporarily disabled
+  # - name: csuite-import-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+
+  #           ${test_env_vars|} $(pwd)/../test/csuite/import/smoke.sh 2>&1
+
+  - name: csuite-incr-backup-test
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -708,7 +728,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/../test/csuite/import/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_incr_backup 2>&1
 
   - name: csuite-random-abort-test
     tags: ["pull_request"]
@@ -1033,7 +1053,7 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4699_json 2>&1
 
-  - name: csuite-wt4803-cache-overflow-abort-test
+  - name: csuite-wt4803-history-store-abort-test
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1046,7 +1066,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/csuite/test_wt4803_cache_overflow_abort 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4803_history_store_abort 2>&1
 
   - name: csuite-wt4891-meta-ckptlist-get-alloc-test
     tags: ["pull_request"]
@@ -1183,20 +1203,20 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3338_partial_update 2>&1
 
-  - name: csuite-wt4333-handle-locks-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+  # - name: csuite-wt4333-handle-locks-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
+  #           ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
 
   # End of csuite test tasks
 
@@ -1295,8 +1315,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defghijk] ${unit_test_args|-v 2} ${smp_command|} 2>&1
-
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [defg] ${unit_test_args|-v 2} ${smp_command|} 2>&1
   - name: unit-test-bucket04
     tags: ["pull_request", "unit_test"]
     depends_on:
@@ -1310,7 +1329,9 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] ${unit_test_args|-v 2} ${smp_command|} 2>&1
+            # Reserve this bucket only for history store tests, which take a long time to run
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py hs ${unit_test_args|-v 2} ${smp_command|} 2>&1
+
 
   - name: unit-test-bucket05
     tags: ["pull_request", "unit_test"]
@@ -1325,9 +1346,42 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] ${unit_test_args|-v 2} ${smp_command|} 2>&1
+            # Non-history store tests in the 'h' family
+            non_ts_tests=$(ls ../test/suite/test_h*.py | xargs -n1 basename | grep -v _hs)
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_ts_tests ${unit_test_args|-v 2} ${smp_command|} 2>&1
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [ijk] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   - name: unit-test-bucket06
+    tags: ["pull_request", "unit_test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [lmnopq] ${unit_test_args|-v 2} ${smp_command|} 2>&1
+
+  - name: unit-test-bucket07
+    tags: ["pull_request", "unit_test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [rs] ${unit_test_args|-v 2} ${smp_command|} 2>&1
+
+  - name: unit-test-bucket08
     tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
@@ -1343,7 +1397,7 @@ tasks:
             # Reserve this bucket only for timestamp tests, which take a long time to run
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py timestamp ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
-  - name: unit-test-bucket07
+  - name: unit-test-bucket09
     tags: ["pull_request", "unit_test"]
     depends_on:
     - name: compile
@@ -1359,6 +1413,20 @@ tasks:
             # Non-timestamp tests in the 't' family
             non_ts_tests=$(ls ../test/suite/test_t*.py | xargs -n1 basename | grep -v timestamp)
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py $non_ts_tests ${unit_test_args|-v 2} ${smp_command|} 2>&1
+
+  - name: unit-test-bucket10
+    tags: ["pull_request", "unit_test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} ${python_binary|python} ../test/suite/run.py [uvwxyz] ${unit_test_args|-v 2} ${smp_command|} 2>&1
 
   # End of Python unit test tasks
@@ -1389,7 +1457,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            
+
             ${test_env_vars|} ${python_binary|python} ../../test/wtperf/test_conf_dump.py 2>&1
 
   - name: compile-windows-alt
@@ -1424,38 +1492,40 @@ tasks:
             pip install scons==3.1.1
             scons-3.1.1.bat ${smp_command|} check
 
-  - name: fops
-    tags: ["pull_request"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            if [ "Windows_NT" = "$OS" ]; then
-              cmd.exe /c t_fops.exe
-            else
-              build_posix/test/fops/t
-            fi
+  # Temporarily disabled
+  # - name: fops
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #   - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           if [ "Windows_NT" = "$OS" ]; then
+  #             cmd.exe /c t_fops.exe
+  #           else
+  #             build_posix/test/fops/t
+  #           fi
 
-  - name: format
-    tags: ["windows_only"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            # format assumes we run it from the format directory
-            cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
+  # Temporarily disabled
+  # - name: format
+  #   tags: ["windows_only"]
+  #   depends_on:
+  #   - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           # format assumes we run it from the format directory
+  #           cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
 
   - name: million-collection-test
     commands:
@@ -1483,129 +1553,135 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_mongodb_releases.sh
 
-  - name: generate-datafile-little-endian
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "compile wiredtiger"
-      - func: "format test"
-        vars:
-          times: 10
-          config: ../../../test/format/CONFIG.endian
-          extra_args: -h "WT_TEST.$i"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/test/format"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            # Archive the WT_TEST directories which include the generated wt data files
-            tar -zcvf WT_TEST.tgz WT_TEST*
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          aws_key: ${aws_key}
-          local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
-          bucket: build_external
-          permissions: public-read
-          content_type: application/tar
-          display_name: WT_TEST
-          remote_file: wiredtiger/little-endian/${revision}/artifacts/WT_TEST.tgz
+  # Temporarily disabled
+  # - name: generate-datafile-little-endian
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "format test"
+  #       vars:
+  #         times: 10
+  #         config: ../../../test/format/CONFIG.endian
+  #         extra_args: -h "WT_TEST.$i"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix/test/format"
+  #         shell: bash
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           # Archive the WT_TEST directories which include the generated wt data files
+  #           tar -zcvf WT_TEST.tgz WT_TEST*
+  #     - command: s3.put
+  #       params:
+  #         aws_secret: ${aws_secret}
+  #         aws_key: ${aws_key}
+  #         local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
+  #         bucket: build_external
+  #         permissions: public-read
+  #         content_type: application/tar
+  #         display_name: WT_TEST
+  #         remote_file: wiredtiger/little-endian/${revision}/artifacts/WT_TEST.tgz
 
-  - name: verify-datafile-little-endian
-    depends_on:
-    - name: compile
-    - name: generate-datafile-little-endian
-    commands:
-      - func: "fetch artifacts"
-      - func: "fetch artifacts from little-endian"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+  # Temporarily disabled
+  # - name: verify-datafile-little-endian
+  #   depends_on:
+  #   - name: compile
+  #   - name: generate-datafile-little-endian
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "fetch artifacts from little-endian"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           ./test/evergreen/verify_wt_datafiles.sh 2>&1
 
-  - name: verify-datafile-from-little-endian
-    depends_on:
-    - name: compile
-    - name: generate-datafile-little-endian
-      variant: little-endian
-    commands:
-      - func: "fetch artifacts"
-      - func: "fetch artifacts from little-endian"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+  # Temporarily disabled
+  # - name: verify-datafile-from-little-endian
+  #   depends_on:
+  #   - name: compile
+  #   - name: generate-datafile-little-endian
+  #     variant: little-endian
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "fetch artifacts from little-endian"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           ./test/evergreen/verify_wt_datafiles.sh 2>&1
 
-  - name: generate-datafile-big-endian
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "compile wiredtiger"
-      - func: "format test"
-        vars:
-          times: 10
-          config: ../../../test/format/CONFIG.endian
-          extra_args: -h "WT_TEST.$i"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/test/format"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            # Archive the WT_TEST directories which include the generated wt data files
-            tar -zcvf WT_TEST.tgz WT_TEST*
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          aws_key: ${aws_key}
-          local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
-          bucket: build_external
-          permissions: public-read
-          content_type: application/tar
-          display_name: WT_TEST
-          remote_file: wiredtiger/big-endian/${revision}/artifacts/WT_TEST.tgz
+  # Temporarily disabled
+  # - name: generate-datafile-big-endian
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "format test"
+  #       vars:
+  #         times: 10
+  #         config: ../../../test/format/CONFIG.endian
+  #         extra_args: -h "WT_TEST.$i"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix/test/format"
+  #         shell: bash
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           # Archive the WT_TEST directories which include the generated wt data files
+  #           tar -zcvf WT_TEST.tgz WT_TEST*
+  #     - command: s3.put
+  #       params:
+  #         aws_secret: ${aws_secret}
+  #         aws_key: ${aws_key}
+  #         local_file: wiredtiger/build_posix/test/format/WT_TEST.tgz
+  #         bucket: build_external
+  #         permissions: public-read
+  #         content_type: application/tar
+  #         display_name: WT_TEST
+  #         remote_file: wiredtiger/big-endian/${revision}/artifacts/WT_TEST.tgz
 
-  - name: verify-datafile-big-endian
-    depends_on:
-    - name: compile
-    - name: generate-datafile-big-endian
-    commands:
-      - func: "fetch artifacts"
-      - func: "fetch artifacts from big-endian"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+  # Temporarily disabled
+  # - name: verify-datafile-big-endian
+  #   depends_on:
+  #   - name: compile
+  #   - name: generate-datafile-big-endian
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "fetch artifacts from big-endian"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           ./test/evergreen/verify_wt_datafiles.sh 2>&1
 
-  - name: verify-datafile-from-big-endian
-    depends_on:
-    - name: compile
-    - name: generate-datafile-big-endian
-      variant: big-endian
-    commands:
-      - func: "fetch artifacts"
-      - func: "fetch artifacts from big-endian"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            ./test/evergreen/verify_wt_datafiles.sh 2>&1
+  # Temporarily disabled
+  # - name: verify-datafile-from-big-endian
+  #   depends_on:
+  #   - name: compile
+  #   - name: generate-datafile-big-endian
+  #     variant: big-endian
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "fetch artifacts from big-endian"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
+  #           ./test/evergreen/verify_wt_datafiles.sh 2>&1
 
   - name: clang-analyzer
     tags: ["pull_request"]
@@ -1653,17 +1729,31 @@ tasks:
         vars:
           format_test_script_args: -t 110 -j 4 direct_io=1
 
-  - name: format-linux-no-ftruncate
-    depends_on:
-    - name: compile-linux-no-ftruncate
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-linux-no-ftruncate
-      - func: "compile wiredtiger no linux ftruncate"
-      - func: "format test"
-        vars:
-          times: 3
+  # Temporarily disabled
+  # - name: linux-directio
+  #   depends_on:
+  #   - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - func: "compile wiredtiger"
+  #     - func: "format test"
+  #       vars:
+  #         times: 3
+  #         config: ../../../test/format/CONFIG.stress
+  #         extra_args: -C "direct_io=[data]"
+
+  # Temporarily disabled
+  # - name: format-linux-no-ftruncate
+  #   depends_on:
+  #   - name: compile-linux-no-ftruncate
+  #   commands:
+  #     - func: "fetch artifacts"
+  #       vars:
+  #         dependent_task: compile-linux-no-ftruncate
+  #     - func: "compile wiredtiger no linux ftruncate"
+  #     - func: "format test"
+  #       vars:
+  #         times: 3
 
   - name: package
     commands:
@@ -1690,109 +1780,113 @@ tasks:
             set -o verbose
             ${python_binary|python} syscall.py --verbose --preserve
 
-  - name: checkpoint-filetypes-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          # Don't use diagnostic - this test looks for timing problems that are more likely to occur without it
-          posix_configure_flags: --enable-strict
-      - func: "checkpoint test"
-        vars:
-          checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
-      - func: "checkpoint test"
-        vars:
-          checkpoint_args: -t r -n 1000000 -k 5000000 -C cache_size=100MB
-      - func: "checkpoint test"
-        vars:
-          checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
+  # Temporarily disabled
+  # - name: checkpoint-filetypes-test
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         # Don't use diagnostic - this test looks for timing problems that are more likely to occur without it
+  #         posix_configure_flags: --enable-strict
+  #     - func: "checkpoint test"
+  #       vars:
+  #         checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
+  #     - func: "checkpoint test"
+  #       vars:
+  #         checkpoint_args: -t r -n 1000000 -k 5000000 -C cache_size=100MB
+  #     - func: "checkpoint test"
+  #       vars:
+  #         checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
 
-  - name: coverage-report
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
-          posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib
-      - func: "make check all"
-      - func: "unit test"
-        vars:
-          unit_test_args: -v 2 --long
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row firstfit=1 internal_key_truncation=1
-      - func: "format test"
-        vars:
-          extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+  # Temporarily disabled
+  # - name: coverage-report
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
+  #         posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib
+  #     - func: "make check all"
+  #     - func: "unit test"
+  #       vars:
+  #         unit_test_args: -v 2 --long
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row firstfit=1 internal_key_truncation=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
+  #     - func: "format test"
+  #       vars:
+  #         extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
 
-            GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          aws_key: ${aws_key}
-          local_file: wiredtiger/coverage_report.html
-          bucket: build_external
-          permissions: public-read
-          content_type: text/html
-          display_name: Coverage report
-          remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}.html
+  #           GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
+  #     - command: s3.put
+  #       params:
+  #         aws_secret: ${aws_secret}
+  #         aws_key: ${aws_key}
+  #         local_file: wiredtiger/coverage_report.html
+  #         bucket: build_external
+  #         permissions: public-read
+  #         content_type: text/html
+  #         display_name: Coverage report
+  #         remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}.html
 
-  - name: spinlock-gcc-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: --enable-python --with-spinlock=gcc --enable-strict
-      - func: "make check all"
-      - func: "format test"
-        vars:
-          times: 3
-      - func: "unit test"
+  # Temporarily disabled
+  # - name: spinlock-gcc-test
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         posix_configure_flags: --enable-python --with-spinlock=gcc --enable-strict
+  #     - func: "make check all"
+  #     - func: "format test"
+  #       vars:
+  #         times: 3
+  #     - func: "unit test"
 
-  - name: spinlock-pthread-adaptive-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: --enable-python --with-spinlock=pthread_adaptive --enable-strict
-      - func: "make check all"
-      - func: "format test"
-        vars:
-          times: 3
-      - func: "unit test"
+  # Temporarily disabled
+  # - name: spinlock-pthread-adaptive-test
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         posix_configure_flags: --enable-python --with-spinlock=pthread_adaptive --enable-strict
+  #     - func: "make check all"
+  #     - func: "format test"
+  #       vars:
+  #         times: 3
+  #     - func: "unit test"
 
   - name: wtperf-test
     depends_on:
@@ -1816,7 +1910,7 @@ tasks:
             done
 
   - name: ftruncate-test
-    commands: 
+    commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -1827,7 +1921,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
+            # ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
             ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh 2>&1
             ${test_env_vars|} $(pwd)/test/csuite/test_truncated_log 2>&1
 
@@ -1839,7 +1933,7 @@ tasks:
           configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-g -Werror"
           posix_configure_flags: --enable-silent-rules --enable-diagnostic --disable-static
       - func: "make wiredtiger"
-      
+
       # Run the long version of make check, that includes the full csuite tests
       - func: "make check all"
         vars:
@@ -1852,7 +1946,7 @@ tasks:
             set -o verbose
 
             WT3363_CHECKPOINT_OP_RACES=1 test/csuite/./test_wt3363_checkpoint_op_races 2>&1
-      
+
       # Many dbs test - Run with:
       # 1.  The defaults
       - func: "many dbs test"
@@ -1868,27 +1962,27 @@ tasks:
       - func: "many dbs test"
         vars:
           many_db_args: -I -D 40
-      
+
       # extended test/thread runs
       - func: "thread test"
-        vars: 
+        vars:
           thread_test_args: -t f
       - func: "thread test"
-        vars: 
+        vars:
           thread_test_args: -S -F -n 100000 -t f
       - func: "thread test"
-        vars: 
+        vars:
           thread_test_args: -t r
       - func: "thread test"
-        vars: 
+        vars:
           thread_test_args: -S -F -n 100000 -t r
       - func: "thread test"
-        vars: 
+        vars:
           thread_test_args: -t v
       - func: "thread test"
         vars:
           thread_test_args: -S -F -n 100000 -t v
-      
+
       # random-abort - default (random time and number of threads)
       - func: "random abort test"
       # random-abort - minimum time, random number of threads
@@ -1899,18 +1993,19 @@ tasks:
       - func: "random abort test"
         vars:
           random_abort_args: -t 40
-      
+
       # truncated-log
       - func: "truncated log test"
-      
+
       # format test
-      - func: "format test"
-        vars:
-          extra_args: file_type=fix
-      - func: "format test"
-        vars:
-          extra_args: file_type=row
-      
+      # Temporarily disabled
+      # - func: "format test"
+      #   vars:
+      #     extra_args: file_type=fix
+      # - func: "format test"
+      #   vars:
+      #     extra_args: file_type=row
+
       #FIXME: Add wtperf testing from Jenkin "wiredtiger-test-check-long" after fixing WT-5270
 
   - name: time-shift-sensitivity-test
@@ -1930,7 +2025,7 @@ tasks:
             set -o verbose
 
             ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
-  
+
   - name: format-stress-sanitizer-test
     #set a 25 hours (25*60*60 = 90000 seconds) timeout
     exec_timeout_secs: 90000
@@ -1942,7 +2037,7 @@ tasks:
           test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
           # run for 24 hours ( 24 * 60 = 1440 minutes), skip known errors, don't stop at failed tests, use default config
           format_test_script_args: -E -t 1440
-  
+
   - name: format-stress-sanitizer-lsm-test
     commands:
       - func: "get project"
@@ -1996,7 +2091,7 @@ tasks:
           # At the time of writing this script, one call to underlying scripts takes about ~15 mins to finish in worst case.
           # We are giving an extra ~20% room for vairance in execution time.
           times: 80
-          
+
   - name: split-stress-test
     commands:
       - func: "get project"
@@ -2010,7 +2105,7 @@ tasks:
             set -o errexit
             set -o verbose
             for i in {1..10}; do ${python_binary|python} split_stress.py; done
-
+  # Temporarily disabled
   - name: format-stress-test
     # Set 25 hours timeout
     exec_timeout_secs: 90000
@@ -2022,6 +2117,7 @@ tasks:
           #run for 24 hours ( 24 * 60 = 1440 minutes), use default config
           format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -t 1440
 
+  # Temporarily disabled
   - name: format-stress-smoke-test
     # Set 7 hours timeout
     exec_timeout_secs: 25200
@@ -2047,7 +2143,7 @@ tasks:
       - func: "checkpoint stress test"
         vars:
           # No of times to run the loop
-          times: 2
+          times: 1
           # No of processes to run in the background
           no_of_procs: 10
 
@@ -2120,6 +2216,40 @@ tasks:
           working_dir: "wiredtiger"
           command: bash test/evergreen/compatibility_test_for_wiredtiger_releases.sh
 
+  - name: format-stress-sanitizer-ppc-test
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          # CC is set to the system default "clang" binary here as a workaround. Change it back to mongodbtoolchain "clang" binary after BUILD-10248 fix.
+          configure_env_vars: CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "format test script"
+        vars:
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=`ls /usr/bin/llvm-symbolizer* | tail -1`
+          # run for 2 hours ( 2 * 60 = 120 minutes), don't stop at failed tests, use default config
+          format_test_script_args: -t 120
+
+  - name: format-stress-sanitizer-smoke-ppc-test
+    # Set 7 hours timeout (60 * 60 * 7)
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          # CC is set to the system default "clang" binary here as a workaround. Change it back to mongodbtoolchain "clang" binary after BUILD-10248 fix.
+          configure_env_vars: CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "format test script"
+        # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
+        # run smoke tests, don't stop at failed tests, use default config
+        vars:
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=`ls /usr/bin/llvm-symbolizer* | tail -1`
+          format_test_script_args: -S
+          times: 16
+
 buildvariants:
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -2127,7 +2257,7 @@ buildvariants:
   - ubuntu1804-test
   expansions:
     test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
@@ -2136,29 +2266,23 @@ buildvariants:
     - name: make-check-msan-test
     - name: compile-ubsan
     - name: ubsan-test
-    - name: linux-directio
-      distros: ubuntu1804-build
+    # Temporarily disabled
+    # - name: linux-directio
+    #   distros: ubuntu1804-build
     - name: syscall-linux
     - name: make-check-asan-test
     - name: configure-combinations
-    - name: checkpoint-filetypes-test
-    - name: coverage-report
+    # Temporarily disabled
+    # - name: checkpoint-filetypes-test
+    # - name: coverage-report
     - name: unit-test-long
-    - name: spinlock-gcc-test
-    - name: spinlock-pthread-adaptive-test
+    # Temporarily disabled
+    # - name: spinlock-gcc-test
+    # - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test
     - name: ftruncate-test
     - name: long-test
-    - name: recovery-stress-test
-    - name: format-stress-sanitizer-test
-    - name: format-stress-sanitizer-smoke-test
-    - name: format-stress-sanitizer-lsm-test
-    - name: split-stress-test
-    - name: format-stress-test
-    - name: format-stress-smoke-test
-    - name: race-condition-stress-sanitizer-test
-    - name: checkpoint-stress-test
     - name: static-wt-build-test
 
 - name: ubuntu1804-compilers
@@ -2188,6 +2312,26 @@ buildvariants:
     - name: ".unit_test"
     - name: conf-dump-test
 
+- name: ubuntu1804-stress-tests
+  display_name: Ubuntu 18.04 Stress tests
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+  tasks:
+    - name: recovery-stress-test
+    - name: format-stress-sanitizer-test
+    - name: format-stress-sanitizer-smoke-test
+    - name: format-stress-sanitizer-lsm-test
+    - name: split-stress-test
+    - name: format-stress-test
+    - name: format-stress-smoke-test
+    - name: race-condition-stress-sanitizer-test
+    - name: checkpoint-stress-test
+
 - name: package
   display_name: Package
   batchtime: 1440 # 1 day
@@ -2209,7 +2353,8 @@ buildvariants:
     - name: compile-linux-no-ftruncate
     - name: make-check-linux-no-ftruncate-test
     - name: unit-linux-no-ftruncate-test
-    - name: format-linux-no-ftruncate
+    # Temporarily disabled
+    # - name: format-linux-no-ftruncate
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -2223,30 +2368,35 @@ buildvariants:
     - name: compile
     - name: make-check-test
     - name: unit-test
-    - name: fops
+    # Temporarily disabled
+    # - name: fops
     - name: time-shift-sensitivity-test
     - name: compile-msan
     - name: make-check-msan-test
     - name: compile-ubsan
     - name: ubsan-test
-    - name: linux-directio
-      distros: rhel80-build
+    # Temporarily disabled
+    # - name: linux-directio
+    #   distros: rhel80-build
     - name: syscall-linux
     - name: compile-asan
     - name: make-check-asan-test
-    - name: checkpoint-filetypes-test
+    # Temporarily disabled
+    # - name: checkpoint-filetypes-test
     - name: unit-test-long
-    - name: spinlock-gcc-test
-    - name: spinlock-pthread-adaptive-test
+    # Temporarily disabled
+    # - name: spinlock-gcc-test
+    # - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test
     - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
-    - name: coverage-report
+    # Temporarily disabled
+    # - name: coverage-report
 
-- name: large-scale-test
-  display_name: Large scale testing
+- name: large-scale-tests
+  display_name: Large scale tests
   batchtime: 1440 # 1 day
   run_on:
   - rhel80-build
@@ -2270,7 +2420,8 @@ buildvariants:
     - name: compile
     - name: ".windows_only"
     - name: ".unit_test"
-    - name: fops
+    # Temporarily disabled
+    # - name: fops
 
 - name: macos-1012
   display_name: OS X 10.12
@@ -2286,37 +2437,40 @@ buildvariants:
     - name: compile
     - name: make-check-test
     - name: unit-test
-    - name: fops
+    # Temporarily disabled
+    # - name: fops
 
-- name: little-endian
-  display_name: Little-endian (x86)
-  run_on:
-  - ubuntu1804-test
-  batchtime: 10080 # 7 days
-  expansions:
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
-  tasks:
-  - name: compile
-  - name: generate-datafile-little-endian
-  - name: verify-datafile-little-endian
-  - name: verify-datafile-from-big-endian
+# Temporarily disabled
+# - name: little-endian
+#   display_name: Little-endian (x86)
+#   run_on:
+#   - ubuntu1804-test
+#   batchtime: 10080 # 7 days
+#   expansions:
+#     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+#     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+#   tasks:
+#   - name: compile
+#   - name: generate-datafile-little-endian
+#   - name: verify-datafile-little-endian
+#   - name: verify-datafile-from-big-endian
 
-- name: big-endian
-  display_name: Big-endian (s390x/zSeries)
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1804-zseries-build
-  batchtime: 10080 # 7 days
-  expansions:
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
-  tasks:
-  - name: compile
-  - name: generate-datafile-big-endian
-  - name: verify-datafile-big-endian
-  - name: verify-datafile-from-little-endian
+# Temporarily disabled
+# - name: big-endian
+#   display_name: Big-endian (s390x/zSeries)
+#   modules:
+#   - enterprise
+#   run_on:
+#   - ubuntu1804-zseries-build
+#   batchtime: 10080 # 7 days
+#   expansions:
+#     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+#     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+#   tasks:
+#   - name: compile
+#   - name: generate-datafile-big-endian
+#   - name: verify-datafile-big-endian
+#   - name: verify-datafile-from-little-endian
 
 - name: ubuntu1804-ppc
   display_name: Ubuntu 18.04 PPC
@@ -2333,6 +2487,9 @@ buildvariants:
   - name: format-stress-ppc-zseries-test
   - name: format-stress-smoke-test
   - name: format-wtperf-test
+  # Replace the below two tests with format-stress-sanitizer-ppc-test and format-stress-sanitizer-smoke-test after BUILD-10248 fix.
+  - name: format-stress-sanitizer-ppc-test
+  - name: format-stress-sanitizer-smoke-ppc-test
 
 - name: ubuntu1804-zseries
   display_name: Ubuntu 18.04 zSeries

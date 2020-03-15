@@ -283,6 +283,7 @@ hugepage
 icount
 ie
 iflag
+incr
 indices
 init
 insn
@@ -428,6 +429,7 @@ putValue
 putValueString
 py
 qnx
+qqq
 rVv
 rdbms
 rdlock

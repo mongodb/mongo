@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, time
 from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 
 # This test uses an artificially small log file limit, and creates
 # large records so two fit into a log file. This allows us to test
@@ -384,7 +384,7 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         ('WiredTiger.basecfg', dict(filename='WiredTiger.basecfg')),
         ('WiredTiger.turtle', dict(filename='WiredTiger.turtle')),
         ('WiredTiger.wt', dict(filename='WiredTiger.wt')),
-        ('WiredTigerLAS.wt', dict(filename='WiredTigerLAS.wt')),
+        ('WiredTigerHS.wt', dict(filename='WiredTigerHS.wt')),
     ]
 
     # In many cases, wiredtiger_open without any salvage options will
@@ -392,34 +392,34 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
     openable = [
         "removal:WiredTiger.basecfg",
         "removal:WiredTiger.turtle",
-        "removal:WiredTigerLAS.wt",
+        "removal:WiredTigerHS.wt",
         "truncate:WiredTiger",
         "truncate:WiredTiger.basecfg",
-        "truncate:WiredTigerLAS.wt",
+        "truncate:WiredTigerHS.wt",
         "truncate-middle:WiredTiger",
         "truncate-middle:WiredTiger.basecfg",
         "truncate-middle:WiredTiger.turtle",
         "truncate-middle:WiredTiger.wt",
-        "truncate-middle:WiredTigerLAS.wt",
+        "truncate-middle:WiredTigerHS.wt",
         "zero:WiredTiger",
         "zero:WiredTiger.basecfg",
-        "zero:WiredTigerLAS.wt",
+        "zero:WiredTigerHS.wt",
         "zero-end:WiredTiger",
         "zero-end:WiredTiger.basecfg",
         "zero-end:WiredTiger.turtle",
         "zero-end:WiredTiger.wt",
-        "zero-end:WiredTigerLAS.wt",
+        "zero-end:WiredTigerHS.wt",
         "garbage-begin:WiredTiger",
-        "garbage-begin:WiredTigerLAS.wt",
+        "garbage-begin:WiredTigerHS.wt",
         "garbage-middle:WiredTiger",
         "garbage-middle:WiredTiger.basecfg",
         "garbage-middle:WiredTiger.turtle",
         "garbage-middle:WiredTiger.wt",
-        "garbage-middle:WiredTigerLAS.wt",
+        "garbage-middle:WiredTigerHS.wt",
         "garbage-end:WiredTiger",
         "garbage-end:WiredTiger.turtle",
         "garbage-end:WiredTiger.wt",
-        "garbage-end:WiredTigerLAS.wt",
+        "garbage-end:WiredTigerHS.wt",
     ]
 
     # The cases for which salvage will not work, represented in the
@@ -476,6 +476,7 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         key = self.kind + ':' + self.filename
         return key not in self.not_salvageable
 
+    @unittest.skip("Temporarily disabled")
     def test_corrupt_meta(self):
         errfile = 'list.err'
         outfile = 'list.out'

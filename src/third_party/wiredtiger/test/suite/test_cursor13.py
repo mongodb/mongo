@@ -183,8 +183,7 @@ class test_cursor13_reopens(test_cursor13_base):
             # create operation above or if this is the second or later
             # time through the loop.
             c = session.open_cursor(self.uri)
-            self.assert_cursor_reopened(caching_enabled and \
-                                        (opens != 0 or create))
+            self.assert_cursor_reopened(caching_enabled and (opens != 0 or create))
 
             # With one cursor for this URI already open, we'll only
             # get a reopened cursor if this is the second or later
@@ -546,7 +545,6 @@ class test_cursor13_dup(test_cursor13_base):
         c1.next()
 
         for notused in range(0, 100):
-            self.session.breakpoint()
             c2 = self.session.open_cursor(None, c1, None)
             c2.close()
         stats = self.caching_stats()

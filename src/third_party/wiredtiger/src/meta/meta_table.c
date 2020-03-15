@@ -343,3 +343,61 @@ __wt_metadata_salvage(WT_SESSION_IMPL *session)
     WT_RET(wt_session->salvage(wt_session, WT_METAFILE_URI, NULL));
     return (0);
 }
+
+/*
+ * __wt_metadata_uri_to_btree_id --
+ *     Given a uri, find the btree id from the metadata. WT_NOTFOUND is returned for a non-file uri.
+ */
+int
+__wt_metadata_uri_to_btree_id(WT_SESSION_IMPL *session, const char *uri, uint32_t *btree_id)
+{
+    WT_CONFIG_ITEM id;
+    WT_DECL_RET;
+    char *value;
+
+    value = NULL;
+
+    if (!WT_PREFIX_MATCH(uri, "file:"))
+        return (WT_NOTFOUND);
+
+    WT_ERR(__wt_metadata_search(session, uri, &value));
+    WT_ERR(__wt_config_getones(session, value, "id", &id));
+    *btree_id = (uint32_t)id.val;
+
+err:
+    __wt_free(session, value);
+    return (ret);
+}
+
+/*
+ * __wt_metadata_btree_id_to_uri --
+ *     Given a btree id, find the matching entry in the metadata and return a copy of the uri. The
+ *     caller has to free the returned uri.
+ */
+int
+__wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char **uri)
+{
+    WT_CONFIG_ITEM id;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    char *key, *value;
+
+    *uri = NULL;
+    key = NULL;
+
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_value(cursor, &value));
+        if ((ret = __wt_config_getones(session, value, "id", &id)) == 0 && btree_id == id.val) {
+            WT_ERR(cursor->get_key(cursor, &key));
+            /* Return a copy as the uri. */
+            WT_ERR(__wt_strdup(session, key, uri));
+            break;
+        }
+        WT_ERR_NOTFOUND_OK(ret);
+    }
+
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}

@@ -32,15 +32,15 @@
 
 /*
  * JIRA ticket reference: WT-4803 Test case description: This test is checking the functionality of
- * the lookaside file_max configuration. When the size of the lookaside file exceeds this value, we
- * expect to panic. Failure mode: If we receive a panic in the test cases we weren't expecting to
- * and vice versa.
+ * the history store file_max configuration. When the size of the history store file exceeds this
+ * value, we expect to panic. Failure mode: If we receive a panic in the test cases we weren't
+ * expecting to and vice versa.
  */
 
 #define NUM_KEYS 2000
 
 /*
- * This is a global flag that should be set before running test_las_workload. It lets the child
+ * This is a global flag that should be set before running test_hs_workload. It lets the child
  * process know whether it should be expecting a panic or not so that it can adjust its exit code as
  * needed.
  */
@@ -56,7 +56,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
 
     if (error == WT_PANIC && strstr(message, "exceeds maximum size") != NULL) {
         fprintf(
-          stderr, "Got cache overflow error (expect_panic=%s)\n", expect_panic ? "true" : "false");
+          stderr, "Got history store error (expect_panic=%s)\n", expect_panic ? "true" : "false");
 
         /*
          * If we're expecting a panic, exit with zero to indicate to the parent that this test was
@@ -75,7 +75,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
 static WT_EVENT_HANDLER event_handler = {handle_message, NULL, NULL, NULL};
 
 static void
-las_workload(TEST_OPTS *opts, const char *las_file_max)
+hs_workload(TEST_OPTS *opts, const char *hs_file_max)
 {
     WT_CURSOR *cursor;
     WT_SESSION *other_session, *session;
@@ -83,7 +83,7 @@ las_workload(TEST_OPTS *opts, const char *las_file_max)
     char buf[WT_MEGABYTE], open_config[128];
 
     testutil_check(__wt_snprintf(open_config, sizeof(open_config),
-      "create,cache_size=50MB,cache_overflow=(file_max=%s)", las_file_max));
+      "create,cache_size=50MB,history_store=(file_max=%s)", hs_file_max));
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, open_config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
@@ -104,7 +104,7 @@ las_workload(TEST_OPTS *opts, const char *las_file_max)
      * Open a snapshot isolation transaction in another session. This forces the cache to retain all
      * previous values. Then update all keys with a new value in the original session while keeping
      * that snapshot transaction open. With the large value buffer, small cache and lots of keys,
-     * this will force a lot of lookaside usage.
+     * this will force a lot of history store usage.
      *
      * When the file_max setting is small, the maximum size should easily be reached and we should
      * panic. When the maximum size is large or not set, then we should succeed.
@@ -133,7 +133,7 @@ las_workload(TEST_OPTS *opts, const char *las_file_max)
 }
 
 static int
-test_las_workload(TEST_OPTS *opts, const char *las_file_max)
+test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
 {
     pid_t pid;
     int status;
@@ -157,7 +157,7 @@ test_las_workload(TEST_OPTS *opts, const char *las_file_max)
         testutil_die(errno, "fork");
     else if (pid == 0) {
         /* Child process from here. */
-        las_workload(opts, las_file_max);
+        hs_workload(opts, hs_file_max);
 
         /*
          * If we're expecting a panic during the workload, we shouldn't get to this point. Exit with
@@ -188,24 +188,25 @@ main(int argc, char **argv)
     testutil_check(testutil_parse_opts(argc, argv, &opts));
 
     /*
-     * The lookaside is unbounded. We don't expect any failure since we can use as much as needed.
+     * The history store is unbounded. We don't expect any failure since we can use as much as
+     * needed.
      */
     expect_panic = false;
-    testutil_check(test_las_workload(&opts, "0"));
+    testutil_check(test_hs_workload(&opts, "0"));
 
     /*
-     * The lookaside is limited to 5GB. This is more than enough for this workload so we don't
+     * The history store is limited to 5GB. This is more than enough for this workload so we don't
      * expect any failure.
      */
     expect_panic = false;
-    testutil_check(test_las_workload(&opts, "5GB"));
+    testutil_check(test_hs_workload(&opts, "5GB"));
 
     /*
-     * The lookaside is limited to 100MB. This is insufficient for this workload so we're expecting
-     * a failure.
+     * The history store is limited to 100MB. This is insufficient for this workload so we're
+     * expecting a failure.
      */
     expect_panic = true;
-    testutil_check(test_las_workload(&opts, "100MB"));
+    testutil_check(test_hs_workload(&opts, "100MB"));
 
     testutil_cleanup(&opts);
 

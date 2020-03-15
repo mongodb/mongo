@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# This benchmark is designed to stress disk access to the LAS/History Store file.
+# This benchmark is designed to stress disk access to the history store file.
 # This is achieved through:
 #   - Long running transactions consisting of read and update operations.
 #   - Low cache size (~20%) for a reasonably sized WT table with large documents.

@@ -2,6 +2,7 @@
 cache_minimum=20
 huffman_key=0
 huffman_value=0
-rows=1000000
+rows=1000000:5000000
 runs=100
-timer=4
+threads=4:32
+timer=6:30

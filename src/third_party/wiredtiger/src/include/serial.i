@@ -217,8 +217,8 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_
  *     Update a row or column-store entry.
  */
 static inline int
-__wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd, WT_UPDATE **updp,
-  size_t upd_size, bool exclusive)
+__wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
+  WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {
     WT_DECL_RET;
     WT_UPDATE *obsolete, *upd;
@@ -237,7 +237,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd
      * Check if our update is still permitted.
      */
     while (!__wt_atomic_cas_ptr(srch_upd, upd->next, upd)) {
-        if ((ret = __wt_txn_update_check(session, upd->next = *srch_upd)) != 0) {
+        if ((ret = __wt_txn_update_check(session, cbt, upd->next = *srch_upd)) != 0) {
             /* Free unused memory on error. */
             __wt_free(session, upd);
             return (ret);
@@ -284,8 +284,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd
 
     WT_PAGE_UNLOCK(session, page);
 
-    if (obsolete != NULL)
-        __wt_free_update_list(session, obsolete);
+    __wt_free_update_list(session, &obsolete);
 
     return (0);
 }

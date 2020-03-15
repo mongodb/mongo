@@ -54,10 +54,7 @@ typedef enum __wt_cache_op {
     WT_SYNC_WRITE_LEAVES
 } WT_CACHE_OP;
 
-#define WT_LAS_FILE_MIN (100 * WT_MEGABYTE)
-#define WT_LAS_NUM_SESSIONS 5
-#define WT_LAS_SWEEP_ENTRIES (20 * WT_THOUSAND)
-#define WT_LAS_SWEEP_SEC 2
+#define WT_HS_FILE_MIN (100 * WT_MEGABYTE)
 
 /*
  * WiredTiger cache structure.
@@ -83,7 +80,7 @@ struct __wt_cache {
     uint64_t bytes_read;     /* Bytes read into memory */
     uint64_t bytes_written;
 
-    uint64_t bytes_lookaside; /* Lookaside bytes inmem */
+    uint64_t bytes_hs; /* History store bytes inmem */
 
     volatile uint64_t eviction_progress; /* Eviction progress count */
     uint64_t last_eviction_progress;     /* Tracked eviction progress */
@@ -184,41 +181,16 @@ struct __wt_cache {
      * varies between 0, if reconciliation always sees updates that are globally visible and hence
      * can be discarded, to 100 if no updates are globally visible.
      */
-    int32_t evict_lookaside_score;
+    int32_t evict_hs_score;
+
+    uint32_t hs_fileid; /* History store table file ID */
 
     /*
-     * Shared lookaside lock, session and cursor, used by threads accessing the lookaside table
-     * (other than eviction server and worker threads and the sweep thread, all of which have their
-     * own lookaside cursors).
-     */
-    WT_SPINLOCK las_lock;
-    WT_SESSION_IMPL *las_session[WT_LAS_NUM_SESSIONS];
-    bool las_session_inuse[WT_LAS_NUM_SESSIONS];
-
-    uint32_t las_fileid;       /* Lookaside table file ID */
-    uint64_t las_insert_count; /* Count of inserts to lookaside */
-    uint64_t las_remove_count; /* Count of removes from lookaside */
-    uint64_t las_pageid;       /* Lookaside table page ID counter */
-
-    bool las_reader; /* Indicate an LAS reader to sweep */
-    WT_RWLOCK las_sweepwalk_lock;
-    WT_SPINLOCK las_sweep_lock;
-    WT_ITEM las_sweep_key;         /* Track sweep position. */
-    uint32_t las_sweep_dropmin;    /* Minimum btree ID in current set. */
-    uint8_t *las_sweep_dropmap;    /* Bitmap of dropped btree IDs. */
-    uint32_t las_sweep_dropmax;    /* Maximum btree ID in current set. */
-    uint64_t las_sweep_max_pageid; /* Maximum page ID for sweep. */
-
-    uint32_t *las_dropped;    /* List of dropped btree IDs. */
-    size_t las_dropped_next;  /* Next index into drop list. */
-    size_t las_dropped_alloc; /* Allocated size of drop list. */
-
-    /*
-     * The "lookaside_activity" verbose messages are throttled to once per checkpoint. To accomplish
+     * The "history_activity" verbose messages are throttled to once per checkpoint. To accomplish
      * this we track the checkpoint generation for the most recent read and write verbose messages.
      */
-    uint64_t las_verb_gen_read;
-    uint64_t las_verb_gen_write;
+    uint64_t hs_verb_gen_read;
+    uint64_t hs_verb_gen_write;
 
     /*
      * Cache pool information.
@@ -249,7 +221,7 @@ struct __wt_cache {
 #define WT_CACHE_EVICT_DEBUG_MODE 0x004u /* Aggressive debugging mode */
 #define WT_CACHE_EVICT_DIRTY 0x008u      /* Evict dirty pages */
 #define WT_CACHE_EVICT_DIRTY_HARD 0x010u /* Dirty % blocking app threads */
-#define WT_CACHE_EVICT_LOOKASIDE 0x020u  /* Try lookaside eviction */
+#define WT_CACHE_EVICT_HS 0x020u         /* Try history store eviction */
 #define WT_CACHE_EVICT_NOKEEP 0x040u     /* Don't add read pages to cache */
 #define WT_CACHE_EVICT_SCRUB 0x080u      /* Scrub dirty pages */
 #define WT_CACHE_EVICT_URGENT 0x100u     /* Pages are in the urgent queue */
@@ -287,6 +259,12 @@ struct __wt_cache_pool {
                                   /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 };
+
+/*
+ * Optimize comparisons against the history store URI, flag handles that reference the history store
+ * file.
+ */
+#define WT_IS_HS(btree) F_ISSET(btree, WT_BTREE_HS)
 
 /* Flags used with __wt_evict */
 /* AUTOMATIC FLAG VALUE GENERATION START */

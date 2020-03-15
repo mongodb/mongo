@@ -29,7 +29,7 @@
 # test_bug008.py
 #       Regression tests.
 
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 

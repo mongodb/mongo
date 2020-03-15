@@ -1038,9 +1038,6 @@ err:
             WT_TRET(wt_session->rollback_transaction(wt_session, NULL));
         }
 
-    /* Release all named snapshots. */
-    __wt_txn_named_snapshot_destroy(session);
-
     /* Close open, external sessions. */
     for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
         if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {
@@ -1056,12 +1053,6 @@ err:
 
     /* Wait for in-flight operations to complete. */
     WT_TRET(__wt_txn_activity_drain(session));
-
-    /*
-     * Disable lookaside eviction: it doesn't help us shut down and can lead to pages being marked
-     * dirty, causing spurious assertions to fire.
-     */
-    F_SET(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 
     /*
      * Clear any pending async operations and shut down the async worker threads and system before
@@ -1246,7 +1237,8 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
     CONNECTION_API_CALL(conn, session, rollback_to_stable, config, cfg);
-    WT_TRET(__wt_txn_rollback_to_stable(session, cfg));
+    WT_STAT_CONN_INCR(session, txn_rts);
+    WT_TRET(__wt_rollback_to_stable(session, cfg, false));
 err:
     API_END_RET(session, ret);
 }
@@ -1841,17 +1833,18 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     static const WT_NAME_FLAG verbtypes[] = {{"api", WT_VERB_API}, {"backup", WT_VERB_BACKUP},
       {"block", WT_VERB_BLOCK}, {"checkpoint", WT_VERB_CHECKPOINT},
+      {"checkpoint_gc", WT_VERB_CHECKPOINT_GC},
       {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS}, {"compact", WT_VERB_COMPACT},
       {"compact_progress", WT_VERB_COMPACT_PROGRESS}, {"error_returns", WT_VERB_ERROR_RETURNS},
       {"evict", WT_VERB_EVICT}, {"evict_stuck", WT_VERB_EVICT_STUCK},
       {"evictserver", WT_VERB_EVICTSERVER}, {"fileops", WT_VERB_FILEOPS},
-      {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG}, {"lookaside", WT_VERB_LOOKASIDE},
-      {"lookaside_activity", WT_VERB_LOOKASIDE_ACTIVITY}, {"lsm", WT_VERB_LSM},
+      {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG}, {"hs", WT_VERB_HS},
+      {"history_store_activity", WT_VERB_HS_ACTIVITY}, {"lsm", WT_VERB_LSM},
       {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
       {"mutex", WT_VERB_MUTEX}, {"overflow", WT_VERB_OVERFLOW}, {"read", WT_VERB_READ},
       {"rebalance", WT_VERB_REBALANCE}, {"reconcile", WT_VERB_RECONCILE},
       {"recovery", WT_VERB_RECOVERY}, {"recovery_progress", WT_VERB_RECOVERY_PROGRESS},
-      {"salvage", WT_VERB_SALVAGE}, {"shared_cache", WT_VERB_SHARED_CACHE},
+      {"rts", WT_VERB_RTS}, {"salvage", WT_VERB_SALVAGE}, {"shared_cache", WT_VERB_SHARED_CACHE},
       {"split", WT_VERB_SPLIT}, {"temporary", WT_VERB_TEMPORARY},
       {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
       {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
@@ -1981,7 +1974,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     static const WT_NAME_FLAG stress_types[] = {
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
-      {"lookaside_sweep_race", WT_TIMING_STRESS_LOOKASIDE_SWEEP},
+      {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
       {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
       {"split_5", WT_TIMING_STRESS_SPLIT_5}, {"split_6", WT_TIMING_STRESS_SPLIT_6},
@@ -2491,7 +2484,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     }
     WT_ERR(__wt_verbose_config(session, cfg));
     WT_ERR(__wt_timing_stress_config(session, cfg));
-    __wt_btree_page_version_config(session);
 
     /* Set up operation tracking if configured. */
     WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
@@ -2666,8 +2658,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     if (F_ISSET(conn, WT_CONN_SALVAGE))
         WT_ERR(__wt_metadata_salvage(session));
 
-    /* Set the connection's base write generation. */
-    WT_ERR(__wt_metadata_set_base_write_gen(session));
+    /* Initialize the connection's base write generation. */
+    WT_ERR(__wt_metadata_init_base_write_gen(session));
 
     WT_ERR(__wt_metadata_cursor(session, NULL));
 

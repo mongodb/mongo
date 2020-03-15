@@ -57,11 +57,11 @@ hazard_grow(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_hazard_set --
+ * __wt_hazard_set_func --
  *     Set a hazard pointer.
  */
 int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
+__wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 #ifdef HAVE_DIAGNOSTIC
   ,
   const char *func, int line
@@ -69,7 +69,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
   )
 {
     WT_HAZARD *hp;
-    uint32_t current_state;
+    uint8_t current_state;
 
     *busyp = false;
 
@@ -82,7 +82,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
      * re-check it after a barrier to make sure we have a valid reference.
      */
     current_state = ref->state;
-    if (current_state != WT_REF_LIMBO && current_state != WT_REF_MEM) {
+    if (current_state != WT_REF_MEM) {
         *busyp = true;
         return (0);
     }
@@ -124,8 +124,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
     /*
      * Do the dance:
      *
-     * The memory location which makes a page "real" is the WT_REF's state of WT_REF_LIMBO or
-     * WT_REF_MEM, which can be set to WT_REF_LOCKED at any time by the page eviction server.
+     * The memory location which makes a page "real" is the WT_REF's state of WT_REF_MEM, which can
+     * be set to WT_REF_LOCKED at any time by the page eviction server.
      *
      * Add the WT_REF reference to the session's hazard list and flush the write, then see if the
      * page's state is still valid. If so, we can use the page because the page eviction server will
@@ -141,11 +141,10 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
     WT_FULL_BARRIER();
 
     /*
-     * Check if the page state is still valid, where valid means a state of WT_REF_LIMBO or
-     * WT_REF_MEM.
+     * Check if the page state is still valid, where valid means a state of WT_REF_MEM.
      */
     current_state = ref->state;
-    if (current_state == WT_REF_LIMBO || current_state == WT_REF_MEM) {
+    if (current_state == WT_REF_MEM) {
         ++session->nhazard;
 
         /*

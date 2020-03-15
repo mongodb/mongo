@@ -76,7 +76,7 @@ rng(WT_RAND_STATE *rnd)
      * and replay because threaded operation order can't be replayed. Do that check inline so it's a
      * cheap call once thread performance starts to matter.
      */
-    return (g.rand_log_stop ? __wt_random(rnd) : rng_slow(rnd));
+    return (g.randfp == NULL || g.rand_log_stop ? __wt_random(rnd) : rng_slow(rnd));
 }
 
 /*

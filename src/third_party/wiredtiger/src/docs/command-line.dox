@@ -148,7 +148,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] [-t timestamp] uri</code>
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -172,6 +172,11 @@ Dump in reverse order, from largest key to smallest.
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
+
+@par <code>-t</code>
+By default, the \c dump command reads the most recent timestamp versions of
+the data source; the \c -t option changes the \c dump command to read at a
+specific timestamp.
 
 <hr>
 @section util_list wt list
@@ -413,10 +418,23 @@ The \c verify command verifies the specified table, exiting success if
 the data source is correct, and failure if the data source is corrupted.
 
 @subsection util_verify_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] verify [-d dump_address | dump_blocks | dump_history | dump_layout | dump_offsets=#,# | dump_pages ] [-s] -a|uri</code>
 
 @subsection util_verify_options Options
-The \c verify command has no command-specific options.
+The following are command-specific options for the \c verify command:
+
+<code>-d [config]</code>
+This option allows you to specify values which you want to be displayed
+when verification is run. See the WT_SESSION::verify configuration options.
+
+<code>-s [config]</code>
+This option allows you to verify against the stable timestamp, valid only after a
+rollback-to-stable operation. See the WT_SESSION::verify configuration options.
+
+<code>-a [config]</code>
+This options allows you to verify the history store against the current state
+of the data store. A uri is not passed along with this option. See the WT_SESSION::verify
+configuration options.
 
 <hr>
 @section util_write wt write

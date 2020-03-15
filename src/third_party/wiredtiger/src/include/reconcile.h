@@ -20,15 +20,15 @@ struct __wt_reconcile {
     uint32_t flags; /* Caller's configuration */
 
     /*
-     * Track start/stop checkpoint generations to decide if lookaside table records are correct.
+     * Track start/stop checkpoint generations to decide if history store table records are correct.
      */
     uint64_t orig_btree_checkpoint_gen;
     uint64_t orig_txn_checkpoint_gen;
 
     /*
-     * Track the oldest running transaction and whether to skew lookaside to the newest update.
+     * Track the oldest running transaction and whether to skew history store to the newest update.
      */
-    bool las_skew_newest;
+    bool hs_skew_newest;
     uint64_t last_running;
 
     /* Track the page's min/maximum transactions. */
@@ -40,15 +40,9 @@ struct __wt_reconcile {
     u_int updates_seen;     /* Count of updates seen. */
     u_int updates_unstable; /* Count of updates not visible_all. */
 
-    bool update_uncommitted; /* An update was uncommitted. */
-    bool update_used;        /* An update could be used. */
-
-    /* All the updates are with prepare in-progress state. */
-    bool all_upd_prepare_in_prog;
-
     /*
-     * When we can't mark the page clean (for example, checkpoint found some uncommitted updates),
-     * there's a leave-dirty flag.
+     * When we can't mark the page clean after reconciliation (for example, checkpoint or eviction
+     * found some uncommitted updates), there's a leave-dirty flag.
      */
     bool leave_dirty;
 
@@ -156,9 +150,9 @@ struct __wt_reconcile {
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
 
     /*
-     * Saved update list, supporting the WT_REC_UPDATE_RESTORE and WT_REC_LOOKASIDE configurations.
-     * While reviewing updates for each page, we save WT_UPDATE lists here, and then move them to
-     * per-block areas as the blocks are defined.
+     * Saved update list, supporting WT_REC_HS configurations. While reviewing updates for each
+     * page, we save WT_UPDATE lists here, and then move them to per-block areas as the blocks are
+     * defined.
      */
     WT_SAVE_UPD *supd; /* Saved updates */
     uint32_t supd_next;
@@ -231,10 +225,10 @@ struct __wt_reconcile {
 
     WT_SALVAGE_COOKIE *salvage; /* If it's a salvage operation */
 
-    bool cache_write_lookaside; /* Used the lookaside table */
-    bool cache_write_restore;   /* Used update/restoration */
+    bool cache_write_hs;      /* Used the history store table */
+    bool cache_write_restore; /* Used update/restoration */
 
-    uint32_t tested_ref_state; /* Debugging information */
+    uint8_t tested_ref_state; /* Debugging information */
 
     /*
      * XXX In the case of a modified update, we may need a copy of the current value as a set of
@@ -252,9 +246,6 @@ typedef struct {
     uint64_t start_txn;
     wt_timestamp_t stop_ts;
     uint64_t stop_txn;
-
-    bool upd_saved; /* Updates saved to list */
-
 } WT_UPDATE_SELECT;
 
 /*

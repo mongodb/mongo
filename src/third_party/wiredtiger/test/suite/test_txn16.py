@@ -33,7 +33,7 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-import wttest
+import unittest, wttest
 
 class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn16_1'

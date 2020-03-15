@@ -33,7 +33,7 @@
 from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 from wtscenario import make_scenarios
 
 def timestamp_str(t):
@@ -305,6 +305,26 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
                 self.table_nots_nolog, dict((k, self.value2) for k in orig_keys))
 
+        # Take a checkpoint using the given configuration.  Then verify
+        # whether value2 appears in a copy of that data or not.
+        valcnt_ts_log = valcnt_nots_log = valcnt_nots_nolog = nkeys
+        if self.ckpt_ts == False:
+            # if use_timestamp is false, then all updates will be checkpointed.
+            valcnt_ts_nolog = nkeys
+        else:
+            # Checkpoint will happen with stable_timestamp=100.
+            if self.using_log == True:
+                # only table_ts_nolog will have old values when logging is enabled
+                self.ckpt_backup(self.value, 0, nkeys, 0, 0)
+            else:
+                # Both table_ts_nolog and table_ts_log will have old values when
+                # logging is disabled.
+                self.ckpt_backup(self.value, nkeys, nkeys, 0, 0)
+            # table_ts_nolog will not have any new values (i.e. value2)
+            valcnt_ts_nolog = 0
+
+        if self.ckpt_ts == False:
+            valcnt_ts_log = nkeys
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
         valcnt_ts_log = valcnt_nots_log = valcnt_nots_nolog = nkeys

@@ -106,6 +106,7 @@
         return (WT_ATOMIC_CAS(vp, &old, new));                         \
     }
 WT_ATOMIC_CAS_FUNC(8, uint8_t *vp, uint8_t old, uint8_t new)
+WT_ATOMIC_CAS_FUNC(v8, volatile uint8_t *vp, uint8_t old, volatile uint8_t new)
 WT_ATOMIC_CAS_FUNC(16, uint16_t *vp, uint16_t old, uint16_t new)
 WT_ATOMIC_CAS_FUNC(32, uint32_t *vp, uint32_t old, uint32_t new)
 WT_ATOMIC_CAS_FUNC(v32, volatile uint32_t *vp, uint32_t old, volatile uint32_t new)
@@ -141,6 +142,7 @@ __wt_atomic_cas_ptr(void *vp, void *old, void *new)
         return (__atomic_sub_fetch(vp, v, __ATOMIC_SEQ_CST));    \
     }
 WT_ATOMIC_FUNC(8, uint8_t, uint8_t *vp, uint8_t v)
+WT_ATOMIC_FUNC(v8, uint8_t, volatile uint8_t *vp, volatile uint8_t v)
 WT_ATOMIC_FUNC(16, uint16_t, uint16_t *vp, uint16_t v)
 WT_ATOMIC_FUNC(32, uint32_t, uint32_t *vp, uint32_t v)
 WT_ATOMIC_FUNC(v32, uint32_t, volatile uint32_t *vp, volatile uint32_t v)

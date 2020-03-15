@@ -1894,7 +1894,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
          * After this point the worker thread owns the slot. There is nothing more to do but return.
          */
         /*
-         * !!! Signalling the wrlsn_cond condition here results in
+         * !!! Signaling the wrlsn_cond condition here results in
          * worse performance because it causes more scheduling churn
          * and more walking of the slot pool for a very small number
          * of slots to process.  Don't signal here.

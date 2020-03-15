@@ -1185,7 +1185,6 @@ __wt_block_extlist_write(
     dsk = tmp->mem;
     memset(dsk, 0, WT_BLOCK_HEADER_BYTE_SIZE);
     dsk->type = WT_PAGE_BLOCK_MANAGER;
-    dsk->version = WT_PAGE_VERSION_TS;
 
     /* Fill the page's data. */
     p = WT_BLOCK_HEADER_BYTE(dsk);

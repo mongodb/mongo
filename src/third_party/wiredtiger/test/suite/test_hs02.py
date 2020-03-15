@@ -33,15 +33,15 @@ from wtdataset import SimpleDataSet
 def timestamp_str(t):
     return '%x' % t
 
-# test_las02.py
-# Test that truncate with lookaside entries and timestamps gives expected results.
-class test_las02(wttest.WiredTigerTestCase):
+# test_hs02.py
+# Test that truncate with history store entries and timestamps gives expected results.
+class test_hs02(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
-        # Update a large number of records, we'll hang if the lookaside table isn't working.
+        # Update a large number of records, we'll hang if the history store table isn't working.
         session = self.session
         cursor = session.open_cursor(uri)
         for i in range(1, nrows + 1):
@@ -61,10 +61,11 @@ class test_las02(wttest.WiredTigerTestCase):
         session.rollback_transaction()
         self.assertEqual(count, nrows)
 
-    def test_las(self):
+    def test_hs(self):
         nrows = 10000
 
-        # Create a table without logging to ensure we get "skew_newest" lookaside eviction behavior.
+        # Create a table without logging to ensure we get "skew_newest" history store eviction
+        # behavior.
         uri = "table:las02_main"
         ds = SimpleDataSet(
             self, uri, 0, key_format="S", value_format="S", config='log=(enabled=false)')
@@ -84,7 +85,7 @@ class test_las02(wttest.WiredTigerTestCase):
         # Check that all updates are seen
         self.check(bigvalue, uri, nrows // 3, 1)
 
-        # Check to see lookaside working with old timestamp
+        # Check to see the history store working with old timestamp
         bigvalue2 = "ddddd" * 100
         self.large_updates(uri, bigvalue2, ds, nrows, 100)
 

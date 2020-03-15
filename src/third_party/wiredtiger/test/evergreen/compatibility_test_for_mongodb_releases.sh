@@ -30,17 +30,11 @@ build_rel()
 	config=""
 	config+="--enable-snappy "
 
-	case "$1" in
-        # Please note 'develop' here is planned as the future MongoDB release 4.2 - the only release that supports
-        # both enabling and disabling of timestamps in data format. Once 4.2 is released, we need to update this script.
-	"develop")
-		branch="develop";;
-	"develop-timestamps")
+	if [ $1 == "develop" ]; then
 		branch="develop"
-		config+="--enable-page-version-ts";;
-	*)
-		branch=$(get_release "$1");;
-	esac
+	else
+		branch=$(get_release "$1")
+	fi
 
 	git checkout --quiet -b $branch || return 1
 
@@ -114,15 +108,14 @@ run()
 	(build_rel 3.4) || return 1
 	(build_rel 3.6) || return 1
 	(build_rel 4.0) || return 1
+	(build_rel 4.2) || return 1
 	(build_rel develop) || return 1
-	(build_rel develop-timestamps) || return 1
 
 	# Verify forward/backward compatibility.
 	(verify 3.4 3.6) || return 1
 	(verify 3.6 4.0) || return 1
-	(verify 4.0 develop) || return 1
-	(verify 4.0 develop-timestamps) || return 1
-	(verify develop develop-timestamps) || return 1
+	(verify 4.0 4.2) || return 1
+	(verify 4.2 develop) || return 1
 
 	return 0
 }

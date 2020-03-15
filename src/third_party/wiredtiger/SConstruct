@@ -407,7 +407,8 @@ shim = env.Library("window_shim",
 
 examples = [
     "ex_access",
-    "ex_all",
+    # Temporarily disabled
+    # "ex_all",
     "ex_async",
     "ex_call_center",
     "ex_config_parse",

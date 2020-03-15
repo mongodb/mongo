@@ -215,6 +215,23 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_ref_addr_free --
+ *     Free the address in a reference, if necessary.
+ */
+void
+__wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    if (ref->addr == NULL)
+        return;
+
+    if (ref->home == NULL || __wt_off_page(ref->home, ref->addr)) {
+        __wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+        __wt_free(session, ref->addr);
+    }
+    ref->addr = NULL;
+}
+
+/*
  * __wt_free_ref --
  *     Discard the contents of a WT_REF structure (optionally including the pages it references).
  */
@@ -225,6 +242,12 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
 
     if (ref == NULL)
         return;
+
+    /*
+     * We create WT_REFs in many places, assert a WT_REF has been configured as either an internal
+     * page or a leaf page, to catch any we've missed.
+     */
+    WT_ASSERT(session, F_ISSET(ref, WT_REF_FLAG_INTERNAL) || F_ISSET(ref, WT_REF_FLAG_LEAF));
 
     /*
      * Optionally free the referenced pages. (The path to free referenced page is used for error
@@ -256,8 +279,7 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
     /* Free any address allocation. */
     __wt_ref_addr_free(session, ref);
 
-    /* Free any lookaside or page-deleted information. */
-    __wt_free(session, ref->page_las);
+    /* Free any page-deleted information. */
     if (ref->page_del != NULL) {
         __wt_free(session, ref->page_del->update_list);
         __wt_free(session, ref->page_del);
@@ -381,7 +403,7 @@ __free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins, bool update_ignore)
 
     for (; ins != NULL; ins = next) {
         if (!update_ignore)
-            __wt_free_update_list(session, ins->upd);
+            __wt_free_update_list(session, &ins->upd);
         next = WT_SKIP_NEXT(ins);
         __wt_free(session, ins);
     }
@@ -403,8 +425,7 @@ __free_update(
      */
     if (!update_ignore)
         for (updp = update_head; entries > 0; --entries, ++updp)
-            if (*updp != NULL)
-                __wt_free_update_list(session, *updp);
+            __wt_free_update_list(session, updp);
 
     /* Free the update array. */
     __wt_free(session, update_head);
@@ -416,12 +437,13 @@ __free_update(
  *     structure and its associated data.
  */
 void
-__wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+__wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE **updp)
 {
-    WT_UPDATE *next;
+    WT_UPDATE *next, *upd;
 
-    for (; upd != NULL; upd = next) {
+    for (upd = *updp; upd != NULL; upd = next) {
         next = upd->next;
         __wt_free(session, upd);
     }
+    *updp = NULL;
 }

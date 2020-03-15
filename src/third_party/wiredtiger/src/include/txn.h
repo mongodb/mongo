@@ -57,10 +57,17 @@ typedef enum {
  * We format timestamps in a couple of ways, declare appropriate sized buffers. Hexadecimal is 2x
  * the size of the value. MongoDB format (high/low pairs of 4B unsigned integers, with surrounding
  * parenthesis and separating comma and space), is 2x the maximum digits from a 4B unsigned integer
- * plus 4. Both sizes include a trailing nul byte as well.
+ * plus 4. Both sizes include a trailing null byte as well.
  */
 #define WT_TS_HEX_STRING_SIZE (2 * sizeof(wt_timestamp_t) + 1)
 #define WT_TS_INT_STRING_SIZE (2 * 10 + 4 + 1)
+
+/*
+ * We need an appropriately sized buffer for formatted time pairs. This is for time pairs of the
+ * form (time_stamp, slash and transaction_id), which gives the max digits of a timestamp plus slash
+ * plus max digits of a 8 byte integer with a trailing null byte.
+ */
+#define WT_TP_STRING_SIZE (WT_TS_INT_STRING_SIZE + 1 + 20 + 1)
 
 /*
  * Perform an operation at the specified isolation level.
@@ -172,11 +179,6 @@ struct __wt_txn_global {
     volatile uint64_t debug_ops;       /* Debug mode op counter */
     uint64_t debug_rollback;           /* Debug mode rollback */
     volatile uint64_t metadata_pinned; /* Oldest ID for metadata */
-
-    /* Named snapshot state. */
-    WT_RWLOCK nsnap_rwlock;
-    volatile uint64_t nsnap_oldest_id;
-    TAILQ_HEAD(__wt_nsnap_qh, __wt_named_snapshot) nsnaph;
 
     WT_TXN_STATE *states; /* Per-session transaction states */
 };
@@ -337,31 +339,30 @@ struct __wt_txn {
  */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_TXN_AUTOCOMMIT 0x0000001u
-#define WT_TXN_ERROR 0x0000002u
-#define WT_TXN_HAS_ID 0x0000004u
-#define WT_TXN_HAS_SNAPSHOT 0x0000008u
-#define WT_TXN_HAS_TS_COMMIT 0x0000010u
-#define WT_TXN_HAS_TS_DURABLE 0x0000020u
-#define WT_TXN_HAS_TS_PREPARE 0x0000040u
-#define WT_TXN_HAS_TS_READ 0x0000080u
-#define WT_TXN_IGNORE_PREPARE 0x0000100u
-#define WT_TXN_NAMED_SNAPSHOT 0x0000200u
-#define WT_TXN_PREPARE 0x0000400u
-#define WT_TXN_PUBLIC_TS_READ 0x0000800u
-#define WT_TXN_READONLY 0x0001000u
-#define WT_TXN_RUNNING 0x0002000u
-#define WT_TXN_SYNC_SET 0x0004000u
-#define WT_TXN_TS_COMMIT_ALWAYS 0x0008000u
-#define WT_TXN_TS_COMMIT_KEYS 0x0010000u
-#define WT_TXN_TS_COMMIT_NEVER 0x0020000u
-#define WT_TXN_TS_DURABLE_ALWAYS 0x0040000u
-#define WT_TXN_TS_DURABLE_KEYS 0x0080000u
-#define WT_TXN_TS_DURABLE_NEVER 0x0100000u
-#define WT_TXN_TS_PUBLISHED 0x0200000u
-#define WT_TXN_TS_ROUND_PREPARED 0x0400000u
-#define WT_TXN_TS_ROUND_READ 0x0800000u
-#define WT_TXN_UPDATE 0x1000000u
+#define WT_TXN_AUTOCOMMIT 0x000001u
+#define WT_TXN_ERROR 0x000002u
+#define WT_TXN_HAS_ID 0x000004u
+#define WT_TXN_HAS_SNAPSHOT 0x000008u
+#define WT_TXN_HAS_TS_COMMIT 0x000010u
+#define WT_TXN_HAS_TS_DURABLE 0x000020u
+#define WT_TXN_HAS_TS_PREPARE 0x000040u
+#define WT_TXN_HAS_TS_READ 0x000080u
+#define WT_TXN_IGNORE_PREPARE 0x000100u
+#define WT_TXN_PREPARE 0x000200u
+#define WT_TXN_PUBLIC_TS_READ 0x000400u
+#define WT_TXN_READONLY 0x000800u
+#define WT_TXN_RUNNING 0x001000u
+#define WT_TXN_SYNC_SET 0x002000u
+#define WT_TXN_TS_COMMIT_ALWAYS 0x004000u
+#define WT_TXN_TS_COMMIT_KEYS 0x008000u
+#define WT_TXN_TS_COMMIT_NEVER 0x010000u
+#define WT_TXN_TS_DURABLE_ALWAYS 0x020000u
+#define WT_TXN_TS_DURABLE_KEYS 0x040000u
+#define WT_TXN_TS_DURABLE_NEVER 0x080000u
+#define WT_TXN_TS_PUBLISHED 0x100000u
+#define WT_TXN_TS_ROUND_PREPARED 0x200000u
+#define WT_TXN_TS_ROUND_READ 0x400000u
+#define WT_TXN_UPDATE 0x800000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };

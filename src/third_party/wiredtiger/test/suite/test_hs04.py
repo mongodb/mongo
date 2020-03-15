@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_las04.py
-#   Test file_max configuration and reconfiguration for the lookaside table.
+# test_hs04.py
+#   Test file_max configuration and reconfiguration for the history store table.
 #
 
 import wiredtiger, wttest
@@ -36,8 +36,8 @@ from wtscenario import make_scenarios
 # Taken from src/include/misc.h.
 WT_MB = 1048576
 
-class test_las04(wttest.WiredTigerTestCase):
-    uri = 'table:las_04'
+class test_hs04(wttest.WiredTigerTestCase):
+    uri = 'table:hs_04'
     in_memory_values = [
         ('false', dict(in_memory=False)),
         ('none', dict(in_memory=None)),
@@ -60,7 +60,7 @@ class test_las04(wttest.WiredTigerTestCase):
     def conn_config(self):
         config = 'statistics=(fast)'
         if self.init_file_max is not None:
-            config += ',cache_overflow=(file_max={})'.format(self.init_file_max)
+            config += ',history_store=(file_max={})'.format(self.init_file_max)
         if self.in_memory is not None:
             config += ',in_memory=' + ('true' if self.in_memory else 'false')
         return config
@@ -71,22 +71,22 @@ class test_las04(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def test_las(self):
+    def test_hs(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         if self.in_memory:
-            # For in-memory configurations, we simply ignore any lookaside
+            # For in-memory configurations, we simply ignore any history store
             # related configuration.
             self.assertEqual(
-                self.get_stat(wiredtiger.stat.conn.cache_lookaside_ondisk_max),
+                self.get_stat(wiredtiger.stat.conn.cache_hs_ondisk_max),
                 0)
         else:
             self.assertEqual(
-                self.get_stat(wiredtiger.stat.conn.cache_lookaside_ondisk_max),
+                self.get_stat(wiredtiger.stat.conn.cache_hs_ondisk_max),
                 self.init_stat_val)
 
         reconfigure = lambda: self.conn.reconfigure(
-            'cache_overflow=(file_max={})'.format(self.reconfig_file_max))
+            'history_store=(file_max={})'.format(self.reconfig_file_max))
 
         # We expect an error when the statistic value is None because the value
         # is out of range.
@@ -99,11 +99,11 @@ class test_las04(wttest.WiredTigerTestCase):
 
         if self.in_memory:
             self.assertEqual(
-                self.get_stat(wiredtiger.stat.conn.cache_lookaside_ondisk_max),
+                self.get_stat(wiredtiger.stat.conn.cache_hs_ondisk_max),
                 0)
         else:
             self.assertEqual(
-                self.get_stat(wiredtiger.stat.conn.cache_lookaside_ondisk_max),
+                self.get_stat(wiredtiger.stat.conn.cache_hs_ondisk_max),
                 self.reconfig_stat_val)
 
 if __name__ == '__main__':

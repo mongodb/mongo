@@ -2460,7 +2460,7 @@ below:
   now it will be used if the shared_cache configuration option is included.
 
 * Add the ability to specify a per-connection reserved size for cache
-  pools.  Ensure cache pool reconfiguration is honoured quickly.
+  pools.  Ensure cache pool reconfiguration is honored quickly.
 
 * Rework hazard pointer coupling during cursor walks to be more efficient.
 

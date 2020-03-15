@@ -27,36 +27,36 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
 def timestamp_str(t):
     return '%x' % t
 
-# test_prepare_lookaside01.py
-# test to ensure lookaside eviction is working for prepared transactions.
-class test_prepare_lookaside01(wttest.WiredTigerTestCase):
+# test_prepare_hs01.py
+# test to ensure history store eviction is working for prepared transactions.
+class test_prepare_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB'
 
     def prepare_updates(self, uri, ds, nrows, nsessions, nkeys):
         # Update a large number of records in their individual transactions.
-        # This will force eviction and start lookaside eviction of committed
+        # This will force eviction and start history store eviction of committed
         # updates.
         #
         # Follow this by updating a number of records in prepared transactions
-        # under multiple sessions. We'll hang if lookaside table isn't doing its
+        # under multiple sessions. We'll hang if the history store table isn't doing its
         # thing. If we do all updates in a single session, then hang will be due
         # to uncommitted updates, instead of prepared updates.
         #
         # Do another set of updates in that many transactions. This forces the
-        # pages that have been evicted to lookaside to be re-read and brought in
-        # memory. Hence testing if we can read prepared updates from lookaside.
+        # pages that have been evicted to the history store to be re-read and brought in
+        # memory. Hence testing if we can read prepared updates from the history store.
 
         # Start with setting a stable timestamp to pin history in cache
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
 
-        # Commit some updates to get eviction and lookaside fired up
+        # Commit some updates to get eviction and history store fired up
         bigvalue1 = b"bbbbb" * 100
         cursor = self.session.open_cursor(uri)
         for i in range(1, nsessions * nkeys):
@@ -67,7 +67,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
 
         # Have prepared updates in multiple sessions. This should ensure writing
-        # prepared updates to the lookaside
+        # prepared updates to the history store
         sessions = [0] * nsessions
         cursors = [0] * nsessions
         bigvalue2 = b"ccccc" * 100
@@ -86,7 +86,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
 
         # Re-read the original versions of all the data.  To do this, the pages
         # that were just evicted need to be read back. This ensures reading
-        # prepared updates from the lookaside
+        # prepared updates from the history store
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + timestamp_str(1))
         for i in range(1, nsessions * nkeys):
@@ -101,9 +101,10 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
             cursors[j].close()
             sessions[j].close()
 
-    def test_prepare_lookaside(self):
+    @unittest.skip("Temporarily disabled")
+    def test_prepare_hs(self):
         # Create a small table.
-        uri = "table:test_prepare_lookaside01"
+        uri = "table:test_prepare_hs01"
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
@@ -118,7 +119,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.checkpoint()
 
-        # Check if lookaside is working properly with prepare transactions.
+        # Check if the history store is working properly with prepare transactions.
         # We put prepared updates in multiple sessions so that we do not hang
         # because of cache being full with uncommitted updates.
         nsessions = 3

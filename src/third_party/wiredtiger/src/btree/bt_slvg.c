@@ -191,6 +191,7 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     ckptbase->oldest_start_txn = WT_TXN_NONE;
     ckptbase->newest_stop_ts = WT_TS_MAX;
     ckptbase->newest_stop_txn = WT_TXN_MAX;
+    ckptbase->write_gen = btree->write_gen;
     F_SET(ckptbase, WT_CKPT_ADD);
 
     /*
@@ -344,15 +345,22 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * !!! (Don't format the comment.)
      * Step 7:
+     * Track the maximum write gen of the leaf pages and set that as the btree write gen.
      * Build an internal page that references all of the leaf pages, and write it, as well as any
      * merged pages, to the file.
+     *
+     * In the case of metadata, we will bump the connection base write gen to the metadata write gen
+     * after metadata salvage completes.
      *
      * Count how many leaf pages we have (we could track this during the array shuffling/splitting,
      * but that's a lot harder).
      */
     for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
-        if (ss->pages[i] != NULL)
+        if (ss->pages[i] != NULL) {
             ++leaf_cnt;
+            btree->write_gen = WT_MAX(btree->write_gen, ss->pages[i]->shared->gen);
+        }
+
     if (leaf_cnt != 0)
         switch (ss->page_type) {
         case WT_PAGE_COL_FIX:
@@ -624,7 +632,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
          * Page flags are 0 because we aren't releasing the memory used to read the page into memory
          * and we don't want page discard to free it.
          */
-        WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, false, &page));
+        WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, &page));
         WT_ERR(__wt_row_leaf_key_copy(session, page, &page->pg_row[0], &trk->row_start));
         WT_ERR(
           __wt_row_leaf_key_copy(session, page, &page->pg_row[page->entries - 1], &trk->row_stop));
@@ -688,7 +696,7 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRA
     /* Count page overflow items. */
     ovfl_cnt = 0;
     WT_CELL_FOREACH_BEGIN (session, btree, dsk, unpack) {
-        if (unpack.ovfl)
+        if (FLD_ISSET(unpack.flags, WT_CELL_UNPACK_OVERFLOW))
             ++ovfl_cnt;
     }
     WT_CELL_FOREACH_END;
@@ -703,7 +711,7 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRA
 
     ovfl_cnt = 0;
     WT_CELL_FOREACH_BEGIN (session, btree, dsk, unpack) {
-        if (unpack.ovfl) {
+        if (FLD_ISSET(unpack.flags, WT_CELL_UNPACK_OVERFLOW)) {
             WT_RET(
               __wt_memdup(session, unpack.data, unpack.size, &trk->trk_ovfl_addr[ovfl_cnt].addr));
             trk->trk_ovfl_addr[ovfl_cnt].size = (uint8_t)unpack.size;
@@ -1165,7 +1173,7 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->newest_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+        addr->start_durable_ts = addr->stop_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
         addr->oldest_start_txn = WT_TXN_NONE;
         addr->newest_stop_ts = WT_TS_MAX;
         addr->newest_stop_txn = WT_TXN_MAX;
@@ -1176,6 +1184,7 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         addr = NULL;
 
         ref->ref_recno = trk->col_start;
+        F_SET(ref, WT_REF_FLAG_LEAF);
         WT_REF_SET_STATE(ref, WT_REF_DISK);
 
         /*
@@ -1272,7 +1281,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
     /* Write the new version of the leaf page to disk. */
     WT_ERR(__slvg_modify_init(session, page));
-    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
+    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR));
 
     /* Reset the page. */
     page->pg_var = save_col_var;
@@ -1685,7 +1694,7 @@ __slvg_row_trk_update_start(WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t sl
      */
     WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
     WT_ERR(__wt_bt_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
-    WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, false, &page));
+    WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, &page));
 
     /*
      * Walk the page, looking for a key sorting greater than the specified stop key -- that's our
@@ -1772,7 +1781,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->newest_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+        addr->start_durable_ts = addr->stop_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
         addr->oldest_start_txn = WT_TXN_NONE;
         addr->newest_stop_ts = WT_TS_MAX;
         addr->newest_stop_txn = WT_TXN_MAX;
@@ -1783,6 +1792,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         addr = NULL;
 
         __wt_ref_key_clear(ref);
+        F_SET(ref, WT_REF_FLAG_LEAF);
         WT_REF_SET_STATE(ref, WT_REF_DISK);
 
         /*
@@ -1940,7 +1950,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
 
     /* Write the new version of the leaf page to disk. */
     WT_ERR(__slvg_modify_init(session, page));
-    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR, NULL));
+    WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR));
 
     /* Reset the page. */
     page->entries += skip_stop;

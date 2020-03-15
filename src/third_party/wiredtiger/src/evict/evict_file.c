@@ -41,8 +41,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     WT_RET(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
     /* Walk the tree, discarding pages. */
-    walk_flags =
-      WT_READ_CACHE | WT_READ_NO_EVICT | (syncop == WT_SYNC_CLOSE ? WT_READ_LOOKASIDE : 0);
+    walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
     next_ref = NULL;
     WT_ERR(__wt_tree_walk(session, &next_ref, walk_flags));
     while ((ref = next_ref) != NULL) {
@@ -60,12 +59,12 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * reconciliation of other page types changes, and there's no advantage to doing so.
          *
          * Eviction can also fail because an update cannot be written. If sessions have disjoint
-         * sets of files open, updates in a no-longer-referenced file may not yet be globally
-         * visible, and the write will fail with EBUSY. Our caller handles that error, retrying
-         * later.
+         * sets of files open, updates in a no-longer-referenced file may not yet be visible, and
+         * the write will fail with EBUSY. Our caller handles that error, retrying later.
          */
         if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
-            WT_ERR(__wt_reconcile(session, ref, NULL, WT_REC_EVICT | WT_REC_VISIBLE_ALL, NULL));
+            WT_ERR(__wt_reconcile(session, ref, NULL,
+              WT_REC_EVICT | WT_REC_HS | WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBLE_ALL));
 
         /*
          * We can't evict the page just returned to us (it marks our place in the tree), so move the

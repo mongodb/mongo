@@ -191,7 +191,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print("ref1: " + str(ref1) + " ref2: " + str(ref2))
             print("XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2))
         self.assertEqual(nfile2 < nfile1, True)
-        # The only files that should be left are the metadata, the lookaside
+        # The only files that should be left are the metadata, the history store
         # file, the lock file, and the active file.
         if (nfile2 != final_nfile):
             print("close1: " + str(close1) + " close2: " + str(close2))

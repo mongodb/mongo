@@ -119,6 +119,10 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_REF *ref;
     uint32_t read_flags;
 
+    /*
+     * Ignore pages not in-memory (deleted, on-disk, being read), there's no in-memory structure to
+     * check.
+     */
     read_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
 
     /* The split is complete and live, verify all of the pages involved. */
@@ -126,14 +130,8 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
         /*
-         * An eviction thread might be attempting to evict the page
-         * (the WT_REF may be WT_REF_LOCKED), or it may be a disk based
-         * page (the WT_REF may be WT_REF_READING), or it may be in
-         * some other state.  Acquire a hazard pointer for any
-         * in-memory pages so we know the state of the page.
-         *
-         * Ignore pages not in-memory (deleted, on-disk, being read),
-         * there's no in-memory structure to check.
+         * The page might be in transition, being read or evicted or something else. Acquire a
+         * hazard pointer for the page so we know its state.
          */
         if ((ret = __wt_page_in(session, ref, read_flags)) == WT_NOTFOUND)
             continue;
@@ -184,7 +182,7 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 
     cell = WT_PAGE_REF_OFFSET(page, cell_offset);
     __wt_cell_unpack(session, page, cell, &kpack);
-    if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM)
+    if (FLD_ISSET(kpack.flags, WT_CELL_UNPACK_OVERFLOW) && kpack.raw != WT_CELL_KEY_OVFL_RM)
         WT_RET(__wt_ovfl_discard(session, page, cell));
 
     return (0);
@@ -251,7 +249,8 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
     if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
         __wt_cell_unpack(session, from_home, (WT_CELL *)ref_addr, &unpack);
         WT_RET(__wt_calloc_one(session, &addr));
-        addr->newest_durable_ts = unpack.newest_durable_ts;
+        addr->start_durable_ts = unpack.newest_start_durable_ts;
+        addr->stop_durable_ts = unpack.newest_stop_durable_ts;
         addr->oldest_start_ts = unpack.oldest_start_ts;
         addr->oldest_start_txn = unpack.oldest_start_txn;
         addr->newest_stop_ts = unpack.newest_stop_ts;
@@ -478,6 +477,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
             root_incr += sizeof(WT_IKEY) + size;
         } else
             ref->ref_recno = (*root_refp)->ref_recno;
+        F_SET(ref, WT_REF_FLAG_INTERNAL);
         WT_REF_SET_STATE(ref, WT_REF_MEM);
 
         /*
@@ -590,6 +590,60 @@ err:
 }
 
 /*
+ * __split_parent_discard_ref --
+ *     Worker routine to discard WT_REFs for the split-parent function.
+ */
+static int
+__split_parent_discard_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *parent, size_t *decrp,
+  uint64_t split_gen, bool exclusive)
+{
+    WT_DECL_RET;
+    WT_IKEY *ikey;
+    size_t size;
+
+    /*
+     * Row-store trees where the old version of the page is being discarded: the previous parent
+     * page's key for this child page may have been an on-page overflow key. In that case, if the
+     * key hasn't been deleted, delete it now, including its backing blocks. We are exchanging the
+     * WT_REF that referenced it for the split page WT_REFs and their keys, and there's no longer
+     * any reference to it. Done after completing the split (if we failed, we'd leak the underlying
+     * blocks, but the parent page would be unaffected).
+     */
+    if (parent->type == WT_PAGE_ROW_INT) {
+        WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
+        ikey = __wt_ref_key_instantiated(ref);
+        if (ikey != NULL) {
+            size = sizeof(WT_IKEY) + ikey->size;
+            WT_TRET(__split_safe_free(session, split_gen, exclusive, ikey, size));
+            *decrp += size;
+        }
+    }
+
+    /*
+     * The page-delete and history store memory weren't added to the parent's footprint, ignore it
+     * here.
+     */
+    if (ref->page_del != NULL) {
+        __wt_free(session, ref->page_del->update_list);
+        __wt_free(session, ref->page_del);
+    }
+
+    /* Free the backing block and address. */
+    WT_TRET(__wt_ref_block_free(session, ref));
+
+    /*
+     * Set the WT_REF state. It may be possible to immediately free the WT_REF, so this is our last
+     * chance.
+     */
+    WT_REF_SET_STATE(ref, WT_REF_SPLIT);
+
+    WT_TRET(__split_safe_free(session, split_gen, exclusive, ref, sizeof(WT_REF)));
+    *decrp += sizeof(WT_REF);
+
+    return (ret);
+}
+
+/*
  * __split_parent --
  *     Resolve a multi-page split, inserting new information into the parent.
  */
@@ -600,7 +654,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     WT_BTREE *btree;
     WT_DECL_ITEM(scr);
     WT_DECL_RET;
-    WT_IKEY *ikey;
     WT_PAGE *parent;
     WT_PAGE_INDEX *alloc_index, *pindex;
     WT_REF **alloc_refp, *next_ref;
@@ -617,6 +670,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
 
     alloc_index = pindex = NULL;
     parent_decr = 0;
+    deleted_refs = NULL;
     empty_parent = false;
     complete = WT_ERR_RETURN;
 
@@ -633,34 +687,35 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
 
     /*
      * Remove any refs to deleted pages while we are splitting, we have the internal page locked
-     * down, and are copying the refs into a new array anyway. Switch them to the special split
-     * state, so that any reading thread will restart.
+     * down and are copying the refs into a new page-index array anyway.
      *
      * We can't do this if there is a sync running in the tree in another session: removing the refs
      * frees the blocks for the deleted pages, which can corrupt the free list calculated by the
      * sync.
      */
-    WT_ERR(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
-    for (deleted_entries = 0, i = 0; i < parent_entries; ++i) {
-        next_ref = pindex->index[i];
-        WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
-        if ((discard && next_ref == ref) ||
-          ((!WT_BTREE_SYNCING(btree) || WT_SESSION_BTREE_SYNC(session)) &&
-              next_ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, next_ref, true) &&
-              WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_SPLIT))) {
-            WT_ERR(__wt_buf_grow(session, scr, (deleted_entries + 1) * sizeof(uint32_t)));
-            deleted_refs = scr->mem;
-            deleted_refs[deleted_entries++] = i;
+    deleted_entries = 0;
+    if (!WT_BTREE_SYNCING(btree) || WT_SESSION_BTREE_SYNC(session))
+        for (i = 0; i < parent_entries; ++i) {
+            next_ref = pindex->index[i];
+            WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+
+            /* Protect against including the replaced WT_REF in the list of deleted items. */
+            if (next_ref != ref && next_ref->state == WT_REF_DELETED &&
+              __wt_delete_page_skip(session, next_ref, true) &&
+              WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_LOCKED)) {
+                if (scr == NULL)
+                    WT_ERR(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
+                WT_ERR(__wt_buf_grow(session, scr, (deleted_entries + 1) * sizeof(uint32_t)));
+                deleted_refs = scr->mem;
+                deleted_refs[deleted_entries++] = i;
+            }
         }
-    }
 
     /*
-     * The final entry count consists of the original count, plus any new pages, less any WT_REFs
-     * we're removing (deleted entries plus the entry we're replacing).
+     * The final entry count is the original count, where one entry will be replaced by some number
+     * of new entries, and some number will be deleted.
      */
-    result_entries = (parent_entries + new_entries) - deleted_entries;
-    if (!discard)
-        --result_entries;
+    result_entries = (parent_entries + (new_entries - 1)) - deleted_entries;
 
     /*
      * If there are no remaining entries on the parent, give up, we can't leave an empty internal
@@ -688,20 +743,29 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     alloc_index->entries = result_entries;
     for (alloc_refp = alloc_index->index, hint = i = 0; i < parent_entries; ++i) {
         next_ref = pindex->index[i];
-        if (next_ref == ref)
+        if (next_ref == ref) {
             for (j = 0; j < new_entries; ++j) {
                 ref_new[j]->home = parent;
                 ref_new[j]->pindex_hint = hint++;
                 *alloc_refp++ = ref_new[j];
             }
-        else if (next_ref->state != WT_REF_SPLIT) {
-            /* Skip refs we have marked for deletion. */
-            next_ref->pindex_hint = hint++;
-            *alloc_refp++ = next_ref;
+            continue;
         }
+
+        /* Skip refs we have marked for deletion. */
+        if (deleted_entries != 0) {
+            for (j = 0; j < deleted_entries; ++j)
+                if (deleted_refs[j] == i)
+                    break;
+            if (j < deleted_entries)
+                continue;
+        }
+
+        next_ref->pindex_hint = hint++;
+        *alloc_refp++ = next_ref;
     }
 
-    /* Check that we filled in all the entries. */
+    /* Check we filled in the expected number of entries. */
     WT_ASSERT(session, alloc_refp - alloc_index->index == (ptrdiff_t)result_entries);
 
     /* Start making real changes to the tree, errors are fatal. */
@@ -730,26 +794,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
     parent->pg_intl_split_gen = split_gen;
 
-    /*
-     * If discarding the page's original WT_REF field, reset it to split. Threads cursoring through
-     * the tree were blocked because that WT_REF state was set to locked. Changing the locked state
-     * to split unblocks those threads and causes them to re-calculate their position based on the
-     * just-updated parent page's index.
-     */
-    if (discard) {
-        /*
-         * Set the discarded WT_REF state to split, ensuring we don't race with any discard of the
-         * WT_REF deleted fields.
-         */
-        WT_REF_SET_STATE(ref, WT_REF_SPLIT);
-
-        /*
-         * Push out the change: not required for correctness, but stops threads spinning on
-         * incorrect page references.
-         */
-        WT_FULL_BARRIER();
-    }
-
 #ifdef HAVE_DIAGNOSTIC
     WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, parent));
 #endif
@@ -758,78 +802,36 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     complete = WT_ERR_IGNORE;
 
     /*
-     * !!!
-     * Swapping in the new page index released the page for eviction, we can
-     * no longer look inside the page.
+     * The new page index is in place. Threads cursoring in the tree are blocked because the WT_REF
+     * being discarded (if any), and deleted WT_REFs (if any) are in a locked state. Changing the
+     * locked state to split unblocks those threads and causes them to re-calculate their position
+     * based on the just-updated parent page's index. The split state doesn't lock the WT_REF.addr
+     * information which is read by cursor threads in some tree-walk cases: free the WT_REF we were
+     * splitting and any deleted WT_REFs we found, modulo the usual safe free semantics, then reset
+     * the WT_REF state.
      */
-    if (ref->page == NULL)
-        __wt_verbose(session, WT_VERB_SPLIT,
-          "%p: reverse split into parent %p, %" PRIu32 " -> %" PRIu32 " (-%" PRIu32 ")",
-          (void *)ref->page, (void *)parent, parent_entries, result_entries,
-          parent_entries - result_entries);
-    else
-        __wt_verbose(session, WT_VERB_SPLIT,
-          "%p: split into parent %p, %" PRIu32 " -> %" PRIu32 " (+%" PRIu32 ")", (void *)ref->page,
-          (void *)parent, parent_entries, result_entries, result_entries - parent_entries);
-
-    /*
-     * The new page index is in place, free the WT_REF we were splitting and any deleted WT_REFs we
-     * found, modulo the usual safe free semantics.
-     */
-    for (i = 0, deleted_refs = scr->mem; i < deleted_entries; ++i) {
+    if (discard) {
+        WT_ASSERT(session, exclusive || ref->state == WT_REF_LOCKED);
+        WT_TRET(
+          __split_parent_discard_ref(session, ref, parent, &parent_decr, split_gen, exclusive));
+    }
+    for (i = 0; i < deleted_entries; ++i) {
         next_ref = pindex->index[deleted_refs[i]];
-#ifdef HAVE_DIAGNOSTIC
-        {
-            uint32_t ref_state;
-            WT_ORDERED_READ(ref_state, next_ref->state);
-            WT_ASSERT(session, ref_state == WT_REF_LOCKED || ref_state == WT_REF_SPLIT);
-        }
-#endif
-
-        /*
-         * We set the WT_REF to split, discard it, freeing any resources it holds.
-         *
-         * Row-store trees where the old version of the page is being discarded: the previous parent
-         * page's key for this child page may have been an on-page overflow key. In that case, if
-         * the key hasn't been deleted, delete it now, including its backing blocks. We are
-         * exchanging the WT_REF that referenced it for the split page WT_REFs and their keys, and
-         * there's no longer any reference to it. Done after completing the split (if we failed,
-         * we'd leak the underlying blocks, but the parent page would be unaffected).
-         */
-        if (parent->type == WT_PAGE_ROW_INT) {
-            WT_TRET(__split_ovfl_key_cleanup(session, parent, next_ref));
-            ikey = __wt_ref_key_instantiated(next_ref);
-            if (ikey != NULL) {
-                size = sizeof(WT_IKEY) + ikey->size;
-                WT_TRET(__split_safe_free(session, split_gen, exclusive, ikey, size));
-                parent_decr += size;
-            }
-        }
-
-        /* Check that we are not discarding active history. */
-        WT_ASSERT(session, !__wt_page_las_active(session, next_ref));
-
-        /*
-         * The page-delete and lookaside memory weren't added to the parent's footprint, ignore it
-         * here.
-         */
-        if (next_ref->page_del != NULL) {
-            __wt_free(session, next_ref->page_del->update_list);
-            __wt_free(session, next_ref->page_del);
-        }
-        __wt_free(session, next_ref->page_las);
-
-        /* Free the backing block and address. */
-        WT_TRET(__wt_ref_block_free(session, next_ref));
-
-        WT_TRET(__split_safe_free(session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
-        parent_decr += sizeof(WT_REF);
+        WT_ASSERT(session, next_ref->state == WT_REF_LOCKED);
+        WT_TRET(__split_parent_discard_ref(
+          session, next_ref, parent, &parent_decr, split_gen, exclusive));
     }
 
     /*
      * !!!
      * The original WT_REF has now been freed, we can no longer look at it.
      */
+
+    /*
+     * Don't cache the change: not required for correctness, but stops threads spinning on incorrect
+     * page references.
+     */
+    WT_FULL_BARRIER();
 
     /*
      * We can't free the previous page index, there may be threads using it. Add it to the session
@@ -843,6 +845,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     __wt_cache_page_inmem_incr(session, parent, parent_incr);
     __wt_cache_page_inmem_decr(session, parent, parent_decr);
 
+    /*
+     * We've discarded the WT_REFs and swapping in a new page index released the page for eviction;
+     * we can no longer look inside the WT_REF or the page, be careful logging the results.
+     */
+    __wt_verbose(session, WT_VERB_SPLIT,
+      "%p: split into parent, %" PRIu32 "->%" PRIu32 ", %" PRIu32 " deleted", (void *)ref,
+      parent_entries, result_entries, deleted_entries);
+
 err:
     __wt_scr_free(session, &scr);
     /*
@@ -851,10 +861,11 @@ err:
      */
     switch (complete) {
     case WT_ERR_RETURN:
-        for (i = 0; i < parent_entries; ++i) {
-            next_ref = pindex->index[i];
-            if (next_ref->state == WT_REF_SPLIT)
-                WT_REF_SET_STATE(next_ref, WT_REF_DELETED);
+        /* Unlock WT_REFs locked because they were in a deleted state. */
+        for (i = 0; i < deleted_entries; ++i) {
+            next_ref = pindex->index[deleted_refs[i]];
+            WT_ASSERT(session, next_ref->state == WT_REF_LOCKED);
+            WT_REF_SET_STATE(next_ref, WT_REF_DELETED);
         }
 
         __wt_free_ref_index(session, NULL, alloc_index, false);
@@ -1003,6 +1014,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
             parent_incr += sizeof(WT_IKEY) + size;
         } else
             ref->ref_recno = (*page_refp)->ref_recno;
+        F_SET(ref, WT_REF_FLAG_INTERNAL);
         WT_REF_SET_STATE(ref, WT_REF_MEM);
 
         /*
@@ -1363,24 +1375,6 @@ err:
     return (ret);
 }
 
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __wt_count_birthmarks --
- *     Sanity check an update list. In particular, make sure there no birthmarks.
- */
-int
-__wt_count_birthmarks(WT_UPDATE *upd)
-{
-    int birthmark_count;
-
-    for (birthmark_count = 0; upd != NULL; upd = upd->next)
-        if (upd->type == WT_UPDATE_BIRTHMARK)
-            ++birthmark_count;
-
-    return (birthmark_count);
-}
-#endif
-
 /*
  * __split_multi_inmem --
  *     Instantiate a page from a disk image.
@@ -1397,8 +1391,6 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_UPDATE *upd;
     uint64_t recno;
     uint32_t i, slot;
-
-    WT_ASSERT(session, multi->page_las.las_pageid == 0);
 
     /*
      * In 04/2016, we removed column-store record numbers from the WT_PAGE structure, leading to
@@ -1420,7 +1412,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * our caller will not discard the disk image when discarding the original page, and our caller
      * will discard the allocated page on error, when discarding the allocated WT_REF.
      */
-    WT_RET(__wt_page_inmem(session, ref, multi->disk_image, WT_PAGE_DISK_ALLOC, false, &page));
+    WT_RET(__wt_page_inmem(session, ref, multi->disk_image, WT_PAGE_DISK_ALLOC, &page));
     multi->disk_image = NULL;
 
     /*
@@ -1470,13 +1462,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
                 key->size = WT_INSERT_KEY_SIZE(supd->ins);
             }
 
-            WT_ASSERT(session, __wt_count_birthmarks(upd) <= 1);
-
             /* Search the page. */
             WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
-
-            /* Birthmarks should only be applied to on-page values. */
-            WT_ASSERT(session, cbt.compare == 0 || upd->type != WT_UPDATE_BIRTHMARK);
 
             /* Apply the modification. */
             WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
@@ -1495,17 +1482,17 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     mod->first_dirty_txn = WT_TXN_FIRST;
 
     /*
-     * If the new page is modified, save the eviction generation to avoid repeatedly attempting
-     * eviction on the same page.
+     * Restore the previous page's modify state to avoid repeatedly attempting eviction on the same
+     * page.
      */
     mod->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
     mod->last_eviction_id = orig->modify->last_eviction_id;
     mod->last_eviction_timestamp = orig->modify->last_eviction_timestamp;
-
-    /* Add the update/restore flag to any previous state. */
-    mod->last_stable_timestamp = orig->modify->last_stable_timestamp;
     mod->rec_max_txn = orig->modify->rec_max_txn;
     mod->rec_max_timestamp = orig->modify->rec_max_timestamp;
+    mod->last_stable_timestamp = orig->modify->last_stable_timestamp;
+
+    /* Add the update/restore flag to any previous state. */
     mod->restore_state = orig->modify->restore_state;
     FLD_SET(mod->restore_state, WT_PAGE_RS_RESTORED);
 
@@ -1583,6 +1570,20 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
     WT_IKEY *ikey;
     WT_REF *ref;
 
+    /* There can be an address or a disk image or both. */
+    WT_ASSERT(session, multi->addr.addr != NULL || multi->disk_image != NULL);
+
+    /* If closing the file, there better be an address. */
+    WT_ASSERT(session, !closing || multi->addr.addr != NULL);
+
+    /* If closing the file, there better not be any saved updates. */
+    WT_ASSERT(session, !closing || multi->supd == NULL);
+
+    /* Verify any disk image we have. */
+    WT_ASSERT(session, multi->disk_image == NULL ||
+        __wt_verify_dsk_image(
+          session, "[page instantiate]", multi->disk_image, 0, &multi->addr, true) == 0);
+
     /* Allocate an underlying WT_REF. */
     WT_RET(__wt_calloc_one(session, refp));
     ref = *refp;
@@ -1606,26 +1607,15 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
         break;
     }
 
-    /*
-     * There can be an address or a disk image or both, but if there is neither, there must be a
-     * backing lookaside page.
-     */
-    WT_ASSERT(session,
-      multi->page_las.las_pageid != 0 || multi->addr.addr != NULL || multi->disk_image != NULL);
-
-    /* If closing the file, there better be an address. */
-    WT_ASSERT(session, !closing || multi->addr.addr != NULL);
-
-    /* If closing the file, there better not be any saved updates. */
-    WT_ASSERT(session, !closing || multi->supd == NULL);
-
-    /* If there are saved updates, there better be a disk image. */
-    WT_ASSERT(session, multi->supd == NULL || multi->disk_image != NULL);
-
-    /* Verify any disk image we have. */
-    WT_ASSERT(session, multi->disk_image == NULL ||
-        __wt_verify_dsk_image(
-          session, "[page instantiate]", multi->disk_image, 0, &multi->addr, true) == 0);
+    switch (page->type) {
+    case WT_PAGE_COL_INT:
+    case WT_PAGE_ROW_INT:
+        F_SET(ref, WT_REF_FLAG_INTERNAL);
+        break;
+    default:
+        F_SET(ref, WT_REF_FLAG_LEAF);
+        break;
+    }
 
     /*
      * If there's an address, the page was written, set it.
@@ -1637,7 +1627,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
     if (multi->addr.addr != NULL) {
         WT_RET(__wt_calloc_one(session, &addr));
         ref->addr = addr;
-        addr->newest_durable_ts = multi->addr.newest_durable_ts;
+        addr->start_durable_ts = multi->addr.start_durable_ts;
+        addr->stop_durable_ts = multi->addr.stop_durable_ts;
         addr->oldest_start_ts = multi->addr.oldest_start_ts;
         addr->oldest_start_txn = multi->addr.oldest_start_txn;
         addr->newest_stop_ts = multi->addr.newest_stop_ts;
@@ -1647,22 +1638,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
         addr->type = multi->addr.type;
 
         WT_REF_SET_STATE(ref, WT_REF_DISK);
-    }
-
-    /*
-     * Copy any associated lookaside reference, potentially resetting WT_REF.state. Regardless of a
-     * backing address, WT_REF_LOOKASIDE overrides WT_REF_DISK.
-     */
-    if (multi->page_las.las_pageid != 0) {
-        /*
-         * We should not have a disk image if we did lookaside eviction.
-         */
-        WT_ASSERT(session, multi->disk_image == NULL);
-
-        WT_RET(__wt_calloc_one(session, &ref->page_las));
-        *ref->page_las = multi->page_las;
-        WT_ASSERT(session, ref->page_las->max_txn != WT_TXN_NONE);
-        WT_REF_SET_STATE(ref, WT_REF_LOOKASIDE);
     }
 
     /*
@@ -1739,8 +1714,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     child->page = ref->page;
     child->home = ref->home;
     child->pindex_hint = ref->pindex_hint;
-    child->state = WT_REF_MEM;
     child->addr = ref->addr;
+    F_SET(child, WT_REF_FLAG_LEAF);
+    child->state = WT_REF_MEM;
+
+    WT_ERR_ASSERT(session, ref->page_del == NULL, WT_PANIC,
+      "unexpected page-delete structure when splitting a page");
 
     /*
      * The address has moved to the replacement WT_REF. Make sure it isn't freed when the original
@@ -1799,6 +1778,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     parent_incr += sizeof(WT_REF);
     child = split_ref[1];
     child->page = right;
+    F_SET(child, WT_REF_FLAG_LEAF);
     child->state = WT_REF_MEM;
 
     if (type == WT_PAGE_ROW_LEAF) {

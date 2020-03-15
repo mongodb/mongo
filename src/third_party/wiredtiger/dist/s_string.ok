@@ -174,6 +174,7 @@ HHHHLL
 HHHLL
 HILQr
 HOTBACKUP
+HSdump
 Hendrik
 HyperLevelDB
 ID's
@@ -210,7 +211,6 @@ Kanowski's
 Kounavis
 LANGID
 LAS
-LASdump
 LF
 LLLLLL
 LLLLLLL
@@ -267,6 +267,7 @@ Mutex
 MySecret
 NEEDKEY
 NEEDVALUE
+NNN
 NOLINT
 NOLINTNEXTLINE
 NOLL
@@ -313,6 +314,7 @@ PowerPC
 Pre
 Preload
 Prepend
+Prev
 Qsort
 RCS
 RDNOLOCK
@@ -363,6 +365,7 @@ Sevii
 SiH
 Skiplist
 SleepConditionVariableCS
+SmallVector
 Solaris
 Spinlock
 Spinlocks
@@ -441,6 +444,7 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
+WiredTigerHS
 WiredTigerInit
 WiredTigerLAS
 WiredTigerLog
@@ -793,6 +797,7 @@ func
 funcid
 fvisibility
 fwrite
+gc
 gcc
 gdb
 ge
@@ -825,6 +830,7 @@ hhh
 highjack
 hilq
 hotbackup
+hs
 hselasky
 html
 huffman
@@ -931,6 +937,7 @@ libwiredtiger
 linkers
 llll
 llu
+llvm
 loadtext
 localTime
 localkey
@@ -961,6 +968,7 @@ lsnappy
 lt
 lu
 lwsync
+lx
 lz
 lzo
 mT
@@ -1111,6 +1119,7 @@ prepended
 prepending
 presize
 presync
+prev
 prevlsn
 primary's
 printf
@@ -1166,6 +1175,7 @@ regionp
 reinitialization
 relocked
 repl
+resizable
 resize
 resizing
 ret
@@ -1180,6 +1190,7 @@ rotN
 rotn
 rp
 rpc
+rts
 ru
 run's
 runtime
@@ -1201,6 +1212,7 @@ setstr
 setv
 setvbuf
 sfence
+signalled
 sii
 sizeof
 sizep
@@ -1264,6 +1276,8 @@ syscall
 sysinfo
 sz
 t's
+tK
+tM
 tV
 tablename
 tcbench

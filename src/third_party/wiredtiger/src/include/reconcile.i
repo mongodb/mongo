@@ -21,15 +21,15 @@ __wt_rec_need_split(WT_RECONCILE *r, size_t len)
 {
     /*
      * In the case of a row-store leaf page, trigger a split if a threshold number of saved updates
-     * is reached. This allows pages to split for update/restore and lookaside eviction when there
-     * is no visible data causing the disk image to grow.
+     * is reached. This allows pages to split for update/restore and history store eviction when
+     * there is no visible data causing the disk image to grow.
      *
      * In the case of small pages or large keys, we might try to split when a page has no updates or
-     * entries, which isn't possible. To consider update/restore or lookaside information, require
-     * either page entries or updates that will be attached to the image. The limit is one of
-     * either, but it doesn't make sense to create pages or images with few entries or updates, even
-     * where page sizes are small (especially as updates that will eventually become overflow items
-     * can throw off our calculations). Bound the combination at something reasonable.
+     * entries, which isn't possible. To consider update/restore or history store information,
+     * require either page entries or updates that will be attached to the image. The limit is one
+     * of either, but it doesn't make sense to create pages or images with few entries or updates,
+     * even where page sizes are small (especially as updates that will eventually become overflow
+     * items can throw off our calculations). Bound the combination at something reasonable.
      */
     if (r->page->type == WT_PAGE_ROW_LEAF && r->entries + r->supd_next > 10)
         len += r->supd_memsize;
@@ -48,17 +48,17 @@ __wt_rec_addr_ts_init(WT_RECONCILE *r, wt_timestamp_t *newest_durable_ts,
   uint64_t *newest_stop_txnp)
 {
     /*
-     * If the page format supports address timestamps (and not fixed-length column-store, where we
-     * don't maintain timestamps at all), set the oldest/newest timestamps to values at the end of
-     * their expected range so they're corrected as we process key/value items. Otherwise, set the
-     * oldest/newest timestamps to simple durability.
+     * If the page is not fixed-length column-store, where we don't maintain timestamps at all, set
+     * the oldest/newest timestamps to values at the end of their expected range so they're
+     * corrected as we process key/value items. Otherwise, set the oldest/newest timestamps to
+     * simple durability.
      */
     *newest_durable_ts = WT_TS_NONE;
     *oldest_start_tsp = WT_TS_MAX;
     *oldest_start_txnp = WT_TXN_MAX;
     *newest_stop_tsp = WT_TS_NONE;
     *newest_stop_txnp = WT_TXN_NONE;
-    if (!__wt_process.page_version_ts || r->page->type == WT_PAGE_COL_FIX) {
+    if (r->page->type == WT_PAGE_COL_FIX) {
         *newest_durable_ts = WT_TS_NONE;
         *oldest_start_tsp = WT_TS_NONE;
         *oldest_start_txnp = WT_TXN_NONE;
@@ -144,11 +144,11 @@ __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
 
 /*
  * __wt_rec_cell_build_addr --
- *     Process an address reference and return a cell structure to be stored on the page.
+ *     Process an address or unpack reference and return a cell structure to be stored on the page.
  */
 static inline void
-__wt_rec_cell_build_addr(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr, bool proxy_cell, uint64_t recno)
+__wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
+  WT_CELL_UNPACK *vpack, bool proxy_cell, uint64_t recno)
 {
     WT_REC_KV *val;
     u_int cell_type;
@@ -161,6 +161,8 @@ __wt_rec_cell_build_addr(
      */
     if (proxy_cell)
         cell_type = WT_CELL_ADDR_DEL;
+    else if (vpack != NULL)
+        cell_type = vpack->type;
     else {
         switch (addr->type) {
         case WT_ADDR_INT:
@@ -188,11 +190,22 @@ __wt_rec_cell_build_addr(
      * We don't copy the data into the buffer, it's not necessary; just re-point the buffer's
      * data/length fields.
      */
-    val->buf.data = addr->addr;
-    val->buf.size = addr->size;
-    val->cell_len = __wt_cell_pack_addr(session, &val->cell, cell_type, recno,
-      addr->newest_durable_ts, addr->oldest_start_ts, addr->oldest_start_txn, addr->newest_stop_ts,
-      addr->newest_stop_txn, val->buf.size);
+    if (vpack == NULL) {
+        WT_ASSERT(session, addr != NULL);
+        val->buf.data = addr->addr;
+        val->buf.size = addr->size;
+        val->cell_len = __wt_cell_pack_addr(session, &val->cell, cell_type, recno,
+          addr->stop_durable_ts, addr->oldest_start_ts, addr->oldest_start_txn,
+          addr->newest_stop_ts, addr->newest_stop_txn, val->buf.size);
+    } else {
+        WT_ASSERT(session, addr == NULL);
+        val->buf.data = vpack->data;
+        val->buf.size = vpack->size;
+        val->cell_len = __wt_cell_pack_addr(session, &val->cell, cell_type, recno,
+          vpack->newest_stop_durable_ts, vpack->oldest_start_ts, vpack->oldest_start_txn,
+          vpack->newest_stop_ts, vpack->newest_stop_txn, val->buf.size);
+    }
+
     val->len = val->cell_len + val->buf.size;
 }
 
@@ -209,12 +222,11 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
     WT_REC_KV *val;
 
     btree = S2BT(session);
-
     val = &r->v;
 
     /*
-     * We don't copy the data into the buffer, it's not necessary; just re-point the buffer's
-     * data/length fields.
+     * Unless necessary we don't copy the data into the buffer; start by just re-pointing the
+     * buffer's data/length fields.
      */
     val->buf.data = data;
     val->buf.size = size;
@@ -234,6 +246,7 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
               session, r, val, WT_CELL_VALUE_OVFL, start_ts, start_txn, stop_ts, stop_txn, rle));
         }
     }
+
     val->cell_len = __wt_cell_pack_value(
       session, &val->cell, start_ts, start_txn, stop_ts, stop_txn, rle, val->buf.size);
     val->len = val->cell_len + val->buf.size;
