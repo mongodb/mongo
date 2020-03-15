@@ -7125,7 +7125,7 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
     ASSERT_EQUALS(lastVote.getCandidateIndex(), 0);
 }
 
-TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
+TEST_F(ReplCoordTest, NodeDoesNotGrantVoteIfInTerminalShutdown) {
     // Set up a 2-node replica set config.
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -7404,6 +7404,44 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         CommitQuorumOptions numNodesCQ;
         numNodesCQ.numNodes = 4;
         ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(numNodesCQ, commitReadyMembers));
+    }
+}
+
+TEST_F(ReplCoordTest, NodeFailsVoteRequestIfCandidateIndexIsInvalid) {
+    // Set up a 2-node replica set config.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+    auto time = OpTimeWithTermOne(100, 1);
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(time, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(time, Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+
+    auto opCtx = makeOperationContext();
+
+    // Invalid candidateIndex values.
+    for (auto candidateIndex : std::vector<long long>{-1LL, 2LL}) {
+        ReplSetRequestVotesArgs args;
+        ASSERT_OK(args.initialize(BSON(
+            "replSetRequestVotes" << 1 << "setName"
+                                  << "mySet"
+                                  << "term" << getReplCoord()->getTerm() << "candidateIndex"
+                                  << candidateIndex << "configVersion" << 2LL << "dryRun" << false
+                                  << "lastAppliedOpTime" << time.asOpTime().toBSON())));
+        ReplSetRequestVotesResponse response;
+        auto r = getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response);
+
+        ASSERT_NOT_OK(r);
+        ASSERT_STRING_CONTAINS(r.reason(), "Invalid candidateIndex");
+        ASSERT_EQUALS(ErrorCodes::BadValue, r.code());
     }
 }
 

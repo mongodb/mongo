@@ -4747,28 +4747,17 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
             return Status(ErrorCodes::ShutdownInProgress, "In the process of shutting down");
         }
 
-        _topCoord->processReplSetRequestVotes(args, response);
-    }
-
-    if (!args.isADryRun()) {
         const int candidateIndex = args.getCandidateIndex();
-        LastVote lastVote{args.getTerm(), candidateIndex};
-
-        const bool votedForCandidate = response->getVoteGranted();
-
-        if (votedForCandidate) {
-            Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
-            if (!status.isOK()) {
-                LOGV2_ERROR(21428,
-                            "replSetRequestVotes failed to store LastVote document; {error}",
-                            "replSetRequestVotes failed to store LastVote document",
-                            "error"_attr = status);
-                return status;
-            }
+        if (candidateIndex < 0 || candidateIndex >= _rsConfig.getNumMembers()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Invalid candidateIndex: " << candidateIndex
+                                        << ". Must be between 0 and "
+                                        << _rsConfig.getNumMembers() - 1 << " inclusive");
         }
 
-        // If the vote was not granted to the candidate, we still want to track metrics around the
-        // node's participation in the election.
+        _topCoord->processReplSetRequestVotes(args, response);
+
+        const bool votedForCandidate = response->getVoteGranted();
         const long long electionTerm = args.getTerm();
         const Date_t lastVoteDate = _replExecutor->now();
         const int electionCandidateMemberId =
@@ -4777,7 +4766,6 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
         const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
         const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
-
         ReplicationMetrics::get(getServiceContext())
             .setElectionParticipantMetrics(votedForCandidate,
                                            electionTerm,
@@ -4787,6 +4775,21 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
                                            lastAppliedOpTime,
                                            maxAppliedOpTime,
                                            priorityAtElection);
+    }
+
+    // It's safe to store lastVote outside of _mutex. The topology coordinator grants only one
+    // vote per term, and storeLocalLastVoteDocument does nothing unless lastVote has a higher term
+    // than the previous lastVote, so threads racing to store votes from different terms will
+    // eventually store the latest vote.
+    if (!args.isADryRun() && response->getVoteGranted()) {
+        LastVote lastVote{args.getTerm(), args.getCandidateIndex()};
+        Status status = _externalState->storeLocalLastVoteDocument(opCtx, lastVote);
+        if (!status.isOK()) {
+            LOGV2_ERROR(21428,
+                        "replSetRequestVotes failed to store LastVote document",
+                        "error"_attr = status);
+            return status;
+        }
     }
     return Status::OK();
 }
