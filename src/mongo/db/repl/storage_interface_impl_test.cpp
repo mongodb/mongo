@@ -77,7 +77,8 @@ BSONObj makeIdIndexSpec(const NamespaceString& nss) {
  */
 template <typename T>
 NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
-    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName()) +
+    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName())
+                               .substr(0, NamespaceString::MaxNsCollectionLen - suffix.length()) +
                            suffix);
 }
 

@@ -162,7 +162,7 @@ bool NamespaceString::checkLengthForFCV() const {
 
     if (serverGlobalParams.featureCompatibility.getVersion() ==
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return true;
+        return size() <= MaxNsCollectionLen;
     }
 
     return false;

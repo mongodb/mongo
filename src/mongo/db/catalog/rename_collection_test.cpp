@@ -549,7 +549,7 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
 
 TEST_F(RenameCollectionTest, TargetCollectionNameLong) {
     _createCollection(_opCtx.get(), _sourceNss);
-    const std::string targetCollectionName(500, 'a');
+    const std::string targetCollectionName(255, 'a');
     NamespaceString longTargetNss(_sourceNss.db(), targetCollectionName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, longTargetNss, {}));
 }

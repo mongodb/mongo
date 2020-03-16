@@ -43,10 +43,12 @@
 
 namespace mongo {
 
-const size_t MaxDatabaseNameLen = 128;  // max str len for the db name, including null char
-
 class NamespaceString {
 public:
+    constexpr static size_t MaxDatabaseNameLen =
+        128;  // max str len for the db name, including null char
+    constexpr static size_t MaxNsCollectionLen = 255;
+
     // Reserved system namespaces
 
     // Namespace for the admin database
@@ -470,10 +472,13 @@ StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& n
 inline StringData nsToDatabaseSubstring(StringData ns) {
     size_t i = ns.find('.');
     if (i == std::string::npos) {
-        massert(10078, "nsToDatabase: db too long", ns.size() < MaxDatabaseNameLen);
+        massert(
+            10078, "nsToDatabase: db too long", ns.size() < NamespaceString::MaxDatabaseNameLen);
         return ns;
     }
-    massert(10088, "nsToDatabase: db too long", i < static_cast<size_t>(MaxDatabaseNameLen));
+    massert(10088,
+            "nsToDatabase: db too long",
+            i < static_cast<size_t>(NamespaceString::MaxDatabaseNameLen));
     return ns.substr(0, i);
 }
 

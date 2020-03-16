@@ -17,9 +17,9 @@ const dbName = 'test';
 const renameDbName = 'rename_test';
 const shortCollName = 'short_collection';
 const longCollName = 'long_collection' +
-    'a'.repeat(8192);
+    'a'.repeat(200);
 const longCollNameRename = 'long_collection' +
-    'b'.repeat(8192);
+    'b'.repeat(200);
 
 const dbpath = MongoRunner.dataPath + 'long_collection_names';
 resetDbpath(dbpath);
