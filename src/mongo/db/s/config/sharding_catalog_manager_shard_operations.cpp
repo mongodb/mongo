@@ -740,6 +740,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    Lock::ExclusiveLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+
     auto findShardResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             kConfigReadSelector,
@@ -793,8 +795,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             BSON("shard" << name),
             ShardingCatalogClient::kLocalWriteConcern));
 
-        Lock::ExclusiveLock shardLock(opCtx->lockState(), _kShardMembershipLock);
-
         uassertStatusOKWithContext(
             catalogClient->updateConfigDocument(opCtx,
                                                 ShardType::ConfigNS,
@@ -807,6 +807,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         return {RemoveShardProgress::STARTED,
                 boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
     }
+
+    shardLock.unlock();
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
