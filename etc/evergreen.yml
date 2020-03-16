@@ -4487,6 +4487,17 @@ tasks:
         ${activate_virtualenv}
         find buildscripts etc jstests -name '*.y*ml' -exec yamllint -c etc/yamllint_config.yml {} +
 
+- name: lint_errorcodes
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "scons lint"
+      vars:
+        targets: lint-errorcodes
+
 - name: burn_in_tests_gen
   commands:
   - command: manifest.load
@@ -9900,6 +9911,7 @@ buildvariants:
   - name: lint_cpplint
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
+  - name: lint_errorcodes
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
