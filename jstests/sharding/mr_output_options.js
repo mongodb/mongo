@@ -6,7 +6,7 @@
 (function() {
 "use strict";
 
-const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 const testDB = st.getDB("mrShard");
 const inputColl = testDB.srcSharded;
