@@ -1890,6 +1890,168 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
     }
 ];
 
+const retryOnReadErrorsFromBackgroundReconfigTest = [
+    {
+        name: "find retries on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({_id: 1}));
+            failCommandWithFailPoint(["find"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.eq(coll1.findOne({_id: 1}), {_id: 1});
+        }
+    },
+    {
+        name: "aggregate retries on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["aggregate"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            const cursor = coll1.aggregate([{$match: {a: 1}}]);
+            assert.eq(cursor.toArray().length, 2);
+        }
+    },
+    {
+        name: "distinct retries on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["distinct"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.eq(coll1.distinct("a").sort(), [1, 2]);
+        }
+    },
+    {
+        name: "count retries on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["count"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.eq(coll1.count({a: 1}), 2);
+        }
+    },
+];
+
+const retryReadsOnNetworkErrorsWithNetworkRetryAndBackgroundReconfigTest = [
+    {
+        name: "find retries on network errors",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({_id: 1}));
+            failCommandWithFailPoint(["find"], {closeConnection: true});
+            assert.eq(coll1.findOne({_id: 1}), {_id: 1});
+        }
+    },
+    {
+        name: "aggregate retries on network errors",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["aggregate"], {closeConnection: true});
+            const cursor = coll1.aggregate([{$match: {a: 1}}]);
+            assert.eq(cursor.toArray().length, 2);
+        }
+    },
+    {
+        name: "distinct retries on network errors",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["distinct"], {closeConnection: true});
+            assert.eq(coll1.distinct("a").sort(), [1, 2]);
+        }
+    },
+    {
+        name: "count retries on network errors",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["count"], {closeConnection: true});
+            assert.eq(coll1.count({a: 1}), 2);
+        }
+    },
+];
+
+const doNotRetryReadErrorWithOutBackgroundReconfigTest = [
+    {
+        name: "find fails on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({_id: 1}));
+            failCommandWithFailPoint(["find"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.commandFailedWithCode(
+                assert.throws(function() {
+                                 coll1.findOne({_id: 1});
+                             }),
+                             ErrorCodes.ReadConcernMajorityNotAvailableYet);
+        }
+    },
+    {
+        name: "aggregate fails on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["aggregate"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.commandFailedWithCode(
+                assert.throws(function() {
+                                 const cursor = coll1.aggregate([{$match: {a: 1}}]);
+                                 assert.eq(cursor.toArray().length, 2);
+                             }),
+                             ErrorCodes.ReadConcernMajorityNotAvailableYet);
+        }
+    },
+    {
+        name: "distinct fails on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["distinct"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.commandFailedWithCode(
+                assert.throws(function() {
+                                 coll1.distinct("a");
+                             }),
+                             ErrorCodes.ReadConcernMajorityNotAvailableYet);
+        }
+    },
+    {
+        name: "count fails on ReadConcernMajorityNotAvailableYet",
+        test: function() {
+            assert.commandWorked(testDB.createCollection(collName1));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 1}));
+            assert.commandWorked(coll1.insert({a: 2}));
+            failCommandWithFailPoint(["count"],
+                                     {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet});
+            assert.commandFailedWithCode(
+                assert.throws(function() {
+                                 coll1.count({a: 1});
+                             }),
+                             ErrorCodes.ReadConcernMajorityNotAvailableYet);
+        }
+    },
+];
+
 TestData.networkErrorAndTxnOverrideConfig = {};
 TestData.sessionOptions = new SessionOptions();
 TestData.overrideRetryAttempts = 3;
@@ -1903,6 +2065,7 @@ jsTestLog("=-=-=-=-=-= Testing with 'retry on network error' by itself. =-=-=-=-
 TestData.sessionOptions = new SessionOptions({retryWrites: true});
 TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
 TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = false;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = false;
 
 session = conn.startSession(TestData.sessionOptions);
 testDB = session.getDatabase(dbName);
@@ -1915,6 +2078,7 @@ jsTestLog("=-=-=-=-=-= Testing with 'txn override' by itself. =-=-=-=-=-=");
 TestData.sessionOptions = new SessionOptions({retryWrites: false});
 TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = false;
 TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = true;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = false;
 
 session = conn.startSession(TestData.sessionOptions);
 testDB = session.getDatabase(dbName);
@@ -1927,6 +2091,7 @@ jsTestLog("=-=-=-=-=-= Testing 'both txn override and retry on network error'. =
 TestData.sessionOptions = new SessionOptions({retryWrites: true});
 TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
 TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = true;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = false;
 
 session = conn.startSession(TestData.sessionOptions);
 testDB = session.getDatabase(dbName);
@@ -1935,6 +2100,51 @@ coll2 = testDB[collName2];
 
 txnOverridePlusRetryOnNetworkErrorTests.forEach(
     (testCase) => runTest("txnOverridePlusRetryOnNetworkErrorTests", testCase));
+
+jsTestLog("=-=-=-=-=-= Testing 'retry on read errors from background reconfigs'. =-=-=-=-=-=");
+TestData.sessionOptions = new SessionOptions({retryWrites: false});
+TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = false;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = true;
+TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = false;
+
+session = conn.startSession(TestData.sessionOptions);
+testDB = session.getDatabase(dbName);
+coll1 = testDB[collName1];
+coll2 = testDB[collName2];
+
+retryOnReadErrorsFromBackgroundReconfigTest.forEach(
+    (testCase) => runTest("retryOnReadErrorsFromBackgroundReconfigTest", testCase));
+
+jsTestLog(
+    "=-=-=-=-=-= Testing 'retry on network errors during network error retry and background reconfigs'. =-=-=-=-=-=");
+TestData.sessionOptions = new SessionOptions({retryWrites: true});
+TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = true;
+TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = false;
+
+session = conn.startSession(TestData.sessionOptions);
+testDB = session.getDatabase(dbName);
+coll1 = testDB[collName1];
+coll2 = testDB[collName2];
+
+retryReadsOnNetworkErrorsWithNetworkRetryAndBackgroundReconfigTest.forEach(
+    (testCase) =>
+        runTest("retryReadsOnNetworkErrorsWithNetworkRetryAndBackgroundReconfigTest", testCase));
+
+jsTestLog(
+    "=-=-=-=-=-= Testing 'don't retry on network errors during background reconfigs'. =-=-=-=-=-=");
+TestData.sessionOptions = new SessionOptions({retryWrites: true});
+TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
+TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs = false;
+TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = false;
+
+session = conn.startSession(TestData.sessionOptions);
+testDB = session.getDatabase(dbName);
+coll1 = testDB[collName1];
+coll2 = testDB[collName2];
+
+doNotRetryReadErrorWithOutBackgroundReconfigTest.forEach(
+    (testCase) => runTest("doNotRetryReadErrorWithOutBackgroundReconfigTest", testCase));
 
 rst.stopSet();
 })();
