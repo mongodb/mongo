@@ -11,6 +11,7 @@ var $config = (function() {
             ErrorCodes.CursorNotFound,
             ErrorCodes.DuplicateKey,
             ErrorCodes.IndexBuildAborted,
+            ErrorCodes.NoProgressMade,
             ErrorCodes.OperationFailed,
             ErrorCodes.QueryPlanKilled,
         ],
