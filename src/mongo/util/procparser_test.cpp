@@ -96,6 +96,11 @@ StringMap toNestedStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcDiskStats(_disks, _x, &builder)); \
     auto obj = builder.obj();                                        \
     auto stringMap = toNestedStringMap(obj);
+#define ASSERT_PARSE_VMSTAT(_keys, _x)                           \
+    BSONObjBuilder builder;                                      \
+    ASSERT_OK(procparser::parseProcVMStat(_keys, _x, &builder)); \
+    auto obj = builder.obj();                                    \
+    auto stringMap = toStringMap(obj);
 
 TEST(FTDCProcStat, TestStat) {
 
@@ -647,6 +652,74 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
     if (!foundDisk) {
         FAIL("Did not find any interesting disks on this machine.");
     }
+}
+
+
+TEST(FTDCProcVMStat, TestVMStat) {
+
+    std::vector<StringData> keys{"Key1", "Key2", "Key3"};
+
+    // Normal case
+    {
+        ASSERT_PARSE_VMSTAT(keys, "Key1 123\nKey2 456");
+        ASSERT_KEY_AND_VALUE("Key1", 123UL);
+        ASSERT_KEY_AND_VALUE("Key2", 456UL);
+    }
+
+    // No newline
+    {
+        ASSERT_PARSE_VMSTAT(keys, "Key1 123 Key2 456");
+        ASSERT_KEY_AND_VALUE("Key1", 123UL);
+        ASSERT_NO_KEY("Key2");
+    }
+
+    // Key without value
+    {
+        ASSERT_PARSE_VMSTAT(keys, "Key1 123\nKey2");
+        ASSERT_KEY_AND_VALUE("Key1", 123UL);
+        ASSERT_NO_KEY("Key2");
+    }
+
+    // Empty string
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcVMStat(keys, "", &builder));
+    }
+}
+
+// Test we can parse the /proc/vmstat on this machine. Also assert we have the expected fields
+// This tests is designed to exercise our parsing code on various Linuxes and fail
+// Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
+// otherwise.
+TEST(FTDCProcVMStat, TestLocalVMStat) {
+    std::vector<StringData> keys{
+        "balloon_deflate"_sd,
+        "balloon_inflate"_sd,
+        "nr_mlock"_sd,
+        "pgfault"_sd,
+        "pgmajfault"_sd,
+        "pswpin"_sd,
+        "pswpout"_sd,
+    };
+
+    BSONObjBuilder builder;
+
+    ASSERT_OK(procparser::parseProcVMStatFile("/proc/vmstat", keys, &builder));
+
+    BSONObj obj = builder.obj();
+    auto stringMap = toStringMap(obj);
+    ASSERT_KEY("nr_mlock");
+    ASSERT_KEY("pgmajfault");
+    ASSERT_KEY("pswpin");
+    ASSERT_KEY("pswpout");
+}
+
+
+TEST(FTDCProcVMStat, TestLocalNonExistentVMStat) {
+    std::vector<StringData> keys{};
+    BSONObjBuilder builder;
+
+    ASSERT_NOT_OK(procparser::parseProcVMStatFile("/proc/does_not_exist", keys, &builder));
 }
 
 }  // namespace

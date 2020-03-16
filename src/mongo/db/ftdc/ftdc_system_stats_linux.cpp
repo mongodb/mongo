@@ -74,6 +74,16 @@ static const std::vector<StringData> kNetstatKeys{
     "IpExt:"_sd,
 };
 
+static const std::vector<StringData> kVMKeys{
+    "balloon_deflate"_sd,
+    "balloon_inflate"_sd,
+    "nr_mlock"_sd,
+    "pgfault"_sd,
+    "pgmajfault"_sd,
+    "pswpin"_sd,
+    "pswpout"_sd,
+};
+
 /**
  *  Collect metrics from the Linux /proc file system.
  */
@@ -125,6 +135,14 @@ public:
             processStatusErrors(procparser::parseProcDiskStatsFile(
                                     "/proc/diskstats"_sd, _disksStringData, &subObjBuilder),
                                 &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("vmstat"_sd));
+            processStatusErrors(
+                procparser::parseProcVMStatFile("/proc/vmstat"_sd, kVMKeys, &subObjBuilder),
+                &subObjBuilder);
             subObjBuilder.doneFast();
         }
     }

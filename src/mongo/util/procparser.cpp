@@ -722,5 +722,94 @@ std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
     return files;
 }
 
+// Here is an example of the type of string it supports:
+// Note: output has been trimmed
+//
+// For more information, see:
+// proc(5) man page
+//
+// > cat /proc/vmstat
+// nr_free_pages 2732282
+// nr_zone_inactive_anon 686253
+// nr_zone_active_anon 4975441
+// nr_zone_inactive_file 2332485
+// nr_zone_active_file 4791149
+// nr_zone_unevictable 0
+// nr_zone_write_pending 0
+// nr_mlock 0
+//
+Status parseProcVMStat(const std::vector<StringData>& keys,
+                       StringData data,
+                       BSONObjBuilder* builder) {
+    bool foundKeys = false;
+
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+
+    // Split the file by lines.
+    // token_compress_on means the iterator skips over consecutive '\n'. This should not be a
+    // problem in normal /proc/vmstat output.
+    for (string_split_iterator lineIt = string_split_iterator(
+             data.begin(),
+             data.end(),
+             boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
+         lineIt != string_split_iterator();
+         ++lineIt) {
+
+        StringData line(lineIt->begin(), lineIt->end());
+
+        // Split the line by spaces since this the delimiters for vmstat files.
+        // token_compress_on means the iterator skips over consecutive ' '. This is needed for
+        // every line.
+        string_split_iterator partIt = string_split_iterator(
+            line.begin(),
+            line.end(),
+            boost::token_finder([](char c) { return c == ' '; }, boost::token_compress_on));
+
+        // Skip processing this line if we do not have a key.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        StringData key(partIt->begin(), partIt->end());
+
+        ++partIt;
+
+        // Skip processing this line if we only have a key, and no number.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        // Check if the key is in the list. /proc/vmstat will have extra keys, and may not have the
+        // keys we want.
+        if (keys.empty() || std::find(keys.begin(), keys.end(), key) != keys.end()) {
+            foundKeys = true;
+
+            StringData stringValue(partIt->begin(), partIt->end());
+
+            uint64_t value;
+
+            if (!NumberParser{}(stringValue, &value).isOK()) {
+                value = 0;
+            }
+
+            builder->appendNumber(key, static_cast<long long>(value));
+        }
+    }
+
+    return foundKeys ? Status::OK()
+                     : Status(ErrorCodes::NoSuchKey, "Failed to find any keys in vmstat string");
+}
+
+Status parseProcVMStatFile(StringData filename,
+                           const std::vector<StringData>& keys,
+                           BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    return parseProcVMStat(keys, swString.getValue(), builder);
+}
+
 }  // namespace procparser
 }  // namespace mongo
