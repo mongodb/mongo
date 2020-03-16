@@ -135,5 +135,24 @@ Status parseProcDiskStatsFile(StringData filename,
  */
 std::vector<std::string> findPhysicalDisks(StringData directory);
 
+/**
+ * Read a string matching /proc/vmstat format, and write the specified list of keys in builder.
+ *
+ * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
+ * data - string to parsee
+ * builder - BSON output
+ */
+Status parseProcVMStat(const std::vector<StringData>& keys,
+                       StringData data,
+                       BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified list of keys in builder.
+ */
+Status parseProcVMStatFile(StringData filename,
+                           const std::vector<StringData>& keys,
+                           BSONObjBuilder* builder);
+
+
 }  // namespace procparser
 }  // namespace mongo
