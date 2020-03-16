@@ -199,3 +199,11 @@ let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     assert.gte(rawMongoProgramOutput().search(errmsgRegExp), 0);
     MongoRunner.stopMongod(mongod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };
+
+/**
+ * Runs the WiredTiger tool with the provided arguments.
+ */
+let runWiredTigerTool = function(...args) {
+    const cmd = ['wt'].concat(args);
+    assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
+};

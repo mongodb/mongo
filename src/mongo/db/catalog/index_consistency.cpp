@@ -112,10 +112,10 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
                                            ValidateResults* results) {
     invariant(!_firstPhase);
 
-    // We'll report up to 1MB for extra index entry errors and missing index entry errors.
-    const int kErrorSizeMB = 1 * 1024 * 1024;
-    int numMissingIndexEntriesSizeMB = 0;
-    int numExtraIndexEntriesSizeMB = 0;
+    // We'll report up to 1MB for extra index entry errors and missing index entry errors combined.
+    const int kErrorSizeBytes = 500 * 1024;
+    long numMissingIndexEntriesSizeBytes = 0;
+    long numExtraIndexEntriesSizeBytes = 0;
 
     int numMissingIndexEntryErrors = _missingIndexEntries.size();
     int numExtraIndexEntryErrors = 0;
@@ -129,13 +129,8 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
     for (const auto& missingIndexEntry : _missingIndexEntries) {
         const BSONObj& entry = missingIndexEntry.second;
 
-        // Only count the indexKey and idKey fields towards the total size.
-        numMissingIndexEntriesSizeMB += entry["indexKey"].size();
-        if (entry.hasField("idKey")) {
-            numMissingIndexEntriesSizeMB += entry["idKey"].size();
-        }
-
-        if (numMissingIndexEntriesSizeMB <= kErrorSizeMB) {
+        numMissingIndexEntriesSizeBytes += entry.objsize();
+        if (numMissingIndexEntriesSizeBytes <= kErrorSizeBytes) {
             results->missingIndexEntries.push_back(entry);
         } else if (!missingIndexEntrySizeLimitWarning) {
             StringBuilder ss;
@@ -161,9 +156,8 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
     for (const auto& extraIndexEntry : _extraIndexEntries) {
         const SimpleBSONObjSet& entries = extraIndexEntry.second;
         for (const auto& entry : entries) {
-            // Only count the indexKey field towards the total size.
-            numExtraIndexEntriesSizeMB += entry["indexKey"].size();
-            if (numExtraIndexEntriesSizeMB <= kErrorSizeMB) {
+            numExtraIndexEntriesSizeBytes += entry.objsize();
+            if (numExtraIndexEntriesSizeBytes <= kErrorSizeBytes) {
                 results->extraIndexEntries.push_back(entry);
             } else if (!extraIndexEntrySizeLimitWarning) {
                 StringBuilder ss;
