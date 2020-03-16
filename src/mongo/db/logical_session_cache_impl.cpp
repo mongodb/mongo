@@ -124,18 +124,22 @@ size_t LogicalSessionCacheImpl::size() {
 void LogicalSessionCacheImpl::_periodicRefresh(Client* client) {
     try {
         _refresh(client);
-    } catch (...) {
-        LOGV2(20710,
-              "Failed to refresh session cache: {exceptionToStatus}, will try again at the next "
-              "refresh interval",
-              "exceptionToStatus"_attr = exceptionToStatus());
+    } catch (const DBException& ex) {
+        LOGV2(
+            20710,
+            "Failed to refresh session cache: {error}, will try again at the next refresh interval",
+            "Failed to refresh session cache, will try again at the next refresh interval",
+            "error"_attr = redact(ex));
     }
 }
 
 void LogicalSessionCacheImpl::_periodicReap(Client* client) {
     auto res = _reap(client);
     if (!res.isOK()) {
-        LOGV2(20711, "Failed to reap transaction table: {res}", "res"_attr = res);
+        LOGV2(20711,
+              "Failed to reap transaction table: {error}",
+              "Failed to reap transaction table",
+              "error"_attr = redact(res));
     }
 
     return;
@@ -172,17 +176,18 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         try {
             _sessionsColl->checkSessionsCollectionExists(opCtx);
         } catch (const DBException& ex) {
-            StringData notSetUpWarning =
-                "Sessions collection is not set up; "
-                "waiting until next sessions reap interval";
             if (ex.code() != ErrorCodes::NamespaceNotFound ||
                 ex.code() != ErrorCodes::NamespaceNotSharded) {
-                LOGV2(20712,
-                      "{notSetUpWarning}: {ex_reason}",
-                      "notSetUpWarning"_attr = notSetUpWarning,
-                      "ex_reason"_attr = ex.reason());
+                LOGV2(
+                    20712,
+                    "Sessions collection is not set up: {error}; waiting until next sessions reap "
+                    "interval",
+                    "Sessions collection is not set up; waiting until next sessions reap interval",
+                    "error"_attr = redact(ex));
             } else {
-                LOGV2(20713, "{notSetUpWarning}", "notSetUpWarning"_attr = notSetUpWarning);
+                LOGV2(20713,
+                      "Sessions collection is not set up because the namespace is either not found"
+                      "or not sharded; waiting until next sessions reap interval");
             }
             return Status::OK();
         }
@@ -249,10 +254,11 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     try {
         _sessionsColl->setupSessionsCollection(opCtx);
     } catch (const DBException& ex) {
-        LOGV2(20714,
-              "Failed to refresh session cache, will try again at the next refresh "
-              "interval{causedBy_ex}",
-              "causedBy_ex"_attr = causedBy(redact(ex)));
+        LOGV2(
+            20714,
+            "Failed to refresh session cache, will try again at the next refresh interval {error}",
+            "Failed to refresh session cache, will try again at the next refresh interval",
+            "error"_attr = redact(ex));
         return;
     }
 
@@ -384,8 +390,12 @@ Status LogicalSessionCacheImpl::_addToCacheIfNotFull(WithLock, LogicalSessionRec
             MONGO_GET_LIMITED_SEVERITY(ErrorCodes::TooManyLogicalSessions, Seconds{1}, 0, 2);
         LOGV2_DEBUG(20715,
                     logSeverityV1toV2(severity).toInt(),
-                    "{status}",
-                    "status"_attr = status.toString());
+                    "Unable to add session {sessionId} into the cache, too many active sessions: "
+                    "{sessionCount}, maximum: {maxSessions}",
+                    "Unable to add session into the cache, too many active sessions",
+                    "sessionId"_attr = record.getId(),
+                    "sessionCount"_attr = _activeSessions.size(),
+                    "maxSessions"_attr = maxSessions);
         return status;
     }
 
