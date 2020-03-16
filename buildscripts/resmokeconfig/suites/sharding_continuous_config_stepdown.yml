@@ -50,6 +50,7 @@ selector:
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/presplit.js
   - jstests/sharding/query_config.js
+  - jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
   - jstests/sharding/remove1.js
   - jstests/sharding/rename_across_mongos.js
   - jstests/sharding/shard1.js

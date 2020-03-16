@@ -210,6 +210,7 @@ private:
     LogicalSessionId _lsid;
     TxnNumber _txnNumber;
     NamespaceString _nss;
+    boost::optional<UUID> _collUuid;
     ConnectionString _fromShardConnString;
     ShardId _fromShard;
     ShardId _toShard;

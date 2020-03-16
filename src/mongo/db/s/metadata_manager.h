@@ -107,6 +107,13 @@ public:
     void toBSONPending(BSONArrayBuilder& bb) const;
 
     /**
+     * Returns the number of items in the _receivingChunks list. Useful for unit tests.
+     */
+    size_t numberOfReceivingChunks() {
+        return _receivingChunks.size();
+    }
+
+    /**
      * Appends information on all the chunk ranges in rangesToClean to builder.
      */
     void append(BSONObjBuilder* builder) const;

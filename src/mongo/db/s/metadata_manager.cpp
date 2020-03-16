@@ -57,13 +57,8 @@ using CallbackArgs = TaskExecutor::CallbackArgs;
  * Returns whether the given metadata object has a chunk owned by this shard that overlaps the
  * input range.
  */
-bool metadataOverlapsRange(const boost::optional<CollectionMetadata>& metadata,
-                           const ChunkRange& range) {
-    if (!metadata) {
-        return false;
-    }
-
-    auto metadataShardKeyPattern = KeyPattern(metadata->getKeyPattern());
+bool metadataOverlapsRange(const CollectionMetadata& metadata, const ChunkRange& range) {
+    auto metadataShardKeyPattern = KeyPattern(metadata.getKeyPattern());
 
     // If the input range is shorter than the range in the ChunkManager inside
     // 'metadata', we must extend its bounds to get a correct comparison. If the input
@@ -102,7 +97,15 @@ bool metadataOverlapsRange(const boost::optional<CollectionMetadata>& metadata,
         }
     }();
 
-    return metadata->rangeOverlapsChunk(chunkRangeToCompareToMetadata);
+    return metadata.rangeOverlapsChunk(chunkRangeToCompareToMetadata);
+}
+
+bool metadataOverlapsRange(const boost::optional<CollectionMetadata>& metadata,
+                           const ChunkRange& range) {
+    if (!metadata) {
+        return false;
+    }
+    return metadataOverlapsRange(metadata.get(), range);
 }
 
 }  // namespace
@@ -240,7 +243,7 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
         const ChunkRange receivingRange(it->first, it->second);
 
-        if (!remoteMetadata.rangeOverlapsChunk(receivingRange)) {
+        if (!metadataOverlapsRange(remoteMetadata, receivingRange)) {
             ++it;
             continue;
         }
