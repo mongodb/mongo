@@ -595,11 +595,6 @@ public:
                                            ReplSetGetStatusResponseStyle responseStyle) = 0;
 
     /**
-     * Does an initial sync of data, after dropping existing data.
-     */
-    virtual Status resyncData(OperationContext* opCtx, bool waitUntilCompleted) = 0;
-
-    /**
      * Adds to "result" a description of the slaveInfo data structure used to map RIDs to their
      * last known optimes.
      */

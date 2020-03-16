@@ -157,8 +157,6 @@ public:
 
     void signalUpstreamUpdater() final;
 
-    Status resyncData(OperationContext*, bool) final;
-
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const final;
 
     Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) final;

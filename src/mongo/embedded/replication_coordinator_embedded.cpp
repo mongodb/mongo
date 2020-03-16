@@ -293,10 +293,6 @@ HostAndPort ReplicationCoordinatorEmbedded::getMyHostAndPort() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::resyncData(OperationContext*, bool) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 StatusWith<BSONObj> ReplicationCoordinatorEmbedded::prepareReplSetUpdatePositionCommand() const {
     UASSERT_NOT_IMPLEMENTED;
 }

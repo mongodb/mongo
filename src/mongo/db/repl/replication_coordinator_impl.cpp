@@ -2839,25 +2839,6 @@ int ReplicationCoordinatorImpl::_getMyId_inlock() const {
     return self.getId().getData();
 }
 
-Status ReplicationCoordinatorImpl::resyncData(OperationContext* opCtx, bool waitUntilCompleted) {
-    _stopDataReplication(opCtx);
-    auto finishedEvent = uassertStatusOK(_replExecutor->makeEvent());
-    std::function<void()> f;
-    if (waitUntilCompleted)
-        f = [&finishedEvent, this]() { _replExecutor->signalEvent(finishedEvent); };
-
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _resetMyLastOpTimes(lk);
-    }
-    // unlock before calling _startDataReplication().
-    _startDataReplication(opCtx, f);
-    if (waitUntilCompleted) {
-        _replExecutor->waitForEvent(finishedEvent);
-    }
-    return Status::OK();
-}
-
 StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _topCoord->prepareReplSetUpdatePositionCommand(

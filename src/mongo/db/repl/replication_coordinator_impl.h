@@ -211,8 +211,6 @@ public:
 
     virtual void signalUpstreamUpdater() override;
 
-    virtual Status resyncData(OperationContext* opCtx, bool waitUntilCompleted) override;
-
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
     virtual Status processReplSetGetStatus(BSONObjBuilder* result,

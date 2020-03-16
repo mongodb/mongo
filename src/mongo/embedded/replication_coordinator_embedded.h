@@ -164,8 +164,6 @@ public:
 
     void signalUpstreamUpdater() override;
 
-    Status resyncData(OperationContext*, bool) override;
-
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
     Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) override;
