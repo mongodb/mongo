@@ -186,7 +186,7 @@ TcmallocNumericPropertyServerParameter tcmallocMaxTotalThreadCacheBytesParameter
 TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
     "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
 
-TcmallocReleaseRateServerParameter tcmallocReleaseRate();
+TcmallocReleaseRateServerParameter tcmallocReleaseRate;
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
                           MONGO_NO_PREREQUISITES,
