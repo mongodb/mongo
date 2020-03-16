@@ -22,24 +22,6 @@ def ns(relative_name):  # pylint: disable=invalid-name
     return NS + "." + relative_name
 
 
-def tests_by_task_stub():
-    return {
-        "jsCore_auth": {
-            "tests": [
-                "jstests/core/currentop_waiting_for_latch.js",
-                "jstests/core/latch_analyzer.js",
-            ],
-            "use_multiversion": None,
-            "distro": "rhel62-small",
-        },
-        "auth_gen": {
-            "tests": ["jstests/auth/auth3.js"],
-            "use_multiversion": None,
-            "distro": "rhel62-small",
-        },
-    }
-
-
 class TestAcceptance(unittest.TestCase):
     """A suite of Acceptance tests for selected_tests."""
 
@@ -279,6 +261,25 @@ class TestFindSelectedTestFiles(unittest.TestCase):
         self.assertEqual(related_test_files, set())
 
 
+class TestExcludeTask(unittest.TestCase):
+    def test_task_should_not_be_excluded(self):
+        task = _evergreen.Task({"name": "regular_task"})
+
+        self.assertEqual(under_test._exclude_task(task), False)
+
+    def test_task_should_be_excluded(self):
+        excluded_task = under_test.EXCLUDE_TASK_LIST[0]
+        task = _evergreen.Task({"name": excluded_task})
+
+        self.assertEqual(under_test._exclude_task(task), True)
+
+    def test_task_matches_excluded_pattern(self):
+        task_that_matches_exclude_pattern = "compile_all"
+        task = _evergreen.Task({"name": task_that_matches_exclude_pattern})
+
+        self.assertEqual(under_test._exclude_task(task), True)
+
+
 class TestFindSelectedTasks(unittest.TestCase):
     @patch(ns("SelectedTestsService"))
     def test_related_tasks_returned_from_selected_tests_service(self, selected_tests_service_mock):
@@ -293,67 +294,10 @@ class TestFindSelectedTasks(unittest.TestCase):
             },
         ]
         changed_files = {"src/file1.cpp", "src/file2.js"}
-        build_variant_conf = MagicMock()
-        build_variant_conf.get_task.return_value = _evergreen.Task({"name": "my_task_1"})
 
-        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
-                                                        build_variant_conf)
+        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files)
 
-        self.assertEqual(related_tasks, {"my_task_1"})
-
-    @patch(ns("SelectedTestsService"))
-    def test_returned_tasks_do_not_exist(self, selected_tests_service_mock):
-        selected_tests_service_mock.get_task_mappings.return_value = [
-            {
-                "source_file": "src/file1.cpp",
-                "tasks": [{"name": "my_task_1"}],
-            },
-        ]
-        changed_files = {"src/file1.cpp", "src/file2.js"}
-        build_variant_conf = MagicMock()
-        build_variant_conf.get_task.return_value = None
-
-        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
-                                                        build_variant_conf)
-
-        self.assertEqual(related_tasks, set())
-
-    @patch(ns("SelectedTestsService"))
-    def test_returned_tasks_should_be_excluded(self, selected_tests_service_mock):
-        excluded_task = under_test.EXCLUDE_TASK_LIST[0]
-        selected_tests_service_mock.get_task_mappings.return_value = [
-            {
-                "source_file": "src/file1.cpp",
-                "tasks": [{"name": excluded_task}],
-            },
-        ]
-        changed_files = {"src/file1.cpp", "src/file2.js"}
-        build_variant_conf = MagicMock()
-        build_variant_conf.get_task.return_value = _evergreen.Task({"name": excluded_task})
-
-        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
-                                                        build_variant_conf)
-
-        self.assertEqual(related_tasks, set())
-
-    @patch(ns("SelectedTestsService"))
-    def test_returned_tasks_match_excluded_pattern(self, selected_tests_service_mock):
-        task_that_matches_exclude_pattern = "compile_all"
-        selected_tests_service_mock.get_task_mappings.return_value = [
-            {
-                "source_file": "src/file1.cpp",
-                "tasks": [{"name": task_that_matches_exclude_pattern}],
-            },
-        ]
-        changed_files = {"src/file1.cpp", "src/file2.js"}
-        build_variant_conf = MagicMock()
-        build_variant_conf.get_task.return_value = _evergreen.Task(
-            {"name": task_that_matches_exclude_pattern})
-
-        related_tasks = under_test._find_selected_tasks(selected_tests_service_mock, changed_files,
-                                                        build_variant_conf)
-
-        self.assertEqual(related_tasks, set())
+        self.assertEqual(related_tasks, {"my_task_1", "my_task_2"})
 
 
 class TestGetSelectedTestsTaskConfiguration(unittest.TestCase):
@@ -375,12 +319,11 @@ class TestGetEvgTaskConfig(unittest.TestCase):
     @patch(ns("_get_selected_tests_task_config"))
     def test_task_is_a_generate_resmoke_task(self, selected_tests_config_mock):
         selected_tests_config_mock.return_value = {"selected_tests_key": "selected_tests_value"}
-        task_name = "auth_gen"
         build_variant_conf = MagicMock()
         build_variant_conf.name = "variant"
-        build_variant_conf.get_task.return_value = _evergreen.Task({
+        task = _evergreen.Task({
             "name":
-                task_name,
+                "auth_gen",
             "commands": [{
                 "func": "generate resmoke tasks",
                 "vars": {
@@ -390,9 +333,9 @@ class TestGetEvgTaskConfig(unittest.TestCase):
             }],
         })
 
-        evg_task_config = under_test._get_evg_task_config({}, task_name, build_variant_conf)
+        evg_task_config = under_test._get_evg_task_config({}, task, build_variant_conf)
 
-        self.assertEqual(evg_task_config["task_name"], task_name)
+        self.assertEqual(evg_task_config["task_name"], "auth_gen")
         self.assertEqual(evg_task_config["build_variant"], "variant")
         self.assertIsNone(evg_task_config.get("suite"))
         self.assertEqual(
@@ -404,21 +347,20 @@ class TestGetEvgTaskConfig(unittest.TestCase):
 
     @patch(ns("_get_selected_tests_task_config"))
     def test_task_is_not_a_generate_resmoke_task(self, selected_tests_config_mock):
-        task_name = "jsCore_auth"
         build_variant_conf = MagicMock()
         build_variant_conf.name = "variant"
-        build_variant_conf.get_task.return_value = _evergreen.Task({
+        task = _evergreen.Task({
             "name":
-                task_name,
+                "jsCore_auth",
             "commands": [{
                 "func": "run tests",
                 "vars": {"resmoke_args": "--suites=core_auth --storageEngine=wiredTiger"}
             }],
         })
 
-        evg_task_config = under_test._get_evg_task_config({}, task_name, build_variant_conf)
+        evg_task_config = under_test._get_evg_task_config({}, task, build_variant_conf)
 
-        self.assertEqual(evg_task_config["task_name"], task_name)
+        self.assertEqual(evg_task_config["task_name"], "jsCore_auth")
         self.assertEqual(evg_task_config["build_variant"], "variant")
         self.assertEqual(evg_task_config["suite"], "core_auth")
         self.assertEqual(
@@ -473,8 +415,24 @@ class TestUpdateConfigDictWithTask(unittest.TestCase):
 
 class TestGetTaskConfigsForTestMappings(unittest.TestCase):
     @patch(ns("_get_evg_task_config"))
-    def test_get_config_for_test_mapping(self, get_evg_task_config_mock):
-        tests_by_task = tests_by_task_stub()
+    @patch(ns("_exclude_task"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_test_mapping(self, find_task_mock, exclude_task_mock,
+                                         get_evg_task_config_mock):
+        find_task_mock.side_effect = [
+            _evergreen.Task({"name": "jsCore_auth"}),
+            _evergreen.Task({"name": "auth_gen"})
+        ]
+        exclude_task_mock.return_value = False
+        tests_by_task = {
+            "jsCore_auth": {
+                "tests": [
+                    "jstests/core/currentop_waiting_for_latch.js",
+                    "jstests/core/latch_analyzer.js",
+                ],
+            },
+            "auth_gen": {"tests": ["jstests/auth/auth3.js"], },
+        }
         get_evg_task_config_mock.side_effect = [{"task_config_key": "task_config_value_1"},
                                                 {"task_config_key": "task_config_value_2"}]
 
@@ -489,17 +447,94 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         self.assertEqual(task_configs["auth_gen"]["selected_tests_to_run"],
                          {'jstests/auth/auth3.js'})
 
+    @patch(ns("_get_evg_task_config"))
+    @patch(ns("_exclude_task"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_test_mapping_when_task_should_be_excluded(
+            self, find_task_mock, exclude_task_mock, get_evg_task_config_mock):
+        find_task_mock.return_value = _evergreen.Task({"name": "jsCore_auth"})
+        exclude_task_mock.return_value = True
+        tests_by_task = {
+            "jsCore_auth": {
+                "tests": [
+                    "jstests/core/currentop_waiting_for_latch.js",
+                    "jstests/core/latch_analyzer.js",
+                ],
+            },
+        }
+        get_evg_task_config_mock.return_value = {"task_config_key": "task_config_value_1"}
+
+        task_configs = under_test._get_task_configs_for_test_mappings({}, tests_by_task,
+                                                                      MagicMock())
+
+        self.assertEqual(task_configs, {})
+
+    @patch(ns("_get_evg_task_config"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_test_mapping_when_task_does_not_exist(self, find_task_mock,
+                                                                  get_evg_task_config_mock):
+        find_task_mock.return_value = None
+        tests_by_task = {
+            "jsCore_auth": {
+                "tests": [
+                    "jstests/core/currentop_waiting_for_latch.js",
+                    "jstests/core/latch_analyzer.js",
+                ],
+            },
+        }
+        get_evg_task_config_mock.return_value = {"task_config_key": "task_config_value_1"}
+
+        task_configs = under_test._get_task_configs_for_test_mappings({}, tests_by_task,
+                                                                      MagicMock())
+
+        self.assertEqual(task_configs, {})
+
 
 class TestGetTaskConfigsForTaskMappings(unittest.TestCase):
     @patch(ns("_get_evg_task_config"))
-    def test_get_config_for_task_mapping(self, get_evg_task_config_mock):
+    @patch(ns("_exclude_task"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_task_mapping(self, find_task_mock, exclude_task_mock,
+                                         get_evg_task_config_mock):
+        find_task_mock.side_effect = [
+            _evergreen.Task({"name": "task_1"}),
+            _evergreen.Task({"name": "task_2"})
+        ]
+        exclude_task_mock.return_value = False
         tasks = ["task_1", "task_2"]
         get_evg_task_config_mock.side_effect = [{"task_config_key": "task_config_value_1"},
                                                 {"task_config_key": "task_config_value_2"}]
+
         task_configs = under_test._get_task_configs_for_task_mappings({}, tasks, MagicMock())
 
         self.assertEqual(task_configs["task_1"]["task_config_key"], "task_config_value_1")
         self.assertEqual(task_configs["task_2"]["task_config_key"], "task_config_value_2")
+
+    @patch(ns("_get_evg_task_config"))
+    @patch(ns("_exclude_task"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_task_mapping_when_task_should_be_excluded(
+            self, find_task_mock, exclude_task_mock, get_evg_task_config_mock):
+        find_task_mock.return_value = _evergreen.Task({"name": "task_1"})
+        exclude_task_mock.return_value = True
+        tasks = ["task_1"]
+        get_evg_task_config_mock.return_value = {"task_config_key": "task_config_value_1"}
+
+        task_configs = under_test._get_task_configs_for_task_mappings({}, tasks, MagicMock())
+
+        self.assertEqual(task_configs, {})
+
+    @patch(ns("_get_evg_task_config"))
+    @patch(ns("_find_task"))
+    def test_get_config_for_task_mapping_when_task_does_not_exist(self, find_task_mock,
+                                                                  get_evg_task_config_mock):
+        find_task_mock.return_value = None
+        tasks = ["task_1"]
+        get_evg_task_config_mock.return_value = {"task_config_key": "task_config_value_1"}
+
+        task_configs = under_test._get_task_configs_for_task_mappings({}, tasks, MagicMock())
+
+        self.assertEqual(task_configs, {})
 
 
 class TestGetTaskConfigs(unittest.TestCase):

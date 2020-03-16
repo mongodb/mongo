@@ -53,7 +53,7 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 SELECTED_TESTS_CONFIG_DIR = "selected_tests_config"
-RELATION_THRESHOLD = 0.1
+RELATION_THRESHOLD = 0
 
 COMPILE_TASK_PATTERN = re.compile(".*compile.*")
 CONCURRENCY_TASK_PATTERN = re.compile("concurrency.*")
@@ -170,32 +170,31 @@ def _find_selected_test_files(selected_tests_service: SelectedTestsService,
     }
 
 
-def _find_selected_tasks(selected_tests_service: SelectedTestsService, changed_files: Set[str],
-                         build_variant_config: Variant) -> Set[str]:
+def _exclude_task(task: Task) -> bool:
+    """
+    Check whether a task should be excluded.
+
+    :param task: Task to get info for.
+    :return: True if this task should be excluded.
+    """
+    if task.name in EXCLUDE_TASK_LIST or any(
+            regex.match(task.name) for regex in EXCLUDE_TASK_PATTERNS):
+        LOGGER.debug("Excluding task from analysis because it is not a jstest", task=task.name)
+        return True
+    return False
+
+
+def _find_selected_tasks(selected_tests_service: SelectedTestsService, changed_files: Set[str]) -> \
+Set[str]:
     """
     Request tasks from selected-tests and filter out tasks that don't exist or should be excluded.
 
     :param selected_tests_service: Selected-tests service.
     :param changed_files: Set of changed_files.
-    :param build_variant_config: Config of build variant to collect task info from.
     :return: Set of tasks returned by selected-tests service that should not be excluded.
     """
     task_mappings = selected_tests_service.get_task_mappings(RELATION_THRESHOLD, changed_files)
-    returned_task_names = {
-        task["name"]
-        for task_mapping in task_mappings for task in task_mapping["tasks"]
-    }
-    existing_task_names = set()
-    for task_name in returned_task_names:
-        task = _find_task(build_variant_config, task_name)
-        if task:
-            if task.name in EXCLUDE_TASK_LIST or any(
-                    regex.match(task.name) for regex in EXCLUDE_TASK_PATTERNS):
-                LOGGER.debug("Excluding task from analysis because it is not a jstest",
-                             task=task_name)
-                continue
-            existing_task_names.add(task.name)
-    return existing_task_names
+    return {task["name"] for task_mapping in task_mappings for task in task_mapping["tasks"]}
 
 
 def _find_task(build_variant_config: Variant, task_name: str) -> Task:
@@ -229,18 +228,17 @@ def _get_selected_tests_task_config(
 
 def _get_evg_task_config(
         selected_tests_variant_expansions: Dict[str, str],
-        task_name: str,
+        task: Task,
         build_variant_config: Variant,
 ) -> Dict[str, Any]:
     """
     Look up task config of the task to be generated.
 
     :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param task_name: Task to get info for.
+    :param task: Task to get info for.
     :param build_variant_config: Config of build variant to collect task info from.
     :return: Task configuration values.
     """
-    task = build_variant_config.get_task(task_name)
     if task.is_generate_resmoke_task:
         task_vars = task.generate_resmoke_tasks_command["vars"]
     else:
@@ -297,11 +295,13 @@ def _get_task_configs_for_test_mappings(selected_tests_variant_expansions: Dict[
     """
     evg_task_configs = {}
     for task_name, test_list_info in tests_by_task.items():
-        evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task_name,
-                                               build_variant_config)
-        evg_task_config.update({"selected_tests_to_run": set(test_list_info["tests"])})
-        LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
-        evg_task_configs[task_name] = evg_task_config
+        task = _find_task(build_variant_config, task_name)
+        if task and not _exclude_task(task):
+            evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
+                                                   build_variant_config)
+            evg_task_config.update({"selected_tests_to_run": set(test_list_info["tests"])})
+            LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
+            evg_task_configs[task.name] = evg_task_config
 
     return evg_task_configs
 
@@ -319,10 +319,12 @@ def _get_task_configs_for_task_mappings(selected_tests_variant_expansions: Dict[
     """
     evg_task_configs = {}
     for task_name in related_tasks:
-        evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task_name,
-                                               build_variant_config)
-        LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
-        evg_task_configs[task_name] = evg_task_config
+        task = _find_task(build_variant_config, task_name)
+        if task and not _exclude_task(task):
+            evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
+                                                   build_variant_config)
+            LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
+            evg_task_configs[task.name] = evg_task_config
 
     return evg_task_configs
 
@@ -371,8 +373,7 @@ def _get_task_configs(evg_conf: EvergreenProjectConfig,
             selected_tests_variant_expansions, tests_by_task, build_variant_config)
         task_configs.update(test_mapping_task_configs)
 
-    related_tasks = _find_selected_tasks(selected_tests_service, changed_files,
-                                         build_variant_config)
+    related_tasks = _find_selected_tasks(selected_tests_service, changed_files)
     LOGGER.debug("related tasks found", related_tasks=related_tasks,
                  variant=build_variant_config.name)
     if related_tasks:
