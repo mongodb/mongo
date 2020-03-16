@@ -150,7 +150,7 @@ TEST(NamespaceStringTest, MakeDropPendingNamespace) {
                   NamespaceString{"test.foo"}.makeDropPendingNamespace(
                       repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
 
-    std::string collName(8192, 't');
+    std::string collName(NamespaceString::MaxNsCollectionLen, 't');
     NamespaceString nss("test", collName);
     ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9." + collName},
                   nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));

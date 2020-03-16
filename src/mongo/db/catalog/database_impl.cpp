@@ -584,6 +584,11 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             str::stream() << "cannot create a collection with an empty name on db: " << nss.db(),
             !nss.coll().empty());
 
+    uassert(17361,
+            str::stream() << "Fully qualified namespace is too long. Namespace: " << nss.ns()
+                          << " Max: " << NamespaceString::MaxNsCollectionLen,
+            !nss.isNormalCollection() || nss.size() <= NamespaceString::MaxNsCollectionLen);
+
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss
