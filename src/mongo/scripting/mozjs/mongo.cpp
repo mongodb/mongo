@@ -190,7 +190,8 @@ void setHiddenMongo(JSContext* cx,
 
         ObjectWrapper from(cx, args.thisv());
         ObjectWrapper to(cx, newMongo);
-        for (const auto& k : {InternedString::slaveOk, InternedString::defaultDB}) {
+        for (const auto& k :
+             {InternedString::slaveOk, InternedString::defaultDB, InternedString::authenticated}) {
             JS::RootedValue tmpValue(cx);
             from.getValue(k, &tmpValue);
             to.setValue(k, tmpValue);
