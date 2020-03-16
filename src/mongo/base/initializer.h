@@ -73,7 +73,16 @@ public:
     Status executeDeinitializers();
 
 private:
+    enum class State {
+        kUninitialized,
+        kInitializing,
+        kInitialized,
+        kDeinitializing,
+    };
+
     InitializerDependencyGraph _graph;
+    std::vector<std::string> _sortedNodes;
+    State _lifecycleState{State::kUninitialized};
 };
 
 /**
