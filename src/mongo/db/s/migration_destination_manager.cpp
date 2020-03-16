@@ -809,6 +809,7 @@ void MigrationDestinationManager::_migrateThread() {
 
     stdx::lock_guard<Latch> lk(_mutex);
     _sessionId.reset();
+    _collUuid.reset();
     _scopedReceiveChunk.reset();
     _isActiveCV.notify_all();
 }
@@ -892,6 +893,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             // Synchronously delete any data which might have been left orphaned in the range
             // being moved, and wait for completion
 
+            // Needed for _forgetPending to make sure the collection has the same UUID at the end of
+            // an aborted migration as at the beginning. Must be set before calling _notePending.
+            _collUuid = donorCollectionOptionsAndIndexes.uuid;
             auto cleanupCompleteFuture = _notePending(outerOpCtx, range);
             auto cleanupStatus = cleanupCompleteFuture.getNoThrow(outerOpCtx);
             // Wait for the range deletion to report back. Swallow
@@ -1356,8 +1360,9 @@ SharedSemiFuture<void> MigrationDestinationManager::_notePending(OperationContex
     auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
     const auto optMetadata = css->getCurrentMetadataIfKnown();
 
-    // This can currently happen because drops aren't synchronized with in-migrations. The idea for
-    // checking this here is that in the future we shouldn't have this problem.
+    // This can currently happen because drops and shard key refine operations aren't guaranteed to
+    // be synchronized with in-migrations. The idea for checking this here is that in the future we
+    // shouldn't have this problem.
     if (!optMetadata || !(*optMetadata)->isSharded() ||
         (*optMetadata)->getCollVersion().epoch() != _epoch) {
         return Status{ErrorCodes::StaleShardVersion,
@@ -1388,10 +1393,14 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
+    //
+    // _collUuid will always be set if _notePending was called, so if it is not set, there is no
+    // need to do anything. If it is set, we use it to ensure that the collection UUID has not
+    // changed since the beginning of migration.
     if (!optMetadata || !(*optMetadata)->isSharded() ||
-        (*optMetadata)->getCollVersion().epoch() != _epoch) {
+        (_collUuid && !(*optMetadata)->uuidMatches(*_collUuid))) {
         LOGV2(22009,
-              "No need to forget pending chunk {range} because the epoch for {nss_ns} changed",
+              "No need to forget pending chunk {range} because the uuid for {nss_ns} changed",
               "range"_attr = redact(range.toString()),
               "nss_ns"_attr = _nss.ns());
         return;

@@ -73,20 +73,20 @@ protected:
     /**
      * Returns an instance of CollectionMetadata which has no chunks owned by 'thisShard'.
      */
-    static CollectionMetadata makeEmptyMetadata() {
+    static CollectionMetadata makeEmptyMetadata(
+        const KeyPattern& shardKeyPattern = kShardKeyPattern,
+        const ChunkRange& range = ChunkRange{BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)},
+        UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
 
         auto rt = RoutingTableHistory::makeNew(
             kNss,
-            UUID::gen(),
-            kShardKeyPattern,
+            uuid,
+            shardKeyPattern,
             nullptr,
             false,
             epoch,
-            {ChunkType{kNss,
-                       ChunkRange{BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)},
-                       ChunkVersion(1, 0, epoch),
-                       kOtherShard}});
+            {ChunkType{kNss, range, ChunkVersion(1, 0, epoch), kOtherShard}});
 
         std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
 
@@ -103,11 +103,16 @@ protected:
      */
     static CollectionMetadata cloneMetadataPlusChunk(const ScopedCollectionDescription& collDesc,
                                                      const ChunkRange& range) {
+        return cloneMetadataPlusChunk(collDesc.get(), range);
+    }
+
+    static CollectionMetadata cloneMetadataPlusChunk(const CollectionMetadata& collMetadata,
+                                                     const ChunkRange& range) {
         const BSONObj& minKey = range.getMin();
         const BSONObj& maxKey = range.getMax();
-        ASSERT(!rangeMapOverlaps(collDesc->getChunks(), minKey, maxKey));
+        ASSERT(!rangeMapOverlaps(collMetadata.getChunks(), minKey, maxKey));
 
-        auto cm = collDesc->getChunkManager();
+        auto cm = collMetadata.getChunkManager();
 
         const auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
         ASSERT_BSONOBJ_GTE(minKey, chunkToSplit.getMin());
@@ -177,6 +182,63 @@ TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
 
     ASSERT_EQ(2UL, _manager->numberOfRangesToClean());
     ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
+}
+
+TEST_F(MetadataManagerTest,
+       ChunkInReceivingChunksListIsRemovedAfterShardKeyRefineIfMigrationSucceeded) {
+    _manager->setFilteringMetadata(makeEmptyMetadata());
+
+    // Simulate receiving a range. This will add an item to _receivingChunks.
+    ChunkRange range(BSON("key" << 0), BSON("key" << 10));
+    auto notif1 = _manager->beginReceive(range);
+
+    ASSERT_EQ(_manager->numberOfReceivingChunks(), 1);
+
+    // Simulate a situation in which the migration completes, and then the shard key is refined,
+    // before this shard discovers the updated metadata.
+    auto uuid = _manager->getActiveMetadata(boost::none)->getChunkManager()->getUUID().get();
+    ChunkRange refinedRange(BSON("key" << 0 << "other" << MINKEY),
+                            BSON("key" << 10 << "other" << MINKEY));
+    auto refinedMetadata = makeEmptyMetadata(BSON(kPattern << 1 << "other" << 1),
+                                             ChunkRange(BSON("key" << MINKEY << "other" << MINKEY),
+                                                        BSON("key" << MAXKEY << "other" << MAXKEY)),
+                                             uuid);
+
+    // Set the updated chunk map on the MetadataManager.
+    _manager->setFilteringMetadata(cloneMetadataPlusChunk(refinedMetadata, refinedRange));
+    // Because the refined range overlaps with the received range (pre-refine), this should remove
+    // the item in _receivingChunks.
+    ASSERT_EQ(_manager->numberOfReceivingChunks(), 0);
+}
+
+TEST_F(MetadataManagerTest,
+       ChunkInReceivingChunksListIsNotRemovedAfterShardKeyRefineIfNonOverlappingRangeIsReceived) {
+    _manager->setFilteringMetadata(makeEmptyMetadata());
+
+    // Simulate receiving a range. This will add an item to _receivingChunks.
+    ChunkRange range(BSON("key" << 0), BSON("key" << 10));
+    auto notif1 = _manager->beginReceive(range);
+    ASSERT_EQ(_manager->numberOfReceivingChunks(), 1);
+
+    // Simulate a situation in which the shard key is refined and this shard discovers
+    // updated metadata where it owns some range that does not overlap with the range being migrated
+    // in.
+    auto uuid = _manager->getActiveMetadata(boost::none)->getChunkManager()->getUUID().get();
+    ChunkRange refinedNonOverlappingRange(BSON("key" << -10 << "other" << MINKEY),
+                                          BSON("key" << 0 << "other" << MINKEY));
+
+    auto refinedMetadata = makeEmptyMetadata(BSON(kPattern << 1 << "other" << 1),
+                                             ChunkRange(BSON("key" << MINKEY << "other" << MINKEY),
+                                                        BSON("key" << MAXKEY << "other" << MAXKEY)),
+                                             uuid);
+
+    // Set the updated chunk map on the MetadataManager.
+    _manager->setFilteringMetadata(
+        cloneMetadataPlusChunk(refinedMetadata, refinedNonOverlappingRange));
+
+    // Because the refined range does not overlap with the received range (pre-refine), this should
+    // NOT remove the item in _receivingChunks.
+    ASSERT_EQ(_manager->numberOfReceivingChunks(), 1);
 }
 
 TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeletions) {
