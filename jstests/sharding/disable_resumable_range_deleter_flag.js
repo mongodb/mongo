@@ -1,8 +1,10 @@
 /*
- *  Tests that migrations behave correctly when the resumable range deleter protocol is
+ * Tests that migrations behave correctly when the resumable range deleter protocol is
  * disabled.
  *
- * @tags: [multiversion_incompatible]
+ * requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
+ * requires_persistence because this test restarts shards and expects them to have their data files.
+ * @tags: [requires_fcv_44, requires_persistence]
  */
 
 (function() {
@@ -10,6 +12,10 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
+
+// This test runs a migration with 'disableResumableRangeDeleter=true', then restarts the shards,
+// so the orphans from that migration will never be cleaned up.
+TestData.skipCheckOrphans = true;
 
 const dbName = "test";
 
@@ -49,20 +55,20 @@ function testBothDisabledSucceeds() {
     }
 
     // Disable resumable range deleter on both shards.
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": true}));
-    assert.commandWorked(st.shard1.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": true}));
+    st.rs0.stopSet(null /* signal */, true /* forRestart */);
+    st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: true}});
+    st.rs1.stopSet(null /* signal */, true /* forRestart */);
+    st.rs1.startSet({restart: true, setParameter: {disableResumableRangeDeleter: true}});
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
 
     // Re-enable resumable range delete.
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": false}));
-    assert.commandWorked(st.shard1.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": false}));
+    st.rs0.stopSet(null /* signal */, true /* forRestart */);
+    st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
+    st.rs1.stopSet(null /* signal */, true /* forRestart */);
+    st.rs1.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
 }
 
 function testDisabledSourceFailsMigration() {
@@ -80,8 +86,8 @@ function testDisabledSourceFailsMigration() {
     }
 
     // Disable resumable range deleter on shard0.
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": true}));
+    st.rs0.stopSet(null /* signal */, true /* forRestart */);
+    st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: true}});
 
     // Move chunk [50, inf) to shard1 should fail since migration id is missing.
     assert.commandFailedWithCode(
@@ -89,8 +95,8 @@ function testDisabledSourceFailsMigration() {
         ErrorCodes.ConflictingOperationInProgress);
 
     // Re-enable resumable range deleter on shard0.
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": false}));
+    st.rs0.stopSet(null /* signal */, true /* forRestart */);
+    st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
 }
 
 function testDisabledRecipientSucceedsMigration() {
@@ -108,16 +114,16 @@ function testDisabledRecipientSucceedsMigration() {
     }
 
     // Disable resumable range deleter on shard1.
-    assert.commandWorked(st.shard1.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": true}));
+    st.rs1.stopSet(null /* signal */, true /* forRestart */);
+    st.rs1.startSet({restart: true, setParameter: {disableResumableRangeDeleter: true}});
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
 
     // Re-enable resumable range deleter on shard1.
-    assert.commandWorked(st.shard1.getDB("admin").runCommand(
-        {setParameter: 1, "disableResumableRangeDeleter": false}));
+    st.rs1.stopSet(null /* signal */, true /* forRestart */);
+    st.rs1.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
 }
 
 testBothDisabledSucceeds();
