@@ -64,6 +64,11 @@ function configuredForTxnOverride() {
     return TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions;
 }
 
+function configuredForBackgroundReconfigs() {
+    assert(TestData.networkErrorAndTxnOverrideConfig, TestData);
+    return TestData.networkErrorAndTxnOverrideConfig.backgroundReconfigs;
+}
+
 // Commands assumed to not be blindly retryable.
 const kNonRetryableCommands = new Set([
     // Commands that take write concern and do not support txnNumbers.
@@ -128,6 +133,15 @@ const kAcceptableNonRetryableCommands = new Set([
     "moveChunk",
 ]);
 
+// The following read operations defined in the CRUD specification are retryable.
+// Note that estimatedDocumentCount() and countDocuments() use the count command.
+const kRetryableReadCommands = new Set(["find", "aggregate", "distinct", "count"]);
+
+// Returns true if the command name is that of a retryable read command.
+function isRetryableReadCmdName(cmdName) {
+    return kRetryableReadCommands.has(cmdName);
+}
+
 // Returns if the given failed response is a safe response to ignore when retrying the
 // given command type.
 function isAcceptableRetryFailedResponse(cmdName, res) {
@@ -184,6 +198,20 @@ function canRetryNetworkErrorForCommand(cmdName, cmdObj) {
     }
 
     return true;
+}
+
+// Returns if the given command should retry a read error when reconfigs are present.
+function canRetryReadErrorDuringBackgroundReconfig(cmdName) {
+    if (!configuredForBackgroundReconfigs()) {
+        return false;
+    }
+    return isRetryableReadCmdName(cmdName);
+}
+
+// When running the reconfig command on a node, it will drop its snapshot. Read commands issued
+// to this node before it updates its snapshot will fail with ReadConcernMajorityNotAvailableYet.
+function isRetryableReadCode(code) {
+    return code === ErrorCodes.ReadConcernMajorityNotAvailableYet;
 }
 
 // Several commands that use the plan executor swallow the actual error code from a failed plan
@@ -905,6 +933,19 @@ function shouldRetryWithNetworkErrorOverride(
     return res;
 }
 
+function shouldRetryForBackgroundReconfigOverride(res, cmdName, logError) {
+    assert(configuredForBackgroundReconfigs());
+    // Background reconfigs can interfere with read commands if they are using readConcern: majority
+    // and readPreference: primary. If we're running a read command and it fails with
+    // ReadConcernMajorityNotAvailableYet, retry because it should eventually succeed.
+    if (isRetryableReadCmdName(cmdName) && isRetryableReadCode(res.code)) {
+        logError("Retrying read command after 100ms because of background reconfigs");
+        sleep(100);
+        return kContinue;
+    }
+    return res;
+}
+
 // Processes exceptions if configured for txn override. Retries the entire transaction on
 // transient transaction errors or network errors if configured for network errors as well.
 // If a retry fails, returns the response, or returns null for further exception processing.
@@ -990,6 +1031,7 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
     }
 
     const canRetryNetworkError = canRetryNetworkErrorForCommand(cmdName, cmdObj);
+    const canRetryReadError = canRetryReadErrorDuringBackgroundReconfig(cmdName);
     let numNetworkErrorRetries = canRetryNetworkError ? kMaxNumRetries : 0;
     do {
         try {
@@ -1017,6 +1059,16 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
                     continue;
                 } else {
                     res = networkRetryRes;
+                }
+            }
+
+            if (canRetryReadError) {
+                const readRetryRes =
+                    shouldRetryForBackgroundReconfigOverride(res, cmdName, logError);
+                if (readRetryRes === kContinue) {
+                    continue;
+                } else {
+                    res = readRetryRes;
                 }
             }
 
