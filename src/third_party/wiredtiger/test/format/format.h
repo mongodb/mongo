@@ -90,6 +90,7 @@ typedef struct {
     bool workers_finished; /* Operations completed */
 
     pthread_rwlock_t backup_lock; /* Backup running */
+    uint32_t backup_id;           /* Block incremental id */
 
     WT_RAND_STATE rnd; /* Global RNG state */
 
@@ -118,6 +119,7 @@ typedef struct {
     uint32_t c_assert_read_timestamp;
     uint32_t c_auto_throttle;
     uint32_t c_backups;
+    char *c_backup_incremental;
     uint32_t c_bitcnt;
     uint32_t c_bloom;
     uint32_t c_bloom_bit_count;
@@ -207,6 +209,11 @@ typedef struct {
 #define ROW 2
 #define VAR 3
     u_int type; /* File type's flag value */
+
+#define INCREMENTAL_BLOCK 1
+#define INCREMENTAL_LOG 2
+#define INCREMENTAL_OFF 3
+    u_int c_backup_incr_flag; /* Incremental backup flag value */
 
 #define CHECKPOINT_OFF 1
 #define CHECKPOINT_ON 2

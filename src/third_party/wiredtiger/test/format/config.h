@@ -77,6 +77,9 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"backups", "if backups are enabled", /* 20% */
     C_BOOL, 20, 0, 0, &g.c_backups, NULL},
 
+  {"backup_incremental", "type of backup (block | log | off)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
+    &g.c_backup_incremental},
+
   {"bitcnt", "number of bits for fixed-length column-store files", 0x0, 1, 8, 8, &g.c_bitcnt, NULL},
 
   {"bloom", "if bloom filters are configured", /* 95% */

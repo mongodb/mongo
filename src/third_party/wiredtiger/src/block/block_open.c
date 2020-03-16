@@ -318,13 +318,37 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
 
     /*
      * If a data file is smaller than the allocation size, we're not going to be able to read the
-     * descriptor block. We should treat this as if the file has been deleted; that is, to log an
-     * error but continue on.
+     * descriptor block.
+     *
+     * If we're performing rollback to stable as part of recovery, we should treat this as if the
+     * file has been deleted; that is, to log an error but continue on.
+     *
+     * In the general case, we should return a generic error and signal that we've detected data
+     * corruption.
+     *
+     * FIXME: MongoDB relies heavily on the error codes reported when opening cursors (which hits
+     * this logic if the relevant data handle isn't already open). However this code gets run in
+     * rollback to stable as part of recovery where we want to skip any corrupted data files
+     * temporarily to allow MongoDB to initiate salvage. This is why we've been forced into this
+     * situation. We should address this as part of WT-5832 and clarify what error codes we expect
+     * to be returning across the API boundary.
      */
-    if (block->size < allocsize)
-        WT_RET_MSG(session, ENOENT,
+    if (block->size < allocsize) {
+        /*
+         * We use the "ignore history store tombstone" flag as of verify so we need to check that
+         * we're not performing a verify.
+         */
+        if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE_FLAGS) &&
+          !F_ISSET(S2BT(session), WT_BTREE_VERIFY))
+            ret = ENOENT;
+        else {
+            ret = WT_ERROR;
+            F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        }
+        WT_RET_MSG(session, ret,
           "File %s is smaller than allocation size; file size=%" PRId64 ", alloc size=%" PRIu32,
           block->name, block->size, allocsize);
+    }
 
     /* Use a scratch buffer to get correct alignment for direct I/O. */
     WT_RET(__wt_scr_alloc(session, allocsize, &buf));
