@@ -27,37 +27,37 @@ The `msg` field predicates a reader's interpretation of the log line. It should 
 * Concisely describe what the log line is reporting, providing enough context necessary for interpreting attr fields
 * Avoid unnecessary punctuation and do not conclude with punctuation
 * For new log messages, do __not__ use a formatting/substitution string for new log messages
-* For updating existing log messages, provide both a format string/substitution, __and__ a substitution-free string.
+* For updating existing log messages, provide both a format string/substitution, __and__ a substitution-free string
 
 ### Attributes (fields in the attr subdocument)
 
 The `attr` subdocument includes important metrics/statistics about the logged event for the purposes of debugging or performance analysis. These variables should be named very well, as though intended for a very human-readable portion of the codebase (like config variable declaration, abstract class definitions, etc.)
 
-Do the following:
+For `attr` fields, do the following:
 
-#### Provide an execution time attribute as "durationMillis"
+#### When providing an execution time attribute, ensure it is named "durationMillis"
 
 To describe the execution time of an operation, specify an `attr` name of “duration” and provide a value using the Milliseconds Duration type. The log system will automatically append "Millis" to the attribute name.
 
 Alternatively, specify an `attr` name of “durationMillis” and provide the number of milliseconds as an integer type.
 
-Importantly: downstream analysis will rely on this convention, as a replacement for the "[0-9]+ms$" format of prior logs.
+Importantly: downstream analysis tools will rely on this convention, as a replacement for the "[0-9]+ms$" format of prior logs.
 
 #### Use certain specific terms whenever possible
 
-Use other specific attribute names whenever possible:
+When logging the below information, do so with these specific terms:
 
-* "namespace" - instead of "ns"
-* "db" - instead of "database"
-* "error" - when an error occurs, instead of "status"
-* "reason" - to provide rationale for an event when "error" isn't appropriate
+* __namespace__ - instead of "ns"
+* __db__ - instead of "database"
+* __error__ - when an error occurs, instead of "status"
+* __reason__ - to provide rationale for an event when "error" isn't appropriate
 
 #### Use camelCased words understandable in the context of the message (msg)
 
 The bar for understanding should be:
 
-* Someone with reasonable understanding of mongod behavior should understand immediately what is being logged.
-* Someone with reasonable troubleshooting skill should be able to extract doc- or code-searchable phrases.
+* Someone with reasonable understanding of mongod behavior should understand immediately what is being logged
+* Someone with reasonable troubleshooting skill should be able to extract doc- or code-searchable phrases
 
 #### Precisely describe values and units
 
