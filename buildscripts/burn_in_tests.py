@@ -583,10 +583,11 @@ def create_generate_tasks_config(
     """
     task_list = TaskList(evg_config)
     resmoke_options = repeat_config.generate_resmoke_options()
+    mv_repl_tasks = evg_project_config.get_task_names_by_tag(RANDOM_MULTIVERSION_REPLSETS_TAG)
     for task in sorted(tests_by_task):
         test_list = tests_by_task[task]["tests"]
         for index, test in enumerate(test_list):
-            if task in evg_project_config.get_task_names_by_tag(RANDOM_MULTIVERSION_REPLSETS_TAG):
+            if generate_config.use_multiversion and task in mv_repl_tasks:
                 # Exclude files that should be blacklisted from multiversion testing.
                 task_name = gen_resmoke.remove_gen_suffix(task)
                 files_to_exclude = gen_multiversion.get_exclude_files(task_name, TASK_PATH_SUFFIX)
