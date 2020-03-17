@@ -1742,7 +1742,7 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
-    if (status == ErrorCodes::InterruptedAtShutdown) {
+    if (status.isA<ErrorCategory::ShutdownError>()) {
         // Leave it as-if kill -9 happened. Startup recovery will rebuild the index.
         _indexBuildsManager.abortIndexBuildWithoutCleanup(
             opCtx, collection, replState->buildUUID, "shutting down");
@@ -1784,7 +1784,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
 
-    if (status == ErrorCodes::InterruptedAtShutdown) {
+    if (status.isA<ErrorCategory::ShutdownError>()) {
         // Promise should be set at least once before it's getting destroyed. Else it would
         // invariant.
         {
