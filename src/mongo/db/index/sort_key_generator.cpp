@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
@@ -219,8 +220,36 @@ StatusWith<Value> SortKeyGenerator::extractKeyPart(
     Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
-        auto key =
-            document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        auto keyVariant = doc.getNestedFieldNonCaching(*patternPart.fieldPath);
+
+        const Status arrayError{ErrorCodes::InternalError, "array along path"};
+        auto key = stdx::visit(
+            visit_helper::Overloaded{
+                // In this case, the document has an array along the path given. This means the
+                // document is ineligible for taking the fast path for index key generation.
+                [&arrayError](Document::TraversesArrayTag) -> StatusWith<Value> {
+                    return arrayError;
+                },
+                // In this case the field was already in the cache (or may not have existed).
+                [&arrayError](const Value& val) -> StatusWith<Value> {
+                    // The document may have an array at the given path.
+                    if (val.getType() == BSONType::Array) {
+                        return arrayError;
+                    }
+                    return val;
+                },
+                // In this case the field was in the backing BSON, and not in the cache.
+                [&arrayError](BSONElement elt) -> StatusWith<Value> {
+                    // The document may have an array at the given path.
+                    if (elt.type() == BSONType::Array) {
+                        return arrayError;
+                    }
+                    return Value(elt);
+                },
+                [](stdx::monostate none) -> StatusWith<Value> { return Value(); },
+            },
+            keyVariant);
+
         if (!key.isOK()) {
             return key;
         }

@@ -37,6 +37,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -350,6 +351,26 @@ public:
         if (!pos.found())
             return appendField(name, ValueElement::Kind::kMaybeInserted);
         return getField(pos).val;
+    }
+
+    /**
+     * Given a field name either return a Value if the field resides in the cache, or a BSONElement
+     * if the field resides in the backing BSON.
+     */
+    stdx::variant<BSONElement, Value> getFieldNonCaching(StringData name) const {
+        Position pos = findField(name, LookupPolicy::kCacheOnly);
+        if (pos.found()) {
+            return {getField(pos).val};
+        }
+
+        for (auto&& bsonElement : _bson) {
+            if (name == bsonElement.fieldNameStringData()) {
+                return {bsonElement};
+            }
+        }
+
+        // Field not found. Return EOO Value.
+        return {Value()};
     }
 
     /// Adds a new field with missing Value at the end of the document
