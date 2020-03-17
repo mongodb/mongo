@@ -1,5 +1,6 @@
 """The unittest.TestCase for JavaScript tests."""
 
+import copy
 import os
 import os.path
 import sys
@@ -70,7 +71,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
             # Directory already exists.
             pass
 
-        process_kwargs = self.shell_options.get("process_kwargs", {}).copy()
+        process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
 
         if process_kwargs \
             and "env_vars" in process_kwargs \
