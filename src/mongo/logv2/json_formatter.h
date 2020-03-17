@@ -32,8 +32,14 @@
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_format.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::logv2 {
 
@@ -43,6 +49,16 @@ public:
                   LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)
         : _maxAttributeSizeKB(maxAttributeSizeKB), _timestampFormat(timestampFormat) {}
 
+    void format(fmt::memory_buffer& buffer,
+                LogSeverity severity,
+                LogComponent component,
+                Date_t date,
+                int32_t id,
+                StringData context,
+                StringData message,
+                const TypeErasedAttributeStorage& attrs,
+                LogTag tags,
+                LogTruncation truncation) const;
     void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
 
 private:
