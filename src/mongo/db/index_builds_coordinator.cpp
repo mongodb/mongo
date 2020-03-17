@@ -260,7 +260,8 @@ void abortIndexBuild(WithLock lk,
         IndexBuildState::kPrepareAbort, skipCheck, boost::none, reason);
     indexBuildsManager->abortIndexBuild(replIndexBuildState->buildUUID, reason);
 
-    replIndexBuildState->waitForNextAction->emplaceValue(IndexBuildAction::kPrimaryAbort);
+    IndexBuildsCoordinator::get(opCtx)->setSignalAndCancelVoteRequestCbkIfActive(
+        replStateLock, opCtx, replIndexBuildState, IndexBuildAction::kPrimaryAbort);
 }
 
 /**
@@ -756,7 +757,8 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
         // Promise can be set only once.
         // We can't skip signaling here if a signal is already set because the previous commit or
         // abort signal might have been sent to handle for primary case.
-        replState->waitForNextAction->emplaceValue(IndexBuildAction::kOplogCommit);
+        setSignalAndCancelVoteRequestCbkIfActive(
+            lk, opCtx, replState, IndexBuildAction::kOplogCommit);
         break;
     }
 
@@ -955,7 +957,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUIDNoWait(
             IndexBuildState::kPrepareAbort, skipCheck, abortTimestamp, reason);
         _indexBuildsManager.abortIndexBuild(buildUUID, reason.get_value_or(""));
 
-        replState->waitForNextAction->emplaceValue(signalAction);
+        setSignalAndCancelVoteRequestCbkIfActive(lk, opCtx, replState, signalAction);
         break;
     }
 
@@ -990,7 +992,8 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
             // After Sending the abort this might have stepped down and stepped back up.
             if (replState->indexBuildState.isAbortPrepared() &&
                 !replState->waitForNextAction->getFuture().isReady()) {
-                replState->waitForNextAction->emplaceValue(IndexBuildAction::kPrimaryAbort);
+                setSignalAndCancelVoteRequestCbkIfActive(
+                    lk, opCtx, replState, IndexBuildAction::kPrimaryAbort);
                 return;
             }
         }
@@ -1009,7 +1012,6 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
     IndexBuilds buildsStopped;
 
     auto indexBuilds = _getIndexBuilds();
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             LOGV2(20659,
@@ -1034,13 +1036,6 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
         // Signals the kRollbackAbort and then waits for the thread to join.
         abortIndexBuildByBuildUUID(
             opCtx, replState->buildUUID, IndexBuildAction::kRollbackAbort, boost::none, reason);
-
-        // Now, cancel if there are any active callback handle waiting for the remote
-        // "voteCommitIndexBuild" command's response.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->voteCmdCbkHandle.isValid()) {
-            replCoord->cancelCbkHandle(replState->voteCmdCbkHandle);
-        }
     };
     forEachIndexBuild(
         indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback - "_sd, onIndexBuild);
@@ -1821,7 +1816,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
         {
             stdx::unique_lock<Latch> lk(replState->mutex);
             if (!replState->waitForNextAction->getFuture().isReady()) {
-                replState->waitForNextAction->emplaceValue(IndexBuildAction::kNoAction);
+                setSignalAndCancelVoteRequestCbkIfActive(
+                    lk, opCtx, replState, IndexBuildAction::kNoAction);
             }
         }
         // Leave it as-if kill -9 happened. Startup recovery will restart the index build.

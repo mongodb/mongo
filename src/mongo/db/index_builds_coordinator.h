@@ -447,6 +447,17 @@ public:
     static int getNumIndexesTotal(OperationContext* opCtx, Collection* collection);
 
 
+    /**
+     * Sets the index build action 'signal' for the index build pointed by 'replState'. Also, it
+     * cancels if there is any active remote 'voteCommitIndexBuild' command request callback handle
+     * for this index build.
+     */
+    virtual void setSignalAndCancelVoteRequestCbkIfActive(
+        WithLock ReplIndexBuildStateLk,
+        OperationContext* opCtx,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        IndexBuildAction signal) = 0;
+
 private:
     /**
      * Registers an index build so that the rest of the system can discover it.
