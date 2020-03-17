@@ -957,6 +957,75 @@ TEST_F(ReplCoordReconfigTest,
     ASSERT_OK(status);
 }
 
+TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommitted) {
+    // Start out in a non-initial config version.
+    init();
+    auto configVersion = 2;
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1"));
+    auto Cb_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"));
+
+    // Startup, simulate application of one oplog entry and get elected.
+    assertStartSuccess(configWithMembers(configVersion, 0, Ca_members), HostAndPort("n1", 1));
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+    const auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Write and commit one new oplog entry, and consume any heartbeats.
+    auto commitPoint = OpTime(Timestamp(2, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    ASSERT_EQ(getReplCoord()->getLastCommittedOpTime(), commitPoint);
+    respondToAllHeartbeats();
+
+    // Do a first reconfig that should succeed since the current config is committed.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    configVersion = 3;
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+
+    opCtx->setDeadlineAfterNowBy(Milliseconds(1), ErrorCodes::MaxTimeMSExpired);
+    stdx::thread reconfigThread =
+        stdx::thread([&] { status = getReplCoord()->awaitConfigCommitment(opCtx.get()); });
+
+    // Run clock past the deadline.
+    enterNetwork();
+    getNet()->runUntil(getNet()->now() + Milliseconds(2));
+    exitNetwork();
+
+    reconfigThread.join();
+    ASSERT_EQUALS(status.code(), ErrorCodes::MaxTimeMSExpired);
+}
+
+TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitted) {
+    // Start out in a non-initial config version.
+    init();
+    auto configVersion = 2;
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1"));
+    auto Cb_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"));
+
+    // Startup, simulate application of one oplog entry and get elected.
+    assertStartSuccess(configWithMembers(configVersion, 0, Ca_members), HostAndPort("n1", 1));
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+    const auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Write and commit one new oplog entry, and consume any heartbeats.
+    auto commitPoint = OpTime(Timestamp(2, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    ASSERT_EQ(getReplCoord()->getLastCommittedOpTime(), commitPoint);
+    respondToAllHeartbeats();
+
+    // Do a first reconfig that should succeed since the current config is committed.
+    configVersion = 3;
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+
+    // Replicate op to ensure config is committed.
+    replicateOpTo(2, commitPoint);
+    ASSERT_OK(getReplCoord()->awaitConfigCommitment(opCtx.get()));
+}
+
 TEST_F(ReplCoordReconfigTest,
        ReconfigFrom1to2NodesSucceedsOnlyWhenLastCommittedOpInPrevConfigIsCommittedInCurrentConfig) {
     // Start out in a non-initial config version.
