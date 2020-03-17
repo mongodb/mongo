@@ -112,8 +112,8 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
                                            ValidateResults* results) {
     invariant(!_firstPhase);
 
-    // We'll report up to 1MB for extra index entry errors and missing index entry errors combined.
-    const int kErrorSizeBytes = 500 * 1024;
+    // We'll report up to 1MB for extra index entry errors and missing index entry errors.
+    const int kErrorSizeBytes = 1 * 1024 * 1024;
     long numMissingIndexEntriesSizeBytes = 0;
     long numExtraIndexEntriesSizeBytes = 0;
 
