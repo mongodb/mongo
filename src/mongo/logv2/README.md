@@ -60,7 +60,7 @@ When logging the below information, do so with these specific terms:
 
 * __namespace__ - instead of "ns"
 * __db__ - instead of "database"
-* __error__ - when an error occurs, instead of "status"
+* __error__ - when an error occurs, instead of "status". Use this for objects of type Status and DBException
 * __reason__ - to provide rationale for an event/action when "error" isn't appropriate
 
 ### Examples
