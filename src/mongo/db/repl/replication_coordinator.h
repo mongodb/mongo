@@ -489,7 +489,7 @@ public:
      * mode. This is used for transitioning to RS_ROLLBACK so that we can conflict with readers
      * holding the RSTL in intent mode.
      */
-    virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState) = 0;
+    virtual Status setFollowerModeRollback(OperationContext* opCtx) = 0;
 
     /**
      * Step-up
@@ -978,7 +978,7 @@ public:
      * Increment the server TopologyVersion and fulfill the promise of any currently waiting
      * isMaster request.
      */
-    virtual void incrementTopologyVersion(OperationContext* opCtx) = 0;
+    virtual void incrementTopologyVersion() = 0;
 
     /**
      * Constructs and returns an IsMasterResponse. Will block until the given deadline waiting for a

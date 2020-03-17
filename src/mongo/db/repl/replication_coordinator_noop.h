@@ -147,7 +147,7 @@ public:
 
     Status setFollowerMode(const MemberState&) final;
 
-    Status setFollowerModeStrict(OperationContext* opCtx, const MemberState&) final;
+    Status setFollowerModeRollback(OperationContext* opCtx) final;
 
     ApplierState getApplierState() final;
 
@@ -260,7 +260,7 @@ public:
 
     void finishRecoveryIfEligible(OperationContext* opCtx) final;
 
-    void incrementTopologyVersion(OperationContext* opCtx) final;
+    void incrementTopologyVersion() final;
 
     void updateAndLogStateTransitionMetrics(
         const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,

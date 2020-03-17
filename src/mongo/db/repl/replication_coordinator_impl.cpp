@@ -995,14 +995,15 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
     _topCoord->clearSyncSourceBlacklist();
 }
 
-Status ReplicationCoordinatorImpl::setFollowerModeStrict(OperationContext* opCtx,
-                                                         const MemberState& newState) {
+Status ReplicationCoordinatorImpl::setFollowerModeRollback(OperationContext* opCtx) {
     invariant(opCtx);
     invariant(opCtx->lockState()->isRSTLExclusive());
-    return _setFollowerMode(opCtx, newState);
+    return _setFollowerMode(opCtx, MemberState::RS_ROLLBACK);
 }
 
 Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+    // Switching to rollback should call setFollowerModeRollback instead.
+    invariant(newState != MemberState::RS_ROLLBACK);
     return _setFollowerMode(nullptr, newState);
 }
 
@@ -1031,7 +1032,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
 
     _topCoord->setFollowerMode(newState.s);
 
-    if (opCtx && _memberState.secondary() && newState == MemberState::RS_ROLLBACK) {
+    if (_memberState.secondary() && newState == MemberState::RS_ROLLBACK) {
         // If we are switching out of SECONDARY and to ROLLBACK, we must make sure that we hold the
         // RSTL in mode X to prevent readers that have the RSTL in intent mode from reading.
         _readWriteAbility->setCanServeNonLocalReads(opCtx, 0U);
@@ -3558,8 +3559,7 @@ bool ReplicationCoordinatorImpl::_haveHorizonsChanged(const ReplSetConfig& oldCo
     return oldHorizonMappings != newHorizonMappings;
 }
 
-void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext* opCtx,
-                                                               WithLock lock) {
+void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
     _topCoord->incrementTopologyVersion();
     _cachedTopologyVersionCounter.store(_topCoord->getTopologyVersion().getCounter());
     // Create an isMaster response for each horizon the server is knowledgeable about.
@@ -3571,9 +3571,9 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(OperationContext*
     }
 }
 
-void ReplicationCoordinatorImpl::incrementTopologyVersion(OperationContext* opCtx) {
+void ReplicationCoordinatorImpl::incrementTopologyVersion() {
     stdx::lock_guard lk(_mutex);
-    _fulfillTopologyChangePromise(opCtx, lk);
+    _fulfillTopologyChangePromise(lk);
 }
 
 void ReplicationCoordinatorImpl::_updateWriteAbilityFromTopologyCoordinator(
@@ -3589,7 +3589,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     // to transition to SECONDARY state.
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized()) {
-            _fulfillTopologyChangePromise(nullptr, lk);
+            _fulfillTopologyChangePromise(lk);
             IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
         }
     });
@@ -3645,7 +3645,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
 
     if (_memberState.secondary() && !newState.primary() && !newState.rollback()) {
         // Switching out of SECONDARY, but not to PRIMARY or ROLLBACK. Note that ROLLBACK case is
-        // handled separately and requires RSTL lock held, see setFollowerModeStrict.
+        // handled separately and requires RSTL lock held, see setFollowerModeRollback.
         _readWriteAbility->setCanServeNonLocalReads_UNSAFE(0U);
     } else if (!_memberState.primary() && newState.secondary()) {
         // Switching into SECONDARY, but not from PRIMARY.

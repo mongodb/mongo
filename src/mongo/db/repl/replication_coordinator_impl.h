@@ -199,8 +199,7 @@ public:
 
     virtual Status setFollowerMode(const MemberState& newState) override;
 
-    virtual Status setFollowerModeStrict(OperationContext* opCtx,
-                                         const MemberState& newState) override;
+    virtual Status setFollowerModeRollback(OperationContext* opCtx) override;
 
     virtual ApplierState getApplierState() override;
 
@@ -352,7 +351,7 @@ public:
 
     virtual TopologyVersion getTopologyVersion() const override;
 
-    virtual void incrementTopologyVersion(OperationContext* opCtx) override;
+    virtual void incrementTopologyVersion() override;
 
     using SharedIsMasterResponse = std::shared_ptr<const IsMasterResponse>;
 
@@ -1030,7 +1029,7 @@ private:
      * Fulfills the promises that are waited on by awaitable isMaster requests. This increments the
      * server TopologyVersion.
      */
-    void _fulfillTopologyChangePromise(OperationContext* opCtx, WithLock);
+    void _fulfillTopologyChangePromise(WithLock);
 
     /**
      * Update _canAcceptNonLocalWrites based on _topCoord->canAcceptWrites().

@@ -204,7 +204,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42 ||
             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44;
         if (isReplSet && shouldIncrementTopologyVersion) {
-            replCoordinator->incrementTopologyVersion(opCtx);
+            replCoordinator->incrementTopologyVersion();
         }
     });
 }

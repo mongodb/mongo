@@ -296,9 +296,8 @@ Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) 
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::setFollowerModeStrict(OperationContext* opCtx,
-                                                         const MemberState& newState) {
-    return setFollowerMode(newState);
+Status ReplicationCoordinatorMock::setFollowerModeRollback(OperationContext* opCtx) {
+    return setFollowerMode(MemberState::RS_ROLLBACK);
 }
 
 ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {
@@ -575,7 +574,7 @@ TopologyVersion ReplicationCoordinatorMock::getTopologyVersion() const {
     return TopologyVersion(repl::instanceId, 0);
 }
 
-void ReplicationCoordinatorMock::incrementTopologyVersion(OperationContext* opCtx) {
+void ReplicationCoordinatorMock::incrementTopologyVersion() {
     return;
 }
 
