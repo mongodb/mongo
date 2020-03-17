@@ -18,16 +18,16 @@ But, what makes these lines human readable is that the `msg` provides a simple, 
 
 ## Specific Guidance
 
-For maximum readability, a log message additionally has the least amount of repetition possible, and shares attr names with other related log lines.
+For maximum readability, a log message additionally has the least amount of repetition possible, and shares attribute names with other related log lines.
 
 ### Message (the msg field)
 
 The `msg` field predicates a reader's interpretation of the log line. It should be crafted with care and attention.
 
-* Concisely describe what the log line is reporting, providing enough context necessary for interpreting attr fields
+* Concisely describe what the log line is reporting, providing enough context necessary for interpreting attribute field names and values
 * Avoid unnecessary punctuation and do not conclude with punctuation
-* For new log messages, do __not__ use a formatting/substitution string for new log messages
-* For updating existing log messages, provide both a format string/substitution, __and__ a substitution-free string
+* For new log messages, do __not__ use a format string/substitution for new log messages
+* For updating existing log messages, provide both a format string/substitution, __and__ a substitution-free message string
 
 ### Attributes (fields in the attr subdocument)
 
@@ -35,13 +35,24 @@ The `attr` subdocument includes important metrics/statistics about the logged ev
 
 For `attr` fields, do the following:
 
+#### Use camelCased words understandable in the context of the message (msg)
+
+The bar for understanding should be:
+
+* Someone with reasonable understanding of mongod behavior should understand immediately what is being logged
+* Someone with reasonable troubleshooting skill should be able to extract doc- or code-searchable phrases to learn about what is being logged
+
+#### Precisely describe values and units
+
+Exception: Do not add a unit suffix when logging a Duration type. The system automatically adds this unit.
+
 #### When providing an execution time attribute, ensure it is named "durationMillis"
 
-To describe the execution time of an operation, specify an `attr` name of “duration” and provide a value using the Milliseconds Duration type. The log system will automatically append "Millis" to the attribute name.
+To describe the execution time of an operation using our preferred method: Specify an `attr` name of “duration” and provide a value using the Milliseconds Duration type. The log system will automatically append "Millis" to the attribute name.
 
 Alternatively, specify an `attr` name of “durationMillis” and provide the number of milliseconds as an integer type.
 
-Importantly: downstream analysis tools will rely on this convention, as a replacement for the "[0-9]+ms$" format of prior logs.
+__Importantly__: downstream analysis tools will rely on this convention, as a replacement for the "[0-9]+ms$" format of prior logs.
 
 #### Use certain specific terms whenever possible
 
@@ -50,18 +61,7 @@ When logging the below information, do so with these specific terms:
 * __namespace__ - instead of "ns"
 * __db__ - instead of "database"
 * __error__ - when an error occurs, instead of "status"
-* __reason__ - to provide rationale for an event when "error" isn't appropriate
-
-#### Use camelCased words understandable in the context of the message (msg)
-
-The bar for understanding should be:
-
-* Someone with reasonable understanding of mongod behavior should understand immediately what is being logged
-* Someone with reasonable troubleshooting skill should be able to extract doc- or code-searchable phrases
-
-#### Precisely describe values and units
-
-Exception: Do not add a unit suffix when logging a Duration type. The system automatically adds this unit.
+* __reason__ - to provide rationale for an event/action when "error" isn't appropriate
 
 ### Examples
 
