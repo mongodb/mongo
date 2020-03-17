@@ -6,8 +6,19 @@
  * 2. Perform updates in transactions without the shard key.
  * 3. Move random chunks.
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
- * requires_non_retryable_writes, uses_transactions, requires_fcv_44];
+ * @tags: [
+ *   assumes_autosplit_off,
+ *   assumes_balancer_off,
+ *   # The init() state function populates each document owned by a particular thread with a
+ *   # "counter" value. Doing so may take longer than the configured stepdown interval. It is
+ *   # therefore unsafe to automatically run inside a multi-statement transaction because its
+ *   # progress will continually be interrupted.
+ *   operations_longer_than_stepdown_interval_in_txns,
+ *   requires_fcv_44,
+ *   requires_non_retryable_writes,
+ *   requires_sharding,
+ *   uses_transactions,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js');

@@ -197,10 +197,6 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_merge_when_not_matched_insert.js
   - jstests/concurrency/fsm_workloads/agg_merge_when_matched_replace_with_new.js
 
-  # TODO SERVER-42192: Re-evaluate if the moveChunk + refineCollectionShardKey workloads can be
-  # enabled after SERVER-46386 has been addressed.
-  - jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key*.js
-
   # Uses the collMod command, which isn't considered to be retryable.
   - jstests/concurrency/fsm_workloads/random_moveChunk_index_operations.js
 
@@ -221,6 +217,9 @@ selector:
   # Tests which expect commands to fail and catch the error can cause transactions to abort and
   # retry indefinitely.
   - catches_command_failures
+  # This tag corresponds to operations which are run long enough to exceed the stepdown interval
+  # when grouped into transactions.
+  - operations_longer_than_stepdown_interval_in_txns
 
   # Note that "requires_non_retryable_writes" does not need to be blacklisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.
