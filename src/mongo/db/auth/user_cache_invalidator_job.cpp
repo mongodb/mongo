@@ -96,7 +96,9 @@ public:
             Date_t expiry = _last + _interval;
             MONGO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
 
-            if (now >= expiry) {
+            // The second clause in the if statement is if we've jumped back in time due to an NTP
+            // sync; we should always trigger a cache refresh in that case.
+            if (now >= expiry || _last > now) {
                 _last = now;
                 MONGO_LOG(5) << "wait: done";
                 return true;
