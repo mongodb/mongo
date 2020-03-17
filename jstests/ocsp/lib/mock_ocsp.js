@@ -56,17 +56,15 @@ class MockOCSPServer {
             args.push("--next_update_seconds=" + this.next_update_secs);
         }
 
-        clearRawMongoProgramOutput();
-
         this.pid = _startMongoProgram({args: args});
         assert(checkProgram(this.pid).alive);
 
         assert.soon(function() {
-            // Change this line if the OCSP endpoint changes
-            return rawMongoProgramOutput().search("Running on http://127.0.0.1:8100/") !== -1;
+            return rawMongoProgramOutput().search("Listening on") !== -1;
         });
 
-        sleep(2000);
+        sleep(1000);
+        print("Mock OCSP Server successfully started");
     }
 
     /**

@@ -35,12 +35,12 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     print('Initializing OCSP Responder')
-    mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds)
+    app = mock_ocsp_responder.OCSPResponder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds)
 
     if args.verbose:
-        mock_ocsp_responder.init(args.port, debug=True)
+        app.serve(args.port, debug=True)
     else:
-        mock_ocsp_responder.init(args.port)
+        app.serve(args.port)
 
     print('Mock OCSP Responder is running on port %s' % (str(args.port)))
 
