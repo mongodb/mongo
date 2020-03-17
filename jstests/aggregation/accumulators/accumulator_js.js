@@ -175,17 +175,17 @@ command.pipeline = [{
         value: {
             $accumulator: {
                 init: function() {
-                    throw 'init should not be called'
+                    throw 'init should not be called';
                 },
                 // Use $cond to thwart constant folding, to ensure we are testing evaluate rather
                 // than optimize.
                 initArgs: {$add: {$cond: ["$foo", "", ""]}},
                 accumulateArgs: [],
                 accumulate: function() {
-                    throw 'accumulate should not be called'
+                    throw 'accumulate should not be called';
                 },
                 merge: function() {
-                    throw 'merge should not be called'
+                    throw 'merge should not be called';
                 },
                 lang: 'js',
             }
@@ -255,7 +255,7 @@ command.pipeline = [{
                 init: function() {},
                 accumulateArgs: ["ABC", "DEF"],
                 accumulate: function(state, str1, str2) {
-                    return str1 + str2
+                    return str1 + str2;
                 },
                 merge: function(s1, s2) {
                     return s1 || s2;
