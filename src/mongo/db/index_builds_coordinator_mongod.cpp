@@ -482,26 +482,16 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
     auto needToVote = [&]() -> bool {
         stdx::unique_lock<Latch> lk(replState->mutex);
-        // Needs comment.
         return !replState->waitForNextAction->getFuture().isReady() ? true : false;
     };
-
-    auto convertToNonFatalStatus = [&](Status origStatus) -> Status {
-        auto errCode = ErrorCodes::InterruptedAtShutdown;
-
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->indexBuildState.isAbortPrepared()) {
-            errCode = ErrorCodes::IndexBuildAborted;
-        }
-
-        return Status{errCode, origStatus.reason()};
-    };
-
 
     // Retry 'voteCommitIndexBuild' command on error until we have been signaled either with commit
     // or abort. This way, we can make sure majority of nodes will never stop voting and wait for
     // commit or abort signal until they have received commit or abort signal.
     while (needToVote()) {
+        // check for any interrupts before starting the voting process.
+        opCtx->checkForInterrupt();
+
         // Don't hammer the network.
         sleepFor(exponentialBackoff.nextSleep());
         // When index build started during startup recovery can try to get it's address when
@@ -528,15 +518,15 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
             voteCmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                 opCtx, "admin", voteCmdRequest, onRemoteCmdScheduled, onRemoteCmdComplete);
         } catch (DBException& ex) {
-            if (ex.isA<ErrorCategory::ShutdownError>() ||
-                ex.isA<ErrorCategory::CancelationError>()) {
-                // This includes error like ErrorCodes::CallbackCanceled,
-                // ErrorCodes::ShutdownInProgress We might have either received
-                // ErrorCodes::CallbackCanceled due to rollback or shutdown. converting the status
-                // to non-fatal
-                uassertStatusOK(convertToNonFatalStatus(ex.toStatus()));
+            if (ex.isA<ErrorCategory::ShutdownError>()) {
+                throw;
             }
-            // All other error including network errors should be retried.
+
+            // All other errors including CallbackCanceled and network errors should be retried.
+            // If ErrorCodes::CallbackCanceled is due to shutdown, then checkForInterrupt() at the
+            // beginning of this loop will catch it and throw an error to the caller. Or, if it's
+            // due to rollback, then index build should have received abort signal which would make
+            // needToVote() to return false and not to retry the voting process.
             LOGV2_DEBUG(4666400,
                         1,
                         "Failed to run 'voteCommitIndexBuild' command.",
@@ -632,8 +622,13 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                 break;
             case IndexBuildAction::kRollbackAbort:
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-                // Currently, We abort the index build before transitioning the state to rollback.
-                // So, we can check if the node state is rollback.
+                // TODO SERVER-46558: Should add an invariant check to confirm if the node is in
+                // rollback state.
+                uassertStatusOK(Status(
+                    ErrorCodes::IndexBuildAborted,
+                    str::stream() << "Aborting index build, index build uuid:"
+                                  << replState->buildUUID << " , abort reason:"
+                                  << replState->indexBuildState.getAbortReason().get_value_or("")));
                 break;
             case IndexBuildAction::kPrimaryAbort:
                 // There are chances when the index build got aborted, it only existed in the
