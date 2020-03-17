@@ -108,8 +108,11 @@ class TestAcceptance(unittest.TestCase):
             "project",
             use_multiversion=False
         )  # yapf: disable
+        evg_conf_mock = MagicMock()
+        evg_conf_mock.get_task_names_by_tag.return_value = set()
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repos, None)
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_conf_mock,
+                           repos, None)
 
         write_json_mock.assert_called_once()
         written_config = write_json_mock.call_args[0][0]
