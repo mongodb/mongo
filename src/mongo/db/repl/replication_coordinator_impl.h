@@ -250,6 +250,8 @@ public:
                                      GetNewConfigFn getNewConfig,
                                      bool force) override;
 
+    virtual Status awaitConfigCommitment(OperationContext* opCtx) override;
+
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) override;

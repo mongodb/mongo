@@ -328,6 +328,10 @@ Status ReplicationCoordinatorNoOp::doReplSetReconfig(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+Status ReplicationCoordinatorNoOp::awaitConfigCommitment(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
 Status ReplicationCoordinatorNoOp::processReplSetInitiate(OperationContext*,
                                                           const BSONObj&,
                                                           BSONObjBuilder*) {
