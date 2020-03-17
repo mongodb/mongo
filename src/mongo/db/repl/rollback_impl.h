@@ -357,14 +357,14 @@ private:
     Status _transitionToRollback(OperationContext* opCtx);
 
     /**
-     * Waits for any in-progress background index builds to complete. We do this before beginning
+     * Stops any active index builds and waits for them to complete. We do this before beginning
      * the rollback process to prevent any issues surrounding index builds pausing/resuming around a
      * call to 'recoverToStableTimestamp'. It's not clear that an index build, resumed in this way,
      * that continues until completion, would be consistent with the collection data. Waiting for
      * all background index builds to complete is a conservative approach, to avoid any of these
      * potential issues.
      */
-    Status _awaitBgIndexCompletion(OperationContext* opCtx);
+    void _stopAndWaitForIndexBuilds(OperationContext* opCtx);
 
     /**
      * Recovers to the stable timestamp while holding the global exclusive lock.

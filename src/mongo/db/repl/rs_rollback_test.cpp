@@ -2748,7 +2748,6 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
              localOplogWithSingleOplogEntry,
              rollbackSourceWithInvalidOplog,
              {},
-             {},
              _coordinator,
              _replicationProcess.get());
     stopCapturingLogMessages();
@@ -2770,7 +2769,6 @@ DEATH_TEST_REGEX_F(RSRollbackTest,
              localOplogWithSingleOplogEntry,
              rollbackSourceWithInvalidOplog,
              {},
-             {},
              _coordinator,
              _replicationProcess.get());
 }
@@ -2789,7 +2787,6 @@ TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollb
     rollback(_opCtx.get(),
              localOplogWithNoEntries,
              rollbackSourceWithValidOplog,
-             {},
              {},
              _coordinator,
              _replicationProcess.get(),
@@ -2816,8 +2813,7 @@ DEATH_TEST_F(RSRollbackTest,
     ASSERT_TRUE(ShardIdentityRollbackNotifier::get(_opCtx.get())->didRollbackHappen());
 
     createOplog(_opCtx.get());
-    rollback(
-        _opCtx.get(), localOplog, rollbackSource, {}, {}, _coordinator, _replicationProcess.get());
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 DEATH_TEST_REGEX_F(
@@ -2832,8 +2828,7 @@ DEATH_TEST_REGEX_F(
     _coordinator->failSettingFollowerMode(MemberState::RS_RECOVERING, ErrorCodes::IllegalOperation);
 
     createOplog(_opCtx.get());
-    rollback(
-        _opCtx.get(), localOplog, rollbackSource, {}, {}, _coordinator, _replicationProcess.get());
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 // The testcases used here are trying to detect off-by-one errors in
