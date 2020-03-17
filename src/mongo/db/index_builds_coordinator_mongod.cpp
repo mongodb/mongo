@@ -481,8 +481,10 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     };
 
     auto needToVote = [&]() -> bool {
+        // Check if the node is shutting down.
+        opCtx->checkForInterrupt();
+
         stdx::unique_lock<Latch> lk(replState->mutex);
-        // Needs comment.
         return !replState->waitForNextAction->getFuture().isReady() ? true : false;
     };
 
