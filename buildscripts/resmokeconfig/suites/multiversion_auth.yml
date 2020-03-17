@@ -9,6 +9,8 @@ selector:
   roots:
   - jstests/multiVersion/*.js
   - jstests/multiVersion/genericSetFCVUsage/*.js
+  exclude_with_any_tags:
+  - fix_for_fcv_46
   exclude_files:
   # TODO: SERVER-21578
   - jstests/multiVersion/balancer_multiVersion_detect.js

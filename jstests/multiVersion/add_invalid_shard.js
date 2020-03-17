@@ -1,5 +1,7 @@
 /**
  * Test that adding invalid or duplicate shards will fail.
+ *
+ * @tags: [fix_for_fcv_46]
  */
 (function() {
 

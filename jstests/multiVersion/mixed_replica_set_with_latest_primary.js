@@ -1,6 +1,7 @@
 /**
  * Tests initializing a mixed version replica set through the shell.
  *
+ * @tags: [fix_for_fcv_46]
  */
 
 (function() {

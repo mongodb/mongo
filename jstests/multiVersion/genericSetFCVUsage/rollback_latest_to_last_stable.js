@@ -1,6 +1,8 @@
 /**
  * Multiversion rollback test. Checks that rollback succeeds between a
  * 'latest' version rollback node and a 'last-stable' version sync source.
+ *
+ * @tags: [fix_for_fcv_46]
  */
 
 (function() {

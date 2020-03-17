@@ -1,6 +1,8 @@
 /**
  * Test that it is not possible to move a chunk from an upgrade featureCompatibilityVersion node to
  * a downgrade binary version node.
+ *
+ * @tags: [fix_for_fcv_46]
  */
 
 (function() {

@@ -1,5 +1,6 @@
 /*
  *  Tests that migrations work correctly across shards with mixed FCV state.
+ *  @tags: [fix_for_fcv_46]
  */
 
 (function() {
