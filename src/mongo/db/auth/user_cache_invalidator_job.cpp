@@ -105,7 +105,9 @@ public:
                         "now"_attr = now,
                         "expiry"_attr = expiry);
 
-            if (now >= expiry) {
+            // The second clause in the if statement is if we've jumped back in time due to an NTP
+            // sync; we should always trigger a cache refresh in that case.
+            if (now >= expiry || _last > now) {
                 _last = now;
                 LOGV2_DEBUG(20261, 5, "wait: done");
                 return true;
