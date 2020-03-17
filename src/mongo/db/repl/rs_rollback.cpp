@@ -467,7 +467,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 // If the index build has been committed or aborted, and the commit or abort
                 // oplog entry has also been rolled back, the index build will have been added
                 // to the set to be restarted. An index build may also be in the set to be restarted
-                // if it was in-progress and aborted before rollback.
+                // if it was in-progress and stopped before rollback.
                 // Remove it, and then add it to the set to be dropped. If the index has already
                 // been dropped by abort, then this is a no-op.
                 auto& buildsToRestart = fixUpInfo.indexBuildsToRestart;
@@ -1166,7 +1166,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 Status _syncRollback(OperationContext* opCtx,
                      const OplogInterface& localOplog,
                      const RollbackSource& rollbackSource,
-                     const IndexBuilds& abortedIndexBuilds,
+                     const IndexBuilds& stoppedIndexBuilds,
                      int requiredRBID,
                      ReplicationCoordinator* replCoord,
                      ReplicationProcess* replicationProcess) {
@@ -1186,10 +1186,10 @@ Status _syncRollback(OperationContext* opCtx,
     // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
     how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
 
-    // Populate the initial list of index builds to restart with the builds that were aborted due to
+    // Populate the initial list of index builds to restart with the builds that were stopped due to
     // rollback. They may need to be restarted if no associated oplog entries are rolled-back, or
     // they may be made redundant by a rolled-back startIndexBuild oplog entry.
-    how.indexBuildsToRestart.insert(abortedIndexBuilds.begin(), abortedIndexBuilds.end());
+    how.indexBuildsToRestart.insert(stoppedIndexBuilds.begin(), stoppedIndexBuilds.end());
 
     LOGV2(21682, "Finding the Common Point");
     try {
@@ -1257,17 +1257,6 @@ Status _syncRollback(OperationContext* opCtx,
         }
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
-    } catch (const DBException& e) {
-        // If we encounter an error during rollback, but we aborted index builds beforehand, we
-        // will be unable to successfully perform any more rollback attempts. The knowledge of these
-        // aborted index builds gets lost after the first attempt.
-        if (abortedIndexBuilds.size()) {
-            return Status{ErrorCodes::UnrecoverableRollbackError,
-                          "Index builds aborted prior to rollback cannot be restarted by "
-                          "subsequent rollback attempts"}
-                .withContext(e.what());
-        }
-        throw;
     }
 
     if (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
@@ -1963,7 +1952,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
-                    const IndexBuilds& abortedIndexBuilds,
+                    const IndexBuilds& stoppedIndexBuilds,
                     int requiredRBID,
                     ReplicationCoordinator* replCoord,
                     ReplicationProcess* replicationProcess) {
@@ -1975,7 +1964,7 @@ Status syncRollback(OperationContext* opCtx,
     Status status = _syncRollback(opCtx,
                                   localOplog,
                                   rollbackSource,
-                                  abortedIndexBuilds,
+                                  stoppedIndexBuilds,
                                   requiredRBID,
                                   replCoord,
                                   replicationProcess);
@@ -1993,7 +1982,6 @@ Status syncRollback(OperationContext* opCtx,
 void rollback(OperationContext* opCtx,
               const OplogInterface& localOplog,
               const RollbackSource& rollbackSource,
-              const IndexBuilds& abortedIndexBuilds,
               int requiredRBID,
               ReplicationCoordinator* replCoord,
               ReplicationProcess* replicationProcess,
@@ -2025,6 +2013,9 @@ void rollback(OperationContext* opCtx,
         }
     }
 
+    // Stop index builds before rollback. These will be restarted at the completion of rollback.
+    auto stoppedIndexBuilds = IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
+
     if (MONGO_unlikely(rollbackHangAfterTransitionToRollback.shouldFail())) {
         LOGV2(21724,
               "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
@@ -2036,7 +2027,7 @@ void rollback(OperationContext* opCtx,
         auto status = syncRollback(opCtx,
                                    localOplog,
                                    rollbackSource,
-                                   abortedIndexBuilds,
+                                   stoppedIndexBuilds,
                                    requiredRBID,
                                    replCoord,
                                    replicationProcess);
@@ -2066,6 +2057,16 @@ void rollback(OperationContext* opCtx,
                       "myLastAppliedOpTime"_attr = replCoord->getMyLastAppliedOpTime(),
                       "minValid"_attr =
                           replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
+
+        // If we encounter an error during rollback, but we stopped index builds beforehand, we
+        // will be unable to successfully perform any more rollback attempts. The knowledge of these
+        // stopped index builds gets lost after the first attempt.
+        if (stoppedIndexBuilds.size()) {
+            LOGV2_FATAL(4655801,
+                        "Index builds stopped prior to rollback cannot be restarted by "
+                        "subsequent rollback attempts");
+            fassertFailedNoTrace(4655800);
+        }
 
         // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
         // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this

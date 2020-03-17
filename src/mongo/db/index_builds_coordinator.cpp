@@ -1003,26 +1003,18 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
 }
 
-IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
-    LOGV2(20658, "IndexBuildsCoordinator::onRollback - this node is entering the rollback state");
+IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext* opCtx) {
+    LOGV2(20658, "stopping index builds before rollback");
 
-    IndexBuilds buildsAborted;
+    IndexBuilds buildsStopped;
 
     auto indexBuilds = _getIndexBuilds();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
-            LOGV2(3856209,
-                  "IndexBuildsCoordinator::onRollback - not aborting single phase index build: "
-                  "{builduuid} ",
-                  "builduuid"_attr = replState->buildUUID);
-            return;
-        }
-        if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             LOGV2(20659,
-                  "IndexBuildsCoordinator::onRollback - not aborting single phase index build: "
-                  "{replState_buildUUID}",
-                  "replState_buildUUID"_attr = replState->buildUUID);
+                  "not stopping single phase index build",
+                  "buildUUID"_attr = replState->buildUUID);
             return;
         }
         const std::string reason = "rollback";
@@ -1034,7 +1026,7 @@ IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
         for (auto spec : replState->indexSpecs) {
             aborted.indexSpecs.emplace_back(spec.getOwned());
         }
-        buildsAborted.insert({replState->buildUUID, aborted});
+        buildsStopped.insert({replState->buildUUID, aborted});
 
         // Leave abort timestamp as null. This will unblock the index build and allow it to
         // complete without cleaning up. Subsequently, the rollback algorithm can decide how to
@@ -1050,9 +1042,10 @@ IndexBuilds IndexBuildsCoordinator::onRollback(OperationContext* opCtx) {
             replCoord->cancelCbkHandle(replState->voteCmdCbkHandle);
         }
     };
-    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onRollback - "_sd, onIndexBuild);
+    forEachIndexBuild(
+        indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback - "_sd, onIndexBuild);
 
-    return buildsAborted;
+    return buildsStopped;
 }
 
 void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opCtx,

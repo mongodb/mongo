@@ -33,7 +33,6 @@
 #include <memory>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -200,7 +199,6 @@ private:
      */
     void _fallBackOnRollbackViaRefetch(OperationContext* opCtx,
                                        const HostAndPort& source,
-                                       const IndexBuilds& abortedIndexBuilds,
                                        int requiredRBID,
                                        OplogInterface* localOplog,
                                        OplogInterfaceRemote::GetConnectionFn getConnection);

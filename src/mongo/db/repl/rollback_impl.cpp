@@ -210,13 +210,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     ON_BLOCK_EXIT([this, opCtx] { _transitionFromRollbackToSecondary(opCtx); });
     ON_BLOCK_EXIT([this, opCtx] { _summarizeRollback(opCtx); });
 
-    // Wait for all background index builds to complete before starting the rollback process.
-    status = _awaitBgIndexCompletion(opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
-    _listener->onBgIndexesComplete();
-
     auto commonPointSW = _findCommonPoint(opCtx);
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();
@@ -347,11 +340,11 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
+void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     invariant(opCtx);
-    if (_isInShutdown()) {
-        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
-    }
+
+    // Aborts all active, two-phase index builds.
+    IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
 
     // Get a list of all databases.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -361,7 +354,9 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
         dbs = storageEngine->listDatabases();
     }
 
-    // Wait for all background operations to complete by waiting on each database.
+    // Wait for all background operations to complete by waiting on each database. Single-phase
+    // index builds are not stopped before rollback, so we must wait for these index builds to
+    // complete.
     std::vector<StringData> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
     for (auto db : dbNames) {
@@ -379,15 +374,9 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
             BackgroundOperation::awaitNoBgOpInProgForDb(db);
             IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(db);
         }
-
-        // Check for shutdown again.
-        if (_isInShutdown()) {
-            return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
-        }
     }
 
     LOGV2(21597, "Finished waiting for background operations to complete before rollback");
-    return Status::OK();
 }
 
 StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const OplogEntry& oplogEntry) {
@@ -472,6 +461,11 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
 
 void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept {
+    // Stop and wait for all background index builds to complete before starting the rollback
+    // process.
+    _stopAndWaitForIndexBuilds(opCtx);
+    _listener->onBgIndexesComplete();
+
     // Before computing record store counts, abort all active transactions. This ensures that
     // the count adjustments are based on correct values where no prepared transactions are
     // active and all in-memory counts have been rolled-back.
