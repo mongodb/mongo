@@ -343,10 +343,26 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     return upsertStatus;
 }
 
+void IndexBuildsCoordinatorMongod::setSignalAndCancelVoteRequestCbkIfActive(
+    WithLock ReplIndexBuildStateLk,
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    IndexBuildAction signal) {
+    // set the signal
+    replState->waitForNextAction->emplaceValue(signal);
+    // Cancel the callback.
+    if (replState->voteCmdCbkHandle.isValid()) {
+        repl::ReplicationCoordinator::get(opCtx)->cancelCbkHandle(replState->voteCmdCbkHandle);
+    }
+}
+
 void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
-    WithLock lk, OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    WithLock ReplIndexBuildStateLk,
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState) {
     if (!replState->waitForNextAction->getFuture().isReady()) {
-        replState->waitForNextAction->emplaceValue(IndexBuildAction::kCommitQuorumSatisfied);
+        setSignalAndCancelVoteRequestCbkIfActive(
+            ReplIndexBuildStateLk, opCtx, replState, IndexBuildAction::kCommitQuorumSatisfied);
     } else {
         // This implies we already got a commit or abort signal by other ways. This might have
         // been signaled earlier with kPrimaryAbort or kCommitQuorumSatisfied. Or, it's also
@@ -486,15 +502,8 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
     auto onRemoteCmdScheduled = [&](executor::TaskExecutor::CallbackHandle handle) {
         stdx::unique_lock<Latch> lk(replState->mutex);
-        auto future = replState->waitForNextAction->getFuture();
-        // Don't set the callback handle if we have been signaled with kRollbackAbort.
-        // Otherwise, it can violate liveness property. Consider a case, where the bgsync
-        // thread has signaled aborted and waits for the secondary indexBuildCoordinator
-        // thread to join. But, the indexBuildCoordinator thread will be waiting for the
-        // remote "voteCommitIndexBuild" command's response. And, the primary will be
-        // waiting for 'voteCommitIndexBuild' command's write to be majority replicated. But,
-        // gets stuck waiting for the rollback node to transition out to secondary.
-        if (future.isReady() && future.get(opCtx) == IndexBuildAction::kRollbackAbort) {
+        // We have already received commit or abort signal, So skip voting.
+        if (replState->waitForNextAction->getFuture().isReady()) {
             replCoord->cancelCbkHandle(handle);
         } else {
             invariant(!replState->voteCmdCbkHandle.isValid());
@@ -551,9 +560,10 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
             // All other errors including CallbackCanceled and network errors should be retried.
             // If ErrorCodes::CallbackCanceled is due to shutdown, then checkForInterrupt() at the
-            // beginning of this loop will catch it and throw an error to the caller. Or, if it's
-            // due to rollback, then index build should have received abort signal which would make
-            // needToVote() to return false and not to retry the voting process.
+            // beginning of this loop will catch it and throw an error to the caller. Or, if we
+            // received the CallbackCanceled error because the index build was signaled with abort
+            // or commit signal, then needToVote() would return false and we don't retry the voting
+            // process.
             LOGV2_DEBUG(4666400,
                         1,
                         "Failed to run 'voteCommitIndexBuild' command.",

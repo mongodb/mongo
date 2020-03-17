@@ -86,6 +86,12 @@ Timestamp IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildAction(
     return Timestamp();
 }
 
+void IndexBuildsCoordinatorEmbedded::setSignalAndCancelVoteRequestCbkIfActive(
+    WithLock ReplIndexBuildStateLk,
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    IndexBuildAction signal) {}
+
 Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(OperationContext* opCtx,
                                                             const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {

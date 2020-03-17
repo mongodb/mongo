@@ -88,6 +88,11 @@ public:
                            const std::vector<StringData>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
 
+    void setSignalAndCancelVoteRequestCbkIfActive(WithLock ReplIndexBuildStateLk,
+                                                  OperationContext* opCtx,
+                                                  std::shared_ptr<ReplIndexBuildState> replState,
+                                                  IndexBuildAction signal) override;
+
 private:
     /**
      * Keeps track of the relevant replica set member states. Index builds are managed differently
@@ -134,9 +139,10 @@ private:
     /**
      * Signals index builder to commit.
      */
-    void _sendCommitQuorumSatisfiedSignal(WithLock lk,
+    void _sendCommitQuorumSatisfiedSignal(WithLock ReplIndexBuildStateLk,
                                           OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState);
+
 
     void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

@@ -65,6 +65,11 @@ public:
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
 
+    void setSignalAndCancelVoteRequestCbkIfActive(WithLock ReplIndexBuildStateLk,
+                                                  OperationContext* opCtx,
+                                                  std::shared_ptr<ReplIndexBuildState> replState,
+                                                  IndexBuildAction signal) override;
+
     /**
      * None of the following functions should ever be called on an embedded server node.
      */
