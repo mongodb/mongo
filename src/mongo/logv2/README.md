@@ -444,3 +444,21 @@ long | int64 (0x12)
 unsigned long | int64 (0x12)
 long long | int64 (0x12)
 unsigned long long | int64 (0x12)
+
+# FAQ
+
+### Why are we doing this?
+
+Structured logging brings __significant__ potential for log analysis to the codebase that isn't present with earlier logging facilities. This is an improvement that facilitates many future improvements.
+
+Not only that, logv2 removes most parsing/post-processing concerns for automated downstream consumption of logs.
+
+### Why are we doing this so fast?
+
+Maintaining multiple output formats for even a single version would present serious overhead for both support and engineering. This dual support would last for years given the adoption curve, and effectively creates __four__ formats (old, new, new-old, and newer).
+
+By making a full cutover in a single release, we are in a much better position.
+
+### Why shouldn't we use formatting strings and substitution for new log lines?
+
+Human readability suffers significantly when `attr` field names are included both in the `attr` subdocument and within `msg` string. This is a powerful feature that we don't want to exclude entirely, but it makes sense to lean on it only when absolutely necessary.
