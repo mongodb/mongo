@@ -262,6 +262,9 @@ struct ReplIndexBuildState {
     // Protects the state below.
     mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");
 
+    // Whether all the requested index(es) are already built on this node.
+    bool alreadyHasIndexesBuilt = false;
+
     // Secondaries do not set this information, so it is only set on primaries or on
     // transition to primary.
     boost::optional<CommitQuorumOptions> commitQuorum;
