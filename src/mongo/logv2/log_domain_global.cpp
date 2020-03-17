@@ -168,7 +168,7 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
 
     if (options.fileEnabled) {
         auto backend = boost::make_shared<RotatableFileBackend>(
-            boost::make_shared<FileRotateSink>(),
+            boost::make_shared<FileRotateSink>(options.timestampFormat),
             boost::make_shared<RamLogSink>(RamLog::get("global")),
             boost::make_shared<RamLogSink>(RamLog::get("startupWarnings")),
             boost::make_shared<UserAssertSink>());

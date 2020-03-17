@@ -30,10 +30,14 @@
 #include "mongo/logv2/file_rotate_sink.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 #include <boost/make_shared.hpp>
 #include <fmt/format.h>
 #include <fstream>
 
+#include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/shared_access_fstream.h"
 #include "mongo/util/string_map.h"
 
@@ -64,10 +68,13 @@ StatusWith<boost::shared_ptr<stream_t>> openFile(const std::string& filename, bo
 }  // namespace
 
 struct FileRotateSink::Impl {
+    Impl(LogTimestampFormat tsFormat) : timestampFormat(tsFormat) {}
     StringMap<boost::shared_ptr<stream_t>> files;
+    LogTimestampFormat timestampFormat;
 };
 
-FileRotateSink::FileRotateSink() : _impl(std::make_unique<Impl>()) {}
+FileRotateSink::FileRotateSink(LogTimestampFormat timestampFormat)
+    : _impl(std::make_unique<Impl>(timestampFormat)) {}
 FileRotateSink::~FileRotateSink() {}
 
 Status FileRotateSink::addFile(const std::string& filename, bool append) {
@@ -129,6 +136,51 @@ Status FileRotateSink::rotate(bool rename, StringData renameSuffix) {
     }
 
     return Status::OK();
+}
+
+void FileRotateSink::consume(const boost::log::record_view& rec,
+                             const string_type& formatted_string) {
+    auto isFailed = [](const auto& file) { return file.second->fail(); };
+    boost::log::sinks::text_ostream_backend::consume(rec, formatted_string);
+    if (std::any_of(_impl->files.begin(), _impl->files.end(), isFailed)) {
+        try {
+            auto failedBegin =
+                boost::make_filter_iterator(isFailed, _impl->files.begin(), _impl->files.end());
+            auto failedEnd =
+                boost::make_filter_iterator(isFailed, _impl->files.begin(), _impl->files.end());
+
+            auto getFilename = [](const auto& file) -> const auto& {
+                return file.first;
+            };
+            auto begin = boost::make_transform_iterator(failedBegin, getFilename);
+            auto end = boost::make_transform_iterator(failedEnd, getFilename);
+            auto sequence = logv2::seqLog(begin, end);
+
+            DynamicAttributes attrs;
+            attrs.add("files", sequence);
+
+            fmt::memory_buffer buffer;
+            JSONFormatter(nullptr, _impl->timestampFormat)
+                .format(buffer,
+                        LogSeverity::Severe(),
+                        LogComponent::kControl,
+                        Date_t::now(),
+                        4522200,
+                        getThreadName(),
+                        "Writing to log file failed, aborting application",
+                        TypeErasedAttributeStorage(attrs),
+                        LogTag::kNone,
+                        LogTruncation::Disabled);
+            // Commented out log line below to get validation of the log id with the errorcodes
+            // linter LOGV2(4522200, "Writing to log file failed, aborting application");
+            std::cout << StringData(buffer.data(), buffer.size()) << std::endl;
+        } catch (...) {
+            // If the formatting code throws for any reason, ignore and proceed with aborting the
+            // application.
+        }
+
+        std::abort();
+    }
 }
 
 }  // namespace mongo::logv2
