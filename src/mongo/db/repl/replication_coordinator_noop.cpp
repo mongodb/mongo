@@ -174,8 +174,7 @@ Status ReplicationCoordinatorNoOp::setFollowerMode(const MemberState&) {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::setFollowerModeStrict(OperationContext* opCtx,
-                                                         const MemberState&) {
+Status ReplicationCoordinatorNoOp::setFollowerModeRollback(OperationContext* opCtx) {
     MONGO_UNREACHABLE;
 }
 
@@ -480,7 +479,7 @@ TopologyVersion ReplicationCoordinatorNoOp::getTopologyVersion() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::incrementTopologyVersion(OperationContext* opCtx) {
+void ReplicationCoordinatorNoOp::incrementTopologyVersion() {
     MONGO_UNREACHABLE;
 }
 

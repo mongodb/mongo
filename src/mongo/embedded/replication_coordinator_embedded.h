@@ -154,7 +154,7 @@ public:
 
     Status setFollowerMode(const repl::MemberState&) override;
 
-    Status setFollowerModeStrict(OperationContext* opCtx, const repl::MemberState&) override;
+    Status setFollowerModeRollback(OperationContext* opCtx) override;
 
     ApplierState getApplierState() override;
 
@@ -273,7 +273,7 @@ public:
 
     TopologyVersion getTopologyVersion() const override;
 
-    void incrementTopologyVersion(OperationContext* opCtx) override;
+    void incrementTopologyVersion() override;
 
     std::shared_ptr<const repl::IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,

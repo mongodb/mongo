@@ -323,8 +323,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
 
         rstlLock.waitForLockUntil(Date_t::max());
 
-        auto status =
-            _replicationCoordinator->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
+        auto status = _replicationCoordinator->setFollowerModeRollback(opCtx);
         if (!status.isOK()) {
             static constexpr char message[] = "Cannot perform replica set state transition";
             LOGV2(21594,

@@ -181,8 +181,7 @@ Status ReplicationCoordinatorEmbedded::setFollowerMode(const MemberState&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::setFollowerModeStrict(OperationContext* opCtx,
-                                                             const MemberState&) {
+Status ReplicationCoordinatorEmbedded::setFollowerModeRollback(OperationContext* opCtx) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
@@ -506,7 +505,7 @@ TopologyVersion ReplicationCoordinatorEmbedded::getTopologyVersion() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::incrementTopologyVersion(OperationContext* opCtx) {
+void ReplicationCoordinatorEmbedded::incrementTopologyVersion() {
     UASSERT_NOT_IMPLEMENTED;
 }
 

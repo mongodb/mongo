@@ -680,7 +680,7 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
-                  getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+                  getReplCoord()->setFollowerModeRollback(opCtx.get()));
 
     ASSERT_FALSE(getReplCoord()->getMemberState().rollback());
 
@@ -1423,7 +1423,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     // Transitioning to rollback state should cancel the takeover
-    ASSERT_OK(replCoord->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(replCoord->setFollowerModeRollback(opCtx.get()));
     ASSERT_TRUE(replCoord->getMemberState().rollback());
 
     stopCapturingLogMessages();

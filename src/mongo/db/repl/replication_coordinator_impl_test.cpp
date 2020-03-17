@@ -2755,7 +2755,7 @@ TEST_F(ReplCoordTest,
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
-    ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 
     // When we go back to SECONDARY, we still observe RECOVERING because of maintenance mode.
@@ -2815,7 +2815,7 @@ TEST_F(ReplCoordTest, SettingAndUnsettingMaintenanceModeShouldNotAffectRollbackS
 
     // From rollback, entering and exiting maintenance mode doesn't change perceived
     // state.
-    ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
     ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
@@ -2827,7 +2827,7 @@ TEST_F(ReplCoordTest, SettingAndUnsettingMaintenanceModeShouldNotAffectRollbackS
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
     ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
-    ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
     ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
@@ -2932,7 +2932,7 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the vote requester.
     ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
-                  getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+                  getReplCoord()->setFollowerModeRollback(opCtx.get()));
 }
 
 TEST_F(ReplCoordTest,
@@ -5225,7 +5225,7 @@ TEST_F(StableOpTimeTest,
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
     const auto opCtx = makeOperationContext();
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
-    ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
 
     // It is possible that rollback-via-refetch forces the stable timestamp backwards to the common
     // point at the end of rollback.
@@ -5290,7 +5290,7 @@ TEST_F(StableOpTimeTest, ClearOpTimeCandidatesPastCommonPointAfterRollback) {
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     // Transition to ROLLBACK. The set of stable optime candidates should not have changed.
-    ASSERT_OK(repl->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(repl->setFollowerModeRollback(opCtx.get()));
     opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 
@@ -6028,7 +6028,7 @@ TEST_F(ReplCoordTest, DoNotScheduleElectionWhenCancelAndRescheduleElectionTimeou
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
     const auto opCtx = makeOperationContext();
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
-    ASSERT_OK(replCoord->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
+    ASSERT_OK(replCoord->setFollowerModeRollback(opCtx.get()));
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
 

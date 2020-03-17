@@ -242,7 +242,7 @@ public:
      */
     Status setFollowerMode(const MemberState& newState) override;
 
-    Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState) override;
+    Status setFollowerModeRollback(OperationContext* opCtx) override;
 
     /**
      * Set this to make transitioning to the given follower mode fail with the given error code.

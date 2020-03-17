@@ -167,7 +167,7 @@ public:
 
     virtual Status setFollowerMode(const MemberState& newState);
 
-    virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState);
+    virtual Status setFollowerModeRollback(OperationContext* opCtx);
 
     virtual ApplierState getApplierState();
 
@@ -330,7 +330,7 @@ public:
 
     virtual TopologyVersion getTopologyVersion() const;
 
-    virtual void incrementTopologyVersion(OperationContext* opCtx) override;
+    virtual void incrementTopologyVersion() override;
 
     virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
