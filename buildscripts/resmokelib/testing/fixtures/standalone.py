@@ -115,9 +115,6 @@ class MongoDFixture(interface.Fixture):
                 self.logger.info("Waiting to connect to mongod on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
 
-        # Ensure that the sessions collection gets created
-        client.admin.command({"refreshLogicalSessionCacheNow": 1})
-
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
