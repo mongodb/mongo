@@ -286,57 +286,38 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
 Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCtx,
                                                           const UUID& buildUUID,
-                                                          const HostAndPort& hostAndPort) {
-
+                                                          const HostAndPort& votingNode) {
     auto swReplState = _getIndexBuild(buildUUID);
     if (!swReplState.isOK()) {
         // Index build might have got torn down.
         return swReplState.getStatus();
     }
 
-    Status upsertStatus = Status::OK();
-    std::vector<HostAndPort> members;
-    members.push_back(hostAndPort);
     auto replState = swReplState.getValue();
-
+    CommitQuorumOptions commitQuorum;
     {
+        // TODO SERVER-46557: persistCommitReadyMemberInfo() should no longer update 'commitQuorum'
+        // field in config.system.indexBuilds collection. So this block should be removed.
         stdx::unique_lock<Latch> lk(replState->mutex);
-        // This indicates the index build was successfully able to commit or abort, and about to
-        // write 'commitIndexBuild' or 'abortIndexBuild' oplog entry. In such case, we should throw
-        // a retryable error code to secondary and not try to persist the votes. Otherwise a
-        // deadlock can happen if a commit/abortIndexBuild oplog entry is followed by write to
-        // "config.system.indexBuilds" collection. In that case, voteCommitIndexBuild cmd on primary
-        // will be waiting for the system.indexBuilds write to be majority replicated. But, then,
-        // secondary oplog will be stuck waiting on commit/abortIndexBuild oplog entry. And,
-        // commit/abortIndexBuild oplog entry will be waiting on the secondary indexBuildCoordinator
-        // thread to join. But, the indexBuildCoordinator thread will be waiting for the
-        // voteCommitIndexBuild response.
-        if (replState->indexBuildState.isSet(IndexBuildState::kCommitted |
-                                             IndexBuildState::kAborted)) {
-            return Status{ErrorCodes::CommandFailed,
-                          str::stream()
-                              << "Index build state : " << replState->indexBuildState.toString()};
-        }
-
         invariant(replState->commitQuorum);
-        IndexBuildEntry indexbuildEntry(buildUUID,
-                                        replState->collectionUUID,
-                                        replState->commitQuorum.get(),
-                                        replState->indexNames);
-        indexbuildEntry.setCommitReadyMembers(members);
-
-        // Persist the vote with replState mutex lock held to make sure that node will not write the
-        // commit/abortIndexBuild oplog entry.
-        upsertStatus = persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
-        // 'DuplicateKey' error indicates that the commit quorum value read from replState does not
-        // match on-disk commit quorum value. Since, we persist the vote with replState mutex lock
-        // held, there is no way this can happen. We basically don't want something like this,
-        // SetIndexCommitQuorum command changes the commit quorum from 3 to 5. And, the
-        // voteCommitIndexBuild resets the commit quorum value to be 3 while updating the voter's
-        // info.
-        invariant(upsertStatus.code() != ErrorCodes::DuplicateKey);
+        commitQuorum = replState->commitQuorum.get();
     }
 
+    Status upsertStatus = Status(ErrorCodes::InternalError, "Uninitialized value");
+    IndexBuildEntry indexbuildEntry(
+        buildUUID, replState->collectionUUID, commitQuorum, replState->indexNames);
+    std::vector<HostAndPort> members{votingNode};
+    indexbuildEntry.setCommitReadyMembers(members);
+
+    {
+        // Upserts doesn't need to acquire pbwm lock.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+        upsertStatus = persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
+    }
+
+    // 'DuplicateKey' error indicates that the commit quorum value read from replState does not
+    // match on-disk commit quorum value.
+    invariant(upsertStatus.code() != ErrorCodes::DuplicateKey);
     if (upsertStatus.isOK()) {
         _signalIfCommitQuorumIsSatisfied(opCtx, replState);
     }
