@@ -839,6 +839,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'drop_pending_collection_reaper',
+        'repl_server_parameters',
         'repl_set_status_commands',
         'repl_settings',
         'replica_set_messages',

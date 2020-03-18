@@ -707,6 +707,13 @@ public:
                                      GetNewConfigFn getNewConfig,
                                      bool force) = 0;
 
+    /**
+     * Waits until the following two conditions are satisfied:
+     *  (1) The current config has propagated to a majority of nodes.
+     *  (2) Any operations committed in the previous config are committed in the current config.
+     */
+    virtual Status awaitConfigCommitment(OperationContext* opCtx) = 0;
+
     /*
      * Handles an incoming replSetInitiate command. If "configObj" is empty, generates a default
      * configuration to use.

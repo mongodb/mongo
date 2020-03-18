@@ -3240,6 +3240,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
           "numMembers"_attr = newConfig.getNumMembers());
 
     if (!force && !MONGO_unlikely(omitConfigQuorumCheck.shouldFail())) {
+        LOGV2(4509600, "Executing quorum check for reconfig");
         status = checkQuorumForReconfig(
             _replExecutor.get(), newConfig, myIndex.getValue(), _topCoord->getTerm());
         if (!status.isOK()) {
@@ -3260,49 +3261,6 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     configStateGuard.dismiss();
     _finishReplSetReconfig(opCtx, newConfig, force, myIndex.getValue());
 
-    if (!force &&
-        serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
-        enableSafeReplicaSetReconfig) {
-        // Wait for the config document to be replicated to a majority of nodes in the new
-        // config.
-        StatusAndDuration configAwaitStatus =
-            awaitReplication(opCtx, fakeOpTime, configWriteConcern);
-        uassertStatusOK(configAwaitStatus.status);
-
-        // Now that the new config has been persisted and installed in memory, wait for the latest
-        // committed optime in the previous config to be committed in the newly installed config.
-        // For force reconfigs we don't need to check this safety condition, and in any FCV < 4.4 we
-        // also bypass this to preserve client facing behavior in mixed version sets. Note that even
-        // if we have just left a force config via a non-force reconfig, we still want to wait for
-        // this oplog commitment check, since a subsequent safe reconfig will check it as a
-        // precondition.
-        lk.lock();
-        auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
-        auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
-        lk.unlock();
-
-        LOGV2(51815,
-              "Waiting for the last committed optime in the previous config "
-              "({configOplogCommitmentOpTime}) to be committed in the current config.",
-              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
-        StatusAndDuration oplogAwaitStatus =
-            awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);
-        if (!oplogAwaitStatus.status.isOK()) {
-            uasserted(oplogAwaitStatus.status.code(),
-                      str::stream() << "Last committed optime in the previous config ("
-                                    << configOplogCommitmentOpTime.toString()
-                                    << ") did not become committed in the current config.");
-        }
-
-        LOGV2(4508701,
-              "Committed new replica set config",
-              "newConfigVersion"_attr = newConfig.getConfigVersion(),
-              "newConfigTerm"_attr = newConfig.getConfigTerm(),
-              "configWaitDuration"_attr = configAwaitStatus.duration,
-              "oplogWaitDuration"_attr = oplogAwaitStatus.duration,
-              "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
-    }
     return Status::OK();
 }
 
@@ -3395,6 +3353,52 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     // Inform the index builds coordinator of the replica set reconfig.
     IndexBuildsCoordinator::get(opCtx)->onReplicaSetReconfig();
 }
+
+Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
+    auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
+    OpTime fakeOpTime(Timestamp(1, 1), _topCoord->getTerm());
+    auto currConfig = _rsConfig;
+    lk.unlock();
+
+    // Wait for the config document to be replicated to a majority of nodes in the current config.
+    LOGV2(4508702, "Waiting for the current config to propagate to a majority of nodes.");
+    StatusAndDuration configAwaitStatus =
+        awaitReplication(opCtx, fakeOpTime, _getConfigReplicationWriteConcern());
+    if (!configAwaitStatus.status.isOK()) {
+        std::stringstream ss;
+        ss << "Current config with " << currConfig.getConfigVersionAndTerm().toString()
+           << " did not propagate to a majority of nodes.";
+        return configAwaitStatus.status.withContext(ss.str());
+    }
+
+    // Wait for the latest committed optime in the previous config to be committed in the current
+    // config.
+    LOGV2(51815,
+          "Waiting for the last committed optime in the previous config "
+          "({configOplogCommitmentOpTime}) to be committed in the current config.",
+          "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+    StatusAndDuration oplogAwaitStatus =
+        awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);
+    if (!oplogAwaitStatus.status.isOK()) {
+        std::stringstream ss;
+        ss << "Last committed optime in the previous config ("
+           << configOplogCommitmentOpTime.toString()
+           << ") did not become committed in the current config.";
+        return oplogAwaitStatus.status.withContext(ss.str());
+    }
+
+    LOGV2(4508701,
+          "Committed current replica set config",
+          "configVersion"_attr = currConfig.getConfigVersion(),
+          "configTerm"_attr = currConfig.getConfigTerm(),
+          "configWaitDuration"_attr = configAwaitStatus.duration,
+          "oplogWaitDuration"_attr = oplogAwaitStatus.duration,
+          "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+    return Status::OK();
+}
+
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCtx,
                                                           const BSONObj& configObj,
