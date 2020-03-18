@@ -201,142 +201,57 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
 
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
-                                                     ChainingPreference chainingPreference) {
-    // If we are not a member of the current replica set configuration, no sync source is valid.
-    if (_selfIndex == -1) {
-        LOGV2_DEBUG(
-            21778, 1, "Cannot sync from any members because we are not in the replica set config");
-        return HostAndPort();
+                                                     ChainingPreference chainingPreference,
+                                                     ReadPreference readPreference) {
+    // Check to make sure we can choose a sync source, and choose a forced one if
+    // set.
+    auto maybeSyncSource = _chooseSyncSourceInitialStep(now);
+    if (maybeSyncSource) {
+        _syncSource = *maybeSyncSource;
+        return _syncSource;
     }
 
-    if (auto sfp = forceSyncSourceCandidate.scoped(); MONGO_unlikely(sfp.isActive())) {
-        const auto& data = sfp.getData();
-        const auto hostAndPortElem = data["hostAndPort"];
-        if (!hostAndPortElem) {
+    // If we are only allowed to sync from the primary, use it as the sync source if possible.
+    if (readPreference == ReadPreference::PrimaryOnly ||
+        (chainingPreference == ChainingPreference::kUseConfiguration &&
+         !_rsConfig.isChainingAllowed())) {
+        if (readPreference == ReadPreference::SecondaryOnly) {
             LOGV2_FATAL(
-                3873103,
+                3873102,
                 "Sync source read preference 'secondaryOnly' with chaining disabled is not valid.");
+            fassertFailed(3873103);
         }
-
-        const auto hostAndPort = HostAndPort(hostAndPortElem.checkAndGetStringData());
-        const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(hostAndPort);
-        if (syncSourceIndex < 0) {
-            LOGV2(21779,
-                  "'forceSyncSourceCandidate' failed due to host and port not in "
-                  "replica set config: {hostAndPort}",
-                  "'forceSyncSourceCandidate' failed due to host and port not in "
-                  "replica set config",
-                  "hostAndPort"_attr = hostAndPort.toString());
-            fassertFailed(50836);
+        _syncSource = _choosePrimaryAsSyncSource(now, lastOpTimeFetched);
+        if (_syncSource.empty()) {
+            if (readPreference == ReadPreference::PrimaryOnly) {
+                LOGV2_DEBUG(3873104,
+                            1,
+                            "Cannot select a sync source because the primary is not a valid sync "
+                            "source and the sync source read preference is 'primary'.");
+            } else {
+                LOGV2_DEBUG(3873105,
+                            1,
+                            "Cannot select a sync source because the primary is not a valid sync "
+                            "source and chaining is disabled.");
+            }
         }
-
-
-        if (_memberIsBlacklisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
-            LOGV2(21780,
-                  "Cannot select a sync source because forced candidate is blacklisted: "
-                  "{hostAndPort}",
-                  "Cannot select a sync source because forced candidate is blacklisted",
-                  "hostAndPort"_attr = hostAndPort.toString());
-            _syncSource = HostAndPort();
-            return _syncSource;
-        }
-
-        _syncSource = _rsConfig.getMemberAt(syncSourceIndex).getHostAndPort();
-        LOGV2(21781,
-              "choosing sync source candidate due to 'forceSyncSourceCandidate' parameter: "
-              "{syncSource}",
-              "Choosing sync source candidate due to 'forceSyncSourceCandidate' parameter",
-              "syncSource"_attr = _syncSource);
-        std::string msg(str::stream() << "syncing from: " << _syncSource.toString()
-                                      << " by 'forceSyncSourceCandidate' parameter");
-        setMyHeartbeatMessage(now, msg);
         return _syncSource;
-    }
-
-    // if we have a target we've requested to sync from, use it
-    if (_forceSyncSourceIndex != -1) {
-        invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
-        _syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
-        _forceSyncSourceIndex = -1;
-        LOGV2(21782,
-              "choosing sync source candidate by request: {syncSource}",
-              "Choosing sync source candidate by request",
-              "syncSource"_attr = _syncSource);
-        std::string msg(str::stream()
-                        << "syncing from: " << _syncSource.toString() << " by request");
-        setMyHeartbeatMessage(now, msg);
-        return _syncSource;
-    }
-
-    // wait for 2N pings (not counting ourselves) before choosing a sync target
-    int needMorePings = (_memberData.size() - 1) * 2 - _getTotalPings();
-
-    if (needMorePings > 0) {
-        static Occasionally sampler;
-        if (sampler.tick()) {
-            LOGV2(21783,
-                  "waiting for {pingsNeeded} pings from other members before syncing",
-                  "Waiting for pings from other members before syncing",
-                  "pingsNeeded"_attr = needMorePings);
-        }
-        _syncSource = HostAndPort();
-        return _syncSource;
-    }
-
-    // If we are only allowed to sync from the primary, set that
-    if (chainingPreference == ChainingPreference::kUseConfiguration &&
-        !_rsConfig.isChainingAllowed()) {
-        if (_currentPrimaryIndex == -1) {
-            LOGV2_DEBUG(21784,
-                        1,
-                        "Cannot select a sync source because chaining is"
-                        " not allowed and primary is unknown/down");
-            _syncSource = HostAndPort();
-            return _syncSource;
-        } else if (_memberIsBlacklisted(*getCurrentPrimaryMember(), now)) {
-            LOGV2_DEBUG(21785,
-                        1,
-                        "Cannot select a sync source because chaining is not allowed and primary "
-                        "member is blacklisted: {primary}",
-                        "Cannot select a sync source because chaining is not allowed and primary "
-                        "member is blacklisted",
-                        "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
-            _syncSource = HostAndPort();
-            return _syncSource;
-        } else if (_currentPrimaryIndex == _selfIndex) {
-            LOGV2_DEBUG(
-                21786,
-                1,
-                "Cannot select a sync source because chaining is not allowed and we are primary");
-            _syncSource = HostAndPort();
-            return _syncSource;
-        } else if (_memberData.at(_currentPrimaryIndex).getLastAppliedOpTime() <
-                   lastOpTimeFetched) {
-            LOGV2_DEBUG(
-                4615639,
-                1,
-                "Cannot select a sync source because chaining is not allowed and the primary "
-                "is behind me. Last oplog optime of primary {primary}: {primaryOpTime}, my "
-                "last fetched oplog "
-                "optime: {lastFetchedOpTime}",
-                "Cannot select a sync source because chaining is not allowed and the primary "
-                "is behind me",
-                "primary"_attr = getCurrentPrimaryMember()->getHostAndPort(),
-                "primaryOpTime"_attr = _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime(),
-                "lastFetchedOpTime"_attr = lastOpTimeFetched);
-            _syncSource = HostAndPort();
-            return _syncSource;
-        } else {
-            _syncSource = getCurrentPrimaryMember()->getHostAndPort();
-            LOGV2(21787,
-                  "chaining not allowed, choosing primary as sync source candidate: {syncSource}",
-                  "Chaining not allowed, choosing primary as sync source candidate",
-                  "syncSource"_attr = _syncSource);
-            std::string msg(str::stream() << "syncing from primary: " << _syncSource.toString());
-            setMyHeartbeatMessage(now, msg);
+    } else if (readPreference == ReadPreference::PrimaryPreferred) {
+        // If we prefer the primary, try it first.
+        _syncSource = _choosePrimaryAsSyncSource(now, lastOpTimeFetched);
+        if (!_syncSource.empty()) {
             return _syncSource;
         }
     }
+    _syncSource = _chooseNearbySyncSource(now, lastOpTimeFetched, readPreference);
+    return _syncSource;
+}
+
+HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
+                                                         const OpTime& lastOpTimeFetched,
+                                                         ReadPreference readPreference) {
+    // We should have handled PrimaryOnly before calling this.
+    invariant(readPreference != ReadPreference::PrimaryOnly);
 
     // find the member with the lowest ping time that is ahead of me
 
@@ -382,123 +297,113 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
 
             // Candidate must be up to be considered.
             if (!it->up()) {
-                LOGV2_DEBUG(21788,
+                LOGV2_DEBUG(3873106,
                             2,
-                            "Cannot select sync source because it is not up: "
-                            "{syncSource}",
-                            "Cannot select sync source because it is not up",
-                            "syncSource"_attr = itMemberConfig.getHostAndPort());
+                            "Cannot select sync source because it is not up.",
+                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                 continue;
             }
             // Candidate must be PRIMARY or SECONDARY state to be considered.
             if (!it->getState().readable()) {
-                LOGV2_DEBUG(21789,
+                LOGV2_DEBUG(3873107,
                             2,
-                            "Cannot select sync source because it is not readable: "
-                            "{syncSource}",
-                            "Cannot select sync source because it is not readable",
-                            "syncSource"_attr = itMemberConfig.getHostAndPort());
+                            "Cannot select sync source because it is not readable.",
+                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                 continue;
+            }
+
+            // Disallow the primary for first or all attempts depending on the readPreference.
+            if (readPreference == ReadPreference::SecondaryOnly ||
+                (readPreference == ReadPreference::SecondaryPreferred && attempts == 0)) {
+                if (it->getState().primary()) {
+                    LOGV2_DEBUG(3873101,
+                                2,
+                                "Cannot select sync source because it is a primary and we are "
+                                "looking for a secondary.",
+                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
+                    continue;
+                }
             }
 
             // On the first attempt, we skip candidates that do not match these criteria.
             if (attempts == 0) {
                 // Candidate must be a voter if we are a voter.
                 if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
-                    LOGV2_DEBUG(21790,
+                    LOGV2_DEBUG(3873108,
                                 2,
-                                "Cannot select sync source because we are a voter and it is not: "
-                                "{syncSource}",
-                                "Cannot select sync source because we are a voter and it is not",
-                                "syncSource"_attr = itMemberConfig.getHostAndPort());
+                                "Cannot select sync source because we are a voter and it is not.",
+                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                     continue;
                 }
                 // Candidates must not be hidden.
                 if (itMemberConfig.isHidden()) {
-                    LOGV2_DEBUG(21791,
+                    LOGV2_DEBUG(3873109,
                                 2,
-                                "Cannot select sync source because it is hidden: "
-                                "{syncSource}",
-                                "Cannot select sync source because it is hidden",
-                                "syncSource"_attr = itMemberConfig.getHostAndPort());
+                                "Cannot select sync source because it is hidden.",
+                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                     continue;
                 }
                 // Candidates cannot be excessively behind.
                 if (it->getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
-                    LOGV2_DEBUG(
-                        21792,
-                        2,
-                        "Cannot select sync source because it is too far behind.Latest optime of "
-                        "sync candidate {syncSource}: "
-                        "{syncSourceHeartbeatAppliedOpTime}, oldest acceptable optime: "
-                        "{oldestAcceptableOpTime}",
-                        "Cannot select sync source because it is too far behind",
-                        "syncSource"_attr = itMemberConfig.getHostAndPort(),
-                        "syncSourceHeartbeatAppliedOpTime"_attr = it->getHeartbeatAppliedOpTime(),
-                        "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+                    LOGV2_DEBUG(3873110,
+                                2,
+                                "Cannot select sync source because it is too far behind.",
+                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
+                                "syncSourceCandidateOpTime"_attr = it->getHeartbeatAppliedOpTime(),
+                                "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
                     continue;
                 }
                 // Candidate must not have a configured delay larger than ours.
                 if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
-                    LOGV2_DEBUG(21793,
+                    LOGV2_DEBUG(3873111,
                                 2,
-                                "Cannot select sync source with larger slaveDelay than ours: "
-                                "{syncSource}",
-                                "Cannot select sync source with larger slaveDelay than ours",
-                                "syncSource"_attr = itMemberConfig.getHostAndPort());
+                                "Cannot select sync source with larger slaveDelay than ours.",
+                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
+                                "syncSourceCandidateSlaveDelay"_attr =
+                                    itMemberConfig.getSlaveDelay(),
+                                "slaveDelay"_attr = _selfConfig().getSlaveDelay());
                     continue;
                 }
             }
             // Candidate must build indexes if we build indexes, to be considered.
             if (_selfConfig().shouldBuildIndexes()) {
                 if (!itMemberConfig.shouldBuildIndexes()) {
-                    LOGV2_DEBUG(21794,
-                                2,
-                                "Cannot select sync source with shouldBuildIndex differences: "
-                                "{syncSource}",
-                                "Cannot select sync source with shouldBuildIndex differences",
-                                "syncSource"_attr = itMemberConfig.getHostAndPort());
+                    LOGV2_DEBUG(
+                        3873112,
+                        2,
+                        "Cannot select sync source which does not build indexes when we do.",
+                        "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                     continue;
                 }
             }
             // Only select a candidate that is ahead of me.
             if (it->getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
-                LOGV2_DEBUG(21795,
+                LOGV2_DEBUG(3873113,
                             1,
-                            "Cannot select this sync source. Sync source must be ahead of me. Sync "
-                            "candidate: {syncSource}, my last fetched oplog "
-                            "optime: {lastOpTimeFetched}, latest oplog optime of sync candidate: "
-                            "{syncSourceHeartbeatAppliedOpTime}",
-                            "Cannot select this sync source. Sync source must be ahead of me",
-                            "syncSource"_attr = itMemberConfig.getHostAndPort(),
-                            "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON(),
-                            "syncSourceHeartbeatAppliedOpTime"_attr =
-                                it->getHeartbeatAppliedOpTime().toBSON());
+                            "Cannot select sync source which is not ahead of me.",
+                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
+                            "syncSourceCandidateLastAppliedOpTime"_attr =
+                                it->getHeartbeatAppliedOpTime().toBSON(),
+                            "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
             if ((closestIndex != -1) &&
                 (_getPing(itMemberConfig.getHostAndPort()) >
                  _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
-                LOGV2_DEBUG(21796,
+                LOGV2_DEBUG(3873114,
                             2,
                             "Cannot select sync source with higher latency than the best "
-                            "candidate: {syncSource}",
-                            "Cannot select sync source with higher latency than the best "
                             "candidate",
-                            "syncSource"_attr = itMemberConfig.getHostAndPort());
-
+                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                 continue;
             }
             // Candidate cannot be blacklisted.
             if (_memberIsBlacklisted(itMemberConfig, now)) {
-                LOGV2_DEBUG(21797,
+                LOGV2_DEBUG(3873115,
                             1,
-                            "Cannot select sync source which is blacklisted: "
-                            "{syncSource}",
-                            "Cannot select sync source which is blacklisted",
-                            "syncSource"_attr = itMemberConfig.getHostAndPort());
-
+                            "Cannot select sync source which is blacklisted.",
+                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
                 continue;
             }
             // This candidate has passed all tests; set 'closestIndex'
@@ -521,13 +426,125 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         return _syncSource;
     }
     _syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
-    LOGV2(21799,
-          "sync source candidate: {syncSource}",
-          "Sync source candidate",
-          "syncSource"_attr = _syncSource);
+    LOGV2(21799, "sync source candidate chosen.", "syncSource"_attr = _syncSource);
     std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
     setMyHeartbeatMessage(now, msg);
     return _syncSource;
+}
+
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(Date_t now) {
+    // If we are not a member of the current replica set configuration, no sync source is valid.
+    if (_selfIndex == -1) {
+        LOGV2_DEBUG(
+            21778, 1, "Cannot sync from any members because we are not in the replica set config");
+        return HostAndPort();
+    }
+
+    if (auto sfp = forceSyncSourceCandidate.scoped(); MONGO_unlikely(sfp.isActive())) {
+        const auto& data = sfp.getData();
+        const auto hostAndPortElem = data["hostAndPort"];
+        if (!hostAndPortElem) {
+            LOGV2_FATAL(21839,
+                        "'forceSyncSoureCandidate' parameter set with invalid host and port: "
+                        "{failpointData}",
+                        "'forceSyncSoureCandidate' parameter set with invalid host and port",
+                        "failpointData"_attr = data);
+            fassertFailed(50835);
+        }
+
+        const auto hostAndPort = HostAndPort(hostAndPortElem.checkAndGetStringData());
+        const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(hostAndPort);
+        if (syncSourceIndex < 0) {
+            LOGV2(3873118,
+                  "'forceSyncSourceCandidate' failed due to host and port not in "
+                  "replica set config.",
+                  "syncSourceCandidate"_attr = hostAndPort.toString());
+            fassertFailed(50836);
+        }
+
+
+        if (_memberIsBlacklisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
+            LOGV2(3873119,
+                  "Cannot select a sync source because forced candidate is blacklisted.",
+                  "syncSourceCandidate"_attr = hostAndPort.toString());
+            return HostAndPort();
+        }
+
+        auto syncSource = _rsConfig.getMemberAt(syncSourceIndex).getHostAndPort();
+        LOGV2(21781,
+              "choosing sync source candidate due to 'forceSyncSourceCandidate' parameter.",
+              "Choosing sync source candidate due to 'forceSyncSourceCandidate' parameter",
+              "syncSource"_attr = syncSource);
+        std::string msg(str::stream() << "syncing from: " << syncSource.toString()
+                                      << " by 'forceSyncSourceCandidate' parameter");
+        setMyHeartbeatMessage(now, msg);
+        return syncSource;
+    }
+
+    // if we have a target we've requested to sync from, use it
+    if (_forceSyncSourceIndex != -1) {
+        invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
+        auto syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
+        _forceSyncSourceIndex = -1;
+        LOGV2(21782, "choosing sync source candidate by request", "syncSource"_attr = syncSource);
+        std::string msg(str::stream()
+                        << "syncing from: " << syncSource.toString() << " by request");
+        setMyHeartbeatMessage(now, msg);
+        return syncSource;
+    }
+
+    // wait for 2N pings (not counting ourselves) before choosing a sync target
+    int needMorePings = (_memberData.size() - 1) * 2 - pingsInConfig;
+
+    if (needMorePings > 0) {
+        static Occasionally sampler;
+        if (sampler.tick()) {
+            LOGV2(21783,
+                  "waiting for {pingsNeeded} pings from other members before syncing",
+                  "Waiting for pings from other members before syncing",
+                  "pingsNeeded"_attr = needMorePings);
+        }
+        return HostAndPort();
+    }
+    return boost::none;
+}
+
+HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
+                                                            const OpTime& lastOpTimeFetched) {
+    if (_currentPrimaryIndex == -1) {
+        LOGV2_DEBUG(21784,
+                    1,
+                    "Cannot select the primary as sync source because"
+                    " the primary is unknown/down.");
+        return HostAndPort();
+    } else if (_memberIsBlacklisted(*getCurrentPrimaryMember(), now)) {
+        LOGV2_DEBUG(3873116,
+                    1,
+                    "Cannot select the primary as sync source because the primary "
+                    "member is blacklisted.",
+                    "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
+        return HostAndPort();
+    } else if (_currentPrimaryIndex == _selfIndex) {
+        LOGV2_DEBUG(
+            21786, 1, "Cannot select the primary as sync source because this node is primary.");
+        return HostAndPort();
+    } else if (_memberData.at(_currentPrimaryIndex).getLastAppliedOpTime() < lastOpTimeFetched) {
+        LOGV2_DEBUG(4615639,
+                    1,
+                    "Cannot select the primary as sync source because the primary "
+                    "is behind this node.",
+                    "primary"_attr = getCurrentPrimaryMember()->getHostAndPort(),
+                    "primaryOpTime"_attr =
+                        _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime(),
+                    "lastFetchedOpTime"_attr = lastOpTimeFetched);
+        return HostAndPort();
+    } else {
+        auto syncSource = getCurrentPrimaryMember()->getHostAndPort();
+        LOGV2(3873117, "Choosing primary as sync source.", "primary"_attr = syncSource);
+        std::string msg(str::stream() << "syncing from primary: " << syncSource.toString());
+        setMyHeartbeatMessage(now, msg);
+        return syncSource;
+    }
 }
 
 bool TopologyCoordinator::_memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now) const {
@@ -967,6 +984,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
                     "setUpValues: heartbeat response good for member _id:{memberId}",
                     "setUpValues: heartbeat response good",
                     "memberId"_attr = member.getId());
+        pingsInConfig++;
         advancedOpTimeOrUpdatedConfig = hbData.setUpValues(now, std::move(hbr));
     }
 
@@ -2121,6 +2139,8 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
         _memberData.clear();
         // We're not in the config, we can't sync any more.
         _syncSource = HostAndPort();
+        // We shouldn't get a sync source until we've received pings for our new config.
+        pingsInConfig = 0;
         MemberData newHeartbeatData;
         for (auto&& oldMemberData : oldHeartbeats) {
             if (oldMemberData.isSelf()) {

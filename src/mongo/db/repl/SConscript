@@ -10,6 +10,7 @@ env.Library(
         env.Idlc('repl_server_parameters.idl')[0]
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ]
 )

@@ -30,6 +30,8 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    cpp_includes:
+      - "mongo/client/read_preference.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -272,3 +274,17 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: enableSafeReplicaSetReconfig
         default: true
+
+    initialSyncSourceReadPreference:
+        description: >-
+            Set this to specify how the sync source for initial sync is determined.
+            Valid options are: nearest, primary, primaryPreferred, secondary,
+            and secondaryPreferred.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: initialSyncSourceReadPreference
+        # When the default is used, if chaining is disabled in the config then readPreference is
+        # 'primary'.  Otherwise, if the node is a voting node, readPreference is 'primaryPreferred'
+        # and if it is not, readPreference is 'nearest'.
+        default: ""
+        validator: { callback: 'validateReadPreferenceMode' }

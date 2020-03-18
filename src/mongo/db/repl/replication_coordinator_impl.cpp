@@ -45,6 +45,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
@@ -4335,11 +4336,41 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
 
     HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
     // Always allow chaining while in catchup and drain mode.
-    auto chainingPreference = _getMemberState_inlock().primary()
+    auto memberState = _getMemberState_inlock();
+    auto chainingPreference = memberState.primary()
         ? TopologyCoordinator::ChainingPreference::kAllowChaining
         : TopologyCoordinator::ChainingPreference::kUseConfiguration;
-    HostAndPort newSyncSource =
-        _topCoord->chooseNewSyncSource(_replExecutor->now(), lastOpTimeFetched, chainingPreference);
+    ReadPreference readPreference = ReadPreference::Nearest;
+    // Handle special case of initial sync source read preference.
+    // This sync source will be cleared when we go to secondary mode, because we will perform
+    // a postMemberState action of kOnFollowerModeStateChange which calls chooseNewSyncSource().
+    if (memberState.startup2() && _selfIndex != -1) {
+        if (!initialSyncSourceReadPreference.empty()) {
+            try {
+                readPreference =
+                    ReadPreference_parse(IDLParserErrorContext("initialSyncSourceReadPreference"),
+                                         initialSyncSourceReadPreference);
+            } catch (const DBException& e) {
+                fassertFailedWithStatus(3873100, e.toStatus());
+            }
+            // If read preference is explictly set, it takes precedence over chaining: false.
+            chainingPreference = TopologyCoordinator::ChainingPreference::kAllowChaining;
+        } else if (_rsConfig.getMemberAt(_selfIndex).getNumVotes() > 0) {
+            // Voting nodes prefer to sync from the primary.  A voting node that is initial syncing
+            // may have acknowledged writes which are part of the set's write majority; if it then
+            // resyncs from a node which does not have those writes, and (before it replicates them
+            // again) helps elect a new primary which also does not have those writes, the writes
+            // may be lost.  By resyncing from the primary (if possible), which always has the
+            // majority-commited writes, the probability of this scenario is reduced.
+            readPreference = ReadPreference::PrimaryPreferred;
+        }
+    }
+    HostAndPort newSyncSource = _topCoord->chooseNewSyncSource(
+        _replExecutor->now(), lastOpTimeFetched, chainingPreference, readPreference);
+    auto primary = _topCoord->getCurrentPrimaryMember();
+    // If read preference is SecondaryOnly, we should never choose the primary.
+    invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
+              primary->getHostAndPort() != newSyncSource);
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.
