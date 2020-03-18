@@ -80,6 +80,8 @@ void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* s
                 auto opCtx = client->makeOperationContext();
 
                 SnapshotWindowUtil::decreaseTargetSnapshotWindowSize(opCtx.get());
+            } catch (const ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+                LOG(4) << "Periodic task cancelled: " << ex.toStatus();
             } catch (const DBException& ex) {
                 if (!ErrorCodes::isShutdownError(ex.toStatus().code())) {
                     warning() << "Periodic task to check for and decrease cache pressure caused by "

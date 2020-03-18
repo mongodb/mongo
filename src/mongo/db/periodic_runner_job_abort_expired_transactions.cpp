@@ -88,7 +88,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    PeriodicRunner::PeriodicJob job("startPeriodicThreadToAbortExpiredTransactions",
+    PeriodicRunner::PeriodicJob job("abortExpiredTransactions",
                                     [](Client* client) {
                                         // The opCtx destructor handles unsetting itself from the
                                         // Client. (The PeriodicRunner's Client must be reset before
@@ -101,8 +101,12 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
                                         // non-transaction, exclusive lock taking operation blocked
                                         // behind an active transaction's intent lock.
                                         opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
-
-                                        killAllExpiredTransactions(opCtx.get());
+                                        try {
+                                            killAllExpiredTransactions(opCtx.get());
+                                        } catch (
+                                            ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+                                            LOG(2) << "Periodic job canceled: " << ex.reason();
+                                        }
                                     },
                                     getPeriod(gTransactionLifetimeLimitSeconds.load()));
 
