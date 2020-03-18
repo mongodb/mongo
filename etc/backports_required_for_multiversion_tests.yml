@@ -61,6 +61,26 @@ replica_sets_multiversion:
   test_file: jstests/replsets/initial_sync_ambiguous_index.js
 - ticket: SERVER-45143
   test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/election_handoff_basic.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/election_candidate_and_participant_metrics.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/no_flapping_during_network_partition.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/election_handoff_flip.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/catchup.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/avg_num_catchup_ops.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/initial_sync_applier_error.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/initial_sync_drop_collection.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/initial_sync_rename_collection.js
+- ticket: SERVER-46389
+  test_file: jstests/replsets/initial_sync_test_fixture_test.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
