@@ -2,10 +2,6 @@
  * $addFields can be used to add fixed and computed fields to documents while preserving the
  * original document. Verify that using $addFields and adding computed fields in a $project yield
  * the same result. Use the sample case of computing weather metadata.
- * @tags: [
- *   requires_sharding,
- *   requires_spawning_own_processes,
- * ]
  */
 
 (function() {
@@ -14,10 +10,16 @@
 // For arrayEq.
 load("jstests/aggregation/extras/utils.js");
 
-const dbName = "test";
 const collName = jsTest.name();
+const coll = db.getCollection(collName);
+coll.drop();
 
 Random.setRandomSeed();
+
+const nDocs = 10;
+for (let i = 0; i < nDocs; i++) {
+    assert.commandWorked(coll.insert(generateRandomDocument()));
+}
 
 /**
  * Helper to generate an array of specified length of numbers in the specified range.
@@ -49,56 +51,34 @@ function generateRandomDocument() {
     };
 }
 
-function doExecutionTest(conn) {
-    const coll = conn.getDB(dbName).getCollection(collName);
-    coll.drop();
-
-    // Insert a bunch of documents of the form above.
-    const nDocs = 10;
-    for (let i = 0; i < nDocs; i++) {
-        assert.commandWorked(coll.insert(generateRandomDocument()));
+// Add the minimum, maximum, and average temperatures, and make sure that doing the same
+// with addFields yields the correct answer.
+// First compute with $project, since we know all the fields in this document.
+let projectWeatherPipe = [{
+    $project: {
+        "month": 1,
+        "day": 1,
+        "temperatures": 1,
+        "minTemp": {"$min": "$temperatures"},
+        "maxTemp": {"$max": "$temperatures"},
+        "average": {"$avg": "$temperatures"},
+        // _id is implicitly included.
     }
+}];
+let correctWeather = coll.aggregate(projectWeatherPipe).toArray();
 
-    // Add the minimum, maximum, and average temperatures, and make sure that doing the same
-    // with addFields yields the correct answer.
-    // First compute with $project, since we know all the fields in this document.
-    let projectWeatherPipe = [{
-        $project: {
-            "month": 1,
-            "day": 1,
-            "temperatures": 1,
-            "minTemp": {"$min": "$temperatures"},
-            "maxTemp": {"$max": "$temperatures"},
-            "average": {"$avg": "$temperatures"},
-            // _id is implicitly included.
-        }
-    }];
-    let correctWeather = coll.aggregate(projectWeatherPipe).toArray();
+// Then compute the same results using $addFields.
+let addFieldsWeatherPipe = [{
+    $addFields: {
+        "minTemp": {"$min": "$temperatures"},
+        "maxTemp": {"$max": "$temperatures"},
+        "average": {"$avg": "$temperatures"},
+        // All other fields are implicitly included.
+    }
+}];
+let addFieldsResult = coll.aggregate(addFieldsWeatherPipe).toArray();
 
-    // Then compute the same results using $addFields.
-    let addFieldsWeatherPipe = [{
-        $addFields: {
-            "minTemp": {"$min": "$temperatures"},
-            "maxTemp": {"$max": "$temperatures"},
-            "average": {"$avg": "$temperatures"},
-            // All other fields are implicitly included.
-        }
-    }];
-    let addFieldsResult = coll.aggregate(addFieldsWeatherPipe).toArray();
-
-    // Then assert they are the same.
-    assert(arrayEq(addFieldsResult, correctWeather),
-           "$addFields does not work the same as a $project with computed and included fields");
-}
-
-// Test against the standalone started by resmoke.py.
-let conn = db.getMongo();
-doExecutionTest(conn);
-print("Success! Standalone execution weather test for $addFields passed.");
-
-// Test against a sharded cluster.
-let st = new ShardingTest({shards: 2});
-doExecutionTest(st.s0);
-st.stop();
-print("Success! Sharding weather test for $addFields passed.");
+// Then assert they are the same.
+assert(arrayEq(addFieldsResult, correctWeather),
+       "$addFields does not work the same as a $project with computed and included fields");
 }());

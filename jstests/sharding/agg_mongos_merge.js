@@ -6,14 +6,8 @@
  * - Non-splittable streaming stages, e.g. $match, $project, $unwind.
  * - Blocking stages in cases where 'allowDiskUse' is false, e.g. $group, $bucketAuto.
  *
- * Because wrapping these aggregations in a $facet stage will affect how the pipeline can be merged,
- * and will therefore invalidate the results of the test cases below, we tag this test to prevent it
- * running under the 'aggregation_facet_unwind' passthrough.
- *
  * @tags: [
- *   do_not_wrap_aggregations_in_facets,
  *   requires_sharding,
- *   requires_spawning_own_processes,
  *   requires_profiling,
  * ]
  */
@@ -66,7 +60,7 @@ assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 // Create a random geo co-ord generator for testing.
-var georng = new GeoNearRandomTest(mongosColl);
+var georng = new GeoNearRandomTest(mongosColl, mongosDB);
 
 // Write 400 documents across the 4 chunks.
 for (let i = -200; i < 200; i++) {

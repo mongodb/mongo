@@ -3,9 +3,6 @@
  * client for the aggregation pipeline is killed.
  *
  * This test was designed to reproduce SERVER-24386.
- * @tags: [
- *   requires_spawning_own_processes,
- * ]
  */
 (function() {
 'use strict';

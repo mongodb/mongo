@@ -1,8 +1,4 @@
 // SERVER-7781 $geoNear pipeline stage
-// @tags: [
-//   requires_sharding,
-//   requires_spawning_own_processes,
-// ]
 (function() {
 'use strict';
 
@@ -55,31 +51,8 @@ function testGeoNearStageOutput({geoNearSpec, limit, batchSize}) {
 // We use this to generate points. Using a single global to avoid reseting RNG in each pass.
 var pointMaker = new GeoNearRandomTest(coll);
 
-function test(db, sharded, indexType) {
+function test(db, indexType) {
     db[coll].drop();
-
-    if (sharded) {  // sharded setup
-        var shards = [];
-        var config = db.getSiblingDB("config");
-        config.shards.find().forEach(function(shard) {
-            shards.push(shard._id);
-        });
-
-        assert.commandWorked(
-            db.adminCommand({shardCollection: db[coll].getFullName(), key: {rand: 1}}));
-        for (var i = 1; i < 10; i++) {
-            // split at 0.1, 0.2, ... 0.9
-            assert.commandWorked(
-                db.adminCommand({split: db[coll].getFullName(), middle: {rand: i / 10}}));
-            db.adminCommand({
-                moveChunk: db[coll].getFullName(),
-                find: {rand: i / 10},
-                to: shards[i % shards.length]
-            });
-        }
-
-        assert.eq(config.chunks.count({'ns': db[coll].getFullName()}), 10);
-    }
 
     // insert points
     var numPts = 10 * 1000;
@@ -117,15 +90,6 @@ function test(db, sharded, indexType) {
     });
 }
 
-test(db, false, '2d');
-test(db, false, '2dsphere');
-
-var sharded = new ShardingTest({shards: 3, mongos: 1});
-assert.commandWorked(sharded.s0.adminCommand({enablesharding: "test"}));
-sharded.ensurePrimaryShard('test', sharded.shard1.shardName);
-
-test(sharded.getDB('test'), true, '2d');
-test(sharded.getDB('test'), true, '2dsphere');
-
-sharded.stop();
+test(db, '2d');
+test(db, '2dsphere');
 })();

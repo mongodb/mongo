@@ -3,18 +3,17 @@
  * document when run via mongoS, and that the former is absent when run on a non-shard mongoD.
  * @tags: [
  *   requires_sharding,
- *   requires_spawning_own_processes,
  * ]
  */
 (function() {
 "use strict";
 
-// Test mongoD behaviour using the standalone started by resmoke.py.
-let testDB = db.getSiblingDB(jsTestName());
+const conn = MongoRunner.runMongod();
+let testDB = conn.getDB(jsTestName());
 let testColl = testDB.test;
 
 // getHostName() doesn't include port, db.getMongo().host is 127.0.0.1:<port>
-const hostName = (getHostName() + ":" + db.getMongo().host.split(":")[1]);
+const hostName = (getHostName() + ":" + testDB.getMongo().host.split(":")[1]);
 
 // Test that the shard field is absent and the host field is present when run on mongoD.
 assert.eq(testColl
@@ -24,6 +23,8 @@ assert.eq(testColl
               ])
               .toArray(),
           [{_id: {host: hostName}}]);
+
+MongoRunner.stopMongod(conn);
 
 // Test that both shard and hostname are present for $collStats results on a sharded cluster.
 const st = new ShardingTest({name: jsTestName(), shards: 2});

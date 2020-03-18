@@ -641,6 +641,18 @@ err = assert.throws(() => sourceColl
                                       {allowDiskUse: true})
                                   .itcount());
 assert.eq(err.code, 28769);
+err = assert.throws(
+    () => sourceColl
+              .aggregate(
+                  [{$facet: {
+                    a: {
+                      $lookup:
+                          {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
+                    }
+                  }}],
+                  {allowDiskUse: true})
+              .itcount());
+assert.eq(err.code, 40170);
 
 st.stop();
 }());

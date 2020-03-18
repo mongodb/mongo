@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   requires_spawning_own_processes,
  *   requires_profiling
  * ]
  */

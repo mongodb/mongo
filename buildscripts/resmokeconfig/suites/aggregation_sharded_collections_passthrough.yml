@@ -6,13 +6,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # The following tests start their own ReplSetTest.
-  - jstests/aggregation/testSlave.js
-  - jstests/aggregation/sources/changeStream/*.js
-  # The following tests start their own mongod.
-  - jstests/aggregation/bugs/cursor_timeout.js
-  - jstests/aggregation/bugs/lookup_unwind_getmore.js
-  - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # This test makes assertions about whether aggregations will need to spill to disk, which assumes
   # all the data is located on a single shard.
   - jstests/aggregation/spill_to_disk.js

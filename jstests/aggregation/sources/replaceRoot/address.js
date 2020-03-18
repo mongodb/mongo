@@ -1,9 +1,5 @@
 /**
  * $replaceRoot can be used to extract parts of a document; here we test a simple address case.
- * @tags: [
- *   requires_sharding,
- *   requires_spawning_own_processes,
- * ]
  */
 
 (function() {
@@ -11,9 +7,6 @@
 
 // For arrayEq.
 load("jstests/aggregation/extras/utils.js");
-
-const dbName = "test";
-const collName = jsTest.name();
 
 Random.setRandomSeed();
 
@@ -51,54 +44,42 @@ function generateRandomDocument() {
     };
 }
 
-function doExecutionTest(conn) {
-    const coll = conn.getDB(dbName).getCollection(collName);
-    coll.drop();
+const dbName = "test";
+const collName = jsTest.name();
+const coll = db.getCollection(collName);
+coll.drop();
 
-    // Insert a bunch of documents of the form above.
-    const nDocs = 10;
-    let bulk = coll.initializeUnorderedBulkOp();
-    for (let i = 0; i < nDocs; i++) {
-        bulk.insert(generateRandomDocument());
-    }
-    assert.commandWorked(bulk.execute());
-
-    // Extract the contents of the address field, and make sure that doing the same
-    // with replaceRoot yields the correct answer.
-    // First compute each separately, since we know all of the fields in the address,
-    // to make sure we have the correct results.
-    let addressPipe = [{
-        $project: {
-            "_id": 0,
-            "number": "$address.number",
-            "street": "$address.street",
-            "city": "$address.city",
-            "zip": "$address.zip"
-        }
-    }];
-    let correctAddresses = coll.aggregate(addressPipe).toArray();
-
-    // Then compute the same results using $replaceRoot.
-    let replaceWithResult = coll.aggregate([
-                                    {$replaceRoot: {newRoot: "$address"}},
-                                    {$sort: {city: 1, zip: 1, street: 1, number: 1}}
-                                ])
-                                .toArray();
-
-    // Then assert they are the same.
-    assert(
-        arrayEq(replaceWithResult, correctAddresses),
-        "$replaceRoot does not work the same as $project-ing the relevant fields to the top level");
+// Insert a bunch of documents of the form above.
+const nDocs = 10;
+let bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i < nDocs; i++) {
+    bulk.insert(generateRandomDocument());
 }
+assert.commandWorked(bulk.execute());
 
-// Test against the standalone started by resmoke.py.
-let conn = db.getMongo();
-doExecutionTest(conn);
-print("Success! Standalone execution test for $replaceRoot passed.");
+// Extract the contents of the address field, and make sure that doing the same
+// with replaceRoot yields the correct answer.
+// First compute each separately, since we know all of the fields in the address,
+// to make sure we have the correct results.
+let addressPipe = [{
+    $project: {
+        "_id": 0,
+        "number": "$address.number",
+        "street": "$address.street",
+        "city": "$address.city",
+        "zip": "$address.zip"
+    }
+}];
+let correctAddresses = coll.aggregate(addressPipe).toArray();
 
-// Test against a sharded cluster.
-let st = new ShardingTest({shards: 2});
-doExecutionTest(st.s0);
-st.stop();
-print("Success! Sharding test for $replaceRoot passed.");
+// Then compute the same results using $replaceRoot.
+let replaceWithResult = coll.aggregate([
+                                {$replaceRoot: {newRoot: "$address"}},
+                                {$sort: {city: 1, zip: 1, street: 1, number: 1}}
+                            ])
+                            .toArray();
+
+// Then assert they are the same.
+assert(arrayEq(replaceWithResult, correctAddresses),
+       "$replaceRoot does not work the same as $project-ing the relevant fields to the top level");
 }());

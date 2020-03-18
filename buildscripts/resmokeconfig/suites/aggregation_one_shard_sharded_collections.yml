@@ -6,10 +6,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # The following tests start their own mongod.
-  - jstests/aggregation/bugs/cursor_timeout.js
-  - jstests/aggregation/bugs/lookup_unwind_getmore.js
-  - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   # TODO SERVER-32309: Enable once $lookup with pipeline supports sharded foreign collections.

@@ -6,20 +6,12 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # Blocked by SERVER-37191
-  - jstests/aggregation/sources/merge/exchange_explain.js
   # This test specifies a $out stage not as the last stage in the aggregation pipeline, causing a
   # non-local readConcern to erroneously be sent with the command.
   - jstests/aggregation/sources/out/required_last_position.js
   # These tests fail due to the inability to specify a writeConcern when secondaryThrottle is not
   # set as part of the moveChunk command.
-  - jstests/aggregation/mongos_merge.js
-  - jstests/aggregation/shard_targeting.js
   - jstests/aggregation/sources/facet/use_cases.js
-  # These test fail because afterOpTime is required to guarantee a secondary has advanced its
-  # majority-committed snapshot.
-  - jstests/aggregation/mongos_slaveok.js
-  - jstests/aggregation/testSlave.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
