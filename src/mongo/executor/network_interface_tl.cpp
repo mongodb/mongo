@@ -520,6 +520,18 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     return Status::OK();
 }
 
+void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
+                                    transport::ConnectSSLMode sslMode,
+                                    Milliseconds timeout,
+                                    Status status) {
+    auto handle = _pool->get(hostAndPort, sslMode, timeout).get();
+    if (status.isOK()) {
+        handle->indicateSuccess();
+    } else {
+        handle->indicateFailure(status);
+    }
+}
+
 Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(size_t reqId) {
     auto requestState = requestManager->getRequest(reqId);
     invariant(requestState);

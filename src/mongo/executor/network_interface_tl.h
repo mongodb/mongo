@@ -94,6 +94,11 @@ public:
 
     void dropConnections(const HostAndPort& hostAndPort) override;
 
+    void testEgress(const HostAndPort& hostAndPort,
+                    transport::ConnectSSLMode sslMode,
+                    Milliseconds timeout,
+                    Status status) override;
+
 private:
     struct RequestState;
     struct RequestManager;
