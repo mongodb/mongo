@@ -14,6 +14,7 @@ executor:
       eval: load("jstests/libs/override_methods/enable_sessions.js")
       readMode: commands
   hooks:
+  - class: FuzzerRestoreClusterSettings
   - class: CheckReplDBHash
     shell_options:
       global_vars:

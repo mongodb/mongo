@@ -17,6 +17,7 @@ executor:
           disableImplicitSessions: true
       readMode: commands
   hooks:
+  - class: FuzzerRestoreClusterSettings
   - class: CheckReplDBHash
     shell_options:
       global_vars:
