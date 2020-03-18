@@ -6,6 +6,7 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_44
+  - need_fixing_for_46
   exclude_files:
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js

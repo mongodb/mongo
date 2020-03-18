@@ -1,5 +1,7 @@
 /**
  * Test that mongos getShardVersion returns the correct version and chunks.
+ *
+ * @tags: [need_fixing_for_46]
  */
 (function() {
 'use strict';

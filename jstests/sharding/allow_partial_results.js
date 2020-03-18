@@ -1,6 +1,8 @@
 /**
  * Tests that the 'allowPartialResults' option to find is respected, and that aggregation does not
  * accept the 'allowPartialResults' option.
+ *
+ * @tags: [need_fixing_for_46]
  */
 
 // This test shuts down a shard.

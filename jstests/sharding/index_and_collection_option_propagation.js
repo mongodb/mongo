@@ -8,6 +8,8 @@
  *   are reported in the 'raw' shard responses) as long as at least one shard returns success.
  *
  * This test verifies this behavior.
+ *
+ * @tags: [need_fixing_for_46]
  */
 
 // This test shuts down a shard.
