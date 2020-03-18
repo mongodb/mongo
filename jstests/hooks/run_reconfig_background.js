@@ -1,8 +1,7 @@
 /**
- * This hook runs two reconfig commands against the primary of a replica set:
- * (1): The first reconfig command changes the votes and priority of a node to 0, which will
- * change the voting majority of the set.
- * (2): The second reconfig command runs against the new voting majority and should succeed.
+ * This hook runs the reconfig command against the primary of a replica set:
+ * The reconfig command first chooses a random node (not the primary) and will change
+ * its votes and priority to 0 or 1 depending on the current value.
  *
  * This hook will run concurrently with tests.
  */
@@ -24,30 +23,30 @@ const topology = DiscoverTopology.findConnectedNodes(conn);
 /**
  * Returns true if the error code is transient.
  */
-const isIgnorableError = function ignorableError(codeName) {
-    if (codeName == "ConfigurationInProgress" || codeName == "NotMaster") {
+function isIgnorableError(codeName) {
+    if (codeName == "ConfigurationInProgress" || codeName == "NotMaster" ||
+        codeName == "InterruptedDueToReplStateChange" || codeName == "PrimarySteppedDown") {
         return true;
     }
     return false;
-};
+}
 
 /**
- * Runs two reconfig commands against the primary of a replica set.
+ * Runs the reconfig command against the primary of a replica set.
  *
- * The first reconfig command randomly chooses a node to change it's votes and priority to 0 or 1
+ * The reconfig command randomly chooses a node to change it's votes and priority to 0 or 1
  * based on what the node's current votes and priority fields are. We always check to see that
- * there exists at least one voting node in the set, which ensures that we can always have a
- * primary.
- * We also want to avoid changing the votes and priority of the current primary to 0 to avoid
- * unnecessary stepdowns.
+ * there exists at least two voting nodes in the set, which ensures that we can always have a
+ * primary in the case of stepdowns.
+ * We also want to avoid changing the votes and priority of the current primary to 0, since this
+ * will result in an error.
  *
  * The number of voting nodes in the replica set determines what the config majority is for both
  * reconfig config commitment and reconfig oplog commitment.
  *
  * This function should not throw if everything is working properly.
  */
-const reconfigBackgroundThread = function reconfigBackground(
-    primary, isIgnorableErrorFunc, numNodes, primaryIndex) {
+function reconfigBackground(primary, numNodes) {
     // Calls 'func' with the print() function overridden to be a no-op.
     Random.setRandomSeed();
     const quietly = (func) => {
@@ -60,6 +59,16 @@ const reconfigBackgroundThread = function reconfigBackground(
         }
     };
 
+    // The stepdown and kill primary hooks run concurrently with this reconfig hook. It is
+    // possible that the topology will not be properly updated in time, meaning that the
+    // current primary can be undefined if a secondary has not stepped up soon enough.
+    if (primary === undefined) {
+        jsTestLog("Skipping reconfig because we do not have a primary yet.");
+        return {ok: 1};
+    }
+
+    jsTestLog("primary is " + primary);
+
     // Suppress the log messages generated establishing new mongo connections. The
     // run_reconfig_background.js hook is executed frequently by resmoke.py and
     // could lead to generating an overwhelming amount of log messages.
@@ -70,13 +79,16 @@ const reconfigBackgroundThread = function reconfigBackground(
     assert.neq(
         null, conn, "Failed to connect to primary '" + primary + "' for background reconfigs");
 
-    jsTestLog("Running reconfig to change votes.");
-
     var config = conn.getDB("local").system.replset.findOne();
-    config.version++;
+
+    // Find the correct host in the member config
+    const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex(m => m.host === pHost);
+    const primaryIndex = primaryHostIndex(config, primary);
+    jsTestLog("primaryIndex is " + primaryIndex);
 
     // Calculate the total number of voting nodes in this set so that we make sure we
-    // always have at least one voting node.
+    // always have at least two voting nodes. This is so that the primary can always
+    // safely step down because there is at least one other electable secondary.
     const numVotingNodes = config.members.filter(member => member.votes === 1).length;
 
     // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
@@ -87,46 +99,28 @@ const reconfigBackgroundThread = function reconfigBackground(
         indexToChange = Random.randInt(numNodes);
     }
 
+    jsTestLog("Running reconfig to change votes of node at index" + indexToChange);
+
     // Change the priority to correspond to the votes. If the member's current votes field
-    // is 1, only change it to 0 if there is another voting member in this set. Otherwise,
-    // we risk having no voting members (and no suitable primary).
-    config.members[indexToChange].votes = (config.members[indexToChange].votes === 1) ? 0 : 1;
+    // is 1, only change it to 0 if there are more than 2 voting members in this set.
+    config.version++;
+    config.members[indexToChange].votes =
+        (config.members[indexToChange].votes === 1 && numVotingNodes > 2) ? 0 : 1;
     config.members[indexToChange].priority = config.members[indexToChange].votes;
 
     let votingRes = conn.getDB("admin").runCommand({replSetReconfig: config});
-    if (!votingRes.ok && !isIgnorableErrorFunc(votingRes.codeName)) {
+    if (!votingRes.ok && !isIgnorableError(votingRes.codeName)) {
         jsTestLog("Reconfig to change votes FAILED.");
         return votingRes;
     }
 
-    jsTestLog("Running reconfig after changing voting majority.");
-
-    config = conn.getDB("local").system.replset.findOne();
-    config.version++;
-    let reconfigRes = conn.getDB("admin").runCommand({replSetReconfig: config});
-    if (!reconfigRes.ok && !isIgnorableErrorFunc(reconfigRes.codeName)) {
-        jsTestLog("Reconfig after changing voting majority FAILED.");
-        return reconfigRes;
-    }
-
     return {ok: 1};
-};
+}
 
 if (topology.type === Topology.kReplicaSet) {
     var numNodes = topology.nodes.length;
-    var primaryIndex = topology.nodes.indexOf(topology.primary);
-    const thread = new Thread(
-        reconfigBackgroundThread, topology.primary, isIgnorableError, numNodes, primaryIndex);
-    try {
-        thread.start();
-    } finally {
-        // Wait for thread to finish and throw an error if it fails.
-        let res;
-        thread.join();
-        res = thread.returnData();
-
-        assert.commandWorked(res, () => "reconfig hook failed: " + tojson(res));
-    }
+    let res = reconfigBackground(topology.primary, numNodes);
+    assert.commandWorked(res, "reconfig hook failed: " + tojson(res));
 } else {
     throw new Error('Unsupported topology configuration: ' + tojson(topology));
 }

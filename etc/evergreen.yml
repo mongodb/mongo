@@ -6191,6 +6191,16 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_reconfig_jscore_passthrough --storageEngine=wiredTiger
 
+- <<: *task_template
+  name: replica_sets_reconfig_jscore_stepdown_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_reconfig_jscore_stepdown_passthrough --storageEngine=wiredTiger
+
 - name: replica_sets_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -8680,6 +8690,7 @@ buildvariants:
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
   - name: replica_sets_reconfig_jscore_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
@@ -9995,6 +10006,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_reconfig_jscore_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
