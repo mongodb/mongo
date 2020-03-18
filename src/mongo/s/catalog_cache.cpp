@@ -381,6 +381,11 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
     auto itColl = itDb->second.find(nss.ns());
     if (itColl == itDb->second.end()) {
         // The collection was dropped.
+    } else if (itColl->second->needsRefresh && itColl->second->epochHasChanged) {
+        // If the epoch has changed, this implies that all routing requests have already been
+        // marked to block behind the next catalog cache refresh. We do not need to mark the shard
+        // as stale in this case.
+        return;
     } else if (itColl->second->routingInfo->getVersion() == ccri._cm->getVersion()) {
         // If the versions match, the last version of the routing information that we used is no
         // longer valid, so trigger a refresh.
