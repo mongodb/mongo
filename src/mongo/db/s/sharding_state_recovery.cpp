@@ -153,8 +153,9 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
 
         LOGV2_DEBUG(22083,
                     1,
-                    "Changing sharding recovery document {updateObj}",
-                    "updateObj"_attr = redact(updateObj));
+                    "Changing sharding recovery document {update}",
+                    "Changing sharding recovery document",
+                    "update"_attr = redact(updateObj));
 
         UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
@@ -200,8 +201,9 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
         modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions());
     if (!status.isOK()) {
         LOGV2_WARNING(22088,
-                      "Failed to decrement minOpTimeUpdaters due to {status}",
-                      "status"_attr = redact(status));
+                      "Failed to decrement minOpTimeUpdaters due to {error}",
+                      "Failed to decrement minOpTimeUpdaters",
+                      "error"_attr = redact(status));
     }
 }
 
@@ -230,6 +232,7 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
 
     LOGV2(22084,
           "Sharding state recovery process found document {recoveryDoc}",
+          "Sharding state recovery process found document",
           "recoveryDoc"_attr = redact(recoveryDoc.toBSON()));
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
@@ -239,19 +242,22 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
         if (prevOpTime) {
             LOGV2(22085,
                   "No in flight metadata change operations, so config server optime updated from "
-                  "{prevOpTime} to {recoveryDoc_getMinOpTime}",
-                  "prevOpTime"_attr = *prevOpTime,
-                  "recoveryDoc_getMinOpTime"_attr = recoveryDoc.getMinOpTime());
+                  "{prevConfigServerMinOpTime} to {newConfigServerMinOpTime}",
+                  "No in flight metadata change operations, so config server optime updated",
+                  "prevConfigServerMinOpTime"_attr = *prevOpTime,
+                  "newConfigServerMinOpTime"_attr = recoveryDoc.getMinOpTime());
         }
         return Status::OK();
     }
 
     LOGV2(
         22086,
-        "Sharding state recovery document indicates there were {recoveryDoc_getMinOpTimeUpdaters} "
+        "Sharding state recovery document indicates there were {inProgressMetadataOperationCount} "
         "metadata change operations in flight. Contacting the config server primary in order "
         "to retrieve the most recent opTime.",
-        "recoveryDoc_getMinOpTimeUpdaters"_attr = recoveryDoc.getMinOpTimeUpdaters());
+        "Sharding state recovery document indicates there were metadata change operations in "
+        "flight. Contacting the config server primary in order to retrieve the most recent opTime",
+        "inProgressMetadataOperationCount"_attr = recoveryDoc.getMinOpTimeUpdaters());
 
     // Need to fetch the latest uptime from the config server, so do a logging write
     Status status = ShardingLogging::get(opCtx)->logChangeChecked(
@@ -264,15 +270,17 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
         return status;
 
     LOGV2(22087,
-          "Sharding state recovered. New config server opTime is {grid_configOpTime}",
-          "grid_configOpTime"_attr = grid->configOpTime());
+          "Sharding state recovered. New config server opTime is {newConfigServerOpTime}",
+          "Sharding state recovered",
+          "newConfigServerOpTime"_attr = grid->configOpTime());
 
     // Finally, clear the recovery document so next time we don't need to recover
     status = modifyRecoveryDocument(opCtx, RecoveryDocument::Clear, kLocalWriteConcern);
     if (!status.isOK()) {
         LOGV2_WARNING(22089,
-                      "Failed to reset sharding state recovery document due to {status}",
-                      "status"_attr = redact(status));
+                      "Failed to reset sharding state recovery document due to {error}",
+                      "Failed to reset sharding state recovery document",
+                      "error"_attr = redact(status));
     }
 
     return Status::OK();

@@ -94,8 +94,9 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
         LOGV2_WARNING(22103,
-                      "shardsvrShardCollection failed{causedBy_status}",
-                      "causedBy_status"_attr = causedBy(redact(status)));
+                      "shardsvrShardCollection failed {error}",
+                      "shardsvrShardCollection failed",
+                      "error"_attr = redact(status));
         uassertStatusOK(status);
     }
 }
@@ -347,7 +348,8 @@ void logStartShardCollection(OperationContext* opCtx,
                              const ShardsvrShardCollection& request,
                              const ShardCollectionTargetState& prerequisites,
                              const ShardId& dbPrimaryShardId) {
-    LOGV2(22100, "CMD: shardcollection: {cmdObj}", "cmdObj"_attr = cmdObj);
+    LOGV2(
+        22100, "CMD: shardcollection: {command}", "CMD: shardcollection", "command"_attr = cmdObj);
 
     audit::logShardCollection(
         opCtx->getClient(), nss.ns(), prerequisites.shardKeyPattern.toBSON(), request.getUnique());
@@ -595,11 +597,12 @@ UUID shardCollection(OperationContext* opCtx,
     }
 
     LOGV2(22101,
-          "Created {initialChunks_chunks_size} chunk(s) for: {nss}, producing collection version "
-          "{initialChunks_collVersion}",
-          "initialChunks_chunks_size"_attr = initialChunks.chunks.size(),
-          "nss"_attr = nss,
-          "initialChunks_collVersion"_attr = initialChunks.collVersion());
+          "Created {numInitialChunks} chunk(s) for: {namespace}, producing collection version "
+          "{initialCollectionVersion}",
+          "Created initial chunk(s)",
+          "numInitialChunks"_attr = initialChunks.chunks.size(),
+          "namespace"_attr = nss,
+          "initialCollectionVersion"_attr = initialChunks.collVersion());
 
 
     ShardingLogging::get(opCtx)->logChange(

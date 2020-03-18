@@ -108,16 +108,18 @@ public:
                 if (ErrorCodes::isCancelationError(status.code())) {
                     LOGV2_DEBUG(22067,
                                 2,
-                                "Unable to schedule confirmed set update due to {status}",
-                                "status"_attr = status);
+                                "Unable to schedule confirmed replica set update due to {error}",
+                                "Unable to schedule confirmed replica set update",
+                                "error"_attr = status);
                     return;
                 }
                 invariant(status);
 
                 try {
                     LOGV2(22068,
-                          "Updating config server with confirmed set {connStr}",
-                          "connStr"_attr = connStr);
+                          "Updating config server with confirmed replica set {connectionString}",
+                          "Updating config server with confirmed replica set",
+                          "connectionString"_attr = connStr);
                     Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
                     if (MONGO_unlikely(failUpdateShardIdentityConfigString.shouldFail())) {
@@ -139,7 +141,7 @@ public:
                     ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(),
                                                                                   connStr);
                 } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-                    LOGV2(22069, "Unable to update config server due to {e}", "e"_attr = e);
+                    LOGV2(22069, "Unable to update config server", "error"_attr = e);
                 }
             });
     }
@@ -149,8 +151,8 @@ public:
         } catch (const DBException& ex) {
             LOGV2_DEBUG(22070,
                         2,
-                        "Unable to update config server with possible set due to {ex}",
-                        "ex"_attr = ex);
+                        "Unable to update config server with possible replica set",
+                        "error"_attr = ex);
         }
     }
     void onDroppedSet(const Key&) noexcept final {}
@@ -189,10 +191,9 @@ void ShardingInitializationMongoD::initializeShardingEnvironmentOnShardServer(
     Grid::get(opCtx)->setShardingInitialized();
 
     LOGV2(22071,
-          "Finished initializing sharding components for {isStandaloneOrPrimary_primary_secondary} "
-          "node.",
-          "isStandaloneOrPrimary_primary_secondary"_attr =
-              (isStandaloneOrPrimary ? "primary" : "secondary"));
+          "Finished initializing sharding components for {memberState} node.",
+          "Finished initializing sharding components",
+          "memberState"_attr = (isStandaloneOrPrimary ? "primary" : "secondary"));
 }
 
 ShardingInitializationMongoD::ShardingInitializationMongoD()
@@ -286,11 +287,13 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
         if (!foundShardIdentity) {
             LOGV2_WARNING(22074,
                           "Started with --shardsvr, but no shardIdentity document was found on "
-                          "disk in {NamespaceString_kServerConfigurationNamespace}. This most "
+                          "disk in {namespace}. This most "
                           "likely means this server has not yet been added to a "
                           "sharded cluster.",
-                          "NamespaceString_kServerConfigurationNamespace"_attr =
-                              NamespaceString::kServerConfigurationNamespace);
+                          "Started with --shardsvr, but no shardIdentity document was found on "
+                          "disk. This most likely means this server has not yet been added to a "
+                          "sharded cluster",
+                          "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
             return false;
         }
 
@@ -312,10 +315,10 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
             LOGV2_WARNING(
                 22075,
                 "Not started with --shardsvr, but a shardIdentity document was found "
-                "on disk in {NamespaceString_kServerConfigurationNamespace}: {shardIdentityBSON}",
-                "NamespaceString_kServerConfigurationNamespace"_attr =
-                    NamespaceString::kServerConfigurationNamespace,
-                "shardIdentityBSON"_attr = shardIdentityBSON);
+                "on disk in {namespace}: {shardIdentityDocument}",
+                "Not started with --shardsvr, but a shardIdentity document was found on disk",
+                "namespace"_attr = NamespaceString::kServerConfigurationNamespace,
+                "shardIdentityDocument"_attr = shardIdentityBSON);
         }
         return false;
     }
@@ -331,8 +334,9 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         "Invalid shard identity document found when initializing sharding state");
 
     LOGV2(22072,
-          "initializing sharding state with: {shardIdentity}",
-          "shardIdentity"_attr = shardIdentity);
+          "Initializing sharding state with: {initialShardIdentity}",
+          "Initializing sharding state",
+          "initialShardIdentity"_attr = shardIdentity);
 
     const auto& configSvrConnStr = shardIdentity.getConfigsvrConnectionString();
 
@@ -384,13 +388,15 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         auto result = update(opCtx, autoDb.getDb(), updateReq);
         if (result.numMatched == 0) {
             LOGV2_WARNING(22076,
-                          "failed to update config string of shard identity document because it "
-                          "does not exist. This shard could have been removed from the cluster");
+                          "Failed to update config server connection string of shard identity "
+                          "document because it does not exist. This shard could have been removed "
+                          "from the cluster");
         } else {
             LOGV2_DEBUG(22073,
                         2,
                         "Updated config server connection string in shardIdentity document "
-                        "to{newConnectionString}",
+                        "to {newConnectionString}",
+                        "Updated config server connection string in shardIdentity document",
                         "newConnectionString"_attr = newConnectionString);
         }
     } catch (const DBException& exception) {
@@ -398,9 +404,10 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         if (!ErrorCodes::isNotMasterError(status.code())) {
             LOGV2_WARNING(22077,
                           "Error encountered while trying to update config connection string to "
-                          "{newConnectionString}{causedBy_status}",
+                          "{newConnectionString} {error}",
+                          "Error encountered while trying to update config connection string",
                           "newConnectionString"_attr = newConnectionString.toString(),
-                          "causedBy_status"_attr = causedBy(redact(status)));
+                          "error"_attr = redact(status));
         }
     }
 }
