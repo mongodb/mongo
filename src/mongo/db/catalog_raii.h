@@ -243,14 +243,12 @@ private:
  * | OplogAccessMode | Global Lock | 'local' DB Lock | 'oplog.rs' Collection Lock |
  * +-----------------+-------------+-----------------+----------------------------|
  * | kRead           | MODE_IS     | MODE_IS         | MODE_IS                    |
- * | kWrite          | MODE_IX     | MODE_IX         | MODE_IX                    |
+ * | kWrite/kLogOp   | MODE_IX     | MODE_IX         | MODE_IX                    |
  *
  * kLogOp is a special mode for replication operation logging and it behaves similar to kWrite. The
  * difference between kWrite and kLogOp is that kLogOp invariants that global IX lock is already
- * held and would only acquire database and collection locks listed above for
- * non-document-level-locking engine only if those locks are not already held. And it is the
- * caller's responsibility to ensure those locks already held are still valid within the lifetime of
- * this object.
+ * held. It is the caller's responsibility to ensure the global lock already held is still valid
+ * within the lifetime of this object.
  *
  * Any acquired locks may be released when this object goes out of scope, therefore the oplog
  * collection reference returned by this class should not be retained.

@@ -184,32 +184,18 @@ ReadSourceScope::~ReadSourceScope() {
 
 AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline)
     : _shouldNotConflictWithSecondaryBatchApplicationBlock(opCtx->lockState()) {
+    auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
     if (mode == OplogAccessMode::kLogOp) {
         // Invariant that global lock is already held for kLogOp mode.
         invariant(opCtx->lockState()->isWriteLocked());
     } else {
-        _globalLock.emplace(opCtx,
-                            mode == OplogAccessMode::kRead ? MODE_IS : MODE_IX,
-                            deadline,
-                            Lock::InterruptBehavior::kThrow);
+        _globalLock.emplace(opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow);
     }
 
     // Obtain database and collection intent locks for non-document-locking storage engines.
     if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
-        auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
-
-        // If mode is kLogOp, only acquire the database lock if it is not already held.
-        if (mode != OplogAccessMode::kLogOp ||
-            !opCtx->lockState()->isDbLockedForMode(NamespaceString::kLocalDb, lockMode)) {
-            _dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, lockMode, deadline);
-        }
-
-        // If mode is kLogOp, only acquire the collection lock if it is not already held.
-        if (mode != OplogAccessMode::kLogOp ||
-            !opCtx->lockState()->isCollectionLockedForMode(NamespaceString::kRsOplogNamespace,
-                                                           lockMode)) {
-            _collWriteLock.emplace(opCtx, NamespaceString::kRsOplogNamespace, lockMode, deadline);
-        }
+        _dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, lockMode, deadline);
+        _collWriteLock.emplace(opCtx, NamespaceString::kRsOplogNamespace, lockMode, deadline);
     }
     _oplogInfo = repl::LocalOplogInfo::get(opCtx);
     _oplog = _oplogInfo->getCollection();
