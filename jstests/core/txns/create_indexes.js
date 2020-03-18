@@ -12,7 +12,7 @@
 load("jstests/libs/create_index_txn_helpers.js");
 
 let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMongo().startSession();
     const collName = "create_new_indexes";
     const secondCollName = collName + "_second";
 

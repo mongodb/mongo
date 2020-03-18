@@ -13,7 +13,7 @@ load("jstests/libs/create_collection_txn_helpers.js");
 load("jstests/libs/fixture_helpers.js");  // for isMongos
 
 function runCollectionCreateTest(explicitCreate, upsert) {
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMongo().startSession();
     const collName = "create_new_collection";
     const secondCollName = collName + "_second";
 

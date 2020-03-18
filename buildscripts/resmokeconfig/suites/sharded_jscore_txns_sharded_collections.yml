@@ -32,6 +32,7 @@ selector:
   - jstests/core/txns/create_collection_parallel.js
   - jstests/core/txns/create_indexes.js
   - jstests/core/txns/create_indexes_parallel.js
+  - jstests/core/txns/commands_in_txns_read_concern.js
 
     # TODO SERVER-46187: maxTimeMS doesn't work correctly for insert on mongos.
   - jstests/core/txns/write_conflicts_with_non_txns.js

@@ -332,10 +332,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         }
     }
 
-    // If we are starting a transaction, we only need to check whether the read concern is
-    // appropriate for running a transaction. There is no need to check whether the specific
-    // command supports the read concern, because all commands that are allowed to run in a
-    // transaction must support all applicable read concerns.
+    // If we are starting a transaction, we need to check whether the read concern is
+    // appropriate for running a transaction.
     if (startTransaction) {
         if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
             return {ErrorCodes::InvalidOptions,
@@ -356,7 +354,10 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
     // it is implicitly "local". There is no need to check whether this is supported, because all
     // commands either support "local" or upconvert the absent readConcern to a stronger level that
     // they do support; for instance, $changeStream upconverts to RC level "majority".
-    if (!startTransaction && readConcernArgs.hasLevel()) {
+    //
+    // Individual transaction statements are checked later on, after we've unstashed the
+    // transaction resources.
+    if (!opCtx->inMultiDocumentTransaction() && readConcernArgs.hasLevel()) {
         if (!readConcernSupport.readConcernSupport.isOK()) {
             return readConcernSupport.readConcernSupport.withContext(
                 str::stream() << "Command " << invocation->definition()->getName()
@@ -618,6 +619,28 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     auto guard = makeGuard([opCtx, &txnParticipant] {
         _abortUnpreparedOrStashPreparedTransaction(opCtx, &txnParticipant);
     });
+
+    if (!opCtx->getClient()->isInDirectClient()) {
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+
+        // For replica sets, we do not receive the readConcernArgs of our parent transaction
+        // statements until we unstash the transaction resources. The below check is necessary to
+        // ensure commands, including those occurring after the first statement in their respective
+        // transactions, are checked for readConcern support. Presently, only `create` and
+        // `createIndexes` do not support readConcern inside transactions.
+        // TODO(SERVER-46971): Consider how to extend this check to other commands.
+        auto cmdName = invocation->definition()->getName();
+        auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+        if (readConcernArgs.hasLevel() &&
+            (cmdName == "create"_sd || cmdName == "createIndexes"_sd)) {
+            if (!readConcernSupport.readConcernSupport.isOK()) {
+                uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
+                    str::stream() << "Command " << cmdName
+                                  << " does not support this transaction's "
+                                  << readConcernArgs.toString()));
+            }
+        }
+    }
 
     try {
         CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);

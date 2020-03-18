@@ -14,9 +14,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     const dbName = "test";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
-    const session = db.getMongo().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    const secondSession =
-        db.getMongo().getDB(dbName).getMongo().startSession({causalConsistency: false});
+    const session = db.getMongo().getDB(dbName).getMongo().startSession();
+    const secondSession = db.getMongo().getDB(dbName).getMongo().startSession();
 
     let sessionDB = session.getDatabase("test");
     let secondSessionDB = secondSession.getDatabase("test");
@@ -66,6 +65,35 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);
 
+    distinctSessionColl.drop({writeConcern: {w: "majority"}});
+    sessionColl.drop({writeConcern: {w: "majority"}});
+
+    jsTest.log("Testing conflicting sequential createIndexes, where failing createIndexes " +
+               "performs a successful index creation earlier in the transaction.");
+    session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
+    secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+
+    createIndexAndCRUDInTxn(sessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    jsTest.log("Committing transaction 2");
+    secondSession.commitTransaction();
+    assert.eq(secondSessionColl.find({}).itcount(), 1);
+    assert.eq(secondSessionColl.getIndexes().length, 2);
+
+    // createIndexes takes minimum visible snapshots of new collections into consideration when
+    // checking for existing indexes.
+    assert.commandFailedWithCode(
+        sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
+        ErrorCodes.SnapshotUnavailable);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+
+    assert.eq(sessionColl.find({}).itcount(), 1);
+    assert.eq(sessionColl.getIndexes().length, 2);
+    assert.eq(distinctSessionColl.find({}).itcount(), 0);
+    assert.eq(distinctSessionColl.getIndexes().length, 0);
+
+    distinctSessionColl.drop({writeConcern: {w: "majority"}});
     sessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log(

@@ -608,7 +608,10 @@ void runCommand(OperationContext* opCtx,
         // then it is implicitly "local". There is no need to check whether this is supported,
         // because all commands either support "local" or upconvert the absent readConcern to a
         // stronger level that they do support; e.g. $changeStream upconverts to RC "majority".
-        if (!startTransaction && readConcernArgs.hasLevel()) {
+        //
+        // Individual transaction statements are checked later on, after we've unstashed the
+        // transaction resources.
+        if (!TransactionRouter::get(opCtx) && readConcernArgs.hasLevel()) {
             if (!readConcernSupport.readConcernSupport.isOK()) {
                 auto responseBuilder = replyBuilder->getBodyBuilder();
                 CommandHelpers::appendCommandStatusNoThrow(
