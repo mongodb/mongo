@@ -14,9 +14,8 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
     const dbName = "test";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
-    const session = db.getMongo().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    const secondSession =
-        db.getMongo().getDB(dbName).getMongo().startSession({causalConsistency: false});
+    const session = db.getMongo().getDB(dbName).getMongo().startSession();
+    const secondSession = db.getMongo().getDB(dbName).getMongo().startSession();
 
     let sessionDB = session.getDatabase("test");
     let secondSessionDB = secondSession.getDatabase("test");
@@ -42,6 +41,29 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
                                  ErrorCodes.NoSuchTransaction);
 
     sessionColl.drop({writeConcern: {w: "majority"}});
+    distinctSessionColl.drop({writeConcern: {w: "majority"}});
+
+    jsTest.log("Testing duplicate createCollections, where failing createCollection performs a " +
+               "successful operation earlier in the transaction.");
+
+    session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
+    secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+
+    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    jsTest.log("Committing transaction 1");
+    session.commitTransaction();
+    assert.eq(sessionColl.find({}).itcount(), 1);
+
+    assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}),
+                                 ErrorCodes.NamespaceExists);
+
+    assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+
+    assert.eq(distinctSessionColl.find({}).itcount(), 0);
+    sessionColl.drop({writeConcern: {w: "majority"}});
+    distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
     session.startTransaction({writeConcern: {w: "majority"}});

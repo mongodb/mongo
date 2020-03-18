@@ -11,10 +11,7 @@ const testColl = testDB[collName];
 
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
-const sessionOptions = {
-    causalConsistency: false
-};
-const session = db.getMongo().startSession(sessionOptions);
+const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 

@@ -44,7 +44,7 @@ const runSuccessfulIndexBuild = function(dbName, collName, indexSpec, requestNum
 };
 
 const runFailedIndexBuildInTxn = function(dbName, collName, indexSpec, requestNumber) {
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMongo().startSession();
 
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB[collName];

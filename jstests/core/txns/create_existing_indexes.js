@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-const session = db.getMongo().startSession({causalConsistency: false});
+const session = db.getMongo().startSession();
 const collName = "create_existing_indexes";
 
 let sessionDB = session.getDatabase("test");

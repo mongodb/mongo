@@ -1,11 +1,9 @@
 'use strict';
 
 /**
- * Perform CRUD operations, some of which may implicitly create collections. Also perform index
- * creations which may implicitly create collections. Performs these in parallel with collection-
- * dropping operations.
+ * Perform CRUD operations, some of which may implicitly create collections, in parallel with
+ * collection-dropping operations.
  */
-
 var $config = (function() {
     const data = {numIds: 10};
 
@@ -124,28 +122,6 @@ var $config = (function() {
             }
         },
 
-        createIndex: function createIndex(db, collName) {
-            db[collName].createIndex({value: 1});
-        },
-
-        createIdIndex: function createIdIndex(db, collName) {
-            try {
-                assertWhenOwnColl.commandWorked(db[collName].createIndex({_id: 1}));
-            } catch (e) {
-                if (e.code == ErrorCodes.ConflictingOperationInProgress) {
-                    // createIndex concurrently with dropCollection can throw.
-                    if (TestData.runInsideTransaction) {
-                        e["errorLabels"] = ["TransientTransactionError"];
-                        throw e;
-                    }
-                }
-            }
-        },
-
-        dropIndex: function dropIndex(db, collName) {
-            db[collName].dropIndex({value: 1});
-        },
-
         dropCollection: function dropCollection(db, collName) {
             db[collName].drop();
         }
@@ -157,9 +133,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.10,
         },
         insertDocs: {
@@ -167,9 +140,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.30,
         },
         updateDocs: {
@@ -177,9 +147,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.30,
         },
         readDocs: {
@@ -187,9 +154,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.30,
         },
         deleteDocs: {
@@ -197,39 +161,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
-            dropCollection: 0.30,
-        },
-        createIndex: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
-            dropCollection: 0.30,
-        },
-        createIdIndex: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
-            dropCollection: 0.30,
-        },
-        dropIndex: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.30,
         },
         dropCollection: {
@@ -237,9 +168,6 @@ var $config = (function() {
             updateDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
-            createIndex: 0.10,
-            createIdIndex: 0.10,
-            dropIndex: 0.10,
             dropCollection: 0.10,
         }
     };
