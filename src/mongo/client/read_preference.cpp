@@ -50,49 +50,6 @@ const char kTagsFieldName[] = "tags";
 const char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 const char kHedgeFieldName[] = "hedge";
 
-const char kPrimaryOnly[] = "primary";
-const char kPrimaryPreferred[] = "primaryPreferred";
-const char kSecondaryOnly[] = "secondary";
-const char kSecondaryPreferred[] = "secondaryPreferred";
-const char kNearest[] = "nearest";
-
-StringData readPreferenceName(ReadPreference pref) {
-    switch (pref) {
-        case ReadPreference::PrimaryOnly:
-            return StringData(kPrimaryOnly);
-        case ReadPreference::PrimaryPreferred:
-            return StringData(kPrimaryPreferred);
-        case ReadPreference::SecondaryOnly:
-            return StringData(kSecondaryOnly);
-        case ReadPreference::SecondaryPreferred:
-            return StringData(kSecondaryPreferred);
-        case ReadPreference::Nearest:
-            return StringData(kNearest);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-StatusWith<ReadPreference> parseReadPreferenceMode(StringData prefStr) {
-    if (prefStr == kPrimaryOnly) {
-        return ReadPreference::PrimaryOnly;
-    } else if (prefStr == kPrimaryPreferred) {
-        return ReadPreference::PrimaryPreferred;
-    } else if (prefStr == kSecondaryOnly) {
-        return ReadPreference::SecondaryOnly;
-    } else if (prefStr == kSecondaryPreferred) {
-        return ReadPreference::SecondaryPreferred;
-    } else if (prefStr == kNearest) {
-        return ReadPreference::Nearest;
-    }
-    return Status(ErrorCodes::FailedToParse,
-                  str::stream() << "Could not parse $readPreference mode '" << prefStr
-                                << "'. Only the modes '" << kPrimaryOnly << "', '"
-                                << kPrimaryPreferred << "', '" << kSecondaryOnly << "', '"
-                                << kSecondaryPreferred << "', and '" << kNearest
-                                << "' are supported.");
-}
-
 // Slight kludge here: if we weren't passed a TagSet, we default to the empty
 // TagSet if ReadPreference is Primary, or the default (wildcard) TagSet otherwise.
 // This maintains compatibility with existing code, while preserving the ability to round
@@ -108,6 +65,14 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
+Status validateReadPreferenceMode(const std::string& prefStr) {
+    try {
+        ReadPreference_parse(IDLParserErrorContext(kModeFieldName), prefStr);
+    } catch (DBException& e) {
+        return e.toStatus();
+    }
+    return Status::OK();
+}
 
 /**
  * Replica set refresh period on the task executor.
@@ -157,11 +122,19 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
     }
 
     ReadPreference mode;
-    auto swReadPrefMode = parseReadPreferenceMode(modeStr);
-    if (!swReadPrefMode.isOK()) {
-        return swReadPrefMode.getStatus();
+    try {
+        mode = ReadPreference_parse(IDLParserErrorContext(kModeFieldName), modeStr);
+    } catch (DBException& e) {
+        return e.toStatus().withContext(
+            str::stream() << "Could not parse $readPreference mode '" << modeStr
+                          << "'. Only the modes '"
+                          << ReadPreference_serializer(ReadPreference::PrimaryOnly) << "', '"
+                          << ReadPreference_serializer(ReadPreference::PrimaryPreferred) << "', '"
+                          << ReadPreference_serializer(ReadPreference::SecondaryOnly) << "', '"
+                          << ReadPreference_serializer(ReadPreference::SecondaryPreferred)
+                          << "', and '" << ReadPreference_serializer(ReadPreference::Nearest)
+                          << "' are supported.");
     }
-    mode = std::move(swReadPrefMode.getValue());
 
     boost::optional<HedgingMode> hedgingMode;
     if (auto hedgingModeEl = readPrefObj[kHedgeFieldName]) {
@@ -261,7 +234,7 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromContainingBSON(
 }
 
 void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
-    bob->append(kModeFieldName, readPreferenceName(pref));
+    bob->append(kModeFieldName, ReadPreference_serializer(pref));
     if (tags != defaultTagSetForMode(pref)) {
         bob->append(kTagsFieldName, tags.getTagBSON());
     }
