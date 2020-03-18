@@ -80,14 +80,14 @@ void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext*
                 auto opCtx = client->makeOperationContext();
 
                 SnapshotWindowUtil::decreaseTargetSnapshotWindowSize(opCtx.get());
+            } catch (const ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+                LOGV2_DEBUG(4684102, 4, "Periodic task cancelled", "reason"_attr = ex.toStatus());
             } catch (const DBException& ex) {
-                if (!ErrorCodes::isShutdownError(ex.toStatus().code())) {
-                    LOGV2_WARNING(
-                        20894,
-                        "Periodic task to check for and decrease cache pressure caused by "
-                        "maintaining too much snapshot history failed! Caused by: {ex_toStatus}",
-                        "ex_toStatus"_attr = ex.toStatus());
-                }
+                LOGV2_WARNING(
+                    20894,
+                    "Periodic task to check for and decrease cache pressure caused by maintaining "
+                    "too much snapshot history failed! Caused by: {ex_toStatus}",
+                    "ex_toStatus"_attr = ex.toStatus());
             }
         },
         Seconds(snapshotWindowParams.checkCachePressurePeriodSeconds.load()));
