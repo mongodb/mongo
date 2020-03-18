@@ -15,6 +15,7 @@ executor:
       eval: load("jstests/libs/override_methods/enable_sessions.js")
       readMode: commands
   hooks:
+  - class: FuzzerRestoreClusterSettings
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
