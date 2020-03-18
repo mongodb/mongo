@@ -772,6 +772,7 @@ public:
 
         // Advance your optime.
         replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
+        respondToAllHeartbeats();
     }
 
     void respondToNHeartbeats(int n) {
@@ -1233,16 +1234,11 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    args.force = true;
     // Do a reconfig that adds new nodes to the repl set.
-    args.newConfigObj = configWithMembers(
-        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+    const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    Status status(ErrorCodes::InternalError, "Not Set");
-    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */);
     ASSERT_OK(status);
     stopCapturingLogMessages();
 
@@ -1268,20 +1264,15 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    args.force = true;
     // Do a reconfig that adds a new node with 'votes: 0'.
-    args.newConfigObj = configWithMembers(
-        2,
-        0,
+    const auto members =
         BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
                                      << BSON("_id" << 3 << "host"
                                                    << "n3:1"
-                                                   << "votes" << 0 << "priority" << 0)));
+                                                   << "votes" << 0 << "priority" << 0));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1307,17 +1298,11 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    args.force = true;
-    // Do a reconfig that renames the host and port for the second node.
-    args.newConfigObj =
-        configWithMembers(2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345")));
+    const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345"));
 
     startCapturingLogMessages();
-    Status status(ErrorCodes::InternalError, "Not Set");
-    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
-    ASSERT_OK(status);
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1342,16 +1327,11 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    args.force = true;
     // Do a reconfig that changes the order but not the ids of the members.
-    args.newConfigObj = configWithMembers(2, 0, BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1")));
+    const auto members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1"));
 
     startCapturingLogMessages();
-    Status status(ErrorCodes::InternalError, "Not Set");
-    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
-    ASSERT_OK(status);
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1361,6 +1341,140 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
 
     // Verify that a log message was not created, since we did not add a 'newlyAdded' field.
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+}
+
+TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldNodes) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    // Do a reconfig that adds a new member, giving it the 'newlyAdded' field.
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
+
+    startCapturingLogMessages();
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    stopCapturingLogMessages();
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    auto newMember = rsConfig.findMemberByID(3);
+
+    // Verify that the new member has its 'newlyAdded' field set.
+    ASSERT_TRUE(newMember->isNewlyAdded());
+
+    // The new member should not be considered as a voting node while its 'newlyAdded' field is set.
+    ASSERT_FALSE(newMember->isVoter());
+
+    // Verify that a log message was created for adding the 'newlyAdded' field.
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+
+    // Advance the commit point on all nodes.
+    const auto commitPoint = OpTime(Timestamp(3, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    replicateOpTo(1, commitPoint);
+    replicateOpTo(2, commitPoint);
+    replicateOpTo(3, commitPoint);
+
+    // Do a force reconfig that only changes the order of the members.
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    args.newConfigObj = configWithMembers(
+        2, 0, BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1")));
+
+    startCapturingLogMessages();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    stopCapturingLogMessages();
+
+    rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    newMember = rsConfig.findMemberByID(3);
+
+    // Verify that the new member does not have its 'newlyAdded' field set.
+    ASSERT_FALSE(newMember->isNewlyAdded());
+
+    // Verify that the new member is now considered to be a voting node.
+    ASSERT_TRUE(newMember->isVoter());
+
+    // Verify that a log message was not created for adding the 'newlyAdded' field.
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+}
+
+TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNodes) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a force reconfig that adds a new voting member to the repl set.
+    args.newConfigObj = configWithMembers(
+        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    startCapturingLogMessages();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    stopCapturingLogMessages();
+
+    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+
+    // Verify that the new member does not have its 'newlyAdded' field set.
+    ASSERT_FALSE(rsConfig.findMemberByID(3)->isNewlyAdded());
+
+    // Verify that a log message was not created for adding the 'newlyAdded' field.
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+}
+
+TEST_F(ReplCoordReconfigTest, ForceReconfigSucceedsWhenNewlyAddedFieldIsSetToTrue) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a force reconfig that includes a member that has a 'newlyAdded' field set to true.
+    args.newConfigObj =
+        configWithMembers(2,
+                          0,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "n3:1"
+                                                                     << "newlyAdded" << true)));
+
+    startCapturingLogMessages();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    stopCapturingLogMessages();
+
+    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    const auto newMember = rsConfig.findMemberByID(3);
+
+    // Verify that the 'newlyAdded' field is set and that the member is considered a non-voting
+    // node.
+    ASSERT_TRUE(newMember->isNewlyAdded());
+    ASSERT_FALSE(newMember->isVoter());
+
+    // Verify that a log message was not created for adding the 'newlyAdded' field, since a force
+    // reconfig should not attempt to append the field.
     ASSERT_EQUALS(0,
                   countTextFormatLogLinesContaining(
                       "Appended the 'newlyAdded' field to a node in the new config."));
@@ -1400,23 +1514,17 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    // Ensure that this is a non-force reconfig.
-    args.force = false;
     // Do a reconfig that tries to add a new member with 'newlyAdded' field passed in.
-    args.newConfigObj =
-        configWithMembers(2,
-                          0,
-                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "n3:1"
-                                                                     << "newlyAdded" << true)));
+    const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "n3:1"
+                                                                    << "newlyAdded" << true));
 
     startCapturingLogMessages();
-    ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig,
-              getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    Status status = doSafeReconfig(opCtx.get(), 2, members, 0 /* quorumHbs */);
     stopCapturingLogMessages();
+
+    ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig, status);
 
     // Verify that an error message was created when the user provides a 'newlyAdded' field during a
     // non-force reconfig.
@@ -1440,16 +1548,11 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedField) {
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-
-    args.force = true;
     // Do a reconfig that adds a new member.
-    args.newConfigObj = configWithMembers(
-        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1461,12 +1564,18 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedField) {
                   countTextFormatLogLinesContaining(
                       "Appended the 'newlyAdded' field to a node in the new config."));
 
+    // Advance the commit point on all nodes.
+    const auto commitPoint = OpTime(Timestamp(3, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    replicateOpTo(1, commitPoint);
+    replicateOpTo(2, commitPoint);
+    replicateOpTo(3, commitPoint);
+
     // Do a reconfig that only changes the order of the nodes.
-    args.newConfigObj = configWithMembers(
-        2, 0, BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1")));
+    members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1489,16 +1598,11 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-
-    args.force = true;
     // Do a reconfig that adds a new member.
-    args.newConfigObj = configWithMembers(
-        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1510,15 +1614,19 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
                   countTextFormatLogLinesContaining(
                       "Appended the 'newlyAdded' field to a node in the new config."));
 
+    // Advance the commit point on all nodes.
+    const auto commitPoint = OpTime(Timestamp(3, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    replicateOpTo(1, commitPoint);
+    replicateOpTo(2, commitPoint);
+    replicateOpTo(3, commitPoint);
+
     // Add another new member to the set.
-    args.newConfigObj =
-        configWithMembers(2,
-                          0,
-                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")
-                                                       << member(4, "n4:1")));
+    members = BSON_ARRAY(member(1, "n1:1")
+                         << member(2, "n2:1") << member(3, "n3:1") << member(4, "n4:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1543,15 +1651,11 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ReplSetReconfigArgs args;
-    args.force = true;
-    // Do a reconfig that adds a new member to the config.
-    args.newConfigObj = configWithMembers(
-        2, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+    // Do a reconfig that adds a new member.
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
