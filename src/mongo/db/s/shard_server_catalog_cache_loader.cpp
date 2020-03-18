@@ -675,10 +675,11 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             LOGV2_FOR_CATALOG_REFRESH(
                 24107,
                 1,
-                "Cache loader remotely refreshed for collection {nss} from version "
-                "{maxLoaderVersion} and no metadata was found.",
-                "nss"_attr = nss,
-                "maxLoaderVersion"_attr = maxLoaderVersion);
+                "Cache loader remotely refreshed for collection {namespace} from version "
+                "{oldCollectionVersion} and no metadata was found",
+                "Cache loader remotely refreshed for collection and no metadata was found",
+                "namespace"_attr = nss,
+                "oldCollectionVersion"_attr = maxLoaderVersion);
             return swCollectionAndChangedChunks;
         }
 
@@ -709,13 +710,12 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         LOGV2_FOR_CATALOG_REFRESH(
             24108,
             1,
-            "Cache loader remotely refreshed for collection {nss} from collection version "
-            "{maxLoaderVersion} and found collection version "
-            "{collAndChunks_changedChunks_back_getVersion}",
-            "nss"_attr = nss,
-            "maxLoaderVersion"_attr = maxLoaderVersion,
-            "collAndChunks_changedChunks_back_getVersion"_attr =
-                collAndChunks.changedChunks.back().getVersion());
+            "Cache loader remotely refreshed for collection {namespace} from collection version "
+            "{oldCollectionVersion} and found collection version {refreshedCollectionVersion}",
+            "Cache loader remotely refreshed for collection",
+            "namespace"_attr = nss,
+            "oldCollectionVersion"_attr = maxLoaderVersion,
+            "refreshedCollectionVersion"_attr = collAndChunks.changedChunks.back().getVersion());
 
         // Metadata was found remotely
         // -- otherwise we would have received NamespaceNotFound rather than Status::OK().
@@ -785,9 +785,11 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
             LOGV2_FOR_CATALOG_REFRESH(
                 24109,
                 1,
-                "Cache loader remotely refreshed for database {name} and found the database has "
-                "been dropped.",
-                "name"_attr = name);
+                "Cache loader remotely refreshed for database {db} and found the database has "
+                "been dropped",
+                "Cache loader remotely refreshed for database and found the database has been "
+                "dropped",
+                "db"_attr = name);
             return swDatabaseType;
         }
 
@@ -799,10 +801,11 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
 
         LOGV2_FOR_CATALOG_REFRESH(24110,
                                   1,
-                                  "Cache loader remotely refreshed for database {name} and found "
-                                  "{swDatabaseType_getValue}",
-                                  "name"_attr = name,
-                                  "swDatabaseType_getValue"_attr =
+                                  "Cache loader remotely refreshed for database {db} and found "
+                                  "{refreshedDatabaseType}",
+                                  "Cache loader remotely refreshed for database",
+                                  "db"_attr = name,
+                                  "refreshedDatabaseType"_attr =
                                       swDatabaseType.getValue().toBSON());
 
         return swDatabaseType;
@@ -842,20 +845,22 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     LOGV2_FOR_CATALOG_REFRESH(
         24111,
         1,
-        "Cache loader found {enqueued} and {persisted}, GTE "
-        "cache version {catalogCacheSinceVersion}",
-        "found"_attr = (enqueued.changedChunks.empty()
-                            ? (tasksAreEnqueued ? "a drop enqueued" : "no enqueued metadata")
-                            : ("enqueued metadata from " +
-                               enqueued.changedChunks.front().getVersion().toString() + " to " +
-                               enqueued.changedChunks.back().getVersion().toString())),
-        "persisted"_attr =
+        "Cache loader found {enqueuedTasksDesc} and {persistedMetadataDesc}, GTE cache version "
+        "{latestCachedVersion}",
+        "Cache loader state since the latest cached version",
+        "enqueuedTasksDesc"_attr =
+            (enqueued.changedChunks.empty()
+                 ? (tasksAreEnqueued ? "a drop enqueued" : "no enqueued metadata")
+                 : ("enqueued metadata from " +
+                    enqueued.changedChunks.front().getVersion().toString() + " to " +
+                    enqueued.changedChunks.back().getVersion().toString())),
+        "persistedMetadataDesc"_attr =
             (persisted.changedChunks.empty()
                  ? "no persisted metadata"
                  : ("persisted metadata from " +
                     persisted.changedChunks.front().getVersion().toString() + " to " +
                     persisted.changedChunks.back().getVersion().toString())),
-        "catalogCacheSinceVersion"_attr = catalogCacheSinceVersion);
+        "latestCachedVersion"_attr = catalogCacheSinceVersion);
 
     if (!tasksAreEnqueued) {
         // There are no tasks in the queue. Return the persisted metadata.
@@ -982,14 +987,16 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         LOGV2(22094,
-              "Failed to persist chunk metadata update for collection '{nss}' due to shutdown.",
-              "nss"_attr = nss);
+              "Failed to persist chunk metadata update for collection {namespace} due to shutdown",
+              "Failed to persist chunk metadata update for collection due to shutdown",
+              "namespace"_attr = nss);
         inShutdown = true;
     } catch (const DBException& ex) {
         LOGV2(22095,
-              "Failed to persist chunk metadata update for collection '{nss}{causedBy_ex}",
-              "nss"_attr = nss,
-              "causedBy_ex"_attr = causedBy(redact(ex)));
+              "Failed to persist chunk metadata update for collection {namespace} {error}",
+              "Failed to persist chunk metadata update for collection",
+              "namespace"_attr = nss,
+              "error"_attr = redact(ex));
     }
 
     {
@@ -1020,10 +1027,13 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
         if (ErrorCodes::isCancelationError(status.code())) {
             LOGV2(22096,
                   "Cache loader failed to schedule a persisted metadata update task for namespace "
-                  "'{nss}' due to '{status}'. Clearing task list so that scheduling will be "
-                  "attempted by the next caller to refresh this namespace.",
-                  "nss"_attr = nss,
-                  "status"_attr = redact(status));
+                  "{namespace} due to {error}. Clearing task list so that scheduling will be "
+                  "attempted by the next caller to refresh this namespace",
+                  "Cache loader failed to schedule a persisted metadata update task. Clearing task "
+                  "list so that scheduling will be attempted by the next caller to refresh this "
+                  "namespace",
+                  "namespace"_attr = nss,
+                  "error"_attr = redact(status));
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);
@@ -1047,14 +1057,16 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         LOGV2(22097,
-              "Failed to persist metadata update for db '{dbName}' due to shutdown.",
-              "dbName"_attr = dbName);
+              "Failed to persist metadata update for db {db} due to shutdown",
+              "Failed to persist metadata update for db due to shutdown",
+              "db"_attr = dbName);
         inShutdown = true;
     } catch (const DBException& ex) {
         LOGV2(22098,
-              "Failed to persist chunk metadata update for database {dbName}{causedBy_ex}",
-              "dbName"_attr = dbName,
-              "causedBy_ex"_attr = causedBy(redact(ex)));
+              "Failed to persist chunk metadata update for database {db} {error}",
+              "Failed to persist chunk metadata update for database",
+              "db"_attr = dbName,
+              "error"_attr = redact(ex));
     }
 
     {
@@ -1085,10 +1097,13 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
         if (ErrorCodes::isCancelationError(status.code())) {
             LOGV2(22099,
                   "Cache loader failed to schedule a persisted metadata update task for namespace "
-                  "'{name}' due to '{status}'. Clearing task list so that scheduling will be "
-                  "attempted by the next caller to refresh this namespace.",
-                  "name"_attr = name,
-                  "status"_attr = redact(status));
+                  "{namespace} due to {error}. Clearing task list so that scheduling will be "
+                  "attempted by the next caller to refresh this namespace",
+                  "Cache loader failed to schedule a persisted metadata update task. Clearing task "
+                  "list so that scheduling will be attempted by the next caller to refresh this "
+                  "namespace",
+                  "namespace"_attr = name,
+                  "error"_attr = redact(status));
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);
@@ -1137,11 +1152,12 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     LOGV2_FOR_CATALOG_REFRESH(
         24112,
         1,
-        "Successfully updated persisted chunk metadata for collection '{nss}' from "
-        "'{task_minQueryVersion}' to collection version '{task_maxQueryVersion}'.",
-        "nss"_attr = nss,
-        "task_minQueryVersion"_attr = task.minQueryVersion,
-        "task_maxQueryVersion"_attr = task.maxQueryVersion);
+        "Successfully updated persisted chunk metadata for collection {namespace} from "
+        "{oldCollectionVersion} to collection version {newCollectionVersion}",
+        "Successfully updated persisted chunk metadata for collection",
+        "namespace"_attr = nss,
+        "oldCollectionVersion"_attr = task.minQueryVersion,
+        "newCollectionVersion"_attr = task.maxQueryVersion);
 }
 
 void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext* opCtx,
@@ -1173,8 +1189,9 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
 
     LOGV2_FOR_CATALOG_REFRESH(24113,
                               1,
-                              "Successfully updated persisted metadata for db {dbName}",
-                              "dbName"_attr = dbName.toString());
+                              "Successfully updated persisted metadata for db {db}",
+                              "Successfully updated persisted metadata for db",
+                              "db"_attr = dbName.toString());
 }
 
 CollectionAndChangedChunks
@@ -1214,7 +1231,9 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
             1,
             "Cache loader read meatadata while updates were being applied: this metadata may be "
             "incomplete. Retrying. Refresh state before read: {beginRefreshState}. Current refresh "
-            "state: '{endRefreshState}'.",
+            "state: {endRefreshState}",
+            "Cache loader read meatadata while updates were being applied: this metadata may be "
+            "incomplete. Retrying",
             "beginRefreshState"_attr = beginRefreshState,
             "endRefreshState"_attr = endRefreshState);
     }

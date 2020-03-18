@@ -51,7 +51,7 @@ ShardedConnectionInfo* ShardedConnectionInfo::get(Client* client, bool create) {
     auto& current = clientSCI(client);
 
     if (!current && create) {
-        LOGV2_DEBUG(22060, 1, "entering shard mode for connection");
+        LOGV2_DEBUG(22060, 1, "Entering shard mode for connection");
         current.emplace();
     }
 

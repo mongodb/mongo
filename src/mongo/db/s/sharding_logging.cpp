@@ -81,8 +81,9 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
             _actionLogCollectionCreated.store(1);
         } else {
             LOGV2(22078,
-                  "couldn't create config.actionlog collection:{causedBy_result}",
-                  "causedBy_result"_attr = causedBy(result));
+                  "Couldn't create config.actionlog collection: {error}",
+                  "Couldn't create config.actionlog collection",
+                  "error"_attr = result);
             return result;
         }
     }
@@ -109,8 +110,9 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
             _changeLogCollectionCreated.store(1);
         } else {
             LOGV2(22079,
-                  "couldn't create config.changelog collection:{causedBy_result}",
-                  "causedBy_result"_attr = causedBy(result));
+                  "Couldn't create config.changelog collection: {error}",
+                  "Couldn't create config.changelog collection",
+                  "error"_attr = result);
             return result;
         }
     }
@@ -149,9 +151,10 @@ Status ShardingLogging::_log(OperationContext* opCtx,
 
     BSONObj changeLogBSON = changeLog.toBSON();
     LOGV2(22080,
-          "about to log metadata event into {logCollName}: {changeLogBSON}",
-          "logCollName"_attr = logCollName,
-          "changeLogBSON"_attr = redact(changeLogBSON));
+          "About to log metadata event into {namespace}: {event}",
+          "About to log metadata event",
+          "namespace"_attr = logCollName,
+          "event"_attr = redact(changeLogBSON));
 
     const NamespaceString nss("config", logCollName);
     Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
@@ -160,10 +163,11 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     if (!result.isOK()) {
         LOGV2_WARNING(22081,
                       "Error encountered while logging config change with ID [{changeId}] into "
-                      "collection {logCollName}: {result}",
+                      "collection {namespace}: {error}",
+                      "Error encountered while logging config change",
                       "changeId"_attr = changeId,
-                      "logCollName"_attr = logCollName,
-                      "result"_attr = redact(result));
+                      "namespace"_attr = logCollName,
+                      "error"_attr = redact(result));
     }
 
     return result;
