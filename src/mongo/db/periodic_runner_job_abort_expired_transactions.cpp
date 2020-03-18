@@ -88,23 +88,27 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    PeriodicRunner::PeriodicJob job("abortExpiredTransactions",
-                                    [](Client* client) {
-                                        // The opCtx destructor handles unsetting itself from the
-                                        // Client. (The PeriodicRunner's Client must be reset before
-                                        // returning.)
-                                        auto opCtx = client->makeOperationContext();
+    PeriodicRunner::PeriodicJob job(
+        "abortExpiredTransactions",
+        [](Client* client) {
+            // The opCtx destructor handles unsetting itself from the
+            // Client. (The PeriodicRunner's Client must be reset before
+            // returning.)
+            auto opCtx = client->makeOperationContext();
 
-                                        // Set the Locker such that all lock requests' timeouts will
-                                        // be overridden and set to 0. This prevents the expired
-                                        // transaction aborter thread from stalling behind any
-                                        // non-transaction, exclusive lock taking operation blocked
-                                        // behind an active transaction's intent lock.
-                                        opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
-
-                                        killAllExpiredTransactions(opCtx.get());
-                                    },
-                                    getPeriod(gTransactionLifetimeLimitSeconds.load()));
+            // Set the Locker such that all lock requests' timeouts will
+            // be overridden and set to 0. This prevents the expired
+            // transaction aborter thread from stalling behind any
+            // non-transaction, exclusive lock taking operation blocked
+            // behind an active transaction's intent lock.
+            opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
+            try {
+                killAllExpiredTransactions(opCtx.get());
+            } catch (ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+                LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
+            }
+        },
+        getPeriod(gTransactionLifetimeLimitSeconds.load()));
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
