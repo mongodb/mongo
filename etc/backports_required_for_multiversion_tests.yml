@@ -51,6 +51,16 @@ replica_sets_multiversion:
   test_file: jstests/replsets/initial_sync_test_fixture_test.js
 - ticket: SERVER-45143
   test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
+- ticket: SERVER-45081
+  test_file: jstests/replsets/catchup.js
+- ticket: SERVER-45081
+  test_file: jstests/replsets/catchup_takeover_one_high_priority.js
+- ticket: SERVER-45081
+  test_file: jstests/replsets/do_not_advance_commit_point_beyond_last_applied_term.js
+- ticket: SERVER-45081
+  test_file: jstests/replsets/reconfig_avoids_diverging_configs.js
+- ticket: SERVER-45081
+  test_file: jstests/replsets/reconfig_waits_for_oplog_commitment_condition.js
 
 sharding_multiversion:
 
