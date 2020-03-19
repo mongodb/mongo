@@ -1,6 +1,6 @@
 /**
  * Tests the startup-only setParameter value suppressNoTLSPeerCertificateWarning which suppresses
- * the log message "no SSL certificate provided by peer" when a client certificate is not provided.
+ * the log message "No SSL certificate provided by peer" when a client certificate is not provided.
  * This only works if weak validation is enabled.
  *
  * This test confirms that the log message is output when the setParameter is set to true,
@@ -49,7 +49,7 @@ function test(suppress) {
 
     // Now check for the message
     const log = rawMongoProgramOutput();
-    assert.eq(suppress, log.search('no SSL certificate provided by peer') === -1);
+    assert.eq(suppress, log.match(/[N,n]o SSL certificate provided by peer/) === null);
 
     try {
         MongoRunner.stopMongod(mongod);

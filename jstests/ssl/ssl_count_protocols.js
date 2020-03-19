@@ -78,9 +78,12 @@ function runTestWithoutSubset(client) {
         const lines = log.split('\n');
         let found = false;
         for (let logMsg of lines) {
+            if (!logMsg) {
+                continue;
+            }
             const logJson = JSON.parse(logMsg);
-            if (logJson.id === 23218 && /1\.\d/.test(logJson.attr.version) &&
-                /127.0.0.1:\d+/.test(logJson.attr.connection)) {
+            if (logJson.id === 23218 && /1\.\d/.test(logJson.attr.tlsVersion) &&
+                /127.0.0.1:\d+/.test(logJson.attr.remoteHost)) {
                 found = true;
                 break;
             }
