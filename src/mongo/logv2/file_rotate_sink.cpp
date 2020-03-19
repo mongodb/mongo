@@ -48,13 +48,17 @@ using stream_t = std::ofstream;
 
 StatusWith<boost::shared_ptr<stream_t>> openFile(const std::string& filename, bool append) {
     std::ios_base::openmode mode = std::ios_base::out;
-    if (append)
+    bool exists = false;
+    if (append) {
         mode |= std::ios_base::app;
-    else
+        exists = boost::filesystem::exists(filename);
+    } else
         mode |= std::ios_base::trunc;
     auto file = boost::make_shared<stream_t>(filename, mode);
     if (file->fail())
         return Status(ErrorCodes::FileNotOpen, fmt::format("Failed to open {}", filename));
+    if (append && exists)
+        file->put('\n');
     return file;
 }
 }  // namespace
