@@ -31,7 +31,7 @@ __schema_backup_check_int(WT_SESSION_IMPL *session, const char *name)
     }
     for (i = 0; backup_list[i] != NULL; ++i) {
         if (strcmp(backup_list[i], name) == 0)
-            return __wt_set_return(session, EBUSY);
+            return (__wt_set_return(session, EBUSY));
     }
 
     return (0);

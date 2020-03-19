@@ -662,21 +662,32 @@ __ckpt_add_blkmod_entry(
   WT_SESSION_IMPL *session, WT_BLOCK_MODS *blk_mod, wt_off_t offset, wt_off_t len)
 {
     uint64_t end, start;
-    uint32_t end_rdup;
+    uint32_t end_buf_bytes, end_rdup_bytes;
 
     WT_ASSERT(session, blk_mod->granularity != 0);
     start = (uint64_t)offset / blk_mod->granularity;
     end = (uint64_t)(offset + len) / blk_mod->granularity;
     WT_ASSERT(session, end < UINT32_MAX);
-    end_rdup = WT_MAX(__wt_rduppo2((uint32_t)end, 8), WT_BLOCK_MODS_LIST_MIN);
-    if ((end_rdup << 3) > blk_mod->nbits) {
+    end_rdup_bytes = WT_MAX(__wt_rduppo2((uint32_t)end, 8), WT_BLOCK_MODS_LIST_MIN);
+    end_buf_bytes = (uint32_t)blk_mod->nbits >> 3;
+    /*
+     * We are doing a lot of shifting. Make sure that the number of bytes we end up with is a
+     * multiple of eight. We guarantee that in the rounding up call, but also make sure that the
+     * constant stays a multiple of eight.
+     */
+    WT_ASSERT(session, end_rdup_bytes % 8 == 0);
+    if (end_rdup_bytes > end_buf_bytes) {
         /* If we don't have enough, extend the buffer. */
         if (blk_mod->nbits == 0) {
-            WT_RET(__wt_buf_initsize(session, &blk_mod->bitstring, end_rdup));
-            memset(blk_mod->bitstring.mem, 0, end_rdup);
-        } else
-            WT_RET(__wt_buf_set(session, &blk_mod->bitstring, blk_mod->bitstring.data, end_rdup));
-        blk_mod->nbits = end_rdup << 3;
+            WT_RET(__wt_buf_initsize(session, &blk_mod->bitstring, end_rdup_bytes));
+            memset(blk_mod->bitstring.mem, 0, end_rdup_bytes);
+        } else {
+            WT_RET(
+              __wt_buf_set(session, &blk_mod->bitstring, blk_mod->bitstring.data, end_rdup_bytes));
+            memset(
+              (uint8_t *)blk_mod->bitstring.mem + end_buf_bytes, 0, end_rdup_bytes - end_buf_bytes);
+        }
+        blk_mod->nbits = end_rdup_bytes << 3;
     }
 
     /* Set all the bits needed to record this offset/length pair. */

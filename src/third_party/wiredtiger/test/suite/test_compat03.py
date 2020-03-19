@@ -46,6 +46,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     # Log version 1 does not have the prevlsn record.
     # Log version 2 introduced that record.
     # Log version 3 continues to have that record.
+    # Log version 4 continues to have that record.
     min_logv = 2
 
     # Test detecting a not-yet-existing log version. This should
@@ -57,8 +58,9 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     # and without the patch number. Test one on release and the
     # required minimum just for testing of parsing.
     compat_release = [
-        ('def_rel', dict(rel='none', log_rel=3)),
         ('future_rel', dict(rel=future_rel, log_rel=future_logv)),
+        ('def_rel', dict(rel='none', log_rel=4)),
+        ('100_rel', dict(rel='10.0', log_rel=4)),
         ('32_rel', dict(rel="3.2", log_rel=3)),
         ('31_rel', dict(rel="3.1", log_rel=3)),
         ('30_rel', dict(rel="3.0", log_rel=2)),
@@ -73,8 +75,9 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     # number as the patch number will get removed in the conn_reconfig.c
     # This rule exemption applies to the minimum verison check as well.
     compat_max = [
-        ('def_max', dict(max_req='none', log_max=3)),
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
+        ('def_max', dict(max_req='none', log_max=4)),
+        ('100_max', dict(max_req='10.0', log_max=4)),
         ('32_max', dict(max_req="3.2", log_max=3)),
         ('30_max', dict(max_req="3.0", log_max=2)),
         ('26_max', dict(max_req="2.6", log_max=1)),
@@ -83,8 +86,9 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Only the minimum version should exist below for each log version.
     compat_min = [
-        ('def_min', dict(min_req='none', log_min=3)),
         ('future_min', dict(min_req=future_rel, log_min=future_logv)),
+        ('def_min', dict(min_req='none', log_min=4)),
+        ('100_min', dict(min_req='10.0', log_min=4)),
         ('31_min', dict(min_req="3.1", log_min=3)),
         ('30_min', dict(min_req="3.0", log_min=2)),
         ('26_min', dict(min_req="2.6", log_min=1)),

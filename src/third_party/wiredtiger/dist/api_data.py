@@ -988,7 +988,10 @@ wiredtiger_open_common =\
         handle''',
         min=15, undoc=True),
     Config('mmap', 'true', r'''
-        Use memory mapping to access files when possible''',
+        Use memory mapping when accessing files in a read-only mode''',
+        type='boolean'),
+    Config('mmap_all', 'false', r'''
+        Use memory mapping to read and write all data files''',
         type='boolean'),
     Config('multiprocess', 'false', r'''
         permit sharing between processes (will automatically start an

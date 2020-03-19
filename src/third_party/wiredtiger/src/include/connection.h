@@ -35,7 +35,7 @@ extern WT_PROCESS __wt_process;
 
 /*
  * WT_KEYED_ENCRYPTOR --
- *	An list entry for an encryptor with a unique (name, keyid).
+ *	A list entry for an encryptor with a unique (name, keyid).
  */
 struct __wt_keyed_encryptor {
     const char *keyid;       /* Key id of encryptor */
@@ -150,8 +150,7 @@ struct __wt_named_extractor {
 
 /*
  * WT_CONN_HOTBACKUP_START --
- *	Macro to set connection data appropriately for when we commence hot
- *	backup.
+ *	Macro to set connection data appropriately for when we commence hot backup.
  */
 #define WT_CONN_HOTBACKUP_START(conn)   \
     do {                                \
@@ -443,7 +442,8 @@ struct __wt_connection_impl {
     uint64_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
     uint64_t write_through;          /* FILE_FLAG_WRITE_THROUGH */
 
-    bool mmap;     /* mmap configuration */
+    bool mmap;     /* use mmap when reading checkpoints */
+    bool mmap_all; /* use mmap for all I/O on data files */
     int page_size; /* OS page size for mmap alignment */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */

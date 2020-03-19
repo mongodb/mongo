@@ -95,7 +95,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_DECL_RET;
     WT_PAGE *page;
     uint64_t time_start, time_stop;
-    bool clean_page, closing, inmem_split, local_gen, tree_dead;
+    uint32_t session_flags;
+    bool clean_page, closing, inmem_split, is_owner, local_gen, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
@@ -109,6 +110,31 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
     if (tree_dead)
         LF_SET(WT_EVICT_CALL_NO_SPLIT);
+
+    /*
+     * Before we enter the eviction generation, make sure this session has a cached history store
+     * cursor, otherwise we can deadlock with a session wanting exclusive access to a handle: that
+     * session will have a handle list write lock and will be waiting on eviction to drain, we'll be
+     * inside eviction waiting on a handle list read lock to open a history store cursor.
+     *
+     * The test for the no-reconciliation flag is necessary because the session may already be doing
+     * history store operations and if we open/close the existing history store cursor, we can
+     * affect those already-running history store operations by changing the cursor state. When
+     * doing history store operations, we set the no-reconciliation flag, use it as short-hand to
+     * avoid that problem. This doesn't open up the window for the deadlock because setting the
+     * no-reconciliation flag limits eviction to in-memory splits. FIXME: This isn't reasonable and
+     * needs a better fix.
+     *
+     * The test for the connection's default session is because there are known problems with using
+     * cached cursors from the default session. FIXME: This isn't reasonable and needs a better fix.
+     */
+    if (!WT_IS_METADATA(S2BT(session)->dhandle) && !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
+      session->hs_cursor == NULL && !F_ISSET(session, WT_SESSION_NO_RECONCILE) &&
+      session != conn->default_session) {
+        session_flags = 0; /* [-Werror=maybe-uninitialized] */
+        WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
+        WT_RET(__wt_hs_cursor_close(session, session_flags, is_owner));
+    }
 
     /*
      * Enter the eviction generation. If we re-enter eviction, leave the previous eviction

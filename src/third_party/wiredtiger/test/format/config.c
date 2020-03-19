@@ -942,6 +942,9 @@ config_reset(void)
 {
     CONFIG *cp;
 
+    if (!config_is_perm("isolation"))
+        g.c_isolation_flag = 0;
+
     /* Clear temporary allocated configuration data. */
     for (cp = c; cp->name != NULL; ++cp) {
         F_CLR(cp, C_TEMP);

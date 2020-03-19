@@ -635,8 +635,14 @@ static const char *const __stats_connection_desc[] = {
   "async: total compact calls", "async: total insert calls", "async: total remove calls",
   "async: total search calls", "async: total update calls", "block-manager: blocks pre-loaded",
   "block-manager: blocks read", "block-manager: blocks written", "block-manager: bytes read",
+  "block-manager: bytes read via memory map API", "block-manager: bytes read via system call API",
   "block-manager: bytes written", "block-manager: bytes written for checkpoint",
-  "block-manager: mapped blocks read", "block-manager: mapped bytes read",
+  "block-manager: bytes written via memory map API",
+  "block-manager: bytes written via system call API", "block-manager: mapped blocks read",
+  "block-manager: mapped bytes read",
+  "block-manager: number of times the file was remapped because it changed size via fallocate or "
+  "truncate",
+  "block-manager: number of times the region was remapped via write",
   "cache: application threads page read from disk to cache count",
   "cache: application threads page read from disk to cache time (usecs)",
   "cache: application threads page write from cache to disk count",
@@ -973,10 +979,16 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_read = 0;
     stats->block_write = 0;
     stats->block_byte_read = 0;
+    stats->block_byte_read_mmap = 0;
+    stats->block_byte_read_syscall = 0;
     stats->block_byte_write = 0;
     stats->block_byte_write_checkpoint = 0;
+    stats->block_byte_write_mmap = 0;
+    stats->block_byte_write_syscall = 0;
     stats->block_map_read = 0;
     stats->block_byte_map_read = 0;
+    stats->block_remap_file_resize = 0;
+    stats->block_remap_file_write = 0;
     stats->cache_read_app_count = 0;
     stats->cache_read_app_time = 0;
     stats->cache_write_app_count = 0;
@@ -1405,10 +1417,16 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_read += WT_STAT_READ(from, block_read);
     to->block_write += WT_STAT_READ(from, block_write);
     to->block_byte_read += WT_STAT_READ(from, block_byte_read);
+    to->block_byte_read_mmap += WT_STAT_READ(from, block_byte_read_mmap);
+    to->block_byte_read_syscall += WT_STAT_READ(from, block_byte_read_syscall);
     to->block_byte_write += WT_STAT_READ(from, block_byte_write);
     to->block_byte_write_checkpoint += WT_STAT_READ(from, block_byte_write_checkpoint);
+    to->block_byte_write_mmap += WT_STAT_READ(from, block_byte_write_mmap);
+    to->block_byte_write_syscall += WT_STAT_READ(from, block_byte_write_syscall);
     to->block_map_read += WT_STAT_READ(from, block_map_read);
     to->block_byte_map_read += WT_STAT_READ(from, block_byte_map_read);
+    to->block_remap_file_resize += WT_STAT_READ(from, block_remap_file_resize);
+    to->block_remap_file_write += WT_STAT_READ(from, block_remap_file_write);
     to->cache_read_app_count += WT_STAT_READ(from, cache_read_app_count);
     to->cache_read_app_time += WT_STAT_READ(from, cache_read_app_time);
     to->cache_write_app_count += WT_STAT_READ(from, cache_write_app_count);

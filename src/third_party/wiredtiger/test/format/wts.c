@@ -198,7 +198,7 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     CONFIG_APPEND(p, ",buffer_alignment=512");
 #endif
 
-    CONFIG_APPEND(p, ",mmap=%d", g.c_mmap ? 1 : 0);
+    CONFIG_APPEND(p, ",mmap=%d,mmap_all=%d", g.c_mmap ? 1 : 0, g.c_mmap_all ? 1 : 0);
 
     if (g.c_direct_io)
         CONFIG_APPEND(p, ",direct_io=(data)");

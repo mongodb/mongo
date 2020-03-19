@@ -127,6 +127,10 @@ __rec_append_orig_value(
 
 err:
     __wt_scr_free(session, &tmp);
+    /* Free append when tombstone allocation fails */
+    if (ret != 0) {
+        __wt_free_update_list(session, &append);
+    }
     return (ret);
 }
 

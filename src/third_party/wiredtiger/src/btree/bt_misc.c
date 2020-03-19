@@ -20,6 +20,8 @@ __wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size
 
     btree = S2BT_SAFE(session);
 
+    WT_ASSERT(session, buf != NULL);
+
     if (addr == NULL || addr_size == 0) {
         buf->data = WT_NO_ADDR_STRING;
         buf->size = strlen(WT_NO_ADDR_STRING);

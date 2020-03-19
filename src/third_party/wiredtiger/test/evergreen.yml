@@ -1113,20 +1113,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
 
-  - name: csuite-wt2323-join-visibility-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+  # Temporarily disabled
+  # - name: csuite-wt2323-join-visibility-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/csuite/test_wt2323_join_visibility 2>&1
+  #           ${test_env_vars|} $(pwd)/test/csuite/test_wt2323_join_visibility 2>&1
 
   - name: csuite-wt2535-insert-race-test
     tags: ["pull_request"]
@@ -1203,20 +1204,20 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt3338_partial_update 2>&1
 
-  # - name: csuite-wt4333-handle-locks-test
-  #   tags: ["pull_request"]
-  #   depends_on:
-  #     - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - command: shell.exec
-  #       params:
-  #         working_dir: "wiredtiger/build_posix"
-  #         script: |
-  #           set -o errexit
-  #           set -o verbose
+  - name: csuite-wt4333-handle-locks-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
 
-  #           ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
 
   # End of csuite test tasks
 

@@ -351,8 +351,9 @@ struct __wt_log_desc {
                          * MongoDB to detect users accidentally running old binaries on a newer
                          * release. There are no actual log file format changes with version 2 and
                          * 3.
+                         * NOTE: We bumped the log version from 3 to 4 for the same reason.
                          */
-#define WT_LOG_VERSION 3
+#define WT_LOG_VERSION 4
     uint16_t version;  /* 04-05: Log version */
     uint16_t unused;   /* 06-07: Unused */
     uint64_t log_size; /* 08-15: Log file size */
@@ -369,6 +370,8 @@ struct __wt_log_desc {
 #define WT_LOG_V2_MINOR 0
 #define WT_LOG_V3_MAJOR 3
 #define WT_LOG_V3_MINOR 1
+#define WT_LOG_V4_MAJOR 10
+#define WT_LOG_V4_MINOR 0
 
 /*
  * __wt_log_desc_byteswap --

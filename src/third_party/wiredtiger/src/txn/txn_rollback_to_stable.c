@@ -465,7 +465,7 @@ __rollback_abort_row_reconciled_page(
          * let the reconciliation happens again on the page. Otherwise, the eviction may pick the
          * already reconciled page to write to disk with newer updates.
          */
-        __wt_page_only_modify_set(session, page);
+        __wt_page_modify_set(session, page);
     } else if (mod->rec_result == WT_PM_REC_MULTIBLOCK) {
         for (multi = mod->mod_multi, multi_entry = 0; multi_entry < mod->mod_multi_entries;
              ++multi, ++multi_entry)
@@ -479,7 +479,7 @@ __rollback_abort_row_reconciled_page(
                  * eviction may pick the already reconciled page to write to disk with newer
                  * updates.
                  */
-                __wt_page_only_modify_set(session, page);
+                __wt_page_modify_set(session, page);
             }
     }
 

@@ -53,10 +53,15 @@ extern void __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, ui
   bool (*run_func)(WT_SESSION_IMPL *), bool *signalled);
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_map_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
+extern void __wt_prepare_remap_resize_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
+extern void __wt_release_without_remap(WT_FILE_HANDLE *file_handle);
+extern void __wt_remap_resize_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_stream_set_line_buffer(FILE *fp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_stream_set_no_buffer(FILE *fp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_thread_id(uintmax_t *id) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_unmap_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session);
 extern void __wt_yield(void) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));

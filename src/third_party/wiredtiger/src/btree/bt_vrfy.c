@@ -527,8 +527,9 @@ __verify_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
     WT_DECL_RET;
     char tp_string[2][WT_TP_STRING_SIZE];
 
+    WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+
     if (__wt_ref_addr_copy(session, ref, &addr)) {
-        WT_ERR(__wt_scr_alloc(session, 0, &tmp));
         WT_ERR(__wt_buf_fmt(session, buf, "%s %s,%s",
           __wt_addr_string(session, addr.addr, addr.size, tmp),
           __wt_time_pair_to_string(addr.oldest_start_ts, addr.oldest_start_txn, tp_string[0]),

@@ -326,7 +326,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
 
     len = strlen(config) + strlen(cursor->value_format) + strlen(cursor->uri) + 20;
     if ((newconfig = malloc(len)) == NULL)
-        return util_err(session, errno, NULL);
+        return (util_err(session, errno, NULL));
     *newconfigp = newconfig;
     wt_api = session->connection->get_extension_api(session->connection);
     if ((ret = wt_api->config_parser_open(wt_api, session, config, strlen(config), &parser)) != 0)

@@ -1,0 +1,76 @@
+/*! @page devdoc-xray Instrumentation and introspection with XRay
+
+XRay is a tool, originally developed at Google and now integrated in LLVM, that
+instruments the program such that when it runs it produces a trace of executed
+functions and their timestamps. This article explains how to instrument
+WiredTiger, collect the XRay traces, and analyze them.  As an example, we will
+show how to trace \c wtperf.
+
+Step 1. Install LLVM.
+
+@code
+$ sudo apt install llvm
+@endcode
+
+LLVM needs to be version 8 or higher. Check the version like this:
+
+@code
+$ llvm-config –version
+@endcode
+
+If your distribution's default \c llvm-config isn't from the 8 series, you'll
+need to move one with a major version of 8 into the \c $PATH such that it gets
+invoked instead.
+
+Step 2. Configure the WiredTiger build with LLVM flags.
+
+@code
+../configure --enable-llvm CC="clang-8" CFLAGS="-fxray-instrument"
+@endcode
+
+Step 3. Build as usual.
+
+@code
+$ cd build_posix
+$ make
+@endcode
+
+Step 4. Run wtperf.
+
+Use the script \c wtperf_xray.sh to launch \c wtperf from the directory
+containing the \c wtperf binary. The first argument to the script must be the
+benchmark configuration file. For example:
+
+@code
+$ cd bench/wtperf
+$ ../../../bench/wtperf/runners/wtperf_xray.sh  ../../../bench/wtperf/runners/small-btree.wtperf
+@endcode
+
+In general the usage is:  
+
+@code
+wtperf_xray.sh <wtperf-config-file> [-h output-directory] [wtperf other arguments]
+@endcode
+
+The run of the program will produce an xray log -- the name of the log file will
+be printed to \c stdout.
+
+Step 5. Process the traces.
+
+To process the traces, use the \c xray_to_optrack tool in the \c
+tools/xray_to_optrack directory. If the tool isn't built, build it by typing \c
+make in the directory.
+
+Then, run the tool like this:
+
+@code
+xray_to_optrack <xray_instrumented_binary> <xray_log>
+@endcode
+
+\c xray_instrumented_binary is the binary that produced the log, \c wtperf in
+our case, and \c xray_log is the log file.
+
+The script will produce one or more files with a prefix \c optrack. You can view
+these files with optrack tools, described in the optrack documentation.
+
+*/

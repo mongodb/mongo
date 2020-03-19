@@ -106,6 +106,7 @@ WiredTigerPanicException
 WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
+XRay
 Yann
 Za
 Zstd
@@ -261,6 +262,7 @@ freelist
 fsync
 ftruncate
 fvisibility
+fxray
 gcc
 gdbm
 ge
@@ -317,6 +319,7 @@ libkvs
 libtool
 libwiredtiger
 lifecycle
+llvm
 lmin
 ln
 loadtext
@@ -482,6 +485,7 @@ startsync
 startuml
 statlog
 stderr
+stdout
 str
 strerror
 strftime
@@ -558,6 +562,7 @@ wrlock
 wtperf
 wtstats
 xa
+xray
 yieldcpu
 zlib
 zseries

@@ -88,6 +88,7 @@ CreateFileMappingW
 CreateFileW
 Crummey
 CustomersPhone
+DAX
 DECL
 DECR
 DESC
@@ -258,6 +259,7 @@ Memrata
 Metadata
 Mewhort
 Mitzenmacher
+Mmap
 MongoDB
 MoveFileExW
 Multi
@@ -975,6 +977,7 @@ mT
 madvise
 majorp
 malloc
+mappable
 marshall
 marshalled
 maxCLevel
@@ -1021,6 +1024,7 @@ mytxn
 namespace
 namespaces
 nbits
+nbsp
 nchunks
 nclr
 nd
@@ -1339,6 +1343,8 @@ unistd
 unlink
 unlinked
 unmap
+unmapped
+unmapping
 unmarshall
 unmarshalled
 unmerged

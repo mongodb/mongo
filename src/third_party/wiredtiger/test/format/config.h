@@ -203,8 +203,11 @@ static CONFIG c[] = {{"abort", "if timed run should drop core", /* 0% */
   {"merge_max", "the maximum number of chunks to include in a merge operation", 0x0, 4, 20, 100,
     &g.c_merge_max, NULL},
 
-  {"mmap", "configure for mmap operations", /* 90% */
+  {"mmap", "configure for mmap operations (readonly)", /* 90% */
     C_BOOL, 90, 0, 0, &g.c_mmap, NULL},
+
+  {"mmap_all", "configure for mmap operations (read and write)", /* 5% */
+    C_BOOL, 5, 0, 0, &g.c_mmap_all, NULL},
 
   {"modify_pct", "percent operations that are value modifications", C_IGNORE, 0, 0, 100,
     &g.c_modify_pct, NULL},
