@@ -227,10 +227,18 @@ public:
     virtual void shardingOnStepDownHook() = 0;
 
     /**
-     * Clears oplog visibility state. All of the oplog is safely visible because there are no oplog
-     * writes during stepdown.
+     * Stops asynchronous updates to and then clears the oplogTruncateAfterPoint.
+     *
+     * Safe to call when there are no oplog writes, and therefore no oplog holes that must be
+     * tracked by the oplogTruncateAfterPoint.
+     *
+     * Only primaries update the truncate point asynchronously; other replication states update the
+     * truncate point manually as necessary. This function should be called whenever replication
+     * leaves state PRIMARY: stepdown; and shutdown while in state PRIMARY. Otherwise, we might
+     * leave a stale oplogTruncateAfterPoint set and cause unnecessary oplog truncation during
+     * startup if the server gets restarted.
      */
-    virtual void clearOplogVisibilityStateForStepDown() = 0;
+    virtual void stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() = 0;
 
     /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.

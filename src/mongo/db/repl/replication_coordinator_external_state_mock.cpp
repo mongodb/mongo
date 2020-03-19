@@ -230,7 +230,7 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
-void ReplicationCoordinatorExternalStateMock::clearOplogVisibilityStateForStepDown() {}
+void ReplicationCoordinatorExternalStateMock::stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
