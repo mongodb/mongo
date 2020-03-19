@@ -778,9 +778,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
                           ::mongo::logv2::LogComponent::kWrite,
                           logv2::LogSeverity::Debug(1),
                           numAttempts,
-                          str::stream()
-                              << "Caught DuplicateKey exception during upsert for namespace "
-                              << ns.ns());
+                          "Caught DuplicateKey exception during upsert",
+                          "namespace"_attr = ns.ns());
         }
     }
 

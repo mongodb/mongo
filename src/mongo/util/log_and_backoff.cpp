@@ -34,20 +34,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::log_backoff_detail {
 
-void logAndBackoff(uint32_t logId,
-                   logv2::LogComponent logComponent,
-                   logv2::LogSeverity logLevel,
-                   size_t numAttempts,
-                   StringData message) {
-    LOGV2_DEBUG_OPTIONS(logId,
-                        logLevel.toInt(),
-                        {logComponent},
-                        "{message}. Retrying, attempt: {attempts}",
-                        "message"_attr = message,
-                        "attempts"_attr = numAttempts);
-
+void logAndBackoffImpl(size_t numAttempts) {
     if (numAttempts < 4) {
         // no-op
     } else if (numAttempts < 10) {
@@ -61,4 +50,4 @@ void logAndBackoff(uint32_t logId,
     }
 }
 
-}  // namespace mongo
+}  // namespace mongo::log_backoff_detail

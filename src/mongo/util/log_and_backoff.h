@@ -31,18 +31,27 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_severity.h"
 
 namespace mongo {
+namespace log_backoff_detail {
+void logAndBackoffImpl(size_t numAttempts);
+}  // namespace log_backoff_detail
 
 /**
  * Will log a message at 'logLevel' for the given 'logComponent' and will perform truncated
  * exponential backoff, with the backoff period based on 'numAttempts'.
  */
-void logAndBackoff(uint32_t logId,
-                   logv2::LogComponent logComponent,
-                   logv2::LogSeverity logLevel,
+template <size_t N, typename... Args>
+void logAndBackoff(int32_t logId,
+                   logv2::LogComponent component,
+                   logv2::LogSeverity severity,
                    size_t numAttempts,
-                   StringData message);
+                   const char (&msg)[N],
+                   const fmt::internal::named_arg<Args, char>&... args) {
+    logv2::detail::doLog(logId, severity, {component}, msg, args..., "attempts"_attr = numAttempts);
+    log_backoff_detail::logAndBackoffImpl(numAttempts);
+}
 
 }  // namespace mongo
