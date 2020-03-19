@@ -26,7 +26,7 @@ let log = cat(conn.fullOptions.logFile);
 let predicate = null;
 if (isJsonLog(conn)) {
     predicate =
-        /slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"count":"foo","query":{"\$where":{"\$code":"function\(\)/;
+        /Slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"count":"foo","query":{"\$where":{"\$code":"function\(\)/;
 } else {
     predicate =
         /COMMAND .* command test.foo appName: "MongoDB Shell" command: count { count: "foo", query: { \$where: function\(\)/;
@@ -38,7 +38,7 @@ for (var a of log.split("\n")) {
 }
 
 assert(predicate.test(log),
-       "'slow query' log line missing in mongod log file!\n" +
+       "'Slow query' log line missing in mongod log file!\n" +
            "Log file contents: " + conn.fullOptions.logFile);
 MongoRunner.stopMongod(conn);
 })();

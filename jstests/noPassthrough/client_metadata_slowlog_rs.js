@@ -16,7 +16,7 @@ let checkLog = function(conn) {
     let predicate = null;
     if (isJsonLog(conn)) {
         predicate =
-            /slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"find":"foo","filter":{"\$where":{"\$code":"function\(\)/;
+            /Slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"find":"foo","filter":{"\$where":{"\$code":"function\(\)/;
     } else {
         predicate =
             /COMMAND .* command test.foo appName: "MongoDB Shell" command: find { find: "foo", filter: { \$where: function\(\)/;
@@ -28,7 +28,7 @@ let checkLog = function(conn) {
     }
 
     assert(predicate.test(log),
-           "'slow query' log line missing in mongod log file!\n" +
+           "'Slow query' log line missing in mongod log file!\n" +
                "Log file contents: " + conn.fullOptions.logFile +
                "\n************************************************************\n" + log +
                "\n************************************************************");

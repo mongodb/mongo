@@ -495,7 +495,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
         logv2::DynamicAttributes attr;
         _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), &attr);
-        LOGV2(51803, "slow query", attr);
+        LOGV2_OPTIONS(51803, {component}, "Slow query", attr);
     }
 
     // Return 'true' if this operation should also be added to the profiler.
