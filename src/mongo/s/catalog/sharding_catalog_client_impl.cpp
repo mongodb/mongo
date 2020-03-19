@@ -724,8 +724,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
 
         LOGV2_WARNING(
             22675,
-            "chunk operation commit failed and metadata will be revalidated{causedBy_status}",
-            "causedBy_status"_attr = causedBy(redact(status)));
+            "Error committing chunk operation, metadata will be revalidated. Caused by {error}",
+            "Error committing chunk operation, metadata will be revalidated",
+            "error"_attr = redact(status));
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that
         // mod made it to the config server, then transaction was successful.

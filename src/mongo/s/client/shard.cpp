@@ -125,12 +125,13 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto status = CommandResponse::getEffectiveStatus(swResponse);
         if (isRetriableError(status.code(), retryPolicy)) {
-            LOGV2_DEBUG(
-                22719,
-                2,
-                "Command {cmdObj} failed with retriable error and will be retried{causedBy_status}",
-                "cmdObj"_attr = redact(cmdObj),
-                "causedBy_status"_attr = causedBy(redact(status)));
+            LOGV2_DEBUG(22719,
+                        2,
+                        "Command {command} failed with retryable error and will be retried. Caused "
+                        "by {error}",
+                        "Command failed with retryable error and will be retried",
+                        "command"_attr = redact(cmdObj),
+                        "error"_attr = redact(status));
             continue;
         }
 
@@ -165,12 +166,13 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto status = CommandResponse::getEffectiveStatus(swResponse);
         if (retry < kOnErrorNumRetries && isRetriableError(status.code(), retryPolicy)) {
-            LOGV2_DEBUG(
-                22720,
-                2,
-                "Command {cmdObj} failed with retriable error and will be retried{causedBy_status}",
-                "cmdObj"_attr = redact(cmdObj),
-                "causedBy_status"_attr = causedBy(redact(status)));
+            LOGV2_DEBUG(22720,
+                        2,
+                        "Command {command} failed with retryable error and will be retried. Caused "
+                        "by {error}",
+                        "Command failed with retryable error and will be retried",
+                        "command"_attr = redact(cmdObj),
+                        "error"_attr = redact(status));
             continue;
         }
 
@@ -215,10 +217,11 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
         if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
             LOGV2_DEBUG(22721,
                         2,
-                        "Batch write command to {getId} failed with retriable error and will be "
-                        "retried{causedBy_writeStatus}",
-                        "getId"_attr = getId(),
-                        "causedBy_writeStatus"_attr = causedBy(redact(writeStatus)));
+                        "Batch write command to shard {shardId} failed with retryable error "
+                        "and will be retried. Caused by {error}",
+                        "Batch write command failed with retryable error and will be retried",
+                        "shardId"_attr = getId(),
+                        "error"_attr = redact(writeStatus));
             continue;
         }
 

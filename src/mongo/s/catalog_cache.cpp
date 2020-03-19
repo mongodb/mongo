@@ -346,8 +346,10 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
     } else if (!itDbEntry->second->dbt ||
                databaseVersion::equal(itDbEntry->second->dbt->getVersion(), databaseVersion)) {
         // If the versions match, the cached database info is stale, so mark it as needs refresh.
-        LOGV2(
-            22642, "Marking cached database entry for '{dbName}' as stale", "dbName"_attr = dbName);
+        LOGV2(22642,
+              "Marking cached database entry for {db} as stale",
+              "Marking cached database entry as stale",
+              "db"_attr = dbName);
         itDbEntry->second->needsRefresh = true;
     }
 }
@@ -467,22 +469,26 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2(22643,
-          "Starting to invalidate databases and collections with data on shard: {shardId}",
+          "Starting to invalidate databases and collections with data on shard {shardId}",
+          "Starting to invalidate databases and collections referencing a specific shard",
           "shardId"_attr = shardId);
 
     // Invalidate databases with this shard as their primary.
     for (const auto& [dbNs, dbInfoEntry] : _databases) {
         LOGV2_DEBUG(22644,
                     3,
-                    "Checking if database {dbNs}has primary shard: {shardId}",
-                    "dbNs"_attr = dbNs,
-                    "shardId"_attr = shardId);
+                    "Checking if database {db} has primary shard: {primaryShardId}",
+                    "Checking if database matches primary shard",
+                    "db"_attr = dbNs,
+                    "primaryShardId"_attr = shardId);
         if (!dbInfoEntry->needsRefresh && dbInfoEntry->dbt->getPrimary() == shardId) {
             LOGV2_DEBUG(22645,
                         3,
-                        "Database {dbNs}has primary shard {shardId}, invalidating cache entry",
-                        "dbNs"_attr = dbNs,
-                        "shardId"_attr = shardId);
+                        "Invalidating cache entry for database {db} that has primary shard "
+                        "{primaryShardId}",
+                        "Invalidating database cache entry",
+                        "db"_attr = dbNs,
+                        "primaryShardId"_attr = shardId);
             dbInfoEntry->needsRefresh = true;
         }
     }
@@ -493,8 +499,9 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 
             LOGV2_DEBUG(22646,
                         3,
-                        "Checking if {collNs}has data on shard: {shardId}",
-                        "collNs"_attr = collNs,
+                        "Checking if collection {namespace} has data on shard {shardId}",
+                        "Checking if collection has data on specific shard",
+                        "namespace"_attr = collNs,
                         "shardId"_attr = shardId);
 
             if (!collRoutingInfoEntry->needsRefresh) {
@@ -506,8 +513,10 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
                     shardsOwningDataForCollection.end()) {
                     LOGV2_DEBUG(22647,
                                 3,
-                                "{collNs}has data on shard {shardId}, invalidating cache entry",
-                                "collNs"_attr = collNs,
+                                "Invalidating cached collection {namespace} that has data "
+                                "on shard {shardId}",
+                                "Invalidating cached collection",
+                                "namespace"_attr = collNs,
                                 "shardId"_attr = shardId);
 
                     collRoutingInfoEntry->needsRefresh = true;
@@ -519,6 +528,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 
     LOGV2(22648,
           "Finished invalidating databases and collections with data on shard: {shardId}",
+          "Finished invalidating databases and collections that reference specific shard",
           "shardId"_attr = shardId);
 }
 
@@ -573,11 +583,12 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
         if (!swDbt.isOK()) {
             LOGV2_OPTIONS(24100,
                           {logv2::LogComponent::kShardingCatalogRefresh},
-                          "Refresh for database {dbName} took {t_millis} ms and "
-                          "failed{causedBy_swDbt_getStatus}",
-                          "dbName"_attr = dbName,
-                          "t_millis"_attr = t.millis(),
-                          "causedBy_swDbt_getStatus"_attr = causedBy(redact(swDbt.getStatus())));
+                          "Error refreshing cached database entry for {db}. Took {duration} and "
+                          "failed due to {error}",
+                          "Error refreshing cached database entry",
+                          "db"_attr = dbName,
+                          "duration"_attr = Milliseconds(t.millis()),
+                          "error"_attr = redact(swDbt.getStatus()));
             return;
         }
 
@@ -591,14 +602,13 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
         LOGV2_FOR_CATALOG_REFRESH(
             24101,
             logSeverityV1toV2(logLevel).toInt(),
-            "Refresh for database {dbName} from version "
-            "{dbEntry_dbt_dbEntry_dbt_getVersion_BSONObj} to version {dbVersionAfterRefresh} "
-            "took {t_millis} ms",
-            "dbName"_attr = dbName,
-            "dbEntry_dbt_dbEntry_dbt_getVersion_BSONObj"_attr =
-                (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
-            "dbVersionAfterRefresh"_attr = dbVersionAfterRefresh.toBSON(),
-            "t_millis"_attr = t.millis());
+            "Refreshed cached database entry for {db} to version {newDbVersion} from version "
+            "{oldDbVersion}. Took {duration}",
+            "Refreshed cached database entry",
+            "db"_attr = dbName,
+            "newDbVersion"_attr = dbVersionAfterRefresh.toBSON(),
+            "oldDbVersion"_attr = (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
+            "duration"_attr = Milliseconds(t.millis()));
     };
 
     // Invoked if getDatabase resulted in error or threw and exception
@@ -636,14 +646,14 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
         dbEntry->dbt = std::move(swDbt.getValue());
     };
 
-    LOGV2_FOR_CATALOG_REFRESH(
-        24102,
-        1,
-        "Refreshing cached database entry for {dbName}; current cached database info is "
-        "{dbEntry_dbt_dbEntry_dbt_BSONObj}",
-        "dbName"_attr = dbName,
-        "dbEntry_dbt_dbEntry_dbt_BSONObj"_attr =
-            (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj()));
+    LOGV2_FOR_CATALOG_REFRESH(24102,
+                              1,
+                              "Refreshing cached database entry for {db}; current cached database "
+                              "info is {currentDbInfo}",
+                              "Refreshing cached database entry",
+                              "db"_attr = dbName,
+                              "currentDbInfo"_attr =
+                                  (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj()));
 
     try {
         _cacheLoader.getDatabase(dbName, refreshCallback);
@@ -685,13 +695,14 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         if (!status.isOK()) {
             _stats.countFailedRefreshes.addAndFetch(1);
 
-            LOGV2_OPTIONS(
-                24103,
-                {logv2::LogComponent::kShardingCatalogRefresh},
-                "Refresh for collection {nss} took {t_millis} ms and failed{causedBy_status}",
-                "nss"_attr = nss,
-                "t_millis"_attr = t.millis(),
-                "causedBy_status"_attr = causedBy(redact(status)));
+            LOGV2_OPTIONS(24103,
+                          {logv2::LogComponent::kShardingCatalogRefresh},
+                          "Error refreshing cached collection {namespace}; Took {duration} and "
+                          "failed due to {error}",
+                          "Error refreshing cached collection",
+                          "namespace"_attr = nss,
+                          "duration"_attr = Milliseconds(t.millis()),
+                          "error"_attr = redact(status));
         } else if (routingInfoAfterRefresh) {
             const int logLevel =
                 (!existingRoutingInfo ||
@@ -702,25 +713,24 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
             LOGV2_FOR_CATALOG_REFRESH(
                 24104,
                 logSeverityV1toV2(logLevel).toInt(),
-                "Refresh for collection "
-                "{nss}{existingRoutingInfo_from_version_existingRoutingInfo_getVersion} to version "
-                "{routingInfoAfterRefresh_getVersion} took {t_millis} ms",
-                "nss"_attr = nss.toString(),
-                "existingRoutingInfo_from_version_existingRoutingInfo_getVersion"_attr =
+                "Refreshed cached collection {namespace} to version {newVersion} from version "
+                "{oldVersion}. Took {duration}",
+                "Refreshed cached collection",
+                "namespace"_attr = nss,
+                "newVersion"_attr = routingInfoAfterRefresh->getVersion(),
+                "oldVersion"_attr =
                     (existingRoutingInfo
                          ? (" from version " + existingRoutingInfo->getVersion().toString())
                          : ""),
-                "routingInfoAfterRefresh_getVersion"_attr =
-                    routingInfoAfterRefresh->getVersion().toString(),
-                "t_millis"_attr = t.millis());
+                "duration"_attr = Milliseconds(t.millis()));
         } else {
-            LOGV2_OPTIONS(
-                24105,
-                {logv2::LogComponent::kShardingCatalogRefresh},
-                "Refresh for collection {nss} took {t_millis} ms and found the collection is not "
-                "sharded",
-                "nss"_attr = nss,
-                "t_millis"_attr = t.millis());
+            LOGV2_OPTIONS(24105,
+                          {logv2::LogComponent::kShardingCatalogRefresh},
+                          "Collection {namespace} was found to be unsharded after refresh that "
+                          "took {duration}",
+                          "Collection has found to be unsharded after refresh",
+                          "namespace"_attr = nss,
+                          "duration"_attr = Milliseconds(t.millis()));
         }
     };
 
@@ -786,10 +796,9 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     LOGV2_FOR_CATALOG_REFRESH(
         24106,
         1,
-        "Refreshing chunks for collection {nss}; current collection version is "
-        "{startingCollectionVersion}",
-        "nss"_attr = nss,
-        "startingCollectionVersion"_attr = startingCollectionVersion);
+        "Refreshing cached collection {namespace} with version {currentCollectionVersion}",
+        "namespace"_attr = nss,
+        "currentCollectionVersion"_attr = startingCollectionVersion);
 
     try {
         _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);
