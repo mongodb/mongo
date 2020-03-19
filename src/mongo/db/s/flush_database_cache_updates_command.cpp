@@ -135,8 +135,9 @@ public:
             if (request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981,
                             1,
-                            "Forcing remote routing table refresh for {dbName}",
-                            "dbName"_attr = _dbName());
+                            "Forcing remote routing table refresh for {db}",
+                            "Forcing remote routing table refresh",
+                            "db"_attr = _dbName());
                 forceDatabaseRefresh(opCtx, _dbName());
             }
 

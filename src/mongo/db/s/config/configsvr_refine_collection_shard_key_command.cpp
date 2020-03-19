@@ -152,6 +152,7 @@ public:
 
             LOGV2(21922,
                   "CMD: refineCollectionShardKey: {request}",
+                  "CMD: refineCollectionShardKey",
                   "request"_attr = request().toBSON({}));
 
             audit::logRefineCollectionShardKey(opCtx->getClient(), nss.ns(), proposedKey);
