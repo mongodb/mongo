@@ -24,43 +24,17 @@ selector:
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/comment_field.js
   - jstests/core/exhaust.js
+  - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/validate_cmd_ns.js
-
-  # Stepdown commands during fsync lock will fail.
-  - jstests/core/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
 
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/batch_write_command_w0.js
+  - jstests/core/crud_api.js
 
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
-  - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
-  - jstests/core/top.js # Tests read commands (including getMore) against the secondary
 
   exclude_with_any_tags:
-  ##
-  # When running reconfigs in the background, certain reads can fail with
-  # ReadConcernMajorityNotAvailableYet. We can retry retryable reads, but getMore's are not
-  # retryable.
-  - requires_getmore
-  ##
-  # The next two tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override read concern of command: ..."
-  - assumes_read_concern_unchanged
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
-
-  - does_not_support_causal_consistency
-  - uses_transactions
-  # collStats is not causally consistent
-  - requires_collstats
-  - requires_dbstats
-  - requires_datasize
+  - assumes_read_preference_unchanged
   - requires_sharding
 
 executor:
@@ -75,20 +49,13 @@ executor:
         testingReplication = true;
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
         load("jstests/libs/override_methods/enable_sessions.js");
-        load("jstests/libs/override_methods/set_read_and_write_concerns.js");
       global_vars:
         TestData:
-          runningWithCausalConsistency: true
-          alwaysInjectTransactionNumber: true
-          defaultReadConcernLevel: "majority"
           networkErrorAndTxnOverrideConfig:
             backgroundReconfigs: true
           sessionOptions:
-            writeConcern:
-              w: "majority"
-            readConcern:
-              level: "majority"
-            # Force DBClientRS to find the primary for non-write commands.
+            # Force DBClientRS to find the primary for non-write commands to make sure reads still
+            # work as expected during reconfigs.
             readPreference:
               mode: "primary"
       readMode: commands
