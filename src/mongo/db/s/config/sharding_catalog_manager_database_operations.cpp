@@ -162,7 +162,10 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             DatabaseType db(
                 dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
 
-            LOGV2(21938, "Registering new database {db} in sharding catalog", "db"_attr = db);
+            LOGV2(21938,
+                  "Registering new database {db} in sharding catalog",
+                  "Registering new database in sharding catalog",
+                  "db"_attr = db);
 
             // Do this write with majority writeConcern to guarantee that the shard sees the write
             // when it receives the _flushDatabaseCacheUpdates.
@@ -233,7 +236,10 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
                                                 Milliseconds{30000}),
                             &unusedResult));
 
-    LOGV2(21939, "Enabling sharding for database [{dbName}] in config db", "dbName"_attr = dbName);
+    LOGV2(21939,
+          "Persisted sharding enabled for database {db}",
+          "Persisted sharding enabled for database",
+          "db"_attr = dbName);
 
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
@@ -323,9 +329,10 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     if (!updateStatus.isOK()) {
         LOGV2(21940,
-              "error committing movePrimary: {dbname}{causedBy_updateStatus_getStatus}",
-              "dbname"_attr = dbname,
-              "causedBy_updateStatus_getStatus"_attr = causedBy(redact(updateStatus.getStatus())));
+              "Error committing movePrimary for {db}: {error}",
+              "Error committing movePrimary",
+              "db"_attr = dbname,
+              "error"_attr = redact(updateStatus.getStatus()));
         return updateStatus.getStatus();
     }
 
