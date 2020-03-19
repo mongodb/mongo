@@ -3847,7 +3847,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             // This code must be safe to run on node rollback and node removal!
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
-            _externalState->clearOplogVisibilityStateForStepDown();
+            _externalState->stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
             break;
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of

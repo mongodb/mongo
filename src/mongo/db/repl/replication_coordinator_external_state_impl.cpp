@@ -409,15 +409,15 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // _taskExecutor pointer never changes.
     _taskExecutor->join();
 
-    // Clear the truncate point if we are still primary, so nothing gets truncated unnecessarily on
-    // startup. There are no oplog holes on clean primary shutdown. Stepdown is similarly safe and
-    // clears the truncate point. The other replication states do need truncation if the truncate
-    // point is set: e.g. interruption mid batch application can leave oplog holes.
+    // The oplog truncate after point must be cleared, if we are still primary for shutdown, so
+    // nothing gets truncated unnecessarily on startup. There are no oplog holes on clean primary
+    // shutdown. Stepdown is similarly safe from holes and halts updates to and clears the truncate
+    // point. The other replication states do need truncation if the truncate point is set: e.g.
+    // interruption mid batch application can leave oplog holes.
     if (!storageGlobalParams.readOnly &&
         _replicationProcess->getConsistencyMarkers()
             ->isOplogTruncateAfterPointBeingUsedForPrimary()) {
-        _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx,
-                                                                                 Timestamp());
+        stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
     }
 }
 
@@ -767,7 +767,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::clearOplogVisibilityStateForStepDown() {
+void ReplicationCoordinatorExternalStateImpl::stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint() {
     auto opCtx = cc().getOperationContext();
     // Temporarily turn off flow control ticketing. Getting a ticket can stall on a ticket being
     // available, which may have to wait for the ticket refresher to run, which in turn blocks on
