@@ -53,7 +53,8 @@ void WriteConflictException::logAndBackoff(int attempt, StringData operation, St
                          ::mongo::logv2::LogComponent::kWrite,
                          logv2::LogSeverity::Debug(1),
                          static_cast<size_t>(attempt),
-                         str::stream() << "Caught WriteConflictException doing " << operation
-                                       << " on " << ns);
+                         "Caught WriteConflictException",
+                         "operation"_attr = operation,
+                         "ns"_attr = ns);
 }
 }  // namespace mongo
