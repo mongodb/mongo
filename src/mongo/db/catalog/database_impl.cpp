@@ -584,23 +584,26 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             str::stream() << "cannot create a collection with an empty name on db: " << nss.db(),
             !nss.coll().empty());
 
-    uassert(17361,
-            str::stream() << "Fully qualified namespace is too long. Namespace: " << nss.ns()
-                          << " Max: " << NamespaceString::MaxNsCollectionLen,
-            !nss.isNormalCollection() || nss.size() <= NamespaceString::MaxNsCollectionLen);
-
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
             !_dropPending.load());
 
-    uassert(ErrorCodes::IncompatibleServerVersion,
-            str::stream() << "Cannot create collection with a long name " << nss
-                          << " - upgrade to feature compatibility version "
-                          << FeatureCompatibilityVersionParser::kVersion44
-                          << " to be able to do so.",
-            nss.checkLengthForFCV());
+    uassert(17381,
+            str::stream() << "Fully qualified namespace is too long. Namespace: " << nss.ns()
+                          << " Max: " << NamespaceString::MaxNsCollectionLen,
+            !nss.isNormalCollection() || nss.size() <= NamespaceString::MaxNsCollectionLen);
+    const auto& fcv = serverGlobalParams.featureCompatibility;
+    if (!fcv.isVersionInitialized() ||
+        fcv.getVersion() < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        uassert(ErrorCodes::IncompatibleServerVersion,
+                str::stream() << "Fully qualified namespace is too long for FCV 4.2. Upgrade to "
+                                 "FCV 4.4 to create this namespace. Namespace: "
+                              << nss.ns()
+                              << " FCV 4.2 Limit: " << NamespaceString::MaxNSCollectionLenFCV42,
+                nss.size() <= NamespaceString::MaxNSCollectionLenFCV42);
+    }
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,
