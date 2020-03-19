@@ -18,7 +18,7 @@ function testRS(opts, expectWarning) {
 
     function checkWarning(member) {
         const observed =
-            /no SSL certificate provided by peer/.test(cat(member.fullOptions.logFile));
+            /[N,n]o SSL certificate provided by peer/.test(cat(member.fullOptions.logFile));
         assert.eq(observed, expectWarning);
     }
     checkWarning(rs.getPrimary());

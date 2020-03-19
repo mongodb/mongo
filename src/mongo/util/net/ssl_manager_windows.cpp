@@ -566,9 +566,9 @@ int SSLManagerWindows::SSL_write(SSLConnectionInterface* connInterface, const vo
             }
             default:
                 LOGV2_FATAL(23283,
-                            "Unexpected ASIO state: {wantStateInt}",
+                            "Unexpected ASIO state: {state}",
                             "Unexpected ASIO state",
-                            "wantStateInt"_attr = static_cast<int>(want));
+                            "state"_attr = static_cast<int>(want));
                 MONGO_UNREACHABLE;
         }
     }
@@ -1821,16 +1821,30 @@ Status validatePeerCertificate(const std::string& remoteHost,
             msg << "The server certificate does not match the host name. Hostname: " << remoteHost
                 << " does not match " << certificateNames.str();
 
+
             if (allowInvalidCertificates) {
                 LOGV2_WARNING(23274,
                               "SSL peer certificate validation failed ({errorCode}): {error}",
+                              "SSL peer certificate validation failed",
                               "errorCode"_attr = integerToHex(certChainPolicyStatus.dwError),
                               "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
-                LOGV2_WARNING(23275, "{msg}", "msg"_attr = msg.ss.str());
+
+                LOGV2_WARNING(23275,
+                              "The server certificate does not match the host name. Hostname: "
+                              "{remoteHost} does not match {certificateNames}",
+                              "The server certificate does not match the host name",
+                              "remoteHost"_attr = remoteHost,
+                              "certificateNames"_attr = certificateNames.str());
+
                 *peerSubjectName = SSLX509Name();
                 return Status::OK();
             } else if (allowInvalidHostnames) {
-                LOGV2_WARNING(23276, "{msg}", "msg"_attr = msg.ss.str());
+                LOGV2_WARNING(23276,
+                              "The server certificate does not match the host name. Hostname: "
+                              "{remoteHost} does not match {certificateNames}",
+                              "The server certificate does not match the host name",
+                              "remoteHost"_attr = remoteHost,
+                              "certificateNames"_attr = certificateNames.str());
                 return Status::OK();
             } else {
                 return Status(ErrorCodes::SSLHandshakeFailed, msg);
@@ -1840,7 +1854,13 @@ Status validatePeerCertificate(const std::string& remoteHost,
             msg << "SSL peer certificate validation failed: ("
                 << integerToHex(certChainPolicyStatus.dwError) << ")"
                 << errnoWithDescription(certChainPolicyStatus.dwError);
-            LOGV2_ERROR(23279, "{msg}", "msg"_attr = msg.ss.str());
+
+
+            LOGV2_ERROR(23279,
+                        "SSL peer certificate validation failed: ({errorCode}){error}",
+                        "SSL peer certificate validation failed",
+                        "errorCode"_attr = integerToHex(certChainPolicyStatus.dwError),
+                        "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
@@ -1904,12 +1924,16 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
         if (_weakValidation) {
             // do not give warning if "no certificate" warnings are suppressed
             if (!_suppressNoCertificateWarning) {
-                LOGV2_WARNING(23277, "no SSL certificate provided by peer");
+                LOGV2_WARNING(23277,
+                              "no SSL certificate provided by peer",
+                              "No SSL certificate provided by peer");
             }
             return SSLPeerInfo(sni);
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
-            LOGV2_ERROR(23280, "{msg}", "msg"_attr = msg);
+            LOGV2_ERROR(23280,
+                        "no SSL certificate provided by peer; connection rejected",
+                        "No SSL certificate provided by peer; connection rejected");
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
