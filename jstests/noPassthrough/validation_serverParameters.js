@@ -16,4 +16,15 @@ testNumericServerParameter('maxValidateMBperSec',
                            -1 /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
+
+// Valid parameter values are in the range (0, infinity).
+testNumericServerParameter('maxValidateMemoryUsageMB',
+                           true /*isStartupParameter*/,
+                           true /*isRuntimeParameter*/,
+                           200 /*defaultValue*/,
+                           50 /*nonDefaultValidValue*/,
+                           true /*hasLowerBound*/,
+                           0 /*lowerOutOfBounds*/,
+                           false /*hasUpperBound*/,
+                           "unused" /*upperOutOfBounds*/);
 })();

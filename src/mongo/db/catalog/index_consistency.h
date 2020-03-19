@@ -131,7 +131,19 @@ public:
      */
     void addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap, ValidateResults* results);
 
+    /**
+     * Sets up this IndexConsistency object to limit memory usage in the second phase of index
+     * validation. Returns whether the memory limit is sufficient to report at least on index entry
+     * inconsistency and continue with the second phase of validation.
+     */
+    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
+
 private:
+    struct IndexKeyBucket {
+        uint32_t indexKeyCount;
+        uint32_t bucketSizeBytes;
+    };
+
     IndexConsistency() = delete;
 
     CollectionValidation::ValidateState* _validateState;
@@ -147,7 +159,7 @@ private:
     //       than zero, there are too few index entries.
     //     - Similarly, if that count ends up less than zero, there are too many index entries.
 
-    std::vector<uint32_t> _indexKeyCount;
+    std::vector<IndexKeyBucket> _indexKeyBuckets;
 
     // A vector of IndexInfo indexes by index number
     IndexInfoMap _indexesInfo;

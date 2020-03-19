@@ -74,9 +74,9 @@ env.Library(
 )
 
 env.Library(
-    target='max_validate_mb_per_sec_idl',
+    target='validate_idl',
     source=[
-        env.Idlc('max_validate_mb_per_sec.idl')[0],
+        env.Idlc('validate.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -373,6 +373,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction',
         'index_build_block',
         'throttle_cursor',
+        'validate_idl',
         'validate_state',
     ],
 )
@@ -400,7 +401,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/util/fail_point',
-        'max_validate_mb_per_sec_idl',
+        'validate_idl',
     ],
 )
 
@@ -515,7 +516,7 @@ env.CppUnitTest(
         'index_build_entry_idl',
         'index_builds_manager',
         'index_key_validate',
-        'max_validate_mb_per_sec_idl',
+        'validate_idl',
         'multi_index_block',
         'throttle_cursor',
         'validate_state',

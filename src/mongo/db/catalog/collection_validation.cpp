@@ -194,6 +194,9 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateResultsMap* indexNsResultsMap,
                              ValidateResults* result) {
     indexConsistency->setSecondPhase();
+    if (!indexConsistency->limitMemoryUsageForSecondPhase(result)) {
+        return;
+    }
 
     LOGV2_OPTIONS(20297,
                   {logComponentV1toV2(LogComponent::kIndex)},
