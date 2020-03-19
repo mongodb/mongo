@@ -54,8 +54,6 @@ class MemberConfig : private MemberConfigBase {
 public:
     // Expose certain member functions used externally.
     using MemberConfigBase::getId;
-    using MemberConfigBase::getPriority;
-
     using MemberConfigBase::setNewlyAdded;
 
     using MemberConfigBase::kArbiterOnlyFieldName;
@@ -120,6 +118,14 @@ public:
     }
 
     /**
+     * Gets this member's effective priority. Higher means more likely to be elected
+     * primary. If the node is newly added, it has an effective priority of 0.0.
+     */
+    double getPriority() const {
+        return isNewlyAdded() ? 0.0 : MemberConfigBase::getPriority();
+    }
+
+    /**
      * Gets the amount of time behind the primary that this member will atempt to
      * remain.  Zero seconds means stay as caught up as possible.
      */
@@ -128,7 +134,8 @@ public:
     }
 
     /**
-     * Returns true if this member may vote in elections.
+     * Returns true if this member may vote in elections. If the node is newly added, it should be
+     * treated as a non-voting node.
      */
     bool isVoter() const {
         return (getVotes() != 0 && !isNewlyAdded());

@@ -352,6 +352,116 @@ TEST(MemberConfig, VotingNodesShouldStillHaveVoteAfterToBSON) {
     ASSERT_EQ(1, mc2.getNumVotes());
 }
 
+TEST(MemberConfig, NodeWithNewlyAddedFieldShouldStillHavePriorityAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'newlyAdded: true' and 'priority: 3'.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "newlyAdded" << true << "priority" << 3),
+                    &tagConfig);
+    ASSERT_TRUE(mc.isNewlyAdded());
+
+    // Nodes with newly added field set should transiently have 'priority: 0'.
+    ASSERT_EQ(0, mc.getPriority());
+
+    // Verify that 'toBSON()' returns the underlying priority field.
+    const auto obj = mc.toBSON(tagConfig);
+    long long priority;
+    uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
+    ASSERT_EQ(3, priority);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_TRUE(mc2.isNewlyAdded());
+    ASSERT_EQ(0, mc2.getPriority());
+}
+
+TEST(MemberConfig, PriorityZeroNodeWithNewlyAddedFieldShouldStillHaveZeroPriorityAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'newlyAdded: true' and 'priority: 0'.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "newlyAdded" << true << "votes" << 0 << "priority" << 0),
+                    &tagConfig);
+    ASSERT_TRUE(mc.isNewlyAdded());
+
+    // Nodes with newly added field set should transiently have 'priority: 0'.
+    ASSERT_EQ(0, mc.getPriority());
+
+    // Verify that 'toBSON()' returns the underlying priority field.
+    const auto obj = mc.toBSON(tagConfig);
+    long long priority;
+    uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
+    ASSERT_EQ(0, priority);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_TRUE(mc2.isNewlyAdded());
+    ASSERT_EQ(0, mc2.getPriority());
+}
+
+TEST(MemberConfig, PriorityZeroNodeShouldStillHaveZeroPriorityAfterToBSON) {
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'priority: 0.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "votes" << 0 << "priority" << 0),
+                    &tagConfig);
+
+    ASSERT_FALSE(mc.isNewlyAdded());
+
+    // When the node does not have its 'newlyAdded' field set, the effective priority should equal
+    // the underlying priority field.
+    ASSERT_EQ(0, mc.getPriority());
+
+    // Verify that 'toBSON()' returns the underlying priority field.
+    const auto obj = mc.toBSON(tagConfig);
+    long long priority;
+    uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
+    ASSERT_EQ(0, priority);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_FALSE(mc2.isNewlyAdded());
+    ASSERT_EQ(0, mc2.getPriority());
+}
+
+TEST(MemberConfig, NodeShouldStillHavePriorityAfterToBSON) {
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'priority: 0.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "priority" << 3),
+                    &tagConfig);
+
+    ASSERT_FALSE(mc.isNewlyAdded());
+
+    // When the node does not have its 'newlyAdded' field set, the effective priority should equal
+    // the underlying priority field.
+    ASSERT_EQ(3, mc.getPriority());
+
+    // Verify that 'toBSON()' returns the underlying priority field.
+    const auto obj = mc.toBSON(tagConfig);
+    long long priority;
+    uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
+    ASSERT_EQ(3, priority);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_FALSE(mc2.isNewlyAdded());
+    ASSERT_EQ(3, mc2.getPriority());
+}
+
 TEST(MemberConfig, ParseHidden) {
     ReplSetTagConfig tagConfig;
     {

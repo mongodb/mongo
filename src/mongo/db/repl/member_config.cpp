@@ -116,7 +116,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
 
 
     if (isArbiter()) {
-        if (getPriority() == 1.0) {
+        if (MemberConfigBase::getPriority() == 1.0) {
             setPriority(0);
         }
 
@@ -129,10 +129,9 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
         }
     }
 
-    // Check for additional electable requirements, when priority is non zero
+    // Check for additional electable requirements, when priority is non zero.
     if (getPriority() != 0) {
-        // TODO (SERVER-46627): Change this to isVoter() rather than getVotes().
-        if (getVotes() == 0) {
+        if (!isVoter()) {
             uasserted(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
         }
         if (getSlaveDelay() > Seconds(0)) {
@@ -174,7 +173,7 @@ BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
 
     configBuilder.append(kBuildIndexesFieldName, getBuildIndexes());
     configBuilder.append(kHiddenFieldName, getHidden());
-    configBuilder.append(kPriorityFieldName, getPriority());
+    configBuilder.append(kPriorityFieldName, MemberConfigBase::getPriority());
 
     BSONObjBuilder tags(configBuilder.subobjStart(kTagsFieldName));
     for (std::vector<ReplSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end(); tag++) {
@@ -190,7 +189,7 @@ BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
     _splitHorizon.toBSON(configBuilder);
 
     configBuilder.append(kSlaveDelaySecsFieldName, getSlaveDelaySecs());
-    configBuilder.append(kVotesFieldName, getVotes() ? 1 : 0);
+    configBuilder.append(kVotesFieldName, MemberConfigBase::getVotes() ? 1 : 0);
     return configBuilder.obj();
 }
 

@@ -1675,6 +1675,73 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     ASSERT_EQUALS(2, rsConfig.getWritableVotingMembersCount());
 }
 
+TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    // Do a reconfig that adds a new member.
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                << BSON("_id" << 3 << "host"
+                                                              << "n3:1"
+                                                              << "priority" << 3));
+
+    startCapturingLogMessages();
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    auto firstNewMember = rsConfig.findMemberByID(3);
+    ASSERT_TRUE(firstNewMember->isNewlyAdded());
+
+    // Verify that the first newly added node has effective priority 0.
+    ASSERT_EQUALS(0, firstNewMember->getPriority());
+
+    // Advance the commit point on all nodes.
+    const auto commitPoint = OpTime(Timestamp(3, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    replicateOpTo(1, commitPoint);
+    replicateOpTo(2, commitPoint);
+    replicateOpTo(3, commitPoint);
+
+    // Do another reconfig that adds a new member.
+    members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "n3:1"
+                                                         << "priority" << 3)
+                                           << BSON("_id" << 4 << "host"
+                                                         << "n4:1"
+                                                         << "priority" << 4));
+
+    startCapturingLogMessages();
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+
+    rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    firstNewMember = rsConfig.findMemberByID(3);
+    auto secondNewMember = rsConfig.findMemberByID(4);
+    ASSERT_TRUE(firstNewMember->isNewlyAdded());
+    ASSERT_TRUE(secondNewMember->isNewlyAdded());
+
+    // Verify that the first newly added node is still has effective priority 0.
+    ASSERT_EQUALS(0, firstNewMember->getPriority());
+
+    // Verify that the second newly added node also has effective priority 0.
+    ASSERT_EQUALS(0, secondNewMember->getPriority());
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo
