@@ -739,6 +739,14 @@ env_vars.Add('GITDIFFFLAGS',
     help='Sets flags for git diff',
     default='')
 
+env_vars.Add('REVISION',
+    help='Base git revision',
+    default='')
+
+env_vars.Add('ENTERPRISE_REV',
+    help='Base git revision of enterprise modules',
+    default='')
+
 # Note: This probably is only really meaningful when configured via a variables file. It will
 # also override whatever the SCons platform defaults would be.
 env_vars.Add('ENV',
@@ -4182,7 +4190,7 @@ if get_option('lint-scope') == 'changed':
             "buildscripts/eslint.py",
             patch_file,
         ],
-        action="$PYTHON ${SOURCES[0]} lint-git-diff ${SOURCES[1]}"
+        action="REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff"
     )
 
 else:

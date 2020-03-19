@@ -1800,7 +1800,7 @@ functions:
             extra_flags="--lint-scope=changed"
           fi
 
-          ${compile_env|} python3 ./buildscripts/scons.py ${compile_flags|} $extra_flags --stack-size=1024 GITDIFFFLAGS="${revision}" ${targets}
+          ${compile_env|} python3 ./buildscripts/scons.py ${compile_flags|} $extra_flags --stack-size=1024 GITDIFFFLAGS="${revision}" REVISION="${revision|}" ENTERPRISE_REV="${enterprise_rev|}" ${targets}
 
   "scons compile":
     command: shell.exec
