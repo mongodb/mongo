@@ -496,14 +496,12 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
             inTxnWhitelist || inTxnWhitelistFCV44);
 
-    if (cmdName == "createCollection"_sd || cmdName == "createIndexes"_sd) {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot run '" << cmdName
-                              << "' in a multi-document transaction "
-                                 "because creation of collections and "
-                                 "indexes inside multi-document transactions is disabled.",
-                gShouldMultiDocTxnCreateCollectionAndIndexes.load());
-    }
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot run '" << cmdName
+                          << "' in a multi-document transaction "
+                             "because creation of collections and "
+                             "indexes inside multi-document transactions is disabled.",
+            gShouldMultiDocTxnCreateCollectionAndIndexes.load() || !inTxnWhitelistFCV44);
 
     const auto dbName = nss.db();
 

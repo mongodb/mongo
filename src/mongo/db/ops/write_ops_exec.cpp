@@ -229,7 +229,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot create namespace " << ns.ns()
-                          << "because creation of collections and indexes inside "
+                          << " because creation of collections and indexes inside "
                              "multi-document transactions is disabled.",
             !inTransaction || gShouldMultiDocTxnCreateCollectionAndIndexes.load());
 
