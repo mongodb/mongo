@@ -1540,8 +1540,9 @@ int ocspClientCallback(SSL* ssl, void* arg) {
         if (swStapleOK.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
             LOGV2_DEBUG(23225,
                         1,
-                        "Stapled Certificate validation failed: {reason}",
-                        "reason"_attr = swStapleOK.getStatus().reason());
+                        "Stapled Certificate validation failed: {error}",
+                        "Stapled Certificate validation failed",
+                        "error"_attr = swStapleOK.getStatus());
             return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
         }
 
@@ -1965,19 +1966,19 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
     BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == nullptr) {
         LOGV2_ERROR(23243,
-                    "failed to allocate BIO object: {openSSLError}",
-                    "failed to allocate BIO object",
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "failed to allocate BIO object: {error}",
+                    "Failed to allocate BIO object",
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
     ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
     if (BIO_read_filename(inBIO, keyFile.c_str()) <= 0) {
         LOGV2_ERROR(23244,
-                    "cannot read key file when setting subject name: {keyFile} {openSSLError}",
-                    "cannot read key file when setting subject name",
+                    "cannot read key file when setting subject name: {keyFile} {error}",
+                    "Cannot read key file when setting subject name",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
@@ -1985,10 +1986,10 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
         inBIO, nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
     if (x509 == nullptr) {
         LOGV2_ERROR(23245,
-                    "cannot retrieve certificate from keyfile: {keyFile} {openSSLError}",
-                    "cannot retrieve certificate from keyfile",
+                    "cannot retrieve certificate from keyfile: {keyFile} {error}",
+                    "Cannot retrieve certificate from keyfile",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
     ON_BLOCK_EXIT([&] { X509_free(x509); });
@@ -2023,29 +2024,29 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
                                   PasswordFetcher* password) {
     if (SSL_CTX_use_certificate_chain_file(context, keyFile.c_str()) != 1) {
         LOGV2_ERROR(23248,
-                    "cannot read certificate file: {keyFile} {openSSLError}",
-                    "cannot read certificate file",
+                    "cannot read certificate file: {keyFile} {error}",
+                    "Cannot read certificate file",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
     BIO* inBio = BIO_new(BIO_s_file());
     if (!inBio) {
         LOGV2_ERROR(23249,
-                    "failed to allocate BIO object: {openSSLError}",
-                    "failed to allocate BIO object",
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "failed to allocate BIO object: {error}",
+                    "Failed to allocate BIO object",
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
     const auto bioGuard = makeGuard([&inBio]() { BIO_free(inBio); });
 
     if (BIO_read_filename(inBio, keyFile.c_str()) <= 0) {
         LOGV2_ERROR(23250,
-                    "cannot read PEM key file: {keyFile} {openSSLError}",
-                    "cannot read PEM key file",
+                    "cannot read PEM key file: {keyFile} {error}",
+                    "Cannot read PEM key file",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
@@ -2055,29 +2056,29 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
     EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(inBio, nullptr, password_cb, userdata);
     if (!privateKey) {
         LOGV2_ERROR(23251,
-                    "cannot read PEM key file: {keyFile} {openSSLError}",
-                    "cannot read PEM key file",
+                    "cannot read PEM key file: {keyFile} {error}",
+                    "Cannot read PEM key file",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
     const auto privateKeyGuard = makeGuard([&privateKey]() { EVP_PKEY_free(privateKey); });
 
     if (SSL_CTX_use_PrivateKey(context, privateKey) != 1) {
         LOGV2_ERROR(23252,
-                    "cannot use PEM key file: {keyFile} {openSSLError}",
-                    "cannot use PEM key file",
+                    "cannot use PEM key file: {keyFile} {error}",
+                    "Cannot use PEM key file",
                     "keyFile"_attr = keyFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
     // Verify that the certificate and the key go together.
     if (SSL_CTX_check_private_key(context) != 1) {
         LOGV2_ERROR(23253,
-                    "SSL certificate validation failed: {openSSLError}",
+                    "SSL certificate validation failed: {error}",
                     "SSL certificate validation failed",
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
@@ -2144,10 +2145,10 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
     int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
     if (status == 0) {
         LOGV2_ERROR(23254,
-                    "cannot read CRL file: {crlFile} {openSSLError}",
-                    "cannot read CRL file",
+                    "cannot read CRL file: {crlFile} {error}",
+                    "Cannot read CRL file",
                     "crlFile"_attr = crlFile,
-                    "openSSLError"_attr = getSSLErrorMessage(ERR_get_error()));
+                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
         return false;
     }
 
@@ -2156,6 +2157,7 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
     } else {
         LOGV2(4652602,
               "ssl imported {numberCerts} revoked certificates from the revocation list",
+              "SSL imported revoked certificates from the revocation list",
               "numberCerts"_attr = status);
     }
 
@@ -2377,11 +2379,15 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         if (_weakValidation) {
             // do not give warning if certificate warnings are  suppressed
             if (!_suppressNoCertificateWarning) {
-                LOGV2_WARNING(23234, "no SSL certificate provided by peer");
+                LOGV2_WARNING(23234,
+                              "no SSL certificate provided by peer",
+                              "No SSL certificate provided by peer");
             }
             return SSLPeerInfo(sni);
         } else {
-            LOGV2_ERROR(23255, "no SSL certificate provided by peer; connection rejected");
+            LOGV2_ERROR(23255,
+                        "no SSL certificate provided by peer; connection rejected",
+                        "No SSL certificate provided by peer; connection rejected");
             return Status(ErrorCodes::SSLHandshakeFailed,
                           "no SSL certificate provided by peer; connection rejected");
         }
@@ -2560,10 +2566,21 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         msgBuilder << "The server certificate does not match the host name. Hostname: "
                    << remoteHost << " does not match " << certificateNames.str();
         std::string msg = msgBuilder.str();
+
         if (_allowInvalidCertificates || _allowInvalidHostnames || isUnixDomainSocket(remoteHost)) {
-            LOGV2_WARNING(23238, "{msg}", "msg"_attr = msg);
+            LOGV2_WARNING(23238,
+                          "The server certificate does not match the host name. Hostname: "
+                          "{remoteHost} does not match {certificateNames}",
+                          "The server certificate does not match the remote host name",
+                          "remoteHost"_attr = remoteHost,
+                          "certificateNames"_attr = certificateNames.str());
         } else {
-            LOGV2_ERROR(23257, "{msg}", "msg"_attr = msg);
+            LOGV2_ERROR(23257,
+                        "The server certificate does not match the host name. Hostname: "
+                        "{remoteHost} does not match {certificateNames}",
+                        "The server certificate does not match the remote host name",
+                        "remoteHost"_attr = remoteHost,
+                        "certificateNames"_attr = certificateNames.str());
             return Future<SSLPeerInfo>::makeReady(Status(ErrorCodes::SSLHandshakeFailed, msg));
         }
     }
@@ -2657,8 +2674,10 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // manner.
             errToThrow = (code == SSL_ERROR_WANT_READ) ? SocketErrorKind::RECV_ERROR
                                                        : SocketErrorKind::SEND_ERROR;
-            LOGV2_ERROR(
-                23258, "SSL: {code}, possibly timed out during connect", "code"_attr = code);
+            LOGV2_ERROR(23258,
+                        "SSL: {error}, possibly timed out during connect",
+                        "SSL: possibly timed out during connect",
+                        "error"_attr = code);
             break;
 
         case SSL_ERROR_ZERO_RETURN:
@@ -2670,17 +2689,19 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // If ERR_get_error returned 0, the error queue is empty
             // check the return value of the actual SSL operation
             if (err != 0) {
-                LOGV2_ERROR(23260, "SSL: {error}", "error"_attr = getSSLErrorMessage(err));
+                LOGV2_ERROR(
+                    23260, "SSL: {error}", "SSL error", "error"_attr = getSSLErrorMessage(err));
             } else if (ret == 0) {
                 LOGV2_ERROR(23261, "Unexpected EOF encountered during SSL communication");
             } else {
                 LOGV2_ERROR(23262,
                             "The SSL BIO reported an I/O error {error}",
+                            "The SSL BIO reported an I/O error",
                             "error"_attr = errnoWithDescription());
             }
             break;
         case SSL_ERROR_SSL: {
-            LOGV2_ERROR(23263, "SSL: {error}", "error"_attr = getSSLErrorMessage(err));
+            LOGV2_ERROR(23263, "SSL: {error}", "SSL error", "error"_attr = getSSLErrorMessage(err));
             break;
         }
 

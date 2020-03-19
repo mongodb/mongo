@@ -103,8 +103,9 @@ void networkWarnWithDescription(const Socket& socket, StringData call, int error
 #endif
     auto ewd = errnoWithDescription(errorCode);
     LOGV2_WARNING(23190,
-                  "Failed to connect to {remoteSocketAddress}:{remoteSocketAddressPort}, "
+                  "failed to connect to {remoteSocketAddress}:{remoteSocketAddressPort}, "
                   "in({call}), reason: {error}",
+                  "Failed to connect to remote host",
                   "remoteSocketAddress"_attr = socket.remoteAddr().getAddr(),
                   "remoteSocketAddressPort"_attr = socket.remoteAddr().getPort(),
                   "call"_attr = call,
@@ -121,14 +122,16 @@ void setSockTimeouts(int sock, double secs) {
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
     if (report && (status == SOCKET_ERROR))
         LOGV2(23177,
-              "unable to set SO_RCVTIMEO: {wsaError}",
-              "wsaError"_attr = errnoWithDescription(WSAGetLastError()));
+              "unable to set SO_RCVTIMEO: {reason}",
+              "Unable to set SO_RCVTIMEO",
+              "reason"_attr = errnoWithDescription(WSAGetLastError()));
     status =
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
     if (kDebugBuild && report && (status == SOCKET_ERROR))
         LOGV2(23178,
-              "unable to set SO_SNDTIMEO: {wsaError}",
-              "wsaError"_attr = errnoWithDescription(WSAGetLastError()));
+              "unable to set SO_SNDTIMEO: {reason}",
+              "Unable to set SO_SNDTIME0",
+              "reason"_attr = errnoWithDescription(WSAGetLastError()));
 #else
     struct timeval tv;
     tv.tv_sec = (int)secs;
@@ -155,7 +158,7 @@ void disableNagle(int sock) {
     if (setsockopt(sock, level, TCP_NODELAY, (char*)&x, sizeof(x)))
         LOGV2_ERROR(23195,
                     "disableNagle failed: {error}",
-                    "disableNagle failed",
+                    "DisableNagle failed",
                     "error"_attr = errnoWithDescription());
 
 #ifdef SO_KEEPALIVE
@@ -183,10 +186,10 @@ SockAddr getLocalAddrForBoundSocketFd(int fd) {
     if (rc != 0) {
         LOGV2_WARNING(23191,
                       "Could not resolve local address for socket with fd {fd}: "
-                      "{socketError}",
-                      "Could not resolve local address for socket",
+                      "{error}",
+                      "Could not resolve local address for socket with fd",
                       "fd"_attr = fd,
-                      "socketError"_attr = getAddrInfoStrError(socketGetLastError()));
+                      "error"_attr = getAddrInfoStrError(socketGetLastError()));
         result = SockAddr();
     }
     return result;
@@ -359,6 +362,7 @@ bool Socket::connect(SockAddr& remote, Milliseconds connectTimeoutMillis) {
                 LOGV2_WARNING(23192,
                               "Failed to connect to {remoteAddr}:{remotePort} after "
                               "{connectTimeout} milliseconds, giving up.",
+                              "Failed to connect to remote host. Giving up",
                               "remoteAddr"_attr = _remote.getAddr(),
                               "remotePort"_attr = _remote.getPort(),
                               "connectTimeout"_attr = connectTimeoutMillis);
@@ -573,17 +577,19 @@ void Socket::handleSendError(int ret, const char* context) {
 #endif
         LOGV2_DEBUG(23181,
                     logSeverityV1toV2(_logLevel).toInt(),
-                    "Socket {context} send() timed out {remoteString}",
+                    "Socket {context} send() timed out {remoteHost}",
+                    "Socket send() to remote host timed out",
                     "context"_attr = context,
-                    "remoteString"_attr = remoteString());
+                    "remoteHost"_attr = remoteString());
         throwSocketError(SocketErrorKind::SEND_TIMEOUT, remoteString());
     } else if (mongo_errno != EINTR) {
         LOGV2_DEBUG(23182,
                     logSeverityV1toV2(_logLevel).toInt(),
-                    "Socket {context} send() {mongoError} {remoteString}",
+                    "Socket {context} send() {error} {remoteHost}",
+                    "Socket send() to remote host failed",
                     "context"_attr = context,
-                    "mongoError"_attr = errnoWithDescription(mongo_errno),
-                    "remoteString"_attr = remoteString());
+                    "error"_attr = errnoWithDescription(mongo_errno),
+                    "remoteHost"_attr = remoteString());
         throwSocketError(SocketErrorKind::SEND_ERROR, remoteString());
     }
 }  // namespace mongo
@@ -592,8 +598,9 @@ void Socket::handleRecvError(int ret, int len) {
     if (ret == 0) {
         LOGV2_DEBUG(23183,
                     3,
-                    "Socket recv() conn closed? {remoteString}",
-                    "remoteString"_attr = remoteString());
+                    "Socket recv() conn closed? {remoteHost}",
+                    "Socket recv() failed; connection may have been closed",
+                    "remoteHost"_attr = remoteString());
         throwSocketError(SocketErrorKind::CLOSED, remoteString());
     }
 
@@ -618,16 +625,18 @@ void Socket::handleRecvError(int ret, int len) {
         // this is a timeout
         LOGV2_DEBUG(23184,
                     logSeverityV1toV2(_logLevel).toInt(),
-                    "Socket recv() timeout  {remoteString}",
-                    "remoteString"_attr = remoteString());
+                    "Socket recv() timeout {remoteHost}",
+                    "Socket recv() timeout",
+                    "remoteHost"_attr = remoteString());
         throwSocketError(SocketErrorKind::RECV_TIMEOUT, remoteString());
     }
 
     LOGV2_DEBUG(23185,
                 logSeverityV1toV2(_logLevel).toInt(),
-                "Socket recv() {error} {remoteString}",
+                "Socket recv() {error} {remoteHost}",
+                "Socket recv() error",
                 "error"_attr = errnoWithDescription(e),
-                "remoteString"_attr = remoteString());
+                "remoteHost"_attr = remoteString());
     throwSocketError(SocketErrorKind::RECV_ERROR, remoteString());
 }
 
@@ -681,10 +690,10 @@ bool Socket::isStillConnected() {
     LOGV2_DEBUG(
         23186,
         2,
-        "polling for status of connection to {remoteString}, "
-        "{nEvents_0_no_events_nEvents_1_error_detected_event_detected}",
-        "remoteString"_attr = remoteString(),
-        "nEvents_0_no_events_nEvents_1_error_detected_event_detected"_attr =
+        "polling for status of connection to {remoteHost}, {errorOrEventDetected}",
+        "Polling for status of connection to remote host",
+        "remoteHost"_attr = remoteString(),
+        "errorOrEventDetected"_attr =
             (nEvents == 0 ? "no events" : nEvents == -1 ? "error detected" : "event detected"));
 
     if (nEvents == 0) {
@@ -694,10 +703,11 @@ bool Socket::isStillConnected() {
         // Poll itself failed, this is weird, warn and log errno
         LOGV2_WARNING(23193,
                       "Socket poll() failed during connectivity check (idle {idleTimeSecs} secs, "
-                      "remote host {remoteString}){causedBy_errnoWithDescription}",
+                      "remote host {remoteHost}){error}",
+                      "Socket poll() to remote host failed during connectivity check",
                       "idleTimeSecs"_attr = idleTimeSecs,
-                      "remoteString"_attr = remoteString(),
-                      "causedBy_errnoWithDescription"_attr = causedBy(errnoWithDescription()));
+                      "remoteHost"_attr = remoteString(),
+                      "error"_attr = causedBy(errnoWithDescription()));
 
         // Return true since it's not clear that we're disconnected.
         return true;
@@ -722,63 +732,74 @@ bool Socket::isStillConnected() {
             // An error occurred during recv, warn and log errno
             LOGV2_WARNING(23194,
                           "Socket recv() failed during connectivity check (idle {idleTimeSecs} "
-                          "secs, remote host {remoteString}){causedBy_errnoWithDescription}",
+                          "secs, remote host {remoteHost}){error}",
+                          "Socket recv() failed during connectivity check",
                           "idleTimeSecs"_attr = idleTimeSecs,
-                          "remoteString"_attr = remoteString(),
-                          "causedBy_errnoWithDescription"_attr = causedBy(errnoWithDescription()));
+                          "remoteHost"_attr = remoteString(),
+                          "error"_attr = causedBy(errnoWithDescription()));
         } else if (recvd > 0) {
             // We got nonzero data from this socket, very weird?
             // Log and warn at runtime, log and abort at devtime
             // TODO: Dump the data to the log somehow?
             LOGV2_ERROR(23197,
-                        "Socket found pending {recvd} bytes of data during connectivity check "
-                        "(idle {idleTimeSecs} secs, remote host {remoteString})",
+                        "Socket found pending {recvd} bytes of data during connectivity "
+                        "check (idle {idleTimeSecs} secs, remote host {remoteHost})",
+                        "Socket found pending bytes of data during connectivity check to remote "
+                        "host",
                         "recvd"_attr = recvd,
                         "idleTimeSecs"_attr = idleTimeSecs,
-                        "remoteString"_attr = remoteString());
+                        "remoteHost"_attr = remoteString());
             if (kDebugBuild) {
                 std::string hex = hexdump(testBuf, recvd);
-                LOGV2_ERROR(23198, "Hex dump of stale log data: {hex}", "hex"_attr = hex);
+                LOGV2_ERROR(23198,
+                            "Hex dump of stale log data: {hex}",
+                            "Hex dump of stale log data",
+                            "hex"_attr = hex);
             }
             dassert(false);
         } else {
             // recvd == 0, socket closed remotely, just return false
             LOGV2(23187,
                   "Socket closed remotely, no longer connected (idle {idleTimeSecs} secs, remote "
-                  "host {remoteString})",
+                  "host {remoteHost})",
+                  "Socket closed remotely, no longer connected to remote host",
                   "idleTimeSecs"_attr = idleTimeSecs,
-                  "remoteString"_attr = remoteString());
+                  "remoteHost"_attr = remoteString());
         }
     } else if (pollInfo.revents & POLLHUP) {
         // A hangup has occurred on this socket
         LOGV2(23188,
               "Socket hangup detected, no longer connected (idle {idleTimeSecs} secs, remote host "
-              "{remoteString})",
+              "{remoteHost})",
+              "Socket hangup detected, no longer connected to remote host",
               "idleTimeSecs"_attr = idleTimeSecs,
-              "remoteString"_attr = remoteString());
+              "remoteHost"_attr = remoteString());
     } else if (pollInfo.revents & POLLERR) {
         // An error has occurred on this socket
         LOGV2(23189,
               "Socket error detected, no longer connected (idle {idleTimeSecs} secs, remote host "
-              "{remoteString})",
+              "{remoteHost})",
+              "Socket error detected, no longer connected to remote host",
               "idleTimeSecs"_attr = idleTimeSecs,
-              "remoteString"_attr = remoteString());
+              "remoteHost"_attr = remoteString());
     } else if (pollInfo.revents & POLLNVAL) {
         // Socket descriptor itself is weird
         // Log and warn at runtime, log and abort at devtime
         LOGV2_ERROR(23199,
                     "Socket descriptor detected as invalid (idle {idleTimeSecs} secs, remote host "
-                    "{remoteString})",
+                    "{remoteHost})",
+                    "Socket descriptor detected as invalid",
                     "idleTimeSecs"_attr = idleTimeSecs,
-                    "remoteString"_attr = remoteString());
+                    "remoteHost"_attr = remoteString());
         dassert(false);
     } else {
         // Don't know what poll is saying here
         // Log and warn at runtime, log and abort at devtime
         LOGV2_ERROR(23200,
-                    "Socket had unknown event ({static_cast_int_pollInfo_revents}) (idle "
+                    "Socket had unknown event ({pollEvents}) (idle "
                     "{idleTimeSecs} secs, remote host {remoteString})",
-                    "static_cast_int_pollInfo_revents"_attr = static_cast<int>(pollInfo.revents),
+                    "Socket had unknown event",
+                    "pollEvents"_attr = static_cast<int>(pollInfo.revents),
                     "idleTimeSecs"_attr = idleTimeSecs,
                     "remoteString"_attr = remoteString());
         dassert(false);
