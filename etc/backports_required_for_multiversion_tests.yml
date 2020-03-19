@@ -49,6 +49,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/initial_sync_rename_collection.js
 - ticket: SERVER-46389
   test_file: jstests/replsets/initial_sync_test_fixture_test.js
+- ticket: SERVER-45143
+  test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
 
 sharding_multiversion:
 
