@@ -243,11 +243,10 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx)
 
     if (settings.getMaxChunkSizeBytes() != getMaxChunkSizeBytes()) {
         LOGV2(22640,
-              "MaxChunkSize changing from {getMaxChunkSizeBytes_1024_1024}MB to "
-              "{settings_getMaxChunkSizeBytes_1024_1024}MB",
-              "getMaxChunkSizeBytes_1024_1024"_attr = getMaxChunkSizeBytes() / (1024 * 1024),
-              "settings_getMaxChunkSizeBytes_1024_1024"_attr =
-                  settings.getMaxChunkSizeBytes() / (1024 * 1024));
+              "Changing MaxChunkSize setting to {newMaxChunkSizeMB}MB from {oldMaxChunkSizeMB}MB",
+              "Changing MaxChunkSize setting",
+              "newMaxChunkSizeMB"_attr = settings.getMaxChunkSizeBytes() / (1024 * 1024),
+              "oldMaxChunkSizeMB"_attr = getMaxChunkSizeBytes() / (1024 * 1024));
 
         _maxChunkSizeBytes.store(settings.getMaxChunkSizeBytes());
     }
@@ -273,9 +272,10 @@ Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* opCtx)
 
     if (settings.getShouldAutoSplit() != getShouldAutoSplit()) {
         LOGV2(22641,
-              "ShouldAutoSplit changing from {getShouldAutoSplit} to {settings_getShouldAutoSplit}",
-              "getShouldAutoSplit"_attr = getShouldAutoSplit(),
-              "settings_getShouldAutoSplit"_attr = settings.getShouldAutoSplit());
+              "Changing ShouldAutoSplit setting to {newShouldAutoSplit} from {oldShouldAutoSplit}",
+              "Changing ShouldAutoSplit setting",
+              "newShouldAutoSplit"_attr = settings.getShouldAutoSplit(),
+              "oldShouldAutoSplit"_attr = getShouldAutoSplit());
 
         _shouldAutoSplit.store(settings.getShouldAutoSplit());
     }
@@ -404,11 +404,10 @@ bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptim
     };
     LOGV2_DEBUG(24094,
                 1,
-                "inBalancingWindow:  now: {timeToString_now} startTime: "
-                "{timeToString_activeWindowStart} stopTime: {timeToString_activeWindowStop}",
-                "timeToString_now"_attr = timeToString(now),
-                "timeToString_activeWindowStart"_attr = timeToString(*_activeWindowStart),
-                "timeToString_activeWindowStop"_attr = timeToString(*_activeWindowStop));
+                "inBalancingWindow",
+                "now"_attr = timeToString(now),
+                "activeWindowStart"_attr = timeToString(*_activeWindowStart),
+                "activeWindowStop"_attr = timeToString(*_activeWindowStop));
 
     if (*_activeWindowStop > *_activeWindowStart) {
         if ((now >= *_activeWindowStart) && (now <= *_activeWindowStop)) {

@@ -89,9 +89,9 @@ protected:
                 if (Interval::INTERVAL_EQUALS !=
                     oil.intervals[i].compare(expectedOil.intervals[i])) {
                     LOGV2(22676,
-                          "{oil_intervals_i} != {expectedOil_intervals_i}",
-                          "oil_intervals_i"_attr = oil.intervals[i],
-                          "expectedOil_intervals_i"_attr = expectedOil.intervals[i]);
+                          "Found mismatching field interval",
+                          "queryFieldInterval"_attr = oil.intervals[i],
+                          "expectedFieldInterval"_attr = expectedOil.intervals[i]);
                 }
                 ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                               oil.intervals[i].compare(expectedOil.intervals[i]));
@@ -111,9 +111,10 @@ protected:
         const OrderedIntervalList& oil = indexBounds.fields.front();
 
         if (oil.intervals.size() != expectedOil.intervals.size()) {
-            for (size_t i = 0; i < oil.intervals.size(); i++) {
-                LOGV2(22677, "{oil_intervals_i}", "oil_intervals_i"_attr = oil.intervals[i]);
-            }
+            LOGV2(22677,
+                  "Found mismatching field intervals",
+                  "queryFieldInterval"_attr = oil,
+                  "expectedFieldInterval"_attr = expectedOil);
         }
 
         ASSERT_EQUALS(oil.intervals.size(), expectedOil.intervals.size());

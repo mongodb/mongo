@@ -186,8 +186,9 @@ public:
         if (s->avail != nullptr) {
             LOGV2_WARNING(
                 22717,
-                "Detected additional sharded connection in the thread local pool for {addr}",
-                "addr"_attr = addr);
+                "Detected additional sharded connection in the thread local pool for {address}",
+                "Detected additional sharded connection in the thread local pool",
+                "address"_attr = addr);
 
             if (DBException::traceExceptions.load()) {
                 // There shouldn't be more than one connection checked out to the same
@@ -249,11 +250,11 @@ public:
 
                 versionManager.checkShardVersionCB(opCtx, s->avail, ns, false, 1);
             } catch (const DBException& ex) {
-                LOGV2_WARNING(
-                    22718,
-                    "Problem while initially checking shard versions on {shardId}{causedBy_ex}",
-                    "shardId"_attr = shardId,
-                    "causedBy_ex"_attr = causedBy(redact(ex)));
+                LOGV2_WARNING(22718,
+                              "Error checking shard version on {shardId} caused by {error}",
+                              "Error checking shard version",
+                              "shardId"_attr = shardId,
+                              "error"_attr = redact(ex));
 
                 // NOTE: This is only a heuristic, to avoid multiple stale version retries across
                 // multiple shards, and does not affect correctness.
@@ -405,8 +406,9 @@ ShardConnection::~ShardConnection() {
         } else {
             // see done() comments above for why we log this line
             LOGV2(22716,
-                  "sharded connection to {conn_getServerAddress} not being returned to the pool",
-                  "conn_getServerAddress"_attr = _conn->getServerAddress());
+                  "Sharded connection to {address} not being returned to the pool",
+                  "Sharded connection not being returned to the pool",
+                  "address"_attr = _conn->getServerAddress());
 
             kill();
         }

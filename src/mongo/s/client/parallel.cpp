@@ -378,9 +378,11 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
                 dassert(repl);
                 LOGV2_WARNING(
                     22695,
-                    "Primary for {repl_getServerAddress} was down before, bypassing "
+                    "Primary for {replicaSetAddress} was down before, bypassing "
                     "setShardVersion. The local replica set view and targeting may be stale.",
-                    "repl_getServerAddress"_attr = repl->getServerAddress());
+                    "Bypassing setShardVersion because replica set view and targeting may be stale "
+                    "from primary having been down",
+                    "replicaSetAddress"_attr = repl->getServerAddress());
             }
 
             return;
@@ -392,8 +394,9 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
             LOGV2_DEBUG(22678,
                         2,
                         "pcursor: needed to set remote version on connection to value compatible "
-                        "with {vinfo}",
-                        "vinfo"_attr = vinfo);
+                        "with {shardVersion}",
+                        "pcursor: needed to set remote version on connection",
+                        "shardVersion"_attr = vinfo);
         }
     } catch (const DBException& dbExcep) {
         auto errCode = dbExcep.code();
@@ -408,10 +411,13 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
                 const DBClientReplicaSet* repl =
                     dynamic_cast<const DBClientReplicaSet*>(state->conn->getRawConn());
                 dassert(repl);
-                LOGV2_WARNING(22696,
-                              "Cannot contact primary for {repl_getServerAddress} to check shard "
-                              "version. The local replica set view and targeting may be stale.",
-                              "repl_getServerAddress"_attr = repl->getServerAddress());
+                LOGV2_WARNING(
+                    22696,
+                    "Cannot contact replica set {replicaSetAdress} to check shard version. "
+                    "The local replica set view and targeting may be stale",
+                    "Cannot contact replica set to check shard version. "
+                    "The local replica set view and targeting may be stale",
+                    "replicaSetAddress"_attr = repl->getServerAddress());
             }
         } else {
             throw;
@@ -433,10 +439,11 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
     }
     LOGV2_DEBUG(22679,
                 2,
-                "pcursor: {prefix} pcursor over {qSpec} and {cInfo}",
+                "pcursor: {prefix} pcursor over {query} and {command}",
+                "pcursor",
                 "prefix"_attr = prefix,
-                "qSpec"_attr = _qSpec,
-                "cInfo"_attr = _cInfo);
+                "query"_attr = _qSpec,
+                "command"_attr = _cInfo);
 
     shared_ptr<ChunkManager> manager;
     shared_ptr<Shard> primary;
@@ -484,9 +491,10 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             LOGV2_DEBUG(22680,
                         2,
                         "pcursor: closing cursor on shard {shardId} as the connection is no longer "
-                        "required by {vinfo}",
+                        "required by {shardVersion}",
+                        "pcursor: closing cursor as the connection is no longer required",
                         "shardId"_attr = shardId,
-                        "vinfo"_attr = vinfo);
+                        "shardVersion"_attr = vinfo);
 
             cmEntry.second.cleanup(true);
         }
@@ -494,9 +502,10 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
     LOGV2_DEBUG(22681,
                 2,
-                "pcursor: initializing over {shardIds_size} shards required by {vinfo}",
-                "shardIds_size"_attr = shardIds.size(),
-                "vinfo"_attr = vinfo);
+                "pcursor: initializing over {shardsNumber} shards required by {shardVersion}",
+                "pcursor: initializing for all shards",
+                "shardsNumber"_attr = shardIds.size(),
+                "shardVersion"_attr = vinfo);
 
     // Don't retry indefinitely for whatever reason
     _totalTries++;
@@ -507,9 +516,11 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
         LOGV2_DEBUG(22682,
                     2,
-                    "pcursor: initializing on shard {shardId}, current connection state is {mdata}",
+                    "pcursor: initializing on shard {shardId}, current connection state is "
+                    "{connectionState}",
+                    "pcursor: initializing on shard",
                     "shardId"_attr = shardId,
-                    "mdata"_attr = mdata.toBSON());
+                    "connectionState"_attr = mdata.toBSON());
 
         // This may be the first time connecting to this shard, if so we can get an error here
         try {
@@ -633,12 +644,13 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
             LOGV2_DEBUG(22683,
                         2,
-                        "pcursor: initialized {isCommand_command_query}{lazyInit_lazily_full}on "
-                        "shard {shardId}, current connection state is {mdata}",
-                        "isCommand_command_query"_attr = (isCommand() ? "command " : "query "),
-                        "lazyInit_lazily_full"_attr = (lazyInit ? "(lazily) " : "(full) "),
+                        "pcursor: initialized {commandType} ({lazyInit}) on shard {shardId}, "
+                        "current connection state is {connectionState}",
+                        "pcursor: initialized command",
+                        "commandType"_attr = (isCommand() ? "command" : "query"),
+                        "lazyInit"_attr = (lazyInit ? "lazily" : "full"),
                         "shardId"_attr = shardId,
-                        "mdata"_attr = mdata.toBSON());
+                        "connectionState"_attr = mdata.toBSON());
         } catch (StaleConfigException& e) {
             // Our version isn't compatible with the current version anymore on at least one shard,
             // need to retry immediately
@@ -650,20 +662,22 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
                 ->invalidateShardOrEntireCollectionEntryForShardedCollection(
                     opCtx, nss, e->getVersionWanted(), e->getVersionReceived(), e->getShardId());
 
-            LOGV2_DEBUG(
-                22684,
-                1,
-                "stale config of ns {staleNS} during initialization, will retry{causedBy_e}",
-                "staleNS"_attr = staleNS,
-                "causedBy_e"_attr = causedBy(redact(e)));
+            LOGV2_DEBUG(22684,
+                        1,
+                        "Error initializing pcursor, stale config for namespace {namespace}, "
+                        "caused by {error}, will retry",
+                        "Error initializing pcursor, will retry",
+                        "namespace"_attr = staleNS,
+                        "error"_attr = redact(e));
 
             // This is somewhat strange
             if (staleNS != nss) {
-                LOGV2_WARNING(
-                    22700,
-                    "versioned ns {nss_ns} doesn't match stale config namespace {staleNS}",
-                    "nss_ns"_attr = nss.ns(),
-                    "staleNS"_attr = staleNS);
+                LOGV2_WARNING(22700,
+                              "Versioned namespace {namespace} doesn't match stale config "
+                              "namespace {staleNamespace}",
+                              "Versioned namespace doesn't match stale config namespace",
+                              "namespace"_attr = nss.ns(),
+                              "staleNamespace"_attr = staleNS);
             }
 
             // Restart with new chunk manager
@@ -671,11 +685,12 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             return;
         } catch (NetworkException& e) {
             LOGV2_WARNING(22701,
-                          "socket exception when initializing on {shardId}, current connection "
-                          "state is {mdata}{causedBy_e}",
+                          "Error initializing pcursor on {shardId} with current connection state "
+                          "{connectionState} caused by {error}",
+                          "Error initializing pcursor",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON(),
-                          "causedBy_e"_attr = causedBy(redact(e)));
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = redact(e));
             mdata.errored = true;
             if (returnPartial) {
                 mdata.cleanup(true);
@@ -684,11 +699,12 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             throw;
         } catch (DBException& e) {
             LOGV2_WARNING(22702,
-                          "db exception when initializing on {shardId}, current connection state "
-                          "is {mdata}{causedBy_e}",
+                          "Error initializing pcursor on {shardId} with current connection state "
+                          "{connectionState} caused by {error}",
+                          "Error initializing pcursor",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON(),
-                          "causedBy_e"_attr = causedBy(redact(e)));
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = redact(e));
             mdata.errored = true;
             if (returnPartial && e.code() == 15925 /* From above! */) {
                 mdata.cleanup(true);
@@ -697,19 +713,22 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             throw;
         } catch (std::exception& e) {
             LOGV2_WARNING(22703,
-                          "exception when initializing on {shardId}, current connection state is "
-                          "{mdata}{causedBy_e}",
+                          "Error initializing pcursor on {shardId} with current connection state "
+                          "{connectionState} caused by {error}",
+                          "Error initializing pcursor",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON(),
-                          "causedBy_e"_attr = causedBy(e));
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = redact(e.what()));
             mdata.errored = true;
             throw;
         } catch (...) {
             LOGV2_WARNING(22704,
-                          "unknown exception when initializing on {shardId}, current connection "
-                          "state is {mdata}",
+                          "Error initializing pcursor on {shardId} with current connection state "
+                          "{connectionState} caused by {error}",
+                          "Error initializing pcursor",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON());
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = "uknownError");
             mdata.errored = true;
             throw;
         }
@@ -760,8 +779,9 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
 
     LOGV2_DEBUG(22685,
                 2,
-                "pcursor: finishing over {cursorMap_size} shards",
-                "cursorMap_size"_attr = _cursorMap.size());
+                "pcursor: finishing over {shardsCount} shards",
+                "pcursor: finishing initialization",
+                "shardsCount"_attr = _cursorMap.size());
 
     for (auto& cmEntry : _cursorMap) {
         const auto& shardId = cmEntry.first;
@@ -769,9 +789,11 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
 
         LOGV2_DEBUG(22686,
                     2,
-                    "pcursor: finishing on shard {shardId}, current connection state is {mdata}",
+                    "pcursor: finishing initialization on shard {shardId}, current connection "
+                    "state is {connectionState}",
+                    "pcursor: finishing initialization for shard",
                     "shardId"_attr = shardId,
-                    "mdata"_attr = mdata.toBSON());
+                    "connectionState"_attr = mdata.toBSON());
 
         // Ignore empty conns for now
         if (!mdata.pcState)
@@ -818,12 +840,13 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
                 // Finalize state
                 state->cursor->attach(state->conn.get());  // Closes connection for us
 
-                LOGV2_DEBUG(
-                    22687,
-                    2,
-                    "pcursor: finished on shard {shardId}, current connection state is {mdata}",
-                    "shardId"_attr = shardId,
-                    "mdata"_attr = mdata.toBSON());
+                LOGV2_DEBUG(22687,
+                            2,
+                            "pcursor: finished on shard {shardId}, current connection state is "
+                            "{connectionState}",
+                            "pcursor: finished initialization for shard",
+                            "shardId"_attr = shardId,
+                            "connectionState"_attr = mdata.toBSON());
             }
         } catch (StaleConfigException& e) {
             retry = true;
@@ -838,11 +861,12 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
             continue;
         } catch (NetworkException& e) {
             LOGV2_WARNING(22705,
-                          "socket exception when finishing on {shardId}, current connection state "
-                          "is {mdata}{causedBy_e}",
+                          "Error finalizing pcursor initialization for shard {shardId} with "
+                          "connection state {connectionState} caused by {error}",
+                          "Error finalizing pcursor initialization for shard",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON(),
-                          "causedBy_e"_attr = causedBy(redact(e)));
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = redact(e));
             mdata.errored = true;
             if (returnPartial) {
                 mdata.cleanup(true);
@@ -854,11 +878,12 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
             // ABOVE
             if (e.code() == 15988) {
                 LOGV2_WARNING(22706,
-                              "exception when receiving data from {shardId}, current connection "
-                              "state is {mdata}{causedBy_e}",
+                              "Error finalizing pcursor initialization for shard {shardId} with "
+                              "connection state {connectionState} caused by {error}",
+                              "Error finalizing pcursor initialization for shard",
                               "shardId"_attr = shardId,
-                              "mdata"_attr = mdata.toBSON(),
-                              "causedBy_e"_attr = causedBy(redact(e)));
+                              "connectionState"_attr = mdata.toBSON(),
+                              "error"_attr = redact(e));
 
                 mdata.errored = true;
                 if (returnPartial) {
@@ -870,36 +895,42 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
                 // the InvalidBSON exception indicates that the BSON is malformed ->
                 // don't print/call "mdata.toBSON()" to avoid unexpected errors e.g. a segfault
                 if (e.code() == ErrorCodes::InvalidBSON)
-                    LOGV2_WARNING(
-                        22707,
-                        "bson is malformed :: db exception when finishing on {shardId}{causedBy_e}",
-                        "shardId"_attr = shardId,
-                        "causedBy_e"_attr = causedBy(redact(e)));
-                else
-                    LOGV2_WARNING(22708,
-                                  "db exception when finishing on {shardId}, current connection "
-                                  "state is {mdata}{causedBy_e}",
+                    LOGV2_WARNING(22707,
+                                  "Error finalizing pcursor initialization for shard "
+                                  "{shardId} caused by {error}",
+                                  "Error finalizing pcursor initialization for shard",
                                   "shardId"_attr = shardId,
-                                  "mdata"_attr = mdata.toBSON(),
-                                  "causedBy_e"_attr = causedBy(redact(e)));
+                                  "error"_attr = redact(e));
+                else
+                    LOGV2_WARNING(
+                        22708,
+                        "Error finalizing pcursor initialization for shard {shardId} with "
+                        "connection state {connectionState} caused by {error}",
+                        "Error finalizing pcursor initialization for shard",
+                        "shardId"_attr = shardId,
+                        "connectionState"_attr = mdata.toBSON(),
+                        "error"_attr = redact(e));
                 mdata.errored = true;
                 throw;
             }
         } catch (std::exception& e) {
             LOGV2_WARNING(22709,
-                          "exception when finishing on {shardId}, current connection state is "
-                          "{mdata}{causedBy_e}",
+                          "Error finalizing pcursor initialization for shard {shardId} with "
+                          "connection state {connectionState} caused by {error}",
+                          "Error finalizing pcursor initialization for shard",
                           "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON(),
-                          "causedBy_e"_attr = causedBy(e));
+                          "connectionState"_attr = mdata.toBSON(),
+                          "error"_attr = redact(e.what()));
             mdata.errored = true;
             throw;
         } catch (...) {
-            LOGV2_WARNING(22710,
-                          "unknown exception when finishing on {shardId}, current connection state "
-                          "is {mdata}",
-                          "shardId"_attr = shardId,
-                          "mdata"_attr = mdata.toBSON());
+            LOGV2_WARNING(
+                22710,
+                "Unknown error finalizing pcursor initialization for shard {shardId} with "
+                "connection state {connectionState}",
+                "Unknown error finalizing pcursor initialization for shard",
+                "shardId"_attr = shardId,
+                "connectionState"_attr = mdata.toBSON());
             mdata.errored = true;
             throw;
         }
@@ -923,20 +954,22 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
                         staleNS, *ex->getShardId());
                 }
 
-                LOGV2_DEBUG(
-                    22688,
-                    1,
-                    "stale config of ns {staleNS} on finishing query, will retry{causedBy_ex}",
-                    "staleNS"_attr = staleNS,
-                    "causedBy_ex"_attr = causedBy(redact(ex)));
+                LOGV2_DEBUG(22688,
+                            1,
+                            "Found stale config for namespace {namespace} on finishing query "
+                            "caused by {error}",
+                            "Found stale config for namespace",
+                            "namespace"_attr = staleNS,
+                            "error"_attr = redact(ex));
 
                 // This is somewhat strange
                 if (staleNS.ns() != ns) {
-                    LOGV2_WARNING(
-                        22711,
-                        "versioned ns {ns} doesn't match stale config namespace {staleNS}",
-                        "ns"_attr = ns,
-                        "staleNS"_attr = staleNS);
+                    LOGV2_WARNING(22711,
+                                  "Versioned namespace {namespace} doesn't match stale config "
+                                  "namespace {staleNamespace}",
+                                  "Versioned namespace doesn't match stale config namespace",
+                                  "namespace"_attr = ns,
+                                  "staleNamespace"_attr = staleNS);
                 }
             }
         }
@@ -953,7 +986,10 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
 
         // Erase empty stuff
         if (!mdata.pcState) {
-            LOGV2(22689, "PCursor erasing empty state {mdata}", "mdata"_attr = mdata.toBSON());
+            LOGV2(22689,
+                  "PCursor erasing empty connection state {connectionState}",
+                  "PCursor erasing empty connection state",
+                  "connectionState"_attr = mdata.toBSON());
             _cursorMap.erase(i++);
             continue;
         } else {
@@ -1043,16 +1079,19 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
         bool firstPass = retryQueries.size() == 0;
 
         if (!firstPass) {
+            vector<StringData> serverHostsToRetry;
+            serverHostsToRetry.reserve(retryQueries.size());
+            transform(retryQueries.begin(),
+                      retryQueries.end(),
+                      std::back_inserter(serverHostsToRetry),
+                      [&](const auto& query) { return serverHosts[query]; });
             LOGV2(22690,
-                  "retrying {returnPartial_partial}parallel connection to ",
-                  "returnPartial_partial"_attr = (returnPartial ? "(partial) " : ""));
-            for (set<int>::const_iterator it = retryQueries.begin(); it != retryQueries.end();
-                 ++it) {
-                LOGV2(22691, "{serverHosts_it}, ", "serverHosts_it"_attr = serverHosts[*it]);
-            }
-            LOGV2(22692,
-                  "{finishedQueries} finished queries.",
-                  "finishedQueries"_attr = finishedQueries);
+                  "Finished queries {finishedQueriesCount}, retrying parallel connection to "
+                  "{serverHostsToRetry}",
+                  "Retrying parallel connection",
+                  "returnPartial"_attr = returnPartial,
+                  "finishedQueriesCount"_attr = finishedQueries,
+                  "serverHostsToRetry"_attr = serverHostsToRetry);
         }
 
         size_t num = 0;
@@ -1099,10 +1138,9 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
 
             LOGV2_DEBUG(22693,
                         5,
-                        "ParallelSortClusteredCursor::init server:{serverHost} ns:{ns} "
-                        "query:{query} fields:{fields} options: {options}",
+                        "ParallelSortClusteredCursor initialization",
                         "serverHost"_attr = serverHost,
-                        "ns"_attr = _ns,
+                        "namespace"_attr = _ns,
                         "query"_attr = redact(_query),
                         "fields"_attr = redact(_fields),
                         "options"_attr = _options);
@@ -1157,9 +1195,10 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
             try {
                 if (!_cursors[i].get()->initLazyFinish(retry)) {
                     LOGV2_WARNING(22712,
-                                  "invalid result from {conns_i_getHost}{retry_retrying}",
-                                  "conns_i_getHost"_attr = conns[i]->getHost(),
-                                  "retry_retrying"_attr = (retry ? ", retrying" : ""));
+                                  "Got invalid result from {host}",
+                                  "Got invalid result",
+                                  "host"_attr = conns[i]->getHost(),
+                                  "retrying"_attr = retry);
                     _cursors[i].reset(nullptr, nullptr);
 
                     if (!retry) {
@@ -1263,13 +1302,17 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
         } else if (throwException) {
             uasserted(14827, errMsg.str());
         } else {
-            LOGV2_WARNING(22713, "{errMsg_str}", "errMsg_str"_attr = redact(errMsg.str()));
+            LOGV2_WARNING(22713,
+                          "Error while initializing cursor across all shards caused by {error}",
+                          "Error while initializing cursor across all shards",
+                          "error"_attr = redact(errMsg.str()));
         }
     }
 
     if (retries > 0)
         LOGV2(22694,
-              "successfully finished parallel query after {retries} retries",
+              "Successfully finished parallel query after {retries} retries",
+              "Successfully finished parallel query",
               "retries"_attr = retries);
 }
 
@@ -1363,9 +1406,9 @@ void ParallelConnectionMetadata::cleanup(bool full) {
                     bool retry = false;
                     pcState->cursor->initLazyFinish(retry);
                 } catch (std::exception&) {
-                    LOGV2_WARNING(22714, "exception closing cursor");
+                    LOGV2_WARNING(22714, "Exception closing cursor");
                 } catch (...) {
-                    LOGV2_WARNING(22715, "unknown exception closing cursor");
+                    LOGV2_WARNING(22715, "Unknown exception closing cursor");
                 }
             }
         }
