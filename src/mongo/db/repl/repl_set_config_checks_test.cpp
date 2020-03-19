@@ -1103,20 +1103,6 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeRemovalDisallowed) {
                   validateMemberReconfig(oldMembers, newMembers, m1));
 }
 
-TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionAllowedFCV42) {
-    EnsureFCV fcv{ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42};
-    BSONArray oldMembers = BSON_ARRAY(m1 << m2);
-    BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3 << m4);  // add 2 voting nodes.
-    ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
-}
-
-TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeRemovalAllowedFCV42) {
-    EnsureFCV fcv{ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42};
-    BSONArray oldMembers = BSON_ARRAY(m1 << m2 << m3 << m4);
-    BSONArray newMembers = BSON_ARRAY(m1 << m2);  // remove 2 voting nodes.
-    ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
-}
-
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfNonVotingNodesAllowed) {
     BSONArray oldMembers = BSON_ARRAY(m1 << m2);
     BSONArray newMembers =

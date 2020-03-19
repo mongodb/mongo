@@ -439,13 +439,8 @@ public:
         uassertStatusOK(status);
 
         // Now that the new config has been persisted and installed in memory, wait for the new
-        // config to become committed. For force reconfigs we don't need to do this waiting, and in
-        // any FCV < 4.4 we also bypass this to preserve client facing behavior in mixed version
-        // sets.
-        if (!parsedArgs.force &&
-            serverGlobalParams.featureCompatibility.isVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
-            enableSafeReplicaSetReconfig) {
+        // config to become committed. For force reconfigs we don't need to do this waiting.
+        if (!parsedArgs.force && enableSafeReplicaSetReconfig) {
             uassertStatusOK(replCoord->awaitConfigCommitment(opCtx));
         }
 

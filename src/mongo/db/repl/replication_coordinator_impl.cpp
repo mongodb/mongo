@@ -3011,10 +3011,7 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_inlock(
     const rpc::ReplSetMetadata& replMetadata) {
-    // If we're in FCV 4.4, allow metadata updates between config versions.
-    if (!serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) ||
-        !enableSafeReplicaSetReconfig) {
+    if (!enableSafeReplicaSetReconfig) {
         if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
             return EventHandle();
         }
@@ -3125,12 +3122,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                             long long currentTerm) -> StatusWith<ReplSetConfig> {
         ReplSetConfig newConfig;
 
-        // Only explicitly set configTerm for reconfig to this node's term if we're in FCV 4.4.
-        // Otherwise, use -1.
-        auto useSafeReconfig = serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-        useSafeReconfig = useSafeReconfig && enableSafeReplicaSetReconfig;
-        auto term = (!args.force && useSafeReconfig) ? currentTerm : OpTime::kUninitializedTerm;
+        // Only explicitly set configTerm for reconfig to this node's term if safe reconfig is
+        // enabled. Otherwise, use -1.
+        auto term = (!args.force && enableSafeReplicaSetReconfig) ? currentTerm
+                                                                  : OpTime::kUninitializedTerm;
 
         // When initializing a new config through the replSetReconfig command, ignore the term
         // field passed in through its args. Instead, use this node's term.
@@ -3265,9 +3260,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     // Construct a fake OpTime that can be accepted but isn't used.
     OpTime fakeOpTime(Timestamp(1, 1), topCoordTerm);
 
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
-        !force && enableSafeReplicaSetReconfig) {
+    if (!force && enableSafeReplicaSetReconfig) {
         if (!_doneWaitingForReplication_inlock(fakeOpTime, configWriteConcern)) {
             return Status(ErrorCodes::ConfigurationInProgress,
                           str::stream()
@@ -3814,13 +3807,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
                   "Replica set state transition",
                   "newState"_attr = newState,
                   "oldState"_attr = _memberState);
-    // Initializes the featureCompatibilityVersion to the latest value, because arbiters do not
-    // receive the replicated version. This is to avoid bugs like SERVER-32639.
-    if (newState.arbiter()) {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-    }
-
     _memberState = newState;
 
     _cancelAndRescheduleElectionTimeout_inlock();
