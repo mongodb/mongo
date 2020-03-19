@@ -436,7 +436,7 @@ functions:
         aws_secret_access_key = ${kitchen_aws_secret}
         EOF
 
-        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz"
+        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
@@ -701,6 +701,24 @@ tasks:
           - "src/mongo/util/options_parser/test_config_files/**"
         exclude_files:
           - "*_test.pdb"
+    - command: archive.targz_pack
+      params:
+        target: "packages.tgz"
+        source_dir: "src"
+        include:
+          - "repo/**"
+          - "./**.msi"
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: packages.tgz
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: Packages
     - func: "upload debugsymbols"
     - command: s3.put
       params:
