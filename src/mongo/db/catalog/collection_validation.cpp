@@ -192,6 +192,9 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateResultsMap* indexNsResultsMap,
                              ValidateResults* result) {
     indexConsistency->setSecondPhase();
+    if (!indexConsistency->limitMemoryUsageForSecondPhase(result)) {
+        return;
+    }
 
     LOGV2_OPTIONS(
         20297, {LogComponent::kIndex}, "Starting to traverse through all the document key sets");

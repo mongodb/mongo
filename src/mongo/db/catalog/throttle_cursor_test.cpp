@@ -35,7 +35,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/max_validate_mb_per_sec_gen.h"
+#include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"

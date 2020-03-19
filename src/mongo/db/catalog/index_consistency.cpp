@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/index_consistency.h"
 
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/storage_debug_util.h"
@@ -77,7 +78,7 @@ IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    CollectionValidation::ValidateState* validateState)
     : _validateState(validateState), _firstPhase(true) {
-    _indexKeyCount.resize(kNumHashBuckets);
+    _indexKeyBuckets.resize(kNumHashBuckets);
 
     for (const auto& index : _validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
@@ -99,8 +100,9 @@ size_t IndexConsistency::getMultikeyMetadataPathCount(IndexInfo* indexInfo) {
 }
 
 bool IndexConsistency::haveEntryMismatch() const {
-    return std::any_of(
-        _indexKeyCount.begin(), _indexKeyCount.end(), [](int count) -> bool { return count; });
+    return std::any_of(_indexKeyBuckets.begin(),
+                       _indexKeyBuckets.end(),
+                       [](const IndexKeyBucket& bucket) -> bool { return bucket.indexKeyCount; });
 }
 
 void IndexConsistency::setSecondPhase() {
@@ -206,7 +208,8 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
     if (_firstPhase) {
         // During the first phase of validation we only keep track of the count for the document
         // keys encountered.
-        _indexKeyCount[hash]++;
+        _indexKeyBuckets[hash].indexKeyCount++;
+        _indexKeyBuckets[hash].bucketSizeBytes += ks.getSize();
         indexInfo->numRecords++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
@@ -217,7 +220,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
             StorageDebugUtil::printKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
         }
-    } else if (_indexKeyCount[hash]) {
+    } else if (_indexKeyBuckets[hash].indexKeyCount) {
         // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
@@ -249,7 +252,8 @@ void IndexConsistency::addIndexKey(const KeyString::Value& ks,
     if (_firstPhase) {
         // During the first phase of validation we only keep track of the count for the index entry
         // keys encountered.
-        _indexKeyCount[hash]--;
+        _indexKeyBuckets[hash].indexKeyCount--;
+        _indexKeyBuckets[hash].bucketSizeBytes += ks.getSize();
         indexInfo->numKeys++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
@@ -260,7 +264,7 @@ void IndexConsistency::addIndexKey(const KeyString::Value& ks,
             StorageDebugUtil::printKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
         }
-    } else if (_indexKeyCount[hash]) {
+    } else if (_indexKeyBuckets[hash].indexKeyCount) {
         // Found an index key for a bucket that has inconsistencies.
         // If there is a corresponding document key for the index entry key, we remove the key from
         // the '_missingIndexEntries' map. However if there was no document key for the index entry
@@ -284,6 +288,69 @@ void IndexConsistency::addIndexKey(const KeyString::Value& ks,
             _missingIndexEntries.erase(key);
         }
     }
+}
+
+bool IndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
+    invariant(!_firstPhase);
+
+    const uint32_t maxMemoryUsageBytes = maxValidateMemoryUsageMB.load() * 1024 * 1024;
+    const uint64_t totalMemoryNeededBytes =
+        std::accumulate(_indexKeyBuckets.begin(),
+                        _indexKeyBuckets.end(),
+                        0,
+                        [](uint64_t bytes, const IndexKeyBucket& bucket) {
+                            return bucket.indexKeyCount ? bytes + bucket.bucketSizeBytes : bytes;
+                        });
+
+    if (totalMemoryNeededBytes <= maxMemoryUsageBytes) {
+        // The amount of memory we need is under the limit, so no need to do anything else.
+        return true;
+    }
+
+    bool hasNonZeroBucket = false;
+    uint64_t memoryUsedSoFarBytes = 0;
+    uint32_t smallestBucketBytes = std::numeric_limits<uint32_t>::max();
+    // Zero out any nonzero buckets that would put us over maxMemoryUsageBytes.
+    std::for_each(_indexKeyBuckets.begin(), _indexKeyBuckets.end(), [&](IndexKeyBucket& bucket) {
+        if (bucket.indexKeyCount == 0) {
+            return;
+        }
+
+        smallestBucketBytes = std::min(smallestBucketBytes, bucket.bucketSizeBytes);
+        if (bucket.bucketSizeBytes + memoryUsedSoFarBytes > maxMemoryUsageBytes) {
+            // Including this bucket would put us over the memory limit, so zero
+            // this bucket.
+            bucket.indexKeyCount = 0;
+            return;
+        }
+        memoryUsedSoFarBytes += bucket.bucketSizeBytes;
+        hasNonZeroBucket = true;
+    });
+
+    StringBuilder memoryLimitMessage;
+    memoryLimitMessage << "Memory limit for validation is currently set to "
+                       << maxValidateMemoryUsageMB.load()
+                       << "MB and can be configured via the 'maxValidateMemoryUsageMB' parameter.";
+
+    if (!hasNonZeroBucket) {
+        const uint32_t minMemoryNeededMB = (smallestBucketBytes / (1024 * 1024)) + 1;
+        StringBuilder ss;
+        ss << "Unable to report index entry inconsistencies due to memory limitations. Need at "
+              "least "
+           << minMemoryNeededMB << "MB to report at least one index entry inconsistency. "
+           << memoryLimitMessage.str();
+        result->errors.push_back(ss.str());
+        result->valid = false;
+
+        return false;
+    }
+
+    StringBuilder ss;
+    ss << "Not all index entry inconsistencies are reported due to memory limitations. "
+       << memoryLimitMessage.str();
+    result->errors.push_back(ss.str());
+
+    return true;
 }
 
 BSONObj IndexConsistency::_generateInfo(const IndexInfo& indexInfo,

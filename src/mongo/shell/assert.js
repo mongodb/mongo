@@ -306,6 +306,32 @@ assert = (function() {
         }
     };
 
+    assert.containsPrefix = function(prefix, arr, msg) {
+        var wasIn = false;
+        if (typeof (prefix) !== "string") {
+            throw new Error("The first argument to containsPrefix must be a string.");
+        }
+        if (!Array.isArray(arr)) {
+            throw new Error("The second argument to containsPrefix must be an array.");
+        }
+
+        for (let i = 0; i < arr.length; i++) {
+            if (typeof (arr[i]) !== "string") {
+                continue;
+            }
+
+            wasIn = arr[i].startsWith(prefix);
+            if (wasIn) {
+                break;
+            }
+        }
+
+        if (!wasIn) {
+            doassert(_buildAssertionMessage(
+                msg, tojson(prefix) + " was not a prefix in " + tojson(arr)));
+        }
+    };
+
     /*
      * Calls a function 'func' at repeated intervals until either func() returns true
      * or more than 'timeout' milliseconds have elapsed. Throws an exception with

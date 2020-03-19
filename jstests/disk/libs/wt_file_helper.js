@@ -207,3 +207,13 @@ let runWiredTigerTool = function(...args) {
     const cmd = ['wt'].concat(args);
     assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
 };
+
+/**
+ * Stops the given mongod, runs the truncate command on the given uri using the WiredTiger tool, and
+ * starts mongod again on the same path.
+ */
+let truncateUriAndRestartMongod = function(uri, conn) {
+    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    runWiredTigerTool("-h", conn.dbpath, "truncate", uri);
+    return startMongodOnExistingPath(conn.dbpath, {});
+};
