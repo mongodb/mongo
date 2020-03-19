@@ -2,7 +2,7 @@
  * Test that the validate command properly limits the index entry inconsistencies reported when
  * there is corruption on an index with a long name.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [requires_wiredtiger, requires_persistence]
  */
 (function() {
 "use strict";
