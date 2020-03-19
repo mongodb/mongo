@@ -20,7 +20,7 @@ TestData.skipCheckDBHashes = true;
 function makePatternForDBHash(dbName) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `slow query.*"ns":"${dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"db[Hh]ash`,
+            `Slow query.*"ns":"${dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"db[Hh]ash`,
             "g");
     }
     return new RegExp(
@@ -31,7 +31,7 @@ function makePatternForDBHash(dbName) {
 function makePatternForValidate(dbName, collName) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `slow query.*"ns":"${
+            `Slow query.*"ns":"${
                 dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"validate":"${collName}"`,
             "g");
     }

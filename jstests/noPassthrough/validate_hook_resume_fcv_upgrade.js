@@ -18,7 +18,7 @@ TestData.skipCollectionAndIndexValidation = true;
 function makePatternForValidate(dbName, collName) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `slow query.*"ns":"${
+            `Slow query.*"ns":"${
                 dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"validate":"${collName}"`,
             "g");
     }
@@ -32,7 +32,7 @@ function makePatternForValidate(dbName, collName) {
 function makePatternForSetFCV(targetVersion) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `slow query.*"appName":"MongoDB Shell","command":{"setFeatureCompatibilityVersion":"${
+            `Slow query.*"appName":"MongoDB Shell","command":{"setFeatureCompatibilityVersion":"${
                 targetVersion}"`,
             "g");
     }
@@ -45,7 +45,7 @@ function makePatternForSetFCV(targetVersion) {
 function makePatternForSetParameter(paramName) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `slow query.*"appName":"MongoDB Shell","command":{"setParameter":1\\.0,"${paramName}":`,
+            `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1\\.0,"${paramName}":`,
             "g");
     }
     return new RegExp("COMMAND.*command.*appName: \"MongoDB Shell\" command: setParameter" +
