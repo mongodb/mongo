@@ -203,13 +203,6 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     if (!NamespaceString::validCollectionName(coll))
         return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
-    if (!NamespaceString(db, coll).checkLengthForFCV())
-        return Status(ErrorCodes::IncompatibleServerVersion,
-                      str::stream() << "Cannot create collection with a long name " << db << "."
-                                    << coll << " - upgrade to feature compatibility version "
-                                    << FeatureCompatibilityVersionParser::kVersion44
-                                    << " to be able to do so.");
-
     // check special areas
 
     if (db == "system")

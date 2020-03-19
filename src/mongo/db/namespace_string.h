@@ -47,6 +47,7 @@ class NamespaceString {
 public:
     constexpr static size_t MaxDatabaseNameLen =
         128;  // max str len for the db name, including null char
+    constexpr static size_t MaxNSCollectionLenFCV42 = 120U;
     constexpr static size_t MaxNsCollectionLen = 255;
 
     // Reserved system namespaces
@@ -296,11 +297,6 @@ public:
      * Returns true if this namespace refers to a drop-pending collection.
      */
     bool isDropPendingNamespace() const;
-
-    /**
-     * Returns true if the namespace length is valid based on the FCV setting.
-     */
-    bool checkLengthForFCV() const;
 
     /**
      * Returns the drop-pending namespace name for this namespace, provided the given optime.

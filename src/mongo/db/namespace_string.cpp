@@ -149,25 +149,6 @@ bool NamespaceString::isDropPendingNamespace() const {
     return coll().startsWith(dropPendingNSPrefix);
 }
 
-bool NamespaceString::checkLengthForFCV() const {
-    // Prior to longer collection names, the limit in older versions was 120 characters.
-    const size_t previousMaxNSLength = 120U;
-    if (size() <= previousMaxNSLength) {
-        return true;
-    }
-
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return false;
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return size() <= MaxNsCollectionLen;
-    }
-
-    return false;
-}
-
 NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
     StringBuilder ss;
     ss << db() << "." << dropPendingNSPrefix;
