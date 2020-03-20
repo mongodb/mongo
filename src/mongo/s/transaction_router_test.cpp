@@ -108,6 +108,10 @@ protected:
 
     const NamespaceString kViewNss = NamespaceString("test.foo");
 
+    const Status kStaleConfigStatus = {
+        StaleConfigInfo(kViewNss, ChunkVersion::UNSHARDED(), boost::none, shard1),
+        "The metadata for the collection is not loaded"};
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -1657,7 +1661,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     // Simulate stale error and internal retry that only re-targets one of the original shards.
 
-    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find"));
+    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     auto future = launchAsync(
         [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
     expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
@@ -1708,7 +1712,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
 
-    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find"));
+    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     auto future = launchAsync(
         [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
     expectAbortTransactions({hostAndPort2, hostAndPort3}, getSessionId(), txnNum);
@@ -1749,7 +1753,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
 
-    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find"));
+    ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1789,11 +1793,11 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     for (auto writeCmd : writeCmds) {
-        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(writeCmd));
+        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(writeCmd, kDummyStatus));
     }
 
     for (auto cmd : otherCmds) {
-        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(cmd));
+        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(cmd, kDummyStatus));
     }
 
     // Advance to the next command.
@@ -1803,11 +1807,11 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     for (auto writeCmd : writeCmds) {
-        ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError(writeCmd));
+        ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError(writeCmd, kDummyStatus));
     }
 
     for (auto cmd : otherCmds) {
-        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(cmd));
+        ASSERT(txnRouter.canContinueOnStaleShardOrDbError(cmd, kDummyStatus));
     }
 }
 
@@ -2210,26 +2214,56 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     auto response = future.default_timed_get();
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession,
-       CannotContinueOnSnapshotOrStaleVersionErrorsWithoutFailpoint) {
+TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirstOp) {
     TxnNumber txnNum{3};
 
     auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     disableRouterRetriesFailPoint();
 
     // Cannot retry on snapshot errors on the first statement.
     ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
 
-    // Cannot retry on stale shard or db version errors for read or write commands.
-    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("find"));
-    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("insert"));
+    // Retry only on first op on stale shard or db version errors for read or write commands.
+    ASSERT_TRUE(txnRouter.canContinueOnStaleShardOrDbError("find", kStaleConfigStatus));
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("insert", kDummyStatus));
+
+    // It shouldn't hang because there won't be any abort transaction sent at this time
+    txnRouter.onStaleShardOrDbError(operationContext(), "find", kStaleConfigStatus);
+
+    // Readd the initial participant removed on onStaleShardOrDbError
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+
+    // Add another participant
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+
+    // Check that the transaction cannot continue on stale config with more than one participant
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("update", kStaleConfigStatus));
 
     // Can still continue on view resolution errors.
-    txnRouter.onViewResolutionError(operationContext(), kViewNss);  // Should not throw.
+    auto future = launchAsync([&] {
+        // Should not throw.
+        txnRouter.onViewResolutionError(operationContext(), kViewNss);
+    });
+
+    // Expect abort on pending operation
+    expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
+
+    future.default_timed_get();
+
+    // Start a new transaction statement.
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+
+    // Cannot retry on a stale config error with one participant after the first statement.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("update", kStaleConfigStatus));
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, ContinuingTransactionPlacesItsReadConcernOnOpCtx) {

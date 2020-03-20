@@ -91,5 +91,14 @@ var count = st.s1.getDB('TestDB').TestAggregateColl.aggregate([{$count: 'total'}
 // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
 assert.neq(2, count[0].total);
 
+// Test transactions with unsharded collection, which is unknown on the shard
+st.restartShardRS(0);
+st.restartShardRS(1);
+
+var session = st.s1.startSession();
+session.startTransaction();
+session.getDatabase('TestDB').getCollection('TestTransactionColl').insert({Key: 1});
+session.commitTransaction();
+
 st.stop();
 })();
