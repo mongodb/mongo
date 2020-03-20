@@ -20,8 +20,8 @@ assert.commandWorked(primaryDB.setProfilingLevel(2));
 assert.commandWorked(secondaryDB.setProfilingLevel(2));
 secondaryDB.getMongo().setReadPref("secondary");
 
+const outCollName = "outColl";
 const inputCollPrimary = primaryDB.getCollection("inputColl");
-const outColl = primaryDB.getCollection("outColl");
 
 assert.commandWorked(inputCollPrimary.insert({_id: 0, a: 1}, {writeConcern: {w: 2}}));
 assert.commandWorked(inputCollPrimary.insert({_id: 1, a: 2}, {writeConcern: {w: 2}}));
@@ -43,7 +43,7 @@ function testMetadata(pipeline, comment) {
             const res = testDB.runCommand({
                 aggregate: "inputColl",
                 pipeline: ${tojson(pipeline)},
-                writeConcern: {w: 1},
+                writeConcern: {w: 2},
                 comment: "${comment}",
                 cursor: {},
                 $readPreference: {mode: "secondary"}
@@ -94,13 +94,19 @@ function testMetadata(pipeline, comment) {
         }
         prevClusterTime = op.command.$clusterTime.clusterTime;
     });
+
+    // Drop the output collection to ensure that the drop replicates to the secondary. This
+    // ensures that any state created by this test is cleaned up in preparation for later test
+    // cases.
+    let outColl = primaryDB.getCollection(outCollName);
+    outColl.drop({writeConcern: {w: 2}});
 }
 
 const mergePipeline =
-    [{$merge: {into: outColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}];
+    [{$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}}];
 testMetadata(mergePipeline, "merge_on_secondary_metadata");
 
-const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outColl.getName()}];
+const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outCollName}];
 testMetadata(outPipeline, "out_on_secondary_metadata");
 
 replTest.stopSet();
