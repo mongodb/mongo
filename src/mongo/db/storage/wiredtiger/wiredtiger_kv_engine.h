@@ -493,5 +493,9 @@ private:
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
     std::unique_ptr<WiredTigerMaxCacheOverflowSizeGBParameter> _maxCacheOverflowParam;
+
+    mutable Mutex _highestDurableTimestampMutex =
+        MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");
+    mutable unsigned long long _highestSeenDurableTimestamp = StorageEngine::kMinimumTimestamp;
 };
 }  // namespace mongo

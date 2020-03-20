@@ -1825,6 +1825,8 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         stableTSConfigString =
             "force=true,oldest_timestamp={0:x},commit_timestamp={0:x},stable_timestamp={0:x}"_format(
                 ts);
+        stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
+        _highestSeenDurableTimestamp = ts;
     } else {
         stableTSConfigString = "stable_timestamp={:x}"_format(ts);
     }
@@ -1881,6 +1883,8 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
                 newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()));
         _oldestTimestamp.store(newOldestTimestamp.asULL());
+        stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
+        _highestSeenDurableTimestamp = newOldestTimestamp.asULL();
         LOGV2_DEBUG(22342,
                     2,
                     "oldest_timestamp and commit_timestamp force set to {newOldestTimestamp}",
@@ -2009,7 +2013,15 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
 }
 
 Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
-    return Timestamp(_oplogManager->fetchAllDurableValue(_conn));
+    auto ret = _oplogManager->fetchAllDurableValue(_conn);
+
+    stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
+    if (ret < _highestSeenDurableTimestamp) {
+        ret = _highestSeenDurableTimestamp;
+    } else {
+        _highestSeenDurableTimestamp = ret;
+    }
+    return Timestamp(ret);
 }
 
 Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {
