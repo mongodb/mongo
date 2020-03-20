@@ -71,9 +71,10 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22751,
                     1,
-                    "dropIndexes: {nss} cmd:{cmdObj}",
-                    "nss"_attr = nss,
-                    "cmdObj"_attr = redact(cmdObj));
+                    "dropIndexes: {namespace} cmd: {command}",
+                    "CMD: dropIndexes",
+                    "namespace"_attr = nss,
+                    "command"_attr = redact(cmdObj));
 
         // If the collection is sharded, we target only the primary shard and the shards that own
         // chunks for the collection. We ignore IndexNotFound errors, because the index may have

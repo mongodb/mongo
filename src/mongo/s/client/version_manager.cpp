@@ -148,11 +148,12 @@ bool setShardVersion(OperationContext* opCtx,
 
     LOGV2_DEBUG(20218,
                 1,
-                "setShardVersion  {shardId} {serverAddress}  {ns}  {cmd} {manager}",
+                "setShardVersion  {shardId} {serverAddress}  {namespace}  {command} {manager}",
+                "setShardVersion",
                 "shardId"_attr = shardId,
                 "serverAddress"_attr = conn->getServerAddress(),
-                "ns"_attr = ns,
-                "cmd"_attr = cmd,
+                "namespace"_attr = ns,
+                "command"_attr = cmd,
                 "manager"_attr =
                     manager ? StringData{ItoA{manager->getSequenceNumber()}} : StringData{});
 
@@ -209,7 +210,11 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
                             true,
                             result);
 
-        LOGV2_DEBUG(22741, 3, "initial sharding result : {result}", "result"_attr = result);
+        LOGV2_DEBUG(22741,
+                    3,
+                    "Initialized shard version for empty namespace: {result}",
+                    "Initialized shard version for empty namespace",
+                    "result"_attr = result);
 
         connectionShardStatus.setSequence(conn, "", 0);
         return ok;
@@ -229,7 +234,7 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
         static Occasionally sampler;
         if (sampler.tick()) {
             LOGV2_WARNING(22747,
-                          "failed to initialize new replica set connection version, will "
+                          "Failed to initialize new replica set connection version, will "
                           "initialize on first use");
         }
 
@@ -353,17 +358,20 @@ bool checkShardVersion(OperationContext* opCtx,
 
     LOGV2_DEBUG(22742,
                 1,
-                "setting shard version of {version} for {ns} on shard {shard}",
-                "version"_attr = version,
-                "ns"_attr = ns,
-                "shard"_attr = shard->toString());
+                "Setting shard version of {shardVersion} for {namespace} on shard {shardId}",
+                "Setting shard version",
+                "shardVersion"_attr = version,
+                "namespace"_attr = ns,
+                "shardId"_attr = shard->getId());
 
-    LOGV2_DEBUG(22743,
-                3,
-                "last version sent with chunk manager iteration {sequenceNumber}, current chunk "
-                "manager iteration is {officialSequenceNumber}",
-                "sequenceNumber"_attr = sequenceNumber,
-                "officialSequenceNumber"_attr = officialSequenceNumber);
+    LOGV2_DEBUG(
+        22743,
+        3,
+        "Last version sent with chunk manager iteration {prevSequenceNumber}, current chunk "
+        "manager iteration is {currSequenceNumber}",
+        "Chunk manager iteration changed",
+        "prevSequenceNumber"_attr = sequenceNumber,
+        "currSequenceNumber"_attr = officialSequenceNumber);
 
     BSONObj result;
     if (setShardVersion(opCtx,
@@ -374,7 +382,11 @@ bool checkShardVersion(OperationContext* opCtx,
                         manager.get(),
                         authoritative,
                         result)) {
-        LOGV2_DEBUG(22744, 1, "      setShardVersion success: {result}", "result"_attr = result);
+        LOGV2_DEBUG(22744,
+                    1,
+                    "setShardVersion succeeded: {result}",
+                    "setShardVersion succeeded",
+                    "result"_attr = result);
         connectionShardStatus.setSequence(conn, ns, officialSequenceNumber);
         return true;
     }
@@ -383,7 +395,11 @@ bool checkShardVersion(OperationContext* opCtx,
     int errCode = result["code"].numberInt();
     uassert(errCode, result["errmsg"].String(), errCode != ErrorCodes::NoShardingEnabled);
 
-    LOGV2_DEBUG(22745, 1, "       setShardVersion failed!\n{result}", "result"_attr = result);
+    LOGV2_DEBUG(22745,
+                1,
+                "setShardVersion failed: {error}",
+                "setShardVersion failed",
+                "error"_attr = result);
 
     if (result["need_authoritative"].trueValue())
         massert(10428, "need_authoritative set but in authoritative mode already", !authoritative);
@@ -401,8 +417,9 @@ bool checkShardVersion(OperationContext* opCtx,
     if (tryNumber < maxNumTries) {
         LOGV2_DEBUG(20162,
                     tryNumber < (maxNumTries / 2) ? 1 : 0,
-                    "going to retry checkShardVersion shard: {shard} {result}",
-                    "shard"_attr = shard->toString(),
+                    "Going to retry checkShardVersion shard: {shardId} {result}",
+                    "Going to retry checkShardVersion",
+                    "shardId"_attr = shard->getId(),
                     "result"_attr = result);
         sleepmillis(10 * tryNumber);
         // use the original connection and get a fresh versionable connection
@@ -411,10 +428,10 @@ bool checkShardVersion(OperationContext* opCtx,
         return true;
     }
 
-    string errmsg = str::stream() << "setShardVersion failed shard: " << shard->toString() << " "
-                                  << result;
-    LOGV2(22746, "     {errmsg}", "errmsg"_attr = errmsg);
-    massert(10429, errmsg, 0);
+    string error = str::stream() << "setShardVersion failed: " << shard->toString() << " "
+                                 << result;
+    LOGV2(22746, "{error}", "setShardVersion failed", "error"_attr = error);
+    massert(10429, error, 0);
     return true;
 }
 

@@ -93,7 +93,10 @@ private:
                     (opSepPos != (opToKill.size() - 1)));  // can't be NN:
 
         auto shardIdent = opToKill.substr(0, opSepPos);
-        LOGV2(22754, "want to kill op: {opToKill}", "opToKill"_attr = redact(opToKill));
+        LOGV2(22754,
+              "About to kill op: {opToKill}",
+              "About to kill op",
+              "opToKill"_attr = redact(opToKill));
 
         // Will throw if shard id is not found
         auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdent);
