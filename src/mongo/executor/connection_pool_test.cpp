@@ -105,7 +105,7 @@ protected:
     void dropConnectionsTest(std::shared_ptr<ConnectionPool> const& pool, Ptr t);
 
 private:
-    std::shared_ptr<OutOfLineExecutor> _executor = std::make_shared<InlineOutOfLineExecutor>();
+    std::shared_ptr<OutOfLineExecutor> _executor = InlineCountingExecutor::make();
     std::shared_ptr<ConnectionPool> _pool;
 };
 

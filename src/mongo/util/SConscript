@@ -591,6 +591,7 @@ icuEnv.CppUnitTest(
         'lru_cache_test.cpp',
         'md5_test.cpp',
         'md5main.cpp',
+        'out_of_line_executor_test.cpp',
         'periodic_runner_impl_test.cpp',
         'processinfo_test.cpp',
         'procparser_test.cpp' if env.TargetOSIs('linux') else [],

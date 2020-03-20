@@ -34,6 +34,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/executor_test_util.h"
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
@@ -48,33 +49,6 @@ enum DoExecutorFuture : bool {
     kNoExecutorFuture_needsTap = false,
     kNoExecutorFuture_needsPromiseSetFrom = false,
     kDoExecutorFuture = true,
-};
-
-class InlineCountingExecutor final : public OutOfLineExecutor {
-public:
-    void schedule(Task task) noexcept override {
-        // Relaxed to avoid adding synchronization where there otherwise wouldn't be. That would
-        // cause a false negative from TSAN.
-        tasksRun.fetch_add(1, std::memory_order_relaxed);
-        task(Status::OK());
-    }
-
-    static auto make() {
-        return std::make_shared<InlineCountingExecutor>();
-    }
-
-    std::atomic<int32_t> tasksRun{0};  // NOLINT
-};
-
-class RejectingExecutor final : public OutOfLineExecutor {
-public:
-    void schedule(Task task) noexcept override {
-        task(Status(ErrorCodes::ShutdownInProgress, ""));
-    }
-
-    static auto make() {
-        return std::make_shared<RejectingExecutor>();
-    }
 };
 
 class DummyInterruptable final : public Interruptible {
