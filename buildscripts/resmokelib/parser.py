@@ -113,6 +113,10 @@ def _make_parser():  # pylint: disable=too-many-statements
               " only tests which have at least one of the specified tags will be"
               " run."))
 
+    # Used for testing resmoke. Do not set this.
+    parser.add_option("--internalParam", action="append", dest="internal_params",
+                      help=optparse.SUPPRESS_HELP)
+
     parser.add_option("-n", action="store_const", const="tests", dest="dry_run",
                       help="Outputs the tests that would be run.")
 
@@ -662,6 +666,9 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storage_engine_cache_size_gb")
     _config.TAG_FILE = config.pop("tag_file")
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
+
+    # Internal testing options.
+    _config.INTERNAL_PARAMS = config.pop("internal_params")
 
     # Evergreen options.
     _config.EVERGREEN_BUILD_ID = config.pop("build_id")

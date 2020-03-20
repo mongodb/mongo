@@ -24,9 +24,10 @@ class MongoDFixture(interface.Fixture):
             preserve_dbpath=False):
         """Initialize MongoDFixture with different options for the mongod process."""
 
+        self.mongod_options = utils.default_if_none(mongod_options, {})
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
-        if "dbpath" in mongod_options and dbpath_prefix is not None:
+        if "dbpath" in self.mongod_options and dbpath_prefix is not None:
             raise ValueError("Cannot specify both mongod_options.dbpath and dbpath_prefix")
 
         # Default to command line options if the YAML configuration is not passed in.

@@ -97,6 +97,9 @@ DEFAULTS = {
     "num_replset_nodes": None,
     "num_shards": None,
 
+    # Internal testing options.
+    "internal_params": [],
+
     # Evergreen options.
     "build_id": None,
     "distro_id": None,
@@ -304,6 +307,10 @@ GENNY_EXECUTABLE = None
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
 INCLUDE_WITH_ANY_TAGS = None
+
+# Params that can be set to change internal resmoke behavior. Used to test resmoke and should
+# not be set by the user.
+INTERNAL_PARAMS = []
 
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None

@@ -1,6 +1,5 @@
 """Archival utility."""
 
-import queue
 import collections
 import json
 import math
@@ -10,6 +9,9 @@ import tarfile
 import tempfile
 import threading
 import time
+import queue
+
+from .. import config
 
 _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 
@@ -229,9 +231,26 @@ class Archival(object):  # pylint: disable=too-many-instance-attributes
         if isinstance(input_files, str):
             input_files = [input_files]
 
-        message = "Tar/gzip {} files: {}".format(display_name, input_files)
         status = 0
         size_mb = 0
+
+        if 'test_archival' in config.INTERNAL_PARAMS:
+            message = "'test_archival' specified. Skipping tar/gzip."
+            with open(os.path.join(config.DBPATH_PREFIX, "test_archival.txt"), "a") as test_file:
+                for input_file in input_files:
+                    # If a resmoke fixture is used, the input_file will be the source of the data
+                    # files. If mongorunner is used, input_file/mongorunner will be the source
+                    # of the data files.
+                    if os.path.isdir(os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)):
+                        input_file = os.path.join(input_file, config.MONGO_RUNNER_SUBDIR)
+
+                    # Each node contains one directory for its data files. Here we write out
+                    # the names of those directories. In the unit test for archival, we will
+                    # check that the directories are those we expect.
+                    test_file.write("\n".join(os.listdir(input_file)) + "\n")
+            return status, message, size_mb
+
+        message = "Tar/gzip {} files: {}".format(display_name, input_files)
 
         # Tar/gzip to a temporary file.
         _, temp_file = tempfile.mkstemp(suffix=".tgz")
