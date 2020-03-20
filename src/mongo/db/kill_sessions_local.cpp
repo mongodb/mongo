@@ -132,14 +132,14 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
             // was active and the session kill aborted it.  We still want to log
             // that as aborted due to transactionLifetimeLimitSessions.
             if (txnParticipant.transactionIsInProgress() || txnParticipant.transactionIsAborted()) {
-                LOGV2(20707,
-                      "Aborting transaction with txnNumber {txnParticipant_getActiveTxnNumber} on "
-                      "session {session_getSessionId_getId} because it has been running for longer "
-                      "than "
-                      "'transactionLifetimeLimitSeconds'",
-                      "txnParticipant_getActiveTxnNumber"_attr =
-                          txnParticipant.getActiveTxnNumber(),
-                      "session_getSessionId_getId"_attr = session.getSessionId().getId());
+                LOGV2(
+                    20707,
+                    "Aborting transaction with session id {sessionId} and txnNumber {txnNumber}  "
+                    "because it has been running for longer than 'transactionLifetimeLimitSeconds'",
+                    "Aborting transaction because it has been running for longer than "
+                    "'transactionLifetimeLimitSeconds'",
+                    "sessionId"_attr = session.getSessionId().getId(),
+                    "txnNumber"_attr = txnParticipant.getActiveTxnNumber());
                 if (txnParticipant.transactionIsInProgress()) {
                     txnParticipant.abortTransaction(opCtx);
                 }
@@ -192,34 +192,30 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // to yield their locks.
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(newOpCtx.get())});
-    killSessionsAction(
-        newOpCtx.get(),
-        matcherAllSessions,
-        [](const ObservableSession& session) {
-            return TransactionParticipant::get(session).transactionIsPrepared();
-        },
-        [](OperationContext* killerOpCtx, const SessionToKill& session) {
-            auto txnParticipant = TransactionParticipant::get(session);
-            // Yield locks for prepared transactions.
-            // When scanning and killing operations, all prepared transactions are
-            // included in the
-            // list. Even though new sessions may be created after the scan, none of
-            // them can become
-            // prepared during stepdown, since the RSTL has been enqueued, preventing
-            // any new
-            // writes.
-            if (txnParticipant.transactionIsPrepared()) {
-                LOGV2_DEBUG(
-                    20708,
-                    3,
-                    "Yielding locks of prepared transaction. SessionId: "
-                    "{session_getSessionId_getId} TxnNumber: {txnParticipant_getActiveTxnNumber}",
-                    "session_getSessionId_getId"_attr = session.getSessionId().getId(),
-                    "txnParticipant_getActiveTxnNumber"_attr = txnParticipant.getActiveTxnNumber());
-                txnParticipant.refreshLocksForPreparedTransaction(killerOpCtx, true);
-            }
-        },
-        ErrorCodes::InterruptedDueToReplStateChange);
+    killSessionsAction(newOpCtx.get(),
+                       matcherAllSessions,
+                       [](const ObservableSession& session) {
+                           return TransactionParticipant::get(session).transactionIsPrepared();
+                       },
+                       [](OperationContext* killerOpCtx, const SessionToKill& session) {
+                           auto txnParticipant = TransactionParticipant::get(session);
+                           // Yield locks for prepared transactions. When scanning and killing
+                           // operations, all prepared transactions are included in the list. Even
+                           // though new sessions may be created after the scan, none of them can
+                           // become prepared during stepdown, since the RSTL has been enqueued,
+                           // preventing any new writes.
+                           if (txnParticipant.transactionIsPrepared()) {
+                               LOGV2_DEBUG(20708,
+                                           3,
+                                           "Yielding locks of prepared transaction. SessionId: "
+                                           "{sessionId} TxnNumber: {txnNumber}",
+                                           "Yielding locks of prepared transaction",
+                                           "sessionId"_attr = session.getSessionId().getId(),
+                                           "txnNumber"_attr = txnParticipant.getActiveTxnNumber());
+                               txnParticipant.refreshLocksForPreparedTransaction(killerOpCtx, true);
+                           }
+                       },
+                       ErrorCodes::InterruptedDueToReplStateChange);
 }
 
 }  // namespace mongo
