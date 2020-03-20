@@ -93,18 +93,8 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     if (_rsConfig.getConfigTerm() != -1) {
         requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
     }
-    // TODO: Remove this check when we upgrade to 4.6 and can remove references to "lastCommittedOp"
-    // (SERVER-46090).
-    // Only append the config term field to the VoteRequester and use "lastAppliedOpTime" as the
-    // field name for _lastAppliedOpTime if we are in FCV 4.4.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
-    } else {
-        // If we are not in FCV 4.4, use "lastCommittedOp" as the field name instead.
-        _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
-    }
+
+    _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
