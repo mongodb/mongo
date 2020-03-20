@@ -32,6 +32,7 @@
 #include <set>
 
 #include "mongo/executor/connection_pool.h"
+#include "mongo/util/executor_test_util.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
@@ -135,35 +136,6 @@ private:
     static std::deque<ConnectionImpl*> _refreshQueue;
 
     static size_t _idCounter;
-};
-
-/**
- * An "OutOfLineExecutor" that actually runs on the same thread of execution
- */
-class InlineOutOfLineExecutor : public OutOfLineExecutor {
-public:
-    void schedule(Task task) override {
-        // Add the task to our queue
-        _taskQueue.emplace_back(std::move(task));
-
-        // Make sure we're not already inline executing
-        if (std::exchange(_inSchedule, true)) {
-            return;
-        }
-
-        // Clear out our queue
-        while (!_taskQueue.empty()) {
-            auto task = std::move(_taskQueue.front());
-            std::move(task)(Status::OK());
-            _taskQueue.pop_front();
-        }
-
-        // Admit we're not working on the queue anymore
-        _inSchedule = false;
-    }
-
-    bool _inSchedule;
-    std::deque<Task> _taskQueue;
 };
 
 /**

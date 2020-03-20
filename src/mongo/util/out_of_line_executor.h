@@ -35,6 +35,50 @@
 namespace mongo {
 
 /**
+ * RunOnceGuard promises that it its run() function is invoked exactly once.
+ *
+ * When a RunOnceGuard is constructed, it marks itself as armed. When a RunOnceGuard is moved from,
+ * it is marked as done. When the RunOnceGuard is destructed, it invariants that it is finished.
+ *
+ * The RunOnceGuard is intended to provide an unsynchronized way to validate that a unit of work was
+ * actually consumed. It can be bound into lambdas or be constructed as a default member of
+ * parameter objects in work queues or maps.
+ */
+class RunOnceGuard {
+    enum class State {
+        kDone,
+        kArmed,
+    };
+
+public:
+    static constexpr const char kRanNeverStr[] = "Function never ran";
+    static constexpr const char kRanTwiceStr[] = "Function ran a second time";
+
+    constexpr RunOnceGuard() : _state{State::kArmed} {}
+    ~RunOnceGuard() {
+        invariant(_state == State::kDone, kRanNeverStr);
+    }
+
+    RunOnceGuard(RunOnceGuard&& other) : _state{std::exchange(other._state, State::kDone)} {}
+    RunOnceGuard& operator=(RunOnceGuard&& other) noexcept {
+        invariant(_state == State::kDone, kRanNeverStr);
+        _state = std::exchange(other._state, State::kDone);
+        return *this;
+    }
+
+    RunOnceGuard(const RunOnceGuard&) = delete;
+    RunOnceGuard& operator=(const RunOnceGuard&) = delete;
+
+    void run() noexcept {
+        invariant(_state == State::kArmed, kRanTwiceStr);
+        _state = State::kDone;
+    }
+
+private:
+    State _state;
+};
+
+/**
  * Provides the minimal api for a simple out of line executor that can run non-cancellable
  * callbacks.
  *
@@ -52,6 +96,9 @@ namespace mongo {
 class OutOfLineExecutor {
 public:
     using Task = unique_function<void(Status)>;
+
+    static constexpr const char kRejectedWorkStr[] = "OutOfLineExecutor rejected work";
+    static constexpr const char kNoExecutorStr[] = "Invalid OutOfLineExecutor provided";
 
 public:
     /**
@@ -74,5 +121,109 @@ public:
 };
 
 using ExecutorPtr = std::shared_ptr<OutOfLineExecutor>;
+
+/**
+ * A GuaranteedExecutor is a wrapper that ensures its Tasks run exactly once.
+ *
+ * If a Task cannot be run, would be destructed without being run, or would run multiple times, it
+ * will trigger an invariant.
+ */
+class GuaranteedExecutor final : public OutOfLineExecutor {
+public:
+    explicit GuaranteedExecutor(ExecutorPtr exec) : _exec(std::move(exec)) {
+        invariant(_exec, kNoExecutorStr);
+    }
+
+    virtual ~GuaranteedExecutor() = default;
+
+    /**
+     * Return a wrapped task that is enforced to run once and only once.
+     */
+    static auto enforceRunOnce(Task&& task) noexcept {
+        return Task([task = std::move(task), guard = RunOnceGuard()](Status status) mutable {
+            invariant(status, kRejectedWorkStr);
+            guard.run();
+
+            auto localTask = std::exchange(task, {});
+            localTask(std::move(status));
+        });
+    }
+
+    void schedule(Task func) override {
+        // Make sure that the function will be called eventually, once.
+        auto sureFunc = enforceRunOnce(std::move(func));
+        _exec->schedule(std::move(sureFunc));
+    }
+
+private:
+    ExecutorPtr _exec;
+};
+
+/**
+ * A GuaranteedExecutorWithFallback is a wrapper that allows a preferred Executor to pass tasks to a
+ * fallback.
+ *
+ * The GuaranteedExecutorWithFallback uses its _fallback executor when _preferred invokes a Task
+ * with a not-okay Status. The _fallback executor is a GuaranteedExecutor wrapper, and thus must run
+ * Tasks under threat of invariant.
+ */
+class GuaranteedExecutorWithFallback final : public OutOfLineExecutor {
+public:
+    explicit GuaranteedExecutorWithFallback(ExecutorPtr preferred, ExecutorPtr fallback)
+        : _preferred(std::move(preferred)), _fallback(std::move(fallback)) {
+        invariant(_preferred, kNoExecutorStr);
+        // Fallback invariants via GuaranteedExecutor's constructor.
+    }
+
+    virtual ~GuaranteedExecutorWithFallback() = default;
+
+    void schedule(Task func) override {
+        _preferred->schedule([func = std::move(func), fallback = _fallback](Status status) mutable {
+            if (!status.isOK()) {
+                // This executor has rejected work, send it to the fallback.
+                fallback.schedule(std::move(func));
+                return;
+            }
+
+            // This executor has accepted work.
+            func(std::move(status));
+        });
+    }
+
+private:
+    ExecutorPtr _preferred;
+    GuaranteedExecutor _fallback;
+};
+
+/**
+ * Make a GuaranteedExecutor without a fallback.
+ *
+ * If exec is invalid, this function will invariant.
+ */
+inline ExecutorPtr makeGuaranteedExecutor(ExecutorPtr exec) noexcept {
+    // Note that each GuaranteedExecutor ctor invariants that the pointer is valid.
+    return std::make_shared<GuaranteedExecutor>(std::move(exec));
+}
+
+/**
+ * Make either a GuaranteedExecutor or a GuaranteedExecutorWithFallback.
+ *
+ * If preferred is invalid and fallback is valid, this creates a GuaranteedExecutor from fallback.
+ * If fallback is invalid and preferred is valid, this creates a GuaranteedExecutor from preferred.
+ * If both preferred and fallback are invalid, this function will invariant.
+ */
+inline ExecutorPtr makeGuaranteedExecutor(ExecutorPtr preferred, ExecutorPtr fallback) noexcept {
+    // Note that each GuaranteedExecutor ctor invariants that the pointer is valid.
+    if (!preferred) {
+        return makeGuaranteedExecutor(std::move(fallback));
+    }
+
+    if (!fallback) {
+        return makeGuaranteedExecutor(std::move(preferred));
+    }
+
+    return std::make_shared<GuaranteedExecutorWithFallback>(std::move(preferred),
+                                                            std::move(fallback));
+}
 
 }  // namespace mongo
