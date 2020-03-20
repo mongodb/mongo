@@ -185,8 +185,13 @@ private:
 class ShellBackend final : public boost::log::sinks::text_ostream_backend {
 public:
     void consume(boost::log::record_view const& rec, string_type const& formatted_message) {
+        using boost::log::extract;
+
         auto lk = stdx::lock_guard(ShellConsoleAppender::mx);
-        if (!ShellConsoleAppender::loggingEnabled)
+        if (!ShellConsoleAppender::loggingEnabled &&
+            !extract<logv2::LogTag>(logv2::attributes::tags(), rec)
+                 .get()
+                 .has(logv2::LogTag::kAllowDuringPromptingShell))
             return;
         boost::log::sinks::text_ostream_backend::consume(rec, formatted_message);
     }
