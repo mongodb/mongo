@@ -10,8 +10,6 @@ selector:
   exclude_files:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
-  # Disable until the new RSM is compatible as per SERVER-46452. TODO SERVER-46454.
-  - jstests/noPassthrough/predictive_connpool.js
   # Multiversion backup-restore tests must run in the multiversion suite.
   - src/mongo/db/modules/*/jstests/hot_backups/*last_stable*.js
 

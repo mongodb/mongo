@@ -133,6 +133,14 @@ private:
     };
     using HostQueryPtr = std::shared_ptr<HostQuery>;
 
+    // Information collected from the primary ServerDescription to be published via the
+    // ReplicaSetChangeNotifier
+    struct ChangeNotifierState {
+        HostAndPort primaryAddress;
+        std::set<HostAndPort> passives;
+        ConnectionString connectionString;
+    };
+
     SemiFuture<std::vector<HostAndPort>> _enqueueOutstandingQuery(
         WithLock, const ReadPreferenceSetting& criteria, const Date_t& deadline);
 
@@ -180,6 +188,7 @@ private:
     void _failOutstandingWithStatus(WithLock, Status status);
     bool _hasMembershipChange(sdam::TopologyDescriptionPtr oldDescription,
                               sdam::TopologyDescriptionPtr newDescription);
+    void _setConfirmedNotifierState(WithLock, const ServerDescriptionPtr& primaryDescription);
 
     Status _makeUnsatisfiedReadPrefError(const ReadPreferenceSetting& criteria) const;
     Status _makeReplicaSetMonitorRemovedError() const;
@@ -205,6 +214,7 @@ private:
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetMonitor");
     std::vector<HostQueryPtr> _outstandingQueries;
+    boost::optional<ChangeNotifierState> _confirmedNotifierState;
     mutable PseudoRandom _random;
 
     static inline const auto kServerSelectionConfig =
