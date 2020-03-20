@@ -98,8 +98,10 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
             if (!autoColl.getCollection()) {
                 LOGV2(4416000,
                       "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                      "{namespace} does not exist",
+                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                       "collection does not exist",
-                      "ns_ns"_attr = ns.ns());
+                      "namespace"_attr = ns.ns());
                 return CleanupResult::kDone;
             }
             collectionUuid.emplace(autoColl.getCollection()->uuid());
@@ -109,8 +111,10 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
             if (!collDesc.isSharded()) {
                 LOGV2(4416001,
                       "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                      "{namespace} is not sharded",
+                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                       "collection is not sharded",
-                      "ns_ns"_attr = ns.ns());
+                      "namespace"_attr = ns.ns());
                 return CleanupResult::kDone;
             }
             range.emplace(collDesc.getMinKey(), collDesc.getMaxKey());
@@ -120,12 +124,13 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
             // cleanupOrphaned logic did if 'startingFromKey' is present.
             BSONObj keyPattern = collDesc.getKeyPattern();
             if (!startingFromKeyConst.isEmpty() && !collDesc.isValidKey(startingFromKeyConst)) {
-                *errMsg = str::stream()
-                    << "could not cleanup orphaned data, start key " << startingFromKeyConst
-                    << " does not match shard key pattern " << keyPattern;
-
-                LOGV2(4416002, "{errMsg}", "errMsg"_attr = *errMsg);
-                return CleanupResult::kError;
+                LOGV2_ERROR_OPTIONS(
+                    4416002,
+                    {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
+                    "Could not cleanup orphaned data because start key does not match shard key "
+                    "pattern",
+                    "startKey"_attr = startingFromKeyConst,
+                    "shardKeyPattern"_attr = keyPattern);
             }
         }
 
@@ -140,7 +145,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                    migrationutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
             LOGV2(4416003,
                   "cleanupOrphaned going to wait for range deletion tasks to complete",
-                  "nss"_attr = ns.ns(),
+                  "namespace"_attr = ns.ns(),
                   "collectionUUID"_attr = *collectionUuid,
                   "numRemainingDeletionTasks"_attr = numRemainingDeletionTasks);
 
@@ -170,19 +175,22 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                 LOGV2(21911,
                       "cleanupOrphaned skipping orphaned data cleanup because collection is not "
                       "sharded",
-                      "ns_ns"_attr = ns.ns());
+                      "namespace"_attr = ns.ns());
                 return CleanupResult::kDone;
             }
 
             BSONObj keyPattern = collDesc.getKeyPattern();
             if (!startingFromKey.isEmpty()) {
                 if (!collDesc.isValidKey(startingFromKey)) {
-                    *errMsg = str::stream()
-                        << "could not cleanup orphaned data, start key " << startingFromKey
-                        << " does not match shard key pattern " << keyPattern;
-
-                    LOGV2(21912, "{errMsg}", "errMsg"_attr = *errMsg);
-                    return CleanupResult::kError;
+                    LOGV2_ERROR_OPTIONS(
+                        21912,
+                        {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
+                        "Could not cleanup orphaned data, start key {startKey} does not match "
+                        "shard key pattern {shardKeyPattern}",
+                        "Could not cleanup orphaned data because start key does not match shard "
+                        "key pattern",
+                        "startKey"_attr = startingFromKey,
+                        "shardKeyPattern"_attr = keyPattern);
                 }
             } else {
                 startingFromKey = collDesc.getMinKey();
@@ -193,7 +201,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                 LOGV2_DEBUG(21913,
                             1,
                             "cleanupOrphaned returning because no orphan ranges remain",
-                            "ns"_attr = ns.toString(),
+                            "namespace"_attr = ns.toString(),
                             "startingFromKey"_attr = redact(startingFromKey));
 
                 return CleanupResult::kDone;
@@ -208,26 +216,30 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         // Sleep waiting for our own deletion. We don't actually care about any others, so there is
         // no need to call css::waitForClean() here.
 
-        LOGV2_DEBUG(
-            21914,
-            1,
-            "cleanupOrphaned requested for {ns} starting from {startingFromKey}, removing next "
-            "orphan range {targetRange}; waiting...",
-            "ns"_attr = ns.toString(),
-            "startingFromKey"_attr = redact(startingFromKey),
-            "targetRange"_attr = redact(targetRange->toString()));
+        LOGV2_DEBUG(21914,
+                    1,
+                    "cleanupOrphaned requested for {namespace} starting from {startingFromKey}, "
+                    "removing next orphan range {targetRange}; waiting...",
+                    "cleanupOrphaned requested",
+                    "namespace"_attr = ns.toString(),
+                    "startingFromKey"_attr = redact(startingFromKey),
+                    "targetRange"_attr = redact(targetRange->toString()));
 
         Status result = cleanupCompleteFuture.getNoThrow(opCtx);
 
         LOGV2_DEBUG(21915,
                     1,
-                    "Finished waiting for last {ns} orphan range cleanup",
-                    "ns"_attr = ns.toString());
+                    "Finished waiting for last {namespace} orphan range cleanup",
+                    "Finished waiting for last orphan range cleanup in collection",
+                    "namespace"_attr = ns.toString());
 
         if (!result.isOK()) {
-            LOGV2(21916, "{result_reason}", "result_reason"_attr = redact(result.reason()));
-            *errMsg = result.reason();
-            return CleanupResult::kError;
+            LOGV2_ERROR_OPTIONS(21916,
+                                {logv2::UserAssertAfterLog(result.code())},
+                                "Error waiting for last {namespace} orphan range cleanup: {error}",
+                                "Error waiting for last orphan range cleanup in collection",
+                                "namespace"_attr = ns.ns(),
+                                "error"_attr = redact(result.reason()));
         }
 
         return CleanupResult::kContinue;

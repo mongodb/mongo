@@ -219,11 +219,10 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
             continue;
         } else if (!candidatesStatus.isOK()) {
             LOGV2_WARNING(21852,
-                          "Unable to enforce tag range policy for collection "
-                          "{nss_ns}{causedBy_candidatesStatus_getStatus}",
-                          "nss_ns"_attr = nss.ns(),
-                          "causedBy_candidatesStatus_getStatus"_attr =
-                              causedBy(candidatesStatus.getStatus()));
+                          "Unable to enforce tag range policy for collection {namespace}: {error}",
+                          "Unable to enforce tag range policy for collection",
+                          "namespace"_attr = nss.ns(),
+                          "error"_attr = candidatesStatus.getStatus());
             continue;
         }
 
@@ -286,8 +285,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         const NamespaceString nss(coll.getNs());
 
         if (!coll.getAllowBalance()) {
-            LOGV2_DEBUG(
-                21851, 1, "Not balancing collection {nss}; explicitly disabled.", "nss"_attr = nss);
+            LOGV2_DEBUG(21851,
+                        1,
+                        "Not balancing collection {namespace}; explicitly disabled.",
+                        "Not balancing explicitly disabled collection",
+                        "namespace"_attr = nss);
             continue;
         }
 
@@ -297,12 +299,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
         } else if (!candidatesStatus.isOK()) {
-            LOGV2_WARNING(
-                21853,
-                "Unable to balance collection {nss_ns}{causedBy_candidatesStatus_getStatus}",
-                "nss_ns"_attr = nss.ns(),
-                "causedBy_candidatesStatus_getStatus"_attr =
-                    causedBy(candidatesStatus.getStatus()));
+            LOGV2_WARNING(21853,
+                          "Unable to balance collection {namespace}: {error}",
+                          "Unable to balance collection",
+                          "namespace"_attr = nss.ns(),
+                          "error"_attr = candidatesStatus.getStatus());
             continue;
         }
 

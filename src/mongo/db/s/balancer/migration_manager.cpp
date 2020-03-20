@@ -236,10 +236,9 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
     if (!statusWithMigrationsQueryResponse.isOK()) {
         LOGV2(21896,
               "Unable to read config.migrations collection documents for balancer migration "
-              "recovery. Abandoning balancer "
-              "recovery.{causedBy_statusWithMigrationsQueryResponse_getStatus}",
-              "causedBy_statusWithMigrationsQueryResponse_getStatus"_attr =
-                  causedBy(redact(statusWithMigrationsQueryResponse.getStatus())));
+              "recovery. Abandoning balancer recovery: {error}",
+              "Unable to read config.migrations documents for balancer migration recovery",
+              "error"_attr = redact(statusWithMigrationsQueryResponse.getStatus()));
         return;
     }
 
@@ -250,12 +249,11 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             // this migration, but without parsing the migration document we cannot identify which
             // distlock must be released. So we must release all distlocks.
             LOGV2(21897,
-                  "Unable to parse config.migrations document '{migration}' for balancer migration "
-                  "recovery. Abandoning balancer "
-                  "recovery.{causedBy_statusWithMigrationType_getStatus}",
+                  "Unable to parse config.migrations document '{migration}' for balancer"
+                  "migration recovery. Abandoning balancer recovery: {error}",
+                  "Unable to parse config.migrations document for balancer migration recovery",
                   "migration"_attr = redact(migration.toString()),
-                  "causedBy_statusWithMigrationType_getStatus"_attr =
-                      causedBy(redact(statusWithMigrationType.getStatus())));
+                  "error"_attr = redact(statusWithMigrationType.getStatus()));
             return;
         }
         MigrationType migrateType = std::move(statusWithMigrationType.getValue());
@@ -273,12 +271,13 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
                 opCtx, migrateType.getNss().ns(), whyMessage, _lockSessionID);
             if (!statusWithDistLockHandle.isOK()) {
                 LOGV2(21898,
-                      "Failed to acquire distributed lock for collection '{migrateType_getNss_ns}' "
+                      "Failed to acquire distributed lock for collection {namespace} "
                       "during balancer recovery of an active migration. Abandoning balancer "
-                      "recovery.{causedBy_statusWithDistLockHandle_getStatus}",
-                      "migrateType_getNss_ns"_attr = migrateType.getNss().ns(),
-                      "causedBy_statusWithDistLockHandle_getStatus"_attr =
-                          causedBy(redact(statusWithDistLockHandle.getStatus())));
+                      "recovery: {error}",
+                      "Failed to acquire distributed lock for collection "
+                      "during balancer recovery of an active migration",
+                      "namespace"_attr = migrateType.getNss().ns(),
+                      "error"_attr = redact(statusWithDistLockHandle.getStatus()));
                 return;
             }
         }
@@ -330,11 +329,11 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
             LOGV2(21899,
-                  "Unable to reload chunk metadata for collection '{nss}' during balancer "
-                  "recovery. Abandoning recovery.{causedBy_routingInfoStatus_getStatus}",
-                  "nss"_attr = nss,
-                  "causedBy_routingInfoStatus_getStatus"_attr =
-                      causedBy(redact(routingInfoStatus.getStatus())));
+                  "Unable to reload chunk metadata for collection {namespace} during balancer "
+                  "recovery. Abandoning recovery: {error}",
+                  "Unable to reload chunk metadata for collection during balancer recovery",
+                  "namespace"_attr = nss,
+                  "error"_attr = redact(routingInfoStatus.getStatus()));
             return;
         }
 
