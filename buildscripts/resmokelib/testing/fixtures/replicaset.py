@@ -299,7 +299,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self._await_primary()
         self._await_secondaries()
         self._await_stable_recovery_timestamp()
-        self._setup_sessions_collection()
         self._setup_cwrwc_defaults()
 
     def _await_primary(self):
@@ -400,11 +399,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                         node.port, last_stable_recovery_timestamp)
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
-
-    def _setup_sessions_collection(self):
-        """Set up the sessions collection so that it will not attempt to set up during a test."""
-        primary = self.nodes[0]
-        primary.mongo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
 
     def _setup_cwrwc_defaults(self):
         """Set up the cluster-wide read/write concern defaults."""
