@@ -69,10 +69,10 @@ ScopedMigrationRequest::~ScopedMigrationRequest() {
 
     if (!result.isOK()) {
         LOGV2(21900,
-              "Failed to remove config.migrations document for migration "
-              "'{migrationDocumentIdentifier}'{causedBy_result}",
-              "migrationDocumentIdentifier"_attr = migrationDocumentIdentifier.toString(),
-              "causedBy_result"_attr = causedBy(redact(result)));
+              "Failed to remove config.migrations document for migration '{migration}': {error}",
+              "Failed to remove config.migrations document for migration",
+              "migration"_attr = migrationDocumentIdentifier.toString(),
+              "error"_attr = redact(result));
     }
 }
 
@@ -144,13 +144,16 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             MigrateInfo activeMigrateInfo = statusWithActiveMigration.getValue().toMigrateInfo();
             if (activeMigrateInfo.to != migrateInfo.to ||
                 activeMigrateInfo.from != migrateInfo.from) {
-                LOGV2(21901,
-                      "Failed to write document '{migrateInfo}' to config.migrations because there "
-                      "is already an active migration for that chunk: "
-                      "'{activeMigrateInfo}'.{causedBy_result}",
-                      "migrateInfo"_attr = redact(migrateInfo.toString()),
-                      "activeMigrateInfo"_attr = redact(activeMigrateInfo.toString()),
-                      "causedBy_result"_attr = causedBy(redact(result)));
+                LOGV2(
+                    21901,
+                    "Failed to write document '{newMigration}' to config.migrations because there "
+                    "is already an active migration for that chunk: "
+                    "'{activeMigration}': {error}",
+                    "Failed to write document to config.migrations because there "
+                    "is already an active migration for that chunk",
+                    "newMigration"_attr = redact(migrateInfo.toString()),
+                    "activeMigration"_attr = redact(activeMigrateInfo.toString()),
+                    "error"_attr = redact(result));
                 return result;
             }
 
@@ -203,9 +206,10 @@ void ScopedMigrationRequest::keepDocumentOnDestruct() {
     _opCtx = nullptr;
     LOGV2_DEBUG(21902,
                 1,
-                "Keeping config.migrations document with namespace '{nss}' and minKey '{minKey}' "
-                "for balancer recovery",
-                "nss"_attr = _nss,
+                "Keeping config.migrations document with namespace {namespace} and minKey "
+                "{minKey} for balancer recovery",
+                "Keeping config.migrations document for balancer recovery",
+                "namespace"_attr = _nss,
                 "minKey"_attr = _minKey);
 }
 

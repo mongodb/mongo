@@ -130,9 +130,10 @@ public:
 
         if (!addShardResult.isOK()) {
             LOGV2(21920,
-                  "addShard request '{parsedRequest}'failed{causedBy_addShardResult_getStatus}",
-                  "parsedRequest"_attr = parsedRequest,
-                  "causedBy_addShardResult_getStatus"_attr = causedBy(addShardResult.getStatus()));
+                  "addShard request '{request}' failed: {error}",
+                  "addShard request failed",
+                  "request"_attr = parsedRequest,
+                  "error"_attr = addShardResult.getStatus());
             uassertStatusOK(addShardResult.getStatus());
         }
 
