@@ -39,8 +39,7 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 struct LogManager::Impl {
     Impl() {}
@@ -99,5 +98,4 @@ LogComponentSettings& LogManager::getGlobalSettings() {
     return getGlobalDomainInternal().settings();
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

@@ -31,8 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 BSONArray LogTag::toBSONArray() {
     BSONArrayBuilder builder;
@@ -45,5 +44,5 @@ BSONArray LogTag::toBSONArray() {
 
     return builder.arr();
 }
-}  // namespace logv2
-}  // namespace mongo
+
+}  // namespace mongo::logv2

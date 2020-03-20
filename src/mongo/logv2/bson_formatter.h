@@ -35,8 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 class BSONFormatter {
 public:
@@ -47,5 +46,4 @@ public:
     BSONObj operator()(boost::log::record_view const& rec) const;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

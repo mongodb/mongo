@@ -36,8 +36,7 @@
 #include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 using std::string;
 
@@ -208,5 +207,4 @@ MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
     return Status::OK();
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

@@ -34,8 +34,7 @@
 #include <memory>
 #include <string>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 class LogDomain;
 class LogDomainGlobal;
@@ -76,5 +75,4 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

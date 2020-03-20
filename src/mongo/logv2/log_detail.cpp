@@ -38,9 +38,7 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_source.h"
 
-namespace mongo {
-namespace logv2 {
-namespace detail {
+namespace mongo::logv2::detail {
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
@@ -71,6 +69,4 @@ void doLogImpl(int32_t id,
     }
 }
 
-}  // namespace detail
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2::detail

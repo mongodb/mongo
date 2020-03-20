@@ -33,8 +33,7 @@
 
 #include <iostream>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 namespace {
 
@@ -97,5 +96,4 @@ std::ostream& operator<<(std::ostream& os, LogSeverity severity) {
     return os << severity.toStringData();
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

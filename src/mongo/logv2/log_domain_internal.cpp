@@ -29,8 +29,8 @@
 
 #include "log_domain_internal.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
+
 LogDomain::Internal::~Internal() = default;
-}  // namespace logv2
-}  // namespace mongo
+
+}  // namespace mongo::logv2

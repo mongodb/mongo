@@ -37,8 +37,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 /**
  * Variable-capacity circular log of line-oriented messages.
@@ -181,5 +180,4 @@ private:
     size_t _nextLineIndex;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

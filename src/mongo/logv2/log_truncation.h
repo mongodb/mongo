@@ -29,10 +29,8 @@
 
 #pragma once
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 enum class LogTruncation { Enabled, Disabled };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

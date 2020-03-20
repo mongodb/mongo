@@ -38,8 +38,7 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_severity.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 // Boost::log filter that enables logging if Component+Severity match current settings
 class ComponentSettingsFilter : public DomainFilter<ComponentSettingsFilter> {
@@ -59,5 +58,4 @@ private:
     const LogComponentSettings& _settings;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

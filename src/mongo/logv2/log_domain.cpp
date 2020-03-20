@@ -28,13 +28,16 @@
  */
 
 #include "mongo/logv2/log_domain.h"
+
+#include <memory>
+#include <utility>
+
 #include "mongo/logv2/log_domain_internal.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
+
 LogDomain::LogDomain(std::unique_ptr<LogDomain::Internal> internalDomain)
     : _internal(std::move(internalDomain)) {}
 LogDomain::~LogDomain() = default;
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

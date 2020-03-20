@@ -33,8 +33,7 @@
 
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 LogComponentSettings::LogComponentSettings() {
     _minimumLoggedSeverity[LogComponent::kDefault].store(LogSeverity::Log().toInt());
@@ -117,5 +116,4 @@ bool LogComponentSettings::shouldLog(LogComponent component, LogSeverity severit
     return severity >= LogSeverity::cast(_minimumLoggedSeverity[component].loadRelaxed());
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

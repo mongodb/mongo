@@ -34,8 +34,8 @@
 #include <cstdint>
 #include <string>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
+
 class LogTag {
 public:
     enum Value {
@@ -80,5 +80,4 @@ private:
     uint64_t _value;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

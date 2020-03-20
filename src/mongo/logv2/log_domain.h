@@ -33,8 +33,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 class LogComponentSettings;
 
 // Log domain class, implemented with the pimpl idiom to not leak out boost::log types
@@ -56,5 +55,4 @@ private:
     std::unique_ptr<Internal> _internal;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

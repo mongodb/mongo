@@ -35,8 +35,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 namespace {
 
@@ -256,5 +255,4 @@ std::ostream& operator<<(std::ostream& os, LogComponent component) {
     return os << component.getNameForLog();
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

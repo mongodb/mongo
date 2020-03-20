@@ -35,8 +35,7 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 class LogTestV2 : public unittest::Test {
 
@@ -66,5 +65,4 @@ private:
     std::vector<boost::shared_ptr<boost::log::sinks::sink>> _attachedSinks;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

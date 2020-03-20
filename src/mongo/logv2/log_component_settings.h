@@ -34,8 +34,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 /**
  * Contains log severities for a list of log components.
@@ -102,5 +101,4 @@ private:
     AtomicWord<int> _minimumLoggedSeverity[LogComponent::kNumLogComponents];
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

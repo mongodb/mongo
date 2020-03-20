@@ -37,8 +37,7 @@
 #include <boost/log/sinks/frontend_requirements.hpp>
 #include <tuple>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 template <typename... Backend>
 class CompositeBackend
@@ -159,5 +158,4 @@ private:
     std::tuple<BackendTraits<Backend>...> _backendTraits;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

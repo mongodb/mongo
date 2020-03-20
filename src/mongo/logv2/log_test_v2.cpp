@@ -65,8 +65,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 namespace {
 
 struct TypeWithoutBSON {
@@ -1640,5 +1639,4 @@ TEST_F(LogTestV2, UserAssert) {
 }
 
 }  // namespace
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

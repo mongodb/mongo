@@ -45,8 +45,7 @@
 
 #include <fmt/format.h>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 namespace {
 struct BSONValueExtractor {
@@ -154,5 +153,4 @@ BSONObj BSONFormatter::operator()(boost::log::record_view const& rec) const {
     return builder.obj();
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

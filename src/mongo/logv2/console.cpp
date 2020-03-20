@@ -40,8 +40,7 @@
 #include <io.h>
 #endif
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 namespace {
 
 #if defined(_WIN32)
@@ -263,5 +262,4 @@ std::ostream& Console::out() {
     return std::cout;
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

@@ -34,8 +34,7 @@
 
 #include "mongo/logv2/ramlog.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 class RamLogSink : public boost::log::sinks::
                        basic_formatted_sink_backend<char, boost::log::sinks::concurrent_feeding> {
@@ -63,5 +62,4 @@ private:
     RamLog* _ramlog;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

@@ -39,8 +39,7 @@
 #include <functional>
 #include <string_view>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 class TypeErasedAttributeStorage;
 
@@ -735,5 +734,4 @@ auto mapLog(It begin, It end) {
     return detail::AssociativeContainerLogger(begin, end);
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

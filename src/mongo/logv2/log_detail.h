@@ -39,8 +39,7 @@
 #include "mongo/util/errno_util.h"
 
 namespace mongo {
-namespace logv2 {
-namespace detail {
+namespace logv2::detail {
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
@@ -81,8 +80,7 @@ void doLog(int32_t id,
     doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), dynamicAttrs);
 }
 
-}  // namespace detail
-}  // namespace logv2
+}  // namespace logv2::detail
 
 inline namespace literals {
 inline fmt::internal::udl_arg<char> operator"" _attr(const char* s, std::size_t) {

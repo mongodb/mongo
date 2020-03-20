@@ -33,8 +33,7 @@
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_format.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 class LogDomainGlobal : public LogDomain::Internal {
 public:
     struct ConfigurationOptions {
@@ -71,5 +70,4 @@ private:
     struct Impl;
     std::unique_ptr<Impl> _impl;
 };
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

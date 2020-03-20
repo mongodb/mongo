@@ -33,8 +33,7 @@
 
 #include "mongo/platform/mutex.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 /**
  * Representation of the console.  Use this in place of cout/cin, in applications that write to
@@ -57,5 +56,4 @@ public:
     static std::ostream& out();
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

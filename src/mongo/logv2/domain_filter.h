@@ -35,8 +35,7 @@
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_domain.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 // Boost::log filter that enables logging if domain match. Using CRTP, users should inherit from
 // this and provide the concrete type as the template argument to this class.
@@ -66,5 +65,4 @@ public:
     }
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

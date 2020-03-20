@@ -34,8 +34,7 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 /**
  * Representation of the severity / priority of a log message.
@@ -199,5 +198,4 @@ bool LogSeverity::operator>=(LogSeverity other) const {
     return _severity <= other._severity;
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

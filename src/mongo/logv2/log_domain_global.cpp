@@ -47,8 +47,7 @@
 #include <boost/log/core.hpp>
 #include <boost/log/sinks.hpp>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 void LogDomainGlobal::ConfigurationOptions::makeDisabled() {
     consoleEnabled = false;
@@ -286,5 +285,4 @@ LogComponentSettings& LogDomainGlobal::settings() {
     return _impl->_settings;
 }
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2

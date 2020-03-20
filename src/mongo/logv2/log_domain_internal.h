@@ -33,8 +33,8 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_source.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
+
 class LogDomain::Internal {
 public:
     Internal() = default;
@@ -43,5 +43,4 @@ public:
     virtual LogSource& source() = 0;
 };
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2
