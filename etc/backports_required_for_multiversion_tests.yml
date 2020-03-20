@@ -59,6 +59,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/initial_sync_ambiguous_index.js
 - ticket: SERVER-45143
   test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
+- ticket: SERVER-44500
+  test_file: jstests/replsets/apply_ops_inserts_do_not_include_fromMigrate_field.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
