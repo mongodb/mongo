@@ -253,12 +253,6 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
-
-            // Eventually, we will obtain the timestamp for completing the index build from the
-            // commitIndexBuild oplog entry.
-            // The current logic for timestamping index completion is consistent with the
-            // IndexBuilder. See SERVER-38986 and SERVER-34896.
-            IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss);
             wunit.commit();
 
             // Required call to clean up even though commit cleaned everything up.
