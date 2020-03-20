@@ -33,6 +33,7 @@
 
 #include "mongo/util/producer_consumer_queue.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"

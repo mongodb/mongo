@@ -34,7 +34,6 @@
 #include <list>
 #include <numeric>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
