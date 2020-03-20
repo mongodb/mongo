@@ -45,14 +45,17 @@
 namespace mongo {
 
 template <typename F>
-bool waitForIntVal(F&& f, int expectedValue) {
+bool waitForCondition(F&& f) {
     // Wait up to 10 seconds.
-    for (auto i = 0; i < 100; i++) {
-        int val = f();
-        if (expectedValue == val) {
+    bool val = false;
+    int i = 0;
+    while (!val && i < 100) {
+        val = f();
+        if (val) {
             return true;
         }
         sleepmillis(100);
+        i++;
     }
     return false;
 }
@@ -705,14 +708,12 @@ TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
-    ASSERT(waitForIntVal(
-        [&] {
-            auto serverStatusCmd = BSON("serverStatus" << 1);
-            BSONObj serverStatusReply;
-            ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt();
-        },
-        0));
+    ASSERT(waitForCondition([&] {
+        auto serverStatusCmd = BSON("serverStatus" << 1);
+        BSONObj serverStatusReply;
+        ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
+    }));
 
     // Issue an isMaster command without a topology version.
     auto isMasterCmd = BSON("isMaster" << 1);
@@ -766,14 +767,12 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
-    ASSERT(waitForIntVal(
-        [&] {
-            auto serverStatusCmd = BSON("serverStatus" << 1);
-            BSONObj serverStatusReply;
-            ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt();
-        },
-        0));
+    ASSERT(waitForCondition([&] {
+        auto serverStatusCmd = BSON("serverStatus" << 1);
+        BSONObj serverStatusReply;
+        ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
+    }));
 
     // Issue an isMaster command without a topology version.
     auto isMasterCmd = BSON("isMaster" << 1);
@@ -819,17 +818,13 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
-    // Receive the next exhaust isMaster.
-    ASSERT_OK(conn1->recv(reply, lastRequestId));
-    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    lastRequestId = reply.header().getId();
-    res = OpMsg::parse(reply).body;
-    ASSERT_OK(getStatusFromCommandResult(res));
-
-    // Receive the failed exhaust isMaster. This should close the exhaust stream.
-    ASSERT_OK(conn1->recv(reply, lastRequestId));
-    res = OpMsg::parse(reply).body;
-    ASSERT_NOT_OK(getStatusFromCommandResult(res));
+    // Wait for the exhaust stream to close from the error returned by isMaster.
+    ASSERT(waitForCondition([&] {
+        const auto status = conn1->recv(reply, lastRequestId);
+        lastRequestId = reply.header().getId();
+        res = OpMsg::parse(reply).body;
+        return !getStatusFromCommandResult(res).isOK();
+    }));
 
     // Terminating the exhaust stream should not decrement the number of 'exhaustIsMaster'.
     ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
@@ -855,14 +850,12 @@ TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStre
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
-    ASSERT(waitForIntVal(
-        [&] {
-            auto serverStatusCmd = BSON("serverStatus" << 1);
-            BSONObj serverStatusReply;
-            ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt();
-        },
-        0));
+    ASSERT(waitForCondition([&] {
+        auto serverStatusCmd = BSON("serverStatus" << 1);
+        BSONObj serverStatusReply;
+        ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
+    }));
 
     // Issue an isMaster command without a topology version.
     auto isMasterCmd = BSON("isMaster" << 1);
@@ -908,17 +901,13 @@ TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStre
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
-    // Receive the next exhaust isMaster.
-    ASSERT_OK(conn1->recv(reply, lastRequestId));
-    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    lastRequestId = reply.header().getId();
-    res = OpMsg::parse(reply).body;
-    ASSERT_OK(getStatusFromCommandResult(res));
-
-    // Receive the failed exhaust isMaster. This should close the exhaust stream.
-    ASSERT_OK(conn1->recv(reply, lastRequestId));
-    res = OpMsg::parse(reply).body;
-    ASSERT_NOT_OK(getStatusFromCommandResult(res));
+    // Wait for the exhaust stream to close from the error returned by isMaster.
+    ASSERT(waitForCondition([&] {
+        const auto status = conn1->recv(reply, lastRequestId);
+        lastRequestId = reply.header().getId();
+        res = OpMsg::parse(reply).body;
+        return !getStatusFromCommandResult(res).isOK();
+    }));
 
     // Terminating the exhaust stream should not decrement the number of 'exhaustIsMaster'.
     ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
