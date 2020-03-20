@@ -277,7 +277,7 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
     return std::pair(state, std::move(future));
 }
 
-AsyncDBClient* NetworkInterfaceTL::RequestState::client() noexcept {
+AsyncDBClient* NetworkInterfaceTL::RequestState::getClient(const ConnectionHandle& conn) noexcept {
     if (!conn) {
         return nullptr;
     }
@@ -321,9 +321,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
 }
 
 void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept {
-    // Settle the connection object on the reactor
     invariant(conn);
-    invariant(interface()->_reactor->onReactorThread());
 
     auto connToReturn = std::exchange(conn, {});
 
@@ -369,25 +367,10 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
 }
 
 void NetworkInterfaceTL::RequestState::cancel() noexcept {
-    auto& reactor = interface()->_reactor;
-
-    // If we failed, then get the client to finish up.
-    // Note: CommandState::returnConnection() and CommandState::cancel() run on the reactor
-    // thread only. One goes first and then the other, so there isn't a risk of canceling
-    // the next command to run on the connection.
-    if (reactor->onReactorThread()) {
-        if (auto clientPtr = client()) {
-            // If we have a client, cancel it
-            clientPtr->cancel(cmdState->baton);
-        }
-    } else {
-        ExecutorFuture<void>(reactor).getAsync([this, anchor = shared_from_this()](Status status) {
-            invariant(status.isOK());
-            if (auto clientPtr = client()) {
-                // If we have a client, cancel it
-                clientPtr->cancel(cmdState->baton);
-            }
-        });
+    auto connToCancel = weakConn.lock();
+    if (auto clientPtr = getClient(connToCancel)) {
+        // If we have a client, cancel it
+        clientPtr->cancel(cmdState->baton);
     }
 }
 
@@ -526,7 +509,8 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(size
 
     return makeReadyFutureWith([this, requestState] {
                setTimer();
-               return requestState->client()->runCommandRequest(*requestState->request, baton);
+               return RequestState::getClient(requestState->conn)
+                   ->runCommandRequest(*requestState->request, baton);
            })
         .then([this, requestState](RemoteCommandResponse response) {
             doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response));
@@ -748,6 +732,7 @@ void NetworkInterfaceTL::RequestState::send(StatusWith<ConnectionPool::Connectio
     request.emplace(remoteCommandRequest);
     host = request.get().target;
     conn = std::move(swConn.getValue());
+    weakConn = conn;
 
     networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
 
@@ -781,74 +766,38 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
                 return RemoteCommandOnAnyResponse(host, std::move(error), stopwatch.elapsed());
             });
 
-    if (baton) {
-        // If we have a baton then use it for the promise and then switch to the reactor to return
-        // our connection.
-        std::move(anyFuture)
-            .thenRunOn(baton)
-            .onCompletion([ this, anchor = shared_from_this() ](auto swr) noexcept {
-                auto response = uassertStatusOK(swr);
-                auto status = swr.getValue().status;
-                auto commandStatus = getStatusFromCommandResult(response.data);
+    std::move(anyFuture)                                    //
+        .thenRunOn(makeGuaranteedExecutor(baton, reactor))  // Switch to the baton/reactor.
+        .getAsync([ this, anchor = shared_from_this() ](auto swr) noexcept {
+            auto response = uassertStatusOK(swr);
+            auto status = response.status;
 
-                // Ignore maxTimeMS expiration errors for hedged reads.
-                if (isHedge && commandStatus == ErrorCodes::MaxTimeMSExpired) {
-                    LOGV2_DEBUG(4660700,
-                                2,
-                                "Hedged request returned status",
-                                "requestId"_attr = request->id,
-                                "target"_attr = request->target,
-                                "status"_attr = commandStatus);
-                } else {
-                    if (cmdState->finishLine.arriveStrongly()) {
-                        if (isHedge) {
-                            auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
-                            invariant(hm);
-                            hm->incrementNumAdvantageouslyHedgedOperations();
-                        }
-                        fulfilledPromise = true;
-                        cmdState->fulfillFinalPromise(std::move(response));
-                    }
+            returnConnection(status);
+
+            auto commandStatus = getStatusFromCommandResult(response.data);
+
+            if (!cmdState->finishLine.arriveStrongly()) {
+                return;
+            }
+
+            // Ignore maxTimeMS expiration errors for hedged reads
+            if (isHedge && commandStatus == ErrorCodes::MaxTimeMSExpired) {
+                LOGV2_DEBUG(4660701,
+                            2,
+                            "Hedged request returned status",
+                            "requestId"_attr = request->id,
+                            "target"_attr = request->target,
+                            "status"_attr = commandStatus);
+            } else {
+                if (isHedge) {
+                    auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
+                    invariant(hm);
+                    hm->incrementNumAdvantageouslyHedgedOperations();
                 }
-
-                return status;
-            })
-            .thenRunOn(reactor)
-            .getAsync(
-                [this, anchor = shared_from_this()](Status status) { returnConnection(status); });
-    } else {
-        // If we do not have a baton, then we can fulfill the promise and return our connection in
-        // the same callback
-        std::move(anyFuture).thenRunOn(reactor).getAsync(
-            [ this, anchor = shared_from_this() ](auto swr) noexcept {
-                auto response = uassertStatusOK(swr);
-                auto status = response.status;
-                auto commandStatus = getStatusFromCommandResult(response.data);
-                ON_BLOCK_EXIT([&] { returnConnection(status); });
-
-                if (!cmdState->finishLine.arriveStrongly()) {
-                    return;
-                }
-
-                // Ignore maxTimeMS expiration errors for hedged reads
-                if (isHedge && commandStatus == ErrorCodes::MaxTimeMSExpired) {
-                    LOGV2_DEBUG(4660701,
-                                2,
-                                "Hedged request returned status",
-                                "requestId"_attr = request->id,
-                                "target"_attr = request->target,
-                                "status"_attr = commandStatus);
-                } else {
-                    if (isHedge) {
-                        auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
-                        invariant(hm);
-                        hm->incrementNumAdvantageouslyHedgedOperations();
-                    }
-                    fulfilledPromise = true;
-                    cmdState->fulfillFinalPromise(std::move(response));
-                }
-            });
-    }
+                fulfilledPromise = true;
+                cmdState->fulfillFinalPromise(std::move(response));
+            }
+        });
 }
 
 NetworkInterfaceTL::ExhaustCommandState::ExhaustCommandState(
@@ -915,8 +864,9 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     return makeReadyFutureWith(
                [this, requestState, clientCallback = std::move(clientCallback)]() mutable {
                    setTimer();
-                   return requestState->client()->runExhaustCommandRequest(
-                       *requestState->request, std::move(clientCallback), baton);
+                   return RequestState::getClient(requestState->conn)
+                       ->runExhaustCommandRequest(
+                           *requestState->request, std::move(clientCallback), baton);
                })
         .then([this, requestState] { return prevResponse; });
 }

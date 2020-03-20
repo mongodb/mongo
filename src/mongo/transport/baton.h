@@ -91,6 +91,8 @@ public:
     NetworkingBaton* networking() noexcept final {
         return this;
     }
+
+    virtual bool canWait() noexcept = 0;
 };
 
 }  // namespace transport
