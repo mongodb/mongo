@@ -76,7 +76,7 @@ try {
         checkLog.contains(
             db.getMongo(),
             new RegExp(
-                "Aborting transaction with txnNumber.*\"txnParticipant_getActiveTxnNumber\":" +
+                "Aborting transaction because it has been running for longer than 'transactionLifetimeLimitSeconds'.*\"txnNumber\":" +
                 txnNumber));
     } else {
         checkLog.contains(db.getMongo(), "Aborting transaction with txnNumber " + txnNumber);

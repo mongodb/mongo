@@ -207,10 +207,10 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOGV2_DEBUG(21978,
                     3,
-                    "Aborting transaction sessionId: {txnRecord_getSessionId} txnNumber "
-                    "{txnRecord_getTxnNum}",
-                    "txnRecord_getSessionId"_attr = txnRecord.getSessionId().toBSON(),
-                    "txnRecord_getTxnNum"_attr = txnRecord.getTxnNum());
+                    "Aborting transaction sessionId: {sessionId} txnNumber {txnNumber}",
+                    "Aborting transaction",
+                    "sessionId"_attr = txnRecord.getSessionId().toBSON(),
+                    "txnNumber"_attr = txnRecord.getTxnNum());
         txnParticipant.abortTransaction(opCtx);
     }
 }
@@ -254,11 +254,11 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
             LOGV2_DEBUG(21979,
                         3,
-                        "Restoring locks of prepared transaction. SessionId: {sessionId_getId} "
-                        "TxnNumber: {txnParticipant_getActiveTxnNumber}",
-                        "sessionId_getId"_attr = sessionId.getId(),
-                        "txnParticipant_getActiveTxnNumber"_attr =
-                            txnParticipant.getActiveTxnNumber());
+                        "Restoring locks of prepared transaction. SessionId: {sessionId} "
+                        "TxnNumber: {txnNumber}",
+                        "Restoring locks of prepared transaction",
+                        "sessionId"_attr = sessionId.getId(),
+                        "txnNumber"_attr = txnParticipant.getActiveTxnNumber());
             txnParticipant.refreshLocksForPreparedTransaction(newOpCtx.get(), false);
         }
     }
