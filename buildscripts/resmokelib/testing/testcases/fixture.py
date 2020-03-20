@@ -39,6 +39,8 @@ class FixtureSetupTestCase(FixtureTestCase):
             self.fixture.setup()
             self.logger.info("Waiting for %s to be ready.", self.fixture)
             self.fixture.await_ready()
+            if not isinstance(self.fixture, fixture_interface.NoOpFixture):
+                self.fixture.mongo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
             self.logger.info("Finished the setup of %s.", self.fixture)
             self.return_code = 0
         except errors.ServerFailure as err:
