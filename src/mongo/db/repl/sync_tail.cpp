@@ -98,7 +98,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(hangAfterRecordingOpApplicationStartTime);
-MONGO_FAIL_POINT_DEFINE(hangAfterTransitionToSecondary);
 
 /**
  * This variable determines the number of writer threads SyncTail will have. It can be overridden
@@ -1012,13 +1011,6 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
 
         // Transition to SECONDARY state, if possible.
         tryToGoLiveAsASecondary(&opCtx, replCoord, minValid);
-
-        if (MONGO_unlikely(hangAfterTransitionToSecondary.shouldFail()) &&
-            replCoord->getMemberState().secondary()) {
-            log() << "fail point hangAfterTransitionToSecondary enabled. Blocking until fail point "
-                     "is disabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterTransitionToSecondary);
-        }
 
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
