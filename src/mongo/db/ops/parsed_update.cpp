@@ -121,9 +121,12 @@ Status ParsedUpdate::parseQueryToCQ() {
     auto qr = std::make_unique<QueryRequest>(_request->getNamespaceString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
-    qr->setCollation(_request->getCollation());
     qr->setExplain(_request->isExplain());
     qr->setHint(_request->getHint());
+
+    // We get the collation off the ExpressionContext because it may contain a collection-default
+    // collator if no collation was included in the user's request.
+    qr->setCollation(_expCtx->getCollatorBSON());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the

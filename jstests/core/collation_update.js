@@ -24,6 +24,16 @@ assert.commandWorked(coll.insert({_id: 1, a: "124"}));
 assert.commandWorked(coll.update({_id: 1}, {$min: {a: "1234"}}));
 assert.eq(coll.find({a: "124"}).count(), 1);
 
+// Simple _id query with hint on different index should work.
+assert.commandWorked(coll.createIndex({foobar: 1}));
+function makeUpdateCmdWithHint(update, hint) {
+    return {update: coll.getName(), updates: [{q: {_id: 1}, u: update, hint: hint}]};
+}
+assert.commandWorked(coll.runCommand(makeUpdateCmdWithHint({$min: {a: "49"}}, {foobar: 1})));
+assert.eq(coll.find({a: "49"}).count(), 1);
+assert.commandWorked(coll.runCommand(makeUpdateCmdWithHint({$min: {a: "5"}}, {_id: 1})));
+assert.eq(coll.find({a: "5"}).count(), 1);
+
 // $min respects query collation.
 if (db.getMongo().writeMode() === "commands") {
     coll.drop();
