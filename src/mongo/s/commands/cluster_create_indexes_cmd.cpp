@@ -72,9 +72,10 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750,
                     1,
-                    "createIndexes: {nss} cmd:{cmdObj}",
-                    "nss"_attr = nss,
-                    "cmdObj"_attr = redact(cmdObj));
+                    "createIndexes: {namespace} cmd: {command}",
+                    "CMD: createIndexes",
+                    "namespace"_attr = nss,
+                    "command"_attr = redact(cmdObj));
 
         createShardDatabase(opCtx, dbName);
 

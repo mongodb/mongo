@@ -233,8 +233,9 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
     if (!response.status.isOK()) {
         if (ErrorCodes::isExceededTimeLimitError(response.status.code())) {
             LOGV2(22739,
-                  "Operation timed out with status {response_status}",
-                  "response_status"_attr = redact(response.status));
+                  "Operation timed out {error}",
+                  "Operation timed out",
+                  "error"_attr = redact(response.status));
         }
         return response.status;
     }
@@ -332,9 +333,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
 
     if (!status.isOK()) {
         if (ErrorCodes::isExceededTimeLimitError(status.code())) {
-            LOGV2(22740,
-                  "Operation timed out {causedBy_status}",
-                  "causedBy_status"_attr = causedBy(status));
+            LOGV2(
+                22740, "Operation timed out {error}", "Operation timed out", "error"_attr = status);
         }
         return status;
     }
