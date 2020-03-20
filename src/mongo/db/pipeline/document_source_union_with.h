@@ -64,6 +64,8 @@ public:
                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
         : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {}
 
+    ~DocumentSourceUnionWith();
+
     const char* getSourceName() const final {
         return kStageName.rawData();
     }

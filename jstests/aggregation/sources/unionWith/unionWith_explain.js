@@ -117,4 +117,13 @@ assert.commandWorked(testDB.runCommand({
         cursor: {},
     }
 }));
+
+// Ensure that $unionWith can still execute explain if followed by a stage that calls dispose().
+var result = assert.commandWorked(testDB.runCommand({
+    explain: {
+        aggregate: collA.getName(),
+        pipeline: [{$unionWith: collB.getName()}, {$limit: 1}],
+        cursor: {},
+    }
+}));
 })();
