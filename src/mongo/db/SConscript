@@ -494,6 +494,17 @@ env.Clone().InjectModule("enterprise").Library(
 )
 
 env.Library(
+    target='client_out_of_line_executor',
+    source=[
+        'client_out_of_line_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
     target='mirror_maestro',
     source=[
         'mirror_maestro.cpp',
@@ -504,6 +515,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         "$BUILD_DIR/mongo/rpc/protocol",
+        'client_out_of_line_executor',
         'service_context',
         "$BUILD_DIR/mongo/util/net/network",
     ],
@@ -517,6 +529,16 @@ env.Library(
         'repl/replica_set_messages',
         'repl/repl_coordinator_interface',
         'repl/topology_version_observer',
+    ],
+)
+
+env.CppUnitTest(
+    target='client_out_of_line_executor_test',
+    source=[
+        'client_out_of_line_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        'client_out_of_line_executor',
     ],
 )
 
