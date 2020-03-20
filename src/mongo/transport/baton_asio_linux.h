@@ -176,6 +176,11 @@ public:
         return std::move(pf.future);
     }
 
+    bool canWait() noexcept override {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _opCtx;
+    }
+
     bool cancelSession(Session& session) noexcept override {
         const auto id = session.id();
 

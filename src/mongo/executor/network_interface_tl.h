@@ -249,22 +249,20 @@ private:
     };
 
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
+        using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
+        using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
         RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_, size_t id)
             : cmdState{std::move(cmdState_)}, requestManager(mgr), reqId(id) {}
 
         ~RequestState();
 
         /**
-         * Return the client object bound to the current command or nullptr if there isn't one.
-         *
-         * This is only useful on the networking thread (i.e. the reactor).
+         * Return the client for a given connection
          */
-        AsyncDBClient* client() noexcept;
+        static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
 
         /**
          * Cancel the current client operation or do nothing if there is no client.
-         *
-         * This must be called from the networking thread (i.e. the reactor).
          */
         void cancel() noexcept;
 
@@ -300,7 +298,8 @@ private:
 
         boost::optional<RemoteCommandRequest> request;
         HostAndPort host;
-        ConnectionPool::ConnectionHandle conn;
+        ConnectionHandle conn;
+        WeakConnectionHandle weakConn;
 
         // Internal id of this request as tracked by the RequestManager.
         size_t reqId;
