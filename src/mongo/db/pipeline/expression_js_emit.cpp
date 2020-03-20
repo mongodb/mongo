@@ -75,6 +75,10 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
     BSONElement expr,
     const VariablesParseState& vps) {
 
+    uassert(4660801,
+            str::stream() << kExpressionName << " cannot be used inside a validator.",
+            !expCtx->isParsingCollectionValidator);
+
     uassert(31221,
             str::stream() << kExpressionName
                           << " requires an object as an argument, found: " << typeName(expr.type()),
