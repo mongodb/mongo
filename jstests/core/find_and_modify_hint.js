@@ -43,6 +43,15 @@ const coll = db.jstests_find_and_modify_hint;
         {findAndModify: coll.getName(), query: {_id: 1}, update: {$set: {y: 1}}, hint: 'y_-1'};
     assertCommandUsesIndex(famUpdateCmd, {y: -1});
 
+    // Passing a hint with an empty 'update' object should work as expected.
+    famUpdateCmd = {findAndModify: coll.getName(), query: {_id: 1}, update: {}, hint: 'y_-1'};
+    assertCommandUsesIndex(famUpdateCmd, {y: -1});
+
+    // Passing a hint on _id with an empty 'update' object with an IDHACK eligible query should
+    // work as expected.
+    famUpdateCmd = {findAndModify: coll.getName(), query: {_id: 1}, update: {}, hint: {_id: 1}};
+    assertCommandUsesIndex(famUpdateCmd, {_id: 1});
+
     // Hint using an index name when removing documents.
     const famRemoveCmd =
         {findAndModify: coll.getName(), query: {_id: 1}, remove: true, hint: 'y_-1'};
