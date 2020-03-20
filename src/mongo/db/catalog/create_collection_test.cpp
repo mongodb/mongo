@@ -55,6 +55,8 @@ private:
     void tearDown() override;
 
 protected:
+    void validateValidator(const std::string& validatorStr, const int expectedError);
+
     // Use StorageInterface to access storage features below catalog interface.
     std::unique_ptr<repl::StorageInterface> _storage;
 };
@@ -85,6 +87,27 @@ void CreateCollectionTest::tearDown() {
  */
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
+}
+
+void CreateCollectionTest::validateValidator(const std::string& validatorStr,
+                                             const int expectedError) {
+    NamespaceString newNss("test.newCollWithValidation");
+
+    auto opCtx = makeOpCtx();
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+
+    CollectionOptions options;
+    options.validator = fromjson(validatorStr);
+    options.uuid = UUID::gen();
+
+    AutoGetOrCreateDb autoDb(opCtx.get(), newNss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    ASSERT_TRUE(db) << "Cannot create collection " << newNss << " because database " << newNss.db()
+                    << " does not exist.";
+
+    const auto status =
+        db->userCreateNS(opCtx.get(), newNss, options, false /*createDefaultIndexes*/);
+    ASSERT_EQ(expectedError, status.code());
 }
 
 /**
@@ -229,5 +252,19 @@ TEST_F(CreateCollectionTest,
 
     ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
+}
+
+TEST_F(CreateCollectionTest, ValidationOptions) {
+    // Try a valid validator before trying invalid validators.
+    validateValidator("", static_cast<int>(ErrorCodes::Error::OK));
+    validateValidator("{a: {$exists: false}}", static_cast<int>(ErrorCodes::Error::OK));
+
+    // Invalid validators.
+    validateValidator(
+        "{$expr: {$function: {body: 'function(age) { return age >= 21; }', args: ['$age'], lang: "
+        "'js'}}}",
+        4660800);
+    validateValidator("{$expr: {$_internalJsEmit: {eval: 'function() {}', this: {}}}}", 4660801);
+    validateValidator("{$where: 'this.a == this.b'}", static_cast<int>(ErrorCodes::BadValue));
 }
 }  // namespace
