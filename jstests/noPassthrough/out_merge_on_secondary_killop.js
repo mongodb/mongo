@@ -8,6 +8,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 const kDBName = "out_merge_on_secondary_db";
 
 const replTest = new ReplSetTest({nodes: 2});
@@ -28,17 +30,8 @@ const outColl = primaryDB.getCollection("outColl");
 assert.commandWorked(inputColl.insert({_id: 0, a: 1}, {writeConcern: {w: 2}}));
 assert.commandWorked(inputColl.insert({_id: 1, a: 2}, {writeConcern: {w: 2}}));
 
-function enableHangFailPoints() {
-    configureFailPoint(primary, "hangDuringBatchInsert");
-    configureFailPoint(primary, "hangDuringBatchUpdate");
-}
-
-function disableHangFailPoints() {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "hangDuringBatchInsert", mode: "off"}));
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
-}
+const mergeFailpoint = "hangDuringBatchUpdate";
+const outFailpoint = "hangDuringBatchInsert";
 
 /**
  * Finds and kills the operation on the given connection marked with the given comment.
@@ -58,8 +51,8 @@ function findAndKillOp(conn, comment) {
     });
 }
 
-function testKillOp(pipeline, comment) {
-    enableHangFailPoints();
+function testKillOp(pipeline, comment, failpointName) {
+    let fp = configureFailPoint(primary, failpointName);
 
     // Run the aggregate and ensure that it is interrupted.
     const runAggregate = `
@@ -76,28 +69,34 @@ function testKillOp(pipeline, comment) {
         `;
     let awaitShell = startParallelShell(runAggregate, secondary.port);
 
+    // Wait until the failpoint is reached before killing the insert/update op.
+    fp.wait();
+
     // Find and kill the insert/update on the primary corresponding to the aggregate on the
     // secondary.
     findAndKillOp(primary, comment);
 
-    disableHangFailPoints();
+    fp.off();
     awaitShell();
-    enableHangFailPoints();
+    fp = configureFailPoint(primary, failpointName);
 
     awaitShell = startParallelShell(runAggregate, secondary.port);
+
+    // Wait until the failpoint is reached before killing the aggregate.
+    fp.wait();
 
     // Find and kill the aggregate on the secondary while it is still waiting on the primary.
     findAndKillOp(secondary, comment);
 
-    disableHangFailPoints();
+    fp.off();
     awaitShell();
 }
 
 const mergePipeline = [{$merge: {into: "outColl"}}];
-testKillOp(mergePipeline, "merge_on_secondary_killop");
+testKillOp(mergePipeline, "merge_on_secondary_killop", mergeFailpoint);
 
 const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outColl.getName()}];
-testKillOp(outPipeline, "out_on_secondary_killop");
+testKillOp(outPipeline, "out_on_secondary_killop", outFailpoint);
 
 replTest.stopSet();
 }());
