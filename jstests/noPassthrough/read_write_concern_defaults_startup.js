@@ -19,7 +19,7 @@ function runTest(conn, failPointConn, restartFn) {
     reconnect(failPointConn);
 
     // Verify the server attempted to load the defaults at startup.
-    checkLog.contains(conn, "Failed to load read and write concern defaults at startup");
+    checkLog.contains(conn, "Error loading read and write concern defaults at startup");
     checkLog.contains(conn,
                       "Failing read/write concern persisted defaults lookup because of fail point");
 

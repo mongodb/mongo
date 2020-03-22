@@ -87,9 +87,9 @@ public:
             BSONObj cmdObj = request().toBSON(BSONObj());
             LOGV2_DEBUG(22757,
                         1,
-                        "setIndexCommitQuorum: {request_getNamespace} cmd:{cmdObj}",
-                        "request_getNamespace"_attr = request().getNamespace(),
-                        "cmdObj"_attr = redact(cmdObj));
+                        "setIndexCommitQuorum",
+                        "namespace"_attr = request().getNamespace(),
+                        "command"_attr = redact(cmdObj));
 
             scatterGatherOnlyVersionIfUnsharded(
                 opCtx,

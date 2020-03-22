@@ -116,11 +116,13 @@ public:
 
         const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, toString);
         if (!toStatus.isOK()) {
-            std::string msg(str::stream()
-                            << "Could not move chunk in '" << nss.ns() << "' to shard '" << toString
-                            << "' because that shard does not exist");
-            LOGV2(22755, "{msg}", "msg"_attr = msg);
-            uasserted(ErrorCodes::ShardNotFound, msg);
+            LOGV2_OPTIONS(22755,
+                          {logv2::UserAssertAfterLog(ErrorCodes::ShardNotFound)},
+                          "Could not move chunk in {namespace} to {toShardId} because that shard"
+                          " does not exist",
+                          "moveChunk destination shard does not exist",
+                          "toShardId"_attr = toString,
+                          "namespace"_attr = nss.ns());
         }
 
         const auto to = toStatus.getValue();

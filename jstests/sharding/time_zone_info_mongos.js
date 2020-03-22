@@ -29,8 +29,8 @@ assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/));
 conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});
 assert.eq(conn, null, "expected launching mongos with bad timezone rules to fail");
 // Look for either old or new error message
-assert(rawMongoProgramOutput().indexOf("Failed to create service context") != -1 ||
-       rawMongoProgramOutput().indexOf("Failed global initialization") != -1);
+assert(rawMongoProgramOutput().includes("Error creating service context") ||
+       rawMongoProgramOutput().includes("Failed to create service context"));
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
