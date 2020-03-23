@@ -1934,11 +1934,12 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         stdx::lock_guard lock(_mutex);
         LOGV2(21339,
               "Replication failed for write concern: {writeConcern}, waiting for optime: {opTime}, "
-              "opID: {opID}, progress: {progress}",
+              "opID: {opID}, all_durable: {all_durable}, progress: {progress}",
               "Replication failed for write concern",
               "writeConcern"_attr = writeConcern.toBSON(),
               "opTime"_attr = opTime,
               "opID"_attr = opCtx->getOpID(),
+              "all_durable"_attr = _storage->getAllDurableTimestamp(_service),
               "progress"_attr = _getReplicationProgress(lock));
     }
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
