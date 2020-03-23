@@ -91,7 +91,6 @@ let viewsCommandTests = {
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
-    _configsvrCreateCollection: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrDropCollection: {skip: isAnInternalCommand},
     _configsvrDropDatabase: {skip: isAnInternalCommand},

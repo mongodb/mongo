@@ -324,15 +324,6 @@ public:
     void generateUUIDsForExistingShardedCollections(OperationContext* opCtx);
 
     /**
-     * Creates a new unsharded collection with the given options.
-     *
-     * Throws exception on errors.
-     */
-    void createCollection(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const CollectionOptions& options);
-
-    /**
      * Refines the shard key of an existing collection with namespace 'nss'. Here, 'shardKey'
      * denotes the new shard key, which must contain the old shard key as a prefix.
      *

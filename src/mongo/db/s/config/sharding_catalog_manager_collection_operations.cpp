@@ -538,41 +538,6 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
     }
 }
 
-void ShardingCatalogManager::createCollection(OperationContext* opCtx,
-                                              const NamespaceString& ns,
-                                              const CollectionOptions& collOptions) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    // Forward the create to the primary shard to either create the collection or verify that the
-    // collection already exists with the same options.
-
-    auto dbEntry =
-        uassertStatusOK(catalogClient->getDatabase(
-                            opCtx, ns.db().toString(), repl::ReadConcernLevel::kLocalReadConcern))
-            .value;
-    const auto& primaryShardId = dbEntry.getPrimary();
-    auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShardId));
-
-    BSONObjBuilder createCmdBuilder;
-    createCmdBuilder.append("create", ns.coll());
-    collOptions.appendBSON(&createCmdBuilder);
-    createCmdBuilder.append(kWriteConcernField, opCtx->getWriteConcern().toBSON());
-    auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        ns.db().toString(),
-        createCmdBuilder.obj(),
-        Shard::RetryPolicy::kIdempotent);
-
-    auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);
-    if (!createStatus.isOK() && createStatus != ErrorCodes::NamespaceExists) {
-        uassertStatusOK(createStatus);
-    }
-
-    checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
-}
-
 void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const ShardKeyPattern& newShardKeyPattern) {

@@ -78,7 +78,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
@@ -288,14 +287,6 @@ bool handleError(OperationContext* opCtx,
             auto& oss = OperationShardingState::get(opCtx);
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
-
-        // Don't try doing more ops since they will fail with the same error.
-        // Command reply serializer will handle repeating this error if needed.
-        out->results.emplace_back(ex.toStatus());
-        return false;
-    } else if (ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        auto& oss = OperationShardingState::get(opCtx);
-        oss.setShardingOperationFailedStatus(ex.toStatus());
 
         // Don't try doing more ops since they will fail with the same error.
         // Command reply serializer will handle repeating this error if needed.

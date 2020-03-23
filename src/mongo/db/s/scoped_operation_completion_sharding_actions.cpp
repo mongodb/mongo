@@ -34,12 +34,10 @@
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
@@ -101,20 +99,6 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             LOGV2(22054,
                   "Failed to handle database version exception{causedBy_handleMismatchStatus}",
                   "causedBy_handleMismatchStatus"_attr = causedBy(redact(handleMismatchStatus)));
-    } else if (auto cannotImplicitCreateCollInfo =
-                   status->extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        if (ShardingState::get(_opCtx)->enabled() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
-            auto handleCannotImplicitCreateStatus =
-                onCannotImplicitlyCreateCollection(_opCtx, cannotImplicitCreateCollInfo->getNss());
-            if (!handleCannotImplicitCreateStatus.isOK())
-                LOGV2(22055,
-                      "Failed to handle CannotImplicitlyCreateCollection "
-                      "exception{causedBy_handleCannotImplicitCreateStatus}",
-                      "causedBy_handleCannotImplicitCreateStatus"_attr =
-                          causedBy(redact(handleCannotImplicitCreateStatus)));
-        }
     }
 }
 

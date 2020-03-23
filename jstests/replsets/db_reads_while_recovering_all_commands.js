@@ -36,7 +36,6 @@ const allCommands = {
     _configsvrCommitChunkMigration: {skip: isPrimaryOnly},
     _configsvrCommitChunkSplit: {skip: isPrimaryOnly},
     _configsvrCommitMovePrimary: {skip: isPrimaryOnly},
-    _configsvrCreateCollection: {skip: isPrimaryOnly},
     _configsvrCreateDatabase: {skip: isPrimaryOnly},
     _configsvrDropCollection: {skip: isPrimaryOnly},
     _configsvrDropDatabase: {skip: isPrimaryOnly},

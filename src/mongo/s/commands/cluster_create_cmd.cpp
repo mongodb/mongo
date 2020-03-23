@@ -37,7 +37,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/create_collection_gen.h"
 
 namespace mongo {
 namespace {

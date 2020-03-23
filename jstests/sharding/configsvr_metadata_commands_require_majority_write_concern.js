@@ -140,11 +140,6 @@ checkCommandConfigSvr({_configsvrMovePrimary: dbName, to: st.shard0.name},
                       setupFuncs.createDatabase,
                       cleanupFuncs.dropDatabase);
 
-// We are using a different name from ns because it was already created in setupFuncs.
-checkCommandConfigSvr({_configsvrCreateCollection: dbName + '.bar', options: {}},
-                      setupFuncs.createDatabase,
-                      cleanupFuncs.dropDatabase);
-
 // shardCollection
 checkCommandMongos(
     {shardCollection: ns, key: {_id: 1}}, setupFuncs.enableSharding, cleanupFuncs.dropDatabase);
