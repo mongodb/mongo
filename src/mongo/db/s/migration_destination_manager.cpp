@@ -38,6 +38,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -1064,13 +1065,15 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                 uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
-            deleteObjects(opCtx,
-                          autoColl.getCollection(),
-                          _nss,
-                          id,
-                          true /* justOne */,
-                          false /* god */,
-                          true /* fromMigrate */);
+            writeConflictRetry(opCtx, "transferModsDeletes", _nss.ns(), [&] {
+                deleteObjects(opCtx,
+                              autoColl.getCollection(),
+                              _nss,
+                              id,
+                              true /* justOne */,
+                              false /* god */,
+                              true /* fromMigrate */);
+            });
 
             *lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             didAnything = true;
@@ -1116,7 +1119,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             // We are in write lock here, so sure we aren't killing
-            Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
+            writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
+                Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
+            });
 
             *lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             didAnything = true;

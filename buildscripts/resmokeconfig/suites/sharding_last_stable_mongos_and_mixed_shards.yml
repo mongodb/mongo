@@ -161,6 +161,8 @@ selector:
   - jstests/sharding/mr_merge_to_existing.js
   # Enable after SERVER-44598 is backported and available on 4.0 binaries
   - jstests/sharding/ssv_after_restart_of_shards_and_mongos_workarround.js
+  # Requires behavior that does not and will never exist in 4.0.
+  - jstests/sharding/migration_retries_on_write_conflict_exceptions.js
 executor:
   config:
     shell_options:
