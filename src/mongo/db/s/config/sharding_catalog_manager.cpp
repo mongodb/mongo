@@ -33,28 +33,19 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
-#include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/database_version_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
 namespace {
@@ -64,75 +55,6 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
 // This value is initialized only if the node is running as a config server
 const auto getShardingCatalogManager =
     ServiceContext::declareDecoration<boost::optional<ShardingCatalogManager>>();
-
-OpMsg runCommandInLocalTxn(OperationContext* opCtx,
-                           StringData db,
-                           bool startTransaction,
-                           TxnNumber txnNumber,
-                           BSONObj cmdObj) {
-    BSONObjBuilder bob(std::move(cmdObj));
-    if (startTransaction) {
-        bob.append("startTransaction", true);
-    }
-    bob.append("autocommit", false);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
-
-    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
-    opCtx->getLogicalSessionId()->serialize(&bob);
-    lsidBuilder.doneFast();
-
-    return OpMsg::parseOwned(
-        opCtx->getServiceContext()
-            ->getServiceEntryPoint()
-            ->handleRequest(opCtx,
-                            OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
-            .response);
-}
-
-void insertDocumentsInLocalTxn(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               std::vector<BSONObj> docs,
-                               bool startTransaction,
-                               TxnNumber txnNumber) {
-    BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setDocuments(std::move(docs));
-        return insertOp;
-    }());
-
-    uassertStatusOK(getStatusFromWriteCommandReply(
-        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body));
-}
-
-void removeDocumentsInLocalTxn(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const BSONObj& query,
-                               bool startTransaction,
-                               TxnNumber txnNumber) {
-    BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(query);
-            entry.setMulti(true);
-            return entry;
-        }()});
-        return deleteOp;
-    }());
-
-    uassertStatusOK(getStatusFromWriteCommandReply(
-        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body));
-}
-
-void commitLocalTxn(OperationContext* opCtx, TxnNumber txnNumber) {
-    uassertStatusOK(
-        getStatusFromCommandResult(runCommandInLocalTxn(opCtx,
-                                                        NamespaceString::kAdminDb,
-                                                        false /* startTransaction */,
-                                                        txnNumber,
-                                                        BSON(CommitTransaction::kCommandName << 1))
-                                       .body));
-}
 
 }  // namespace
 
@@ -414,138 +336,6 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
     return lk;
-}
-
-// TODO SERVER-44034: Remove this function.
-void deleteAndInsertChunk(OperationContext* opCtx,
-                          const BSONObj& chunkDoc,
-                          bool startTransaction,
-                          TxnNumber txnNumber,
-                          ShardingCatalogManager::ConfigUpgradeType upgradeType) {
-    auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(chunkDoc));
-
-    removeDocumentsInLocalTxn(
-        opCtx,
-        ChunkType::ConfigNS,
-        BSON(ChunkType::ns(chunk.getNS().ns()) << ChunkType::min(chunk.getMin())),
-        startTransaction,
-        txnNumber);
-
-    insertDocumentsInLocalTxn(
-        opCtx,
-        ChunkType::ConfigNS,
-        {upgradeType == ShardingCatalogManager::ConfigUpgradeType::kUpgrade
-             // Note that ChunkType::toConfigBSON() will not include an _id if one hasn't been set,
-             // which will be the case for chunks written in the 4.2 format because parsing ignores
-             // _ids in the 4.2 format, so the insert path will generate one for us.
-             ? chunk.toConfigBSON()
-             : chunk.toConfigBSONLegacyID()},
-        false /* startTransaction */,
-        txnNumber);
-}
-
-// TODO SERVER-44034: Remove this function.
-void deleteAndInsertTag(OperationContext* opCtx,
-                        const BSONObj& tagDoc,
-                        bool startTransaction,
-                        TxnNumber txnNumber,
-                        ShardingCatalogManager::ConfigUpgradeType upgradeType) {
-    auto tag = uassertStatusOK(TagsType::fromBSON(tagDoc));
-
-    removeDocumentsInLocalTxn(
-        opCtx,
-        TagsType::ConfigNS,
-        BSON(TagsType::ns(tag.getNS().ns()) << TagsType::min(tag.getMinKey())),
-        startTransaction,
-        txnNumber);
-
-    insertDocumentsInLocalTxn(opCtx,
-                              TagsType::ConfigNS,
-                              {upgradeType == ShardingCatalogManager::ConfigUpgradeType::kUpgrade
-                                   // Note that TagsType::toBSON() will not include an _id, so the
-                                   // insert path will generate one for us.
-                                   ? tag.toBSON()
-                                   : tag.toBSONLegacyID()},
-                              false /* startTransaction */,
-                              txnNumber);
-}
-
-// TODO SERVER-44034: Remove this function and type.
-using ConfigDocModFunction = std::function<void(
-    OperationContext*, BSONObj, bool, TxnNumber, ShardingCatalogManager::ConfigUpgradeType)>;
-void forEachConfigDocInBatchedTransactions(OperationContext* opCtx,
-                                           const NamespaceString& configNss,
-                                           const NamespaceString& shardedCollNss,
-                                           ConfigDocModFunction configDocModFn,
-                                           ShardingCatalogManager::ConfigUpgradeType upgradeType) {
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto findResponse = uassertStatusOK(
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            configNss,
-                                            BSON("ns" << shardedCollNss.ns()),
-                                            {},
-                                            boost::none /* limit */));
-
-    AlternativeSessionRegion asr(opCtx);
-    AuthorizationSession::get(asr.opCtx()->getClient())
-        ->grantInternalAuthorization(asr.opCtx()->getClient());
-    TxnNumber txnNumber = 0;
-
-    const auto batchSizeLimit = 100;
-    auto currentBatchSize = 0;
-    for (const auto& doc : findResponse.docs) {
-        auto startTransaction = currentBatchSize == 0;
-
-        configDocModFn(asr.opCtx(), doc, startTransaction, txnNumber, upgradeType);
-
-        currentBatchSize += 1;
-        if (currentBatchSize == batchSizeLimit) {
-            commitLocalTxn(asr.opCtx(), txnNumber);
-            txnNumber += 1;
-            currentBatchSize = 0;
-        }
-    }
-
-    if (currentBatchSize != 0) {
-        commitLocalTxn(asr.opCtx(), txnNumber);
-    }
-}
-
-void ShardingCatalogManager::upgradeOrDowngradeChunksAndTags(OperationContext* opCtx,
-                                                             ConfigUpgradeType upgradeType) {
-    const auto grid = Grid::get(opCtx);
-    auto allDbs = uassertStatusOK(grid->catalogClient()->getAllDBs(
-                                      opCtx, repl::ReadConcernLevel::kLocalReadConcern))
-                      .value;
-
-    // The 'config' database contains the sharded 'config.system.sessions' collection but does not
-    // have an entry in config.databases.
-    allDbs.emplace_back("config", ShardId("config"), true, DatabaseVersion());
-
-    for (const auto& db : allDbs) {
-        auto collections = uassertStatusOK(grid->catalogClient()->getCollections(
-            opCtx, &db.getName(), nullptr, repl::ReadConcernLevel::kLocalReadConcern));
-
-        for (const auto& coll : collections) {
-            if (coll.getDropped()) {
-                continue;
-            }
-
-            {
-                Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-                forEachConfigDocInBatchedTransactions(
-                    opCtx, ChunkType::ConfigNS, coll.getNs(), deleteAndInsertChunk, upgradeType);
-            }
-
-            {
-                Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
-                forEachConfigDocInBatchedTransactions(
-                    opCtx, TagsType::ConfigNS, coll.getNs(), deleteAndInsertTag, upgradeType);
-            }
-        }
-    }
 }
 
 StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(

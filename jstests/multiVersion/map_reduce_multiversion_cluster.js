@@ -1,5 +1,7 @@
 // Verify that we can run various forms of the mapReduce command during different stages of the
 // cluster upgrade process.
+//
+// @tags: [fix_for_fcv_46]
 
 // Checking UUID consistency uses cached connections, which are not valid across restarts or
 // stepdowns.

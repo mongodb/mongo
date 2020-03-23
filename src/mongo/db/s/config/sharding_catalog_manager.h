@@ -94,14 +94,6 @@ public:
     ~ShardingCatalogManager();
 
     /**
-     * Indicates the desired modification to the config.chunks and config.tags collections during
-     * setFeatureCompatibilityVersion.
-     *
-     * TODO SERVER-44034: Remove this enum.
-     */
-    enum class ConfigUpgradeType { kUpgrade, kDowngrade };
-
-    /**
      * Instantiates an instance of the sharding catalog manager and installs it on the specified
      * service context. This method is not thread-safe and must be called only once when the service
      * is starting.
@@ -399,14 +391,6 @@ public:
      * Runs the setFeatureCompatibilityVersion command on all shards.
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
-
-    /**
-     * Changes the _id format of all documents in config.chunks and config.tags to use either the
-     * format introduced in 4.4 or the format expected by a 4.2 binary.
-     *
-     * TODO SERVER-44034: Remove this method.
-     */
-    void upgradeOrDowngradeChunksAndTags(OperationContext* opCtx, ConfigUpgradeType upgradeType);
 
     //
     // For Diagnostics

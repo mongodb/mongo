@@ -76,7 +76,6 @@ MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeCriticalSection);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionReadOnlyCriticalSection);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionCommitPhase);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionAfterCriticalSection);
-MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeReturning);
 
 struct ShardCollectionTargetState {
     UUID uuid;
@@ -434,12 +433,7 @@ void writeFirstChunksToConfig(OperationContext* opCtx,
     std::vector<BSONObj> chunkObjs;
     chunkObjs.reserve(initialChunks.chunks.size());
     for (const auto& chunk : initialChunks.chunks) {
-        if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44) {
-            chunkObjs.push_back(chunk.toConfigBSON());
-        } else {
-            chunkObjs.push_back(chunk.toConfigBSONLegacyID());
-        }
+        chunkObjs.push_back(chunk.toConfigBSON());
     }
 
     Grid::get(opCtx)->catalogClient()->insertConfigDocumentsAsRetryableWrite(
@@ -690,11 +684,6 @@ public:
             uassert(ErrorCodes::InvalidUUID,
                     str::stream() << "Collection " << nss << " is sharded without UUID",
                     uuid);
-
-            if (MONGO_unlikely(pauseShardCollectionBeforeReturning.shouldFail())) {
-                LOGV2(22102, "Hit pauseShardCollectionBeforeReturning");
-                pauseShardCollectionBeforeReturning.pauseWhileSet(opCtx);
-            }
 
             scopedShardCollection.emplaceUUID(uuid);
         }

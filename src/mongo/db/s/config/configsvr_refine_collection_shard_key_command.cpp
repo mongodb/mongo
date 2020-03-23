@@ -38,7 +38,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_key_util.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
@@ -65,12 +64,6 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "refineCollectionShardKey must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
-            uassert(ErrorCodes::CommandNotSupported,
-                    "'refineCollectionShardKey' is only supported in feature compatibility version "
-                    "4.4",
-                    serverGlobalParams.featureCompatibility.getVersion() ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
             // Set the operation context read concern level to local for reads into the config
             // database.

@@ -74,14 +74,6 @@ public:
     StatusWith<ScopedShardCollection> registerShardCollection(
         const ShardsvrShardCollection& request);
 
-    /**
-     * Takes a snapshot of all currently active shard collections and synchronously waits for each
-     * to complete.
-     *
-     * TODO SERVER-44034: Remove this method.
-     */
-    void waitForActiveShardCollectionsToComplete(OperationContext* opCtx);
-
 private:
     friend class ScopedShardCollection;
 

@@ -147,13 +147,6 @@ BSONObj TagsType::toBSON() const {
     return builder.obj();
 }
 
-BSONObj TagsType::toBSONLegacyID() const {
-    // Note that toBSON() doesn't append an _id.
-    BSONObjBuilder bob(toBSON());
-    bob.append("_id", BSON(TagsType::ns(_ns->ns()) << TagsType::min(*_minKey)));
-    return bob.obj();
-}
-
 std::string TagsType::toString() const {
     return toBSON().toString();
 }

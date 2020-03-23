@@ -194,7 +194,6 @@ public:
 
     // Field names and types in the chunks collections.
     static const BSONField<OID> name;
-    static const BSONField<std::string> legacyName;  // TODO SERVER-44034: Remove legacyName.
     static const BSONField<BSONObj> minShardID;
     static const BSONField<std::string> ns;
     static const BSONField<BSONObj> min;
@@ -225,14 +224,6 @@ public:
     BSONObj toConfigBSON() const;
 
     /**
-     * Returns the BSON representation of the entry for the config server's config.chunks
-     * collection using the _id format expected by binaries in 4.2 and earlier.
-     *
-     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
-     */
-    BSONObj toConfigBSONLegacyID() const;
-
-    /**
      * Constructs a new ChunkType object from BSON that has a shard server's config.chunks.<epoch>
      * collection format.
      *
@@ -241,25 +232,10 @@ public:
     static StatusWith<ChunkType> fromShardBSON(const BSONObj& source, const OID& epoch);
 
     /**
-     * Generates the chunk id that would be expected in binaries 4.2 and earlier based on the
-     * namespace and lower chunk bound.
-     *
-     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
-     */
-    static std::string genLegacyID(const NamespaceString& nss, const BSONObj& o);
-
-    /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>
      * collection.
      */
     BSONObj toShardBSON() const;
-
-    /**
-     * Returns the _id that would be used for this chunk in binaries 4.2 and earlier.
-     *
-     * TODO SERVER-44034: Remove when 4.4 becomes last-stable.
-     */
-    std::string getLegacyName() const;
 
     const OID& getName() const;
     void setName(const OID& id);

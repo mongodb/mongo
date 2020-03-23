@@ -50,7 +50,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -70,8 +69,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-44034: Remove.
-MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 
@@ -225,12 +222,6 @@ public:
                     LOGV2(20500, "Upgrade: submitting orphaned ranges for cleanup");
                     migrationutil::submitOrphanRangesForCleanup(opCtx);
                 }
-
-                // The primary shard sharding a collection will write the initial chunks for a
-                // collection directly to the config server, so wait for all shard collections to
-                // complete to guarantee no chunks are missed by the update on the config server.
-                ActiveShardCollectionRegistry::get(opCtx).waitForActiveShardCollectionsToComplete(
-                    opCtx);
             }
 
             // Upgrade shards before config finishes its upgrade.
@@ -243,13 +234,6 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
-
-                if (MONGO_unlikely(pauseBeforeUpgradingConfigMetadata.shouldFail())) {
-                    LOGV2(20501, "Hit pauseBeforeUpgradingConfigMetadata");
-                    pauseBeforeUpgradingConfigMetadata.pauseWhileSet(opCtx);
-                }
-                ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(
-                    opCtx, ShardingCatalogManager::ConfigUpgradeType::kUpgrade);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
@@ -326,12 +310,6 @@ public:
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");
                 migrationutil::dropRangeDeletionsCollection(opCtx);
-
-                // The primary shard sharding a collection will write the initial chunks for a
-                // collection directly to the config server, so wait for all shard collections to
-                // complete to guarantee no chunks are missed by the update on the config server.
-                ActiveShardCollectionRegistry::get(opCtx).waitForActiveShardCollectionsToComplete(
-                    opCtx);
             } else if (isReplSet || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 // The default rwc document should only be deleted on plain replica sets and the
                 // config server replica set, not on shards or standalones.
@@ -348,13 +326,6 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
-
-                if (MONGO_unlikely(pauseBeforeDowngradingConfigMetadata.shouldFail())) {
-                    LOGV2(20503, "Hit pauseBeforeDowngradingConfigMetadata");
-                    pauseBeforeDowngradingConfigMetadata.pauseWhileSet(opCtx);
-                }
-                ShardingCatalogManager::get(opCtx)->upgradeOrDowngradeChunksAndTags(
-                    opCtx, ShardingCatalogManager::ConfigUpgradeType::kDowngrade);
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
