@@ -36,28 +36,17 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using write_ops::Insert;
-using write_ops::Update;
-using write_ops::UpdateOpEntry;
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
@@ -81,23 +70,25 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
                                                                          UUID uuid) const {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-    const auto collDesc = [opCtx, &nss]() -> ScopedCollectionDescription {
-        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
-    }();
-
-    if (!collDesc.isSharded() || !collDesc.uuidMatches(uuid)) {
-        // An unsharded collection can still become sharded so is not final. If the uuid doesn't
-        // match the one stored in the ScopedCollectionDescription, this implies that the collection
-        // has been dropped and recreated as sharded. We don't know what the old document key fields
-        // might have been in this case so we return just _id.
-        return {{"_id"}, false};
+    auto* const catalogCache = Grid::get(opCtx)->catalogCache();
+    auto swCollectionRoutingInfo = catalogCache->getCollectionRoutingInfo(opCtx, nss);
+    if (swCollectionRoutingInfo.isOK()) {
+        auto cm = swCollectionRoutingInfo.getValue().cm();
+        if (cm && cm->uuidMatches(uuid)) {
+            // Unpack the shard key. Collection is now sharded so the document key fields will never
+            // change, mark as final.
+            return {_shardKeyToDocumentKeyFields(cm->getShardKeyPattern().getKeyPatternFields()),
+                    true};
+        }
+    } else if (swCollectionRoutingInfo != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOK(std::move(swCollectionRoutingInfo));
     }
 
-    // Unpack the shard key. Collection is now sharded so the document key fields will never change,
-    // mark as final.
-    return {_shardKeyToDocumentKeyFields(collDesc.getKeyPatternFields()), true};
+    // An unsharded collection can still become sharded so is not final. If the uuid doesn't match
+    // the one stored in the ScopedCollectionDescription, this implies that the collection has been
+    // dropped and recreated as sharded. We don't know what the old document key fields might have
+    // been in this case so we return just _id.
+    return {{"_id"}, false};
 }
 
 Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,

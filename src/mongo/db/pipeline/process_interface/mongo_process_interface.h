@@ -323,10 +323,6 @@ public:
      * collection is not sharded or no longer exists, returns only _id. Also returns a boolean that
      * indicates whether the returned fields of the document key are final and will never change for
      * the given collection, either because the collection was dropped or has become sharded.
-     *
-     * This method is meant to be called from a mongod which owns at least one chunk for this
-     * collection. It will inspect the CollectionShardingState, not the CatalogCache. If asked about
-     * a collection not hosted on this shard, the answer will be incorrect.
      */
     virtual std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const = 0;
