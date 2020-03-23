@@ -4547,7 +4547,7 @@ tasks:
 
         burn_in_args="$burn_in_args"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --use-multiversion --verbose
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
 
   - command: archive.targz_pack
     params:
