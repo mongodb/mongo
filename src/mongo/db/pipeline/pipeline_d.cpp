@@ -488,6 +488,10 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                           const NamespaceString& nss,
                                           const AggregationRequest* aggRequest,
                                           Pipeline* pipeline) {
+    // Make a last effort to optimize pipeline stages before potentially detaching them to be pushed
+    // down into the query executor.
+    pipeline->optimizePipeline();
+
     Pipeline::SourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
 
