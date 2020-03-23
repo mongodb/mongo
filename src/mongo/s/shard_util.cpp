@@ -204,9 +204,11 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
 
     if (!status.isOK()) {
         LOGV2(22878,
-              "Split chunk {cmdObj} failed{causedBy_status}",
-              "cmdObj"_attr = redact(cmdObj),
-              "causedBy_status"_attr = causedBy(redact(status)));
+              "Split chunk {request} failed: {error}",
+              "Split chunk request against shard failed",
+              "request"_attr = redact(cmdObj),
+              "shardId"_attr = shardId,
+              "error"_attr = redact(status));
         return status.withContext("split failed");
     }
 
@@ -223,10 +225,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
         LOGV2_WARNING(
             22879,
             "Chunk migration will be skipped because splitChunk returned invalid response: "
-            "{cmdResponse}. Extracting {kShouldMigrate} field failed{causedBy_status}",
-            "cmdResponse"_attr = redact(cmdResponse),
-            "kShouldMigrate"_attr = kShouldMigrate,
-            "causedBy_status"_attr = causedBy(redact(status)));
+            "{response}. Extracting {field} field failed: {error}",
+            "Chunk migration will be skipped because extracting field from splitChunk response "
+            "failed",
+            "response"_attr = redact(cmdResponse),
+            "field"_attr = kShouldMigrate,
+            "error"_attr = redact(status));
     }
 
     return boost::optional<ChunkRange>();
