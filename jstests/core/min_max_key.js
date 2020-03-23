@@ -1,4 +1,7 @@
 // Tests the behavior of queries using MinKey and MaxKey
+// SERVER-35921 is fixed in 4.4 and up and the fix is not planned for backport, hence we
+// need to blacklist the test from 4.2/4.4 multiversion testing.
+// @tags: [requires_fcv_44]
 
 (function() {
 "use strict";
