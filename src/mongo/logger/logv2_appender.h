@@ -113,7 +113,8 @@ public:
                     static_cast<std::underlying_type_t<logv2::LogTag::Value>>(logTagValue) |
                     static_cast<std::underlying_type_t<logv2::LogTag::Value>>(_tag))},
                 event.isTruncatable() ? logv2::LogTruncation::Enabled
-                                      : logv2::LogTruncation::Disabled},
+                                      : logv2::LogTruncation::Disabled,
+                logv2::FatalMode::kContinue},
 
             "{}",
             "message"_attr = message);

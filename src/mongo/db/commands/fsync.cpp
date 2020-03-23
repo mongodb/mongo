@@ -433,8 +433,7 @@ void FSyncLockThread::run() {
         }
 
     } catch (const std::exception& e) {
-        LOGV2_FATAL(20474, "FSyncLockThread exception: {e_what}", "e_what"_attr = e.what());
-        fassertFailed(40350);
+        LOGV2_FATAL(40350, "FSyncLockThread exception: {e_what}", "e_what"_attr = e.what());
     }
 }
 

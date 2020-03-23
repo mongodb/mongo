@@ -182,7 +182,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
             std::string message = str::stream()
                 << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
                 << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
-            LOGV2_FATAL(21240, "{message}", "message"_attr = message);
+            LOGV2_FATAL_CONTINUE(21240, "{message}", "message"_attr = message);
             return {ErrorCodes::BadValue, message};
         }
 

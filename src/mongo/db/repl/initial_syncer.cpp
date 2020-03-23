@@ -1651,7 +1651,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     if (_stats.failedInitialSyncAttempts >= _stats.maxFailedInitialSyncAttempts) {
         const std::string err =
             "The maximum number of retries have been exhausted for initial sync.";
-        LOGV2_FATAL(21202, "{err}", "err"_attr = err);
+        LOGV2_FATAL_CONTINUE(21202, "{err}", "err"_attr = err);
 
         initialSyncFailures.increment();
 

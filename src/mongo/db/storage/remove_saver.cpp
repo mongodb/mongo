@@ -84,52 +84,47 @@ RemoveSaver::~RemoveSaver() {
         size_t resultLen;
         Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
-            LOGV2_FATAL(23736,
+            LOGV2_FATAL(34350,
                         "Unable to finalize DataProtector while closing RemoveSaver: {status}",
                         "status"_attr = redact(status));
-            fassertFailed(34350);
         }
 
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
-            LOGV2_FATAL(23737,
+            LOGV2_FATAL(34351,
                         "Couldn't write finalized DataProtector data to: {file_string} for remove "
                         "saving: {errnoWithDescription}",
                         "file_string"_attr = _file.string(),
                         "errnoWithDescription"_attr = redact(errnoWithDescription()));
-            fassertFailed(34351);
         }
 
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
         status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             LOGV2_FATAL(
-                23738,
+                34352,
                 "Unable to get finalizeTag from DataProtector while closing RemoveSaver: {status}",
                 "status"_attr = redact(status));
-            fassertFailed(34352);
         }
 
         if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
-            LOGV2_FATAL(23739,
+            LOGV2_FATAL(34353,
                         "Attempted to write tag of size {resultLen} when DataProtector only "
                         "reserved {protector_getNumberOfBytesReservedForTag} bytes",
                         "resultLen"_attr = resultLen,
                         "protector_getNumberOfBytesReservedForTag"_attr =
                             _protector->getNumberOfBytesReservedForTag());
-            fassertFailed(34353);
         }
 
         _out->seekp(0);
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
 
         if (_out->fail()) {
-            LOGV2_FATAL(23740,
+            LOGV2_FATAL(34354,
                         "Couldn't write finalizeTag from DataProtector to: {file_string} for "
                         "remove saving: {errnoWithDescription}",
                         "file_string"_attr = _file.string(),
                         "errnoWithDescription"_attr = redact(errnoWithDescription()));
-            fassertFailed(34354);
         }
     }
 }

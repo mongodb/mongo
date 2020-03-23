@@ -611,7 +611,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
     invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
-        LOGV2_FATAL(21234, "attempting to replicate ops while primary");
+        LOGV2_FATAL_CONTINUE(21234, "Attempting to replicate ops while primary");
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};
     }
@@ -701,16 +701,17 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             for (auto it = statusVector.cbegin(); it != statusVector.cend(); ++it) {
                 const auto& status = *it;
                 if (!status.isOK()) {
-                    LOGV2_FATAL(21235,
-                                "Failed to apply batch of operations. Number of operations in "
-                                "batch: {size}. First operation: {first}. Last operation: "
-                                "{last}. Oplog application failed in writer thread "
-                                "{thread}: {status}",
-                                "size"_attr = ops.size(),
-                                "first"_attr = redact(ops.front().toBSON()),
-                                "last"_attr = redact(ops.back().toBSON()),
-                                "thread"_attr = std::distance(statusVector.cbegin(), it),
-                                "status"_attr = redact(status));
+                    LOGV2_FATAL_CONTINUE(
+                        21235,
+                        "Failed to apply batch of operations. Number of operations in "
+                        "batch: {size}. First operation: {first}. Last operation: "
+                        "{last}. Oplog application failed in writer thread "
+                        "{thread}: {status}",
+                        "size"_attr = ops.size(),
+                        "first"_attr = redact(ops.front().toBSON()),
+                        "last"_attr = redact(ops.back().toBSON()),
+                        "thread"_attr = std::distance(statusVector.cbegin(), it),
+                        "status"_attr = redact(status));
                     return status;
                 }
             }
@@ -732,10 +733,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
               "point is disabled.");
         while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
             if (inShutdown()) {
-                LOGV2_FATAL(21236,
-                            "Turn off pauseBatchApplicationBeforeCompletion before attempting "
-                            "clean shutdown");
-                fassertFailedNoTrace(50798);
+                LOGV2_FATAL_NOTRACE(
+                    50798,
+                    "Turn off pauseBatchApplicationBeforeCompletion before attempting "
+                    "clean shutdown");
             }
             sleepmillis(100);
         }
@@ -1054,10 +1055,10 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                         continue;
                     }
 
-                    LOGV2_FATAL(21237,
-                                "Error applying operation ({entry}): {status}",
-                                "entry"_attr = redact(entry.toBSON()),
-                                "status"_attr = causedBy(redact(status)));
+                    LOGV2_FATAL_CONTINUE(21237,
+                                         "Error applying operation ({entry}): {status}",
+                                         "entry"_attr = redact(entry.toBSON()),
+                                         "status"_attr = causedBy(redact(status)));
                     return status;
                 }
             } catch (const DBException& e) {
@@ -1068,10 +1069,10 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                     continue;
                 }
 
-                LOGV2_FATAL(21238,
-                            "writer worker caught exception: {e} on: {entry}",
-                            "e"_attr = redact(e),
-                            "entry"_attr = redact(entry.toBSON()));
+                LOGV2_FATAL_CONTINUE(21238,
+                                     "writer worker caught exception: {e} on: {entry}",
+                                     "e"_attr = redact(e),
+                                     "entry"_attr = redact(entry.toBSON()));
                 return e.toStatus();
             }
         }

@@ -490,11 +490,10 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
         case kConfigPreStart:
         case kConfigStartingUp:
         case kConfigReplicationDisabled:
-            LOGV2_FATAL(21491,
+            LOGV2_FATAL(18807,
                         "Reconfiguration request occurred while _rsConfigState == "
                         "{_rsConfigState}; aborting.",
                         "_rsConfigState"_attr = int(_rsConfigState));
-            fassertFailed(18807);
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||

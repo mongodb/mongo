@@ -85,10 +85,9 @@ public:
     CetRegistrationAgent(const std::string& name, ExecutorTestCaseFactory makeTest) {
         auto& entry = executorTestCaseRegistry()[name];
         if (entry) {
-            LOGV2_FATAL(23924,
+            LOGV2_FATAL(28713,
                         "Multiple attempts to register ExecutorTest named {name}",
                         "name"_attr = name);
-            fassertFailed(28713);
         }
         entry = std::move(makeTest);
     }

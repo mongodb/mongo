@@ -57,8 +57,7 @@ Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
         // have extra info.
         if (kDebugBuild) {
             // Make it easier to find this issue by fatally failing in debug builds.
-            LOGV2_FATAL(23805, "Code {code} is supposed to have extra info", "code"_attr = code);
-            fassertFailed(40680);
+            LOGV2_FATAL(40680, "Code {code} is supposed to have extra info", "code"_attr = code);
         }
 
         // In release builds, replace the error code. This maintains the invariant that all Statuses
@@ -126,9 +125,10 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& sb, const
             // This really shouldn't happen but it would be really annoying if it broke error
             // logging in production.
             if (kDebugBuild) {
-                LOGV2_FATAL(23806,
-                            "Error serializing extra info for {status_code} in Status::toString()",
-                            "status_code"_attr = status.code());
+                LOGV2_FATAL_CONTINUE(
+                    23806,
+                    "Error serializing extra info for {status_code} in Status::toString()",
+                    "status_code"_attr = status.code());
                 std::terminate();
             }
         }

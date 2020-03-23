@@ -133,8 +133,7 @@ void growWorkingSize(std::size_t bytes) {
 
     if (!GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize)) {
         auto str = errnoWithPrefix("Failed to GetProcessWorkingSetSize");
-        LOGV2_FATAL(23708, "{str}", "str"_attr = str);
-        fassertFailed(40285);
+        LOGV2_FATAL(40285, "{str}", "str"_attr = str);
     }
 
     // Since allocation request is aligned to page size, we can just add it to the current working
@@ -148,8 +147,7 @@ void growWorkingSize(std::size_t bytes) {
                                     QUOTA_LIMITS_HARDWS_MIN_ENABLE |
                                         QUOTA_LIMITS_HARDWS_MAX_DISABLE)) {
         auto str = errnoWithPrefix("Failed to SetProcessWorkingSetSizeEx");
-        LOGV2_FATAL(23709, "{str}", "str"_attr = str);
-        fassertFailed(40286);
+        LOGV2_FATAL(40286, "{str}", "str"_attr = str);
     }
 }
 
@@ -168,8 +166,7 @@ void* systemAllocate(std::size_t bytes) {
 
     if (!ptr) {
         auto str = errnoWithPrefix("Failed to VirtualAlloc");
-        LOGV2_FATAL(23710, "{str}", "str"_attr = str);
-        fassertFailed(28835);
+        LOGV2_FATAL(28835, "{str}", "str"_attr = str);
     }
 
     if (VirtualLock(ptr, bytes) == 0) {
@@ -185,8 +182,7 @@ void* systemAllocate(std::size_t bytes) {
         }
 
         auto str = errnoWithPrefix("Failed to VirtualLock");
-        LOGV2_FATAL(23711, "{str}", "str"_attr = str);
-        fassertFailed(28828);
+        LOGV2_FATAL(28828, "{str}", "str"_attr = str);
     }
 
     return ptr;
@@ -195,16 +191,14 @@ void* systemAllocate(std::size_t bytes) {
 void systemDeallocate(void* ptr, std::size_t bytes) {
     if (VirtualUnlock(ptr, bytes) == 0) {
         auto str = errnoWithPrefix("Failed to VirtualUnlock");
-        LOGV2_FATAL(23712, "{str}", "str"_attr = str);
-        fassertFailed(28829);
+        LOGV2_FATAL(28829, "{str}", "str"_attr = str);
     }
 
     // VirtualFree needs to take 0 as the size parameter for MEM_RELEASE
     // (that's how the api works).
     if (VirtualFree(ptr, 0, MEM_RELEASE) == 0) {
         auto str = errnoWithPrefix("Failed to VirtualFree");
-        LOGV2_FATAL(23713, "{str}", "str"_attr = str);
-        fassertFailed(28830);
+        LOGV2_FATAL(28830, "{str}", "str"_attr = str);
     }
 }
 
@@ -271,18 +265,16 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
 #endif
 
     if (munlock(ptr, bytes) != 0) {
-        LOGV2_FATAL(23716,
+        LOGV2_FATAL(28833,
                     "{errnoWithPrefix_Failed_to_munlock}",
                     "errnoWithPrefix_Failed_to_munlock"_attr =
                         errnoWithPrefix("Failed to munlock"));
-        fassertFailed(28833);
     }
 
     if (munmap(ptr, bytes) != 0) {
-        LOGV2_FATAL(23717,
+        LOGV2_FATAL(28834,
                     "{errnoWithPrefix_Failed_to_munmap}",
                     "errnoWithPrefix_Failed_to_munmap"_attr = errnoWithPrefix("Failed to munmap"));
-        fassertFailed(28834);
     }
 }
 

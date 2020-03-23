@@ -78,10 +78,9 @@ public:
     TptRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {
         auto& entry = threadPoolTestCaseRegistry()[name];
         if (entry) {
-            LOGV2_FATAL(23922,
+            LOGV2_FATAL(34355,
                         "Multiple attempts to register ThreadPoolTest named {name}",
                         "name"_attr = name);
-            fassertFailed(34355);
         }
         entry = std::move(makeTest);
     }
@@ -96,10 +95,9 @@ public:
     TptDeathRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {
         auto& entry = threadPoolTestCaseRegistry()[name];
         if (entry) {
-            LOGV2_FATAL(23923,
+            LOGV2_FATAL(34356,
                         "Multiple attempts to register ThreadPoolDeathTest named {name}",
                         "name"_attr = name);
-            fassertFailed(34356);
         }
         entry = [makeTest](ThreadPoolFactory makeThreadPool) {
             return std::make_unique<::mongo::unittest::DeathTest<T>>(std::move(makeThreadPool));

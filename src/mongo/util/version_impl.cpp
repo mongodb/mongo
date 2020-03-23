@@ -88,8 +88,7 @@ public:
 #error This targeted Windows version is not supported
 #endif  // NTDDI_VERSION
 #else
-        LOGV2_FATAL(23868, "VersionInfoInterface::targetMinOS is only available for Windows");
-        fassertFailed(40277);
+        LOGV2_FATAL(40277, "VersionInfoInterface::targetMinOS is only available for Windows");
 #endif
     }
 

@@ -267,11 +267,10 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     Collection* oplogCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
-        LOGV2_FATAL(21022,
-                    "The oplog collection {oplogNss} is not capped; a capped oplog is a "
-                    "requirement for replication to function.",
-                    "oplogNss"_attr = oplogNss);
-        fassertFailedNoTrace(40115);
+        LOGV2_FATAL_NOTRACE(40115,
+                            "The oplog collection {oplogNss} is not capped; a capped oplog is a "
+                            "requirement for replication to function.",
+                            "oplogNss"_attr = oplogNss);
     }
 }
 
@@ -531,13 +530,12 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                 // current version of mongod with --repair and then proceed with normal startup.
                 status = {ErrorCodes::MustUpgrade, status.reason()};
             }
-            LOGV2_FATAL(21023,
-                        "Unable to start mongod due to an incompatibility with the data files and"
-                        " this version of mongod: {status}",
-                        "status"_attr = redact(status));
-            LOGV2_FATAL(21024,
-                        "Please consult our documentation when trying to downgrade to a previous"
-                        " major release");
+            LOGV2_FATAL_CONTINUE(
+                21023,
+                "Unable to start mongod due to an incompatibility with the data files and"
+                " this version of mongod: {status}. Please consult our documentation when trying "
+                "to downgrade to a previous major release",
+                "status"_attr = redact(status));
             quickExit(EXIT_NEED_UPGRADE);
             MONGO_UNREACHABLE;
         }
@@ -642,11 +640,9 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present and we do not need to start up via initial sync.
     if (!fcvDocumentExists && nonLocalDatabases && !needInitialSync) {
-        LOGV2_FATAL(
-            21025,
-            "Unable to start up mongod due to missing featureCompatibilityVersion document.");
-        LOGV2_FATAL(21026, "Please run with --repair to restore the document.");
-        fassertFailedNoTrace(40652);
+        LOGV2_FATAL_NOTRACE(40652,
+                            "Unable to start up mongod due to missing featureCompatibilityVersion "
+                            "document. Please run with --repair to restore the document.");
     }
 
     LOGV2_DEBUG(21017, 1, "done repairDatabases");

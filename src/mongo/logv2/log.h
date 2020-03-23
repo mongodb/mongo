@@ -79,6 +79,11 @@ const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
 
 namespace mongo {
 
+#define MAKE_OPTIONS_ARG2(ARG0, ARG1) \
+    ::mongo::logv2::LogOptions {      \
+        ARG0, ARG1                    \
+    }
+
 #define LOGV2_IMPL(ID, SEVERITY, OPTIONS, MESSAGE, ...) \
     ::mongo::logv2::detail::doLog(ID, SEVERITY, OPTIONS, FMT_STRING(MESSAGE), ##__VA_ARGS__)
 
@@ -142,20 +147,53 @@ namespace mongo {
                MESSAGE,                                            \
                ##__VA_ARGS__)
 
-#define LOGV2_FATAL(ID, MESSAGE, ...)                                            \
-    LOGV2_IMPL(ID,                                                               \
-               ::mongo::logv2::LogSeverity::Severe(),                            \
-               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-               MESSAGE,                                                          \
+#define LOGV2_FATAL(ID, MESSAGE, ...)                                                \
+    do {                                                                             \
+        LOGV2_IMPL(ID,                                                               \
+                   ::mongo::logv2::LogSeverity::Severe(),                            \
+                   ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
+                   MESSAGE,                                                          \
+                   ##__VA_ARGS__);                                                   \
+        fassertFailed(ID);                                                           \
+    } while (false)
+
+#define LOGV2_FATAL_NOTRACE(ID, MESSAGE, ...)                                    \
+    do {                                                                         \
+        LOGV2_IMPL(ID,                                                           \
+                   ::mongo::logv2::LogSeverity::Severe(),                        \
+                   MAKE_OPTIONS_ARG2(MongoLogV2DefaultComponent_component,       \
+                                     ::mongo::logv2::FatalMode::kAssertNoTrace), \
+                   MESSAGE,                                                      \
+                   ##__VA_ARGS__);                                               \
+        fassertFailedNoTrace(ID);                                                \
+    } while (false)
+
+#define LOGV2_FATAL_CONTINUE(ID, MESSAGE, ...)                          \
+    LOGV2_IMPL(ID,                                                      \
+               ::mongo::logv2::LogSeverity::Severe(),                   \
+               MAKE_OPTIONS_ARG2(MongoLogV2DefaultComponent_component,  \
+                                 ::mongo::logv2::FatalMode::kContinue), \
+               MESSAGE,                                                 \
                ##__VA_ARGS__)
 
-#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MESSAGE, ...)             \
-    LOGV2_IMPL(ID,                                                 \
-               ::mongo::logv2::LogSeverity::Severe(),              \
-               ::mongo::logv2::LogOptions::ensureValidComponent(   \
-                   OPTIONS, MongoLogV2DefaultComponent_component), \
-               MESSAGE,                                            \
-               ##__VA_ARGS__)
+#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MESSAGE, ...)                              \
+    do {                                                                            \
+        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent( \
+            OPTIONS, MongoLogV2DefaultComponent_component);                         \
+        LOGV2_IMPL(ID,                                                              \
+                   ::mongo::logv2::LogSeverity::Severe(),                           \
+                   optionsMacroLocal_,                                              \
+                   MESSAGE,                                                         \
+                   ##__VA_ARGS__);                                                  \
+        switch (optionsMacroLocal_.fatalMode()) {                                   \
+            case ::mongo::logv2::FatalMode::kAssert:                                \
+                fassertFailed(ID);                                                  \
+            case ::mongo::logv2::FatalMode::kAssertNoTrace:                         \
+                fassertFailedNoTrace(ID);                                           \
+            case ::mongo::logv2::FatalMode::kContinue:                              \
+                break;                                                              \
+        };                                                                          \
+    } while (false)
 
 #define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MESSAGE, ...)                               \
     do {                                                                                     \

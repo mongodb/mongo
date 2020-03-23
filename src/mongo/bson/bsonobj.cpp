@@ -120,11 +120,10 @@ BSONObj BSONObj::copy() const {
     // undefined behavior.
     if (int sizeAfter = objsize(); sizeAfter != size) {
         LOGV2_FATAL(
-            20103,
+            31323,
             "BSONObj::copy() - size {sizeAfter} differs from previously observed size {size}",
             "sizeAfter"_attr = sizeAfter,
             "size"_attr = size);
-        fassertFailed(31323);
     }
     memcpy(storage.get(), objdata(), size);
     return BSONObj(std::move(storage));
@@ -168,11 +167,10 @@ void BSONObj::_validateUnownedSize(int size) const {
     // the size to ever be invalid. This means that the unowned memory we are reading has
     // changed, and we must exit immediately to avoid further undefined behavior.
     if (!isOwned() && (size < kMinBSONLength || size > BufferMaxSize)) {
-        LOGV2_FATAL(51772,
+        LOGV2_FATAL(31322,
                     "BSONObj::_validateUnownedSize() - size {size} of unowned BSONObj is invalid "
                     "and differs from previously validated size.",
                     "size"_attr = size);
-        fassertFailed(31322);
     }
 }
 

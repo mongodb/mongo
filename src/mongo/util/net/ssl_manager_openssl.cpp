@@ -2009,8 +2009,7 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
         }
 
         if ((notBeforeMillis > Date_t::now()) || (Date_t::now() > notAfterMillis)) {
-            LOGV2_FATAL(23875, "The provided SSL certificate is expired or not yet valid.");
-            fassertFailedNoTrace(28652);
+            LOGV2_FATAL_NOTRACE(28652, "The provided SSL certificate is expired or not yet valid.");
         }
 
         *serverCertificateExpirationDate = notAfterMillis;

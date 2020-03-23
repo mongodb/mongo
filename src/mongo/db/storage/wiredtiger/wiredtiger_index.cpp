@@ -1331,14 +1331,13 @@ private:
         _typeBits.resetFromBuffer(&br);
 
         if (!br.atEof()) {
-            LOGV2_FATAL(51795,
+            LOGV2_FATAL(28608,
                         "Unique index cursor seeing multiple records for key {key} in index "
                         "{index} ({uri}) belonging to collection {collection}",
                         "key"_attr = redact(curr(kWantKey)->key),
                         "index"_attr = _idx.indexName(),
                         "uri"_attr = _idx.uri(),
                         "collection"_attr = _idx.collectionNamespace());
-            fassertFailed(28608);
         }
     }
 };

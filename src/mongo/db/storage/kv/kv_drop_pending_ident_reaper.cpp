@@ -57,13 +57,12 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
         info.ident = ident.toString();
         _dropPendingIdents.insert(std::make_pair(dropTimestamp, info));
     } else {
-        LOGV2_FATAL(22238,
-                    "Failed to add drop-pending ident {ident} ({nss}) with drop timestamp "
-                    "{dropTimestamp}: duplicate timestamp and ident pair.",
-                    "ident"_attr = ident,
-                    "nss"_attr = nss,
-                    "dropTimestamp"_attr = dropTimestamp);
-        fassertFailedNoTrace(51023);
+        LOGV2_FATAL_NOTRACE(51023,
+                            "Failed to add drop-pending ident {ident} ({nss}) with drop timestamp "
+                            "{dropTimestamp}: duplicate timestamp and ident pair.",
+                            "ident"_attr = ident,
+                            "nss"_attr = nss,
+                            "dropTimestamp"_attr = dropTimestamp);
     }
 }
 
@@ -121,14 +120,14 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             WriteUnitOfWork wuow(opCtx);
             auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), ident);
             if (!status.isOK()) {
-                LOGV2_FATAL(22239,
-                            "Failed to remove drop-pending ident {ident}(ns: {nss}) with drop "
-                            "timestamp {dropTimestamp}: {status}",
-                            "ident"_attr = ident,
-                            "nss"_attr = nss,
-                            "dropTimestamp"_attr = dropTimestamp,
-                            "status"_attr = status);
-                fassertFailedNoTrace(51022);
+                LOGV2_FATAL_NOTRACE(
+                    51022,
+                    "Failed to remove drop-pending ident {ident}(ns: {nss}) with drop "
+                    "timestamp {dropTimestamp}: {status}",
+                    "ident"_attr = ident,
+                    "nss"_attr = nss,
+                    "dropTimestamp"_attr = dropTimestamp,
+                    "status"_attr = status);
             }
             wuow.commit();
         }

@@ -65,8 +65,7 @@ void NetworkInterfaceThreadPool::_dtorImpl() {
 void NetworkInterfaceThreadPool::startup() {
     stdx::unique_lock<Latch> lk(_mutex);
     if (_started) {
-        LOGV2_FATAL(23790, "Attempting to start pool, but it has already started");
-        fassertFailed(34358);
+        LOGV2_FATAL(34358, "Attempting to start pool, but it has already started");
     }
     _started = true;
 
@@ -87,8 +86,7 @@ void NetworkInterfaceThreadPool::join() {
         stdx::unique_lock<Latch> lk(_mutex);
 
         if (_joining) {
-            LOGV2_FATAL(23791, "Attempted to join pool more than once");
-            fassertFailed(34357);
+            LOGV2_FATAL(34357, "Attempted to join pool more than once");
         }
 
         _joining = true;

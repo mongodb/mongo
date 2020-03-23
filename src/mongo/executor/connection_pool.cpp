@@ -340,8 +340,7 @@ public:
 
     void fassertSSLModeIs(transport::ConnectSSLMode desired) const {
         if (desired != _sslMode) {
-            LOGV2_FATAL(22580, "Mixing ssl modes for a single host is not supported");
-            fassertFailedNoTrace(51043);
+            LOGV2_FATAL_NOTRACE(51043, "Mixing ssl modes for a single host is not supported");
         }
     }
 
@@ -1016,10 +1015,9 @@ void ConnectionPool::SpecificPool::spawnConnections() {
             // make a new connection and put it in processing
             handle = _parent->_factory->makeConnection(_hostAndPort, _sslMode, _generation);
         } catch (std::system_error& e) {
-            LOGV2_FATAL(22581,
+            LOGV2_FATAL(40336,
                         "Failed to construct a new connection object: {e_what}",
                         "e_what"_attr = e.what());
-            fassertFailed(40336);
         }
 
         _processingPool[handle.get()] = handle;

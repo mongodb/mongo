@@ -283,10 +283,9 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
     if (_isActive()) {
         return;
     }
-    LOGV2_FATAL(22417,
+    LOGV2_FATAL(28575,
                 "Recovery unit is not active. Current state: {getState}",
                 "getState"_attr = toString(_getState()));
-    fassertFailed(28575);
 }
 
 boost::optional<int64_t> WiredTigerRecoveryUnit::getOplogVisibilityTs() {

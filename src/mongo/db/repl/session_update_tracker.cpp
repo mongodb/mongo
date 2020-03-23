@@ -191,18 +191,16 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
         return;
     }
 
-    LOGV2_FATAL(23792,
-                "Entry for session {lsid} has txnNumber {sessionInfo_getTxnNumber} < "
-                "{existingSessionInfo_getTxnNumber}",
-                "lsid"_attr = lsid->toBSON(),
-                "sessionInfo_getTxnNumber"_attr = *sessionInfo.getTxnNumber(),
-                "existingSessionInfo_getTxnNumber"_attr = *existingSessionInfo.getTxnNumber());
-    LOGV2_FATAL(23793, "New oplog entry: {entry}", "entry"_attr = redact(entry.toString()));
-    LOGV2_FATAL(23794,
-                "Existing oplog entry: {iter_second}",
-                "iter_second"_attr = redact(iter->second.toString()));
-
-    fassertFailedNoTrace(50843);
+    LOGV2_FATAL_NOTRACE(50843,
+                        "Entry for session {lsid} has txnNumber {sessionInfo_getTxnNumber} < "
+                        "{existingSessionInfo_getTxnNumber}. New oplog entry: {newEntry}, Existing "
+                        "oplog entry: {existingEntry}",
+                        "lsid"_attr = lsid->toBSON(),
+                        "sessionInfo_getTxnNumber"_attr = *sessionInfo.getTxnNumber(),
+                        "existingSessionInfo_getTxnNumber"_attr =
+                            *existingSessionInfo.getTxnNumber(),
+                        "newEntry"_attr = redact(entry.toString()),
+                        "existingEntry"_attr = redact(iter->second.toString()));
 }
 
 std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {

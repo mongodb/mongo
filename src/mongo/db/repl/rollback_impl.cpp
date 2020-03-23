@@ -1010,12 +1010,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     if (commonPointOpTime.getTimestamp() < *stableTimestamp) {
         // This is an fassert rather than an invariant, since it can happen if the server was
         // recently upgraded to enableMajorityReadConcern=true.
-        LOGV2_FATAL(21644,
-                    "Common point must be at least stable timestamp, common point: "
-                    "{commonPoint}, stable timestamp: {stableTimestamp}",
-                    "commonPoint"_attr = commonPointOpTime.getTimestamp(),
-                    "stableTimestamp"_attr = *stableTimestamp);
-        fassertFailedNoTrace(51121);
+        LOGV2_FATAL_NOTRACE(51121,
+                            "Common point must be at least stable timestamp, common point: "
+                            "{commonPoint}, stable timestamp: {stableTimestamp}",
+                            "commonPoint"_attr = commonPointOpTime.getTimestamp(),
+                            "stableTimestamp"_attr = *stableTimestamp);
     }
 
     return commonPointSW.getValue();
@@ -1082,13 +1081,14 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
     } else if (document.getStatus().code() == ErrorCodes::NoSuchKey) {
         return boost::none;
     } else {
-        LOGV2_FATAL(21645,
-                    "Rollback failed to read document with {id} in namespace {ns} with uuid "
-                    "{uuid}{status}",
-                    "id"_attr = redact(id),
-                    "ns"_attr = nss.ns(),
-                    "uuid"_attr = uuid.toString(),
-                    "status"_attr = causedBy(document.getStatus()));
+        LOGV2_FATAL_CONTINUE(
+            21645,
+            "Rollback failed to read document with {id} in namespace {ns} with uuid "
+            "{uuid}{status}",
+            "id"_attr = redact(id),
+            "ns"_attr = nss.ns(),
+            "uuid"_attr = uuid.toString(),
+            "status"_attr = causedBy(document.getStatus()));
         fassert(50751, document.getStatus());
     }
 
@@ -1197,15 +1197,14 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 
     auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {
-        LOGV2_FATAL(21646,
-                    "Failed to transition into {targetState}; expected to be in "
-                    "state {expectedState}; found self in "
-                    "{actualState}{status}",
-                    "targetState"_attr = MemberState(MemberState::RS_SECONDARY),
-                    "expectedState"_attr = MemberState(MemberState::RS_ROLLBACK),
-                    "actualState"_attr = _replicationCoordinator->getMemberState(),
-                    "status"_attr = causedBy(status));
-        fassertFailedNoTrace(40408);
+        LOGV2_FATAL_NOTRACE(40408,
+                            "Failed to transition into {targetState}; expected to be in "
+                            "state {expectedState}; found self in "
+                            "{actualState}{status}",
+                            "targetState"_attr = MemberState(MemberState::RS_SECONDARY),
+                            "expectedState"_attr = MemberState(MemberState::RS_ROLLBACK),
+                            "actualState"_attr = _replicationCoordinator->getMemberState(),
+                            "status"_attr = causedBy(status));
     }
 }
 

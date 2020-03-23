@@ -285,11 +285,10 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
     }
 
     if (!swHandle.isOK()) {
-        LOGV2_FATAL(24092,
+        LOGV2_FATAL(40140,
                     "Can't continue refresh for replica set {name} due to {swHandle_getStatus}",
                     "name"_attr = name,
                     "swHandle_getStatus"_attr = redact(swHandle.getStatus()));
-        fassertFailed(40140);
     }
 
     refresherHandle = std::move(swHandle.getValue());
@@ -521,11 +520,10 @@ void Refresher::scheduleNetworkRequests() {
 
         if (!swHandle.isOK()) {
             LOGV2_FATAL(
-                24093,
+                31176,
                 "Can't continue scan for replica set {set_name} due to {swHandle_getStatus}",
                 "set_name"_attr = _set->name,
                 "swHandle_getStatus"_attr = redact(swHandle.getStatus()));
-            fassertFailed(31176);
         }
 
         node->scheduledIsMasterHandle = uassertStatusOK(std::move(swHandle));

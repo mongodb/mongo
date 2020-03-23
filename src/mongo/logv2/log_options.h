@@ -44,6 +44,8 @@ public:
     ErrorCodes::Error errorCode;
 };
 
+enum class FatalMode { kAssert, kAssertNoTrace, kContinue };
+
 class LogOptions {
 public:
     static LogOptions ensureValidComponent(LogOptions options, LogComponent component) {
@@ -55,6 +57,8 @@ public:
 
     LogOptions(LogComponent component) : _component(component) {}
 
+    LogOptions(LogComponent component, FatalMode mode) : _component(component), _fatalMode(mode) {}
+
     LogOptions(LogDomain* domain) : _domain(domain) {}
 
     LogOptions(LogTag tags) : _tags(tags) {}
@@ -64,13 +68,23 @@ public:
     LogOptions(UserAssertAfterLog uassertAfterLog)
         : _userAssertErrorCode(uassertAfterLog.errorCode) {}
 
+    LogOptions(FatalMode mode) : _fatalMode(mode) {}
+
     LogOptions(LogTag tags, LogTruncation truncation) : _tags(tags), _truncation(truncation) {}
 
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
         : _domain(domain), _tags(tags), _component(component) {}
 
-    LogOptions(LogComponent component, LogDomain* domain, LogTag tags, LogTruncation truncation)
-        : _domain(domain), _tags(tags), _component(component), _truncation(truncation) {}
+    LogOptions(LogComponent component,
+               LogDomain* domain,
+               LogTag tags,
+               LogTruncation truncation,
+               FatalMode fatalMode)
+        : _domain(domain),
+          _tags(tags),
+          _component(component),
+          _truncation(truncation),
+          _fatalMode(fatalMode) {}
 
     LogComponent component() const {
         return _component;
@@ -92,12 +106,17 @@ public:
         return _userAssertErrorCode;
     }
 
+    FatalMode fatalMode() const {
+        return _fatalMode;
+    }
+
 private:
     LogDomain* _domain = &LogManager::global().getGlobalDomain();
     LogTag _tags;
     LogComponent _component = LogComponent::kAutomaticDetermination;
     LogTruncation _truncation = constants::kDefaultTruncation;
     ErrorCodes::Error _userAssertErrorCode = ErrorCodes::OK;
+    FatalMode _fatalMode = FatalMode::kAssert;
 };
 
 }  // namespace logv2

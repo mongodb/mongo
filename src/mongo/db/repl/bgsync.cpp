@@ -216,10 +216,9 @@ void BackgroundSync::_run() {
             sleepmillis(100);  // sleep a bit to keep from hammering this thread with temp. errors.
         } catch (const std::exception& e2) {
             // redact(std::exception&) doesn't work
-            LOGV2_FATAL(21127,
+            LOGV2_FATAL(28546,
                         "sync producer exception: {exception}",
                         "exception"_attr = redact(e2.what()));
-            fassertFailed(28546);
         }
     }
     // No need to reset optimes here because we are shutting down.
@@ -764,7 +763,7 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     if (status.isOK()) {
         LOGV2(21105, "Rollback successful.");
     } else if (status == ErrorCodes::UnrecoverableRollbackError) {
-        LOGV2_FATAL(
+        LOGV2_FATAL_CONTINUE(
             21128, "Rollback failed with unrecoverable error: {status}", "status"_attr = status);
         fassertFailedWithStatusNoTrace(50666, status);
     } else {
@@ -880,11 +879,10 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         throw;
     } catch (const DBException& ex) {
-        LOGV2_FATAL(21129,
+        LOGV2_FATAL(18904,
                     "Problem reading {namespace}: {exception}",
                     "namespace"_attr = NamespaceString::kRsOplogNamespace.ns(),
                     "exception"_attr = redact(ex));
-        fassertFailed(18904);
     }
 
     OplogEntry parsedEntry(oplogEntry);

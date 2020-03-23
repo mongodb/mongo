@@ -214,10 +214,8 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         const auto hostAndPortElem = data["hostAndPort"];
         if (!hostAndPortElem) {
             LOGV2_FATAL(
-                21839,
-                "'forceSyncSoureCandidate' parameter set with invalid host and port: {data}",
-                "data"_attr = data);
-            fassertFailed(50835);
+                3873103,
+                "Sync source read preference 'secondaryOnly' with chaining disabled is not valid.");
         }
 
         const auto hostAndPort = HostAndPort(hostAndPortElem.checkAndGetStringData());
@@ -2308,10 +2306,9 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
         ss << "node is not a member of a valid replica set configuration";
     }
     if (!hasWrittenToStream) {
-        LOGV2_FATAL(21842,
+        LOGV2_FATAL(26011,
                     "Invalid UnelectableReasonMask value 0x{value}",
                     "value"_attr = integerToHex(ur));
-        fassertFailed(26011);
     }
     ss << " (mask 0x" << integerToHex(ur) << ")";
     return ss;

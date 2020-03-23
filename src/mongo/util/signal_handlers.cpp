@@ -179,9 +179,9 @@ bool waitForSignal(const sigset_t& sigset, SignalWaitResult* result) {
         if (result->sig == -1) {
             if (errsv == EINTR)
                 continue;
-            LOGV2_FATAL(23385,
-                        "sigwaitinfo failed with error:{strerror_errsv}",
-                        "strerror_errsv"_attr = strerror(errsv));
+            LOGV2_FATAL_CONTINUE(23385,
+                                 "sigwaitinfo failed with error:{strerror_errsv}",
+                                 "strerror_errsv"_attr = strerror(errsv));
             return false;
         }
         return true;
@@ -279,10 +279,9 @@ void signalProcessingThread(LogFileStatus rotate) {
     errno = 0;
     if (int r = pthread_sigmask(SIG_SETMASK, &waitSignals, nullptr); r != 0) {
         int errsv = errno;
-        LOGV2_FATAL(23386,
+        LOGV2_FATAL(31377,
                     "pthread_sigmask failed with error:{strerror_errsv}",
                     "strerror_errsv"_attr = strerror(errsv));
-        fassertFailed(31377);
     }
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
