@@ -4,6 +4,8 @@
 //   does_not_support_stepdowns,
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
+//   TODO SERVER-47060 Unblacklist once FCV constants are updated for 4.6.
+//   requires_fcv_44,
 // ]
 
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
