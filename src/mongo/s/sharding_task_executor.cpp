@@ -186,28 +186,32 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             if (!shard) {
                 LOGV2_DEBUG(22870,
                             1,
-                            "Could not find shard containing host: {target}",
-                            "target"_attr = target);
+                            "Could not find shard containing host: {host}",
+                            "Could not find shard containing host",
+                            "host"_attr = target);
             }
 
             if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
                 LOGV2_FATAL_NOTRACE(
                     50710,
                     "This mongos server must be upgraded. It is attempting to communicate "
-                    "with "
-                    "an upgraded cluster with which it is incompatible. Error: "
-                    "'{args_response_status}' Crashing in order to bring attention to the "
-                    "incompatibility, rather "
-                    "than erroring endlessly.",
-                    "args_response_status"_attr = args.response.status.toString());
+                    "with an upgraded cluster with which it is incompatible. Error: {error} "
+                    "Crashing in order to bring attention to the incompatibility, rather than "
+                    "erroring endlessly.",
+                    "This mongos is attempting to communicate with an upgraded cluster with which "
+                    "it is incompatible, so this mongos should be upgraded. Crashing in order to "
+                    "bring attention to the incompatibility rather than erroring endlessly.",
+                    "error"_attr = args.response.status);
             }
 
             if (shard) {
                 shard->updateReplSetMonitor(target, args.response.status);
             }
 
-            LOGV2_DEBUG(
-                22871, 1, "Error processing the remote request, not updating operationTime or gLE");
+            LOGV2_DEBUG(22871,
+                        1,
+                        "Error processing the remote request, not updating operationTime or gLE",
+                        "error"_attr = args.response.status);
 
             return;
         }
@@ -239,8 +243,10 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
                 auto shardConn = ConnectionString::parse(target.toString());
                 if (!shardConn.isOK()) {
                     LOGV2_ERROR(22874,
-                                "got bad host string in saveGLEStats: {target}",
-                                "target"_attr = target);
+                                "Could not parse connection string to update getLastError stats: "
+                                "{connectionString}",
+                                "Could not parse connection string to update getLastError stats",
+                                "connectionString"_attr = target);
                 }
 
                 clusterGLE->addHostOpTime(shardConn.getValue(),
@@ -248,11 +254,11 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
                                                      shardingMetadata.getLastElectionId()));
             } else if (swShardingMetadata.getStatus() != ErrorCodes::NoSuchKey) {
                 LOGV2_WARNING(22872,
-                              "Got invalid sharding metadata {swShardingMetadata_getStatus} "
-                              "metadata object was '{args_response_data}'",
-                              "swShardingMetadata_getStatus"_attr =
-                                  redact(swShardingMetadata.getStatus()),
-                              "args_response_data"_attr = redact(args.response.data));
+                              "Got invalid sharding metadata {error} "
+                              "metadata object was '{response}'",
+                              "Could not parse sharding metadata from response",
+                              "error"_attr = redact(swShardingMetadata.getStatus()),
+                              "response"_attr = redact(args.response.data));
             }
         }
     };

@@ -75,17 +75,18 @@ void reportStatus(OperationContext* opCtx,
         getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
 
     try {
-        Grid::get(opCtx)
-            ->catalogClient()
-            ->updateConfigDocument(opCtx,
-                                   MongosType::ConfigNS,
-                                   BSON(MongosType::name(instanceId)),
-                                   BSON("$set" << mType.toBSON()),
-                                   true,
-                                   ShardingCatalogClient::kMajorityWriteConcern)
-            .status_with_transitional_ignore();
-    } catch (const std::exception& e) {
-        LOGV2(22875, "Caught exception while reporting uptime: {e_what}", "e_what"_attr = e.what());
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+            opCtx,
+            MongosType::ConfigNS,
+            BSON(MongosType::name(instanceId)),
+            BSON("$set" << mType.toBSON()),
+            true,
+            ShardingCatalogClient::kMajorityWriteConcern));
+    } catch (const DBException& e) {
+        LOGV2(22875,
+              "Error while attempting to write this node's uptime to config.mongos: {error}",
+              "Error while attempting to write this node's uptime to config.mongos",
+              "error"_attr = e);
     }
 }
 
@@ -118,17 +119,19 @@ void ShardingUptimeReporter::startPeriodicThread() {
                                   ->refreshAndCheck(opCtx.get());
                 if (!status.isOK()) {
                     LOGV2_WARNING(22876,
-                                  "failed to refresh mongos settings{causedBy_status}",
-                                  "causedBy_status"_attr = causedBy(status));
+                                  "Failed to refresh balancer settings from config server: {error}",
+                                  "Failed to refresh balancer settings from config server",
+                                  "error"_attr = status);
                 }
 
                 try {
                     ReadWriteConcernDefaults::get(opCtx.get()->getServiceContext())
                         .refreshIfNecessary(opCtx.get());
                 } catch (const DBException& ex) {
-                    LOGV2_WARNING(22877,
-                                  "failed to refresh RWC defaults{causedBy_ex_toStatus}",
-                                  "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
+                    LOGV2_WARNING(
+                        22877,
+                        "Failed to refresh readConcern/writeConcern defaults from config server",
+                        "error"_attr = redact(ex));
                 }
             }
 

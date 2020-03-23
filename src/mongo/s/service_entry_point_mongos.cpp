@@ -119,10 +119,11 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
 
         LOGV2_DEBUG(22867,
                     3,
-                    "Request::process begin ns: {nss} msg id: {msgId} op: {networkOpToString_op}",
-                    "nss"_attr = nss,
+                    "Request::process begin ns: {namespace} msg id: {msgId} op: {operation}",
+                    "Starting operation",
+                    "namespace"_attr = nss,
                     "msgId"_attr = msgId,
-                    "networkOpToString_op"_attr = networkOpToString(op));
+                    "operation"_attr = networkOpToString(op));
 
         switch (op) {
             case dbQuery:
@@ -152,19 +153,20 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
 
         LOGV2_DEBUG(22868,
                     3,
-                    "Request::process end ns: {nss} msg id: {msgId} op: {networkOpToString_op}",
-                    "nss"_attr = nss,
+                    "Request::process end ns: {namespace} msg id: {msgId} op: {operation}",
+                    "Done processing operation",
+                    "namespace"_attr = nss,
                     "msgId"_attr = msgId,
-                    "networkOpToString_op"_attr = networkOpToString(op));
+                    "operation"_attr = networkOpToString(op));
 
     } catch (const DBException& ex) {
-        LOGV2_DEBUG(
-            22869,
-            1,
-            "Exception thrown while processing {networkOpToString_op} op for {nss_ns}{causedBy_ex}",
-            "networkOpToString_op"_attr = networkOpToString(op),
-            "nss_ns"_attr = nss.ns(),
-            "causedBy_ex"_attr = causedBy(ex));
+        LOGV2_DEBUG(22869,
+                    1,
+                    "Exception thrown while processing {operation} op for {namespace}: {error}",
+                    "Got an error while processing operation",
+                    "operation"_attr = networkOpToString(op),
+                    "namespace"_attr = nss.ns(),
+                    "error"_attr = ex);
 
         if (op == dbQuery || op == dbGetMore) {
             dbResponse = replyToQuery(buildErrReply(ex), ResultFlag_ErrSet);
