@@ -1,7 +1,6 @@
 /*
  * Test that the index commands are correctly propagated if they are executed
  * either before, during, or after the initial split critical section.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

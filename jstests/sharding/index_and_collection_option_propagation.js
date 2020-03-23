@@ -8,8 +8,6 @@
  *   are reported in the 'raw' shard responses) as long as at least one shard returns success.
  *
  * This test verifies this behavior.
- *
- * @tags: [need_fixing_for_46]
  */
 
 // This test shuts down a shard.
@@ -82,9 +80,6 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-// TODO (SERVER-45017): Remove this check when v4.4 becomes last-stable.
-const isLastStableMongos = (jsTestOptions().mongosBinVersion === "last-stable");
-
 var st = new ShardingTest(
     {shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
 
@@ -130,11 +125,7 @@ var res;
 // createIndex
 res = st.s.getDB(dbName).getCollection(collName).createIndex({"idx2": 1});
 assert.commandWorked(res);
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardIndexes("idx2", [st.shard1], [st.shard2]);
@@ -142,11 +133,7 @@ checkShardIndexes("idx2", [st.shard1], [st.shard2]);
 // dropIndex
 res = st.s.getDB(dbName).getCollection(collName).dropIndex("idx1_1");
 assert.commandWorked(res);
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardIndexes("idx1", [], [st.shard1, st.shard2]);
@@ -162,11 +149,7 @@ res = st.s.getDB(dbName).runCommand({
     validationAction: "warn"
 });
 assert.commandWorked(res);
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardCollOption("validator", validationOption2, [st.shard1], [st.shard2]);
@@ -184,17 +167,8 @@ assert.neq(null, res.errmsg, tojson(res));
 
 // If all shards report the same error, the overall command error should be set to that error.
 res = st.s.getDB(dbName).getCollection(collName).createIndex({});
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));
-    assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
-    assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
-    assert.eq(res.raw[st.shard2.host].ok, 0, tojson(res));
-    assert.eq(res.code, res.raw[st.shard2.host].code, tojson(res));
-    assert.eq(res.codeName, res.raw[st.shard2.host].codeName, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-    assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
+assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 0, tojson(res));
 assert.eq(res.code, res.raw[st.shard1.host].code, tojson(res));
 assert.eq(res.codeName, res.raw[st.shard1.host].codeName, tojson(res));
@@ -205,13 +179,7 @@ assert.neq(null, res.errmsg, tojson(res));
 // If all the non-ignorable errors reported by shards are the same, the overall command error
 // should be set to that error.
 res = st.s.getDB(dbName).getCollection(collName).createIndex({z: 1}, {unique: true});
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));
-    assert.eq(ErrorCodes.CannotCreateIndex, res.raw[st.shard0.host].code, tojson(res));
-    assert.eq("CannotCreateIndex", res.raw[st.shard0.host].codeName, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 0, tojson(res));
 assert.eq(null, res.raw[st.shard2.host], tojson(res));
 assert.eq(ErrorCodes.CannotCreateIndex, res.raw[st.shard1.host].code, tojson(res));
@@ -238,19 +206,8 @@ assert(res.codeName === "HostUnreachable" || res.codeName === "FailedToSatisfyRe
 // If some shard returns a non-ignorable error, it should be reported as the command error, even
 // if other shards returned ignorable errors.
 res = st.s.getDB(dbName).getCollection(collName).createIndex({"validIdx": 1});
-if (isLastStableMongos) {
-    assert.eq(res.raw[st.shard0.host].ok, 0, tojson(res));  // shard was down
-    assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
-    assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
-    // We can expect to see 'FailedToSatisfyReadPreference' this time, because after the previous
-    // createIndexes attempt, mongos's ReplicaSetMonitor should have been updated.
-    assert.eq(res.code, ErrorCodes.FailedToSatisfyReadPreference, tojson(res));
-    assert.eq("FailedToSatisfyReadPreference", res.codeName, tojson(res));
-    assert.neq(null, res.errmsg, tojson(res));
-} else {
-    assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-    assert.eq(res.ok, 1, tojson(res));
-}
+assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
+assert.eq(res.ok, 1, tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));  // gets created on shard that owns chunks
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));  // shard does not own chunks
 

@@ -23,9 +23,6 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
 
     const keyFile = this.keyFile;
 
-    // TODO (SERVER-45017): Remove this check when v4.4 becomes last-stable.
-    const isMixedVersion = this.isMixedVersionCluster();
-
     /**
      * Returns an array of config.collections docs for undropped collections.
      */
@@ -42,20 +39,6 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
      */
     function makeGetIndexDocsFunc(ns) {
         return () => {
-            if (isMixedVersion) {
-                return mongos.getCollection(ns)
-                    .aggregate(
-                        [
-                            {$indexStats: {}},
-                            {
-                                $group:
-                                    {_id: "$host", indexes: {$push: {key: "$key", name: "$name"}}}
-                            },
-                            {$project: {_id: 0, host: "$_id", indexes: 1}}
-                        ],
-                        {readConcern: {level: "local"}})
-                    .toArray();
-            }
             return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
         };
     }
@@ -76,8 +59,7 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
             continue;
         }
 
-        const inconsistentIndexes =
-            ShardedIndexUtil.findInconsistentIndexesAcrossShards(indexDocs, isMixedVersion);
+        const inconsistentIndexes = ShardedIndexUtil.findInconsistentIndexesAcrossShards(indexDocs);
 
         for (const shard in inconsistentIndexes) {
             const shardInconsistentIndexes = inconsistentIndexes[shard];

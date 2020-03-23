@@ -1,6 +1,5 @@
 /*
  * Test that the index commands abort concurrent outgoing migrations.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
@@ -144,41 +143,6 @@ stepNames.forEach((stepName) => {
     // or may not perform schema validation.
     if (stepName == moveChunkStepNames.reachedSteadyState) {
         assert.commandWorked(st.shard1.getCollection(ns).insert({x: 1}));
-    }
-});
-
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-
-stepNames.forEach((stepName) => {
-    jsTest.log(
-        `Testing that createIndexes in FCV 4.2 aborts concurrent outgoing migrations that are in step ${
-            stepName}...`);
-    const collName = "testCreateIndexesFCV42MoveChunkStep" + stepName;
-    const ns = dbName + "." + collName;
-
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-
-    assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
-        const coll = st.s.getCollection(ns);
-
-        // Insert document into collection to avoid optimization for index creation on an empty
-        // collection. This allows us to pause index builds on the collection using a fail point.
-        assert.commandWorked(coll.insert({a: 1}));
-
-        assert.commandWorked(coll.createIndexes([index]));
-    });
-
-    // Verify that the index command succeeds.
-    ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, index);
-
-    // If createIndexes is run after the migration has reached the steady state, shard1
-    // will not have the index created by the command because the index just does not
-    // exist when shard1 clones the collection options and indexes from shard0. However,
-    // if createIndexes is run after the cloning step starts but before the steady state
-    // is reached, shard0 may have the index when shard1 does the cloning so shard1 may
-    // or may not have the index.
-    if (stepName == moveChunkStepNames.reachedSteadyState) {
-        ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
     }
 });
 

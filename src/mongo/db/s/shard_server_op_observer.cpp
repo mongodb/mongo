@@ -192,21 +192,10 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
 }
 
 /**
- * Aborts any ongoing migration for the given namespace if the observed operation was sent with a
- * shard version. Should only be called when observing index operations.
- *
- * TODO SERVER-45017: Update this comment once the check for a shard version is removed.
+ * Aborts any ongoing migration for the given namespace. Should only be called when observing
+ * index operations.
  */
 void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceString nss) {
-    // Only abort migrations if the request is versioned, meaning it came from a mongos using the
-    // 4.4 index operation protocol.
-    //
-    // TODO SERVER-45017: Remove this check once 4.4. is last-stable, since all index operations
-    // sent from a mongos will have shard versions.
-    if (!OperationShardingState::isOperationVersioned(opCtx)) {
-        return;
-    }
-
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);

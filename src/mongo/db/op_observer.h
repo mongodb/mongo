@@ -103,9 +103,6 @@ public:
                                    const CommitQuorumOptions& commitQuorum,
                                    bool fromMigrate) = 0;
 
-    /**
-     * TODO (SERVER-45017): Remove when v4.4 becomes last-stable.
-     */
     virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                               const NamespaceString& nss) = 0;
 
