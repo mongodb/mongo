@@ -124,8 +124,7 @@ const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction acti
         return fallbackVersionInfo;
     }
 
-    LOGV2_FATAL(23405, "Terminating because valid version info has not been configured");
-    fassertFailed(40278);
+    LOGV2_FATAL(40278, "Terminating because valid version info has not been configured");
 }
 
 std::string VersionInfoInterface::makeVersionString(StringData binaryName) const {

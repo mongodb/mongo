@@ -644,13 +644,12 @@ void initialize(int signal) {
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;
         LOGV2_FATAL(
-            23397,
+            31376,
             "{format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr}",
             "format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr"_attr =
                 format(FMT_STRING("Failed to install sigaction for signal {} ({})"),
                        signal,
                        strerror(savedErr)));
-        fassertFailed(31376);
     }
 }
 

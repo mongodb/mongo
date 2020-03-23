@@ -445,11 +445,10 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
 
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(opCtx);
     if (!lastVote.isOK()) {
-        LOGV2_FATAL(21429,
-                    "Error loading local voted for document at startup; {error}",
-                    "Error loading local voted for document at startup",
-                    "error"_attr = lastVote.getStatus());
-        fassertFailedNoTrace(40367);
+        LOGV2_FATAL_NOTRACE(40367,
+                            "Error loading local voted for document at startup; {error}",
+                            "Error loading local voted for document at startup",
+                            "error"_attr = lastVote.getStatus());
     }
     if (lastVote.getValue().getTerm() == OpTime::kInitialTerm) {
         // This log line is checked in unit tests.
@@ -468,11 +467,10 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
             auto initializingStatus = _replicationProcess->initializeRollbackID(opCtx);
             fassert(40424, initializingStatus);
         } else {
-            LOGV2_FATAL(21430,
-                        "Error loading local Rollback ID document at startup; {error}",
-                        "Error loading local Rollback ID document at startup",
-                        "error"_attr = status);
-            fassertFailedNoTrace(40428);
+            LOGV2_FATAL_NOTRACE(40428,
+                                "Error loading local Rollback ID document at startup; {error}",
+                                "Error loading local Rollback ID document at startup",
+                                "error"_attr = status);
         }
     }
 
@@ -488,27 +486,26 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     status = localConfig.initialize(cfg.getValue());
     if (!status.isOK()) {
         if (status.code() == ErrorCodes::RepairedReplicaSetNode) {
-            LOGV2_FATAL(
-                21431,
+            LOGV2_FATAL_NOTRACE(
+                50923,
                 "This instance has been repaired and may contain modified replicated data that "
                 "would not match other replica set members. To see your repaired data, start "
                 "mongod without the --replSet option. When you are finished recovering your "
                 "data and would like to perform a complete re-sync, please refer to the "
                 "documentation here: "
                 "https://docs.mongodb.com/manual/tutorial/resync-replica-set-member/");
-            fassertFailedNoTrace(50923);
         }
-        LOGV2_ERROR(21414,
-                    "Locally stored replica set configuration does not parse; See "
-                    "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-                    "for information on how to recover from this. Got \"{error}\" while parsing "
-                    "{config}",
-                    "Locally stored replica set configuration does not parse; See "
-                    "hhttp://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-                    "for information on how to recover from this",
-                    "error"_attr = status,
-                    "config"_attr = cfg.getValue());
-        fassertFailedNoTrace(28545);
+        LOGV2_FATAL_NOTRACE(
+            28545,
+            "Locally stored replica set configuration does not parse; See "
+            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
+            "for information on how to recover from this. Got \"{error}\" while parsing "
+            "{config}",
+            "Locally stored replica set configuration does not parse; See "
+            "hhttp://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
+            "for information on how to recover from this",
+            "error"_attr = status,
+            "config"_attr = cfg.getValue());
     }
 
     // Read the last op from the oplog after cleaning up any partially applied batches.
@@ -1162,9 +1159,9 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
                 // occurred after the node became primary and so the concurrent reconfig has updated
                 // the term appropriately.
                 if (reconfigStatus != ErrorCodes::ConfigurationInProgress) {
-                    LOGV2_FATAL(4508101,
-                                "Reconfig on stepup failed for unknown reasons",
-                                "error"_attr = reconfigStatus);
+                    LOGV2_FATAL_CONTINUE(4508101,
+                                         "Reconfig on stepup failed for unknown reasons",
+                                         "error"_attr = reconfigStatus);
                     fassertFailedWithStatus(31477, reconfigStatus);
                 }
             }
@@ -3245,11 +3242,10 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
                           "Cannot run replSetReconfig because the node is currently updating "
                           "its configuration");
         default:
-            LOGV2_FATAL(21432,
+            LOGV2_FATAL(18914,
                         "Unexpected _rsConfigState {_rsConfigState}",
                         "Unexpected _rsConfigState",
                         "_rsConfigState"_attr = int(_rsConfigState));
-            fassertFailed(18914);
     }
 
     invariant(_rsConfig.isInitialized());
@@ -3854,11 +3850,10 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _startElectSelfV1(StartElectionReasonEnum::kElectionTimeout);
             break;
         default:
-            LOGV2_FATAL(21433,
+            LOGV2_FATAL(26010,
                         "Unknown post member state update action {action}",
                         "Unknown post member state update action",
                         "action"_attr = static_cast<int>(action));
-            fassertFailed(26010);
     }
 }
 

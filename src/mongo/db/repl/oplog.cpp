@@ -272,11 +272,10 @@ void _logOpsInner(OperationContext* opCtx,
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
     if (!result.isOK()) {
-        LOGV2_FATAL(21263,
+        LOGV2_FATAL(17322,
                     "write to oplog failed: {error}",
                     "Write to oplog failed",
                     "error"_attr = result.toString());
-        fassertFailed(17322);
     }
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.

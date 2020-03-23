@@ -63,22 +63,20 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
         options.threadNamePrefix = str::stream() << options.poolName << '-';
     }
     if (options.maxThreads < 1) {
-        LOGV2_FATAL(23114,
+        LOGV2_FATAL(28702,
                     "Tried to create pool {options_poolName} with a maximum of "
                     "{options_maxThreads} but the maximum must be at least 1",
                     "options_poolName"_attr = options.poolName,
                     "options_maxThreads"_attr = options.maxThreads);
-        fassertFailed(28702);
     }
     if (options.minThreads > options.maxThreads) {
         LOGV2_FATAL(
-            23115,
+            28686,
             "Tried to create pool {options_poolName} with a minimum of {options_minThreads} which "
             "is more than the configured maximum of {options_maxThreads}",
             "options_poolName"_attr = options.poolName,
             "options_minThreads"_attr = options.minThreads,
             "options_maxThreads"_attr = options.maxThreads);
-        fassertFailed(28686);
     }
     return {std::move(options)};
 }
@@ -95,8 +93,7 @@ ThreadPool::~ThreadPool() {
     }
 
     if (shutdownComplete != _state) {
-        LOGV2_FATAL(23116, "Failed to shutdown pool during destruction");
-        fassertFailed(28704);
+        LOGV2_FATAL(28704, "Failed to shutdown pool during destruction");
     }
     invariant(_threads.empty());
     invariant(_pendingTasks.empty());
@@ -105,10 +102,9 @@ ThreadPool::~ThreadPool() {
 void ThreadPool::startup() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_state != preStart) {
-        LOGV2_FATAL(23117,
+        LOGV2_FATAL(28698,
                     "Attempting to start pool {options_poolName}, but it has already started",
                     "options_poolName"_attr = _options.poolName);
-        fassertFailed(28698);
     }
     _setState_inlock(running);
     invariant(_threads.empty());
@@ -164,10 +160,9 @@ void ThreadPool::_join_inlock(stdx::unique_lock<Latch>* lk) {
                 return true;
             case joining:
             case shutdownComplete:
-                LOGV2_FATAL(23118,
+                LOGV2_FATAL(28700,
                             "Attempted to join pool {options_poolName} more than once",
                             "options_poolName"_attr = _options.poolName);
-                fassertFailed(28700);
         }
         MONGO_UNREACHABLE;
     });
@@ -349,13 +344,13 @@ void ThreadPool::_consumeTasks() {
     --_numIdleThreads;
 
     if (_state != running) {
-        LOGV2_FATAL(23119,
-                    "State of pool {options_poolName} is {static_cast_int32_t_state}, but expected "
-                    "{static_cast_int32_t_running}",
-                    "options_poolName"_attr = _options.poolName,
-                    "static_cast_int32_t_state"_attr = static_cast<int32_t>(_state),
-                    "static_cast_int32_t_running"_attr = static_cast<int32_t>(running));
-        fassertFailedNoTrace(28701);
+        LOGV2_FATAL_NOTRACE(
+            28701,
+            "State of pool {options_poolName} is {static_cast_int32_t_state}, but expected "
+            "{static_cast_int32_t_running}",
+            "options_poolName"_attr = _options.poolName,
+            "static_cast_int32_t_state"_attr = static_cast<int32_t>(_state),
+            "static_cast_int32_t_running"_attr = static_cast<int32_t>(running));
     }
 
     // This thread is ending because it was idle for too long.  Find self in _threads, remove self
@@ -373,11 +368,10 @@ void ThreadPool::_consumeTasks() {
 
     std::ostringstream threadId;
     threadId << stdx::this_thread::get_id();
-    LOGV2_FATAL(4615600,
-                "Could not find this thread, with id {threadId} in pool {pool}",
-                "threadId"_attr = threadId.str(),
-                "pool"_attr = _options.poolName);
-    fassertFailedNoTrace(28703);
+    LOGV2_FATAL_NOTRACE(28703,
+                        "Could not find this thread, with id {threadId} in pool {pool}",
+                        "threadId"_attr = threadId.str(),
+                        "pool"_attr = _options.poolName);
 }
 
 void ThreadPool::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {

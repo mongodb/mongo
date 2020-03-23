@@ -210,10 +210,10 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
-        LOGV2_FATAL(21030,
-                    "Failed to repair database {dbName}: {status_reason}",
-                    "dbName"_attr = dbName,
-                    "status_reason"_attr = status.reason());
+        LOGV2_FATAL_CONTINUE(21030,
+                             "Failed to repair database {dbName}: {status_reason}",
+                             "dbName"_attr = dbName,
+                             "status_reason"_attr = status.reason());
     }
 
     try {
@@ -239,8 +239,8 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
         // have a UUID.
         throw;
     } catch (...) {
-        LOGV2_FATAL(21031,
-                    "Unexpected exception encountered while reopening database after repair.");
+        LOGV2_FATAL_CONTINUE(
+            21031, "Unexpected exception encountered while reopening database after repair.");
         std::terminate();  // Logs additional info about the specific error.
     }
 

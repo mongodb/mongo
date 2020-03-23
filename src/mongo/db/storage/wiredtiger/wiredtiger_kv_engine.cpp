@@ -865,17 +865,16 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         LOGV2_WARNING(22348, "WiredTiger metadata corruption detected");
 
         if (!_inRepairMode) {
-            LOGV2_FATAL(22362, "{kWTRepairMsg}", "kWTRepairMsg"_attr = kWTRepairMsg);
-            fassertFailedNoTrace(50944);
+            LOGV2_FATAL_NOTRACE(50944, "{kWTRepairMsg}", "kWTRepairMsg"_attr = kWTRepairMsg);
         }
     }
 
-    LOGV2_FATAL(22363,
-                "Reason: {wtRCToStatus_ret_reason}",
-                "wtRCToStatus_ret_reason"_attr = wtRCToStatus(ret).reason());
-    if (!_inRepairMode) {
-        fassertFailedNoTrace(28595);
-    }
+    logv2::FatalMode assertMode =
+        _inRepairMode ? logv2::FatalMode::kContinue : logv2::FatalMode::kAssertNoTrace;
+    LOGV2_FATAL_OPTIONS(28595,
+                        {assertMode},
+                        "Reason: {wtRCToStatus_ret_reason}",
+                        "wtRCToStatus_ret_reason"_attr = wtRCToStatus(ret).reason());
 
     // Always attempt to salvage metadata regardless of error code when in repair mode.
 
@@ -888,11 +887,10 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         return;
     }
 
-    LOGV2_FATAL(22364,
-                "{Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason}",
-                "Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason"_attr =
-                    "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason());
-    fassertFailedNoTrace(50947);
+    LOGV2_FATAL_NOTRACE(50947,
+                        "{Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason}",
+                        "Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason"_attr =
+                            "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason());
 }
 
 void WiredTigerKVEngine::cleanShutdown() {
@@ -1961,8 +1959,7 @@ bool WiredTigerKVEngine::_canRecoverToStableTimestamp() const {
 
 StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationContext* opCtx) {
     if (!supportsRecoverToStableTimestamp()) {
-        LOGV2_FATAL(22365, "WiredTiger is configured to not support recover to a stable timestamp");
-        fassertFailed(50665);
+        LOGV2_FATAL(50665, "WiredTiger is configured to not support recover to a stable timestamp");
     }
 
     if (!_canRecoverToStableTimestamp()) {
@@ -2040,9 +2037,8 @@ Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
     if (!supportsRecoveryTimestamp()) {
-        LOGV2_FATAL(22366,
+        LOGV2_FATAL(50745,
                     "WiredTiger is configured to not support providing a recovery timestamp");
-        fassertFailed(50745);
     }
 
     if (_recoveryTimestamp.isNull()) {

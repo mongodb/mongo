@@ -240,11 +240,10 @@ void ShardRegistry::startup(OperationContext* opCtx) {
     }
 
     if (!status.isOK()) {
-        LOGV2_FATAL(22737,
+        LOGV2_FATAL(40252,
                     "Error scheduling shard registry reload caused by {error}",
                     "Error scheduling shard registry reload",
                     "error"_attr = redact(status.getStatus()));
-        fassertFailed(40252);
     }
 }
 
@@ -285,11 +284,10 @@ void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
     }
 
     if (!status.isOK()) {
-        LOGV2_FATAL(22738,
+        LOGV2_FATAL(40253,
                     "Error scheduling shard registry reload caused by {error}",
                     "Error scheduling shard registry reload",
                     "error"_attr = redact(status.getStatus()));
-        fassertFailed(40253);
     }
 }
 

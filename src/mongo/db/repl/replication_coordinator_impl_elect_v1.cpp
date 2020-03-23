@@ -110,12 +110,11 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnu
             _topCoord->processLoseElection();
             return;
         default:
-            LOGV2_FATAL(21452,
+            LOGV2_FATAL(28641,
                         "Entered replica set election code while in illegal config state "
                         "{rsConfigState}",
                         "Entered replica set election code while in illegal config state",
                         "rsConfigState"_attr = int(_rsConfigState));
-            fassertFailed(28641);
     }
 
     auto finishedEvent = _makeEvent();

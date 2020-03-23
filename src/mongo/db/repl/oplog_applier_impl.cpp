@@ -618,7 +618,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
     invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
-        LOGV2_FATAL(21234, "Attempting to replicate ops while primary");
+        LOGV2_FATAL_CONTINUE(21234, "Attempting to replicate ops while primary");
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};
     }
@@ -708,19 +708,19 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             for (auto it = statusVector.cbegin(); it != statusVector.cend(); ++it) {
                 const auto& status = *it;
                 if (!status.isOK()) {
-                    LOGV2_FATAL(21235,
-                                "Failed to apply batch of operations. Number of operations in "
-                                "batch: {numOperationsInBatch}. First operation: {firstOperation}. "
-                                "Last operation: "
-                                "{lastOperation}. Oplog application failed in writer thread "
-                                "{failedWriterThread}: {error}",
-                                "Failed to apply batch of operations",
-                                "numOperationsInBatch"_attr = ops.size(),
-                                "firstOperation"_attr = redact(ops.front().toBSON()),
-                                "lastOperation"_attr = redact(ops.back().toBSON()),
-                                "failedWriterThread"_attr =
-                                    std::distance(statusVector.cbegin(), it),
-                                "error"_attr = redact(status));
+                    LOGV2_FATAL_CONTINUE(
+                        21235,
+                        "Failed to apply batch of operations. Number of operations in "
+                        "batch: {numOperationsInBatch}. First operation: {firstOperation}. "
+                        "Last operation: "
+                        "{lastOperation}. Oplog application failed in writer thread "
+                        "{failedWriterThread}: {error}",
+                        "Failed to apply batch of operations",
+                        "numOperationsInBatch"_attr = ops.size(),
+                        "firstOperation"_attr = redact(ops.front().toBSON()),
+                        "lastOperation"_attr = redact(ops.back().toBSON()),
+                        "failedWriterThread"_attr = std::distance(statusVector.cbegin(), it),
+                        "error"_attr = redact(status));
                     return status;
                 }
             }
@@ -741,10 +741,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
               "point is disabled");
         while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
             if (inShutdown()) {
-                LOGV2_FATAL(21236,
-                            "Turn off pauseBatchApplicationBeforeCompletion before attempting "
-                            "clean shutdown");
-                fassertFailedNoTrace(50798);
+                LOGV2_FATAL_NOTRACE(
+                    50798,
+                    "Turn off pauseBatchApplicationBeforeCompletion before attempting "
+                    "clean shutdown");
             }
             sleepmillis(100);
         }
@@ -1067,11 +1067,11 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                         continue;
                     }
 
-                    LOGV2_FATAL(21237,
-                                "Error applying operation ({oplogEntry}): {error}",
-                                "Error applying operation",
-                                "oplogEntry"_attr = redact(entry.toBSON()),
-                                "error"_attr = causedBy(redact(status)));
+                    LOGV2_FATAL_CONTINUE(21237,
+                                         "Error applying operation ({oplogEntry}): {error}",
+                                         "Error applying operation",
+                                         "oplogEntry"_attr = redact(entry.toBSON()),
+                                         "error"_attr = causedBy(redact(status)));
                     return status;
                 }
             } catch (const DBException& e) {
@@ -1082,11 +1082,11 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                     continue;
                 }
 
-                LOGV2_FATAL(21238,
-                            "writer worker caught exception: {error} on: {oplogEntry}",
-                            "Writer worker caught exception",
-                            "error"_attr = redact(e),
-                            "oplogEntry"_attr = redact(entry.toBSON()));
+                LOGV2_FATAL_CONTINUE(21238,
+                                     "writer worker caught exception: {error} on: {oplogEntry}",
+                                     "Writer worker caught exception",
+                                     "error"_attr = redact(e),
+                                     "oplogEntry"_attr = redact(entry.toBSON()));
                 return e.toStatus();
             }
         }

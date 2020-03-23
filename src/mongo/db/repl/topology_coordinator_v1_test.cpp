@@ -797,7 +797,7 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
-DEATH_TEST_F(TopoCoordTest, SecondaryOnlyAssertsWhenChainingNotAllowed, "3873102") {
+DEATH_TEST_F(TopoCoordTest, SecondaryOnlyAssertsWhenChainingNotAllowed, "3873103") {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "settings" << BSON("chainingAllowed" << false)

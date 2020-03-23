@@ -106,12 +106,11 @@ void SingleServerPingMonitor::_scheduleServerPing() {
     }
 
     if (!schedulePingHandle.isOK()) {
-        LOGV2_FATAL(23732,
+        LOGV2_FATAL(31434,
                     "Can't continue scheduling pings to {hostAndPort} due to "
                     "{schedulePingHandle_getStatus}",
                     "hostAndPort"_attr = _hostAndPort,
                     "schedulePingHandle_getStatus"_attr = redact(schedulePingHandle.getStatus()));
-        fassertFailed(31434);
     }
 
     _pingHandle = std::move(schedulePingHandle.getValue());
@@ -162,11 +161,10 @@ void SingleServerPingMonitor::_doServerPing() {
     }
 
     if (!remotePingHandle.isOK()) {
-        LOGV2_FATAL(23733,
+        LOGV2_FATAL(31435,
                     "Can't continue pinging {hostAndPort} due to {remotePingHandle_getStatus}",
                     "hostAndPort"_attr = _hostAndPort,
                     "remotePingHandle_getStatus"_attr = redact(remotePingHandle.getStatus()));
-        fassertFailed(31435);
     }
 
     // Update the _pingHandle so the ping can be canceled if the SingleServerPingMonitor gets

@@ -529,14 +529,15 @@ void _abortUnpreparedOrStashPreparedTransaction(
             txnParticipant->abortTransaction(opCtx);
     } catch (...) {
         // It is illegal for this to throw so we catch and log this here for diagnosability.
-        LOGV2_FATAL(21974,
-                    "Caught exception during transaction "
-                    "{opCtx_getTxnNumber}{isPrepared_stash_abort}{opCtx_getLogicalSessionId}: "
-                    "{exceptionToStatus}",
-                    "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                    "isPrepared_stash_abort"_attr = (isPrepared ? " stash " : " abort "),
-                    "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
-                    "exceptionToStatus"_attr = exceptionToStatus());
+        LOGV2_FATAL_CONTINUE(
+            21974,
+            "Caught exception during transaction "
+            "{opCtx_getTxnNumber}{isPrepared_stash_abort}{opCtx_getLogicalSessionId}: "
+            "{exceptionToStatus}",
+            "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
+            "isPrepared_stash_abort"_attr = (isPrepared ? " stash " : " abort "),
+            "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
+            "exceptionToStatus"_attr = exceptionToStatus());
         std::terminate();
     }
 }

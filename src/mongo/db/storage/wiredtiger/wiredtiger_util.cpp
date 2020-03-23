@@ -626,7 +626,7 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
                 "on"_attr = on);
     int ret = session->alter(session, uri.c_str(), setting.c_str());
     if (ret) {
-        LOGV2_FATAL(22437,
+        LOGV2_FATAL(50756,
                     "Failed to update log setting. Uri: {uri} Enable? {on} Ret: {ret} MD: "
                     "{existingMetadata} Msg: {session_strerror_session_ret}",
                     "uri"_attr = uri,
@@ -634,7 +634,6 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
                     "ret"_attr = ret,
                     "existingMetadata"_attr = redact(existingMetadata),
                     "session_strerror_session_ret"_attr = session->strerror(session, ret));
-        fassertFailed(50756);
     }
 
     return Status::OK();

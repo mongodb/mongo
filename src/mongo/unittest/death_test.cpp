@@ -54,7 +54,7 @@
     do {                                                              \
         if (-1 == (EXPR)) {                                           \
             const int err = errno;                                    \
-            LOGV2_FATAL(24138,                                        \
+            LOGV2_ERROR(24138,                                        \
                         "{expr} failed: {errno}",                     \
                         "expr"_attr = #EXPR,                          \
                         "errno"_attr = errnoWithDescription(err));    \

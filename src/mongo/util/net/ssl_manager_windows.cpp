@@ -402,8 +402,7 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
         BOOLEAN enabled = FALSE;
         BCryptGetFipsAlgorithmMode(&enabled);
         if (!enabled) {
-            LOGV2_FATAL(23281, "FIPS modes is not enabled on the operating system.");
-            fassertFailedNoTrace(50744);
+            LOGV2_FATAL_NOTRACE(50744, "FIPS modes is not enabled on the operating system.");
         }
     }
 
@@ -1598,8 +1597,7 @@ Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
 
         if ((FiletimeToULL(cert->pCertInfo->NotBefore) > currentTimeLong) ||
             (currentTimeLong > FiletimeToULL(cert->pCertInfo->NotAfter))) {
-            LOGV2_FATAL(23284, "The provided SSL certificate is expired or not yet valid.");
-            fassertFailedNoTrace(50755);
+            LOGV2_FATAL_NOTRACE(50755, "The provided SSL certificate is expired or not yet valid.");
         }
 
         *serverCertificateExpirationDate =

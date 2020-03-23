@@ -158,6 +158,8 @@ LOGV2_OPTIONS(1003, {LogComponent::kCommand}, "Log event to specified component"
 * `LOGV2_WARNING`
 * `LOGV2_ERROR`
 * `LOGV2_FATAL`
+* `LOGV2_FATAL_NOTRACE`
+* `LOGV2_FATAL_CONTINUE`
 
 There is also variations that take `LogOptions` if needed:
 
@@ -165,7 +167,9 @@ There is also variations that take `LogOptions` if needed:
 * `LOGV2_ERROR_OPTIONS`
 * `LOGV2_FATAL_OPTIONS`
 
-Fatal level log statements perform `fassert` after logging, using the provided ID as assert id. 
+Fatal level log statements using `LOGV2_FATAL` perform `fassert` after logging, using the provided ID as assert id. `LOGV2_FATAL_NOTRACE` perform `fassertNoTrace` and `LOGV2_FATAL_CONTINUE` does not `fassert` allowing for continued execution. `LOGV2_FATAL_CONTINUE` is meant to be used when a fatal error has occured but a different way of halting execution is desired such as `std::terminate` or `fassertFailedWithStatus`.
+
+`LOGV2_FATAL_OPTIONS` performs `fassert` by default like `LOGV2_FATAL` but this can be changed by setting the `FatalMode` on the `LogOptions`.
 
 Debug-level logging is slightly different where an additional parameter (as integer) required to indicate the desired debug level:
 

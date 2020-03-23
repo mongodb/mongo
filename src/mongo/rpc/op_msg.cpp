@@ -297,12 +297,11 @@ Message OpMsgBuilder::finish() {
         std::set<StringData> seenFields;
         for (auto elem : resumeBody().asTempObj()) {
             if (!(seenFields.insert(elem.fieldNameStringData()).second)) {
-                LOGV2_FATAL(22633,
+                LOGV2_FATAL(40474,
                             "OP_MSG with duplicate field '{elem_fieldNameStringData}' : "
                             "{resumeBody_asTempObj}",
                             "elem_fieldNameStringData"_attr = elem.fieldNameStringData(),
                             "resumeBody_asTempObj"_attr = redact(resumeBody().asTempObj()));
-                fassert(40474, false);
             }
         }
     }

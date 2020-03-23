@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -66,8 +66,8 @@
 #include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
-#include "mongo/logger/log_component.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
@@ -146,7 +146,7 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     {"FilterAllowedIndexFieldNames"});
 }  // namespace
 
-using logger::LogComponent;
+using logv2::LogComponent;
 using std::endl;
 
 void shutdown(ServiceContext* srvContext) {
@@ -183,7 +183,7 @@ void shutdown(ServiceContext* srvContext) {
     }
     setGlobalServiceContext(nullptr);
 
-    LOGV2_OPTIONS(22551, {logComponentV1toV2(LogComponent::kControl)}, "now exiting");
+    LOGV2_OPTIONS(22551, {LogComponent::kControl}, "now exiting");
 }
 
 
@@ -230,8 +230,7 @@ ServiceContext* initialize(const char* yaml_config) {
     }
 
     if (kDebugBuild)
-        LOGV2_OPTIONS(
-            22552, {logComponentV1toV2(LogComponent::kControl)}, "DEBUG build (which is slower)");
+        LOGV2_OPTIONS(22552, {LogComponent::kControl}, "DEBUG build (which is slower)");
 
     // The periodic runner is required by the storage engine to be running beforehand.
     auto periodicRunner = std::make_unique<PeriodicRunnerEmbedded>(
@@ -295,7 +294,7 @@ ServiceContext* initialize(const char* yaml_config) {
         repairDatabasesAndCheckVersion(startupOpCtx.get());
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(22555,
-                            {logComponentV1toV2(LogComponent::kControl)},
+                            logv2::LogOptions(LogComponent::kControl, logv2::FatalMode::kContinue),
                             "** IMPORTANT: {error_toStatus_reason}",
                             "error_toStatus_reason"_attr = error.toStatus().reason());
         quickExit(EXIT_NEED_DOWNGRADE);
