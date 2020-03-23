@@ -54,8 +54,22 @@ namespace {
 const int kMaxNumFailedHostRetryAttempts = 3;
 
 /**
- * Returns the sort key out of the $sortKey metadata field in 'obj'. This object is of the form
- * {'': 'firstSortKey', '': 'secondSortKey', ...}.
+ * Returns the sort key out of the $sortKey metadata field in 'obj'. The sort key should be
+ * formatted as an array with one value per field of the sort pattern:
+ *  {..., $sortKey: [<firstSortKeyComponent>, <secondSortKeyComponent>, ...], ...}
+ *
+ * This function returns the sort key not as an array, but as the equivalent BSONObj:
+ *   {"0": <firstSortKeyComponent>, "1": <secondSortKeyComponent>}
+ *
+ * The return value is allowed to omit the key names, so the caller should not rely on the key names
+ * being present. That is, the return value could consist of an object such as
+ *   {"": <firstSortKeyComponent>, "": <secondSortKeyComponent>}
+ *
+ * If 'compareWholeSortKey' is true, then the value inside the $sortKey is directly interpreted as a
+ * single-element sort key. For example, given the document
+ *   {..., $sortKey: <value>, ...}
+ * and 'compareWholeSortKey'=true, this function will return
+ *   {"": <value>}
  */
 BSONObj extractSortKey(BSONObj obj, bool compareWholeSortKey) {
     auto key = obj[AsyncResultsMerger::kSortKeyField];
@@ -63,12 +77,8 @@ BSONObj extractSortKey(BSONObj obj, bool compareWholeSortKey) {
     if (compareWholeSortKey) {
         return key.wrap();
     }
-    // TODO (SERVER-43361): We expect the sort key to be an array, but if the sort key originated
-    // from a 4.2 mongod, it will be a document, instead. Either way, 'isABSONObj()' will return
-    // true, and 'compareSortKeys()' will behave the same way. After branching for 4.5, we can
-    // tighten this invariant to specifically require a 'BSONArray' type.
-    invariant(key.isABSONObj());
-    return key.Obj();
+    invariant(key.type() == BSONType::Array);
+    return key.embeddedObject();
 }
 
 /**

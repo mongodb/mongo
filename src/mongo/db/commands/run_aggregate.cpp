@@ -216,8 +216,7 @@ bool handleCursorCommand(OperationContext* opCtx,
         // for later.
 
         auto* expCtx = exec->getExpCtx().get();
-        BSONObj next = expCtx->needsMerge ? nextDoc.toBsonWithMetaData(expCtx->sortKeyFormat)
-                                          : nextDoc.toBson();
+        BSONObj next = expCtx->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             exec->enqueue(nextDoc);
             stashedResult = true;
@@ -617,30 +616,6 @@ Status runAggregate(OperationContext* opCtx,
 
         invariant(collatorToUse);
         expCtx = makeExpressionContext(opCtx, request, std::move(*collatorToUse), uuid);
-
-        // If this is a shard server, we need to use the correct sort key format for the mongoS that
-        // generated this query. We determine the version by checking for the "use44SortKeys" flag
-        // in the aggregation request.
-        // TODO (SERVER-43361): This check will be unnecessary after branching for 4.5.
-        if (expCtx->fromMongos) {
-            if (request.getUse44SortKeys()) {
-                // This request originated with 4.4-or-newer mongoS, which can understand the new
-                // sort key format. Note: it's possible that merging will actually occur on a mongoD
-                // (for pipelines that merge on a shard), but if the mongoS is 4.4 or newer, all
-                // shard servers must also be 4.4 or newer.
-                expCtx->sortKeyFormat = SortKeyFormat::k44SortKey;
-            } else {
-                // This request originated with an older mongoS that will not understand the new
-                // sort key format. We must use the older format, which differs depending on whether
-                // or not the pipeline is a change stream. Non-$changeStream pipelines may still
-                // merge on a mongoD, but a 4.4 mongoD can still understand the 4.2 sort key format.
-                expCtx->sortKeyFormat = liteParsedPipeline.hasChangeStream()
-                    ? SortKeyFormat::k42ChangeStreamSortKey
-                    : SortKeyFormat::k42SortKey;
-            }
-        } else {
-            // Use default value for the ExpressionContext's 'sortKeyFormat' member variable.
-        }
 
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
 

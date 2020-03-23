@@ -470,7 +470,7 @@ constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 
-BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
+BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;
     toBson(&bb);
     if (!metadata()) {
@@ -481,24 +481,10 @@ BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
         bb.append(metaFieldTextScore, metadata().getTextScore());
     if (metadata().hasRandVal())
         bb.append(metaFieldRandVal, metadata().getRandVal());
-    if (metadata().hasSortKey()) {
-        switch (sortKeyFormat) {
-            case SortKeyFormat::k42ChangeStreamSortKey:
-                invariant(metadata().isSingleElementKey());
-                metadata().getSortKey().addToBsonObj(&bb, metaFieldSortKey);
-                break;
-            case SortKeyFormat::k42SortKey:
-                bb.append(metaFieldSortKey,
-                          DocumentMetadataFields::serializeSortKeyAsObject(
-                              metadata().isSingleElementKey(), metadata().getSortKey()));
-                break;
-            case SortKeyFormat::k44SortKey:
-                bb.append(metaFieldSortKey,
-                          DocumentMetadataFields::serializeSortKeyAsArray(
-                              metadata().isSingleElementKey(), metadata().getSortKey()));
-                break;
-        }
-    }
+    if (metadata().hasSortKey())
+        bb.append(metaFieldSortKey,
+                  DocumentMetadataFields::serializeSortKey(metadata().isSingleElementKey(),
+                                                           metadata().getSortKey()));
     if (metadata().hasGeoNearDistance())
         bb.append(metaFieldGeoNearDistance, metadata().getGeoNearDistance());
     if (metadata().hasGeoNearPoint())

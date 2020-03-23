@@ -218,10 +218,6 @@ public:
         return _runtimeConstants;
     }
 
-    bool getUse44SortKeys() const {
-        return _use44SortKeys;
-    }
-
     bool getIsMapReduceCommand() const {
         return _isMapReduceCommand;
     }
@@ -290,10 +286,6 @@ public:
         _runtimeConstants = std::move(runtimeConstants);
     }
 
-    void setUse44SortKeys(bool use44SortKeys) {
-        _use44SortKeys = use44SortKeys;
-    }
-
     void setIsMapReduceCommand(bool isMapReduce) {
         _isMapReduceCommand = isMapReduce;
     }
@@ -347,10 +339,6 @@ private:
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
-
-    // All aggregation requests from mongos-4.4 set this flag, indicating that shard results should
-    // use the updated sort key format when returning change stream results.
-    bool _use44SortKeys = false;
 
     // True when an aggregation was invoked by the MapReduce command.
     bool _isMapReduceCommand = false;

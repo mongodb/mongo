@@ -132,7 +132,7 @@ TEST_F(AsyncResultsMergerTest, SingleShardSorted) {
 
     // Shard responds; the handleBatchResponse callbacks are run and ARM's remotes get updated.
     std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch = {fromjson("{$sortKey: {'': 5}}"), fromjson("{$sortKey: {'': 6}}")};
+    std::vector<BSONObj> batch = {fromjson("{$sortKey: [5]}"), fromjson("{$sortKey: [6]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch);
     scheduleNetworkResponses(std::move(responses));
 
@@ -144,10 +144,10 @@ TEST_F(AsyncResultsMergerTest, SingleShardSorted) {
 
     // ARM returns all results in order.
     executor()->waitForEvent(readyEvent);
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 6}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [6]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // After returning all the buffered results, ARM returns EOF immediately because the cursor was
@@ -249,8 +249,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSorted) {
 
     // First shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
     std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: {'': 5}}"),
-                                   fromjson("{$sortKey: {'': 6}}")};
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: [5]}"), fromjson("{$sortKey: [6]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch1);
     scheduleNetworkResponses(std::move(responses));
 
@@ -262,8 +261,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSorted) {
 
     // Second shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
     responses.clear();
-    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: {'': 3}}"),
-                                   fromjson("{$sortKey: {'': 9}}")};
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: [3]}"), fromjson("{$sortKey: [9]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch2);
     scheduleNetworkResponses(std::move(responses));
 
@@ -273,16 +271,16 @@ TEST_F(AsyncResultsMergerTest, MultiShardSorted) {
 
     // ARM returns all results in sorted order.
     executor()->waitForEvent(readyEvent);
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 3}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [3]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 6}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [6]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 9}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [9]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // After returning all the buffered results, the ARM returns EOF immediately because both shards
@@ -404,14 +402,13 @@ TEST_F(AsyncResultsMergerTest, CompoundSortKey) {
 
     // Deliver responses.
     std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: {'': 5, '': 9}}"),
-                                   fromjson("{$sortKey: {'': 4, '': 20}}")};
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: [5, 9]}"), fromjson("{$sortKey: [4, 20]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch1);
-    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: {'': 10, '': 11}}"),
-                                   fromjson("{$sortKey: {'': 4, '': 4}}")};
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: [10, 11]}"),
+                                   fromjson("{$sortKey: [4, 4]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch2);
-    std::vector<BSONObj> batch3 = {fromjson("{$sortKey: {'': 10, '': 12}}"),
-                                   fromjson("{$sortKey: {'': 5, '': 9}}")};
+    std::vector<BSONObj> batch3 = {fromjson("{$sortKey: [10, 12]}"),
+                                   fromjson("{$sortKey: [5, 9]}")};
     responses.emplace_back(kTestNss, CursorId(0), batch3);
     scheduleNetworkResponses(std::move(responses));
     executor()->waitForEvent(readyEvent);
@@ -419,22 +416,22 @@ TEST_F(AsyncResultsMergerTest, CompoundSortKey) {
     // ARM returns all results in sorted order.
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(arm->remotesExhausted());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10, '': 11}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [10, 11]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10, '': 12}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [10, 12]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5, 9]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5, 9]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 4, '': 4}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [4, 4]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 4, '': 20}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [4, 20]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
 
     // After returning all the buffered results, the ARM returns EOF immediately because both shards
@@ -1346,8 +1343,8 @@ DEATH_TEST_REGEX_F(
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     auto firstCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': {_data: '"
-                      << firstDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 1}}, $sortKey: [{_data: '"
+                      << firstDocSortKey.firstElement().String() << "'}]}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1379,8 +1376,8 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     auto firstCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': {_data: '"
-                      << firstDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 1}}, $sortKey: [{_data: '"
+                      << firstDocSortKey.firstElement().String() << "'}]}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1407,8 +1404,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     auto firstCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': {data: '"
-                      << firstDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 1}}, $sortKey: [{data: '"
+                      << firstDocSortKey.firstElement().String() << "'}]}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1458,8 +1455,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 6));
     auto firstCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': {_data: '"
-                      << firstDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 1}}, $sortKey: [{_data: '"
+                      << firstDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
     auto firstDoc = batch1.front();
     responses.emplace_back(kTestNss, CursorId(123), batch1, boost::none, pbrtFirstCursor);
@@ -1487,8 +1484,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 6));
     auto secondCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 2}}, $sortKey: {'': {_data: '"
-                      << secondDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 2}}, $sortKey: [{_data: '"
+                      << secondDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     auto secondDoc = batch2.front();
     responses.emplace_back(kTestNss, CursorId(456), batch2, boost::none, pbrtSecondCursor);
@@ -1536,8 +1533,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
     auto firstCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': {_data: '"
-                      << firstDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 1}}, $sortKey: [{_data: '"
+                      << firstDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
     responses.emplace_back(kTestNss, CursorId(123), batch1, boost::none, pbrtFirstCursor);
     scheduleNetworkResponses(std::move(responses));
@@ -1564,8 +1561,8 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 5));
     auto secondCursorResponse = fromjson(
         str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 3)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 2}}, $sortKey: {'': {_data: '"
-                      << secondDocSortKey.firstElement().String() << "'}}}");
+                      << "', documentKey: {_id: 2}}, $sortKey: [{_data: '"
+                      << secondDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     // The last observed time should still be later than the first shard, so we can get the data
     // from it.

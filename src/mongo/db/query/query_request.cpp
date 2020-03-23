@@ -417,7 +417,10 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             if (!status.isOK()) {
                 return status;
             }
-            qr->_use44SortKeys = el.boolean();
+
+            // TODO SERVER-47065: A 4.6 node still has to accept the '_use44SortKeys' field, since
+            // it could be included in a command sent from a 4.4 mongos. In 4.7 development, this
+            // code to tolerate the '_use44SortKeys' field can be deleted.
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -601,10 +604,6 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (!_resumeAfter.isEmpty()) {
         cmdBuilder->append(kResumeAfterField, _resumeAfter);
-    }
-
-    if (_use44SortKeys) {
-        cmdBuilder->append(kUse44SortKeys, true);
     }
 }
 

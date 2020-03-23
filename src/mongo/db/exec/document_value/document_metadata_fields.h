@@ -77,26 +77,12 @@ public:
     static void deserializeForSorter(BufReader& buf, DocumentMetadataFields* out);
 
     /**
-     * Converts a Value representing an in-memory sort key to a BSONObj representing a serialized
-     * sort key. If 'isSingleElementKey' is true, returns a BSON object with 'value' as its only
-     * value - and an empty field name. Otherwise returns a BSONObj with one field for each value in
-     * the array, each field using the empty string as the key name.
-     *
-     * Note that this format for serializing a sort key is deprecated and will be removed as part of
-     * SERVER-43361. The serialized sort key is a BSONObj with a field for each key component. Each
-     * field name is the empty string, meaning that the fields have the same name
-     * (e.g., {"": 1, "": 2}). The new preferred way to serialize a sort key is as a BSONArray
-     * (e.g.: [1, 2]), which can be done with the 'serializeSortKeyAsArray()' function.
-     */
-    static BSONObj serializeSortKeyAsObject(bool isSingleElementKey, const Value& value);
-
-    /**
      * Converts a Value representing an in-memory sort key to a BSONArray representing a serialized
      * sort key. If 'isSingleElementKey' is true, returns a BSONArray with 'value' as its only
      * element. Otherwise, converts 'value' (which is expected to be an Array) to a BSONArray. Any
      * Value elements whose value is "missing" get converted to BSONNull.
      */
-    static BSONArray serializeSortKeyAsArray(bool isSingleElementKey, const Value& value);
+    static BSONArray serializeSortKey(bool isSingleElementKey, const Value& value);
 
     /**
      * Converts a BSONObj representing a serialized sort key into a Value, which we use for

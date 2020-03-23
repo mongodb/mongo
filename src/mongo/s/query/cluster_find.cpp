@@ -162,10 +162,6 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     // Any expansion of the 'showRecordId' flag should have already happened on mongos.
     newQR->setShowRecordId(false);
 
-    // Indicate to shard servers that this is a 4.4 or newer mongoS, and they should serialize sort
-    // keys in the new format.
-    newQR->setUse44SortKeys(true);
-
     invariant(newQR->validate());
     return std::move(newQR);
 }
@@ -189,9 +185,6 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         // Forwards the QueryRequest as is to a single shard so that limit and skip can
         // be applied on mongod.
         qrToForward = std::make_unique<QueryRequest>(query.getQueryRequest());
-        // Indicate to shard servers that this is a 4.4 or newer mongoS, and they should serialize
-        // sort keys in the new format.
-        qrToForward->setUse44SortKeys(true);
     }
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();

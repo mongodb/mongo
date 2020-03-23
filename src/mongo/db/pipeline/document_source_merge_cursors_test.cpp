@@ -364,14 +364,14 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     onCommand([&](const auto& request) {
         return cursorResponseObj(expCtx->ns,
                                  kExhaustedCursorID,
-                                 {BSON("x" << 1 << "$sortKey" << BSON("" << 1)),
-                                  BSON("x" << 3 << "$sortKey" << BSON("" << 3))});
+                                 {BSON("x" << 1 << "$sortKey" << BSON_ARRAY(1)),
+                                  BSON("x" << 3 << "$sortKey" << BSON_ARRAY(3))});
     });
     onCommand([&](const auto& request) {
         return cursorResponseObj(expCtx->ns,
                                  kExhaustedCursorID,
-                                 {BSON("x" << 2 << "$sortKey" << BSON("" << 2)),
-                                  BSON("x" << 4 << "$sortKey" << BSON("" << 4))});
+                                 {BSON("x" << 2 << "$sortKey" << BSON_ARRAY(2)),
+                                  BSON("x" << 4 << "$sortKey" << BSON_ARRAY(4))});
     });
 
     future.default_timed_get();

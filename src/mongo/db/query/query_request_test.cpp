@@ -448,7 +448,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "awaitData: true,"
         "allowPartialResults: true,"
         "readOnce: true,"
-        "_use44SortKeys: true,"
         "allowSpeculativeMajorityRead: true}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
@@ -463,7 +462,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(qr->isTailableAndAwaitData());
     ASSERT(qr->isAllowPartialResults());
     ASSERT(qr->isReadOnce());
-    ASSERT(qr->use44SortKeys());
     ASSERT(qr->allowSpeculativeMajorityRead());
 }
 
@@ -474,15 +472,6 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
     ASSERT(!qr->isReadOnce());
-}
-
-TEST(QueryRequestTest, ParseFromCommandUse44SortKeysDefaultsToFalse) {
-    BSONObj cmdObj = fromjson("{find: 'testns'}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT(!qr->use44SortKeys());
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
@@ -862,17 +851,6 @@ TEST(QueryRequestTest, ParseFromCommandRuntimeConstantsSubfieldsWrongType) {
     ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
-}
-
-TEST(QueryRequestTest, ParseFromCommandUse44SortKeysWrongType) {
-    BSONObj cmdObj = BSON("find"
-                          << "testns"
-                          << "_use44SortKeys"
-                          << "shouldBeBool");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
 }
 
 //

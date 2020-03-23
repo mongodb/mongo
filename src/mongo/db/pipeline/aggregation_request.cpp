@@ -196,17 +196,15 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                 return ex.toStatus();
             }
         } else if (fieldName == kUse44SortKeys) {
-            // TODO (SERVER-43361): After branching for 4.5, we will accept this option but ignore
-            // it, as we will be able to assume that any supported mongoS will be recent enough to
-            // understand the 4.4 sort key format. In the version that follows, we will be able to
-            // completely remove this option.
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << kUse44SortKeys << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
 
-            request.setUse44SortKeys(elem.boolean());
+            // TODO SERVER-47065: A 4.6 node still has to accept the 'use44SortKeys' field, since it
+            // could be included in a command sent from a 4.4 mongos or 4.4 mongod. In 4.7, this
+            // code to tolerate the 'use44SortKeys' field can be deleted.
         } else if (fieldName == "useNewUpsert"_sd) {
             // TODO SERVER-46751: we must retain the ability to ingest the 'useNewUpsert' field for
             // 4.6 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
@@ -317,7 +315,6 @@ Document AggregationRequest::serializeToCommandObj() const {
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
-        {kUse44SortKeys, _use44SortKeys ? Value(true) : Value()},
         {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
     };
 }

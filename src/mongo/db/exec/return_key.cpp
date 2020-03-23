@@ -97,22 +97,10 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
             continue;
         }
 
-        switch (_sortKeyFormat) {
-            case SortKeyFormat::k44SortKey:
-                md.setNestedField(
-                    fieldPath,
-                    Value(DocumentMetadataFields::serializeSortKeyAsArray(
-                        member->metadata().isSingleElementKey(), member->metadata().getSortKey())));
-                break;
-            case SortKeyFormat::k42SortKey:
-                md.setNestedField(
-                    fieldPath,
-                    Value(DocumentMetadataFields::serializeSortKeyAsObject(
-                        member->metadata().isSingleElementKey(), member->metadata().getSortKey())));
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
+        md.setNestedField(
+            fieldPath,
+            Value(DocumentMetadataFields::serializeSortKey(member->metadata().isSingleElementKey(),
+                                                           member->metadata().getSortKey())));
     }
 
     member->keyData.clear();

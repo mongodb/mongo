@@ -116,17 +116,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           boost::none  // uuid
         );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    // TODO (SERVER-43361): We will not need to set 'sortKeyFormat' after branching for 4.5.
-    auto assumeInternalClient = !opCtx->getClient()->session() ||
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-    if (assumeInternalClient) {
-        expCtx->sortKeyFormat =
-            queryRequest.use44SortKeys() ? SortKeyFormat::k44SortKey : SortKeyFormat::k42SortKey;
-    } else {
-        // The client is not a mongoS, so we will not need to use an older sort key format to
-        // support it. Use default value for the ExpressionContext's 'sortKeyFormat' member
-        // variable, which is the newest format.
-    }
     return expCtx;
 }
 

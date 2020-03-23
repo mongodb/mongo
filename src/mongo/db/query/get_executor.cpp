@@ -441,7 +441,6 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
                     : std::vector<FieldPath>{},
                 ws,
-                canonicalQuery->getExpCtx()->sortKeyFormat,
                 std::move(root));
         } else if (cqProjection) {
             // There might be a projection. The idhack stage will always fetch the full

@@ -59,26 +59,6 @@ class MutableDocument;
  */
 class Position;
 
-/**
- * "Sort keys" are stored in memory as a Value with Array type (with an exception for singleton sort
- * keys). When serializing a sort key for storage in document metadata or as part of a
- * {$meta: "sortKey"} projection, there are three possible storage formats:
- */
-enum class SortKeyFormat {
-    // We expect the in-memory sort key to have one object, which has the format:
-    // {_data: ..., _typeBits:...}. This same object becomes the serialized sort key. This format
-    // exists for compatibility with 4.2 and will be deleted in 4.6 (SERVER-43361).
-    k42ChangeStreamSortKey,
-
-    // A sort key with values "a" and "b" would get translated to an object that looks like:
-    // {"": "a", "": "b"}. Also scheduled for deletion in 4.6.
-    k42SortKey,
-
-    // A sort key with values "a" and "b" would get translated to an array that looks like:
-    // ["a", "b"].
-    k44SortKey,
-};
-
 /** A Document is similar to a BSONObj but with a different in-memory representation.
  *
  *  A Document can be treated as a const std::map<std::string, const Value> that is
@@ -262,16 +242,9 @@ public:
     boost::optional<BSONObj> toBsonIfTriviallyConvertible() const;
 
     /**
-     * Like the 'toBson()' method, but includes metadata at the top-level. When the metadata
-     * includes a sort key, the 'sortKeyFormat' parameter controls how it gets converted from its
-     * in-memory representation as a Value to its serialized representation as either a BSONObj or
-     * BSONArray. The possible formats are described in the comment above the 'SortKeyFormat' enum.
-     *
-     * Note that the 'fromBsonWithMetaData()' function does not need a corresponding 'sortKeyFormat'
-     * parameter, because sort key deserialization is able to infer the sort key format based on the
-     * layout of the object.
+     * Like the 'toBson()' method, but includes metadata as top-level fields.
      */
-    BSONObj toBsonWithMetaData(SortKeyFormat sortKeyFormat) const;
+    BSONObj toBsonWithMetaData() const;
 
     /**
      * Like Document(BSONObj) but treats top-level fields with special names as metadata.
