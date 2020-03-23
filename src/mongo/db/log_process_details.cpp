@@ -33,6 +33,11 @@
 
 #include "mongo/db/log_process_details.h"
 
+#include <ostream>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -44,26 +49,35 @@
 
 namespace mongo {
 
+namespace {
+
 bool is32bit() {
     return (sizeof(int*) == 4);
 }
 
-void logProcessDetails() {
+}  // namespace
+
+void logProcessDetails(std::ostream* os) {
     auto&& vii = VersionInfoInterface::instance();
-    vii.logBuildInfo();
-
-    ProcessInfo p;
-    LOGV2(
-        51765, "Operating system", "name"_attr = p.getOsName(), "version"_attr = p.getOsVersion());
-
     if (ProcessInfo::getMemSizeMB() < ProcessInfo::getSystemMemSizeMB()) {
         LOGV2_WARNING(20720,
                       "Available memory is less than system memory",
                       "availableMemSizeMB"_attr = ProcessInfo::getMemSizeMB(),
                       "systemMemSizeMB"_attr = ProcessInfo::getSystemMemSizeMB());
     }
-
-    printCommandLineOpts();
+    auto osInfo = BSONObjBuilder()
+                      .append("name", ProcessInfo::getOsName())
+                      .append("version", ProcessInfo::getOsVersion())
+                      .obj();
+    vii.logBuildInfo(os);
+    if (os) {
+        *os << format(FMT_STRING("Operating System: {}"),
+                      tojson(osInfo, ExtendedRelaxedV2_0_0, true))
+            << std::endl;
+    } else {
+        LOGV2(51765, "Operating System", "os"_attr = osInfo);
+    }
+    printCommandLineOpts(os);
 }
 
 void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
@@ -89,7 +103,7 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
         }
     }
 
-    logProcessDetails();
+    logProcessDetails(nullptr);
 }
 
 }  // namespace mongo

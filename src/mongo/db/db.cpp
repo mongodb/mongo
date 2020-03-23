@@ -325,7 +325,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     VersionInfoInterface::instance().logTargetMinOS();
 #endif
 
-    logProcessDetails();
+    logProcessDetails(nullptr);
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 

@@ -86,14 +86,16 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
 
 bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
-    auto&& vii = VersionInfoInterface::instance();
-    if (params.count("version") || params.count("help")) {
+    if (params.count("help")) {
+        auto&& vii = VersionInfoInterface::instance();
         std::cout << mongoShellVersion(vii) << std::endl;
-        if (params.count("help")) {
-            std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
-        } else {
-            vii.logBuildInfo();
-        }
+        std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
+        return false;
+    }
+    if (params.count("version")) {
+        auto&& vii = VersionInfoInterface::instance();
+        std::cout << mongoShellVersion(vii) << std::endl;
+        vii.logBuildInfo(&std::cout);
         return false;
     }
     return true;
