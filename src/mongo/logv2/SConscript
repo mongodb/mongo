@@ -5,9 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.CppUnitTest(
-    target='log_test_v2',
+    target='logv2_test',
     source=[
-        'log_test_v2.cpp',
+        'logv2_test.cpp',
         'redaction_test.cpp',
     ],
     LIBDEPS=[
