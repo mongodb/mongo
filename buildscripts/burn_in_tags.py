@@ -149,7 +149,7 @@ def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build
                                          repeat_tests_secs=config_options.repeat_tests_secs)
 
             create_generate_tasks_config(shrub_config, tests_by_task, gen_config, repeat_config,
-                                         evergreen_api, evg_conf, include_gen_task=False)
+                                         evergreen_api, include_gen_task=False)
 
 
 def _write_to_file(shrub_config):
