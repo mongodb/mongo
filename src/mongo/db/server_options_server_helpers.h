@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <iosfwd>
+
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -66,6 +68,9 @@ Status setupServerOptions(const std::vector<std::string>& args);
  */
 Status storeServerOptions(const optionenvironment::Environment& params);
 
-void printCommandLineOpts();
+/**
+ * Write to `os`, or to LOGV2 if null.
+ */
+void printCommandLineOpts(std::ostream* os);
 
 }  // namespace mongo

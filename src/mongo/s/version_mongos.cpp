@@ -44,18 +44,15 @@
 
 namespace mongo {
 
-void printShardingVersionInfo(bool isForVersionReportingOnly) {
-    auto&& vii = VersionInfoInterface::instance();
-
-    if (isForVersionReportingOnly) {
-        auto& globalDomain = logv2::LogManager::global().getGlobalDomainInternal();
-        logv2::LogDomainGlobal::ConfigurationOptions config = globalDomain.config();
-        config.format = logv2::LogFormat::kPlain;
-        invariant(globalDomain.configure(config).isOK());
-        LOGV2(22900, "{mongosVersion_vii}", "mongosVersion_vii"_attr = mongosVersion(vii));
-        vii.logBuildInfo();
+void logShardingVersionInfo(std::ostream* os) {
+    if (os) {
+        auto&& vii = VersionInfoInterface::instance();
+        *os << mongosVersion(vii) << std::endl;
+        vii.logBuildInfo(os);
+        *os << std::endl;
     } else {
-        logProcessDetails();
+        logProcessDetails(nullptr);
     }
 }
+
 }  // namespace mongo

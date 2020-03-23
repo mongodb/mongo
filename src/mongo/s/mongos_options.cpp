@@ -64,7 +64,7 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
         return false;
     }
     if (params.count("version") && params["version"].as<bool>() == true) {
-        printShardingVersionInfo(true);
+        logShardingVersionInfo(&std::cout);
         return false;
     }
     if (params.count("test") && params["test"].as<bool>() == true) {
