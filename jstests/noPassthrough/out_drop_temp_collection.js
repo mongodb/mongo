@@ -1,6 +1,5 @@
 /**
- * Test the behaviour of a dropDatabase command during an aggregation containing $out for single
- * phase index builds.
+ * Test the behavior of a dropDatabase command during an aggregation containing $out.
  *
  * @tags: [
  *   assumes_unsharded_collection,
@@ -36,27 +35,22 @@ function runTest(st, testDb, portNum) {
             mode: "alwaysOn",
         }
     });
+    res.forEach(cmdResult => assert.commandWorked(cmdResult));
 
     const aggDone = startParallelShell(() => {
-        const targetColl = db.getSiblingDB("out_drop_temp").out_target_coll;
-        const pipeline = [{$out: "out_target_coll"}];
-        targetColl.aggregate(pipeline);
+        const targetDB = db.getSiblingDB("out_drop_temp");
+        // There are a number of possible error codes depending on configuration and index build
+        // options.
+        assert.commandFailed(targetDB.runCommand(
+            {aggregate: "out_source_coll", pipeline: [{$out: "out_target_coll"}], cursor: {}}));
+        const collList = assert.commandWorked(targetDB.runCommand({listCollections: 1}));
+        assert.eq(collList.cursor.firstBatch.length, 0);
     }, portNum);
 
     waitForCurOpByFilter(testDb, {"failpointMsg": failpointName});
-    // TODO SERVER-45358 Make it easier to run commands without retrying.
-    // Tests are run with an override function that retries commands that fail because of a
-    // background operation. Parallel shells don't automatically have that override, so drop has to
-    // be run in a parallel shell.
-    const dropColl = startParallelShell(() => {
-        const targetDb = db.getSiblingDB("out_drop_temp");
-        assert.commandFailedWithCode(targetDb.runCommand({dropDatabase: 1}), [
-            ErrorCodes.BackgroundOperationInProgressForDatabase,
-            ErrorCodes.BackgroundOperationInProgressForNamespace
-        ]);
-    }, portNum);
-    dropColl();
-    // The $out should complete once the failpoint is disabled, not fail on index creation.
+
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+
     FixtureHelpers.runCommandOnEachPrimary({
         db: testDb.getSiblingDB("admin"),
         cmdObj: {
@@ -66,13 +60,8 @@ function runTest(st, testDb, portNum) {
     });
     aggDone();
 }
-const conn = MongoRunner.runMongod({});
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(conn)) {
-    jsTest.log("Not running because two phase index builds are enabled.");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
+const conn = MongoRunner.runMongod({});
 runTest(null, conn.getDB("out_drop_temp"), conn.port);
 MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});

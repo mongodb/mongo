@@ -127,11 +127,6 @@ void DocumentSourceOut::initialize() {
             "namespace '{}' is capped so it can't be used for {}"_format(outputNs.ns(), kStageName),
             _originalOutOptions["capped"].eoo());
 
-    // Create temp collection, copying options from the existing output collection if any.
-    // Disallows drops and renames on this namespace. This is required to ensure
-    // 'createIndexesOnEmptyCollection' is called on a namespace that both exists and is empty as
-    // the function expects.
-    BackgroundOperation backgroundOp(_tempNs.ns());
     {
         BSONObjBuilder cmd;
         cmd << "create" << _tempNs.coll();
