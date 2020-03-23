@@ -622,7 +622,8 @@ class EvergreenConfigGenerator(object):
                 LOGGER.debug("Setting exec_timeout", exec_timeout=exec_timeout,
                              suite_runtime=expected_suite_runtime, factor=repeat_factor)
 
-            if timeout > MAX_EXPECTED_TIMEOUT or exec_timeout > MAX_EXPECTED_TIMEOUT:
+            if self.options.is_patch and \
+                    (timeout > MAX_EXPECTED_TIMEOUT or exec_timeout > MAX_EXPECTED_TIMEOUT):
                 frameinfo = getframeinfo(currentframe())
                 LOGGER.error(
                     "This task looks like it is expected to run far longer than normal. This is "
