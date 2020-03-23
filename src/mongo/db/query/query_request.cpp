@@ -320,7 +320,9 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
 
-            qr->_oplogReplay = el.boolean();
+            // Ignore the 'oplogReplay' field for compatibility with old clients. Nodes 4.4 and
+            // greater will apply the 'oplogReplay' optimization to eligible oplog scans regardless
+            // of whether the flag is set explicitly, so the flag is no longer meaningful.
         } else if (fieldName == kNoCursorTimeoutField) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -562,10 +564,6 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
         case TailableModeEnum::kNormal: {
             break;
         }
-    }
-
-    if (_oplogReplay) {
-        cmdBuilder->append(kOplogReplayField, true);
     }
 
     if (_noCursorTimeout) {
@@ -952,9 +950,6 @@ int QueryRequest::getOptions() const {
     if (_slaveOk) {
         options |= QueryOption_SlaveOk;
     }
-    if (_oplogReplay) {
-        options |= QueryOption_OplogReplay;
-    }
     if (_noCursorTimeout) {
         options |= QueryOption_NoCursorTimeout;
     }
@@ -972,7 +967,6 @@ void QueryRequest::initFromInt(int options) {
     bool awaitData = (options & QueryOption_AwaitData) != 0;
     _tailableMode = uassertStatusOK(tailableModeFromBools(tailable, awaitData));
     _slaveOk = (options & QueryOption_SlaveOk) != 0;
-    _oplogReplay = (options & QueryOption_OplogReplay) != 0;
     _noCursorTimeout = (options & QueryOption_NoCursorTimeout) != 0;
     _exhaust = (options & QueryOption_Exhaust) != 0;
     _allowPartialResults = (options & QueryOption_PartialResults) != 0;
@@ -1012,11 +1006,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (isTailable()) {
         return {ErrorCodes::InvalidPipelineOperator,
                 "Tailable cursors are not supported in aggregation."};
-    }
-    if (_oplogReplay) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kOplogReplayField
-                              << " not supported in aggregation."};
     }
     if (_noCursorTimeout) {
         return {ErrorCodes::InvalidPipelineOperator,

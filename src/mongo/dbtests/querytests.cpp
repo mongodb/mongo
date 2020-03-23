@@ -685,9 +685,9 @@ public:
     }
 };
 
-class OplogReplayMode : public ClientBase {
+class OplogScanWithGtTimstampPred : public ClientBase {
 public:
-    ~OplogReplayMode() {
+    ~OplogScanWithGtTimstampPred() {
         _client.dropCollection(ns);
     }
     void run() {
@@ -709,7 +709,7 @@ public:
             BSONObj info;
             _client.runCommand("local",
                                BSON("emptycapped"
-                                    << "oplog.querytests.OplogReplayMode"),
+                                    << "oplog.querytests.OplogScanWithGtTimstampPred"),
                                info);
         }
 
@@ -738,12 +738,12 @@ public:
     }
 
 private:
-    const char* ns = "local.oplog.querytests.OplogReplayMode";
+    const char* ns = "local.oplog.querytests.OplogScanWithGtTimstampPred";
 };
 
-class OplogReplayExplain : public ClientBase {
+class OplogScanGtTsExplain : public ClientBase {
 public:
-    ~OplogReplayExplain() {
+    ~OplogScanGtTsExplain() {
         _client.dropCollection(string(ns));
     }
     void run() {
@@ -765,7 +765,7 @@ public:
             BSONObj info;
             _client.runCommand("local",
                                BSON("emptycapped"
-                                    << "oplog.querytests.OplogReplayExplain"),
+                                    << "oplog.querytests.OplogScanGtTsExplain"),
                                info);
         }
 
@@ -791,7 +791,7 @@ public:
     }
 
 private:
-    const char* ns = "local.oplog.querytests.OplogReplayExplain";
+    const char* ns = "local.oplog.querytests.OplogScanGtTsExplain";
 };
 
 class BasicCount : public ClientBase {
@@ -2009,8 +2009,8 @@ public:
         add<TailableInsertDelete>();
         add<TailCappedOnly>();
         add<TailableQueryOnId>();
-        add<OplogReplayMode>();
-        add<OplogReplayExplain>();
+        add<OplogScanWithGtTimstampPred>();
+        add<OplogScanGtTsExplain>();
         add<ArrayId>();
         add<UnderscoreNs>();
         add<EmptyFieldSpec>();

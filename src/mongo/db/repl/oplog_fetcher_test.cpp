@@ -158,7 +158,6 @@ void validateFindCommand(Message m, OpTime lastFetched, int findTimeout) {
     auto msg = mongo::OpMsg::parse(m);
     ASSERT_EQ(mongo::StringData(msg.body.firstElement().fieldName()), "find");
     ASSERT_TRUE(msg.body.getBoolField("tailable"));
-    ASSERT_TRUE(msg.body.getBoolField("oplogReplay"));
     ASSERT_TRUE(msg.body.getBoolField("awaitData"));
     ASSERT_EQUALS(findTimeout, msg.body.getIntField("maxTimeMS"));
     ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
@@ -168,6 +167,9 @@ void validateFindCommand(Message m, OpTime lastFetched, int findTimeout) {
                            << "local"
                            << "afterClusterTime" << Timestamp(0, 1)),
                       msg.body.getObjectField("readConcern"));
+
+    // The find command should not specify the deprecated 'oplogReplay' flag.
+    ASSERT_FALSE(msg.body["oplogReplay"]);
 
     validateMetadataRequest(msg);
 }

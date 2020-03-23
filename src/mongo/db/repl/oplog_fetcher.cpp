@@ -606,16 +606,16 @@ void OplogFetcher::_createNewCursor(bool initialFind) {
                                                                : _getRetriedFindMaxTime());
     _setSocketTimeout(findTimeout);
 
-    _cursor = std::make_unique<DBClientCursor>(
-        _conn.get(),
-        _nss,
-        _makeFindQuery(findTimeout),
-        0 /* nToReturn */,
-        0 /* nToSkip */,
-        nullptr /* fieldsToReturn */,
-        QueryOption_CursorTailable | QueryOption_AwaitData | QueryOption_OplogReplay |
-            (oplogFetcherUsesExhaust ? QueryOption_Exhaust : 0),
-        _batchSize);
+    _cursor =
+        std::make_unique<DBClientCursor>(_conn.get(),
+                                         _nss,
+                                         _makeFindQuery(findTimeout),
+                                         0 /* nToReturn */,
+                                         0 /* nToSkip */,
+                                         nullptr /* fieldsToReturn */,
+                                         QueryOption_CursorTailable | QueryOption_AwaitData |
+                                             (oplogFetcherUsesExhaust ? QueryOption_Exhaust : 0),
+                                         _batchSize);
 
     _firstBatch = true;
 

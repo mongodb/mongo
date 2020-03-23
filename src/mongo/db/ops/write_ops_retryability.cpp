@@ -108,10 +108,8 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
                                             : oplog.getPostImageOpTime().value();
 
     DBDirectClient client(opCtx);
-    auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                                   opTime.asQuery(),
-                                   nullptr,
-                                   QueryOption_OplogReplay);
+    auto oplogDoc =
+        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), nullptr);
 
     uassert(40613,
             str::stream() << "oplog no longer contains the complete write history of this "

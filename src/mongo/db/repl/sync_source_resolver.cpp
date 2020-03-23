@@ -187,13 +187,14 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
 std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndPort candidate,
                                                                         OpTime earliestOpTimeSeen,
                                                                         int rbid) {
-    // This query is structured so that it is executed on the sync source using the oplog
-    // start hack (oplogReplay=true and $gt/$gte predicate over "ts").
+    // This query is structured so that it is executed on the sync source using the "oplog start
+    // hack". The sync source should recognize that it can optimize an oplog query with a $gt/$gte
+    // predicate over "ts".
     return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
         kLocalOplogNss.db().toString(),
-        BSON("find" << kLocalOplogNss.coll() << "oplogReplay" << true << "filter"
+        BSON("find" << kLocalOplogNss.coll() << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
                     << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kImplicitDefault),

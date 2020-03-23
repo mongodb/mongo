@@ -841,8 +841,8 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
 
 TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     // This tests DBClientCursor supports oplog query with special fields in the command request.
-    // 1. Initial find command has "filter", "tailable", "awaitData", "oplogReplay", "maxTimeMS",
-    //    "batchSize", "term" and "readConcern" fields set.
+    // 1. Initial find command has "filter", "tailable", "awaitData", "maxTimeMS", "batchSize",
+    //    "term" and "readConcern" fields set.
     // 2. A subsequent getMore command sets awaitData timeout and lastKnownCommittedOpTime
     //    correctly.
 
@@ -862,8 +862,7 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
                           0,
                           0,
                           nullptr,
-                          QueryOption_CursorTailable | QueryOption_AwaitData |
-                              QueryOption_OplogReplay,
+                          QueryOption_CursorTailable | QueryOption_AwaitData,
                           0);
     cursor.setBatchSize(0);
 
@@ -884,7 +883,6 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     ASSERT_BSONOBJ_EQ(msg.body["filter"].Obj(), filterObj);
     ASSERT_TRUE(msg.body.getBoolField("tailable")) << msg.body;
     ASSERT_TRUE(msg.body.getBoolField("awaitData")) << msg.body;
-    ASSERT_TRUE(msg.body.getBoolField("oplogReplay")) << msg.body;
     ASSERT_EQ(msg.body["maxTimeMS"].numberLong(), maxTimeMS) << msg.body;
     ASSERT_EQ(msg.body["batchSize"].number(), 0) << msg.body;
     ASSERT_EQ(msg.body["term"].numberLong(), term) << msg.body;

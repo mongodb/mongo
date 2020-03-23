@@ -443,7 +443,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
         "tailable: true,"
-        "oplogReplay: true,"
         "noCursorTimeout: true,"
         "awaitData: true,"
         "allowPartialResults: true,"
@@ -457,12 +456,28 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     // Test that all the flags got set to true.
     ASSERT(qr->isTailable());
     ASSERT(!qr->isSlaveOk());
-    ASSERT(qr->isOplogReplay());
     ASSERT(qr->isNoCursorTimeout());
     ASSERT(qr->isTailableAndAwaitData());
     ASSERT(qr->isAllowPartialResults());
     ASSERT(qr->isReadOnce());
     ASSERT(qr->allowSpeculativeMajorityRead());
+}
+
+TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
+    auto cmdObj = BSON("find"
+                       << "testns"
+                       << "oplogReplay" << true << "tailable" << true);
+    const bool isExplain = false;
+    const NamespaceString nss{"test.testns"};
+    auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_OK(qr.getStatus());
+
+    // Verify that the 'oplogReplay' flag does not appear if we reserialize the request.
+    auto reserialized = qr.getValue()->asFindCommand();
+    ASSERT_BSONOBJ_EQ(reserialized,
+                      BSON("find"
+                           << "testns"
+                           << "tailable" << true));
 }
 
 TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
@@ -1182,7 +1197,6 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(false, qr->hasReadPref());
     ASSERT_EQUALS(false, qr->isTailable());
     ASSERT_EQUALS(false, qr->isSlaveOk());
-    ASSERT_EQUALS(false, qr->isOplogReplay());
     ASSERT_EQUALS(false, qr->isNoCursorTimeout());
     ASSERT_EQUALS(false, qr->isTailableAndAwaitData());
     ASSERT_EQUALS(false, qr->isExhaust());
@@ -1355,12 +1369,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
     QueryRequest qr(testns);
     qr.setTailableMode(TailableModeEnum::kTailable);
-    ASSERT_NOT_OK(qr.asAggregationCommand());
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithOplogReplayFails) {
-    QueryRequest qr(testns);
-    qr.setOplogReplay(true);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
@@ -1574,12 +1582,35 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
     ASSERT_EQ(qr->wantMore(), true);
     ASSERT_EQ(qr->isExplain(), false);
     ASSERT_EQ(qr->isSlaveOk(), false);
-    ASSERT_EQ(qr->isOplogReplay(), false);
     ASSERT_EQ(qr->isNoCursorTimeout(), false);
     ASSERT_EQ(qr->isTailable(), false);
     ASSERT_EQ(qr->isExhaust(), true);
     ASSERT_EQ(qr->isAllowPartialResults(), false);
     ASSERT_EQ(qr->getOptions(), QueryOption_Exhaust);
+}
+
+TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
+    const NamespaceString nss("test.testns");
+    auto queryObj = fromjson("{query: {query: 1}, orderby: {sort: 1}}");
+    const BSONObj projectionObj{};
+    const auto nToSkip = 0;
+    const auto nToReturn = 0;
+
+    // Test that parsing succeeds even if the oplog replay bit is set in the OP_QUERY message. This
+    // flag may be set by old clients.
+    auto options = QueryOption_OplogReplay_DEPRECATED;
+    auto qr =
+        QueryRequest::fromLegacyQuery(nss, queryObj, projectionObj, nToSkip, nToReturn, options);
+    ASSERT_OK(qr.getStatus());
+
+    // Verify that if we reserialize the QueryRequest as a find command, the 'oplogReplay' field
+    // does not appear.
+    auto reserialized = qr.getValue()->asFindCommand();
+    ASSERT_BSONOBJ_EQ(reserialized,
+                      BSON("find"
+                           << "testns"
+                           << "filter" << BSON("query" << 1) << "sort" << BSON("sort" << 1)
+                           << "readConcern" << BSONObj{}));
 }
 
 TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {

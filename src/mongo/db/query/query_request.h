@@ -374,14 +374,6 @@ public:
         _slaveOk = slaveOk;
     }
 
-    bool isOplogReplay() const {
-        return _oplogReplay;
-    }
-
-    void setOplogReplay(bool oplogReplay) {
-        _oplogReplay = oplogReplay;
-    }
-
     bool isNoCursorTimeout() const {
         return _noCursorTimeout;
     }
@@ -575,7 +567,6 @@ private:
     // Options that can be specified in the OP_QUERY 'flags' header.
     TailableModeEnum _tailableMode = TailableModeEnum::kNormal;
     bool _slaveOk = false;
-    bool _oplogReplay = false;
     bool _noCursorTimeout = false;
     bool _exhaust = false;
     bool _allowPartialResults = false;

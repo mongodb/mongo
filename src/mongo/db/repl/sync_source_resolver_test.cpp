@@ -674,7 +674,6 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
     auto firstElement = request.cmdObj.firstElement();
     ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
     ASSERT_EQUALS(SyncSourceResolver::kLocalOplogNss.coll(), firstElement.String());
-    ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
     auto filter = request.cmdObj.getObjectField("filter");
     ASSERT_TRUE(filter.hasField("ts")) << request.cmdObj;
     auto tsFilter = filter.getObjectField("ts");
@@ -683,6 +682,9 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
     ASSERT_TRUE(tsFilter.hasField("$lte")) << request.cmdObj;
     ASSERT_EQUALS(requiredOpTime.getTimestamp(), tsFilter["$lte"].timestamp()) << request.cmdObj;
 
+    // The find command executed against the sync source should not specify the deprecated
+    // 'oplogReplay' flag.
+    ASSERT_FALSE(request.cmdObj["oplogReplay"]);
 
     net->runReadyNetworkOperations();
 }
@@ -705,9 +707,8 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
 
 const OpTime requiredOpTime(Timestamp(200, 1U), 1LL);
 
-TEST_F(
-    SyncSourceResolverTest,
-    SyncSourceResolverWillCheckForRequiredOpTimeUsingOplogReplayQueryIfRequiredOpTimeIsProvided) {
+TEST_F(SyncSourceResolverTest,
+       SyncSourceResolverWillCheckForRequiredOpTimeIfRequiredOpTimeIsProvided) {
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     HostAndPort candidate1("node1", 12345);
@@ -903,7 +904,19 @@ TEST_F(SyncSourceResolverTest,
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     _shouldFailRequest = [](const executor::RemoteCommandRequest& request) {
-        return request.cmdObj.getBoolField("oplogReplay");
+        // Fail find commands reading the oplog with filter containing a "ts" predicate.
+        if (StringData{request.cmdObj.getStringField("find")} !=
+            SyncSourceResolver::kLocalOplogNss.coll()) {
+            return false;
+        }
+
+        auto filterElt = request.cmdObj["filter"];
+        if (!filterElt || filterElt.type() != BSONType::Object) {
+            return false;
+        }
+
+        // Fail the request if the filter has a predicate over the "ts" field.
+        return static_cast<bool>(filterElt.embeddedObject()["ts"]);
     };
 
     HostAndPort candidate1("node1", 12345);

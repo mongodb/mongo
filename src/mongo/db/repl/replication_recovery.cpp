@@ -141,16 +141,14 @@ public:
                                  QUERY("ts" << predicate),
                                  /*batchSize*/ 0,
                                  /*skip*/ 0,
-                                 /*projection*/ nullptr,
-                                 QueryOption_OplogReplay);
+                                 /*projection*/ nullptr);
 
         // Check that the first document matches our appliedThrough point then skip it since it's
         // already been applied.
         if (!_cursor->more()) {
             // This should really be impossible because we check above that the top of the oplog is
             // strictly > appliedThrough. If this fails it represents a serious bug in either the
-            // storage engine or query's implementation of OplogReplay.
-
+            // storage engine or query's implementation of the oplog scan.
             logv2::DynamicAttributes attrs;
             attrs.add("oplogApplicationStartPoint", _oplogApplicationStartPoint.toBSON());
             if (_oplogApplicationEndPoint) {
