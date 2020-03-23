@@ -1,6 +1,6 @@
 /**
- * If a user attempts to downgrade the server while there is an index build in progress, we should
- * reject the downgrade request.
+ * If a user attempts to downgrade the server while there is an index build in progress, the
+ * downgrade should succeed without blocking.
  * @tags: [requires_replication]
  */
 (function() {
@@ -36,9 +36,7 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
 try {
-    assert.commandFailedWithCode(
-        primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
-        ErrorCodes.ConflictingOperationInProgress);
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 } finally {
     IndexBuildTest.resumeIndexBuilds(primary);
 }

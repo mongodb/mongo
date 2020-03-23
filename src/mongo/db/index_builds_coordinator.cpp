@@ -206,12 +206,7 @@ void onAbortIndexBuild(OperationContext* opCtx,
                        const NamespaceString& nss,
                        ReplIndexBuildState& replState,
                        const Status& cause) {
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return;
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
         return;
     }
 

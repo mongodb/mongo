@@ -6,8 +6,10 @@
 //
 // This test involves using fsync to lock the secondaries, so cannot be run on
 // storage engines which do not support the command.
-// @tags: [requires_fsync]
-//
+// @tags: [
+//    requires_fsync,
+//    need_fixing_for_46,
+// ]
 
 (function() {
 'use strict';

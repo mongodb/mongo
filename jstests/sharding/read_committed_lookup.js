@@ -1,6 +1,7 @@
 /**
  * Tests that a $lookup and $graphLookup stage within an aggregation pipeline will read only
  * committed data if the pipeline is using a majority readConcern.
+ * @tags: [need_fixing_for_46]
  */
 
 load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.

@@ -398,9 +398,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto fromMigrate = false;
-    auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
+    auto buildUUID = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()
         ? boost::make_optional(UUID::gen())
         : boost::none;
 

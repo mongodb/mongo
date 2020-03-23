@@ -269,19 +269,6 @@ public:
                 return true;
             }
 
-            // Two phase index builds are only supported in 4.4. If the user tries to downgrade the
-            // cluster to FCV42, they must first wait for all index builds to run to completion, or
-            // abort the index builds (using the dropIndexes command).
-            if (auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx)) {
-                auto numIndexBuilds = indexBuildsCoord->getActiveIndexBuildCount(opCtx);
-                uassert(
-                    ErrorCodes::ConflictingOperationInProgress,
-                    str::stream()
-                        << "Cannot downgrade the cluster when there are index builds in progress: "
-                        << numIndexBuilds,
-                    numIndexBuilds == 0U);
-            }
-
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
             // Safe reconfig introduces a new "term" field in the config document. If the user tries

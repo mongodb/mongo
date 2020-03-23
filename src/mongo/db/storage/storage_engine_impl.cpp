@@ -862,16 +862,6 @@ bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
     if (!enableTwoPhaseIndexBuild) {
         return false;
     }
-
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        return false;
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return false;
-    }
-
     return true;
 }
 
