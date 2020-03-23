@@ -29,17 +29,14 @@
 
 #pragma once
 
-#include <iosfwd>
-
 namespace mongo {
 
 class ServiceContext;
 
 /**
- * Writes useful information about the running process.
- * If `os` is nonnull, print to it, else to LOGV2.
+ * Writes useful information about the running process to the diagnostic log on startup.
  */
-void logProcessDetails(std::ostream* os);
+void logProcessDetails();
 
 /**
  * Writes useful information about the running process to diagnostic log

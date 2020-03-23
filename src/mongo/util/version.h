@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -145,10 +144,7 @@ public:
     std::string makeVersionString(StringData binaryName) const;
 
     /**
-     * Appends several fields of build information to the `result`. One of them is
-     * "buildEnvironment", mapped to a subobject containing most of the information associated
-     * with 'buildInfo', above, but with the elements for which inBuildInfo == false
-     * removed.
+     * Appends the information associated with 'buildInfo', above, to the given builder.
      */
     void appendBuildInfo(BSONObjBuilder* result) const;
 
@@ -158,12 +154,9 @@ public:
     void logTargetMinOS() const;
 
     /**
-     * Logs similar info to `appendBuildInfo`, suitable for the --version flag or for a
-     * startup log message (trimmed for user-friendliness). The `buildInfo` data appear
-     * in a subobject mapped to the "environment" key, but with the elements for which
-     * inVersion == false removed. Puts to `os` if nonnull, else to LOGV2.
+     * Logs the result of 'buildInfo', above.
      */
-    void logBuildInfo(std::ostream* os) const;
+    void logBuildInfo() const;
 
 protected:
     constexpr VersionInfoInterface() = default;

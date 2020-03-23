@@ -537,8 +537,7 @@ private:
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
     ThreadClient tc("mongosMain", serviceContext);
-
-    logShardingVersionInfo(nullptr);
+    printShardingVersionInfo(false);
 
     initWireSpec();
 

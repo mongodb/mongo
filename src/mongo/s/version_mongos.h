@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-#include <iosfwd>
-
 namespace mongo {
 
 /**
- * Outputs the version of MongoS as part of server startup.
- * Goes to `os` if nonnull, else to LOGV2.
- *
- * NOTE: Outputs the version of MongoS to `os` (as part of the --version option),
- * which reports different data than if `os` is null!
+ * Outputs the version of MongoS either to the standard output (as part of the --version option,
+ * which case isForVersionReportingOnly = true) or to the log file as part of server startup.
  */
-void logShardingVersionInfo(std::ostream* os);
+void printShardingVersionInfo(bool isForVersionReportingOnly);
 
 }  // namespace mongo

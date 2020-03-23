@@ -41,12 +41,14 @@
 #endif
 #endif
 
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <pcrecpp.h>
+
 #include <fmt/format.h>
 #include <sstream>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -133,51 +135,49 @@ std::string VersionInfoInterface::makeVersionString(StringData binaryName) const
 }
 
 void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
-    BSONObjBuilder& o = *result;
-    o.append("version", version());
-    o.append("gitVersion", gitVersion());
+    *result << "version" << version() << "gitVersion" << gitVersion()
 #if defined(_WIN32)
-    o.append("targetMinOS", targetMinOS());
+            << "targetMinOS" << targetMinOS()
 #endif
-    o.append("modules", modules());
-    o.append("allocator", allocator());
-    o.append("javascriptEngine", jsEngine());
-    o.append("sysInfo", "deprecated");
+            << "modules" << modules() << "allocator" << allocator() << "javascriptEngine"
+            << jsEngine() << "sysInfo"
+            << "deprecated";
 
-    BSONArrayBuilder(o.subarrayStart("versionArray"))
-        .append(majorVersion())
-        .append(minorVersion())
-        .append(patchVersion())
-        .append(extraVersion());
+    BSONArrayBuilder versionArray(result->subarrayStart("versionArray"));
+    versionArray << majorVersion() << minorVersion() << patchVersion() << extraVersion();
+    versionArray.done();
 
-    BSONObjBuilder(o.subobjStart("openssl"))
+    BSONObjBuilder opensslInfo(result->subobjStart("openssl"));
 #ifdef MONGO_CONFIG_SSL
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-        .append("running", openSSLVersion())
-        .append("compiled", OPENSSL_VERSION_TEXT)
+    opensslInfo << "running" << openSSLVersion() << "compiled" << OPENSSL_VERSION_TEXT;
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-        .append("running", "Windows SChannel")
+    opensslInfo << "running"
+                << "Windows SChannel";
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
-        .append("running", "Apple Secure Transport")
+    opensslInfo << "running"
+                << "Apple Secure Transport";
 #else
 #error "Unknown SSL Provider"
 #endif  // MONGO_CONFIG_SSL_PROVIDER
 #else
-        .append("running", "disabled")
-        .append("compiled", "disabled")
+    opensslInfo << "running"
+                << "disabled"
+                << "compiled"
+                << "disabled";
 #endif
-        ;
+    opensslInfo.done();
 
     {
-        auto env = BSONObjBuilder(o.subobjStart("buildEnvironment"));
+        BSONObjBuilder env(result->subobjStart("buildEnvironment"));
         for (auto&& e : buildInfo())
             if (e.inBuildInfo)
                 env.append(e.key, e.value);
     }
 
-    o.append("bits", (int)sizeof(void*) * CHAR_BIT);
-    o.appendBool("debug", kDebugBuild);
-    o.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+    *result << "bits" << (int)sizeof(void*) * 8;
+    result->appendBool("debug", kDebugBuild);
+    result->appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
 }
 
 std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
@@ -192,28 +192,37 @@ void VersionInfoInterface::logTargetMinOS() const {
     LOGV2(23398, "Target operating system minimum version", "targetMinOS"_attr = targetMinOS());
 }
 
-void VersionInfoInterface::logBuildInfo(std::ostream* os) const {
-    BSONObjBuilder bob;
-    bob.append("version", version());
-    bob.append("gitVersion", gitVersion());
+void VersionInfoInterface::logBuildInfo() const {
+    logv2::DynamicAttributes attrs;
+    attrs.add("version", version());
+    attrs.add("gitVersion", gitVersion());
+
 #if defined(MONGO_CONFIG_SSL) && MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    bob.append("openSSLVersion", openSSLVersion());
+    std::string opensslVersion = openSSLVersion();
+    attrs.add("openSSLVersion", opensslVersion);
 #endif
-    bob.append("modules", modules());
-    bob.append("allocator", allocator());
-    {
-        auto envObj = BSONObjBuilder(bob.subobjStart("environment"));
-        for (auto&& bi : buildInfo())
-            if (bi.inVersion && !bi.value.empty())
-                envObj.append(bi.key, bi.value);
-    }
-    BSONObj obj = bob.done();
-    if (os) {
-        // If printing to ostream, print a json object with a single "buildInfo" element.
-        *os << "Build Info:" << tojson(obj, ExtendedRelaxedV2_0_0, true) << std::endl;
-    } else {
-        LOGV2(23403, "Build Info", "buildInfo"_attr = obj);
-    }
+
+    attrs.add("allocator", allocator());
+
+    auto modules_list = modules();
+    auto modules_sequence = logv2::seqLog(modules_list.begin(), modules_list.end());
+    attrs.add("modules", modules_sequence);
+
+    auto build = buildInfo();
+
+    auto envFilter = [](auto&& bi) { return bi.inBuildInfo && !bi.value.empty(); };
+
+    auto filtered_begin = boost::make_filter_iterator(envFilter, build.begin(), build.end());
+    auto filtered_end = boost::make_filter_iterator(envFilter, build.end(), build.end());
+
+    auto envFormatter = [](auto&& bi) { return BSONObjBuilder{}.append(bi.key, bi.value).obj(); };
+
+    auto begin = boost::make_transform_iterator(filtered_begin, envFormatter);
+    auto end = boost::make_transform_iterator(filtered_end, envFormatter);
+    auto buildEnv = logv2::seqLog(begin, end);
+    attrs.add("environment", buildEnv);
+
+    LOGV2(23403, "Build Info", attrs);
 }
 
 std::string mongoShellVersion(const VersionInfoInterface& provider) {
