@@ -198,15 +198,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
         "admin",
         BSON("_flushDatabaseCacheUpdates" << dbName),
         Shard::RetryPolicy::kIdempotent));
-
-    // If the shard had binary version v4.2 when it received the _flushDatabaseCacheUpdates, it will
-    // have responded with NamespaceNotFound, because the shard does not have the database (see
-    // SERVER-34431). Ignore this error, since the _flushDatabaseCacheUpdates is only a nicety for
-    // users testing transactions, and the transaction passthrough suites do not change shard binary
-    // versions.
-    if (cmdResponse.commandStatus != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOK(cmdResponse.commandStatus);
-    }
+    uassertStatusOK(cmdResponse.commandStatus);
 
     return database;
 }

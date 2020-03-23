@@ -182,15 +182,6 @@ public:
                 "admin",
                 BSON("_flushDatabaseCacheUpdates" << dbname),
                 Shard::RetryPolicy::kIdempotent));
-
-            // If the shard had binary version v4.2 when it received the
-            // _flushDatabaseCacheUpdates, it will have responded with NamespaceNotFound,
-            // because the shard no longer has the database (see SERVER-34431). Ignore this
-            // error, since once the shard is restarted in v4.4, its in-memory database version
-            // will be cleared anyway.
-            if (cmdResponse.commandStatus == ErrorCodes::NamespaceNotFound) {
-                continue;
-            }
             uassertStatusOK(cmdResponse.commandStatus);
         }
 
