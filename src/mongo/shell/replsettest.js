@@ -2316,6 +2316,10 @@ var ReplSetTest = function(opts) {
                             return rightArr === undefined;
                         }
 
+                        if (rightArr === undefined) {
+                            return false;
+                        }
+
                         const map = {};
                         leftArr.forEach(key => {
                             map[key] = 1;
