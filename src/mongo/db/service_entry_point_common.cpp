@@ -298,7 +298,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
             // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
             // since this covers both isSpecified() && !isSpecified()
-            if (readConcernArgs.isEmpty()) {
+            if (!isInternalClient && readConcernArgs.isEmpty()) {
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                            .getDefaultReadConcern(opCtx);
                 if (rcDefault) {
@@ -741,7 +741,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 }
             }
             extractedWriteConcern.emplace(
-                uassertStatusOK(extractWriteConcern(opCtx, request.body)));
+                uassertStatusOK(extractWriteConcern(opCtx, request.body, isInternalClient)));
             if (sessionOptions.getAutocommit()) {
                 validateWriteConcernForTransaction(*extractedWriteConcern,
                                                    invocation->definition()->getName());

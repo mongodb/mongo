@@ -53,7 +53,9 @@ bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
-StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx, const BSONObj& cmdObj);
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
+                                                    const BSONObj& cmdObj,
+                                                    bool isInternalClient);
 
 /**
  * Verifies that a WriteConcern is valid for this particular host.
