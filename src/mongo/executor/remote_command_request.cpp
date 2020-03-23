@@ -34,7 +34,6 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
 
@@ -70,17 +69,9 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
       fireAndForgetMode(fireAndForgetMode) {
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
-    //
-    // TODO SERVER-45579: Remove this FCV check after branching for 4.5. This is needed only for
-    // compatibility with 4.2 during the 4.2 <=> 4.4 upgrade/downgrade process.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        opCtx && opCtx->getComment() && !theCmdObj["comment"]) {
-        cmdObj = theCmdObj.addField(*opCtx->getComment());
-    } else {
-        cmdObj = theCmdObj;
-    }
+    cmdObj = opCtx && opCtx->getComment() && !theCmdObj["comment"]
+        ? theCmdObj.addField(*opCtx->getComment())
+        : cmdObj = theCmdObj;
 
     if (hedgeOptions) {
         operationKey.emplace(UUID::gen());
