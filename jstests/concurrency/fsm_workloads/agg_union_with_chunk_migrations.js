@@ -16,7 +16,7 @@
  *   assumes_balancer_off,
  *   assumes_autosplit_off,
  *   requires_non_retryable_writes,
- *   requires_fcv_4.4,  # Uses $unionWith.
+ *   requires_fcv_44,  # Uses $unionWith.
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
