@@ -116,13 +116,6 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opC
     return _duplicateKeyTracker->checkConstraints(opCtx);
 }
 
-bool IndexBuildInterceptor::areAllConstraintsChecked(OperationContext* opCtx) const {
-    if (!_duplicateKeyTracker) {
-        return true;
-    }
-    return _duplicateKeyTracker->areAllConstraintsChecked(opCtx);
-}
-
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
                                                    TrackDuplicates trackDuplicates,

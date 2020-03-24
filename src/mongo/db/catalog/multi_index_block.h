@@ -371,9 +371,6 @@ private:
     // incorrect state set anywhere.
     bool _buildIsCleanedUp = true;
 
-    // Duplicate key constraints should be checked at least once in the MultiIndexBlock.
-    bool _constraintsChecked = false;
-
     // A unique identifier associating this index build with a two-phase index build within a
     // replica set.
     boost::optional<UUID> _buildUUID;
