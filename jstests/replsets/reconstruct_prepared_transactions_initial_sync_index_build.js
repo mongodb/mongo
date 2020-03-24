@@ -111,7 +111,7 @@ assert.commandWorked(secondary.adminCommand(
 // Unblock index build.
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     // Wait for log message.
-    checkLog.containsJson(secondary, 21849, {ns: testColl.getFullName()});
+    checkLog.containsJson(secondary, 21849, {namespace: testColl.getFullName()});
 
     // Let the secondary finish its index build.
     IndexBuildTest.resumeIndexBuilds(secondary);

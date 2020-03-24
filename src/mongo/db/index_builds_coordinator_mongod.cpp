@@ -247,7 +247,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     _threadPool.schedule([
         this,
         buildUUID,
-        collectionUUID,
         dbName,
         nss,
         deadline,
