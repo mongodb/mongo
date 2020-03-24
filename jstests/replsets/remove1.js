@@ -74,7 +74,7 @@ config.version = nextVersion;
 // perception that the secondary is still "down".
 assert.soon(function() {
     try {
-        reconfig(replTest, config);
+        assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: config}));
         return true;
     } catch (e) {
         return false;
