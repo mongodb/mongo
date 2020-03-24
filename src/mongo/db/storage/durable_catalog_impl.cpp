@@ -597,17 +597,6 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
     BSONObj obj = _findEntry(opCtx, catalogId);
 
     {
-        // Remove the index spec 'ns' field if FCV is set to 4.4.
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            for (size_t i = 0; i < md.indexes.size(); i++) {
-                if (md.indexes[i].spec.hasField("ns")) {
-                    md.indexes[i].spec = md.indexes[i].spec.removeField("ns");
-                }
-            }
-        }
-
         // rebuilt doc
         BSONObjBuilder b;
         b.append("md", md.toBSON());
@@ -662,7 +651,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
 
         BSONCollectionCatalogEntry::MetaData md;
         md.parse(old["md"].Obj());
-        md.rename(toNss.ns());
+        md.ns = toNss.ns();
         if (!stayTemp)
             md.options.temp = false;
         b.append("md", md.toBSON());
