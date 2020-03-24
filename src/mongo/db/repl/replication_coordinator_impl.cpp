@@ -4227,6 +4227,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         // Clear the horizon promise mappings of removed nodes so they can be recreated if the node
         // later rejoins the set.
         _horizonToPromiseMap.clear();
+
+        // If we're still REMOVED, clear the seedList.
+        _seedList.clear();
     }
 
     _updateLastCommittedOpTimeAndWallTime(lk);
