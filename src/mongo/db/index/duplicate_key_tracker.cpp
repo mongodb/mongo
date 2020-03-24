@@ -151,15 +151,4 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
     return Status::OK();
 }
 
-bool DuplicateKeyTracker::areAllConstraintsChecked(OperationContext* opCtx) const {
-    auto cursor = _keyConstraintsTable->rs()->getCursor(opCtx);
-    auto record = cursor->next();
-
-    // The table is empty only when there are no more constraints to check.
-    if (!record)
-        return true;
-
-    return false;
-}
-
 }  // namespace mongo

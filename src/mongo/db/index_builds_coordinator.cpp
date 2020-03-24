@@ -2118,9 +2118,11 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
         RecoveryUnit::ReadSource::kUnset,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
-    // Retry indexing records that may have been skipped while relaxing constraints (i.e. as
-    // secondary), but only if we are primary and committing the index build and during two-phase
-    // builds. Single-phase index builds are not resilient to state transitions.
+    // Retry indexing records that failed key generation while relaxing constraints (i.e. while
+    // a secondary node), but only if we are primary and committing the index build and during
+    // two-phase builds. Single-phase index builds are not resilient to state transitions and do not
+    // track skipped records. Secondaries rely on the primary's decision to commit as assurance that
+    // it has checked all key generation errors on its behalf.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (IndexBuildProtocol::kTwoPhase == replState->protocol &&
         replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
@@ -2128,9 +2130,17 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
             _indexBuildsManager.retrySkippedRecords(opCtx, replState->buildUUID, collection));
     }
 
-    // Index constraint checking phase.
-    uassertStatusOK(
-        _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
+    // Duplicate key constraint checking phase. Duplicate key errors are tracked for single-phase
+    // builds on primaries and two-phase builds in all replication states. Single-phase builds on
+    // secondaries don't track duplicates so this call is a no-op. This can be called for two-phase
+    // builds in all replication states except during initial sync when this node is not guaranteed
+    // to be consistent.
+    bool twoPhaseAndNotInitialSyncing = IndexBuildProtocol::kTwoPhase == replState->protocol &&
+        !replCoord->getMemberState().startup2();
+    if (IndexBuildProtocol::kSinglePhase == replState->protocol || twoPhaseAndNotInitialSyncing) {
+        uassertStatusOK(
+            _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
+    }
 
     // If two phase index builds is enabled, index build will be coordinated using
     // startIndexBuild and commitIndexBuild oplog entries.

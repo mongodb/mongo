@@ -76,12 +76,6 @@ public:
      */
     Status checkConstraints(OperationContext* opCtx) const;
 
-    /**
-     * Returns true if all recorded duplicate key constraint violations have been deleted from the
-     * temporary record store.
-     */
-    bool areAllConstraintsChecked(OperationContext* opCtx) const;
-
 private:
     const IndexCatalogEntry* _indexCatalogEntry;
 

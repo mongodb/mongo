@@ -159,12 +159,6 @@ public:
     bool areAllWritesApplied(OperationContext* opCtx) const;
 
     /**
-     * Returns true if all recorded duplicate key constraint violations have been checked.
-     */
-    bool areAllConstraintsChecked(OperationContext* opCtx) const;
-
-
-    /**
      * When an index builder wants to commit, use this to retrieve any recorded multikey paths
      * that were tracked during the build.
      */

@@ -168,9 +168,6 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 
         // An index build should never be completed with writes remaining in the interceptor.
         invariant(_indexBuildInterceptor->areAllWritesApplied(opCtx));
-
-        // An index build should never be completed without resolving all key constraints.
-        invariant(_indexBuildInterceptor->areAllConstraintsChecked(opCtx));
     }
 
     LOGV2(20345,
