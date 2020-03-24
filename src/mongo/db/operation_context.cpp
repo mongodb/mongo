@@ -223,9 +223,7 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 
     checkForInterruptFail.executeIf(
         [&](auto&&) {
-            LOGV2(20882,
-                  "set pending kill on op {getOpID}, for checkForInterruptFail",
-                  "getOpID"_attr = getOpID());
+            LOGV2(20882, "Marking operation as killed for failpoint", "opId"_attr = getOpID());
             markKilled();
         },
         [&](auto&& data) { return opShouldFail(getClient(), data); });
@@ -326,7 +324,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     invariant(!ErrorExtraInfo::parserFor(killCode));
 
     if (killCode == ErrorCodes::ClientDisconnect) {
-        LOGV2(20883, "operation was interrupted because a client disconnected");
+        LOGV2(20883, "Interrupted operation as its client disconnected", "opId"_attr = getOpID());
     }
 
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
