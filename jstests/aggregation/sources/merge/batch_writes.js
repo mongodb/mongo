@@ -1,11 +1,11 @@
 // Tests the behavior of an $merge stage which encounters an error in the middle of processing. We
 // don't guarantee any particular behavior in this scenario, but this test exists to make sure
 // nothing horrendous happens and to characterize the current behavior.
-// @tags: [assumes_unsharded_collection]
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode and
+                                                      // dropWithoutImplicitRecreate.
 load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
 
 const coll = db.batch_writes;
@@ -46,7 +46,7 @@ for (let i = 0; i < 10; i++) {
 // running the $merge. The second document to be written ({_id: 1, a: 1}) will conflict with the
 // existing document in the output collection. We use a unique index on a field other than _id
 // because whenMatched: "replace" will not change _id when one already exists.
-outColl.drop();
+dropWithoutImplicitRecreate(outColl.getName());
 assert.commandWorked(outColl.insert({_id: 2, a: 1}));
 assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
 

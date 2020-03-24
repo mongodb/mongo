@@ -1,10 +1,10 @@
 // Tests the behavior of $merge with whenMatched: "fail" and whenNotMatched: "insert".
-// @tags: [assumes_unsharded_collection, assumes_no_implicit_collection_creation_after_drop]
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
+load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
 
 const coll = db.merge_insert_only;
 coll.drop();
@@ -42,7 +42,7 @@ assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
 const validator = {
     a: {$gt: 0}
 };
-targetColl.drop();
+dropWithoutImplicitRecreate(targetColl.getName());
 assert.commandWorked(db.createCollection(targetColl.getName(), {validator: validator}));
 assert.commandWorked(targetColl.createIndex({a: 1}));
 
@@ -62,7 +62,7 @@ assert.eq(validator, listColl.cursor.firstBatch[0].options["validator"]);
 //
 coll.drop();
 assert.commandWorked(coll.insert([{_id: 0, a: 0}, {_id: 1, a: 0}]));
-targetColl.drop();
+dropWithoutImplicitRecreate(targetColl.getName());
 assert.commandWorked(targetColl.createIndex({a: 1}, {unique: true}));
 
 assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
@@ -86,7 +86,7 @@ assert.eq(1, targetColl.find().itcount());
 //
 coll.drop();
 assert.commandWorked(coll.insert([{_id: "should be projected away", name: "kyle"}]));
-targetColl.drop();
+dropWithoutImplicitRecreate(targetColl.getName());
 assert.commandWorked(targetColl.createIndex({_id: 1, name: -1}, {unique: true}));
 assert.doesNotThrow(() => coll.aggregate([
     {$project: {_id: 0}},

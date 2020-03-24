@@ -1,8 +1,4 @@
 // Tests the behaviour of the $merge stage with whenMatched=[pipeline] and whenNotMatched=fail.
-//
-// Cannot implicitly shard accessed collections because a collection can be implictly created and
-// exists when none is expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
 (function() {
 "use strict";
 
@@ -34,7 +30,7 @@ const pipeline = [mergeStage];
     assert.commandWorked(target.insert([{_id: 1, b: 1}]));
     error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1, x: 2}]});
+    assert.eq(target.find().itcount(), 1);
 })();
 
 // Test $merge when all documents in the source collection have a matching document in the

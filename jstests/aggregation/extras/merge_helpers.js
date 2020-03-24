@@ -81,3 +81,9 @@ function assertMergeSucceedsWithExpectedUniqueIndex(
         assert.doesNotThrow(() => source.aggregate(pipeline, options));
     });
 }
+
+// Helper to drop a collection without using the shell helper, and thus avoiding the implicit
+// recreation in the sharded collections passthrough suites.
+function dropWithoutImplicitRecreate(collName) {
+    db.runCommand({drop: collName});
+}

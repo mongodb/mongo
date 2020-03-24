@@ -2,12 +2,12 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
+load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
+load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
 
 // A helper function to create a pipeline with a $merge stage using a custom 'updatePipeline'
 // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be
@@ -194,8 +194,8 @@ target.drop();
     }
 
     // The 'on' fields contains a single document field.
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 30}]));
@@ -244,8 +244,8 @@ target.drop();
         return;
     }
 
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(target.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(source.insert([
@@ -276,8 +276,8 @@ target.drop();
         return;
     }
 
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({"z": 1}, {unique: true}));
     assert.commandWorked(target.createIndex({"z": 1}, {unique: true}));
 
@@ -315,7 +315,7 @@ target.drop();
     });
 
     // The _id is a single 'on' field (a default one).
-    assert(source.drop());
+    dropWithoutImplicitRecreate(source.getName());
     assert(target.drop());
     assert.commandWorked(source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]));
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
@@ -335,7 +335,7 @@ target.drop();
     });
 
     // The _id is part of the compound 'on' field.
-    assert(target.drop());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
     assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
     assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));
@@ -351,7 +351,7 @@ target.drop();
 // Test $merge preserves indexes and options of the existing target collection.
 (function testMergePresrvesIndexesAndOptions() {
     const validator = {z: {$gt: 0}};
-    assert(target.drop());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(db.createCollection(target.getName(), {validator: validator}));
     assert.commandWorked(target.createIndex({a: 1}));
     assert.commandWorked(target.insert([{_id: 1, z: 5}, {_id: 2, z: 5}]));
@@ -372,27 +372,32 @@ target.drop();
 
     const foreignDb = db.getSiblingDB(`${jsTest.name()}_foreign_db`);
     assert.commandWorked(foreignDb.dropDatabase());
-    const foreignTarget = foreignDb[`${jsTest.name()}_target`];
+    const foreignTargetCollName = jsTest.name() + "_target";
     const foreignPipeline = makeMergePipeline({
-        target: {db: foreignDb.getName(), coll: foreignTarget.getName()},
+        target: {db: foreignDb.getName(), coll: foreignTargetCollName},
         updatePipeline: [{$addFields: {z: 1}}]
     });
 
     if (!FixtureHelpers.isMongos(db)) {
         assert.doesNotThrow(() => source.aggregate(foreignPipeline));
-        assertArrayEq({actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1, b: "a"}]});
+        assertArrayEq({
+            actual: foreignDb[foreignTargetCollName].find().toArray(),
+            expected: [{_id: 1, a: 1, b: "a"}]
+        });
     } else {
         // Implicit database creation is prohibited in a cluster.
         const error = assert.throws(() => source.aggregate(foreignPipeline));
         assert.commandFailedWithCode(error, ErrorCodes.NamespaceNotFound);
 
         // Force creation of the database and collection, then fall through the test below.
-        assert.commandWorked(foreignTarget.insert({_id: 1, a: 1, b: "a"}));
+        assert.commandWorked(foreignDb[foreignTargetCollName].insert({_id: 1, a: 1, b: "a"}));
     }
 
     assert.doesNotThrow(() => source.aggregate(foreignPipeline));
-    assertArrayEq(
-        {actual: foreignTarget.find().toArray(), expected: [{_id: 1, a: 1, b: "a", z: 1}]});
+    assertArrayEq({
+        actual: foreignDb[foreignTargetCollName].find().toArray(),
+        expected: [{_id: 1, a: 1, b: "a", z: 1}]
+    });
     assert.commandWorked(foreignDb.dropDatabase());
 })();
 
