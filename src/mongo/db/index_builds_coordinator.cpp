@@ -1046,12 +1046,10 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opC
         invariant(nss);
 
         LOGV2(20660,
-              "Restarting index build for collection: {nss}, collection UUID: {build_collUUID}, "
-              "index build UUID: {buildUUID}",
-              "nss"_attr = *nss,
-              "build_collUUID"_attr = build.collUUID,
+              "Restarting index build",
+              "collection"_attr = nss,
+              "collectionUUID"_attr = build.collUUID,
               "buildUUID"_attr = buildUUID);
-
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
         // Start the index build as if in secondary oplog application.
         indexBuildOptions.replSetAndNotPrimaryAtStart = true;

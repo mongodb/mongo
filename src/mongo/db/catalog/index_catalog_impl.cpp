@@ -101,6 +101,8 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
     vector<string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);
     durableCatalog->getAllIndexes(opCtx, _collection->getCatalogId(), &indexNames);
+    const bool replSetMemberInStandaloneMode =
+        getReplSetMemberInStandaloneMode(opCtx->getServiceContext());
 
     for (size_t i = 0; i < indexNames.size(); i++) {
         const string& indexName = indexNames[i];
@@ -114,28 +116,34 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
                 .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
         }
 
-        // We intentionally do not drop or rebuild unfinished two-phase index builds before
-        // initializing the IndexCatalog when starting a replica set member in standalone mode. This
-        // is because the index build cannot complete until it receives a replicated commit or
-        // abort oplog entry.
-        if (!durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName)) {
-            invariant(getReplSetMemberInStandaloneMode(opCtx->getServiceContext()));
+        bool ready = durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName);
+        if (!ready) {
             auto buildUUID =
                 durableCatalog->getIndexBuildUUID(opCtx, _collection->getCatalogId(), indexName);
-            invariant(buildUUID);
-
-            // Indicate that this index is "frozen". It is not ready but is not currently in
-            // progress either. These indexes may be dropped.
-            auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
+            invariant(buildUUID,
+                      str::stream()
+                          << "collection: " << _collection->ns() << "index:" << indexName);
+            // We intentionally do not drop or rebuild unfinished two-phase index builds before
+            // initializing the IndexCatalog when starting a replica set member in standalone mode.
+            // This is because the index build cannot complete until it receives a replicated commit
+            // or abort oplog entry.
+            if (replSetMemberInStandaloneMode) {
+                // Indicate that this index is "frozen". It is not ready but is not currently in
+                // progress either. These indexes may be dropped.
+                auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
+                IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
+                fassert(31433, !entry->isReady(opCtx));
+            } else {
+                // Initializing with unfinished indexes may occur during rollback or startup.
+                auto flags = CreateIndexEntryFlags::kInitFromDisk;
+                IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
+                fassert(4505500, !entry->isReady(opCtx));
+            }
+        } else {
+            auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
             IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
-            fassert(31433, !entry->isReady(opCtx));
-            continue;
+            fassert(17340, entry->isReady(opCtx));
         }
-
-        auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
-        IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
-
-        fassert(17340, entry->isReady(opCtx));
     }
 
     CollectionQueryInfo::get(_collection).init(opCtx);
