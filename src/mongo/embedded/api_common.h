@@ -145,7 +145,7 @@ thread_local bool ReentrancyGuard::GuardHolder<T>::inLibrary = false;
 
 template <typename Status,
           typename Function,
-          typename ReturnType = typename std::result_of<Function()>::type>
+          typename ReturnType = typename std::invoke_result<Function>::type>
 struct enterCXXImpl;
 
 template <typename Status, typename Function>

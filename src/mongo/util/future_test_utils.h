@@ -125,7 +125,7 @@ inline void sleepIfShould() {
 #endif
 }
 
-template <typename Func, typename Result = std::result_of_t<Func && ()>>
+template <typename Func, typename Result = std::invoke_result_t<Func&&>>
 Future<Result> async(Func&& func) {
     auto pf = makePromiseFuture<Result>();
 
@@ -158,7 +158,7 @@ inline Status failStatus() {
 template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture,
           typename CompletionFunc,
           typename TestFunc,
-          typename = std::enable_if_t<!std::is_void<std::result_of_t<CompletionFunc()>>::value>>
+          typename = std::enable_if_t<!std::is_void<std::invoke_result_t<CompletionFunc>>::value>>
 void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test) {
     using CompletionType = decltype(completion());
     {  // immediate future
@@ -183,7 +183,7 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
 template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture,
           typename CompletionFunc,
           typename TestFunc,
-          typename = std::enable_if_t<std::is_void<std::result_of_t<CompletionFunc()>>::value>,
+          typename = std::enable_if_t<std::is_void<std::invoke_result_t<CompletionFunc>>::value>,
           typename = void>
 void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test) {
     using CompletionType = decltype(completion());

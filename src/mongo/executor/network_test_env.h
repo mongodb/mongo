@@ -151,9 +151,9 @@ public:
      * Must be defined in the header because of its use of templates.
      */
     template <typename Lambda>
-    FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(Lambda&& func) const {
+    FutureHandle<typename std::invoke_result<Lambda>::type> launchAsync(Lambda&& func) const {
         auto future = async(stdx::launch::async, std::forward<Lambda>(func));
-        return NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type>{
+        return NetworkTestEnv::FutureHandle<typename std::invoke_result<Lambda>::type>{
             std::move(future), _executor, _mockNetwork};
     }
 

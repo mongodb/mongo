@@ -52,7 +52,7 @@ public:
     ~ShardingTestFixtureCommon();
 
     template <typename Lambda>
-    executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
+    executor::NetworkTestEnv::FutureHandle<typename std::invoke_result<Lambda>::type> launchAsync(
         Lambda&& func) const {
         return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
     }
