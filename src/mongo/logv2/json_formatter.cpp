@@ -245,26 +245,30 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
             outputDateAsISOStringLocal(buffer, date);
             break;
     };
-    static const auto& fmtStrBody = *new auto(
-        fmt::compile<StringData,
-                     StringData,
-                     StringData,
-                     int,
-                     StringData,
-                     StringData,
-                     StringData,
-                     int,
-                     StringData,
-                     int32_t,
-                     StringData,
-                     StringData,
-                     StringData>(R"("}},)"              // close timestamp
-                                 R"("{}":"{}"{: <{}})"  // severity with padding for the comma
-                                 R"("{}":"{}"{: <{}})"  // component with padding for the comma
-                                 R"("{}":{},)"          // id
-                                 R"("{}":"{}",)"        // context
-                                 R"("{}":")"            // message
-                                 ));
+    static const auto& fmtStrBody =
+        *new auto(fmt::compile<StringData,  // severity start
+                               StringData,
+                               StringData,
+                               int,
+                               StringData,  // component start
+                               StringData,
+                               StringData,
+                               int,
+                               StringData,  // id start
+                               StringData,
+                               StringData,
+                               int,
+                               StringData,  // context start
+                               StringData,
+                               StringData>  // message start
+                  (R"("}},)"                // close timestamp
+                   R"("{}":"{}"{: <{}})"    // severity with padding for the comma
+                   R"("{}":"{}"{: <{}})"    // component with padding for the comma
+                   R"("{}":{}{: <{}})"      // id with padding for the comma
+                   R"("{}":"{}",)"          // context
+                   R"("{}":")"              // message
+                   ));
+    fmt::format_int idString(id);
     compiled_format_to(
         buffer,
         fmtStrBody,
@@ -280,7 +284,9 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         9 - componentString.size(),
         // id
         constants::kIdFieldName,
-        id,
+        StringData(idString.data(), idString.size()),
+        ","_sd,
+        8 - idString.size(),
         // context
         constants::kContextFieldName,
         context,
