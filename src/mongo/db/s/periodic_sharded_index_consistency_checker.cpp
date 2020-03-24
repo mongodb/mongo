@@ -79,23 +79,6 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 return;
             }
 
-            if (serverGlobalParams.featureCompatibility.getVersion() !=
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-                // Short circuit when not fully FCV upgraded because in v4.4
-                // ClusterAggregate::runAggregate() attaches fields that can't be parsed by a 4.2
-                // mongod. This is not a problem for aggregations run through mongos, because mongos
-                // won't connect to a 4.2 mongod, but this aggregation is run by the config server
-                // and will fail in a mixed version cluster. A config server can only be in FCV 4.4
-                // if all shards are running a 4.4 binary, which avoids this problem at the expense
-                // of not detecting inconsistent indexes when FCV < 4.4.
-                LOGV2(4608400,
-                      "Skipping sharded index consistency check because feature compatibility "
-                      "version is not fully upgraded");
-                stdx::lock_guard<Latch> lk(_mutex);
-                _numShardedCollsWithInconsistentIndexes = 0;
-                return;
-            }
-
             LOGV2(22049, "Checking consistency of sharded collection indexes across the cluster");
 
             const auto aggRequestBSON = fromjson(

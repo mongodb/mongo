@@ -1,7 +1,7 @@
 /*
  * Tests the aggregation that collects index consistency metrics for serverStatus retries on stale
- * version errors. These metrics are only correct in FCV 4.4, so this test requires it.
- * @tags: [requires_fcv_44, requires_sharding]
+ * version errors.
+ * @tags: [requires_sharding]
  */
 (function() {
 "use strict";

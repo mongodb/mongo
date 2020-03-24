@@ -1,7 +1,6 @@
 /*
- * Tests index consistency metrics in the serverStatus output. These metrics are only correct in FCV
- * 4.4, so this test requires it.
- * @tags: [requires_fcv_44, requires_sharding]
+ * Tests index consistency metrics in the serverStatus output.
+ * @tags: [requires_sharding]
  */
 (function() {
 "use strict";
