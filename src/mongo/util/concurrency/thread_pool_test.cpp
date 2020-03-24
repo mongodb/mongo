@@ -186,7 +186,9 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
         << "Failed to reap excess threads after " << durationCount<Milliseconds>(reapTime) << "ms";
 }
 
-DEATH_TEST_REGEX(ThreadPoolTest, MaxThreadsTooFewDies, "but the maximum must be at least 1") {
+DEATH_TEST_REGEX(ThreadPoolTest,
+                 MaxThreadsTooFewDies,
+                 "Cannot create pool.*with maximum number of threads.*less than 1") {
     ThreadPool::Options options;
     options.maxThreads = 0;
     ThreadPool pool(options);
@@ -195,7 +197,7 @@ DEATH_TEST_REGEX(ThreadPoolTest, MaxThreadsTooFewDies, "but the maximum must be 
 DEATH_TEST_REGEX(
     ThreadPoolTest,
     MinThreadsTooManyDies,
-    R"#(.*which is more than the configured maximum of.*minThreads":6,"options_maxThreads":5)#") {
+    R"#(.*Cannot create pool.*with minimum number of threads.*larger than the configured maximum.*minThreads":6,"maxThreads":5)#") {
     ThreadPool::Options options;
     options.maxThreads = 5;
     options.minThreads = 6;
@@ -213,7 +215,7 @@ TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
 
 DEATH_TEST_REGEX(ThreadPoolTest,
                  DestructionDuringJoinDies,
-                 "Attempted to join pool .* more than once.*DoubleJoinPool") {
+                 "Attempted to join pool.*more than once.*DoubleJoinPool") {
     // This test is a little complicated. We need to ensure that the ThreadPool destructor runs
     // while some thread is blocked running ThreadPool::join, to see that double-join is fatal in
     // the pool destructor. To do this, we first wait for minThreads threads to have started. Then,

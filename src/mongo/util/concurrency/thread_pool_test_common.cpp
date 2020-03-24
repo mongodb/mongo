@@ -80,6 +80,7 @@ public:
         if (entry) {
             LOGV2_FATAL(34355,
                         "Multiple attempts to register ThreadPoolTest named {name}",
+                        "Multiple attempts to register ThreadPoolTest",
                         "name"_attr = name);
         }
         entry = std::move(makeTest);
@@ -97,6 +98,7 @@ public:
         if (entry) {
             LOGV2_FATAL(34356,
                         "Multiple attempts to register ThreadPoolDeathTest named {name}",
+                        "Multiple attempts to register ThreadPoolDeathTest",
                         "name"_attr = name);
         }
         entry = [makeTest](ThreadPoolFactory makeThreadPool) {
@@ -151,7 +153,7 @@ COMMON_THREAD_POOL_TEST(CannotScheduleAfterShutdown) {
     pool.schedule([](auto status) { ASSERT_EQ(status, ErrorCodes::ShutdownInProgress); });
 }
 
-COMMON_THREAD_POOL_DEATH_TEST(DieOnDoubleStartUp, "it has already started") {
+COMMON_THREAD_POOL_DEATH_TEST(DieOnDoubleStartUp, "already started") {
     auto& pool = getThreadPool();
     pool.startup();
     pool.startup();

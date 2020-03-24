@@ -32,7 +32,7 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
             testColl.insert({a: 1});
         });
     },
-    new RegExp("Fatal Assertion.*50883"));
+    new RegExp("Fatal assertion.*50883"));
 
 /**
  * Test 2. Delete the _mdb_catalog.
@@ -43,7 +43,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
     jsTestLog("deleting catalog file: " + mdbCatalogFile);
     removeFile(mdbCatalogFile);
-}, new RegExp("Fatal Assertion.*50883"));
+}, new RegExp("Fatal assertion.*50883"));
 
 /**
  * Test 3. Delete the WiredTiger.wt.
@@ -54,7 +54,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     let WiredTigerWTFile = dbpath + "WiredTiger.wt";
     jsTestLog("deleting WiredTiger.wt");
     removeFile(WiredTigerWTFile);
-}, new RegExp("Fatal Assertion.*50944"));
+}, new RegExp("Fatal assertion.*50944"));
 
 /**
  * Test 4. Delete an index file.
@@ -80,5 +80,5 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
             testColl.insert({a: 1});
         });
     },
-    new RegExp("Fatal Assertion.*50883"));
+    new RegExp("Fatal assertion.*50883"));
 })();

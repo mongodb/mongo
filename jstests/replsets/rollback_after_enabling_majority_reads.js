@@ -51,7 +51,7 @@ jsTest.log("Attempt to roll back. This will fassert.");
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 assert.soon(() => {
-    return rawMongoProgramOutput().search(/Fatal Assertion.+51121/) != -1;
+    return rawMongoProgramOutput().search(/Fatal assertion.+51121/) != -1;
 });
 
 jsTest.log(

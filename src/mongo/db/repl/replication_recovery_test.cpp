@@ -455,7 +455,7 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     recovery.recoverFromOplog(opCtx, Timestamp(1, 1));
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest, TruncateEntireOplogFasserts, "Fatal Assertion.*40296") {
+DEATH_TEST_REGEX_F(ReplicationRecoveryTest, TruncateEntireOplogFasserts, "Fatal assertion.*40296") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -781,7 +781,7 @@ TEST_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    AppliedThroughBehindOplogFasserts,
-                   "Fatal Assertion.*40292") {
+                   "Fatal assertion.*40292") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -793,7 +793,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    AppliedThroughAheadOfTopOfOplogCausesFassert,
-                   "Fatal Assertion.*40313") {
+                   "Fatal assertion.*40313") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -805,7 +805,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    AppliedThroughNotInOplogCausesFassert,
-                   "Fatal Assertion.*40292") {
+                   "Fatal assertion.*40292") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1083,7 +1083,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    RecoveryFailsWithPrepareAndEnableReadConcernMajorityFalse,
-                   "Fatal Assertion.*51146") {
+                   "Fatal assertion.*51146") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1471,7 +1471,7 @@ TEST_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    RecoverFromOplogUpToWithoutStableCheckpoint,
-                   "Fatal Assertion.*31399") {
+                   "Fatal assertion.*31399") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1482,7 +1482,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    RecoverFromOplogAsStandaloneFailsWithoutStableCheckpoint,
-                   "Fatal Assertion.*31229") {
+                   "Fatal assertion.*31229") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1493,7 +1493,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    RecoverFromOplogAsStandaloneFailsWithNullStableCheckpoint,
-                   "Fatal Assertion.*50806") {
+                   "Fatal assertion.*50806") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1505,7 +1505,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    RecoverFromOplogUpToFailsWithNullStableCheckpoint,
-                   "Fatal Assertion.*50806") {
+                   "Fatal assertion.*50806") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -1562,7 +1562,7 @@ TEST_F(ReplicationRecoveryTest,
 DEATH_TEST_REGEX_F(
     ReplicationRecoveryTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithInitialSyncFlag,
-    "Fatal Assertion.*31362") {
+    "Fatal assertion.*31362") {
     gTakeUnstableCheckpointOnShutdown = true;
 
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1577,7 +1577,7 @@ DEATH_TEST_REGEX_F(
 DEATH_TEST_REGEX_F(
     ReplicationRecoveryTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithOplogTruncateAfterPoint,
-    "Fatal Assertion.*31363") {
+    "Fatal assertion.*31363") {
     gTakeUnstableCheckpointOnShutdown = true;
 
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1592,7 +1592,7 @@ DEATH_TEST_REGEX_F(
 DEATH_TEST_REGEX_F(
     ReplicationRecoveryTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithEmptyOplog,
-    "Fatal Assertion.*31364") {
+    "Fatal assertion.*31364") {
     gTakeUnstableCheckpointOnShutdown = true;
 
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1606,7 +1606,7 @@ DEATH_TEST_REGEX_F(
 DEATH_TEST_REGEX_F(
     ReplicationRecoveryTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithMismatchedAppliedThrough,
-    "Fatal Assertion.*31365") {
+    "Fatal assertion.*31365") {
     gTakeUnstableCheckpointOnShutdown = true;
 
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1621,7 +1621,7 @@ DEATH_TEST_REGEX_F(
 DEATH_TEST_REGEX_F(
     ReplicationRecoveryTest,
     RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownFailsWithHighMinValid,
-    "Fatal Assertion.*31366") {
+    "Fatal assertion.*31366") {
     gTakeUnstableCheckpointOnShutdown = true;
 
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());

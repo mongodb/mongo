@@ -175,8 +175,9 @@ FailPoint::RetCode FailPoint::_slowShouldFailOpenBlockWithoutIncrementingTimesEn
         }
         default:
             LOGV2_ERROR(23832,
-                        "FailPoint Mode not supported: {static_cast_int_mode}",
-                        "static_cast_int_mode"_attr = static_cast<int>(_mode));
+                        "FailPoint mode not supported: {mode}",
+                        "FailPoint mode not supported",
+                        "mode"_attr = static_cast<int>(_mode));
             fassertFailed(16444);
     }
 }
@@ -305,7 +306,8 @@ auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
         uasserted(ErrorCodes::FailPointSetFailed, failPointName + " not found");
     auto timesEntered = failPoint->setMode(uassertStatusOK(FailPoint::parseBSON(cmdObj)));
     LOGV2_WARNING(23829,
-                  "failpoint: {failPointName} set to: {failPoint}",
+                  "Set failpoint {failPointName} to: {failPoint}",
+                  "Set failpoint",
                   "failPointName"_attr = failPointName,
                   "failPoint"_attr = failPoint->toBSON());
     return timesEntered;
@@ -322,7 +324,8 @@ FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj da
     _initialTimesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
 
     LOGV2_WARNING(23830,
-                  "failpoint: {failPointName} set to: {failPoint}",
+                  "Set failpoint {failPointName} to: {failPoint}",
+                  "Set failpoint",
                   "failPointName"_attr = _failPointName,
                   "failPoint"_attr = _failPoint->toBSON());
 }
@@ -330,7 +333,8 @@ FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj da
 FailPointEnableBlock::~FailPointEnableBlock() {
     _failPoint->setMode(FailPoint::off);
     LOGV2_WARNING(23831,
-                  "failpoint: {failPointName} set to: {failPoint}",
+                  "Set failpoint {failPointName} to: {failPoint}",
+                  "Set failpoint",
                   "failPointName"_attr = _failPointName,
                   "failPoint"_attr = _failPoint->toBSON());
 }
