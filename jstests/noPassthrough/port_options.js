@@ -20,7 +20,7 @@ function runTest(bindIP, expectOk) {
         assert.soonNoExcept(() => {
             const logContents = rawMongoProgramOutput();
             const found = logContents.match(
-                /"id":23016,"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
+                /"id":23016,\s*"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
             if (found !== null) {
                 print("Found message from mongod with port it is listening on: " + found[0]);
                 port = found[1];
