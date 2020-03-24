@@ -231,32 +231,6 @@ TEST(AssertUtils, MassertTypedExtraInfoWorks) {
     }
 }
 
-// uassert and its friends
-DEATH_TEST(UassertionTerminationTest, uassert, "Terminating with uassert") {
-    uassert(40204, "Terminating with uassert", false);
-}
-
-DEATH_TEST(UassertionTerminationTest, uasserted, "Terminating with uasserted") {
-    uasserted(40205, "Terminating with uasserted");
-}
-
-DEATH_TEST(UassertionTerminationTest, uassertStatusOK, "Terminating with uassertStatusOK") {
-    uassertStatusOK(Status(ErrorCodes::InternalError, "Terminating with uassertStatusOK"));
-}
-
-DEATH_TEST(UassertionTerminationTest, uassertStatusOKOverload, "Terminating with uassertStatusOK") {
-    uassertStatusOK(
-        StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with uassertStatusOK"));
-}
-
-DEATH_TEST(UassertionTerminationTest,
-           uassertStatusOKWithContext,
-           "Terminating with uassertStatusOKWithContext") {
-    uassertStatusOKWithContext(
-        Status(ErrorCodes::InternalError, "Terminating with uassertStatusOKWithContext"),
-        "Terminating with uassertStatusOKWithContext");
-}
-
 // fassert and its friends
 DEATH_TEST(FassertionTerminationTest, fassert, "40206") {
     fassert(40206, false);
@@ -302,20 +276,6 @@ DEATH_TEST(FassertionTerminationTest,
            "Terminating with fassertFailedWithStatusNoTrace") {
     fassertFailedWithStatusNoTrace(
         40213, {ErrorCodes::InternalError, "Terminating with fassertFailedWithStatusNoTrace"});
-}
-
-// massert and its friends
-DEATH_TEST(MassertionTerminationTest, massert, "Terminating with massert") {
-    massert(40214, "Terminating with massert", false);
-}
-
-
-DEATH_TEST(MassertionTerminationTest, massertStatusOK, "Terminating with massertStatusOK") {
-    massertStatusOK(Status(ErrorCodes::InternalError, "Terminating with massertStatusOK"));
-}
-
-DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted") {
-    msgasserted(40215, "Terminating with msgasserted");
 }
 
 // invariant and its friends
