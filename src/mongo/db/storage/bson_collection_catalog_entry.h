@@ -96,6 +96,8 @@ public:
          */
         bool eraseIndex(StringData name);
 
+        void rename(StringData toNS);
+
         KVPrefix getMaxPrefix() const;
 
         std::string ns;

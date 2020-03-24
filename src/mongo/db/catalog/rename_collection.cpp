@@ -605,7 +605,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
         }
     });
 
-    // Copy the index descriptions from the source collection.
+    // Copy the index descriptions from the source collection, adjusting the 'ns' field if
+    // necessary.
     std::vector<BSONObj> indexesToCopy;
     for (auto sourceIndIt = sourceColl->getIndexCatalog()->getIndexIterator(opCtx, true);
          sourceIndIt->more();) {
@@ -614,7 +615,27 @@ Status renameBetweenDBs(OperationContext* opCtx,
             continue;
         }
 
-        indexesToCopy.push_back(descriptor->infoObj());
+        const BSONObj currIndex = descriptor->infoObj();
+
+        // In FCV 4.4, there is no 'ns' field to modify.
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            indexesToCopy.push_back(currIndex);
+            continue;
+        }
+
+        // In FCV 4.2, we must rename the 'ns' field if it exists.
+        // Process the source index, adding fields in the same order as they were originally.
+        BSONObjBuilder newIndex;
+        for (auto&& elem : currIndex) {
+            if (elem.fieldNameStringData() == "ns") {
+                newIndex.append("ns", tmpName.ns());
+            } else {
+                newIndex.append(elem);
+            }
+        }
+        indexesToCopy.push_back(newIndex.obj());
     }
 
     // Create indexes using the index specs on the empty temporary collection that was just created.
