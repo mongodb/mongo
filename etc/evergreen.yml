@@ -5477,6 +5477,17 @@ tasks:
       resmoke_args: --suites=aggregation_sharded_collections_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: aggregation_sharded_collections_causally_consistent_passthrough
+  tags: ["aggregation", "secondary_reads"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_sharded_collections_causally_consistent_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: audit
   commands:
   - func: "do setup"

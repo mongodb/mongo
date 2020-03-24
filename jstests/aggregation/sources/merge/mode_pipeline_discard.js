@@ -2,12 +2,12 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isSharded.
+load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
+load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
+load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isSharded.
 
 // A helper function to create a pipeline with a $merge stage using a custom 'updatePipeline'
 // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be
@@ -136,8 +136,8 @@ target.drop();
     });
 
     // The 'on' fields contains a single document field.
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(
@@ -162,8 +162,8 @@ target.drop();
     });
 
     // The 'on' fields contains multiple document fields.
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({a: 1, b: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1, b: 1}, {unique: true}));
     assert.commandWorked(source.insert(
@@ -199,8 +199,8 @@ target.drop();
         updatePipeline: [{$set: {x: 1, y: 2}}]
     });
 
-    assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(source.getName());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(target.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(source.insert([
@@ -228,7 +228,7 @@ target.drop();
     });
 
     // The _id is a single 'on' field (a default one).
-    assert(source.drop());
+    dropWithoutImplicitRecreate(source.getName());
     assert(target.drop());
     assert.commandWorked(source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]));
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
@@ -243,7 +243,7 @@ target.drop();
     });
 
     // The _id is part of the compound 'on' field.
-    assert(target.drop());
+    dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
     assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
     assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));

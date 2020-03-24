@@ -1,10 +1,11 @@
 // Tests that $out preserves the collection options of the "out" collection.
 // @tags: [
 //   uses_$out,
-//   assumes_unsharded_collection
 // ]
 (function() {
 "use strict";
+
+load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
 
 // Setup and populate input collection.
 const inputName = "out_preserve_coll_options";
@@ -14,9 +15,8 @@ assert.commandWorked(inputColl.insert({_id: 0}));
 
 // Setup target collection.
 const targetName = inputName + "_target";
-db.runCommand({drop: targetName});
+dropWithoutImplicitRecreate(targetName);
 assert.commandWorked(db.createCollection(targetName, {validationLevel: "moderate"}));
-const targetColl = db[targetName];
 
 // Verify target collection options.
 const targetOptionsResponse =
@@ -27,6 +27,7 @@ assert.eq({validationLevel: "moderate"}, targetOptionsResults[0].options, target
 
 // Run $out pipeline.
 inputColl.aggregate([{$out: targetName}]);
+const targetColl = db[targetName];
 assert.eq(1, targetColl.find().itcount());
 
 // Verify new target collection options.

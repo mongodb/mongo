@@ -1,0 +1,88 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/aggregation/**/*.js
+  exclude_files:
+  # The files in these directories contain utilities for use in other tests, not tests.
+  - jstests/aggregation/extras/*.js
+  - jstests/aggregation/data/*.js
+  # This test makes assertions about whether aggregations will need to spill to disk, which assumes
+  # all the data is located on a single shard.
+  - jstests/aggregation/spill_to_disk.js
+  # This test modifies internal parameter on primary node. In order for this test to run
+  # successfully in this passthrough, it would need to run setParameter on every shardsvr in the
+  # cluster.
+  - jstests/aggregation/sources/unionWith/unionWith.js
+  # TODO: Remove when SERVER-23229 is fixed.
+  - jstests/aggregation/bugs/groupMissing.js
+  # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+  - jstests/aggregation/match_swapping_renamed_fields.js
+  - jstests/aggregation/use_query_project_and_sort.js
+  - jstests/aggregation/use_query_projection.js
+  - jstests/aggregation/use_query_sort.js
+  # TODO SERVER-32309: Enable once $lookup with pipeline supports sharded foreign collections.
+  - jstests/aggregation/sources/lookup/lookup_subpipeline.js
+  - jstests/aggregation/sources/graphLookup/variables.js
+
+  exclude_with_any_tags:
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  #
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  # These tests assume that the 'db' object refers to unsharded cluster.
+  - assumes_against_mongod_not_mongos
+  # These tests cannot work with 'implicitly_shard_accessed_collections.js' override.
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_unsharded_collection
+  - cannot_create_unique_index_when_using_hashed_shard_key
+  # collStats and dbStats are not causally consistent.
+  - requires_collstats
+  - requires_dbstats
+  # These tests attempt to read from the "system.profile" collection, which may be missing entries
+  # if a write was performed on the primary of the replica set instead.
+  - requires_profiling
+  # These tests start their own ShardingTest, ReplicaSetTest, or mongods, respectively.
+  - requires_sharding
+  - requires_replication
+  - requires_spawning_own_processes
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/enable_causal_consistency.js');
+        load('jstests/libs/override_methods/detect_spawning_own_mongod.js');
+        load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2
+    enable_sharding:
+    - test

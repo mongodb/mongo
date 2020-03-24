@@ -2,12 +2,12 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
+load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
+load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
@@ -78,7 +78,7 @@ const pipeline = [mergeStage];
     const maxDocsInBatch = maxBatchSize / docSize;
 
     assert(source.drop());
-    assert(target.drop());
+    dropWithoutImplicitRecreate(target.getName());
 
     // Insert 'numDocs' documents of size 'docSize' into the source collection.
     generateCollection({coll: source, numDocs: numDocs, docSize: docSize});
