@@ -59,7 +59,7 @@ class WiredTigerEngineRuntimeConfigParameter;
 class WiredTigerMaxCacheOverflowSizeGBParameter;
 
 struct WiredTigerFileVersion {
-    // MongoDB 4.4+ will not open on datafiles left behind by 4.2.5 and earlier. MongoDB 4.4
+    // MongoDB 4.4+ will not open on datafiles left behind by 4.0 and earlier. MongoDB 4.4
     // shutting down in FCV 4.2 will leave data files that 4.2.6+ will understand
     // (IS_44_FCV_42). MongoDB 4.2.x always writes out IS_42.
     enum class StartupVersion { IS_42, IS_44_FCV_42, IS_44_FCV_44 };
