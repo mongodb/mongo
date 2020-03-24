@@ -916,10 +916,9 @@ void WiredTigerKVEngine::cleanShutdown() {
     }
     LOGV2_FOR_RECOVERY(23988,
                        2,
-                       "Shutdown timestamps. StableTimestamp: {stableTimestamp_load} Initial data "
-                       "timestamp: {initialDataTimestamp_load}",
-                       "stableTimestamp_load"_attr = _stableTimestamp.load(),
-                       "initialDataTimestamp_load"_attr = _initialDataTimestamp.load());
+                       "Shutdown timestamps.",
+                       "Stable Timestamp"_attr = Timestamp(_stableTimestamp.load()),
+                       "Initial Data Timestamp"_attr = Timestamp(_initialDataTimestamp.load()));
 
     _sizeStorer.reset();
     _sessionCache->shuttingDown();
