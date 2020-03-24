@@ -118,25 +118,6 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         Shard::RetryPolicy::kIdempotent);
 
     auto cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
-
-    // If the `toShard` is on v4.2 or earlier, it will not recognize the command name
-    // _shardsvrCloneCatalogData. We will retry the command with the old name _cloneCatalogData.
-    if (cloneCommandStatus == ErrorCodes::CommandNotFound) {
-        BSONObjBuilder legacyCloneCatalogDataCommandBuilder;
-        legacyCloneCatalogDataCommandBuilder << "_cloneCatalogData" << _dbname << "from"
-                                             << fromShardObj->getConnString().toString();
-
-
-        cloneCommandResponse = toShardObj->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
-            CommandHelpers::appendMajorityWriteConcern(legacyCloneCatalogDataCommandBuilder.obj()),
-            Shard::RetryPolicy::kIdempotent);
-
-        cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
-    }
-
     uassertStatusOK(cloneCommandStatus);
 
     auto clonedCollsArray = cloneCommandResponse.getValue().response["clonedColls"];
