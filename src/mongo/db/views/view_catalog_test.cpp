@@ -133,8 +133,8 @@ public:
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline) {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
-        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
             NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
@@ -592,8 +592,8 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
         wunit.commit();
     }
     {
-        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
-        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
         Lock::CollectionLock sysCollLock(
             operationContext(),
             NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
