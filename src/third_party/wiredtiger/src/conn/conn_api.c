@@ -1298,8 +1298,9 @@ __conn_config_check_version(WT_SESSION_IMPL *session, const char *config)
     if (vmajor.val > WIREDTIGER_VERSION_MAJOR ||
       (vmajor.val == WIREDTIGER_VERSION_MAJOR && vminor.val > WIREDTIGER_VERSION_MINOR))
         WT_RET_MSG(session, ENOTSUP,
-          "WiredTiger configuration is from an incompatible release "
-          "of the WiredTiger engine");
+          "WiredTiger configuration is from an incompatible release of the WiredTiger engine, "
+          "configuration major, minor of (%" PRId64 ", %" PRId64 "), with build (%d, %d)",
+          vmajor.val, vminor.val, WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 
     return (0);
 }

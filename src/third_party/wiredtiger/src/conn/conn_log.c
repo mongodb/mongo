@@ -103,38 +103,53 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
      * Note: downgrade in this context means the new version is not the latest possible version. It
      * does not mean the direction of change from the release we may be running currently.
      */
-    if (conn->compat_major < WT_LOG_V2_MAJOR) {
-        new_version = 1;
-        first_record = WT_LOG_END_HEADER;
-        downgrade = true;
-    } else if (conn->compat_major == WT_LOG_V2_MAJOR) {
-        new_version = conn->compat_minor == WT_LOG_V2_MINOR ? 2 : 3;
-        first_record = WT_LOG_END_HEADER + log->allocsize;
-        downgrade = true;
-    } else {
+    if (conn->compat_major == WT_LOG_V5_MAJOR) {
         new_version = WT_LOG_VERSION;
         first_record = WT_LOG_END_HEADER + log->allocsize;
         downgrade = false;
+    } else if (conn->compat_major == WT_LOG_V4_MAJOR) {
+        if (conn->compat_minor == WT_LOG_V4_MINOR)
+            new_version = 4;
+        else if (conn->compat_minor > WT_LOG_V2_MINOR)
+            new_version = 3;
+        else
+            new_version = 2;
+        first_record = WT_LOG_END_HEADER + log->allocsize;
+        downgrade = true;
+    } else {
+        new_version = 1;
+        first_record = WT_LOG_END_HEADER;
+        downgrade = true;
     }
 
     /*
      * Set up the maximum and minimum log version required if needed.
      */
     if (conn->req_max_major != WT_CONN_COMPAT_NONE) {
-        if (conn->req_max_major < WT_LOG_V2_MAJOR)
-            conn->log_req_max = 1;
-        else if (conn->req_max_major == WT_LOG_V2_MAJOR)
-            conn->log_req_max = conn->req_max_minor == WT_LOG_V2_MINOR ? 2 : 3;
-        else
+        if (conn->req_max_major == WT_LOG_V5_MAJOR)
             conn->log_req_max = WT_LOG_VERSION;
+        else if (conn->req_max_major == WT_LOG_V4_MAJOR)
+            if (conn->req_max_minor == WT_LOG_V4_MINOR)
+                conn->log_req_max = 4;
+            else if (conn->req_max_minor > WT_LOG_V2_MINOR)
+                conn->log_req_max = 3;
+            else
+                conn->log_req_max = 2;
+        else
+            conn->log_req_max = 1;
     }
     if (conn->req_min_major != WT_CONN_COMPAT_NONE) {
-        if (conn->req_min_major < WT_LOG_V2_MAJOR)
-            conn->log_req_min = 1;
-        else if (conn->req_min_major == WT_LOG_V2_MAJOR)
-            conn->log_req_min = conn->req_min_minor == WT_LOG_V2_MINOR ? 2 : 3;
-        else
+        if (conn->req_min_major == WT_LOG_V5_MAJOR)
             conn->log_req_min = WT_LOG_VERSION;
+        else if (conn->req_min_major == WT_LOG_V4_MAJOR)
+            if (conn->req_min_minor == WT_LOG_V4_MINOR)
+                conn->log_req_min = 4;
+            else if (conn->req_min_minor > WT_LOG_V2_MINOR)
+                conn->log_req_min = 3;
+            else
+                conn->log_req_min = 2;
+        else
+            conn->log_req_min = 1;
     }
 
     /*

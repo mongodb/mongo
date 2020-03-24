@@ -56,8 +56,8 @@ __rebalance_discard(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
  *     Add a new entry to the list of leaf pages.
  */
 static int
-__rebalance_leaf_append(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const uint8_t *key,
-  size_t key_len, WT_CELL_UNPACK *unpack, WT_REBALANCE_STUFF *rs)
+__rebalance_leaf_append(WT_SESSION_IMPL *session, const uint8_t *key, size_t key_len,
+  WT_CELL_UNPACK *unpack, WT_REBALANCE_STUFF *rs)
 {
     WT_ADDR *copy_addr;
     WT_REF *copy;
@@ -76,10 +76,10 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, con
 
     WT_RET(__wt_calloc_one(session, &copy_addr));
     copy->addr = copy_addr;
-    /* FIXME-prepare-support: use durable timestamps from unpack struct */
-    copy_addr->stop_durable_ts = durable_ts;
+    copy_addr->start_durable_ts = unpack->newest_start_durable_ts;
     copy_addr->oldest_start_ts = unpack->oldest_start_ts;
     copy_addr->oldest_start_txn = unpack->oldest_start_txn;
+    copy_addr->stop_durable_ts = unpack->newest_stop_durable_ts;
     copy_addr->newest_stop_ts = unpack->newest_stop_ts;
     copy_addr->newest_stop_txn = unpack->newest_stop_txn;
     WT_RET(__wt_memdup(session, unpack->data, unpack->size, &copy_addr->addr));
@@ -188,8 +188,7 @@ __rebalance_free_original(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
  *     Walk a column-store page and its descendants.
  */
 static int
-__rebalance_col_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const WT_PAGE_HEADER *dsk,
-  WT_REBALANCE_STUFF *rs)
+__rebalance_col_walk(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_REBALANCE_STUFF *rs)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK unpack;
@@ -213,14 +212,14 @@ __rebalance_col_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const 
         case WT_CELL_ADDR_INT:
             /* An internal page: read it and recursively walk it. */
             WT_ERR(__wt_bt_read(session, buf, unpack.data, unpack.size));
-            WT_ERR(__rebalance_col_walk(session, unpack.newest_stop_durable_ts, buf->data, rs));
+            WT_ERR(__rebalance_col_walk(session, buf->data, rs));
             __wt_verbose(session, WT_VERB_REBALANCE, "free-list append internal page: %s",
               __wt_addr_string(session, unpack.data, unpack.size, rs->tmp1));
             WT_ERR(__rebalance_fl_append(session, unpack.data, unpack.size, rs));
             break;
         case WT_CELL_ADDR_LEAF:
         case WT_CELL_ADDR_LEAF_NO:
-            WT_ERR(__rebalance_leaf_append(session, durable_ts, NULL, 0, &unpack, rs));
+            WT_ERR(__rebalance_leaf_append(session, NULL, 0, &unpack, rs));
             break;
         default:
             WT_ERR(__wt_illegal_value(session, unpack.type));
@@ -264,8 +263,7 @@ __rebalance_row_leaf_key(WT_SESSION_IMPL *session, const uint8_t *addr, size_t a
  *     Walk a row-store page and its descendants.
  */
 static int
-__rebalance_row_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const WT_PAGE_HEADER *dsk,
-  WT_REBALANCE_STUFF *rs)
+__rebalance_row_walk(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_REBALANCE_STUFF *rs)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK key, unpack;
@@ -327,7 +325,7 @@ __rebalance_row_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const 
 
             /* Read and recursively walk the page. */
             WT_ERR(__wt_bt_read(session, buf, unpack.data, unpack.size));
-            WT_ERR(__rebalance_row_walk(session, unpack.newest_stop_durable_ts, buf->data, rs));
+            WT_ERR(__rebalance_row_walk(session, buf->data, rs));
             break;
         case WT_CELL_ADDR_LEAF:
         case WT_CELL_ADDR_LEAF_NO:
@@ -349,7 +347,7 @@ __rebalance_row_walk(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts, const 
                 p = key.data;
                 len = key.size;
             }
-            WT_ERR(__rebalance_leaf_append(session, durable_ts, p, len, &unpack, rs));
+            WT_ERR(__rebalance_leaf_append(session, p, len, &unpack, rs));
 
             first_cell = false;
             break;
@@ -407,10 +405,10 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
      */
     switch (rs->type) {
     case WT_PAGE_ROW_INT:
-        WT_ERR(__rebalance_row_walk(session, WT_TS_MAX, ref->page->dsk, rs));
+        WT_ERR(__rebalance_row_walk(session, ref->page->dsk, rs));
         break;
     case WT_PAGE_COL_INT:
-        WT_ERR(__rebalance_col_walk(session, WT_TS_MAX, ref->page->dsk, rs));
+        WT_ERR(__rebalance_col_walk(session, ref->page->dsk, rs));
         break;
     default:
         WT_ERR(__wt_illegal_value(session, rs->type));

@@ -257,7 +257,6 @@ __verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *unpack, 
 {
     WT_BTREE *btree;
     WT_CURSOR *hs_cursor;
-    WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
     wt_timestamp_t newer_start_ts, older_start_ts, older_stop_ts;
     uint64_t hs_counter;
@@ -279,8 +278,6 @@ __verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *unpack, 
     older_stop_ts = 0;
     is_owner = false;
 
-    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
-
     /*
      * Open a history store cursor positioned at the end of the data store key (the newest record)
      * and iterate backwards until we reach a different key or btree.
@@ -295,12 +292,12 @@ __verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *unpack, 
         WT_ERR(hs_cursor->prev(hs_cursor));
 
     for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &older_start_ts, &hs_counter));
+        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, vs->tmp1, &older_start_ts, &hs_counter));
 
         if (hs_btree_id != btree->id)
             break;
 
-        WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
+        WT_ERR(__wt_compare(session, NULL, vs->tmp1, key, &cmp));
         if (cmp != 0)
             break;
 
@@ -319,7 +316,8 @@ __verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *unpack, 
               ", Key %s has a overlap of "
               "timestamp ranges between history store stop timestamp %s being "
               "newer than a more recent timestamp range having start timestamp %s",
-              hs_btree_id, __wt_buf_set_printable(session, hs_key->data, hs_key->size, vs->tmp1),
+              hs_btree_id,
+              __wt_buf_set_printable(session, vs->tmp1->data, vs->tmp1->size, vs->tmp1),
               __verify_timestamp_to_pretty_string(older_stop_ts, ts_string[0]),
               __verify_timestamp_to_pretty_string(newer_start_ts, ts_string[1]));
         }
@@ -338,7 +336,6 @@ err:
     if (ret == WT_NOTFOUND)
         ret = 0;
 
-    __wt_scr_free(session, &hs_key);
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
 
     return (ret);
@@ -435,9 +432,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
              * Create a fake, unpacked parent cell for the tree based on the checkpoint information.
              */
             memset(&addr_unpack, 0, sizeof(addr_unpack));
-            addr_unpack.newest_stop_durable_ts = ckpt->newest_durable_ts;
+            addr_unpack.newest_start_durable_ts = ckpt->start_durable_ts;
             addr_unpack.oldest_start_ts = ckpt->oldest_start_ts;
             addr_unpack.oldest_start_txn = ckpt->oldest_start_txn;
+            addr_unpack.newest_stop_durable_ts = ckpt->stop_durable_ts;
             addr_unpack.newest_stop_ts = ckpt->newest_stop_ts;
             addr_unpack.newest_stop_txn = ckpt->newest_stop_txn;
             addr_unpack.raw = WT_CELL_ADDR_INT;
@@ -584,9 +582,10 @@ int
 __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
 {
     WT_CURSOR *cursor, *data_cursor;
+    WT_DECL_ITEM(hs_key);
+    WT_DECL_ITEM(prev_hs_key);
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    WT_ITEM hs_key, prev_hs_key;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter;
     uint32_t btree_id, btree_id_given_uri, session_flags, prev_btree_id;
@@ -594,15 +593,17 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
     char *uri_itr;
     bool is_owner;
 
+    cursor = data_cursor = NULL;
     session_flags = 0;
-    data_cursor = NULL;
-    WT_CLEAR(prev_hs_key);
-    WT_CLEAR(hs_key);
     btree_id_given_uri = 0; /* [-Wconditional-uninitialized] */
     prev_btree_id = 0;      /* [-Wconditional-uninitialized] */
+    is_owner = false;       /* [-Wconditional-uninitialized] */
     uri_itr = NULL;
 
-    WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
+    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
+    WT_ERR(__wt_scr_alloc(session, 0, &prev_hs_key));
+
+    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
     cursor = session->hs_cursor;
 
     /*
@@ -618,7 +619,7 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
          * Position the cursor at the first record of the specified btree, or one after. It is
          * possible there are no records in the history store for this btree.
          */
-        cursor->set_key(cursor, btree_id_given_uri, &hs_key, 0, 0, 0, 0);
+        cursor->set_key(cursor, btree_id_given_uri, hs_key, 0, 0, 0, 0);
         ret = cursor->search_near(cursor, &exact);
         if (ret == 0 && exact < 0)
             ret = cursor->next(cursor);
@@ -627,7 +628,7 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
 
     /* We have the history store cursor positioned at the first record that we want to verify. */
     for (; ret == 0; ret = cursor->next(cursor)) {
-        WT_ERR(cursor->get_key(cursor, &btree_id, &hs_key, &hs_start_ts, &hs_counter));
+        WT_ERR(cursor->get_key(cursor, &btree_id, hs_key, &hs_start_ts, &hs_counter));
 
         /* When limiting our verification to a uri, bail out if the btree-id doesn't match. */
         if (uri != NULL && btree_id != btree_id_given_uri)
@@ -659,27 +660,27 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
                 WT_ERR_MSG(session, ret, "Unable to find btree-id %" PRIu32
                                          " in the metadata file for the associated "
                                          "history store key %s",
-                  btree_id, __wt_buf_set_printable(session, hs_key.data, hs_key.size, tmp));
+                  btree_id, __wt_buf_set_printable(session, hs_key->data, hs_key->size, tmp));
             }
 
             WT_ERR(__wt_open_cursor(session, uri_itr, NULL, NULL, &data_cursor));
             F_SET(data_cursor, WT_CURSOR_RAW_OK);
         } else {
-            WT_ERR(__wt_compare(session, NULL, &hs_key, &prev_hs_key, &cmp));
+            WT_ERR(__wt_compare(session, NULL, hs_key, prev_hs_key, &cmp));
             if (cmp == 0)
                 continue;
         }
-        WT_ERR(__wt_buf_set(session, &prev_hs_key, hs_key.data, hs_key.size));
+        WT_ERR(__wt_buf_set(session, prev_hs_key, hs_key->data, hs_key->size));
         prev_btree_id = btree_id;
 
-        data_cursor->set_key(data_cursor, &hs_key);
+        data_cursor->set_key(data_cursor, hs_key);
         ret = data_cursor->search(data_cursor);
         if (ret == WT_NOTFOUND) {
             WT_ERR(__wt_scr_alloc(session, 0, &tmp));
             WT_ERR_MSG(session, WT_NOTFOUND,
               "In the URI %s, the associated history store key %s cannot be found in the data "
               "store",
-              uri_itr, __wt_buf_set_printable(session, hs_key.data, hs_key.size, tmp));
+              uri_itr, __wt_buf_set_printable(session, hs_key->data, hs_key->size, tmp));
         }
         WT_ERR(ret);
     }
@@ -687,7 +688,11 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
 err:
     if (data_cursor != NULL)
         WT_TRET(data_cursor->close(data_cursor));
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+    if (cursor != NULL)
+        WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+
+    __wt_scr_free(session, &hs_key);
+    __wt_scr_free(session, &prev_hs_key);
     __wt_scr_free(session, &tmp);
     __wt_free(session, uri_itr);
     return (ret);
@@ -1262,15 +1267,26 @@ __verify_page_cell(
                   unpack.oldest_start_txn, unpack.newest_stop_txn);
             }
 
-            /* FIXME-prepare-support: check newest start durable timestamp as well. */
-            WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "newest durable",
-              unpack.newest_stop_durable_ts, "newest durable", addr_unpack->newest_stop_durable_ts,
-              false, vs));
+            /*
+             * FIXME-prepare-support: Enable verification once all durable is finished.
+             *
+             * WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "start durable",
+             * unpack.newest_start_durable_ts, "start durable",
+             * addr_unpack->newest_start_durable_ts, false, vs));
+             */
             WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "oldest start",
               unpack.oldest_start_ts, "oldest start", addr_unpack->oldest_start_ts, true, vs));
             WT_RET(__verify_txn_addr_cmp(session, ref, cell_num - 1, "oldest start",
               unpack.oldest_start_txn, "oldest start", addr_unpack->oldest_start_txn, true, dsk,
               vs));
+
+            /*
+             * FIXME-prepare-support: Enable verification once all durable is finished.
+             *
+             * WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "stop durable",
+             * unpack.newest_stop_durable_ts, "stop durable", addr_unpack->newest_stop_durable_ts,
+             * false, vs));
+             */
             WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "newest stop",
               unpack.newest_stop_ts, "newest stop", addr_unpack->newest_stop_ts, false, vs));
             WT_RET(__verify_txn_addr_cmp(session, ref, cell_num - 1, "newest stop",
@@ -1305,10 +1321,24 @@ __verify_page_cell(
                   cell_num - 1, __verify_addr_string(session, ref, vs->tmp1), unpack.start_txn,
                   unpack.stop_txn);
 
+            /*
+             * FIXME-prepare-support: Enable verification once all durable is finished.
+             *
+             * WT_RET(
+             * __verify_ts_addr_cmp(session, ref, cell_num - 1, "start", unpack.durable_start_ts,
+             *   "durable start", addr_unpack->newest_start_durable_ts, true, vs));
+             */
             WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "start", unpack.start_ts,
               "oldest start", addr_unpack->oldest_start_ts, true, vs));
             WT_RET(__verify_txn_addr_cmp(session, ref, cell_num - 1, "start", unpack.start_txn,
               "oldest start", addr_unpack->oldest_start_txn, true, dsk, vs));
+            /*
+             * FIXME-prepare-support: Enable verification once all durable is finished.
+             *
+             * WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "start",
+             * unpack.durable_stop_ts,
+             *  "durable stop", addr_unpack->newest_stop_durable_ts, true, vs));
+             */
             WT_RET(__verify_ts_addr_cmp(session, ref, cell_num - 1, "stop", unpack.stop_ts,
               "newest stop", addr_unpack->newest_stop_ts, false, vs));
             WT_RET(__verify_txn_addr_cmp(session, ref, cell_num - 1, "stop", unpack.stop_txn,

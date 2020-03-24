@@ -587,23 +587,26 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
     ckpt->size = (uint64_t)a.val;
 
     /* Default to durability. */
-    ret = __wt_config_subgets(session, v, "newest_durable_ts", &a);
+    ret = __wt_config_subgets(session, v, "start_durable_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
-    ckpt->newest_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
+    ckpt->start_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "oldest_start_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->oldest_start_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "oldest_start_txn", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->oldest_start_txn = ret == WT_NOTFOUND || a.len == 0 ? WT_TXN_NONE : (uint64_t)a.val;
+    ret = __wt_config_subgets(session, v, "stop_durable_ts", &a);
+    WT_RET_NOTFOUND_OK(ret);
+    ckpt->stop_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "newest_stop_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->newest_stop_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_MAX : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "newest_stop_txn", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->newest_stop_txn = ret == WT_NOTFOUND || a.len == 0 ? WT_TXN_MAX : (uint64_t)a.val;
-    __wt_check_addr_validity(session, ckpt->oldest_start_ts, ckpt->oldest_start_txn,
-      ckpt->newest_stop_ts, ckpt->newest_stop_txn);
+    __wt_check_addr_validity(session, ckpt->start_durable_ts, ckpt->oldest_start_ts,
+      ckpt->oldest_start_txn, ckpt->stop_durable_ts, ckpt->newest_stop_ts, ckpt->newest_stop_txn);
 
     WT_RET(__wt_config_subgets(session, v, "write_gen", &a));
     if (a.len == 0)
@@ -689,8 +692,9 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
                 WT_RET(__wt_raw_to_hex(session, ckpt->raw.data, ckpt->raw.size, &ckpt->addr));
         }
 
-        __wt_check_addr_validity(session, ckpt->oldest_start_ts, ckpt->oldest_start_txn,
-          ckpt->newest_stop_ts, ckpt->newest_stop_txn);
+        __wt_check_addr_validity(session, ckpt->start_durable_ts, ckpt->oldest_start_ts,
+          ckpt->oldest_start_txn, ckpt->stop_durable_ts, ckpt->newest_stop_ts,
+          ckpt->newest_stop_txn);
 
         WT_RET(__wt_buf_catfmt(session, buf, "%s%s", sep, ckpt->name));
         sep = ",";
@@ -703,12 +707,13 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
          */
         WT_RET(__wt_buf_catfmt(session, buf,
           "=(addr=\"%.*s\",order=%" PRId64 ",time=%" PRIu64 ",size=%" PRId64
-          ",newest_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",oldest_start_txn=%" PRId64
-          ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64 ",write_gen=%" PRId64 ")",
+          ",start_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",oldest_start_txn=%" PRId64
+          ",stop_durable_ts=%" PRId64 ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64
+          ",write_gen=%" PRId64 ")",
           (int)ckpt->addr.size, (char *)ckpt->addr.data, ckpt->order, ckpt->sec,
-          (int64_t)ckpt->size, (int64_t)ckpt->newest_durable_ts, (int64_t)ckpt->oldest_start_ts,
-          (int64_t)ckpt->oldest_start_txn, (int64_t)ckpt->newest_stop_ts,
-          (int64_t)ckpt->newest_stop_txn, (int64_t)ckpt->write_gen));
+          (int64_t)ckpt->size, (int64_t)ckpt->start_durable_ts, (int64_t)ckpt->oldest_start_ts,
+          (int64_t)ckpt->oldest_start_txn, (int64_t)ckpt->stop_durable_ts,
+          (int64_t)ckpt->newest_stop_ts, (int64_t)ckpt->newest_stop_txn, (int64_t)ckpt->write_gen));
     }
     WT_RET(__wt_buf_catfmt(session, buf, ")"));
 

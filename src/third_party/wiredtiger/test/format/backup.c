@@ -327,8 +327,8 @@ backup(void *arg)
     WT_CURSOR *backup_cursor;
     WT_DECL_RET;
     WT_SESSION *session;
-    uint32_t src_id, src_prev;
     u_int incremental, period;
+    uint32_t src_id;
     const char *config, *key;
     char cfg[512];
     bool full, incr_full;
@@ -382,28 +382,11 @@ backup(void *arg)
                 full = true;
                 incr_full = false;
             } else {
-                /*
-                 * 75% of the time, use the most recent source id. 25% of the time, use the id
-                 * that is from two incremental backups prior. The handling of the active files for
-                 * the source one or two incrementals prior is unpleasant but necessary.
-                 */
-                src_prev = mmrand(NULL, 1, 4) == 2 && g.backup_id >= 2 && full == false ? 2 : 1;
-                if (src_prev == 2) {
-                    /*
-                     * If we're going back two incrementals ago, set active_prev to the other list
-                     * of active files (i.e. the active list that is not the immediate previous
-                     * list) and overwrite active_prev with the current one.
-                     */
-                    active_now = active_prev;
-                    if (active_prev == &active[0])
-                        active_prev = &active[1];
-                    else
-                        active_prev = &active[0];
-                } else if (active_prev == &active[0])
+                if (active_prev == &active[0])
                     active_now = &active[1];
                 else
                     active_now = &active[0];
-                src_id = g.backup_id - src_prev;
+                src_id = g.backup_id - 1;
                 testutil_check(__wt_snprintf(cfg, sizeof(cfg),
                   "incremental=(enabled,src_id=ID%u,this_id=ID%" PRIu32 ")", src_id,
                   g.backup_id++));
@@ -476,7 +459,7 @@ backup(void *arg)
          * more incremental backups).
          */
         if (full)
-            incremental = g.c_logging_archive ? 1 : mmrand(NULL, 1, 5);
+            incremental = g.c_logging_archive ? 1 : mmrand(NULL, 1, 8);
         if (--incremental == 0) {
             check_copy();
             /* We ran recovery in the backup directory, so next time it must be a full backup. */

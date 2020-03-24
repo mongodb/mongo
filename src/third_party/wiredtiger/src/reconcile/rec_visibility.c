@@ -183,9 +183,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * both must be initialized.
      */
     upd_select->upd = NULL;
-    upd_select->durable_ts = WT_TS_NONE;
+    upd_select->start_durable_ts = WT_TS_NONE;
     upd_select->start_ts = WT_TS_NONE;
     upd_select->start_txn = WT_TXN_NONE;
+    upd_select->stop_durable_ts = WT_TS_NONE;
     upd_select->stop_ts = WT_TS_MAX;
     upd_select->stop_txn = WT_TXN_MAX;
 
@@ -194,7 +195,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     upd_memsize = 0;
     checkpoint_timestamp = S2C(session)->txn_global.checkpoint_timestamp;
     max_ts = WT_TS_NONE;
-    tombstone_durable_ts = WT_TS_MAX;
+    tombstone_durable_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
     has_newer_updates = upd_saved = false;
     is_hs_page = F_ISSET(S2BT(session), WT_BTREE_HS);
@@ -359,15 +360,15 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         }
         if (upd != NULL) {
             /* The beginning of the validity window is the selected update's time pair. */
-            upd_select->durable_ts = upd_select->start_ts = upd->start_ts;
+            upd_select->start_durable_ts = upd_select->start_ts = upd->start_ts;
             /* If durable timestamp is provided, use it. */
             if (upd->durable_ts != WT_TS_NONE)
-                upd_select->durable_ts = upd->durable_ts;
+                upd_select->start_durable_ts = upd->durable_ts;
             upd_select->start_txn = upd->txnid;
 
             /* Use the tombstone durable timestamp as the overall durable timestamp if it exists. */
-            if (tombstone_durable_ts != WT_TS_MAX)
-                upd_select->durable_ts = tombstone_durable_ts;
+            if (tombstone_durable_ts != WT_TS_NONE)
+                upd_select->stop_durable_ts = tombstone_durable_ts;
         } else if (upd_select->stop_ts != WT_TS_NONE || upd_select->stop_txn != WT_TXN_NONE) {
             /* If we only have a tombstone in the update list, we must have an ondisk value. */
             WT_ASSERT(session, vpack != NULL);
@@ -381,12 +382,12 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
              * keep the same on-disk value but set the stop time pair to indicate that the validity
              * window ends when this tombstone started.
              */
-            upd_select->durable_ts = upd_select->start_ts = vpack->start_ts;
+            upd_select->start_durable_ts = upd_select->start_ts = vpack->start_ts;
             upd_select->start_txn = vpack->start_txn;
 
             /* Use the tombstone durable timestamp as the overall durable timestamp if it exists. */
-            if (tombstone_durable_ts != WT_TS_MAX)
-                upd_select->durable_ts = tombstone_durable_ts;
+            if (tombstone_durable_ts != WT_TS_NONE)
+                upd_select->stop_durable_ts = tombstone_durable_ts;
 
             /*
              * Leaving the update unset means that we can skip reconciling. If we've set the stop
@@ -432,6 +433,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
           "Warning: fixing out-of-order timestamps remove at %s earlier than value at %s",
           __wt_timestamp_to_string(upd_select->stop_ts, ts_string[0]),
           __wt_timestamp_to_string(upd_select->start_ts, ts_string[1]));
+        upd_select->start_durable_ts = upd_select->stop_durable_ts;
         upd_select->start_ts = upd_select->stop_ts;
         upd_select->start_txn = upd_select->stop_txn;
     }

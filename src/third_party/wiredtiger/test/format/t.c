@@ -116,8 +116,9 @@ main(int argc, char *argv[])
 {
     uint64_t now, start;
     u_int ops_seconds;
-    int ch, onerun, reps;
+    int ch, reps;
     const char *config, *home;
+    bool one_flag, quiet_flag;
 
     custom_die = format_die; /* Local death handler. */
 
@@ -148,16 +149,13 @@ main(int argc, char *argv[])
 	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
 #endif
 
-    /* Track progress unless we're re-directing output to a file. */
-    g.c_quiet = isatty(1) ? 0 : 1;
-
     /* Set values from the command line. */
     home = NULL;
-    onerun = 0;
+    one_flag = quiet_flag = false;
     while ((ch = __wt_getopt(progname, argc, argv, "1C:c:h:lqrt:")) != EOF)
         switch (ch) {
         case '1': /* One run */
-            onerun = 1;
+            one_flag = true;
             break;
         case 'C': /* wiredtiger_open config */
             g.config_open = __wt_optarg;
@@ -172,7 +170,7 @@ main(int argc, char *argv[])
             g.logging = true;
             break;
         case 'q': /* Quiet */
-            g.c_quiet = 1;
+            quiet_flag = true;
             break;
         case 'r': /* Replay a run */
             g.replay = true;
@@ -229,10 +227,13 @@ main(int argc, char *argv[])
         g.c_runs = 1;
 
     /*
-     * Let the command line -1 flag override runs configured from other sources.
+     * Let the command line -1 and -q flags override values configured from other sources.
+     * Regardless, don't go all verbose if we're not talking to a terminal.
      */
-    if (onerun)
+    if (one_flag)
         g.c_runs = 1;
+    if (quiet_flag || !isatty(1))
+        g.c_quiet = 1;
 
     /*
      * Initialize locks to single-thread named checkpoints and backups, last last-record updates,

@@ -854,7 +854,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
       parent_entries, result_entries, deleted_entries);
 
 err:
-    __wt_scr_free(session, &scr);
     /*
      * A note on error handling: if we completed the split, return success, nothing really bad can
      * have happened, and our caller has to proceed with the split.
@@ -890,6 +889,7 @@ err:
         }
         break;
     }
+    __wt_scr_free(session, &scr);
     return (ret);
 }
 

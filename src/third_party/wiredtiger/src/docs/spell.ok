@@ -9,6 +9,7 @@ CFLAGS
 CPPFLAGS
 CPUs
 CRC
+CSV
 Cheng
 Christoph
 Collet's
@@ -502,6 +503,7 @@ svg
 sys
 syscalls
 sz
+t2
 tRuE
 tablename
 tcl

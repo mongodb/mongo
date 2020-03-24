@@ -186,9 +186,10 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     __wt_seconds(session, &ckptbase->sec);
     WT_ERR(__wt_metadata_search(session, dhandle->name, &config));
     WT_ERR(__wt_meta_block_metadata(session, config, ckptbase));
-    ckptbase->newest_durable_ts = WT_TS_NONE;
+    ckptbase->start_durable_ts = WT_TS_NONE;
     ckptbase->oldest_start_ts = WT_TS_NONE;
     ckptbase->oldest_start_txn = WT_TXN_NONE;
+    ckptbase->stop_durable_ts = WT_TS_NONE;
     ckptbase->newest_stop_ts = WT_TS_MAX;
     ckptbase->newest_stop_txn = WT_TXN_MAX;
     ckptbase->write_gen = btree->write_gen;

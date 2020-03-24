@@ -1602,6 +1602,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
     WT_DECL_RET;
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *s;
+    char ts_string[WT_TS_INT_STRING_SIZE];
     const char *ckpt_cfg;
 
     conn = S2C(session);
@@ -1624,8 +1625,12 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
          * Perform rollback to stable to ensure that the stable version is written to disk on a
          * clean shutdown.
          */
-        if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP))
+        if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP)) {
+            __wt_verbose(session, WT_VERB_RTS,
+              "Performing shutdown rollback to stable with stable timestamp: %s",
+              __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
             WT_TRET(__wt_rollback_to_stable(session, cfg, true));
+        }
 
         s = NULL;
         WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));

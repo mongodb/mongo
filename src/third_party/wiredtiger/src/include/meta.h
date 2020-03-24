@@ -134,9 +134,10 @@ struct __wt_ckpt {
     WT_BLOCK_MODS backup_blocks[WT_BLKINCR_MAX];
 
     /* Validity window */
-    wt_timestamp_t newest_durable_ts;
+    wt_timestamp_t start_durable_ts;
     wt_timestamp_t oldest_start_ts;
     uint64_t oldest_start_txn;
+    wt_timestamp_t stop_durable_ts;
     wt_timestamp_t newest_stop_ts;
     uint64_t newest_stop_txn;
 

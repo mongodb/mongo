@@ -382,6 +382,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
      */
     WT_ERR(__wt_update_alloc(session, NULL, &hs_upd, &notused, WT_UPDATE_TOMBSTONE));
     hs_upd->start_ts = stop_ts_pair.timestamp;
+    hs_upd->durable_ts = stop_ts_pair.timestamp;
     hs_upd->txnid = stop_ts_pair.txnid;
 
     /*

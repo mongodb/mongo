@@ -203,9 +203,22 @@ restart_read:
             cbt->v = 0;
             cbt->iface.value.data = &cbt->v;
         } else {
-            if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK) && upd->type != WT_UPDATE_TOMBSTONE)
-                return (__wt_value_return(cbt, upd));
-            cbt->iface.value.data = upd->data;
+            /*
+             * If this update has been restored from the disk, it needs to be freed after copying it
+             * to the user cursor.
+             */
+            if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK)) {
+                switch (upd->type) {
+                case WT_UPDATE_TOMBSTONE:
+                    cbt->iface.value.data = upd->data;
+                    __wt_free_update_list(session, &upd);
+                    break;
+                default:
+                    return (__wt_value_return(cbt, upd));
+                }
+            }
+            if (upd != NULL)
+                cbt->iface.value.data = upd->data;
         }
     }
     cbt->iface.value.size = 1;
@@ -264,9 +277,22 @@ restart_read:
         cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
         cbt->iface.value.data = &cbt->v;
     } else {
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK) && upd->type != WT_UPDATE_TOMBSTONE)
-            return (__wt_value_return(cbt, upd));
-        cbt->iface.value.data = upd->data;
+        /*
+         * If this update has been restored from the disk, it needs to be freed after copying it to
+         * the user cursor.
+         */
+        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK)) {
+            switch (upd->type) {
+            case WT_UPDATE_TOMBSTONE:
+                cbt->iface.value.data = upd->data;
+                __wt_free_update_list(session, &upd);
+                break;
+            default:
+                return (__wt_value_return(cbt, upd));
+            }
+        }
+        if (upd != NULL)
+            cbt->iface.value.data = upd->data;
     }
     cbt->iface.value.size = 1;
     return (0);
