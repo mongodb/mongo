@@ -121,7 +121,9 @@ It is allowed to have more attributes than replacement fields in a log statement
 
 As shown above there is also an API taking both a format string and a message string. This is an API to help with the transition from text output to JSON output. JSON logs have no need for embedded replacement fields in the description, if written in a short and descriptive manner providing context for the attribute names. But a format string may still be needed to provide good JSON to human readable text conversion. See the JSON output format and style guide below for more information.
 
-Both the format string and the message string must be compile time constants. This is to avoid dynamic attribute names in the log output and to be able to add compile time verification of log statements in the future.
+Both the format string and the message string must be compile time constants. This is to avoid dynamic attribute names in the log output and to be able to add compile time verification of log statements in the future. If the string needs to be shared with anything else (like constructing a Status object) you can use this pattern: 
+
+`static constexpr char str[] = "the string";`
 
 ##### Examples
 
@@ -253,11 +255,9 @@ Many basic types have built in support:
 
 ### User defined types
 
-To make a user defined type loggable it needs a serialization member function that the log system can bind to. At a minimum a type needs a stringification function. This would be used to produce text output and used as a fallback for JSON output.
+To make a user defined type loggable it needs a serialization member function that the log system can bind to. 
 
-In order to offer more its string representation in JSON, a type would need to supply a  structured serialization function.
-
-The system will bind a stringification function and optionally a structured serialization function. The system binds to the serialization functions by looking for functions in the following priority order:
+The system binds and uses serialization functions by looking for functions in the following priority order:
 
 ##### Structured serialization function signatures
 
@@ -275,14 +275,16 @@ Non-member functions:
 
 Member functions:
 
-1. `void serialize(fmt::memory_buffer&) const`
-2. `std::string toString() const`
+5. `void serialize(fmt::memory_buffer&) const`
+6. `std::string toString() const`
 
 Non-member functions:
 
-3. `toString(const T& val)` (non-member function) 
+7. `toString(const T& val)` (non-member function) 
 
 Enums will only try to bind a `toString(const T& val)` non-member function. If one is not available the enum value will be logged as its underlying integral type.
+
+In order to offer structured serialization and output, a type would need to supply a structured serialization function (functions 1 to 4 above), otherwise if only stringification is provided the output will be an escaped string.
 
 *NOTE: No `operator<<` overload is used even if available*
 
@@ -294,10 +296,6 @@ public:
     void serialize(BSONObjBuilder* builder) const {
         builder->append("str"_sd, _str);
         builder->append("int"_sd, _int);
-    }
-
-    void serialize(fmt::memory_buffer& buffer) const {
-        fmt::format_to(buffer, "UserDefinedType: (str: {}, int: {})", _str, _int);
     }
 
 private:
@@ -345,6 +343,29 @@ LOGV2(1013, "log map directly: {values}", "values"_attr = bsonMap);
 LOGV2(1014, "log map iterator range: {values}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 ``` 
 
+#### Containers and uint64_t
+
+Logging of containers uses `BSONObj` as an internal representation and `uint64_t` is not a supported type with `BSONObjBuilder::append()`. As a user you can use `boost::transform_iterator` to cast the `uint64_t` to a supported type. 
+
+##### Examples
+
+```
+std::vector<uint64_t> vec = ...;
+
+// If we know casting to signed is safe
+auto asSigned = [](uint64_t i) { return static_cast<int64_t>(i); };
+LOGV2(2000, "as signed array: {values}", "values"_attr = seqLog(
+  boost::make_transform_iterator(vec.begin(), asSigned), 
+  boost::make_transform_iterator(vec.end(), asSigned)
+));
+
+// Otherwise we can log as any of these types instead of using asSigned
+auto asDecimal128 = [](uint64_t i) { return Decimal128(i); };
+auto asString = [](uint64_t i) { return std::to_string(i); };
+
+```
+
+
 ### Duration types
 
 Duration types have special formatting to match existing practices in the server code base. Their resulting format depends on the context they are logged.
@@ -357,18 +378,20 @@ When logging containers with durations there is no attribute per duration instan
 
 `"duration"_attr = Milliseconds(10)`
 
-Text | JSON/BSON
----- | ---------
-`10 ms` | `"durationMillis": 10`
+JSON format:
+
+`"durationMillis": 10`
 
 ```
 std::vector<Nanoseconds> nanos = {Nanoseconds(200), Nanoseconds(400)};
 "samples"_attr = nanos
 ```
 
-Text | JSON/BSON
----- | ---------
-`(200 ns, 400 ns)` | `"samples": [{"durationNanos": 200}, {"durationNanos": 400}]`
+JSON format:
+
+```
+"samples": [{"durationNanos": 200}, {"durationNanos": 400}]
+``` 
 
 # Additional features
 
@@ -385,15 +408,7 @@ Would emit an `uassert` after performing the log that is equivalent to:
 uasserted(ErrorCodes::DataCorruptionDetected, "Data corruption detected for RecordId(123456)");
 ```
 
-# Output formats
-
-Desired log output format is set to mongod, mongos and the mongo shell using the `-logFormat` option. Available values are `text` and `json`. Currently text formatting is default.
-
-## Text
-
-Produces legacy log statements matching the old log system. This format may or may not be removed for the 4.4 server release. 
-
-## JSON
+# JSON output format
 
 Produces structured logs of the [Relaxed Extended JSON 2.0.0](https://github.com/mongodb/specifications/blob/master/source/extended-json.rst) format. Below is an example of a log statement in C++ and a pretty-printed JSON output:
 
@@ -430,24 +445,6 @@ LOGV2_ERROR(1020, "Example (b: {bson}), (vec: {vector})",
     }
 }
 ```
-
-## BSON
-
-The BSON formatter is an internal formatter that may or may not be removed. It produces BSON documents close to the JSON document above. Due to the lack of unsigned integer types in BSON, logged C++ types are handled according to the table below for BSON:
-
-C++ Type | BSON Type
--------- | ---------
-char | int32 (0x10)
-signed char | int32 (0x10)
-unsigned char | int32 (0x10)
-short | int32 (0x10)
-unsigned short | int32 (0x10)
-int | int32 (0x10)
-unsigned int | int64 (0x12)
-long | int64 (0x12)
-unsigned long | int64 (0x12)
-long long | int64 (0x12)
-unsigned long long | int64 (0x12)
 
 # FAQ
 
