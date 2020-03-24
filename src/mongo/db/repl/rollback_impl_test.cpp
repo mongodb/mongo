@@ -1848,9 +1848,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEnt
     ASSERT(expectedNamespaces == _rbInfo.rollbackNamespaces);
 }
 
-DEATH_TEST_F(RollbackImplObserverInfoTest,
-             RollbackFailsOnUnknownOplogEntryCommandType,
-             "Unknown oplog entry command type") {
+TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType) {
     // Create a command of an unknown type.
     auto unknownCmdOp =
         makeCommandOp(Timestamp(2, 2), boost::none, "admin.$cmd", BSON("unknownCommand" << 1), 2);
@@ -1860,9 +1858,10 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
     ASSERT_OK(_insertOplogEntry(commonOp.first));
     ASSERT_OK(_insertOplogEntry(unknownCmdOp.first));
 
-    auto status = _rollback->runRollback(_opCtx.get());
-    LOGV2(21655, "Mongod did not crash. Status: {status}", "status"_attr = status);
-    MONGO_UNREACHABLE;
+    const StringData err(
+        "Unknown oplog entry command type: unknownCommand Object field: { unknownCommand: 1 }");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        _rollback->runRollback(_opCtx.get()), DBException, ErrorCodes::BadValue, err);
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {
