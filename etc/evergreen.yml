@@ -8796,10 +8796,10 @@ buildvariants:
   - name: .jstestfuzz_multiversion_gen
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
+# - name: .multiversion_fuzzer
+# - name: .multiversion_passthrough
   - name: .ocsp
-  - name: .random_multiversion_replica_sets
+# - name: .random_multiversion_replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -10165,9 +10165,9 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
-  - name: .random_multiversion_replica_sets
+# - name: .multiversion_fuzzer
+# - name: .multiversion_passthrough
+# - name: .random_multiversion_replica_sets
 
 - name: enterprise-rhel-62-64-bit-flow-control-off
   display_name: "Enterprise RHEL 6.2 (flow control off)"
@@ -10360,10 +10360,10 @@ buildvariants:
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion_gen
-    - name: .multiversion_fuzzer
-    - name: .multiversion_passthrough
+#   - name: .multiversion_fuzzer
+#   - name: .multiversion_passthrough
     - name: .query_fuzzer
-    - name: .random_multiversion_replica_sets
+#   - name: .random_multiversion_replica_sets
     - name: .read_write_concern
     - name: .replica_sets
     - name: .read_only
@@ -11821,10 +11821,10 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion_gen
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
+# - name: .multiversion_fuzzer
+# - name: .multiversion_passthrough
   - name: .query_fuzzer
-  - name: .random_multiversion_replica_sets
+# - name: .random_multiversion_replica_sets
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
@@ -11910,9 +11910,9 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion_gen
-  - name: .multiversion_fuzzer
-  - name: .multiversion_passthrough
-  - name: .random_multiversion_replica_sets
+# - name: .multiversion_fuzzer
+# - name: .multiversion_passthrough
+# - name: .random_multiversion_replica_sets
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
