@@ -39,9 +39,12 @@ const initialSyncNode = rst.add({
 rst.reInitiate();
 rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
 
-let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
-assert.eq(primary.name, res.syncSourceHost, res);
-assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
+// Wait for the initial syncing node to choose a sync source.
+assert.soon(function() {
+    const res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
+    return primary.name === res.syncSourceHost &&
+        res.initialSyncStatus.failedInitialSyncAttempts === 0;
+});
 assert.commandWorked(
     initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}));
 
@@ -55,7 +58,7 @@ let hangBeforeFinishInitialSync =
 assert.commandWorked(initialSyncNode.adminCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 hangBeforeFinishInitialSync.wait();
-res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
+let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
 assert.eq(secondary.name, res.syncSourceHost, res);
 assert.eq(1, res.initialSyncStatus.failedInitialSyncAttempts);
 assert.eq(2, res.initialSyncStatus.initialSyncAttempts.length);
