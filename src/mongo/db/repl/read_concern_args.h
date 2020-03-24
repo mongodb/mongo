@@ -55,8 +55,6 @@ public:
     static constexpr StringData kAtClusterTimeFieldName = "atClusterTime"_sd;
     static constexpr StringData kLevelFieldName = "level"_sd;
 
-    static const BSONObj kImplicitDefault;
-
     /**
      * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
      */

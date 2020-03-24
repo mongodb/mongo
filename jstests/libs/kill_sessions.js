@@ -290,8 +290,6 @@ var _kill_sessions_api_module = (function() {
             "$readPreference": {
                 mode: "primaryPreferred",
             },
-            readConcern: {},
-            writeConcern: {w: 1},
         };
 
         var cursors = {};

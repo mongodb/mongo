@@ -69,7 +69,7 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
             // operation in a transaction, or not running in a transaction, then use the readConcern
             // from the opCtx (which may be a cluster-wide default).
             const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            qr->setReadConcern(readConcernArgs.toBSONInner());
+            qr->setReadConcern(readConcernArgs.toBSON()["readConcern"].Obj());
         }
     }
     uassert(

@@ -34,7 +34,6 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -84,14 +83,8 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() c
     const Query query = Query().sort(BSON("$natural" << -1));
     const BSONObj fields = BSON("ts" << 1 << "t" << 1);
     return std::unique_ptr<OplogInterface::Iterator>(
-        new OplogIteratorRemote(_getConnection()->query(NamespaceString(_collectionName),
-                                                        query,
-                                                        0,
-                                                        0,
-                                                        &fields,
-                                                        0,
-                                                        _batchSize,
-                                                        ReadConcernArgs::kImplicitDefault)));
+        new OplogIteratorRemote(_getConnection()->query(
+            NamespaceString(_collectionName), query, 0, 0, &fields, 0, _batchSize)));
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase>

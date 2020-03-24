@@ -185,15 +185,9 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                 DBClientConnection* cliConn = dynamic_cast<DBClientConnection*>(&conn.conn());
                 if (cliConn && replAuthenticate(cliConn).isOK()) {
                     BSONObj first = conn->findOne((string) "local.oplog.$" + sourcename,
-                                                  Query().sort(BSON("$natural" << 1)),
-                                                  nullptr /* fieldsToReturn */,
-                                                  0 /* queryOptions */,
-                                                  ReadConcernArgs::kImplicitDefault);
+                                                  Query().sort(BSON("$natural" << 1)));
                     BSONObj last = conn->findOne((string) "local.oplog.$" + sourcename,
-                                                 Query().sort(BSON("$natural" << -1)),
-                                                 nullptr /* fieldsToReturn */,
-                                                 0 /* queryOptions */,
-                                                 ReadConcernArgs::kImplicitDefault);
+                                                 Query().sort(BSON("$natural" << -1)));
                     bb.appendDate("masterFirst", first["ts"].timestampTime());
                     bb.appendDate("masterLast", last["ts"].timestampTime());
                     const auto lag = (last["ts"].timestampTime() - s["syncedTo"].timestampTime());

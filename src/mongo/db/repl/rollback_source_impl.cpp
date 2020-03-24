@@ -35,7 +35,6 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -69,21 +68,19 @@ int RollbackSourceImpl::getRollbackId() const {
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
     const Query query = Query().sort(BSON("$natural" << -1));
-    return _getConnection()->findOne(
-        _collectionName, query, nullptr, QueryOption_SlaveOk, ReadConcernArgs::kImplicitDefault);
+    return _getConnection()->findOne(_collectionName, query, nullptr, QueryOption_SlaveOk);
 }
 
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
     return _getConnection()
-        ->findOne(
-            nss.toString(), filter, nullptr, QueryOption_SlaveOk, ReadConcernArgs::kImplicitDefault)
+        ->findOne(nss.toString(), filter, nullptr, QueryOption_SlaveOk)
         .getOwned();
 }
 
 std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std::string& db,
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
-    return _getConnection()->findOneByUUID(db, uuid, filter, ReadConcernArgs::kImplicitDefault);
+    return _getConnection()->findOneByUUID(db, uuid, filter);
 }
 
 void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,

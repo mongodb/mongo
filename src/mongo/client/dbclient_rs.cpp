@@ -522,33 +522,20 @@ void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {
 
 // ------------- simple functions -----------------
 
-void DBClientReplicaSet::insert(const string& ns,
-                                BSONObj obj,
-                                int flags,
-                                boost::optional<BSONObj> writeConcernObj) {
-    checkMaster()->insert(ns, obj, flags, writeConcernObj);
+void DBClientReplicaSet::insert(const string& ns, BSONObj obj, int flags) {
+    checkMaster()->insert(ns, obj, flags);
 }
 
-void DBClientReplicaSet::insert(const string& ns,
-                                const vector<BSONObj>& v,
-                                int flags,
-                                boost::optional<BSONObj> writeConcernObj) {
-    checkMaster()->insert(ns, v, flags, writeConcernObj);
+void DBClientReplicaSet::insert(const string& ns, const vector<BSONObj>& v, int flags) {
+    checkMaster()->insert(ns, v, flags);
 }
 
-void DBClientReplicaSet::remove(const string& ns,
-                                Query obj,
-                                int flags,
-                                boost::optional<BSONObj> writeConcernObj) {
-    checkMaster()->remove(ns, obj, flags, writeConcernObj);
+void DBClientReplicaSet::remove(const string& ns, Query obj, int flags) {
+    checkMaster()->remove(ns, obj, flags);
 }
 
-void DBClientReplicaSet::update(const string& ns,
-                                Query query,
-                                BSONObj obj,
-                                int flags,
-                                boost::optional<BSONObj> writeConcernObj) {
-    return checkMaster()->update(ns, query, obj, flags, writeConcernObj);
+void DBClientReplicaSet::update(const string& ns, Query query, BSONObj obj, int flags) {
+    return checkMaster()->update(ns, query, obj, flags);
 }
 
 unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
@@ -557,8 +544,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                                                      int nToSkip,
                                                      const BSONObj* fieldsToReturn,
                                                      int queryOptions,
-                                                     int batchSize,
-                                                     boost::optional<BSONObj> readConcernObj) {
+                                                     int batchSize) {
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
     invariant(nsOrUuid.nss());
     const string ns = nsOrUuid.nss()->ns();
@@ -587,14 +573,8 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                     break;
                 }
 
-                unique_ptr<DBClientCursor> cursor = conn->query(nsOrUuid,
-                                                                query,
-                                                                nToReturn,
-                                                                nToSkip,
-                                                                fieldsToReturn,
-                                                                queryOptions,
-                                                                batchSize,
-                                                                readConcernObj);
+                unique_ptr<DBClientCursor> cursor = conn->query(
+                    nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 
                 return checkSlaveQueryResult(std::move(cursor));
             } catch (const DBException& ex) {
@@ -619,21 +599,14 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                 "dbclient_rs query to primary node in {getMonitor_getName}",
                 "getMonitor_getName"_attr = _getMonitor()->getName());
 
-    return checkMaster()->query(nsOrUuid,
-                                query,
-                                nToReturn,
-                                nToSkip,
-                                fieldsToReturn,
-                                queryOptions,
-                                batchSize,
-                                readConcernObj);
+    return checkMaster()->query(
+        nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
 BSONObj DBClientReplicaSet::findOne(const string& ns,
                                     const Query& query,
                                     const BSONObj* fieldsToReturn,
-                                    int queryOptions,
-                                    boost::optional<BSONObj> readConcernObj) {
+                                    int queryOptions) {
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOGV2_DEBUG(20135,
@@ -660,7 +633,7 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
                     break;
                 }
 
-                return conn->findOne(ns, query, fieldsToReturn, queryOptions, readConcernObj);
+                return conn->findOne(ns, query, fieldsToReturn, queryOptions);
             } catch (const DBException& ex) {
                 const Status status = ex.toStatus(str::stream() << "can't findone replica set node "
                                                                 << _lastSlaveOkHost.toString());
@@ -683,7 +656,7 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
                 "dbclient_rs findOne to primary node in {getMonitor_getName}",
                 "getMonitor_getName"_attr = _getMonitor()->getName());
 
-    return checkMaster()->findOne(ns, query, fieldsToReturn, queryOptions, readConcernObj);
+    return checkMaster()->findOne(ns, query, fieldsToReturn, queryOptions);
 }
 
 void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {

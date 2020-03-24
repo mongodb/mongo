@@ -166,22 +166,15 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
                                                  int nToSkip,
                                                  const BSONObj* fieldsToReturn,
                                                  int queryOptions,
-                                                 int batchSize,
-                                                 boost::optional<BSONObj> readConcernObj) {
-    invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
+                                                 int batchSize) {
     return DBClientBase::query(
         nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
-long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
-                                const BSONObj& query,
-                                int options,
-                                int limit,
-                                int skip,
-                                boost::optional<BSONObj> readConcernObj) {
-    invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
+long long DBDirectClient::count(
+    const NamespaceStringOrUUID nsOrUuid, const BSONObj& query, int options, int limit, int skip) {
     DirectClientScope directClientScope(_opCtx);
-    BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
+    BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip);
 
     auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
 

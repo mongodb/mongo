@@ -168,24 +168,20 @@ TEST(MigrationSecondaryThrottleOptions, DisabledInBalancerConfig) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff, options.getSecondaryThrottle());
 }
 
-TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleOff) {
-    MigrationSecondaryThrottleOptions options =
-        assertGet(MigrationSecondaryThrottleOptions::createFromCommand(
-            BSON("someOtherField" << 1 << "_secondaryThrottle" << false << "writeConcern"
-                                  << BSON("w"
-                                          << "majority"))));
-    ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff, options.getSecondaryThrottle());
-    ASSERT(!options.isWriteConcernSpecified());
+TEST(MigrationSecondaryThrottleOptions, ParseFailsDisabledInCommandBSONWriteConcernSpecified) {
+    auto status = MigrationSecondaryThrottleOptions::createFromCommand(
+        BSON("someOtherField" << 1 << "secondaryThrottle" << false << "writeConcern"
+                              << BSON("w"
+                                      << "majority")));
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.getStatus().code());
 }
 
-TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleAbsent) {
-    MigrationSecondaryThrottleOptions options =
-        assertGet(MigrationSecondaryThrottleOptions::createFromCommand(
-            BSON("someOtherField" << 1 << "writeConcern"
-                                  << BSON("w"
-                                          << "majority"))));
-    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault, options.getSecondaryThrottle());
-    ASSERT(!options.isWriteConcernSpecified());
+TEST(MigrationSecondaryThrottleOptions, ParseFailsNotSpecifiedInCommandBSONWriteConcernSpecified) {
+    auto status = MigrationSecondaryThrottleOptions::createFromCommand(
+        BSON("someOtherField" << 1 << "writeConcern"
+                              << BSON("w"
+                                      << "majority")));
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.getStatus().code());
 }
 
 TEST(MigrationSecondaryThrottleOptions, EqualityOperatorSameValue) {

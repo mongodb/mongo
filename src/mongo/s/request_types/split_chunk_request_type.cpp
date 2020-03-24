@@ -33,7 +33,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -121,7 +120,7 @@ BSONObj SplitChunkRequest::toConfigCommandBSON(const BSONObj& writeConcern) {
     appendAsConfigCommand(&cmdBuilder);
 
     // Tack on passed-in writeConcern
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, writeConcern);
+    cmdBuilder.appendElements(writeConcern);
 
     return cmdBuilder.obj();
 }

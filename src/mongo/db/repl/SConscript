@@ -896,7 +896,6 @@ env.Library(
     LIBDEPS=[
         'oplog_entry',
         'optime',
-        'read_concern_args',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/namespace_string',

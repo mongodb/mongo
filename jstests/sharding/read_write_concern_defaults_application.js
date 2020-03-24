@@ -4,12 +4,10 @@
  * The following fields are required for each command that is not skipped:
  *
  * - setUp: [OPTIONAL] A function that does any set up (inserts, etc.) needed to check the command's
- *   results. These operations will run with the default RWC set, so ensure they use appropriate
- *   explicit RWC if necessary.
+ *   results.
  * - command: The command to run, with all required options. If a function, is called with the
  *   connection as the argument, and the returned object is used. The readConcern/writeConcern
- *   fields may be appended to this object. The command object cannot include its own explicit
- *   readConcern/writeConcern fields.
+ *   fields may be appended to this object.
  * - checkReadConcern: Boolean that controls whether to check the application of readConcern.
  * - checkWriteConcern: Boolean that controls whether to check the application of writeConcern.
  * - db: [OPTIONAL] The database to run the command against.
@@ -119,11 +117,10 @@ let testCases = {
     _transferMods: {skip: "internal command"},
     abortTransaction: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
             // Ensure that the dbVersion is known.
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-            assert.eq(1,
-                      conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x);
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
+            assert.eq(1, conn.getCollection(nss).findOne({x: 1}).x);
             // Start the transaction.
             assert.commandWorked(conn.getDB(db).runCommand({
                 insert: coll,
@@ -146,7 +143,7 @@ let testCases = {
     addShardToZone: {skip: "does not accept read or write concern"},
     aggregate: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {aggregate: coll, pipeline: [{$match: {x: 1}}, {$out: "out"}], cursor: {}},
         checkReadConcern: true,
@@ -176,7 +173,7 @@ let testCases = {
     clone: {skip: "deprecated"},
     cloneCollectionAsCapped: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {cloneCollectionAsCapped: coll, toCollection: coll + "2", size: 10 * 1024 * 1024},
         checkReadConcern: false,
@@ -184,7 +181,7 @@ let testCases = {
     },
     collMod: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {collMod: coll, validator: {}},
         checkReadConcern: false,
@@ -193,11 +190,10 @@ let testCases = {
     collStats: {skip: "does not accept read or write concern"},
     commitTransaction: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
             // Ensure that the dbVersion is known.
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-            assert.eq(1,
-                      conn.getCollection(nss).find({x: 1}).readConcern("local").limit(1).next().x);
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
+            assert.eq(1, conn.getCollection(nss).findOne({x: 1}).x);
             // Start the transaction.
             assert.commandWorked(conn.getDB(db).runCommand({
                 insert: coll,
@@ -223,7 +219,7 @@ let testCases = {
     connectionStatus: {skip: "does not accept read or write concern"},
     convertToCapped: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {convertToCapped: coll, size: 10 * 1024 * 1024},
         checkReadConcern: false,
@@ -232,7 +228,7 @@ let testCases = {
     coordinateCommitTransaction: {skip: "internal command"},
     count: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {count: coll, query: {x: 1}},
         checkReadConcern: true,
@@ -246,7 +242,7 @@ let testCases = {
     },
     createIndexes: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {createIndexes: coll, indexes: [{key: {x: 1}, name: "foo"}]},
         checkReadConcern: false,
@@ -273,7 +269,7 @@ let testCases = {
     dbStats: {skip: "does not accept read or write concern"},
     delete: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {delete: coll, deletes: [{q: {x: 1}, limit: 1}]},
         checkReadConcern: false,
@@ -284,7 +280,7 @@ let testCases = {
     },
     distinct: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {distinct: coll, key: "x"},
         checkReadConcern: true,
@@ -293,7 +289,7 @@ let testCases = {
     driverOIDTest: {skip: "internal command"},
     drop: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {drop: coll},
         checkReadConcern: false,
@@ -301,8 +297,8 @@ let testCases = {
     },
     dropAllRolesFromDatabase: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
         },
         command: {dropAllRolesFromDatabase: 1},
         checkReadConcern: false,
@@ -312,8 +308,8 @@ let testCases = {
     },
     dropAllUsersFromDatabase: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: []}));
         },
         command: {dropAllUsersFromDatabase: 1},
         checkReadConcern: false,
@@ -325,12 +321,9 @@ let testCases = {
     dropDatabase: {skip: "not profiled or logged"},
     dropIndexes: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-            assert.commandWorked(conn.getDB(db).runCommand({
-                createIndexes: coll,
-                indexes: [{key: {x: 1}, name: "foo"}],
-                writeConcern: {w: 1}
-            }));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
+            assert.commandWorked(conn.getDB(db).runCommand(
+                {createIndexes: coll, indexes: [{key: {x: 1}, name: "foo"}]}));
         },
         command: {dropIndexes: coll, index: "foo"},
         checkReadConcern: false,
@@ -338,8 +331,8 @@ let testCases = {
     },
     dropRole: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
         },
         command: {dropRole: "foo"},
         checkReadConcern: false,
@@ -349,8 +342,8 @@ let testCases = {
     },
     dropUser: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: []}));
         },
         command: {dropUser: "foo"},
         checkReadConcern: false,
@@ -367,7 +360,7 @@ let testCases = {
     filemd5: {skip: "does not accept read or write concern"},
     find: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {find: coll, filter: {x: 1}},
         checkReadConcern: true,
@@ -375,7 +368,7 @@ let testCases = {
     },
     findAndModify: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {findAndModify: coll, query: {x: 1}, update: {$set: {x: 2}}},
         checkReadConcern: false,
@@ -387,11 +380,8 @@ let testCases = {
     fsyncUnlock: {skip: "does not accept read or write concern"},
     geoSearch: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({
-                createIndexes: coll,
-                indexes: [{key: {loc: "geoHaystack", foo: 1}, bucketSize: 1, name: "foo"}],
-                writeConcern: {w: 1}
-            }));
+            assert.commandWorked(
+                conn.getCollection(nss).createIndex({loc: "geoHaystack", foo: 1}, {bucketSize: 1}));
         },
         command: {geoSearch: coll, search: {}, near: [0, 0], maxDistance: 1},
         checkReadConcern: true,
@@ -412,8 +402,8 @@ let testCases = {
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
         },
         command: {
             grantPrivilegesToRole: "foo",
@@ -426,10 +416,10 @@ let testCases = {
     },
     grantRolesToRole: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "bar", privileges: [], roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "bar", privileges: [], roles: []}));
         },
         command: {grantRolesToRole: "foo", roles: [{role: "bar", db: db}]},
         checkReadConcern: false,
@@ -439,10 +429,10 @@ let testCases = {
     },
     grantRolesToUser: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: []}));
         },
         command: {grantRolesToUser: "foo", roles: [{role: "foo", db: db}]},
         checkReadConcern: false,
@@ -455,7 +445,7 @@ let testCases = {
     httpClientRequest: {skip: "does not accept read or write concern"},
     insert: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {insert: coll, documents: [{_id: ObjectId()}]},
         checkReadConcern: false,
@@ -507,7 +497,7 @@ let testCases = {
     removeShardFromZone: {skip: "does not accept read or write concern"},
     renameCollection: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll}));
         },
         command: {renameCollection: nss, to: nss + "2"},
         db: "admin",
@@ -538,8 +528,7 @@ let testCases = {
             assert.commandWorked(conn.getDB(db).runCommand({
                 createRole: "foo",
                 privileges: [{resource: {db: db, collection: coll}, actions: ["find"]}],
-                roles: [],
-                writeConcern: {w: 1}
+                roles: []
             }));
         },
         command: {
@@ -553,14 +542,10 @@ let testCases = {
     },
     revokeRolesFromRole: {
         setUp: function(conn) {
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "bar", privileges: [], roles: []}));
             assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "bar", privileges: [], roles: [], writeConcern: {w: 1}}));
-            assert.commandWorked(conn.getDB(db).runCommand({
-                createRole: "foo",
-                privileges: [],
-                roles: [{role: "bar", db: db}],
-                writeConcern: {w: 1}
-            }));
+                {createRole: "foo", privileges: [], roles: [{role: "bar", db: db}]}));
         },
         command: {revokeRolesFromRole: "foo", roles: [{role: "foo", db: db}]},
         checkReadConcern: false,
@@ -570,14 +555,10 @@ let testCases = {
     },
     revokeRolesFromUser: {
         setUp: function(conn) {
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
             assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
-            assert.commandWorked(conn.getDB(db).runCommand({
-                createUser: "foo",
-                pwd: "bar",
-                roles: [{role: "foo", db: db}],
-                writeConcern: {w: 1}
-            }));
+                {createUser: "foo", pwd: "bar", roles: [{role: "foo", db: db}]}));
         },
         command: {revokeRolesFromUser: "foo", roles: [{role: "foo", db: db}]},
         checkReadConcern: false,
@@ -612,7 +593,7 @@ let testCases = {
     unsetSharding: {skip: "internal command"},
     update: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(nss).insert({x: 1}));
         },
         command: {update: coll, updates: [{q: {x: 1}, u: {x: 2}}]},
         checkReadConcern: false,
@@ -623,8 +604,8 @@ let testCases = {
     },
     updateRole: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createRole: "foo", privileges: [], roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createRole: "foo", privileges: [], roles: []}));
         },
         command: {updateRole: "foo", privileges: []},
         checkReadConcern: false,
@@ -634,8 +615,8 @@ let testCases = {
     },
     updateUser: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand(
-                {createUser: "foo", pwd: "bar", roles: [], writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({createUser: "foo", pwd: "bar", roles: []}));
         },
         command: {updateUser: "foo", pwd: "bar2"},
         checkReadConcern: false,
@@ -807,15 +788,13 @@ function runScenario(
 
         // Do any test-specific setup.
         if (typeof (test.setUp) === "function") {
-            conn._runWithForcedReadMode("commands", test.setUp);
+            test.setUp(conn);
         }
 
         // Get the command from the test case.
         let actualCmd = (typeof (test.command) === "function")
             ? test.command(conn)
             : Object.assign({}, test.command, {});
-        assert.eq("undefined", typeof (actualCmd.readConcern));
-        assert.eq("undefined", typeof (actualCmd.writeConcern));
 
         // Add extra fields for RWC if necessary, and an identifying comment.
         // When sharded, the field order is: comment, readConcern, writeConcern.

@@ -40,7 +40,6 @@
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -235,10 +234,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     LogicalSessionIdSet removed{sessions.begin(), sessions.end()};
 
     auto wrappedSend = [&](BSONObj batch) {
-        BSONObjBuilder batchWithReadConcernLocal(batch);
-        batchWithReadConcernLocal.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                         repl::ReadConcernArgs::kImplicitDefault);
-        auto swBatchResult = send(batchWithReadConcernLocal.obj());
+        auto swBatchResult = send(batch);
 
         auto result =
             SessionsCollectionFetchResult::parse("SessionsCollectionFetchResult"_sd, swBatchResult);
@@ -283,9 +279,7 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
     createIndexes.setCreateIndexes(NamespaceString::kLogicalSessionsNamespace.coll());
     createIndexes.setIndexes(std::move(indexes));
 
-    return BSONObjBuilder(createIndexes.toBSON())
-        .append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::kImplicitDefault)
-        .obj();
+    return createIndexes.toBSON();
 }
 
 BSONObj SessionsCollection::generateCollModCmd() {
@@ -298,8 +292,6 @@ BSONObj SessionsCollection::generateCollModCmd() {
     indexBuilder << "expireAfterSeconds" << localLogicalSessionTimeoutMinutes * 60;
 
     indexBuilder.done();
-    collModCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                             WriteConcernOptions::kImplicitDefault);
     collModCmdBuilder.done();
 
     return collModCmdBuilder.obj();

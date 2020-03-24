@@ -41,7 +41,6 @@
 #include "mongo/client/query.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
@@ -694,8 +693,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                         newOpCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         "admin",
-                        CommandHelpers::appendMajorityWriteConcern(
-                            ensureChunkVersionIsGreaterThanRequestBSON),
+                        ensureChunkVersionIsGreaterThanRequestBSON,
                         Shard::RetryPolicy::kIdempotent);
             const auto ensureChunkVersionIsGreaterThanStatus =
                 Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);

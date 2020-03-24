@@ -129,9 +129,9 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
                                                repl::ReadConcernArgs readConcernArgs,
                                                boost::optional<LogicalTime> atClusterTime,
                                                bool doAppendStartTransaction) {
-    // startTransaction: true always requires readConcern, even if it's empty.
-    auto cmdWithReadConcern =
-        appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
+    auto cmdWithReadConcern = !readConcernArgs.isEmpty()
+        ? appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime)
+        : std::move(cmd);
 
     BSONObjBuilder bob(std::move(cmdWithReadConcern));
 
@@ -668,8 +668,8 @@ void TransactionRouter::Router::_assertAbortStatusIsOkOrNoSuchTransaction(
                           << " from shard: " << response.shardId,
             status.isOK() || status.code() == ErrorCodes::NoSuchTransaction);
 
-    // abortTransaction is sent with "local" write concern (w: 1), so there's no need to check for a
-    // write concern error.
+    // abortTransaction is sent with no write concern, so there's no need to check for a write
+    // concern error.
 }
 
 std::vector<ShardId> TransactionRouter::Router::_getPendingParticipants() const {
@@ -689,10 +689,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
     // transactions will be left open if the retry does not re-target any of these shards.
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participant : pendingParticipants) {
-        abortRequests.emplace_back(participant,
-                                   BSON("abortTransaction"
-                                        << 1 << WriteConcernOptions::kWriteConcernField
-                                        << WriteConcernOptions().toBSON()));
+        abortRequests.emplace_back(participant, BSON("abortTransaction" << 1));
     }
     auto responses = gatherResponses(opCtx,
                                      NamespaceString::kAdminDb,
@@ -1227,8 +1224,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
 
     p().terminationInitiated = true;
 
-    auto abortCmd = BSON("abortTransaction" << 1 << WriteConcernOptions::kWriteConcernField
-                                            << WriteConcernOptions().toBSON());
+    auto abortCmd = BSON("abortTransaction" << 1);
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participantEntry : o().participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);

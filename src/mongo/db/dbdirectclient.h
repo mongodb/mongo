@@ -58,15 +58,13 @@ public:
     // XXX: is this valid or useful?
     void setOpCtx(OperationContext* opCtx);
 
-    virtual std::unique_ptr<DBClientCursor> query(
-        const NamespaceStringOrUUID& nsOrUuid,
-        Query query,
-        int nToReturn = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
+    virtual std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
+                                                  Query query,
+                                                  int nToReturn = 0,
+                                                  int nToSkip = 0,
+                                                  const BSONObj* fieldsToReturn = nullptr,
+                                                  int queryOptions = 0,
+                                                  int batchSize = 0);
 
     virtual bool isFailed() const;
 
@@ -87,8 +85,7 @@ public:
                             const BSONObj& query = BSONObj(),
                             int options = 0,
                             int limit = 0,
-                            int skip = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+                            int skip = 0);
 
     virtual ConnectionString::ConnectionType type() const;
 

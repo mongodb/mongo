@@ -151,24 +151,16 @@ public:
      */
     void logout(const std::string& dbname, BSONObj& info) override;
 
-    std::unique_ptr<DBClientCursor> query(
-        const NamespaceStringOrUUID& nsOrUuid,
-        Query query = Query(),
-        int nToReturn = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override {
+    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
+                                          Query query = Query(),
+                                          int nToReturn = 0,
+                                          int nToSkip = 0,
+                                          const BSONObj* fieldsToReturn = nullptr,
+                                          int queryOptions = 0,
+                                          int batchSize = 0) override {
         checkConnection();
-        return DBClientBase::query(nsOrUuid,
-                                   query,
-                                   nToReturn,
-                                   nToSkip,
-                                   fieldsToReturn,
-                                   queryOptions,
-                                   batchSize,
-                                   readConcernObj);
+        return DBClientBase::query(
+            nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
     }
 
     unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
@@ -176,8 +168,7 @@ public:
                              Query query,
                              const BSONObj* fieldsToReturn,
                              int queryOptions,
-                             int batchSize = 0,
-                             boost::optional<BSONObj> readConcernObj = boost::none) override;
+                             int batchSize = 0) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;

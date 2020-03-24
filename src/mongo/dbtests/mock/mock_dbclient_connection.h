@@ -118,32 +118,21 @@ public:
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
-    std::unique_ptr<mongo::DBClientCursor> query(
-        const NamespaceStringOrUUID& nsOrUuid,
-        mongo::Query query = mongo::Query(),
-        int nToReturn = 0,
-        int nToSkip = 0,
-        const mongo::BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override;
+    std::unique_ptr<mongo::DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
+                                                 mongo::Query query = mongo::Query(),
+                                                 int nToReturn = 0,
+                                                 int nToSkip = 0,
+                                                 const mongo::BSONObj* fieldsToReturn = nullptr,
+                                                 int queryOptions = 0,
+                                                 int batchSize = 0) override;
 
     uint64_t getSockCreationMicroSec() const override;
 
-    void insert(const std::string& ns,
-                BSONObj obj,
-                int flags = 0,
-                boost::optional<BSONObj> writeConcernObj = boost::none) override;
+    void insert(const std::string& ns, BSONObj obj, int flags = 0) override;
 
-    void insert(const std::string& ns,
-                const std::vector<BSONObj>& objList,
-                int flags = 0,
-                boost::optional<BSONObj> writeConcernObj = boost::none) override;
+    void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0) override;
 
-    void remove(const std::string& ns,
-                Query query,
-                int flags = 0,
-                boost::optional<BSONObj> writeConcernObj = boost::none) override;
+    void remove(const std::string& ns, Query query, int flags = 0) override;
 
     bool call(mongo::Message& toSend,
               mongo::Message& response,
@@ -186,8 +175,7 @@ public:
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = nullptr,
                              int queryOptions = 0,
-                             int batchSize = 0,
-                             boost::optional<BSONObj> readConcernObj = boost::none) override;
+                             int batchSize = 0) override;
 
     //
     // Unsupported methods (these are pure virtuals in the base class)
