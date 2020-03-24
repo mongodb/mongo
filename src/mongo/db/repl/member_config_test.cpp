@@ -228,14 +228,14 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
         ASSERT_FALSE(mc.isNewlyAdded());
 
         mc.setNewlyAdded(true);
-        ASSERT_TRUE(mc.isNewlyAdded().get());
+        ASSERT_TRUE(mc.isNewlyAdded());
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "h"
                                    << "newlyAdded" << true),
                         &tagConfig);
-        ASSERT_TRUE(mc.isNewlyAdded().get());
+        ASSERT_TRUE(mc.isNewlyAdded());
     }
 }
 
@@ -253,7 +253,7 @@ TEST(MemberConfig, NewlyAddedSetToFalseShouldThrow) {
                   ExceptionFor<ErrorCodes::InvalidReplicaSetConfig>);
 }
 
-TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVote) {
+TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVoteAfterToBSON) {
     // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
@@ -266,16 +266,90 @@ TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVote) {
                                << "h"
                                << "newlyAdded" << true),
                     &tagConfig);
-    ASSERT_TRUE(mc.isNewlyAdded().get());
+    ASSERT_TRUE(mc.isNewlyAdded());
 
     // Nodes with newly added field set should transiently not be allowed to vote.
     ASSERT_FALSE(mc.isVoter());
+    ASSERT_EQ(0, mc.getNumVotes());
 
     // Verify that the member is still a voting node.
     const auto obj = mc.toBSON(tagConfig);
     long long votes;
     uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
     ASSERT_EQ(1, votes);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_TRUE(mc2.isNewlyAdded());
+    ASSERT_FALSE(mc2.isVoter());
+    ASSERT_EQ(0, mc2.getNumVotes());
+}
+
+TEST(MemberConfig, NonVotingNodesWithNewlyAddedFieldShouldStillHaveZeroVotesAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "votes" << 0 << "priority" << 0 << "newlyAdded" << true),
+                    &tagConfig);
+    ASSERT_TRUE(mc.isNewlyAdded());
+    ASSERT_FALSE(mc.isVoter());
+    ASSERT_EQ(0, mc.getNumVotes());
+
+    const auto obj = mc.toBSON(tagConfig);
+    long long votes;
+    uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
+    ASSERT_EQ(0, votes);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_TRUE(mc2.isNewlyAdded());
+    ASSERT_FALSE(mc2.isVoter());
+    ASSERT_EQ(0, mc2.getNumVotes());
+}
+
+TEST(MemberConfig, NonVotingNodesShouldStillHaveZeroVotesAfterToBSON) {
+    ReplSetTagConfig tagConfig;
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "votes" << 0 << "priority" << 0),
+                    &tagConfig);
+    ASSERT_FALSE(mc.isNewlyAdded());
+    ASSERT_FALSE(mc.isVoter());
+    ASSERT_EQ(0, mc.getNumVotes());
+
+    const auto obj = mc.toBSON(tagConfig);
+    long long votes;
+    uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
+    ASSERT_EQ(0, votes);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_FALSE(mc2.isNewlyAdded());
+    ASSERT_FALSE(mc2.isVoter());
+    ASSERT_EQ(0, mc2.getNumVotes());
+}
+
+TEST(MemberConfig, VotingNodesShouldStillHaveVoteAfterToBSON) {
+    ReplSetTagConfig tagConfig;
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"),
+                    &tagConfig);
+    ASSERT_FALSE(mc.isNewlyAdded());
+    ASSERT_TRUE(mc.isVoter());
+    ASSERT_EQ(1, mc.getNumVotes());
+
+    const auto obj = mc.toBSON(tagConfig);
+    long long votes;
+    uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
+    ASSERT_EQ(1, votes);
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_FALSE(mc2.isNewlyAdded());
+    ASSERT_TRUE(mc2.isVoter());
+    ASSERT_EQ(1, mc2.getNumVotes());
 }
 
 TEST(MemberConfig, ParseHidden) {
