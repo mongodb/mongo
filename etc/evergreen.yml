@@ -10061,9 +10061,14 @@ buildvariants:
     # Ban tests that run prepareTransaction or multi-shard transactions (which use
     # prepareTransaction). prepareTransaction is rejected on nodes with
     # enableMajorityReadConcern:"false" (SERVER-37559).
+    # We also relax oplog constraints so that applying oplog entries after a rollbackViaRefetch
+    # works correctly.
+    # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
+    # correctly after rollbackViaRefetch.
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
+      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
