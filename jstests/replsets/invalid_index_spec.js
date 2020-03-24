@@ -49,7 +49,7 @@ replTest.stop(secondary, undefined, {allowedExitCode: exitCode});
 
 // During the transition from the old code path in IndexBuilder to IndexBuildsCoordinator, we
 // will accept the fatal assertion code from either component.
-const msgIndexBuilder = "Fatal Assertion 50769";
+const msgIndexBuilder = "Fatal assertion 50769";
 const msgIndexBuildsCoordinator = "Fatal assertion 34437";
 const msgIndexErrorType = "InvalidIndexSpecificationOption";
 const msgIndexError = "The field 'invalidOption2'";

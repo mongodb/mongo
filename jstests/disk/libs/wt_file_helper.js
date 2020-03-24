@@ -83,7 +83,7 @@ let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
     let node = MongoRunner.runMongod(
         {dbpath: dbpath, port: port, replSet: rsName, noCleanData: true, waitForConnect: false});
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal Assertion.*50923/) >= 0;
+        return rawMongoProgramOutput().search(/Fatal assertion.*50923/) >= 0;
     });
     MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };
@@ -99,7 +99,7 @@ let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
     let node = MongoRunner.runMongod(
         {dbpath: dbpath, port: port, noCleanData: true, waitForConnect: false});
     assert.soon(function() {
-        return rawMongoProgramOutput().search(/Fatal Assertion.*50922/) >= 0;
+        return rawMongoProgramOutput().search(/Fatal assertion.*50922/) >= 0;
     });
     MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };

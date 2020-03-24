@@ -32,7 +32,7 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
             testColl.insert({a: 1});
         });
     },
-    new RegExp("Fatal Assertion.*50882"));
+    new RegExp("Fatal assertion.*50882"));
 
 /**
  * Test 2. Corrupt the _mdb_catalog.
@@ -43,7 +43,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     const mdbCatalogFile = dbpath + "_mdb_catalog.wt";
     jsTestLog("corrupting catalog file: " + mdbCatalogFile);
     corruptFile(mdbCatalogFile);
-}, new RegExp("Fatal Assertion.*50882"));
+}, new RegExp("Fatal assertion.*50882"));
 
 /**
  * Test 3. Corrupt the WiredTiger.wt.
@@ -54,7 +54,7 @@ assertErrorOnStartupWhenFilesAreCorruptOrMissing(dbpath, baseName, collName, (mo
     const WiredTigerWTFile = dbpath + "WiredTiger.wt";
     jsTestLog("corrupting WiredTiger.wt");
     corruptFile(WiredTigerWTFile);
-}, new RegExp("Fatal Assertion.*50944"));
+}, new RegExp("Fatal assertion.*50944"));
 
 /**
  * Test 4. Corrupt an index file.
@@ -80,5 +80,5 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
             testColl.insert({a: 1});
         });
     },
-    new RegExp("Fatal Assertion.*50882"));
+    new RegExp("Fatal assertion.*50882"));
 })();

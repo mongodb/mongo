@@ -2176,7 +2176,7 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
                   RSFatalException);
 }
 
-DEATH_TEST_F(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal, "Fatal Assertion") {
+DEATH_TEST_F(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal, "Fatal assertion") {
     const auto invalidOplogEntry = BSON("op"
                                         << "u"
                                         << "ui" << UUID::gen() << "ts" << Timestamp(1, 1) << "t"

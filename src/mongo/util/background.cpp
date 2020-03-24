@@ -55,6 +55,10 @@ namespace {
 
 class PeriodicTaskRunner : public BackgroundJob {
 public:
+    // Tasks are expected to finish reasonably quickly, so when a task run takes longer
+    // than `kMinLog`, the verbosity of its summary log statement is upgraded from 3 to 0.
+    static constexpr auto kMinLog = Milliseconds(100);
+
     PeriodicTaskRunner() : _shutdownRequested(false) {}
 
     void add(PeriodicTask* task);
@@ -147,7 +151,11 @@ void BackgroundJob::jobBody() {
         setThreadName(threadName);
     }
 
-    LOGV2_DEBUG(23098, 1, "BackgroundJob starting: {threadName}", "threadName"_attr = threadName);
+    LOGV2_DEBUG(23098,
+                1,
+                "BackgroundJob starting: {threadName}",
+                "BackgroundJob starting",
+                "threadName"_attr = threadName);
 
     run();
 
@@ -334,21 +342,25 @@ void PeriodicTaskRunner::_runTask(PeriodicTask* const task) {
         task->taskDoWork();
     } catch (const std::exception& e) {
         LOGV2_ERROR(23100,
-                    "task: {taskName} failed: {e_what}",
+                    "Task: {taskName} failed: {error}",
+                    "Task failed",
                     "taskName"_attr = taskName,
-                    "e_what"_attr = redact(e.what()));
+                    "error"_attr = redact(e.what()));
     } catch (...) {
-        LOGV2_ERROR(
-            23101, "task: {taskName} failed with unknown error", "taskName"_attr = taskName);
+        LOGV2_ERROR(23101,
+                    "Task: {taskName} failed with unknown error",
+                    "Task failed with unknown error",
+                    "taskName"_attr = taskName);
     }
 
-    const int ms = timer.millis();
-    const int kMinLogMs = 100;
+    const auto duration = timer.elapsed();
+
     LOGV2_DEBUG(23099,
-                logSeverityV1toV2(ms <= kMinLogMs ? 3 : 0).toInt(),
-                "task: {taskName} took: {ms}ms",
+                logSeverityV1toV2(duration <= kMinLog ? 3 : 0).toInt(),
+                "Task: {taskName} took: {duration}",
+                "Task finished",
                 "taskName"_attr = taskName,
-                "ms"_attr = ms);
+                "duration"_attr = duration_cast<Milliseconds>(duration));
 }
 
 }  // namespace mongo

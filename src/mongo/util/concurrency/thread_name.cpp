@@ -133,8 +133,9 @@ void setThreadName(StringData name) {
     int error = pthread_setname_np(threadNameCopy.c_str());
     if (error) {
         LOGV2(23102,
-              "Ignoring error from setting thread name: {errnoWithDescription_error}",
-              "errnoWithDescription_error"_attr = errnoWithDescription(error));
+              "Ignoring error from setting thread name: {error}",
+              "Ignoring error from setting thread name",
+              "error"_attr = errnoWithDescription(error));
     }
 #elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
     // Do not set thread name on the main() thread. Setting the name on main thread breaks
@@ -156,8 +157,9 @@ void setThreadName(StringData name) {
 
         if (error) {
             LOGV2(23103,
-                  "Ignoring error from setting thread name: {errnoWithDescription_error}",
-                  "errnoWithDescription_error"_attr = errnoWithDescription(error));
+                  "Ignoring error from setting thread name: {error}",
+                  "Ignoring error from setting thread name",
+                  "error"_attr = errnoWithDescription(error));
         }
     }
 #endif

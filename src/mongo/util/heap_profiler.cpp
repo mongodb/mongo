@@ -538,9 +538,10 @@ private:
         }
         stackInfo.stackObj = builder.obj();
         LOGV2(23158,
-              "heapProfile stack{stackInfo_stackNum}: {stackInfo_stackObj}",
-              "stackInfo_stackNum"_attr = stackInfo.stackNum,
-              "stackInfo_stackObj"_attr = stackInfo.stackObj);
+              "heapProfile stack {stackNum}: {stackObj}",
+              "heapProfile stack",
+              "stackNum"_attr = stackInfo.stackNum,
+              "stackObj"_attr = stackInfo.stackObj);
     }
 
     //
@@ -567,15 +568,18 @@ private:
             const size_t stackTableSize = stackHashTable.memorySizeBytes();
             const double MB = 1024 * 1024;
             LOGV2(23159,
-                  "sampleIntervalBytes {HeapProfilingSampleIntervalBytes}; maxActiveMemory "
-                  "{maxActiveMemory_MB} MB; objTableSize {objTableSize_MB} MB; stackTableSize "
-                  "{stackTableSize_MB} MB",
-                  "HeapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes,
-                  "maxActiveMemory_MB"_attr = maxActiveMemory / MB,
+                  "Generating heap profiler serverStatus: sampleIntervalBytes "
+                  "{heapProfilingSampleIntervalBytes}; "
+                  "maxActiveMemory {maxActiveMemoryMB} MB; objTableSize {objTableSize_MB} MB; "
+                  "stackTableSize "
+                  "{stackTableSizeMB} MB",
+                  "Generating heap profiler serverStatus",
+                  "heapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes,
+                  "maxActiveMemoryMB"_attr = maxActiveMemory / MB,
                   "objTableSize_MB"_attr = objTableSize / MB,
-                  "stackTableSize_MB"_attr = stackTableSize / MB);
+                  "stackTableSizeMB"_attr = stackTableSize / MB);
             // print a stack trace to log somap for post-facto symbolization
-            LOGV2(23160, "following stack trace is for heap profiler informational purposes");
+            LOGV2(23160, "Following stack trace is for heap profiler informational purposes");
             printStackTrace();
             logGeneralStats = false;
         }
@@ -638,7 +642,7 @@ private:
         // importantStacks grows monotonically, so it can accumulate unneeded stacks,
         // so we clear it periodically.
         if (++numImportantSamples >= kMaxImportantSamples) {
-            LOGV2(23161, "clearing importantStacks");
+            LOGV2(23161, "Clearing importantStacks");
             importantStacks.clear();
             numImportantSamples = 0;
         }

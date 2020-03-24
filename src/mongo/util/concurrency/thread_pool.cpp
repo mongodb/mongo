@@ -64,19 +64,21 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
     }
     if (options.maxThreads < 1) {
         LOGV2_FATAL(28702,
-                    "Tried to create pool {options_poolName} with a maximum of "
-                    "{options_maxThreads} but the maximum must be at least 1",
-                    "options_poolName"_attr = options.poolName,
-                    "options_maxThreads"_attr = options.maxThreads);
+                    "Cannot create pool {poolName} with maximum number of threads of "
+                    "{maxThreads} which is less than 1",
+                    "Cannot create pool with maximum number of threads less than 1",
+                    "poolName"_attr = options.poolName,
+                    "maxThreads"_attr = options.maxThreads);
     }
     if (options.minThreads > options.maxThreads) {
-        LOGV2_FATAL(
-            28686,
-            "Tried to create pool {options_poolName} with a minimum of {options_minThreads} which "
-            "is more than the configured maximum of {options_maxThreads}",
-            "options_poolName"_attr = options.poolName,
-            "options_minThreads"_attr = options.minThreads,
-            "options_maxThreads"_attr = options.maxThreads);
+        LOGV2_FATAL(28686,
+                    "Cannot create pool {poolName} with minimum number of threads of "
+                    "{minThreads} which is larger than the configured maximum of {maxThreads}",
+                    "Cannot create pool with minimum number of threads larger than the "
+                    "configured maximum",
+                    "poolName"_attr = options.poolName,
+                    "minThreads"_attr = options.minThreads,
+                    "maxThreads"_attr = options.maxThreads);
     }
     return {std::move(options)};
 }
@@ -103,8 +105,9 @@ void ThreadPool::startup() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_state != preStart) {
         LOGV2_FATAL(28698,
-                    "Attempting to start pool {options_poolName}, but it has already started",
-                    "options_poolName"_attr = _options.poolName);
+                    "Attempted to start pool {poolName}, but it has already started",
+                    "Attempted to start pool that has already started",
+                    "poolName"_attr = _options.poolName);
     }
     _setState_inlock(running);
     invariant(_threads.empty());
@@ -161,8 +164,9 @@ void ThreadPool::_join_inlock(stdx::unique_lock<Latch>* lk) {
             case joining:
             case shutdownComplete:
                 LOGV2_FATAL(28700,
-                            "Attempted to join pool {options_poolName} more than once",
-                            "options_poolName"_attr = _options.poolName);
+                            "Attempted to join pool {poolName} more than once",
+                            "Attempted to join pool more than once",
+                            "poolName"_attr = _options.poolName);
         }
         MONGO_UNREACHABLE;
     });
@@ -260,7 +264,12 @@ void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadNa
     setThreadName(threadName);
     pool->_options.onCreateThread(threadName);
     const auto poolName = pool->_options.poolName;
-    LOGV2_DEBUG(23104, 1, "starting thread in pool {poolName}", "poolName"_attr = poolName);
+    LOGV2_DEBUG(23104,
+                1,
+                "Starting thread {threadName} in pool {poolName}",
+                "Starting thread",
+                "threadName"_attr = threadName,
+                "poolName"_attr = poolName);
     pool->_consumeTasks();
 
     // At this point, another thread may have destroyed "pool", if this thread chose to detach
@@ -270,7 +279,12 @@ void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadNa
     // This can happen if this thread decided to retire, got descheduled after removing itself
     // from _threads and calling detach(), and then the pool was deleted. When this thread resumes,
     // it is no longer safe to access "pool".
-    LOGV2_DEBUG(23105, 1, "shutting down thread in pool {poolName}", "poolName"_attr = poolName);
+    LOGV2_DEBUG(23105,
+                1,
+                "Shutting down thread {threadName} in pool {poolName}",
+                "Shutting down thread",
+                "threadName"_attr = threadName,
+                "poolName"_attr = poolName);
 }
 
 void ThreadPool::_consumeTasks() {
@@ -296,16 +310,18 @@ void ThreadPool::_consumeTasks() {
                     LOGV2_DEBUG(23106,
                                 1,
                                 "Reaping this thread; next thread reaped no earlier than "
-                                "{lastFullUtilizationDate_options_maxIdleThreadAge}",
-                                "lastFullUtilizationDate_options_maxIdleThreadAge"_attr =
+                                "{nextThreadRetirementDate}",
+                                "Reaping this thread",
+                                "nextThreadRetirementDate"_attr =
                                     _lastFullUtilizationDate + _options.maxIdleThreadAge);
                     break;
                 }
 
                 LOGV2_DEBUG(23107,
                             3,
-                            "Not reaping because the earliest retirement date is "
+                            "Not reaping this thread because the earliest retirement date is "
                             "{nextThreadRetirementDate}",
+                            "Not reaping this thread",
                             "nextThreadRetirementDate"_attr = nextThreadRetirementDate);
                 MONGO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait_until(lk, nextThreadRetirementDate.toSystemTimePoint());
@@ -316,10 +332,11 @@ void ThreadPool::_consumeTasks() {
                 // would be eligible for retirement once they had no work left to do.
                 LOGV2_DEBUG(23108,
                             3,
-                            "waiting for work; I am one of {threads_size} thread(s); the minimum "
-                            "number of threads is {options_minThreads}",
-                            "threads_size"_attr = _threads.size(),
-                            "options_minThreads"_attr = _options.minThreads);
+                            "Waiting for work; the thread pool size is {numThreads}; the minimum "
+                            "number of threads is {minThreads}",
+                            "Waiting for work",
+                            "numThreads"_attr = _threads.size(),
+                            "minThreads"_attr = _options.minThreads);
                 MONGO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait(lk);
             }
@@ -344,13 +361,13 @@ void ThreadPool::_consumeTasks() {
     --_numIdleThreads;
 
     if (_state != running) {
-        LOGV2_FATAL_NOTRACE(
-            28701,
-            "State of pool {options_poolName} is {static_cast_int32_t_state}, but expected "
-            "{static_cast_int32_t_running}",
-            "options_poolName"_attr = _options.poolName,
-            "static_cast_int32_t_state"_attr = static_cast<int32_t>(_state),
-            "static_cast_int32_t_running"_attr = static_cast<int32_t>(running));
+        LOGV2_FATAL_NOTRACE(28701,
+                            "State of pool {poolName} is {actualState}, but expected "
+                            "{expectedState}",
+                            "Unexpected pool state",
+                            "poolName"_attr = _options.poolName,
+                            "actualState"_attr = static_cast<int32_t>(_state),
+                            "expectedState"_attr = static_cast<int32_t>(running));
     }
 
     // This thread is ending because it was idle for too long.  Find self in _threads, remove self
@@ -369,17 +386,19 @@ void ThreadPool::_consumeTasks() {
     std::ostringstream threadId;
     threadId << stdx::this_thread::get_id();
     LOGV2_FATAL_NOTRACE(28703,
-                        "Could not find this thread, with id {threadId} in pool {pool}",
+                        "Could not find thread with id {threadId} in pool {poolName}",
+                        "Could not find thread",
                         "threadId"_attr = threadId.str(),
-                        "pool"_attr = _options.poolName);
+                        "poolName"_attr = _options.poolName);
 }
 
 void ThreadPool::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
     invariant(!_pendingTasks.empty());
     LOGV2_DEBUG(23109,
                 3,
-                "Executing a task on behalf of pool {options_poolName}",
-                "options_poolName"_attr = _options.poolName);
+                "Executing a task on behalf of pool {poolName}",
+                "Executing a task on behalf of pool",
+                "poolName"_attr = _options.poolName);
     Task task = std::move(_pendingTasks.front());
     _pendingTasks.pop_front();
     --_numIdleThreads;
@@ -395,19 +414,22 @@ void ThreadPool::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
 void ThreadPool::_startWorkerThread_inlock() {
     switch (_state) {
         case preStart:
-            LOGV2_DEBUG(23110,
-                        1,
-                        "Not starting new thread in pool {options_poolName}, yet; waiting for "
-                        "startup() call",
-                        "options_poolName"_attr = _options.poolName);
+            LOGV2_DEBUG(
+                23110,
+                1,
+                "Not starting new thread in pool {poolName}, yet; waiting for "
+                "startup() call",
+                "Not starting new thread since the pool is still waiting for startup() call",
+                "poolName"_attr = _options.poolName);
             return;
         case joinRequired:
         case joining:
         case shutdownComplete:
             LOGV2_DEBUG(23111,
                         1,
-                        "Not starting new thread in pool {options_poolName} while shutting down",
-                        "options_poolName"_attr = _options.poolName);
+                        "Not starting new thread in pool {poolName}; shutting down",
+                        "Not starting new thread since the pool is shutting down",
+                        "poolName"_attr = _options.poolName);
             return;
         case running:
             break;
@@ -417,10 +439,11 @@ void ThreadPool::_startWorkerThread_inlock() {
     if (_threads.size() == _options.maxThreads) {
         LOGV2_DEBUG(23112,
                     2,
-                    "Not starting new thread in pool {options_poolName} because it already has "
-                    "{options_maxThreads}, its maximum",
-                    "options_poolName"_attr = _options.poolName,
-                    "options_maxThreads"_attr = _options.maxThreads);
+                    "Not starting new thread in pool {poolName} because it already has "
+                    "{maxThreads} threads, its maximum",
+                    "Not starting new thread in pool since the pool is already full",
+                    "poolName"_attr = _options.poolName,
+                    "maxThreads"_attr = _options.maxThreads);
         return;
     }
     invariant(_threads.size() < _options.maxThreads);
@@ -430,12 +453,13 @@ void ThreadPool::_startWorkerThread_inlock() {
         ++_numIdleThreads;
     } catch (const std::exception& ex) {
         LOGV2_ERROR(23113,
-                    "Failed to start {threadName}; {threads_size} other thread(s) still running in "
-                    "pool {options_poolName}; caught exception: {ex_what}",
+                    "Failed to start {threadName}; {numThreads} other thread(s) still running in "
+                    "pool {poolName}; caught exception: {error}",
+                    "Failed to start thread",
                     "threadName"_attr = threadName,
-                    "threads_size"_attr = _threads.size(),
-                    "options_poolName"_attr = _options.poolName,
-                    "ex_what"_attr = redact(ex.what()));
+                    "numThreads"_attr = _threads.size(),
+                    "poolName"_attr = _options.poolName,
+                    "error"_attr = redact(ex.what()));
     }
 }
 

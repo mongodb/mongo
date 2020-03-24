@@ -559,7 +559,7 @@ DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
 
 DEATH_TEST_REGEX_F(OpObserverTest,
                    NodeCrashesIfShardIdentityDocumentRolledBack,
-                   "Fatal Assertion.*50712") {
+                   "Fatal assertion.*50712") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
 

@@ -180,6 +180,7 @@ private:
                     using namespace mongo::literals;
                     LOGV2_ERROR(24129,
                                 "blockTask thread detected anomaly - data: {data}",
+                                "blockTask thread detected anomaly",
                                 "data"_attr = data);
                     ASSERT(false);
                 }
@@ -199,6 +200,7 @@ private:
                         using namespace mongo::literals;
                         LOGV2_ERROR(24130,
                                     "blockWithExceptionTask thread detected anomaly - data: {data}",
+                                    "blockWithExceptionTask thread detected anomaly",
                                     "data"_attr = data);
                         ASSERT(false);
                     }
