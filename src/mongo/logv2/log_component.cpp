@@ -31,7 +31,6 @@
 
 #include "mongo/logv2/log_component.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 
@@ -39,220 +38,73 @@ namespace mongo::logv2 {
 
 namespace {
 
-// Component dotted names.
-// Lazily evaluated in LogComponent::getDottedName().
-std::string _dottedNames[LogComponent::kNumLogComponents + 1];
-
-//
-// Fully initialize _dottedNames before we enter multithreaded execution.
-//
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNamesV2, MONGO_NO_PREREQUISITES)
-(InitializerContext* context) {
-    for (int i = 0; i <= int(LogComponent::kNumLogComponents); ++i) {
-        logv2::LogComponent component = static_cast<logv2::LogComponent::Value>(i);
-        component.getDottedName();
-    }
-
-    return Status::OK();
-}
-
-}  // namespace
+struct {
+    LogComponent value;
+    StringData shortName;
+    StringData logName;
+    LogComponent parent;
+} constexpr kTable[] = {
+#define X_(id, val, shortName, logName, parent) \
+    {LogComponent::id, shortName##_sd, logName##_sd, LogComponent::parent},
+    MONGO_EXPAND_LOGV2_COMPONENT(X_)
+#undef X_
+};
 
 // Children always come after parent component.
 // This makes it unnecessary to compute children of each component
 // when setting/clearing log severities in LogComponentSettings.
-#define DECLARE_LOG_COMPONENT_PARENT(CHILD, PARENT)        \
-    case (CHILD):                                          \
-        do {                                               \
-            MONGO_STATIC_ASSERT(int(CHILD) > int(PARENT)); \
-            return (PARENT);                               \
-        } while (0)
+constexpr bool correctParentOrder(LogComponent id, LogComponent parent) {
+    using V = LogComponent::Value;
+    switch (V{id}) {
+        case LogComponent::kAutomaticDetermination:
+        case LogComponent::kDefault:
+        case LogComponent::kNumLogComponents:
+            return true;
+        default:
+            using I = std::underlying_type_t<V>;
+            return I{id} > I{parent};
+    }
+}
+#define X_(id, val, shortName, logName, parent) \
+    MONGO_STATIC_ASSERT(correctParentOrder(LogComponent::id, LogComponent::parent));
+MONGO_EXPAND_LOGV2_COMPONENT(X_)
+#undef X_
+
+}  // namespace
 
 LogComponent LogComponent::parent() const {
-    switch (_value) {
-        case kDefault:
-            return kNumLogComponents;
-            DECLARE_LOG_COMPONENT_PARENT(kJournal, kStorage);
-            DECLARE_LOG_COMPONENT_PARENT(kASIO, kNetwork);
-            DECLARE_LOG_COMPONENT_PARENT(kConnectionPool, kNetwork);
-            DECLARE_LOG_COMPONENT_PARENT(kBridge, kNetwork);
-            DECLARE_LOG_COMPONENT_PARENT(kReplicationElection, kReplication);
-            DECLARE_LOG_COMPONENT_PARENT(kReplicationHeartbeats, kReplication);
-            DECLARE_LOG_COMPONENT_PARENT(kReplicationInitialSync, kReplication);
-            DECLARE_LOG_COMPONENT_PARENT(kReplicationRollback, kReplication);
-            DECLARE_LOG_COMPONENT_PARENT(kShardingCatalogRefresh, kSharding);
-            DECLARE_LOG_COMPONENT_PARENT(kShardingMigration, kSharding);
-            DECLARE_LOG_COMPONENT_PARENT(kStorageRecovery, kStorage);
-        case kNumLogComponents:
-            return kNumLogComponents;
-        default:
-            return kDefault;
-    }
-    MONGO_UNREACHABLE;
+    return kTable[_value].parent;
 }
 
 StringData LogComponent::toStringData() const {
-    switch (_value) {
-        case kDefault:
-            return "default"_sd;
-        case kAccessControl:
-            return "accessControl"_sd;
-        case kCommand:
-            return "command"_sd;
-        case kControl:
-            return "control"_sd;
-        case kExecutor:
-            return "executor"_sd;
-        case kGeo:
-            return "geo"_sd;
-        case kIndex:
-            return "index"_sd;
-        case kNetwork:
-            return "network"_sd;
-        case kQuery:
-            return "query"_sd;
-        case kReplication:
-            return "replication"_sd;
-        case kReplicationElection:
-            return "election"_sd;
-        case kReplicationHeartbeats:
-            return "heartbeats"_sd;
-        case kReplicationInitialSync:
-            return "initialSync"_sd;
-        case kReplicationRollback:
-            return "rollback"_sd;
-        case kSharding:
-            return "sharding"_sd;
-        case kShardingCatalogRefresh:
-            return "shardingCatalogRefresh"_sd;
-        case kShardingMigration:
-            return "migration"_sd;
-        case kStorage:
-            return "storage"_sd;
-        case kStorageRecovery:
-            return "recovery"_sd;
-        case kJournal:
-            return "journal"_sd;
-        case kWrite:
-            return "write"_sd;
-        case kFTDC:
-            return "ftdc"_sd;
-        case kASIO:
-            return "asio"_sd;
-        case kBridge:
-            return "bridge"_sd;
-        case kTracking:
-            return "tracking"_sd;
-        case kTransaction:
-            return "transaction"_sd;
-        case kConnectionPool:
-            return "connectionPool"_sd;
-        case kTest:
-            return "test"_sd;
-        case kNumLogComponents:
-            return "total"_sd;
-        case kAutomaticDetermination:
-            // We should not reach this
-            break;
-            // No default. Compiler should complain if there's a log component that's not handled.
-    }
-    MONGO_UNREACHABLE;
-}
-
-std::string LogComponent::getShortName() const {
-    return toStringData().toString();
-}
-
-std::string LogComponent::getDottedName() const {
-    // Lazily evaluate dotted names in anonymous namespace.
-    if (_dottedNames[_value].empty()) {
-        switch (_value) {
-            case kDefault:
-                _dottedNames[_value] = getShortName();
-                break;
-            case kNumLogComponents:
-                _dottedNames[_value] = getShortName();
-                break;
-            default:
-                // Omit short name of 'default' component from dotted name.
-                if (parent() == kDefault) {
-                    _dottedNames[_value] = getShortName();
-                } else {
-                    _dottedNames[_value] = parent().getDottedName() + "." + getShortName();
-                }
-                break;
-        }
-    }
-    return _dottedNames[_value];
+    return kTable[_value].shortName;
 }
 
 StringData LogComponent::getNameForLog() const {
-    switch (_value) {
-        case kDefault:
-            return "-"_sd;
-        case kAccessControl:
-            return "ACCESS"_sd;
-        case kCommand:
-            return "COMMAND"_sd;
-        case kControl:
-            return "CONTROL"_sd;
-        case kExecutor:
-            return "EXECUTOR"_sd;
-        case kGeo:
-            return "GEO"_sd;
-        case kIndex:
-            return "INDEX"_sd;
-        case kNetwork:
-            return "NETWORK"_sd;
-        case kQuery:
-            return "QUERY"_sd;
-        case kReplication:
-            return "REPL"_sd;
-        case kReplicationElection:
-            return "ELECTION"_sd;
-        case kReplicationHeartbeats:
-            return "REPL_HB"_sd;
-        case kReplicationInitialSync:
-            return "INITSYNC"_sd;
-        case kReplicationRollback:
-            return "ROLLBACK"_sd;
-        case kSharding:
-            return "SHARDING"_sd;
-        case kShardingCatalogRefresh:
-            return "SH_REFR"_sd;
-        case kShardingMigration:
-            return "MIGRATE"_sd;
-        case kStorage:
-            return "STORAGE"_sd;
-        case kStorageRecovery:
-            return "RECOVERY"_sd;
-        case kJournal:
-            return "JOURNAL"_sd;
-        case kWrite:
-            return "WRITE"_sd;
-        case kFTDC:
-            return "FTDC"_sd;
-        case kASIO:
-            return "ASIO"_sd;
-        case kBridge:
-            return "BRIDGE"_sd;
-        case kTracking:
-            return "TRACKING"_sd;
-        case kTransaction:
-            return "TXN"_sd;
-        case kConnectionPool:
-            return "CONNPOOL"_sd;
-        case kTest:
-            return "TEST"_sd;
-        case kNumLogComponents:
-            return "TOTAL"_sd;
-        case kAutomaticDetermination:
-            // We should not reach this
-            break;
-            // No default. Compiler should complain if there's a log component that's not handled.
+    return kTable[_value].logName;
+}
+
+std::string LogComponent::getShortName() const {
+    return std::string{toStringData()};
+}
+
+namespace {
+void _appendDottedName(LogComponent id, std::string* out) {
+    if (id.parent() != LogComponent::kDefault) {
+        _appendDottedName(id.parent(), out);
+        out->append(".");
     }
-    MONGO_UNREACHABLE;
+    StringData shortName = id.toStringData();
+    out->append(shortName.begin(), shortName.end());
+}
+}  // namespace
+
+std::string LogComponent::getDottedName() const {
+    if (*this == kDefault || *this == kNumLogComponents)
+        return std::string{toStringData()};
+    std::string out;
+    _appendDottedName(*this, &out);
+    return out;
 }
 
 std::ostream& operator<<(std::ostream& os, LogComponent component) {
