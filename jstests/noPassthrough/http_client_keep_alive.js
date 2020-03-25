@@ -49,6 +49,11 @@ function runTest(mongod, web) {
         admin.runCommand({httpClientRequest: 1, uri: web.getURL() + '/connect_count'});
     const connects = assert.commandWorked(connectsCmd).body;
     assert.eq(connects, 2, "Connection count incorrect.");
+
+    // Check 404 returns failure.
+    const failedCmd = assert.commandWorked(
+        admin.runCommand({httpClientRequest: 1, uri: web.getURL() + '/no_such_path'}));
+    assert.eq(failedCmd.code, 404);
 }
 
 const web = new ConfigExpandRestServer();

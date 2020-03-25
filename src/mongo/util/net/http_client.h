@@ -49,6 +49,21 @@ constexpr Seconds kTotalRequestTimeout{120};
  */
 class HttpClient {
 public:
+    enum class HttpMethod {
+        kGET,
+        kPOST,
+        kPUT,
+    };
+
+    struct HttpReply {
+        std::uint16_t code;
+        DataBuilder header;
+        DataBuilder body;
+
+        HttpReply(std::uint16_t code_, DataBuilder&& header_, DataBuilder&& body_)
+            : code(code_), header(std::move(header_)), body(std::move(body_)) {}
+    };
+
     virtual ~HttpClient() = default;
 
     /**
@@ -75,19 +90,33 @@ public:
     virtual void setTimeout(Seconds timeout) = 0;
 
     /**
-     * Perform a POST request to specified URL.
+     * Perform a request to specified URL.
+     * Note that some methods (GET, HEAD) prohibit context bodies.
      */
-    virtual DataBuilder post(StringData url, ConstDataRange data) const = 0;
+    virtual HttpReply request(HttpMethod method,
+                              StringData url,
+                              ConstDataRange data = {nullptr, 0}) const = 0;
 
     /**
-     * Perform a PUT request to specified URL.
+     * Convenience wrapper to perform a POST and require a 200 response.
      */
-    virtual DataBuilder put(StringData url, ConstDataRange data) const = 0;
+    DataBuilder post(StringData url, ConstDataRange data) {
+        return requestSuccess(HttpMethod::kPOST, url, data);
+    }
 
     /**
-     * Perform a GET request from the specified URL.
+     * Convenience wrapper to perform a PUT and require a 200 response.
      */
-    virtual DataBuilder get(StringData url) const = 0;
+    DataBuilder put(StringData url, ConstDataRange data) {
+        return requestSuccess(HttpMethod::kPUT, url, data);
+    }
+
+    /**
+     * Convenience wrapper to perform a GET and require a 200 response.
+     */
+    DataBuilder get(StringData url) {
+        return requestSuccess(HttpMethod::kGET, url, {nullptr, 0});
+    }
 
     /**
      * Factory method provided by client implementation.
@@ -98,6 +127,15 @@ public:
      * Content for ServerStatus http_client section.
      */
     static BSONObj getServerStatus();
+
+private:
+    DataBuilder requestSuccess(HttpMethod method, StringData url, ConstDataRange data) const {
+        auto reply = request(method, url, data);
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Unexpected http status code from server: " << reply.code,
+                reply.code == 200);
+        return std::move(reply.body);
+    }
 };
 
 }  // namespace mongo

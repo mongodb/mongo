@@ -36,6 +36,12 @@ structs:
     httpClientReply:
         description: "Result of an HTTP(S) GET request"
         fields:
+            code:
+                description: "Status code returned by server"
+                type: int
+            header:
+                description: "Headers returned by server"
+                type: string
             body:
                 description: "Content returned by server"
                 type: string
