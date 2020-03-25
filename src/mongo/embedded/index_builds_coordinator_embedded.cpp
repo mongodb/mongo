@@ -52,8 +52,8 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
                                                 IndexBuildOptions indexBuildOptions) {
     invariant(!opCtx->lockState()->isLocked());
 
-    auto statusWithOptionalResult = _filterSpecsAndRegisterBuild(
-        opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
+    auto statusWithOptionalResult =
+        _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);
     if (!statusWithOptionalResult.isOK()) {
         return statusWithOptionalResult.getStatus();
     }
@@ -67,7 +67,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         return statusWithOptionalResult.getValue().get();
     }
 
-    auto status = _setUpIndexBuild(opCtx, buildUUID, Timestamp());
+    auto status = _setUpIndexBuild(opCtx, buildUUID, Timestamp(), indexBuildOptions.commitQuorum);
     if (!status.isOK()) {
         return status;
     }
@@ -111,7 +111,7 @@ void IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
 }
 
 bool IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumNotEnabled(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState, bool onStepUp) {
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     MONGO_UNREACHABLE;
 }
 

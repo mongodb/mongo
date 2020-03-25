@@ -51,18 +51,28 @@ public:
     ValidateStateTest() : CatalogTestFixture("wiredTiger") {}
 
     /**
+     * Create collection 'nss'. It will possess a default _id index.
+     */
+    void createCollection(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Create collection 'nss' and insert some documents. It will possess a default _id index.
      */
     Collection* createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
 };
 
-Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
-                                                             const NamespaceString& nss) {
+void ValidateStateTest::createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     // Create collection.
     CollectionOptions defaultCollectionOptions;
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, defaultCollectionOptions));
+}
 
-    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
+                                                             const NamespaceString& nss) {
+    // Create collection.
+    createCollection(opCtx, nss);
+
+    AutoGetCollection autoColl(opCtx, nss, MODE_X);
     Collection* collection = autoColl.getCollection();
     invariant(collection);
 
@@ -150,6 +160,10 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
                   .find("enableIndexBuildCommitQuorum")
                   ->second->setFromString("false"));
     auto opCtx = operationContext();
+    // Create config.system.indexBuilds collection to store commit quorum value during index
+    // building.
+    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
+
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
@@ -200,6 +214,10 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
                   ->second->setFromString("false"));
 
     auto opCtx = operationContext();
+    // Create config.system.indexBuilds collection to store commit quorum value during index
+    // building.
+    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
+
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
@@ -235,6 +253,10 @@ TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereL
                   ->second->setFromString("false"));
 
     auto opCtx = operationContext();
+    // Create config.system.indexBuilds collection to store commit quorum value during index
+    // building.
+    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
+
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.

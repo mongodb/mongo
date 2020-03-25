@@ -186,13 +186,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         }
     } else {
         auto statusWithOptionalResult =
-            _filterSpecsAndRegisterBuild(opCtx,
-                                         dbName,
-                                         collectionUUID,
-                                         specs,
-                                         buildUUID,
-                                         protocol,
-                                         indexBuildOptions.commitQuorum);
+            _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);
         if (!statusWithOptionalResult.isOK()) {
             return statusWithOptionalResult.getStatus();
         }
@@ -300,7 +294,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             opCtx->lockState());
 
         if (!indexBuildOptions.twoPhaseRecovery) {
-            status = _setUpIndexBuild(opCtx.get(), buildUUID, startTimestamp);
+            status = _setUpIndexBuild(
+                opCtx.get(), buildUUID, startTimestamp, indexBuildOptions.commitQuorum);
             if (!status.isOK()) {
                 startPromise.setError(status);
                 return;
@@ -348,20 +343,12 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     }
 
     auto replState = swReplState.getValue();
-    CommitQuorumOptions commitQuorum;
-    {
-        // TODO SERVER-46557: persistCommitReadyMemberInfo() should no longer update 'commitQuorum'
-        // field in config.system.indexBuilds collection. So this block should be removed.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        invariant(replState->commitQuorum);
-        commitQuorum = replState->commitQuorum.get();
-    }
+    Status upsertStatus(ErrorCodes::InternalError, "Uninitialized value");
 
-    Status upsertStatus = Status(ErrorCodes::InternalError, "Uninitialized value");
     IndexBuildEntry indexbuildEntry(
-        buildUUID, replState->collectionUUID, commitQuorum, replState->indexNames);
-    std::vector<HostAndPort> members{votingNode};
-    indexbuildEntry.setCommitReadyMembers(members);
+        buildUUID, replState->collectionUUID, CommitQuorumOptions(), replState->indexNames);
+    std::vector<HostAndPort> votersList{votingNode};
+    indexbuildEntry.setCommitReadyMembers(votersList);
 
     {
         // Upserts doesn't need to acquire pbwm lock.
@@ -369,9 +356,6 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
         upsertStatus = persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
     }
 
-    // 'DuplicateKey' error indicates that the commit quorum value read from replState does not
-    // match on-disk commit quorum value.
-    invariant(upsertStatus.code() != ErrorCodes::DuplicateKey);
     if (upsertStatus.isOK()) {
         _signalIfCommitQuorumIsSatisfied(opCtx, replState);
     }
@@ -392,9 +376,8 @@ void IndexBuildsCoordinatorMongod::setSignalAndCancelVoteRequestCbkIfActive(
 }
 
 void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
-    WithLock ReplIndexBuildStateLk,
-    OperationContext* opCtx,
-    std::shared_ptr<ReplIndexBuildState> replState) {
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    stdx::unique_lock<Latch> ReplIndexBuildStateLk(replState->mutex);
     if (!replState->waitForNextAction->getFuture().isReady()) {
         setSignalAndCancelVoteRequestCbkIfActive(
             ReplIndexBuildStateLk, opCtx, replState, IndexBuildAction::kCommitQuorumSatisfied);
@@ -417,59 +400,34 @@ void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
 
 void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    while (true) {
-        // Read the index builds entry from config.system.indexBuilds collection.
-        auto swIndexBuildEntry = getIndexBuildEntry(opCtx, replState->buildUUID);
-        // This can occur when no vote got received and stepup tries to check if commit quorum is
-        // satisfied.
-        if (swIndexBuildEntry == ErrorCodes::NoMatchingDocument)
-            return;
 
-        auto indexBuildEntry = invariantStatusOK(swIndexBuildEntry);
+    // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
+    // after reading it from config.system.indexBuilds collection.
+    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
 
-        auto voteMemberList = indexBuildEntry.getCommitReadyMembers();
-        invariant(voteMemberList,
-                  str::stream() << "'" << IndexBuildEntry::kCommitReadyMembersFieldName
-                                << "' list is empty for index build: " << replState->buildUUID);
-        auto onDiskcommitQuorum = indexBuildEntry.getCommitQuorum();
-        bool commitQuorumSatisfied =
-            repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(onDiskcommitQuorum,
-                                                                              voteMemberList.get());
+    // Read the index builds entry from config.system.indexBuilds collection.
+    auto swIndexBuildEntry = getIndexBuildEntry(opCtx, replState->buildUUID);
+    auto indexBuildEntry = invariantStatusOK(swIndexBuildEntry);
 
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        invariant(replState->commitQuorum,
-                  str::stream() << "Commit quorum is missing for index build: "
-                                << replState->buildUUID);
-        if (onDiskcommitQuorum == replState->commitQuorum.get()) {
-            if (commitQuorumSatisfied) {
-                LOGV2(3856201,
-                      "Index build commit quorum satisfied:",
-                      "indexBuildEntry"_attr = indexBuildEntry);
-                _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
-            }
-            return;
-        }
-        // Try reading from system.indexBuilds collection again as the commit quorum value got
-        // changed after the data is read from system.indexBuilds collection.
-        LOGV2_DEBUG(
-            4655300,
-            1,
-            "Commit Quorum value got changed after reading the value from \"{collName}\" "
-            "collection for index build: {buildUUID}, current commit quorum : {currentVal}, old "
-            "commit quorum: {oldVal}",
-            "collName"_attr = NamespaceString::kIndexBuildEntryNamespace,
-            "buildUUID"_attr = replState->buildUUID,
-            "currentVal"_attr = replState->commitQuorum.get(),
-            "oldVal"_attr = onDiskcommitQuorum);
-        mongo::sleepmillis(10);
-        continue;
-    }
+    auto voteMemberList = indexBuildEntry.getCommitReadyMembers();
+    // This can occur when no vote got received and stepup tries to check if commit quorum is
+    // satisfied.
+    if (!voteMemberList)
+        return;
+
+    bool commitQuorumSatisfied = repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(
+        indexBuildEntry.getCommitQuorum(), voteMemberList.get());
+
+    if (!commitQuorumSatisfied)
+        return;
+
+    LOGV2(
+        3856201, "Index build commit quorum satisfied:", "indexBuildEntry"_attr = indexBuildEntry);
+    _sendCommitQuorumSatisfiedSignal(opCtx, replState);
 }
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState, bool onStepup) {
-    // TODO SERVER-46557: Revisit this logic to see if we can check replState->commitQuorum for
-    // value to be zero to determine whether commit quorum is enabled or not for this index build.
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
@@ -490,18 +448,31 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
         }
         replState->waitForNextAction->emplaceValue(IndexBuildAction::kSinglePhaseCommit);
         return true;
-    } else if (!enableIndexBuildCommitQuorum) {
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-        if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID) || onStepup) {
-            // Node is primary here.
-            stdx::unique_lock<Latch> lk(replState->mutex);
-            _sendCommitQuorumSatisfiedSignal(lk, opCtx, replState);
-        }
-        // No-op for secondaries.
-        return true;
     }
-    return false;
+
+    invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
+
+    // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
+    // after reading it from config.system.indexBuilds collection.
+    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+
+    // Read the commit quorum value from config.system.indexBuilds collection.
+    auto swCommitQuorum = getCommitQuorum(opCtx, replState->buildUUID);
+    auto commitQuorum = invariantStatusOK(swCommitQuorum);
+
+    // Check if the commit quorum is disabled for the index build.
+    if (commitQuorum.numNodes != CommitQuorumOptions::kDisabled) {
+        return false;
+    }
+
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+        // Node is primary here.
+        _sendCommitQuorumSatisfiedSignal(opCtx, replState);
+    }
+    // No-op for secondaries.
+    return true;
 }
 
 bool IndexBuildsCoordinatorMongod::_checkVoteCommitIndexCmdSucceeded(const BSONObj& response,
@@ -800,32 +771,34 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     }
 
     UUID collectionUUID = collection->uuid();
+    std::shared_ptr<ReplIndexBuildState> replState;
+    {
+        stdx::unique_lock<Latch> lk(_mutex);
+        auto pred = [&](const auto& replState) {
+            if (collectionUUID != replState.collectionUUID) {
+                return false;
+            }
+            if (indexNames.size() != replState.indexNames.size()) {
+                return false;
+            }
+            // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
+            return std::equal(
+                replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
+        };
+        auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
+        if (collIndexBuilds.empty()) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "Cannot find an index build on collection '" << nss
+                                        << "' with the provided index names");
+        }
+        invariant(
+            1U == collIndexBuilds.size(),
+            str::stream() << "Found multiple index builds with the same index names on collection "
+                          << nss << " (" << collectionUUID
+                          << "): first index name: " << indexNames.front());
 
-    stdx::unique_lock<Latch> lk(_mutex);
-    auto pred = [&](const auto& replState) {
-        if (collectionUUID != replState.collectionUUID) {
-            return false;
-        }
-        if (indexNames.size() != replState.indexNames.size()) {
-            return false;
-        }
-        // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
-        return std::equal(
-            replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
-    };
-    auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
-    if (collIndexBuilds.empty()) {
-        return Status(ErrorCodes::IndexNotFound,
-                      str::stream() << "Cannot find an index build on collection '" << nss
-                                    << "' with the provided index names");
+        replState = collIndexBuilds.front();
     }
-    invariant(
-        1U == collIndexBuilds.size(),
-        str::stream() << "Found multiple index builds with the same index names on collection "
-                      << nss << " (" << collectionUUID
-                      << "): first index name: " << indexNames.front());
-
-    auto buildState = collIndexBuilds.front();
 
     // See if the new commit quorum is satisfiable.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -834,14 +807,45 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         return status;
     }
 
-    // Persist the new commit quorum for the index build and write it to the collection.
-    buildState->commitQuorum = newCommitQuorum;
-    // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not have
-    // downstream impact.
-    /*
-    return indexbuildentryhelpers::setCommitQuorum(opCtx, buildState->buildUUID, newCommitQuorum);
-    */
-    return Status::OK();
+    // Read the index builds entry from config.system.indexBuilds collection.
+    auto swOnDiskCommitQuorum = getCommitQuorum(opCtx, replState->buildUUID);
+    // Index build has not yet started.
+    if (swOnDiskCommitQuorum == ErrorCodes::NoMatchingDocument) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream()
+                          << "Index build not yet started for the provided indexes in collection '"
+                          << nss << "'.");
+    }
+
+    invariantStatusOK(swOnDiskCommitQuorum);
+    invariant(opCtx->lockState()->isRSTLLocked());
+    // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
+    // prevent readers from reading the commit quorum value and making decision on commit quorum
+    // satisfied with the stale read commit quorum value.
+    Lock::ExclusiveLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+    {
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (replState->waitForNextAction->getFuture().isReady()) {
+            return Status(ErrorCodes::CommandFailed,
+                          str::stream() << "Commit quorum can't be changed as index build is "
+                                           "ready to commit or abort");
+        }
+    }
+
+    IndexBuildEntry indexbuildEntry(
+        replState->buildUUID, replState->collectionUUID, newCommitQuorum, replState->indexNames);
+    status = persistIndexCommitQuorum(opCtx, indexbuildEntry);
+
+    {
+        // Check to see the index build hasn't received commit index build signal while updating
+        // the commit quorum value on-disk.
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (replState->waitForNextAction->getFuture().isReady()) {
+            auto action = replState->waitForNextAction->getFuture().get();
+            invariant(action != IndexBuildAction::kCommitQuorumSatisfied);
+        }
+    }
+    return status;
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {

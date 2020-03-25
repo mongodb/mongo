@@ -86,8 +86,7 @@ private:
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
     bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
-                                         std::shared_ptr<ReplIndexBuildState> replState,
-                                         bool onStepUp) override;
+                                         std::shared_ptr<ReplIndexBuildState> replState) override;
 
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

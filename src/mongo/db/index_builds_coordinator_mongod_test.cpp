@@ -64,12 +64,16 @@ public:
     const CollectionUUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
-        CommitQuorumOptions("majority")};
+        CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
 };
 
 void IndexBuildsCoordinatorMongodTest::setUp() {
     CatalogTestFixture::setUp();
+    // Create config.system.indexBuilds collection to store commit quorum value during index
+    // building.
+    createCollection(NamespaceString::kIndexBuildEntryNamespace, UUID::gen());
+
     createCollection(_testFooNss, _testFooUUID);
     createCollection(_testBarNss, _testBarUUID);
     createCollection(_othertestFooNss, _othertestFooUUID);

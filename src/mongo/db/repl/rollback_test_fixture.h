@@ -71,6 +71,11 @@ public:
                                          const CollectionOptions& options);
 
     /**
+     * Inserts a single document into the collection namespace 'nss'.
+     */
+    void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc);
+
+    /**
      * Inserts a document into the oplog.
      */
     Status _insertOplogEntry(const BSONObj& doc);

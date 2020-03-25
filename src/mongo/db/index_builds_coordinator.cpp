@@ -375,6 +375,19 @@ bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() {
     return storageEngine->supportsTwoPhaseIndexBuild();
 }
 
+std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
+    const std::vector<BSONObj>& specs) {
+    std::vector<std::string> indexNames;
+    for (const auto& spec : specs) {
+        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        invariant(!name.empty(),
+                  str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
+                                << IndexDescriptor::kIndexNameFieldName << "' field: " << spec);
+        indexNames.push_back(name);
+    }
+    return indexNames;
+}
+
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndexesForRecovery(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -487,13 +500,8 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         auto dbName = nss.db().toString();
-        auto replIndexBuildState =
-            std::make_shared<ReplIndexBuildState>(buildUUID,
-                                                  collection->uuid(),
-                                                  dbName,
-                                                  specs,
-                                                  protocol,
-                                                  /*commitQuorum=*/boost::none);
+        auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
+            buildUUID, collection->uuid(), dbName, specs, protocol);
 
         Status status = [&]() {
             stdx::unique_lock<Latch> lk(_mutex);
@@ -687,8 +695,6 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     const auto nss = getNsFromUUID(opCtx, collUUID);
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-    invariant(oplogEntry.commitQuorum);
-    indexBuildOptions.commitQuorum = oplogEntry.commitQuorum.get();
     indexBuildOptions.replSetAndNotPrimaryAtStart = true;
 
     // If this is an initial syncing node, drop any conflicting ready index specs prior to
@@ -770,10 +776,6 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
         indexBuildOptions.replSetAndNotPrimaryAtStart = true;
-        // It's ok to set the commitQuorum value as 0, as we have already received the
-        // commitIndexBuild oplog entry. No way in future, this index build will be coordinated by
-        // this node.
-        indexBuildOptions.commitQuorum = CommitQuorumOptions(0);
 
         // This spawns a new thread and returns immediately.
         auto fut = uassertStatusOK(indexBuildsCoord->startIndexBuild(
@@ -1061,7 +1063,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
             }
         }
 
-        if (!_signalIfCommitQuorumNotEnabled(opCtx, replState, true /* onStepUp */)) {
+        if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
             // This reads from system.indexBuilds collection to see if commit quorum got satisfied.
             _signalIfCommitQuorumIsSatisfied(opCtx, replState);
         }
@@ -1276,12 +1278,37 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
         if (!supportsTwoPhaseIndexBuild()) {
             return;
         }
-        // Since, we don't use IndexBuildsCoordinatorMongod thread pool to build system indexes,
-        // it's ok to set the commit quorum option as 1. Also, this is currently only get
-        // called during system index creation on startup. So, onStartIndexBuild() call will be a
-        // no-op.
-        opObserver->onStartIndexBuild(
-            opCtx, nss, collectionUUID, buildUUID, specs, CommitQuorumOptions(1), fromMigrate);
+
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!(replCoord->getSettings().usingReplSets() &&
+              replCoord->canAcceptWritesFor(opCtx, nss))) {
+            // Not primary.
+            return;
+        }
+
+        // TODO SERVER-47439: Should remove this onCommitFn lambda function as we no longer
+        // need to generate startIndexBuild and commitIndexBuild oplog entries.
+
+
+        // Currently, primary doesn't wait for any votes from secondaries to commit
+        // the index build. So, it's of no use to set the commit quorum option of any value
+        // greater than 0. Disabling commit quorum is just an optimization to avoid secondaries
+        // from trying to vote before committing index build.
+        //
+        // Persist the commit quorum value in the config.system.indexBuilds collection.
+        IndexBuildEntry indexbuildEntry(buildUUID,
+                                        collectionUUID,
+                                        CommitQuorumOptions(CommitQuorumOptions::kDisabled),
+                                        extractIndexNames(specs));
+        uassertStatusOK(addIndexBuildEntry(opCtx, indexbuildEntry));
+
+        opObserver->onStartIndexBuild(opCtx,
+                                      nss,
+                                      collectionUUID,
+                                      buildUUID,
+                                      specs,
+                                      CommitQuorumOptions(CommitQuorumOptions::kDisabled),
+                                      fromMigrate);
         opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
     };
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
@@ -1440,14 +1467,12 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
 }
 
 StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
-IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
-    OperationContext* opCtx,
-    StringData dbName,
-    CollectionUUID collectionUUID,
-    const std::vector<BSONObj>& specs,
-    const UUID& buildUUID,
-    IndexBuildProtocol protocol,
-    boost::optional<CommitQuorumOptions> commitQuorum) {
+IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
+                                                     StringData dbName,
+                                                     CollectionUUID collectionUUID,
+                                                     const std::vector<BSONObj>& specs,
+                                                     const UUID& buildUUID,
+                                                     IndexBuildProtocol protocol) {
 
     // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
@@ -1519,7 +1544,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol, commitQuorum);
+        buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol);
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
 
     status = _registerIndexBuild(lk, replIndexBuildState);
@@ -1537,7 +1562,8 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
 IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuildInner(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
-    Timestamp startTimestamp) {
+    Timestamp startTimestamp,
+    boost::optional<CommitQuorumOptions> commitQuorum) {
     const NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
 
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
@@ -1566,24 +1592,33 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
         onInitFn = [&](std::vector<BSONObj>& specs) {
-            if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
+            if (!(replCoord->getSettings().usingReplSets() &&
+                  replCoord->canAcceptWritesFor(opCtx, nss))) {
                 // Not primary.
                 return Status::OK();
             }
 
-            stdx::unique_lock<Latch> lk(replState->mutex);
-            // Need to run this in repl mutex, as we want to the commitQuorum value. And, generate
-            // the startIndexBuild oplog entry with mutex lock held. We basically don't want
-            // something like this, SetIndexCommitQuorum command changes the commit quorum from 3
-            // to 5. And, the startIndexBuild resets the commit quorum value to be 3 on secondaries.
-            invariant(replState->commitQuorum, "Commit quorum required for two phase index build");
+            // Two phase index builds should have commit quorum set.
+            invariant(commitQuorum,
+                      str::stream()
+                          << "Commit quorum required for two phase index build, buildUUID: "
+                          << replState->buildUUID
+                          << " collectionUUID: " << replState->collectionUUID);
+
+            // Persist the commit quorum value in the config.system.indexBuilds collection.
+            IndexBuildEntry indexBuildEntry(replState->buildUUID,
+                                            replState->collectionUUID,
+                                            commitQuorum.get(),
+                                            replState->indexNames);
+            uassertStatusOK(addIndexBuildEntry(opCtx, indexBuildEntry));
+
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
                 nss,
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->indexSpecs,
-                replState->commitQuorum.get(),
+                indexBuildEntry.getCommitQuorum(),
                 false /* fromMigrate */);
 
             return Status::OK();
@@ -1638,12 +1673,13 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
 Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
                                                 const UUID& buildUUID,
-                                                Timestamp startTimestamp) {
+                                                Timestamp startTimestamp,
+                                                boost::optional<CommitQuorumOptions> commitQuorum) {
     auto replState = invariant(_getIndexBuild(buildUUID));
 
     auto postSetupAction = PostSetupAction::kContinueIndexBuild;
     try {
-        postSetupAction = _setUpIndexBuildInner(opCtx, replState, startTimestamp);
+        postSetupAction = _setUpIndexBuildInner(opCtx, replState, startTimestamp, commitQuorum);
     } catch (const DBException& ex) {
         stdx::unique_lock<Latch> lk(_mutex);
         _unregisterIndexBuild(lk, replState);

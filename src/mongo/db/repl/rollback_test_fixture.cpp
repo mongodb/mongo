@@ -233,6 +233,23 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
     return _createCollection(opCtx, NamespaceString(nss), options);
 }
 
+void RollbackTest::_insertDocument(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const BSONObj& doc) {
+
+    AutoGetCollection autoColl(opCtx, nss, MODE_X);
+    auto collection = autoColl.getCollection();
+    if (!collection) {
+        CollectionOptions options;
+        options.uuid = UUID::gen();
+        collection = _createCollection(opCtx, nss, options);
+    }
+    WriteUnitOfWork wuow(opCtx);
+    OpDebug* const opDebug = nullptr;
+    ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug));
+    wuow.commit();
+}
+
 Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
     TimestampedBSONObj obj;
     obj.obj = doc;

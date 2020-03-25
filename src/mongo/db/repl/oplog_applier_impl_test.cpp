@@ -1313,7 +1313,11 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
 }
 
 TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInfoOnInsert) {
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    // Set the state as secondary as we are going to apply createIndexes oplog entry.
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
         auto op = makeCreateCollectionOplogEntry(
@@ -1334,7 +1338,11 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInf
 }
 
 TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultikeyPathInfo) {
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    // Set the state as secondary as we are going to apply createIndexes oplog entry.
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
         auto op = makeCreateCollectionOplogEntry(
