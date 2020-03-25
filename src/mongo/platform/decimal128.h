@@ -595,6 +595,8 @@ private:
     Value _value;
 };
 
+inline namespace literals {
+
 inline Decimal128 operator"" _dec128(const char* s) {
     return Decimal128(s);
 }
@@ -602,5 +604,7 @@ inline Decimal128 operator"" _dec128(const char* s) {
 inline Decimal128 operator"" _dec128(const char* s, std::size_t len) {
     return Decimal128(std::string(s, len));
 }
+
+}  // namespace literals
 
 }  // namespace mongo

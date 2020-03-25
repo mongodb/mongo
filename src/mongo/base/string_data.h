@@ -59,6 +59,7 @@ namespace mongo {
  *    rawData() terminates with a null.
  */
 class StringData {
+    /** Tag used to bypass the invariant of the {c,len} constructor. */
     struct TrustedInitTag {};
     constexpr StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
 
@@ -88,20 +89,19 @@ public:
 
     /**
      * Constructs a StringData with an explicit length. 'c' must
-     * either be NULL (in which case len must be zero), or be a
+     * either be nullptr (in which case len must be zero), or be a
      * pointer into a character array. The StringData will refer to
      * the first 'len' characters starting at 'c'. The range of
-     * characters c to c+len must be valid.
+     * characters in the half-open interval `[c, c + len)` must be valid.
      */
     StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
         invariant(_data || (_size == 0));
     }
 
-    /**
-     * Constructs a StringData from a user defined literal.  This allows
-     * for constexpr creation of StringData's that are known at compile time.
-     */
-    constexpr friend StringData operator"" _sd(const char* c, std::size_t len);
+    /** Helper for the `literals::operator""_sd` function below. Conceptually non-public. */
+    static constexpr StringData _literalHelper(const char* c, std::size_t len) {
+        return StringData(c, len, TrustedInitTag{});
+    }
 
     explicit operator std::string() const {
         return toString();
@@ -225,10 +225,6 @@ inline bool operator>=(StringData lhs, StringData rhs) {
 }
 
 std::ostream& operator<<(std::ostream& stream, StringData value);
-
-constexpr StringData operator"" _sd(const char* c, std::size_t len) {
-    return StringData(c, len, StringData::TrustedInitTag{});
-}
 
 inline int StringData::compare(StringData other) const {
     // It is illegal to pass nullptr to memcmp. It is an invariant of
@@ -357,5 +353,16 @@ inline std::string operator+(StringData lhs, std::string rhs) {
 constexpr fmt::string_view to_string_view(StringData s) noexcept {
     return fmt::string_view(s.rawData(), s.size());
 }
+
+inline namespace literals {
+
+/**
+ * Makes a constexpr StringData from a user defined literal (e.g. "hello"_sd).
+ * This allows for constexpr creation of `StringData` that are known at compile time.
+ */
+constexpr StringData operator"" _sd(const char* c, std::size_t len) {
+    return StringData::_literalHelper(c, len);
+}
+}  // namespace literals
 
 }  // namespace mongo
