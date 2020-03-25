@@ -275,34 +275,28 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
         !opCtx->getClient()->isInDirectClient()) {
 
-        if (serverGlobalParams.featureCompatibility.isVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-            if (isInternalClient) {
-                // ReadConcern should always be explicitly specified by operations received from
-                // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
-                // readConcern: {}, meaning to use the implicit server defaults).
-                uassert(
-                    4569200,
-                    "received command without explicit readConcern on an internalClient connection {}"_format(
-                        redact(cmdObj.toString())),
-                    readConcernArgs.isSpecified());
-            } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                       serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                if (!readConcernArgs.isSpecified()) {
-                    // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                    // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
-                    // "for command", "command"_attr = invocation->definition()->getName());
-                }
+        if (isInternalClient) {
+            // ReadConcern should always be explicitly specified by operations received from
+            // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
+            // readConcern: {}, meaning to use the implicit server defaults).
+            uassert(
+                4569200,
+                "received command without explicit readConcern on an internalClient connection {}"_format(
+                    redact(cmdObj.toString())),
+                readConcernArgs.isSpecified());
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                   serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            if (!readConcernArgs.isSpecified()) {
+                // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
+                // "for command", "command"_attr = invocation->definition()->getName());
             }
-        }
-
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        } else {
             // A member in a regular replica set.  Since these servers receive client queries, in
             // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
             // since this covers both isSpecified() && !isSpecified()
-            if (!isInternalClient && readConcernArgs.isEmpty()) {
+            if (readConcernArgs.isEmpty()) {
                 const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                            .getDefaultReadConcern(opCtx);
                 if (rcDefault) {
@@ -746,24 +740,21 @@ bool runCommandImpl(OperationContext* opCtx,
             if (!opCtx->getClient()->isInDirectClient() &&
                 (!opCtx->inMultiDocumentTransaction() ||
                  isTransactionCommand(command->getName()))) {
-                if (serverGlobalParams.featureCompatibility.isVersion(
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-                    if (isInternalClient) {
-                        // WriteConcern should always be explicitly specified by operations received
-                        // from internal clients (ie. from a mongos or mongod), even if it is empty
-                        // (ie. writeConcern: {}, which is equivalent to { w: 1, wtimeout: 0 }).
-                        uassert(
-                            4569201,
-                            "received command without explicit writeConcern on an internalClient connection {}"_format(
-                                redact(request.body.toString())),
-                            request.body.hasField(WriteConcernOptions::kWriteConcernField));
-                    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                               serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                        if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
-                            // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                            // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
-                            // "writeConcern on command", "command"_attr = command->getName());
-                        }
+                if (isInternalClient) {
+                    // WriteConcern should always be explicitly specified by operations received
+                    // from internal clients (ie. from a mongos or mongod), even if it is empty
+                    // (ie. writeConcern: {}, which is equivalent to { w: 1, wtimeout: 0 }).
+                    uassert(
+                        4569201,
+                        "received command without explicit writeConcern on an internalClient connection {}"_format(
+                            redact(request.body.toString())),
+                        request.body.hasField(WriteConcernOptions::kWriteConcernField));
+                } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                           serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
+                        // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                        // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
+                        // "writeConcern on command", "command"_attr = command->getName());
                     }
                 }
             }

@@ -299,15 +299,12 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                             _args.getSecondaryThrottle(),
                                             resumableRangeDeleterDisabled);
 
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        // In 4.4, commands sent to shards that accept writeConcern, must always have writeConcern.
-        // So if the StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then
-        // we add the implicit server default writeConcern.
-        if (!cmdBuilder.hasField(WriteConcernOptions::kWriteConcernField)) {
-            cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              WriteConcernOptions::kImplicitDefault);
-        }
+    // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
+    // StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then we add the
+    // implicit server default writeConcern.
+    if (!cmdBuilder.hasField(WriteConcernOptions::kWriteConcernField)) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                          WriteConcernOptions::kImplicitDefault);
     }
 
     auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());

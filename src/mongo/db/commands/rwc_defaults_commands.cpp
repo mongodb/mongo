@@ -113,12 +113,6 @@ public:
         auto typedRun(OperationContext* opCtx) {
             assertNotStandaloneOrShardServer(opCtx, SetDefaultRWConcern::kCommandName);
 
-            uassert(ErrorCodes::CommandNotSupported,
-                    str::stream() << "'" << SetDefaultRWConcern::kCommandName
-                                  << "' is only supported in feature compatibility version 4.4",
-                    serverGlobalParams.featureCompatibility.getVersion() ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
             auto newDefaults = rwcDefaults.generateNewConcerns(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());

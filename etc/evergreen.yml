@@ -10039,7 +10039,7 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: multiversion_sanity_check_gen
+# - name: multiversion_sanity_check_gen
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen

@@ -47,13 +47,6 @@ ReadWriteConcernProvenance ReadWriteConcernProvenance::parse(const IDLParserErro
     return ReadWriteConcernProvenance(ReadWriteConcernProvenanceBase::parse(ctxt, bsonObject));
 }
 
-void ReadWriteConcernProvenance::serialize(BSONObjBuilder* builder) const {
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        ReadWriteConcernProvenanceBase::serialize(builder);
-    }
-}
-
 StringData ReadWriteConcernProvenance::sourceToString(boost::optional<Source> source) {
     return source ? ReadWriteConcernProvenanceSource_serializer(*source) : "(unset)";
 }

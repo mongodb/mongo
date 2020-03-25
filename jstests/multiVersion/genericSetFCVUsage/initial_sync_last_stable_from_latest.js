@@ -2,6 +2,7 @@
  * Multiversion initial sync test. Tests that initial sync succeeds when a 'last-stable' version
  * secondary syncs from a 'latest' version replica set.
  */
+// @tags: [fix_for_fcv_46]
 
 'use strict';
 

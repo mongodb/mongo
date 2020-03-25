@@ -127,15 +127,6 @@ public:
                                             const BSONObj& bsonObject);
 
     /**
-     * Serialises this provenance by appending a field named "provenance" to the given
-     * BSONObjBuilder.
-     *
-     * Since only servers running 4.4+ can successfully parse read/writeConcern fields with a
-     * 'provenance' field, this output serialization only occurs when FCV is kFullyUpgradedTo44.
-     */
-    void serialize(BSONObjBuilder* builder) const;
-
-    /**
      * Convenience functions.
      */
     static StringData sourceToString(boost::optional<Source> source);

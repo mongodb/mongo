@@ -31,7 +31,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
-#include "mongo/db/server_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -133,56 +132,16 @@ TEST(ReadWriteConcernProvenanceTest, ParseInvalidSource) {
                        ErrorCodes::BadValue);
 }
 
-TEST(ReadWriteConcernProvenanceTest, SerializeUnsetVersionUnset) {
+TEST(ReadWriteConcernProvenanceTest, SerializeUnset) {
     ReadWriteConcernProvenance provenance;
     BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault42Behavior);
     provenance.serialize(&builder);
     ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
 }
 
-TEST(ReadWriteConcernProvenanceTest, SerializeSetVersionUnset) {
+TEST(ReadWriteConcernProvenanceTest, SerializeSet) {
     ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
     BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault42Behavior);
-    provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
-}
-
-TEST(ReadWriteConcernProvenanceTest, SerializeUnsetVersion42) {
-    ReadWriteConcernProvenance provenance;
-    BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
-    provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
-}
-
-TEST(ReadWriteConcernProvenanceTest, SerializeSetVersion42) {
-    ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
-    BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
-    provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
-}
-
-TEST(ReadWriteConcernProvenanceTest, SerializeUnsetVersion44) {
-    ReadWriteConcernProvenance provenance;
-    BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-    provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
-}
-
-TEST(ReadWriteConcernProvenanceTest, SerializeSetVersion44) {
-    ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
-    BSONObjBuilder builder;
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
     provenance.serialize(&builder);
     ASSERT_BSONOBJ_EQ(BSON("provenance"
                            << "clientSupplied"),
