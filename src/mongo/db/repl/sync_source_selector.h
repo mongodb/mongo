@@ -83,14 +83,10 @@ public:
      * source and only has data up to "myLastOpTime", returns true.
      *
      * "now" is used to skip over currently blacklisted sync sources.
-     *
-     * OplogQueryMetadata is optional for compatibility with 3.4 servers that do not know to
-     * send OplogQueryMetadata.
-     * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,
-                                        boost::optional<rpc::OplogQueryMetadata> oqMetadata) = 0;
+                                        const rpc::OplogQueryMetadata& oqMetadata) = 0;
 };
 
 }  // namespace repl

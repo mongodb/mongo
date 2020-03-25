@@ -40,8 +40,9 @@ DataReplicatorExternalStateInitialSync::DataReplicatorExternalStateInitialSync(
     : DataReplicatorExternalStateImpl(replicationCoordinator, replicationCoordinatorExternalState) {
 }
 
-bool DataReplicatorExternalStateInitialSync::shouldStopFetching(
-    const HostAndPort&, const rpc::ReplSetMetadata&, boost::optional<rpc::OplogQueryMetadata>) {
+bool DataReplicatorExternalStateInitialSync::shouldStopFetching(const HostAndPort&,
+                                                                const rpc::ReplSetMetadata&,
+                                                                const rpc::OplogQueryMetadata&) {
 
     // Since initial sync does not allow for sync source changes, it should not check if there are
     // better sync sources. If there is a problem on the sync source, it will manifest itself in the

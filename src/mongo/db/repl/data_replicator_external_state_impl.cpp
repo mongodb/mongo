@@ -95,33 +95,19 @@ void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata
 bool DataReplicatorExternalStateImpl::shouldStopFetching(
     const HostAndPort& source,
     const rpc::ReplSetMetadata& replMetadata,
-    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
+    const rpc::OplogQueryMetadata& oqMetadata) {
     // Re-evaluate quality of sync target.
     if (_replicationCoordinator->shouldChangeSyncSource(source, replMetadata, oqMetadata)) {
-        // If OplogQueryMetadata was provided, its values were used to determine if we should
-        // change sync sources.
-        if (oqMetadata) {
-            LOGV2(21150,
-                  "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
-                  "sync source. Current source: {syncSource}, OpTime {lastAppliedOpTime}, "
-                  "its sync source index:{syncSourceIndex}",
-                  "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
-                  "sync source",
-                  "syncSource"_attr = source,
-                  "lastAppliedOpTime"_attr = oqMetadata->getLastOpApplied(),
-                  "syncSourceIndex"_attr = oqMetadata->getSyncSourceIndex());
+        LOGV2(21150,
+              "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
+              "sync source. Current source: {syncSource}, OpTime {lastAppliedOpTime}, "
+              "its sync source index:{syncSourceIndex}",
+              "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
+              "sync source",
+              "syncSource"_attr = source,
+              "lastAppliedOpTime"_attr = oqMetadata.getLastOpApplied(),
+              "syncSourceIndex"_attr = oqMetadata.getSyncSourceIndex());
 
-        } else {
-            LOGV2(21151,
-                  "Canceling oplog query due to ReplSetMetadata. We have to choose a new sync "
-                  "source. Current source: {syncSource}, OpTime {lastVisibleOpTime}, its "
-                  "sync source index:{syncSourceIndex}",
-                  "Canceling oplog query due to ReplSetMetadata. We have to choose a new sync "
-                  "source",
-                  "syncSource"_attr = source,
-                  "lastVisibleOpTime"_attr = replMetadata.getLastOpVisible(),
-                  "syncSourceIndex"_attr = replMetadata.getSyncSourceIndex());
-        }
         return true;
     }
     return false;

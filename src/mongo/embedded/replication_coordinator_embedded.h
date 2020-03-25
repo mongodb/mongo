@@ -215,7 +215,7 @@ public:
 
     bool shouldChangeSyncSource(const HostAndPort&,
                                 const rpc::ReplSetMetadata&,
-                                boost::optional<rpc::OplogQueryMetadata>) override;
+                                const rpc::OplogQueryMetadata&) override;
 
     repl::OpTime getLastCommittedOpTime() const override;
 

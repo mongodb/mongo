@@ -306,8 +306,8 @@ protected:
     /**
      * Tests checkSyncSource result handling.
      */
-    void testSyncSourceChecking(boost::optional<const rpc::ReplSetMetadata&> replMetadata,
-                                boost::optional<const rpc::OplogQueryMetadata&> oqMetadata);
+    void testSyncSourceChecking(const rpc::ReplSetMetadata& replMetadata,
+                                const rpc::OplogQueryMetadata& oqMetadata);
 
     void validateLastBatch(bool skipFirstDoc, OplogFetcher::Documents docs, OpTime lastFetched);
 
@@ -453,9 +453,8 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Messag
     return shutdownState;
 }
 
-void OplogFetcherTest::testSyncSourceChecking(
-    boost::optional<const rpc::ReplSetMetadata&> replMetadata,
-    boost::optional<const rpc::OplogQueryMetadata&> oqMetadata) {
+void OplogFetcherTest::testSyncSourceChecking(const rpc::ReplSetMetadata& replMetadata,
+                                              const rpc::OplogQueryMetadata& oqMetadata) {
     auto firstEntry = makeNoopOplogEntry(lastFetched);
     auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
     auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
@@ -824,14 +823,12 @@ TEST_F(OplogFetcherTest, InvalidOplogQueryMetadataInResponseStopsTheOplogFetcher
                   processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
 }
 
-DEATH_TEST_REGEX_F(OplogFetcherTest,
-                   ValidMetadataInResponseWithoutOplogMetadataInvariants,
-                   "Invariant failure.*oqMetadata") {
+TEST_F(OplogFetcherTest, ValidMetadataInResponseWithoutOplogMetadataStopsTheOplogFetcher) {
     CursorId cursorId = 22LL;
     auto entry = makeNoopOplogEntry(lastFetched);
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, boost::none);
-
-    processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
 }
 
 TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMetadataFn) {
@@ -936,17 +933,6 @@ TEST_F(OplogFetcherTest,
     ASSERT(dataReplicatorExternalState->metadataWasProcessed);
 }
 
-TEST_F(OplogFetcherTest,
-       MetadataWithoutOplogQueryMetadataIsNotProcessedOnBatchThatTriggersRollback) {
-    CursorId cursorId = 22LL;
-    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, boost::none);
-    auto entry = makeNoopOplogEntry(Seconds(456));
-
-    ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
-    ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
-}
-
 TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
     CursorId cursorId = 22LL;
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
@@ -955,14 +941,6 @@ TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
     ASSERT_EQUALS(
         ErrorCodes::OplogStartMissing,
         processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
-    ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
-}
-
-TEST_F(OplogFetcherTest, EmptyMetadataIsNotProcessed) {
-    CursorId cursorId = 0LL;
-    auto entry = makeNoopOplogEntry(lastFetched);
-
-    ASSERT_OK(processSingleBatch(makeFirstBatch(cursorId, {entry}, {}))->getStatus());
     ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
 }
 
@@ -1448,8 +1426,9 @@ TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) 
 
 TEST_F(OplogFetcherTest, EmptyFirstBatchStopsOplogFetcherWithOplogStartMissingError) {
     CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  processSingleBatch(makeFirstBatch(cursorId, {}, {}))->getStatus());
+                  processSingleBatch(makeFirstBatch(cursorId, {}, {metadataObj}))->getStatus());
 }
 
 TEST_F(OplogFetcherTest, MissingOpTimeInFirstDocumentCausesOplogFetcherToStopWithInvalidBSONError) {
@@ -1693,16 +1672,6 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldReportErrorsThrownFromEnqueueDocument
     auto shutdownState =
         processSingleBatch(makeFirstBatch(cursorId, {firstEntry, secondEntry}, metadataObj));
     ASSERT_EQ(Status(ErrorCodes::InternalError, "my custom error"), shutdownState->getStatus());
-}
-
-TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithoutMetadataStopsTheOplogFetcher) {
-    testSyncSourceChecking(boost::none, boost::none);
-
-    // Sync source optime and "hasSyncSource" are not available if the response does not
-    // contain metadata.
-    ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
-    ASSERT_EQUALS(OpTime(), dataReplicatorExternalState->syncSourceLastOpTime);
-    ASSERT_FALSE(dataReplicatorExternalState->syncSourceHasSyncSource);
 }
 
 TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetcher) {

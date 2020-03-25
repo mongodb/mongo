@@ -988,10 +988,6 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
         HostAndPort("h2"), makeReplSetMetadata(), makeOplogQueryMetadata(oldOpTime), now()));
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("h3"), makeReplSetMetadata(), makeOplogQueryMetadata(newOpTime), now()));
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("h2"), makeReplSetMetadata(oldOpTime), boost::none, now()));
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("h3"), makeReplSetMetadata(newOpTime), boost::none, now()));
     getTopoCoord().chooseNewSyncSource(now()++,
                                        OpTime(),
                                        TopologyCoordinator::ChainingPreference::kUseConfiguration,
@@ -4095,13 +4091,6 @@ TEST_F(HeartbeatResponseTestV1,
                                                       now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
-
-    // set up complete, time for actual check
-    startCapturingLogMessages();
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied), boost::none, now()));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTestV1,
@@ -4120,8 +4109,6 @@ TEST_F(HeartbeatResponseTestV1,
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(lastOpTimeApplied, 1),
                                                        now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied, 1), boost::none, now()));
 
     // Show that we also like host2 while it has a sync source.
     nextAction = receiveUpHeartbeat(
@@ -4132,8 +4119,6 @@ TEST_F(HeartbeatResponseTestV1,
                                               makeReplSetMetadata(),
                                               makeOplogQueryMetadata(lastOpTimeApplied, 2, 2),
                                               now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied, 2, 2), boost::none, now()));
 
     // Show that we do not like it when it is not PRIMARY and lacks a sync source and lacks progress
     // beyond our own.
@@ -4144,8 +4129,6 @@ TEST_F(HeartbeatResponseTestV1,
                                                  makeReplSetMetadata(),
                                                  makeOplogQueryMetadata(lastOpTimeApplied),
                                                  now()));
-    ASSERT(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied), boost::none, now()));
 
     // Sometimes the heartbeat is stale and the metadata says it's the primary. Trust the metadata.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
@@ -4153,11 +4136,6 @@ TEST_F(HeartbeatResponseTestV1,
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
             lastOpTimeApplied, 1 /* host2 is primary */, -1 /* no sync source */),
-        now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
-        makeReplSetMetadata(lastOpTimeApplied, 1 /* host2 is primary */, -1 /* no sync source */),
-        boost::none,
         now()));
 
     // But if it is secondary and has some progress beyond our own, we still like it.
@@ -4173,8 +4151,6 @@ TEST_F(HeartbeatResponseTestV1,
                                               makeReplSetMetadata(),
                                               makeOplogQueryMetadata(newerThanLastOpTimeApplied),
                                               now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(newerThanLastOpTimeApplied), boost::none, now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown) {
@@ -4211,9 +4187,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        now()));
-
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBlackListed) {
@@ -4244,8 +4217,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
 
     // unblacklist with too early a time (node should remained blacklisted)
     getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(90));
@@ -4253,8 +4224,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        now()));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
 
     // unblacklist and it should succeed
     getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
@@ -4263,12 +4232,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
                                                       makeReplSetMetadata(),
                                                       makeOplogQueryMetadata(syncSourceOpTime),
                                                       now()));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
-
-    startCapturingLogMessages();
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
@@ -4297,12 +4260,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbea
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(lastOpTimeApplied),
                                                        now()));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
-
-    startCapturingLogMessages();
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied), boost::none, now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
@@ -4334,12 +4291,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsStaleByHeartbea
                                               now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
-    // set up complete, time for actual check
-    startCapturingLogMessages();
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(fresherLastOpTimeApplied), boost::none, now()));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
@@ -4367,20 +4318,16 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
                                                       now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
-
-    // set up complete, time for actual check
-    startCapturingLogMessages();
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied), boost::none, now()));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberHasYetToHeartbeatUs) {
     // In this test, the TopologyCoordinator should not tell us to change sync sources away from
     // "host2" since we do not use the member's heartbeatdata in pv1.
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(), makeOplogQueryMetadata(), now()));
+    OpTime lastOpTimeApplied = OpTime(Timestamp(4, 0), 0);
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
+                                                       makeReplSetMetadata(),
+                                                       makeOplogQueryMetadata(lastOpTimeApplied),
+                                                       now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) {
@@ -6870,9 +6817,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNo
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        now()));
-    // set up complete, time for actual check
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotReadable) {
@@ -6901,10 +6845,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotR
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        now()));
-
-    // set up complete, time for actual check
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"), makeReplSetMetadata(syncSourceOpTime), boost::none, now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferentConfigVersion) {
@@ -6938,11 +6878,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferen
         makeReplSetMetadata(OpTime(), -1, -1, 8 /* different config version */),
         makeOplogQueryMetadata(syncSourceOpTime),
         now()));
-    ASSERT_FALSE(
-        getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                              makeReplSetMetadata(syncSourceOpTime, -1, -1, 8),
-                                              boost::none,
-                                              now()));
 }
 
 class HeartbeatResponseTestOneRetryV1 : public HeartbeatResponseTestV1 {
