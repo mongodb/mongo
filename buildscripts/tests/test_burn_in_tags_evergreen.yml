@@ -19,6 +19,45 @@ tasks:
   depends_on: []
   commands:
     - func: "fake command"
+- name: compile_all_run_unittests_TG
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: clang_tidy_TG
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: stitch_support_lib_build_and_archive
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: lint_pylinters
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: lint_clang_format
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: burn_in_tests_gen
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: aggregation_multiversion_fuzzer_gen
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: aggregation_expression_multiversion_fuzzer_gen
+  depends_on: []
+  commands:
+    - func: "fake command"
+- name: aggregation
+  depends_on:
+  - name: compile
+  commands:
+  - func: run tests
+    vars:
+      resmoke_args: --suites=aggregation --storageEngine=wiredTiger
 
 buildvariants:
 - name: enterprise-rhel-62-64-bit
@@ -27,6 +66,13 @@ buildvariants:
     multiversion_platform: rhel62
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem
   tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: lint_pylinters
+  - name: burn_in_tests_gen
+  - name: aggregation_multiversion_fuzzer_gen
+  - name: aggregation
   - name: burn_in_tags_gen
 - name: buildvariant-without-burn-in-tag-buildvariants
   display_name: "Buildvariant without burn in tag buildvariants expansion"
@@ -42,7 +88,11 @@ buildvariants:
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
     multiversion_edition: enterprise
   tasks:
-  - name: compile
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: aggregation_multiversion_fuzzer_gen
+  - name: aggregation
 - name: enterprise-rhel-62-64-bit-inmem
   display_name: Enterprise RHEL 6.2 (inMemory)
   modules: ["enterprise"]
@@ -65,3 +115,24 @@ buildvariants:
     large_distro_name: rhel62-large
   tasks:
   - name: compile
+- name: enterprise-rhel-62-64-bit-inmem
+  display_name: Enterprise RHEL 6.2 (inMemory)
+  expansions:
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    large_distro_name: rhel62-large
+    multiversion_edition: enterprise
+    multiversion_platform: rhel62
+    scons_cache_scope: shared
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: aggregation_multiversion_fuzzer_gen
+  - name: aggregation

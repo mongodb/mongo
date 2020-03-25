@@ -1,5 +1,6 @@
 """Unit tests for the burn_in_tags.py script."""
-
+import sys
+from collections import defaultdict
 import os
 import unittest
 from unittest.mock import MagicMock, patch
@@ -9,6 +10,8 @@ from shrub.config import Configuration
 import buildscripts.burn_in_tags as under_test
 
 import buildscripts.ciconfig.evergreen as _evergreen
+
+from buildscripts.tests.test_burn_in_tests import ns as burn_in_tests_ns
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -144,3 +147,119 @@ class TestGenerateEvgTasks(unittest.TestCase):
         self.assertEqual(
             first_generated_build_variant["display_tasks"][0]["execution_tasks"][0],
             "burn_in:aggregation_mongos_passthrough_0_enterprise-rhel-62-64-bit-inmem-required")
+
+
+EXPANSIONS_FILE_DATA = {
+    "build_variant": "enterprise-rhel-62-64-bit",
+    "revision": "badf00d000000000000000000000000000000000", "max_revisions": "1000",
+    "branch_name": "mongodb-mongo-master", "is_patch": "false", "distro_id": "rhel62-small",
+    "repeat_tests_min": "2", "repeat_tests_max": "1000", "repeat_tests_secs": "600", "project":
+        "mongodb-mongo-master"
+}
+
+CREATE_EVG_BUILD_VARIANT_MAP = {
+    'enterprise-rhel-62-64-bit-majority-read-concern-off':
+        'enterprise-rhel-62-64-bit-majority-read-concern-off-required',
+    'enterprise-rhel-62-64-bit-inmem':
+        'enterprise-rhel-62-64-bit-inmem-required'
+}
+
+CREATE_TEST_MEMBERSHIP_MAP = {
+    "jstests/aggregation/accumulators/accumulator_js.js": [
+        "aggregation", "aggregation_auth", "aggregation_disabled_optimization", "aggregation_ese",
+        "aggregation_ese_gcm", "aggregation_facet_unwind_passthrough",
+        "aggregation_mongos_passthrough", "aggregation_one_shard_sharded_collections",
+        "aggregation_read_concern_majority_passthrough", "aggregation_secondary_reads",
+        "aggregation_sharded_collections_passthrough"
+    ], "jstests/core/create_collection.js": [
+        "core", "core_auth", "core_ese", "core_ese_gcm", "core_minimum_batch_size", "core_op_query",
+        "cwrwc_passthrough", "cwrwc_rc_majority_passthrough", "cwrwc_wc_majority_passthrough",
+        "logical_session_cache_replication_100ms_refresh_jscore_passthrough",
+        "logical_session_cache_replication_10sec_refresh_jscore_passthrough",
+        "logical_session_cache_replication_1sec_refresh_jscore_passthrough",
+        "logical_session_cache_replication_default_refresh_jscore_passthrough",
+        "logical_session_cache_standalone_100ms_refresh_jscore_passthrough",
+        "logical_session_cache_standalone_10sec_refresh_jscore_passthrough",
+        "logical_session_cache_standalone_1sec_refresh_jscore_passthrough",
+        "logical_session_cache_standalone_default_refresh_jscore_passthrough",
+        "read_concern_linearizable_passthrough", "read_concern_majority_passthrough",
+        "replica_sets_initsync_jscore_passthrough",
+        "replica_sets_initsync_static_jscore_passthrough", "replica_sets_jscore_passthrough",
+        "replica_sets_kill_primary_jscore_passthrough",
+        "replica_sets_kill_secondaries_jscore_passthrough",
+        "replica_sets_reconfig_jscore_passthrough",
+        "replica_sets_terminate_primary_jscore_passthrough", "retryable_writes_jscore_passthrough",
+        "retryable_writes_jscore_stepdown_passthrough", "secondary_reads_passthrough",
+        "session_jscore_passthrough", "write_concern_majority_passthrough"
+    ]
+}
+
+
+class TestAcceptance(unittest.TestCase):
+    @patch(ns("_write_to_file"))
+    @patch(ns("_create_evg_build_variant_map"))
+    @patch(burn_in_tests_ns("find_changed_tests"))
+    def test_no_tests_run_if_none_changed(self, find_changed_tests_mock,
+                                          create_evg_build_variant_map_mock, write_to_file_mock):
+        """
+        Given a git repository with no changes,
+        When burn_in_tags is run,
+        Then no tests are discovered to run.
+        """
+        repos = [MagicMock()]
+        evg_conf_mock = MagicMock()
+        find_changed_tests_mock.return_value = {}
+
+        create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
+
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, None, repos)
+
+        write_to_file_mock.assert_called_once()
+        shrub_config = write_to_file_mock.call_args[0][0]
+        self.assertEqual('{}', shrub_config.to_json())
+
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
+    @patch(ns("_write_to_file"))
+    @patch(ns("_create_evg_build_variant_map"))
+    @patch(burn_in_tests_ns("find_changed_tests"))
+    @patch(burn_in_tests_ns("create_test_membership_map"))
+    def test_tests_generated_if_a_file_changed(
+            self, create_test_membership_map_mock, find_changed_tests_mock,
+            create_evg_build_variant_map_mock, write_to_file_mock):
+        """
+        Given a git repository with changes,
+        When burn_in_tags is run,
+        Then some tags are discovered to run.
+        """
+        create_test_membership_map_mock.return_value = defaultdict(list, CREATE_TEST_MEMBERSHIP_MAP)
+
+        repos = [MagicMock()]
+        evg_conf = get_evergreen_config()
+        create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
+        find_changed_tests_mock.return_value = {
+            'jstests/slow1/large_role_chain.js',
+            'jstests/aggregation/accumulators/accumulator_js.js'
+        }
+
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, None, repos)
+
+        write_to_file_mock.assert_called_once()
+        written_config = write_to_file_mock.call_args[0][0]
+        written_config_map = written_config.to_map()
+
+        n_tasks = len(written_config_map["tasks"])
+        # Ensure we are generating at least one task for the test.
+        self.assertGreaterEqual(n_tasks, 1)
+
+        written_build_variants = written_config_map["buildvariants"]
+        written_build_variants_name = [variant['name'] for variant in written_build_variants]
+        self.assertEqual(
+            set(CREATE_EVG_BUILD_VARIANT_MAP.values()), set(written_build_variants_name))
+
+        tasks = written_config_map["tasks"]
+        self.assertGreaterEqual(len(tasks), len(CREATE_EVG_BUILD_VARIANT_MAP))
+
+        self.assertTrue(
+            all(
+                len(display_tasks) == 1 for display_tasks in
+                [build_variant["display_tasks"] for build_variant in written_build_variants]))
