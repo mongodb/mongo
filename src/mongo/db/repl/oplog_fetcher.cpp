@@ -802,26 +802,19 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     // Process replset metadata.  It is important that this happen after we've validated the
     // first batch, so we don't progress our knowledge of the commit point from a
     // response that triggers a rollback.
-    rpc::ReplSetMetadata replSetMetadata;
-    bool receivedReplMetadata = _metadataObj.hasElement(rpc::kReplSetMetadataFieldName);
-    if (receivedReplMetadata) {
-        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(_metadataObj);
-        if (!metadataResult.isOK()) {
-            LOGV2_ERROR(21279,
-                        "invalid replication metadata from sync source {syncSource}: "
-                        "{error}: {metadata}",
-                        "Invalid replication metadata from sync source",
-                        "syncSource"_attr = _source,
-                        "error"_attr = metadataResult.getStatus(),
-                        "metadata"_attr = _metadataObj);
-            return metadataResult.getStatus();
-        }
-        replSetMetadata = metadataResult.getValue();
-
-        // We will only ever have OplogQueryMetadata if we have ReplSetMetadata, so it is safe
-        // to call processMetadata() in this if block.
-        _dataReplicatorExternalState->processMetadata(replSetMetadata, oqMetadata);
+    auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(_metadataObj);
+    if (!metadataResult.isOK()) {
+        LOGV2_ERROR(21279,
+                    "invalid replication metadata from sync source {syncSource}: "
+                    "{error}: {metadata}",
+                    "Invalid replication metadata from sync source",
+                    "syncSource"_attr = _source,
+                    "error"_attr = metadataResult.getStatus(),
+                    "metadata"_attr = _metadataObj);
+        return metadataResult.getStatus();
     }
+    auto replSetMetadata = metadataResult.getValue();
+    _dataReplicatorExternalState->processMetadata(replSetMetadata, oqMetadata);
 
     // Increment stats. We read all of the docs in the query.
     opsReadStats.increment(info.networkDocumentCount);
