@@ -32,6 +32,8 @@ selector:
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable when SERVER-43310 is backported
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
+  # TODO SERVER-46040: Enable when SERVER-46040 is backported
+  - jstests/sharding/drop_indexes_with_stale_config_error.js
 
 executor:
   config:

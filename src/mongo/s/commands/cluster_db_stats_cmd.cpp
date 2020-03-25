@@ -132,7 +132,7 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
-        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
+        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses).responseOK) {
             return false;
         }
 

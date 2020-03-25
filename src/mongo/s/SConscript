@@ -440,6 +440,7 @@ env.CppUnitTest(
     source=[
         'append_raw_responses_test.cpp',
         'balancer_configuration_test.cpp',
+        'build_versioned_requests_for_targeted_shards_test.cpp',
         'catalog_cache_refresh_test.cpp',
         'catalog/type_changelog_test.cpp',
         'catalog/type_chunk_test.cpp',
