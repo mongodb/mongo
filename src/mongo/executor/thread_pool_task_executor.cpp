@@ -690,7 +690,8 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
     auto commandStatus = _net->startExhaustCommand(
         swCbHandle.getValue(),
         scheduledRequest,
-        [this, scheduledRequest, cbState, cb, baton](const ResponseOnAnyStatus& response) {
+        [this, scheduledRequest, cbState, cb, baton](const ResponseOnAnyStatus& response,
+                                                     bool isMoreToComeSet) {
             using std::swap;
 
             LOGV2_DEBUG(
@@ -705,26 +706,16 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
                 return;
             }
 
-            if (cbState->canceled.load()) {
-                _networkInProgressQueue.erase(cbState->iter);
-                return;
-            }
-
             // Swap the callback function with the new one
             CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
                 remoteCommandFinished(cbData, cb, scheduledRequest, response);
             };
             swap(cbState->callback, newCb);
+
             // If this is the last response, invoke the non-exhaust path. This will mark cbState as
             // finished and remove the task from _networkInProgressQueue
-            if (!response.moreToCome) {
-                _networkInProgressQueue.erase(cbState->iter);
-
-                WorkQueue result;
-                result.emplace_front(cbState);
-                result.front()->iter = result.begin();
-
-                scheduleIntoPool_inlock(&result, std::move(lk));
+            if (!isMoreToComeSet) {
+                scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
                 return;
             }
 
@@ -782,23 +773,26 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
 void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> cbState) {
     CallbackHandle cbHandle;
     setCallbackForHandle(&cbHandle, cbState);
-    auto canceled = cbState->canceled.load();
     CallbackArgs args(this,
                       std::move(cbHandle),
-                      canceled ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
-                               : Status::OK());
-    if (!cbState->isFinished.load()) {
-        cbState->callback(std::move(args));
+                      cbState->canceled.load()
+                          ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
+                          : Status::OK());
+    invariant(!cbState->isFinished.load());
+    {
+        // After running callback function, clear 'cbStateArg->callback' to release any resources
+        // that might be held by this function object.
+        // Swap 'cbStateArg->callback' with temporary copy before running callback for exception
+        // safety.
+        TaskExecutor::CallbackFn callback;
+        std::swap(cbState->callback, callback);
+        callback(std::move(args));
     }
 
     // Do not mark cbState as finished. It will be marked as finished on the last reply.
     stdx::lock_guard<Latch> lk(_mutex);
-
-    if (cbState->exhaustIter) {
-        _poolInProgressQueue.erase(cbState->exhaustIter.get());
-        cbState->exhaustIter = boost::none;
-    }
-
+    invariant(cbState->exhaustIter);
+    _poolInProgressQueue.erase(cbState->exhaustIter.get());
     if (_inShutdown_inlock() && _poolInProgressQueue.empty()) {
         _stateChange.notify_all();
     }

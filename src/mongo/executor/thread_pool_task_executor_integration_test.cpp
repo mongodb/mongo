@@ -163,6 +163,11 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
     ASSERT(cbHandle.isValid());
     executor()->cancel(cbHandle);
     ASSERT(cbHandle.isCanceled());
+    auto counters = exhaustRequestHandler.getCountersWhenReady();
+
+    // The command was cancelled so the 'fail' counter should be incremented
+    ASSERT_EQ(counters._success, 2);
+    ASSERT_EQ(counters._failed, 1);
 
     // The tasks should be removed after 'isMaster' fails
     ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));

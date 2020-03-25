@@ -40,7 +40,6 @@ class SingleServerIsMasterMonitor
 public:
     explicit SingleServerIsMasterMonitor(const MongoURI& setUri,
                                          const ServerAddress& host,
-                                         boost::optional<TopologyVersion> topologyVersion,
                                          Milliseconds heartbeatFrequencyMS,
                                          TopologyEventsPublisherPtr eventListener,
                                          std::shared_ptr<executor::TaskExecutor> executor);
@@ -57,25 +56,15 @@ public:
     void requestImmediateCheck();
     void disableExpeditedChecking();
 
-    static constexpr Milliseconds kMaxAwaitTimeMs = Milliseconds(10000);
-
 private:
     void _scheduleNextIsMaster(WithLock, Milliseconds delay);
     void _doRemoteCommand();
-
-    // Use the awaitable isMaster protocol with the exhaust bit set. Attach _topologyVersion and
-    // kMaxAwaitTimeMS to the request.
-    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleStreamableIsMaster();
-
-    // Use the old isMaster protocol. Do not attach _topologyVersion or kMaxAwaitTimeMS to the
-    // request.
-    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleIsMaster();
 
     void _onIsMasterSuccess(IsMasterRTT latency, const BSONObj bson);
     void _onIsMasterFailure(IsMasterRTT latency, const Status& status, const BSONObj bson);
 
     Milliseconds _overrideRefreshPeriod(Milliseconds original);
-    Milliseconds _currentRefreshPeriod(WithLock, bool scheduleImmediately);
+    Milliseconds _currentRefreshPeriod(WithLock);
     void _cancelOutstandingRequest(WithLock);
 
     static constexpr auto kLogLevel = 0;
@@ -83,7 +72,6 @@ private:
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerIsMasterMonitor::mutex");
     ServerAddress _host;
-    boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
     Milliseconds _heartbeatFrequencyMS;

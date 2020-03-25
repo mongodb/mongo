@@ -55,10 +55,8 @@ RemoteCommandResponseBase::RemoteCommandResponseBase(Status s, Milliseconds mill
     invariant(!isOK());
 };
 
-RemoteCommandResponseBase::RemoteCommandResponseBase(BSONObj dataObj,
-                                                     Milliseconds millis,
-                                                     bool moreToCome)
-    : data(std::move(dataObj)), elapsedMillis(millis), moreToCome(moreToCome) {
+RemoteCommandResponseBase::RemoteCommandResponseBase(BSONObj dataObj, Milliseconds millis)
+    : data(std::move(dataObj)), elapsedMillis(millis) {
     // The buffer backing the default empty BSONObj has static duration so it is effectively
     // owned.
     invariant(data.isOwned() || data.objdata() == BSONObj().objdata());
@@ -67,9 +65,8 @@ RemoteCommandResponseBase::RemoteCommandResponseBase(BSONObj dataObj,
 // TODO(amidvidy): we currently discard output docs when we use this constructor. We should
 // have RCR hold those too, but we need more machinery before that is possible.
 RemoteCommandResponseBase::RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply,
-                                                     Milliseconds millis,
-                                                     bool moreToCome)
-    : RemoteCommandResponseBase(rpcReply.getCommandReply(), std::move(millis), moreToCome) {}
+                                                     Milliseconds millis)
+    : RemoteCommandResponseBase(rpcReply.getCommandReply(), std::move(millis)) {}
 
 bool RemoteCommandResponseBase::isOK() const {
     return status.isOK();

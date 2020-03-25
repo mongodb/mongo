@@ -133,16 +133,16 @@ Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
         cbHandle,
         rcroa,
         [p = std::move(pf.promise), exhaustUtilCB = std::move(exhaustUtilCB)](
-            const TaskExecutor::ResponseOnAnyStatus& rs) mutable {
+            const TaskExecutor::ResponseOnAnyStatus& rs, bool isMoreToComeSet) mutable {
             exhaustUtilCB(rs);
 
             if (!rs.status.isOK()) {
-                invariant(!rs.moreToCome);
+                invariant(!isMoreToComeSet);
                 p.setError(rs.status);
                 return;
             }
 
-            if (!rs.moreToCome) {
+            if (!isMoreToComeSet) {
                 p.emplaceValue();
             }
         },
