@@ -183,7 +183,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
         auto serializedPipe = _pipeline->serializeToBson();
         LOGV2_DEBUG(23869,
-                    3,
+                    1,
                     "$unionWith attaching cursor to pipeline {pipeline}",
                     "pipeline"_attr = serializedPipe);
         try {
@@ -196,7 +196,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 serializedPipe);
             LOGV2_DEBUG(4556300,
-                        0,
+                        3,
                         "$unionWith found view definition. ns: {ns}, pipeline: {pipeline}. New "
                         "$unionWith sub-pipeline: {new_pipe}",
                         "ns"_attr = e->getNamespace(),
