@@ -419,6 +419,18 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         request.metadata = newMetadata.obj();
     }
 
+    bool targetHostsInAlphabeticalOrder =
+        MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail());
+
+    if (targetHostsInAlphabeticalOrder) {
+        // Sort the target hosts by host names.
+        std::sort(request.target.begin(),
+                  request.target.end(),
+                  [](const HostAndPort& target1, const HostAndPort& target2) {
+                      return target1.toString() < target2.toString();
+                  });
+    }
+
     auto [cmdState, future] = CommandState::make(this, request, cbHandle);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
@@ -487,37 +499,21 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     RequestManager* rm = cmdState->requestManager.get();
 
-    if (MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail())) {
-        // Sort the target hosts by host names.
-        std::sort(request.target.begin(),
-                  request.target.end(),
-                  [](const HostAndPort& target1, const HostAndPort& target2) {
-                      return target1.toString() < target2.toString();
-                  });
-    }
-
     // Attempt to get a connection to every target host
     for (size_t idx = 0; idx < request.target.size() && !rm->usedAllConn(); ++idx) {
         auto connFuture = _pool->get(request.target[idx], request.sslMode, request.timeout);
 
-        if (connFuture.isReady()) {
+        // If connection future is ready or requests should be sent in order, send the request
+        // immediately.
+        if (connFuture.isReady() || targetHostsInAlphabeticalOrder) {
             rm->trySend(std::move(connFuture).getNoThrow(), idx);
             continue;
         }
 
-        if (MONGO_unlikely(
-                networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail())) {
-            // Wait for a connection so the requests are sent to target hosts in alphabetical order
-            // of host names.
-            auto swConn = std::move(connFuture).get();
+        // Otherwise, schedule the request.
+        std::move(connFuture).thenRunOn(_reactor).getAsync([requestStates, rm, idx](auto swConn) {
             rm->trySend(std::move(swConn), idx);
-        } else {
-            // For every connection future we didn't have immediately ready, schedule
-            std::move(connFuture)
-                .thenRunOn(_reactor)
-                .getAsync(
-                    [requestStates, rm, idx](auto swConn) { rm->trySend(std::move(swConn), idx); });
-        }
+        });
     }
 
     return Status::OK();

@@ -94,15 +94,15 @@ st.rs0.nodes.forEach(function(conn) {
 assert.commandWorked(
     st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 2}}}));
 
-jsTest.log("Verify the initial request is canceled when the hedged request responds first");
+jsTest.log("Verify that the initial request is canceled when the hedged request responds first");
 try {
     // Make the initial request block.
-    setCommandDelay(sortedNodes[0], "find", kLargeTimeoutMS);
+    setCommandDelay(sortedNodes[0], "count", kLargeTimeoutMS);
 
     const comment = "test_kill_initial_request_" + ObjectId();
     assert.commandWorked(testDB.runCommand({
-        find: collName,
-        filter: {x: {$gte: 0}},
+        count: collName,
+        query: {x: {$gte: 0}},
         $readPreference: {mode: "nearest"},
         comment: comment
     }));
@@ -117,18 +117,19 @@ try {
     clearCommandDelay(sortedNodes[0]);
 }
 
-jsTest.log("Verify the additional request is canceled when the initial request responds first");
+jsTest.log(
+    "Verify that the additional request is canceled when the initial request responds first");
 try {
     // Make the additional/hedged request block, set a large maxTimeMSForHedgedReads to prevent
     // the remote host from killing the operation by itself.
     assert.commandWorked(
         st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: kLargeTimeoutMS}));
-    setCommandDelay(sortedNodes[1], "find", kLargeTimeoutMS);
+    setCommandDelay(sortedNodes[1], "count", kLargeTimeoutMS);
 
     const comment = "test_kill_additional_request_" + ObjectId();
     assert.commandWorked(testDB.runCommand({
-        find: collName,
-        filter: {x: {$gte: 0}},
+        count: collName,
+        query: {x: {$gte: 0}},
         $readPreference: {mode: "nearest"},
         comment: comment
     }));
