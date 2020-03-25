@@ -124,6 +124,7 @@ var doTest = function(signal) {
 
     t.save({a: 1000});
     t.ensureIndex({a: 1});
+    replTest.waitForAllIndexBuildsToFinish('foo', 'foo');
 
     var result = db.runCommand({getLastError: 1, w: 3, wtimeout: 30000});
     printjson(result);
@@ -131,8 +132,6 @@ var doTest = function(signal) {
     var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
     assert.eq(lastOplogOp['ts'], lastOp['ts']);
     assert.eq(lastOplogOp['t'], lastOp['t']);
-
-    replTest.waitForAllIndexBuildsToFinish('foo', 'foo');
 
     ts.forEach(function(z) {
         assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
