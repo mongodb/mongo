@@ -226,6 +226,7 @@ public:
         curl_easy_setopt(_handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #endif
         curl_easy_setopt(_handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+        curl_easy_setopt(_handle.get(), CURLOPT_HEADERFUNCTION, WriteMemoryCallback);
 
         // TODO: CURLOPT_EXPECT_100_TIMEOUT_MS?
         // TODO: consider making this configurable
@@ -257,42 +258,66 @@ public:
         curl_easy_setopt(_handle.get(), CURLOPT_CONNECTTIMEOUT, longSeconds(timeout));
     }
 
-    DataBuilder get(StringData url) const final {
-        // Make a local copy of the base handle for this request.
+    HttpReply request(HttpMethod method,
+                      StringData url,
+                      ConstDataRange cdr = {nullptr, 0}) const final {
         CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
         uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
-
-        return doRequest(myHandle.get(), url);
-    }
-
-    DataBuilder post(StringData url, ConstDataRange cdr) const final {
-        // Make a local copy of the base handle for this request.
-        CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
-        uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
-
-        curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
 
         ConstDataRangeCursor cdrc(cdr);
-        curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
-        curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
-        curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
+        switch (method) {
+            case HttpMethod::kGET:
+                uassert(ErrorCodes::BadValue,
+                        "Request body not permitted with GET requests",
+                        cdr.length() == 0);
+                break;
+            case HttpMethod::kPOST:
+                curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
 
-        return doRequest(myHandle.get(), url);
-    }
+                curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
+                curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
+                curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
+                break;
+            case HttpMethod::kPUT:
+                curl_easy_setopt(myHandle.get(), CURLOPT_PUT, 1);
 
-    DataBuilder put(StringData url, ConstDataRange cdr) const final {
-        // Make a local copy of the base handle for this request.
-        CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
-        uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
+                curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
+                curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
+                curl_easy_setopt(myHandle.get(), CURLOPT_INFILESIZE_LARGE, (long)cdrc.length());
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_PUT, 1);
+        const auto urlString = url.toString();
+        curl_easy_setopt(myHandle.get(), CURLOPT_URL, urlString.c_str());
+        curl_easy_setopt(myHandle.get(), CURLOPT_SHARE, curlLibraryManager.getShareHandle());
 
-        ConstDataRangeCursor cdrc(cdr);
-        curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
-        curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
-        curl_easy_setopt(myHandle.get(), CURLOPT_INFILESIZE_LARGE, (long)cdrc.length());
+        DataBuilder dataBuilder(4096), headerBuilder(4096);
+        curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
+        curl_easy_setopt(myHandle.get(), CURLOPT_HEADERDATA, &headerBuilder);
 
-        return doRequest(myHandle.get(), url);
+        curl_slist* chunk = curl_slist_append(nullptr, "Connection: keep-alive");
+        for (const auto& header : _headers) {
+            chunk = curl_slist_append(chunk, header.c_str());
+        }
+        curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
+        CurlSlist _headers(chunk);
+
+        CURLcode result = curl_easy_perform(myHandle.get());
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Bad HTTP response from API server: "
+                              << curl_easy_strerror(result),
+                result == CURLE_OK);
+
+        long statusCode;
+        result = curl_easy_getinfo(myHandle.get(), CURLINFO_RESPONSE_CODE, &statusCode);
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Unexpected error retrieving response: "
+                              << curl_easy_strerror(result),
+                result == CURLE_OK);
+
+        return HttpReply(statusCode, std::move(headerBuilder), std::move(dataBuilder));
     }
 
 private:
@@ -304,40 +329,6 @@ private:
         return static_cast<long>(durationCount<Seconds>(tm));
     }
 
-    DataBuilder doRequest(CURL* handle, StringData url) const {
-        const auto urlString = url.toString();
-        curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());
-        curl_easy_setopt(handle, CURLOPT_SHARE, curlLibraryManager.getShareHandle());
-
-        DataBuilder dataBuilder(4096);
-        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dataBuilder);
-
-        curl_slist* chunk = curl_slist_append(nullptr, "Connection: keep-alive");
-        for (const auto& header : _headers) {
-            chunk = curl_slist_append(chunk, header.c_str());
-        }
-        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, chunk);
-        CurlSlist _headers(chunk);
-
-        CURLcode result = curl_easy_perform(handle);
-        uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Bad HTTP response from API server: "
-                              << curl_easy_strerror(result),
-                result == CURLE_OK);
-
-        long statusCode;
-        result = curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &statusCode);
-        uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Unexpected error retrieving response: "
-                              << curl_easy_strerror(result),
-                result == CURLE_OK);
-
-        uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Unexpected http status code from server: " << statusCode,
-                statusCode == 200);
-
-        return dataBuilder;
-    }
 
 private:
     CurlHandle _handle;

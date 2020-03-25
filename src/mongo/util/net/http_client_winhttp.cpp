@@ -157,22 +157,26 @@ public:
         _timeout = timeout;
     }
 
-    DataBuilder post(StringData url, ConstDataRange cdr) const final {
-        return doRequest(
-            L"POST", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
-    }
+    HttpReply request(HttpMethod methodType, StringData urlSD, ConstDataRange cdrData) const final {
+        LPCWSTR method = L"GET";
+        LPVOID data = const_cast<void*>(static_cast<const void*>(cdrData.data()));
+        DWORD data_len = cdrData.length();
+        switch (methodType) {
+            case HttpMethod::kGET:
+                uassert(ErrorCodes::BadValue,
+                        "GET requests do not support content",
+                        cdrData.length() == 0);
+                break;
+            case HttpMethod::kPOST:
+                method = L"POST";
+                break;
+            case HttpMethod::kPUT:
+                method = L"PUT";
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
 
-    DataBuilder put(StringData url, ConstDataRange cdr) const final {
-        return doRequest(
-            L"PUT", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
-    }
-
-    DataBuilder get(StringData url) const final {
-        return doRequest(L"GET", url, nullptr, 0);
-    }
-
-private:
-    DataBuilder doRequest(LPCWSTR method, StringData urlSD, LPVOID data, DWORD data_len) const {
         const auto uassertWithErrno = [](StringData reason, bool ok) {
             const auto msg = errnoWithDescription(GetLastError());
             uassert(ErrorCodes::OperationFailed, str::stream() << reason << ": " << msg, ok);
@@ -272,14 +276,11 @@ private:
                                              &statusCodeLength,
                                              WINHTTP_NO_HEADER_INDEX));
 
-        uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Unexpected http status code from server: " << statusCode,
-                statusCode == 200);
-
+        DWORD len = 0;
         std::vector<char> buffer;
         DataBuilder ret(4096);
         for (;;) {
-            DWORD len = 0;
+            len = 0;
             uassertWithErrno("Failed receiving response data",
                              WinHttpQueryDataAvailable(request, &len));
             if (!len) {
@@ -294,7 +295,26 @@ private:
             ret.writeAndAdvance(cdr);
         }
 
-        return ret;
+        DataBuilder headers(4096);
+        if (!WinHttpQueryHeaders(request,
+                                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                                 WINHTTP_HEADER_NAME_BY_INDEX,
+                                 WINHTTP_NO_OUTPUT_BUFFER,
+                                 &len,
+                                 WINHTTP_NO_HEADER_INDEX) &&
+            (GetLastError() == ERROR_INSUFFICIENT_BUFFER)) {
+            buffer.resize(len);
+            uassertWithErrno("Error querying headers from server",
+                             WinHttpQueryHeaders(request,
+                                                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                                                 WINHTTP_HEADER_NAME_BY_INDEX,
+                                                 &buffer[0],
+                                                 &len,
+                                                 WINHTTP_NO_HEADER_INDEX));
+            headers.writeAndAdvance(ConstDataRange(buffer.data(), len));
+        }
+
+        return HttpReply(statusCode, std::move(headers), std::move(ret));
     }
 
 private:
