@@ -918,7 +918,7 @@ TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
     ASSERT_FALSE(config.findMemberByID(1)->isNewlyAdded());
 
     config.setNewlyAddedFieldForMemberAtIndex(0, true);
-    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded().get());
+    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
 }
 
 TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {

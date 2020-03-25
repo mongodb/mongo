@@ -1247,7 +1247,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     ASSERT_FALSE(rsConfig.findMemberByID(1)->isNewlyAdded());
     ASSERT_FALSE(rsConfig.findMemberByID(2)->isNewlyAdded());
     // Verify that the newly added node has the flag set to true.
-    ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded().get());
+    ASSERT_TRUE(rsConfig.findMemberByID(3)->isNewlyAdded());
 
     // Verify that a log message was created for adding the 'newlyAdded' field.
     ASSERT_EQUALS(1,

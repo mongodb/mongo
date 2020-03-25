@@ -131,8 +131,7 @@ public:
      * Returns true if this member may vote in elections.
      */
     bool isVoter() const {
-        const bool isNewlyAddedFieldSet = isNewlyAdded().get_value_or(false);
-        return (getVotes() != 0 && !isNewlyAddedFieldSet);
+        return (getVotes() != 0 && !isNewlyAdded());
     }
 
     /**
@@ -153,8 +152,12 @@ public:
      * Returns true if this member is newly added from reconfig. This indicates that this node
      * should be treated as non-voting.
      */
-    boost::optional<bool> isNewlyAdded() const {
-        return getNewlyAdded();
+    bool isNewlyAdded() const {
+        if (getNewlyAdded()) {
+            invariant(getNewlyAdded().get());
+            return true;
+        }
+        return false;
     }
 
     /**
