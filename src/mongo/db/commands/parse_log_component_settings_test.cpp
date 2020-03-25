@@ -29,16 +29,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/logger/log_component.h"
-#include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/db/commands/parse_log_component_settings.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
-using namespace mongo::logger;
+using logv2::LogComponent;
 
 typedef std::vector<LogComponentSetting> Settings;
 

@@ -41,8 +41,8 @@
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
+#include "mongo/db/commands/parse_log_component_settings.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -52,8 +52,6 @@ using std::stringstream;
 namespace mongo {
 
 namespace {
-using logger::LogComponentSetting;
-using logger::parseLogComponentSettings;
 using logv2::LogComponent;
 using logv2::LogSeverity;
 
@@ -174,14 +172,14 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
         // Negative value means to clear log level of component.
         if (newSetting.level < 0) {
             logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(
-                logComponentV1toV2(newSetting.component));
+                newSetting.component);
             continue;
         }
         // Convert non-negative value to Log()/Debug(N).
         LogSeverity newSeverity =
             (newSetting.level > 0) ? LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
         logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
-            logComponentV1toV2(newSetting.component), newSeverity);
+            newSetting.component, newSeverity);
     }
 
     return Status::OK();

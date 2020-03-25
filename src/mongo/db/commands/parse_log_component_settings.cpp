@@ -27,35 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/db/commands/parse_log_component_settings.h"
 
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/logger/log_component.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-namespace logger {
 
 /*
  * Looks up a component by its short name, or returns kNumLogComponents
  * if the shortName is invalid
  */
-const LogComponent _getComponentForShortName(StringData shortName) {
-    for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
-        LogComponent component = static_cast<LogComponent::Value>(i);
+logv2::LogComponent _getComponentForShortName(StringData shortName) {
+    for (int i = 0; i < int(logv2::LogComponent::kNumLogComponents); ++i) {
+        logv2::LogComponent component = static_cast<logv2::LogComponent::Value>(i);
         if (component.getShortName() == shortName)
             return component;
     }
-    return static_cast<LogComponent::Value>(LogComponent::kNumLogComponents);
+    return static_cast<logv2::LogComponent::Value>(logv2::LogComponent::kNumLogComponents);
 }
 
 StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSONObj& settings) {
@@ -64,7 +63,7 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
     std::vector<LogComponentSetting> levelsToSet;
     std::vector<BSONObjIterator> iterators;
 
-    LogComponent parentComponent = LogComponent::kDefault;
+    logv2::LogComponent parentComponent = logv2::LogComponent::kDefault;
     BSONObjIterator iter(settings);
 
     while (iter.moreWithEOO()) {
@@ -89,9 +88,9 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
             continue;
         }
         const StringData shortName = elem.fieldNameStringData();
-        const LogComponent curr = _getComponentForShortName(shortName);
+        const logv2::LogComponent curr = _getComponentForShortName(shortName);
 
-        if (curr == LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
+        if (curr == logv2::LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
             return StatusWith<Result>(ErrorCodes::BadValue,
                                       str::stream()
                                           << "Invalid component name "
@@ -116,5 +115,4 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
     return StatusWith<Result>(levelsToSet);
 }
 
-}  // namespace logger
 }  // namespace mongo

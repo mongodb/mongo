@@ -31,7 +31,7 @@
 
 #include <vector>
 
-#include "mongo/logger/log_component.h"
+#include "mongo/logv2/log_component.h"
 
 namespace mongo {
 
@@ -39,15 +39,13 @@ class BSONObj;
 template <typename T>
 class StatusWith;
 
-namespace logger {
-
 /**
  * One parsed LogComponent and desired log level
  */
 struct LogComponentSetting {
-    LogComponentSetting(LogComponent c, int lvl) : component(c), level(lvl) {}
+    LogComponentSetting(logv2::LogComponent c, int lvl) : component(c), level(lvl) {}
 
-    LogComponent component;
+    logv2::LogComponent component;
     int level;
 };
 
@@ -59,5 +57,4 @@ struct LogComponentSetting {
  */
 StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSONObj& settings);
 
-}  // namespace logger
 }  // namespace mongo
