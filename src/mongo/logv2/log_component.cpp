@@ -148,6 +148,8 @@ StringData LogComponent::toStringData() const {
             return "transaction"_sd;
         case kConnectionPool:
             return "connectionPool"_sd;
+        case kTest:
+            return "test"_sd;
         case kNumLogComponents:
             return "total"_sd;
         case kAutomaticDetermination:
@@ -241,6 +243,8 @@ StringData LogComponent::getNameForLog() const {
             return "TXN"_sd;
         case kConnectionPool:
             return "CONNPOOL"_sd;
+        case kTest:
+            return "TEST"_sd;
         case kNumLogComponents:
             return "TOTAL"_sd;
         case kAutomaticDetermination:

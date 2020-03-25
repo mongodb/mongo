@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
 
@@ -56,6 +57,7 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -108,6 +110,22 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "defau
 
 class Result {
 public:
+    struct FailStatus {
+        std::string test;
+        std::string type;
+        std::string error;
+        std::string extra;
+
+        friend std::ostream& operator<<(std::ostream& os, const FailStatus& f) {
+            return os                      //
+                << "{test: " << f.test     //
+                << ", type: " << f.type    //
+                << ", error: " << f.error  //
+                << ", extra: " << f.extra  //
+                << "}";
+        }
+    };
+
     Result(const std::string& name)
         : _name(name), _rc(0), _tests(0), _fails(), _asserts(0), _millis(0) {}
 
@@ -125,6 +143,28 @@ public:
         return ss.str();
     }
 
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        bob.append("name", _name);
+        bob.append("tests", _tests);
+        bob.appendNumber("fails", _fails.size());
+        bob.append("asserts", _asserts);
+        bob.append("time", Milliseconds(_millis).toBSON());
+        {
+            auto arr = BSONArrayBuilder(bob.subarrayStart("failures"));
+            for (const auto& m : _messages) {
+                auto o = BSONObjBuilder(arr.subobjStart());
+                o.append("test", m.test);
+                o.append("type", m.type);
+                o.append("error", m.error);
+                if (!m.extra.empty()) {
+                    o.append("extra", m.extra);
+                }
+            }
+        }
+        return bob.obj();
+    }
+
     int rc() {
         return _rc;
     }
@@ -136,33 +176,10 @@ public:
     std::vector<std::string> _fails;
     int _asserts;
     int _millis;
-    std::vector<std::string> _messages;
+    std::vector<FailStatus> _messages;
 };
 
 namespace {
-
-/**
- * This unsafe scope guard allows exceptions in its destructor. Thus, if it goes out of scope when
- * an exception is active and the guard function also throws an exception, the program will call
- * std::terminate. This should only be used in unittests where termination on exception is okay.
- */
-template <typename F>
-class UnsafeScopeGuard {
-public:
-    UnsafeScopeGuard(F fun) : _fun(fun) {}
-
-    ~UnsafeScopeGuard() noexcept(false) {
-        _fun();
-    }
-
-private:
-    F _fun;
-};
-
-template <typename F>
-UnsafeScopeGuard<F> MakeUnsafeScopeGuard(F fun) {
-    return UnsafeScopeGuard<F>(std::move(fun));
-}
 
 // Attempting to read the featureCompatibilityVersion parameter before it is explicitly initialized
 // with a meaningful value will trigger failures as of SERVER-32630.
@@ -452,59 +469,52 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
 
     for (const auto& tc : _tests) {
         if (filter.size() && tc.name.find(filter) == std::string::npos) {
-            LOGV2_DEBUG(23057,
-                        1,
-                        "\t skipping test: {tc_name} because it doesn't match filter",
-                        "tc_name"_attr = tc.name);
+            LOGV2_DEBUG(23057, 1, "skipped due to filter", "test"_attr = tc.name);
             continue;
         }
 
         if (fileNameFilter.size() && tc.fileName.find(fileNameFilter) == std::string::npos) {
-            LOGV2_DEBUG(23058,
-                        1,
-                        "\t skipping test: {tc_fileName} because it doesn't match fileNameFilter",
-                        "tc_fileName"_attr = tc.fileName);
+            LOGV2_DEBUG(23058, 1, "skipped due to fileNameFilter", "testFile"_attr = tc.fileName);
             continue;
         }
 
         ++r->_tests;
 
-        bool passes = false;
-
-        std::ostringstream err;
-        err << tc.name << "\t";
-
+        struct Event {
+            std::string type;
+            std::string error;
+            std::string extra;
+        };
         try {
-            for (int x = 0; x < runsPerTest; x++) {
-                std::ostringstream runTimes;
-                if (runsPerTest > 1) {
-                    runTimes << "  (" << x + 1 << "/" << runsPerTest << ")";
+            try {
+                for (int x = 0; x < runsPerTest; x++) {
+                    LOGV2(23059,
+                          "Running",
+                          "test"_attr = tc.name,
+                          "rep"_attr = x + 1,
+                          "reps"_attr = runsPerTest);
+                    TestSuiteEnvironment environment;
+                    tc.fn();
                 }
-
-                LOGV2(23059,
-                      "\t going to run test: {tc_name}{runTimes_str}",
-                      "tc_name"_attr = tc.name,
-                      "runTimes_str"_attr = runTimes.str());
-                TestSuiteEnvironment environment;
-                tc.fn();
+            } catch (const TestAssertionFailureException& ae) {
+                throw Event{"TestAssertionFailureException", ae.toString(), ae.getStacktrace()};
+            } catch (const DBException& e) {
+                throw Event{"DBException", e.toString()};
+            } catch (const std::exception& e) {
+                throw Event{"std::exception", e.what()};
+            } catch (int x) {
+                throw Event{"int", std::to_string(x)};
             }
-            passes = true;
-        } catch (const TestAssertionFailureException& ae) {
-            err << ae.toString() << " in test " << tc.name << '\n' << ae.getStacktrace();
-        } catch (const DBException& e) {
-            err << "DBException: " << e.toString() << " in test " << tc.name;
-        } catch (const std::exception& e) {
-            err << "std::exception: " << e.what() << " in test " << tc.name;
-        } catch (int x) {
-            err << "caught int " << x << " in test " << tc.name;
-        }
-
-        if (!passes) {
-            std::string s = err.str();
-            // Don't truncate failure messages, e.g: stacktraces.
-            log().setIsTruncatable(false) << "FAIL: " << s;
+        } catch (const Event& e) {
+            LOGV2_OPTIONS(4680100,
+                          {logv2::LogTruncation::Disabled},
+                          "FAIL",
+                          "test"_attr = tc.name,
+                          "type"_attr = e.type,
+                          "error"_attr = e.error,
+                          "extra"_attr = e.extra);
             r->_fails.push_back(tc.name);
-            r->_messages.push_back(s);
+            r->_messages.push_back({tc.name, e.type, e.error, e.extra});
         }
     }
 
@@ -513,7 +523,7 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
 
     r->_millis = timer.millis();
 
-    LOGV2(23060, "\t DONE running tests");
+    LOGV2(23060, "Done running tests");
 
     return r;
 }
@@ -523,15 +533,15 @@ int Suite::run(const std::vector<std::string>& suites,
                const std::string& fileNameFilter,
                int runsPerTest) {
     if (suitesMap().empty()) {
-        LOGV2(23061, "error: no suites registered.");
+        LOGV2_ERROR(23061, "no suites registered.");
         return EXIT_FAILURE;
     }
 
     for (unsigned int i = 0; i < suites.size(); i++) {
         if (suitesMap().count(suites[i]) == 0) {
-            LOGV2(23062,
-                  "invalid test suite [{suites_i}], use --list to see valid names",
-                  "suites_i"_attr = suites[i]);
+            LOGV2_ERROR(23062,
+                        "invalid test suite, use --list to see valid names",
+                        "suite"_attr = suites[i]);
             return EXIT_FAILURE;
         }
     }
@@ -550,11 +560,10 @@ int Suite::run(const std::vector<std::string>& suites,
         std::shared_ptr<Suite>& s = suitesMap()[name];
         fassert(16145, s != nullptr);
 
-        LOGV2(23063, "going to run suite: {name}", "name"_attr = name);
-        results.push_back(s->run(filter, fileNameFilter, runsPerTest));
+        LOGV2(23063, "Running", "suite"_attr = name);
+        auto result = s->run(filter, fileNameFilter, runsPerTest);
+        results.push_back(std::move(result));
     }
-
-    LOGV2(23064, "**************************************************");
 
     int rc = 0;
 
@@ -563,41 +572,40 @@ int Suite::run(const std::vector<std::string>& suites,
     int millis = 0;
 
     Result totals("TOTALS");
-    std::vector<std::string> failedSuites;
+    std::vector<BSONObj> failedSuites;
 
     for (const auto& r : results) {
-        log().setIsTruncatable(false) << r->toString();
         if (abs(r->rc()) > abs(rc))
             rc = r->rc();
 
         tests += r->_tests;
         if (!r->_fails.empty()) {
-            failedSuites.push_back(r->toString());
-            for (const std::string& s : r->_fails) {
-                totals._fails.push_back(r->_name + "/" + s);
+            failedSuites.push_back(r->toBSON());
+            for (const std::string& failedTest : r->_fails) {
+                totals._fails.push_back(r->_name + "/" + failedTest);
             }
         }
         asserts += r->_asserts;
         millis += r->_millis;
     }
-    results.clear();
-
     totals._tests = tests;
     totals._asserts = asserts;
     totals._millis = millis;
 
-    LOGV2(23065, "{totals}", "totals"_attr = totals.toString());
+    for (const auto& r : results) {
+        LOGV2_OPTIONS(
+            4680101, {logv2::LogTruncation::Disabled}, "Result", "suite"_attr = r->toBSON());
+    }
+    LOGV2(23065, "Totals", "totals"_attr = totals.toBSON());
 
     // summary
     if (!totals._fails.empty()) {
-        LOGV2(23066, "Failing tests:");
-        for (const std::string& s : totals._fails) {
-            LOGV2(23067, "\t {s} Failed", "s"_attr = s);
-        }
-        LOGV2(23068,
-              "FAILURE - {totals_fails_size} tests in {failedSuites_size} suites failed",
-              "totals_fails_size"_attr = totals._fails.size(),
-              "failedSuites_size"_attr = failedSuites.size());
+        LOGV2_OPTIONS(23068,
+                      {logv2::LogTruncation::Disabled},
+                      "FAILURE",
+                      "failedTestsCount"_attr = totals._fails.size(),
+                      "failedSuitesCount"_attr = failedSuites.size(),
+                      "failedTests"_attr = totals._fails);
     } else {
         LOGV2(23069, "SUCCESS - All tests in all suites passed");
     }
@@ -655,7 +663,7 @@ TestAssertionFailure::~TestAssertionFailure() noexcept(false) {
     if (!_stream.str().empty()) {
         _exception.setMessage(_exception.getMessage() + " " + _stream.str());
     }
-    LOGV2_ERROR(23070, "Throwing exception: {exception}", "exception"_attr = _exception);
+    LOGV2_ERROR(23070, "Throwing exception", "exception"_attr = _exception);
     throw _exception;
 }
 
