@@ -10,6 +10,7 @@ var $config = (function() {
             ErrorCodes.ConflictingOperationInProgress,
             ErrorCodes.CursorNotFound,
             ErrorCodes.DuplicateKey,
+            ErrorCodes.NoProgressMade,
             ErrorCodes.OperationFailed,
             ErrorCodes.QueryPlanKilled,
         ],
