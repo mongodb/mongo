@@ -46,7 +46,7 @@ public:
 
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& replMetadata,
-                            boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
+                            const rpc::OplogQueryMetadata& oqMetadata) override;
 };
 
 }  // namespace repl

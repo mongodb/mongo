@@ -228,12 +228,10 @@ public:
      * ("syncSourceHasSyncSource" is false), and only has data up to "myLastOpTime", returns true.
      *
      * "now" is used to skip over currently blacklisted sync sources.
-     *
-     * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& replMetadata,
-                                boost::optional<rpc::OplogQueryMetadata> oqMetadata,
+                                const rpc::OplogQueryMetadata& oqMetadata,
                                 Date_t now) const;
 
     /**

@@ -243,7 +243,7 @@ public:
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,
-                                        boost::optional<rpc::OplogQueryMetadata> oqMetadata);
+                                        const rpc::OplogQueryMetadata& oqMetadata);
 
     virtual OpTime getLastCommittedOpTime() const;
 

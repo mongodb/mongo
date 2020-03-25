@@ -94,12 +94,10 @@ public:
      * Evaluates quality of sync source. Accepts the current sync source; the last optime on this
      * sync source (from metadata); and whether this sync source has a sync source (also from
      * metadata).
-     *
-     * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     virtual bool shouldStopFetching(const HostAndPort& source,
                                     const rpc::ReplSetMetadata& replMetadata,
-                                    boost::optional<rpc::OplogQueryMetadata> oqMetadata) = 0;
+                                    const rpc::OplogQueryMetadata& oqMetadata) = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.

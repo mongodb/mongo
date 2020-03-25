@@ -111,7 +111,7 @@ public:
         BackgroundSync* bgsync);
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& replMetadata,
-                            boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
+                            const rpc::OplogQueryMetadata& oqMetadata) override;
 
 private:
     BackgroundSync* _bgsync;
@@ -127,7 +127,7 @@ DataReplicatorExternalStateBackgroundSync::DataReplicatorExternalStateBackground
 bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
     const HostAndPort& source,
     const rpc::ReplSetMetadata& replMetadata,
-    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
+    const rpc::OplogQueryMetadata& oqMetadata) {
     if (_bgsync->shouldStopFetching()) {
         return true;
     }

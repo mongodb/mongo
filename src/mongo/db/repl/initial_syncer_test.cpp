@@ -158,7 +158,7 @@ public:
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& replMetadata,
-                                boost::optional<rpc::OplogQueryMetadata> oqMetadata) override {
+                                const rpc::OplogQueryMetadata& oqMetadata) override {
         return _syncSourceSelector->shouldChangeSyncSource(currentSource, replMetadata, oqMetadata);
     }
 

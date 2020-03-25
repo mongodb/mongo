@@ -2882,11 +2882,10 @@ long long TopologyCoordinator::getTerm() const {
 
 // TODO(siyuan): Merge _hddata into _slaveInfo, so that we have a single view of the
 // replset. Passing metadata is unnecessary.
-bool TopologyCoordinator::shouldChangeSyncSource(
-    const HostAndPort& currentSource,
-    const rpc::ReplSetMetadata& replMetadata,
-    boost::optional<rpc::OplogQueryMetadata> oqMetadata,
-    Date_t now) const {
+bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                 const rpc::ReplSetMetadata& replMetadata,
+                                                 const rpc::OplogQueryMetadata& oqMetadata,
+                                                 Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
     // reached an optime greater than _options.maxSyncSourceLagSecs later than currentSource's,
@@ -2940,30 +2939,14 @@ bool TopologyCoordinator::shouldChangeSyncSource(
 
     invariant(currentSourceIndex != _selfIndex);
 
-    // If OplogQueryMetadata was provided, use its values, otherwise use the ones in
-    // ReplSetMetadata.
-    OpTime currentSourceOpTime;
-    int syncSourceIndex = -1;
-    int primaryIndex = -1;
-    if (oqMetadata) {
-        currentSourceOpTime =
-            std::max(oqMetadata->getLastOpApplied(),
-                     _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
-        syncSourceIndex = oqMetadata->getSyncSourceIndex();
-        primaryIndex = oqMetadata->getPrimaryIndex();
-    } else {
-        currentSourceOpTime =
-            std::max(replMetadata.getLastOpVisible(),
-                     _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
-        syncSourceIndex = replMetadata.getSyncSourceIndex();
-        primaryIndex = replMetadata.getPrimaryIndex();
-    }
+    OpTime currentSourceOpTime =
+        std::max(oqMetadata.getLastOpApplied(),
+                 _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
 
-    if (currentSourceOpTime.isNull()) {
-        // Haven't received a heartbeat from the sync source yet, so can't tell if we should
-        // change.
-        return false;
-    }
+    fassert(4612000, !currentSourceOpTime.isNull());
+
+    int syncSourceIndex = oqMetadata.getSyncSourceIndex();
+    int primaryIndex = oqMetadata.getPrimaryIndex();
 
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
