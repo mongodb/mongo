@@ -93,7 +93,7 @@ public:
             BSONObj() /* query */,
             BSONObj() /* collation */);
 
-        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+        return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses)).responseOK;
     }
 
 } createIndexesCmd;
