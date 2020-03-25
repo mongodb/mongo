@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/util/stacktrace_json.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
+#include "mongo/util/stacktrace.h"
 
 #include <cctype>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stack_trace_detail {
@@ -87,6 +91,26 @@ uint64_t Hex::fromHex(StringData s) {
         }
     }
     return x;
+}
+
+void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable) {
+    if (sink) {
+        *sink << fmt::format(FMT_STRING("BACKTRACE: {}"), tojson(bt, ExtendedRelaxedV2_0_0));
+    } else {
+        LOGV2_OPTIONS(31380, {logv2::LogTruncation::Disabled}, "BACKTRACE", "bt"_attr = bt);
+    }
+    if (withHumanReadable) {
+        if (auto elem = bt.getField("backtrace"); !elem.eoo()) {
+            for (const auto& fe : elem.Obj()) {
+                BSONObj frame = fe.Obj();
+                if (sink) {
+                    *sink << fmt::format("\n  Frame: {}", tojson(frame, ExtendedRelaxedV2_0_0));
+                } else {
+                    LOGV2(31445, "Frame", "frame"_attr = frame);
+                }
+            }
+        }
+    }
 }
 
 }  // namespace mongo::stack_trace_detail

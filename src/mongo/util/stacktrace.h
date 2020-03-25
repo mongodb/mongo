@@ -32,10 +32,12 @@
  */
 #pragma once
 
+#include <array>
 #include <iosfwd>
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 
 /**
@@ -88,6 +90,60 @@ private:
 
     std::string& _s;
 };
+
+namespace stack_trace_detail {
+/**
+ * A utility for uint64_t <=> uppercase hex string conversions. It
+ * can be used to produce a StringData.
+ *
+ *     sink << Hex(x);  // as a temporary
+ *
+ *     Hex hx(x);
+ *     StringData sd = hx;  // sd storage is in `hx`.
+ */
+class Hex {
+public:
+    using Buf = std::array<char, 18>;  // 64/4 hex digits plus potential "0x"
+
+    static StringData toHex(uint64_t x, Buf& buf, bool showBase = false);
+
+    static uint64_t fromHex(StringData s);
+
+    explicit Hex(uint64_t x, bool showBase = false) : _str{toHex(x, _buf, showBase)} {}
+    explicit Hex(const void* x, bool showBase = false)
+        : Hex{reinterpret_cast<uintptr_t>(x), showBase} {}
+
+    operator StringData() const {
+        return _str;
+    }
+
+private:
+    Buf _buf;
+    StringData _str;
+};
+
+class Dec {
+public:
+    using Buf = std::array<char, 20>;  // ceil(64*log10(2))
+
+    static StringData toDec(uint64_t x, Buf& buf);
+
+    static uint64_t fromDec(StringData s);
+
+    explicit Dec(uint64_t x) : _str(toDec(x, _buf)) {}
+
+    operator StringData() const {
+        return _str;
+    }
+
+private:
+    Buf _buf;
+    StringData _str;
+};
+
+void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable);
+
+}  // namespace stack_trace_detail
 
 #ifndef _WIN32
 /**

@@ -59,7 +59,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/stacktrace_json.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -96,9 +95,8 @@ public:
         const auto symbolPath = symbolPathBuilder.str();
 
         if (!SymInitializeW(handle, symbolPath.c_str(), TRUE)) {
-            LOGV2_ERROR(31443,
-                        "Stack trace initialization failed, SymInitialize failed with error {err}",
-                        "err"_attr = errnoWithDescription());
+            LOGV2_ERROR(
+                31443, "Stack trace initialization failed", "error"_attr = errnoWithDescription());
             return;
         }
 
@@ -244,7 +242,7 @@ std::vector<TraceItem> makeTraceList(CONTEXT& context) {
     stdx::lock_guard<SymbolHandler> lk(symbolHandler);
 
     if (!symbolHandler) {
-        LOGV2_ERROR(31444, "Stack trace failed, symbol handler returned an invalid handle.");
+        LOGV2_ERROR(31444, "Stack trace failed, symbol handler returned an invalid handle");
         return traceList;
     }
 
@@ -307,30 +305,7 @@ void printTraceList(const std::vector<TraceItem>& traceList,
         return;
     BSONObjBuilder bob;
     appendTrace(&bob, traceList, options);
-    const BSONObj bt = bob.done();
-
-    static constexpr char fmtBt[] = "BACKTRACE: {bt}";
-    if (sink) {
-        *sink << fmt::format(fmtBt, "bt"_a = tojson(bt, ExtendedRelaxedV2_0_0));
-    } else {
-        LOGV2_OPTIONS(31380, {logv2::LogTruncation::Disabled}, fmtBt, "bt"_attr = bt);
-    }
-
-    if (options.withHumanReadable) {
-        if (auto elem = bt.getField("backtrace"); !elem.eoo()) {
-            for (const auto& fe : elem.Obj()) {
-                BSONObj frame = fe.Obj();
-                static constexpr char fmtFrame[] = "  Frame: {frame}";
-                if (sink) {
-                    *sink << "\n"
-                          << fmt::format(fmtFrame,
-                                         "frame"_a = tojson(frame, ExtendedRelaxedV2_0_0));
-                } else {
-                    LOGV2(31445, fmtFrame, "frame"_attr = frame);
-                }
-            }
-        }
-    }
+    stack_trace_detail::logBacktraceObject(bob.done(), sink, options.withHumanReadable);
 }
 
 /** `sink` can be nullptr to emit structured logs instead of writing to a sink. */

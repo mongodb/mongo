@@ -48,7 +48,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler_gcc.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace_json.h"
 #include "mongo/util/stacktrace_somap.h"
 #include "mongo/util/version.h"
 
@@ -426,38 +425,15 @@ void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr)
     appendStackTraceObject(&bob, iteration, options);
 #endif
 
-    BSONObj obj = bob.done();
     if (!err.empty()) {
-        static constexpr char fmtErr[] = "Error collecting stack trace: {err}";
         if (sink) {
-            *sink << fmt::format(fmtErr, "err"_a = err);
+            *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), err);
         } else {
-            LOGV2(31430, fmtErr, "err"_attr = err);
+            LOGV2(31430, "Error collecting stack trace", "error"_attr = err);
         }
         return;
     }
-    static constexpr char fmtBt[] = "BACKTRACE: {bt}";
-    if (sink) {
-        *sink << fmt::format(fmtBt, "bt"_a = tojson(obj, ExtendedRelaxedV2_0_0));
-    } else {
-        LOGV2_OPTIONS(31431, {logv2::LogTruncation::Disabled}, fmtBt, "bt"_attr = obj);
-    }
-
-    if (options.withHumanReadable) {
-        if (auto elem = obj.getField("backtrace"); !elem.eoo()) {
-            for (const auto& fe : elem.embeddedObject()) {
-                BSONObj frame = fe.embeddedObject();
-                static constexpr char fmtFrame[] = "  Frame: {frame}";
-                if (sink) {
-                    *sink << "\n"
-                          << fmt::format(fmtFrame,
-                                         "frame"_a = tojson(frame, ExtendedRelaxedV2_0_0));
-                } else {
-                    LOGV2(31427, fmtFrame, "frame"_attr = frame);
-                }
-            }
-        }
-    }
+    stack_trace_detail::logBacktraceObject(bob.done(), sink, options.withHumanReadable);
 }
 
 

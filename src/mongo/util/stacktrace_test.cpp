@@ -55,7 +55,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/stacktrace_json.h"
 
 /** `sigaltstack` was introduced in glibc-2.12 in 2010. */
 #if !defined(_WIN32)
