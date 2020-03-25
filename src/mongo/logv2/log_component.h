@@ -34,8 +34,52 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
+
+// clang-format off
+/**
+ * id: The enum identifier for the LogComponent.
+ * val: (empty except for kDefault) an expression used to assign value to the enum.
+ * shortName: its short name, used in component related server options.
+ * logName: The key that appears in log the "c" field. Should fit into 8 columns, as
+ *          we pad the `c` field in json logs to 8 columns.
+ * parent: Components are arranged in a hierarchy for the purposes of log filtering.  The
+ *        dottedName that is used to configure log filtering is a parent-recursive "."-join
+ *        of shortName strings.
+ */
+#define MONGO_EXPAND_LOGV2_COMPONENT(X) \
+/*   (id, val                  , shortName               , logName   , parent) */ \
+    X(kDefault, = 0            , "default"               , "-"       , kNumLogComponents) \
+    X(kAccessControl,          , "accessControl"         , "ACCESS"  , kDefault) \
+    X(kCommand,                , "command"               , "COMMAND" , kDefault) \
+    X(kControl,                , "control"               , "CONTROL" , kDefault) \
+    X(kExecutor,               , "executor"              , "EXECUTOR", kDefault) \
+    X(kGeo,                    , "geo"                   , "GEO"     , kDefault) \
+    X(kIndex,                  , "index"                 , "INDEX"   , kDefault) \
+    X(kNetwork,                , "network"               , "NETWORK" , kDefault) \
+    X(kQuery,                  , "query"                 , "QUERY"   , kDefault) \
+    X(kReplication,            , "replication"           , "REPL"    , kDefault) \
+    X(kReplicationElection,    , "election"              , "ELECTION", kReplication) \
+    X(kReplicationHeartbeats,  , "heartbeats"            , "REPL_HB" , kReplication) \
+    X(kReplicationInitialSync, , "initialSync"           , "INITSYNC", kReplication) \
+    X(kReplicationRollback,    , "rollback"              , "ROLLBACK", kReplication) \
+    X(kSharding,               , "sharding"              , "SHARDING", kDefault) \
+    X(kShardingCatalogRefresh, , "shardingCatalogRefresh", "SH_REFR" , kSharding) \
+    X(kShardingMigration,      , "migration"             , "MIGRATE" , kSharding) \
+    X(kStorage,                , "storage"               , "STORAGE" , kDefault) \
+    X(kStorageRecovery,        , "recovery"              , "RECOVERY", kStorage) \
+    X(kJournal,                , "journal"               , "JOURNAL" , kStorage) \
+    X(kWrite,                  , "write"                 , "WRITE"   , kDefault) \
+    X(kFTDC,                   , "ftdc"                  , "FTDC"    , kDefault) \
+    X(kASIO,                   , "asio"                  , "ASIO"    , kNetwork) \
+    X(kBridge,                 , "bridge"                , "BRIDGE"  , kNetwork) \
+    X(kTracking,               , "tracking"              , "TRACKING", kDefault) \
+    X(kTransaction,            , "transaction"           , "TXN"     , kDefault) \
+    X(kConnectionPool,         , "connectionPool"        , "CONNPOOL", kNetwork) \
+    X(kTest,                   , "test"                  , "TEST"    , kDefault) \
+    X(kNumLogComponents,       , "total"                 , "TOTAL"   , kNumLogComponents) \
+    /**/
+// clang-format on
 
 /**
  * Log components.
@@ -45,42 +89,19 @@ namespace logv2 {
 class LogComponent {
 public:
     enum Value {
-        // kAutomaticDetermination is placeholder for using component set by
-        // MONGO_LOGV2_DEFAULT_COMPONENT macro
+        // clang-format off
+        /** Placeholder for using the component set by the MONGO_LOGV2_DEFAULT_COMPONENT macro */
         kAutomaticDetermination = -1,
-        kDefault = 0,
-        kAccessControl,
-        kCommand,
-        kControl,
-        kExecutor,
-        kGeo,
-        kIndex,
-        kNetwork,
-        kQuery,
-        kReplication,
-        kReplicationElection,
-        kReplicationHeartbeats,
-        kReplicationInitialSync,
-        kReplicationRollback,
-        kSharding,
-        kShardingCatalogRefresh,
-        kShardingMigration,
-        kStorage,
-        kStorageRecovery,
-        kJournal,
-        kWrite,
-        kFTDC,
-        kASIO,
-        kBridge,
-        kTracking,
-        kTransaction,
-        kConnectionPool,
-        kNumLogComponents
+#define X_(id, val, shortName, logName, parent) id val,
+MONGO_EXPAND_LOGV2_COMPONENT(X_)
+#undef X_
+        // clang-format on
     };
 
-    /* implicit */ LogComponent(Value value) : _value(value) {}
+    /* implicit */
+    constexpr LogComponent(Value value) : _value(value) {}
 
-    operator Value() const {
+    constexpr operator Value() const {
         return _value;
     }
 
@@ -122,5 +143,4 @@ private:
 
 std::ostream& operator<<(std::ostream& os, LogComponent component);
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2
