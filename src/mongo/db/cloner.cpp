@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -405,15 +407,27 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     MultiIndexBlock::OnInitFn onInitFn;
     if (opCtx->writesAreReplicated() && buildUUID) {
         onInitFn = [&](std::vector<BSONObj>& specs) {
-            // Since, we don't use IndexBuildsCoordinatorMongod thread pool to build indexes,
-            // it's ok to set the commit quorum option as 1. Also, this is currently only get
-            // called in rollback via refetch. So, onStartIndexBuild() call will be a no-op.
+            // TODO SERVER-47438: Should remove this onInitFn lambda function as we no longer
+            // need to generate startIndexBuild and commitIndexBuild oplog entries.
+
+            // Currently, primary doesn't wait for any votes from secondaries to commit
+            // the index build. So, it's of no use to set the commit quorum option of any value
+            // greater than 0. Disabling commit quorum is just an optimization to avoid secondaries
+            // from trying to vote before committing index build.
+            //
+            // Persist the commit quorum value in the config.system.indexBuilds collection.
+            IndexBuildEntry indexbuildEntry(*buildUUID,
+                                            collection->uuid(),
+                                            CommitQuorumOptions(CommitQuorumOptions::kDisabled),
+                                            IndexBuildsCoordinator::extractIndexNames(specs));
+            uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexbuildEntry));
+
             opObserver->onStartIndexBuild(opCtx,
                                           to_collection,
                                           collection->uuid(),
                                           *buildUUID,
                                           specs,
-                                          CommitQuorumOptions(1),
+                                          CommitQuorumOptions(CommitQuorumOptions::kDisabled),
                                           fromMigrate);
             return Status::OK();
         };

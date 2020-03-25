@@ -1022,9 +1022,15 @@ TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
+    auto buildUUID = UUID::gen();
+    // Store the commit quorum value for the index build in config.system.indexBuilds collection.
+    _insertDocument(_opCtx.get(),
+                    NamespaceString::kIndexBuildEntryNamespace,
+                    BSON("_id" << buildUUID << "collectionUUID" << options.uuid.get()
+                               << "indexNames" << BSON_ARRAY(idxName("0")) << "commitQuorum" << 0));
+
     auto commonOp = makeOpAndRecordId(1);
 
-    auto buildUUID = UUID::gen();
     auto commitIndexBuild = makeCommitIndexBuildOplogEntry(coll, buildUUID, indexSpec, 2);
 
     // Roll back a commit oplog entry, which will drop and restart the index build.
@@ -1066,9 +1072,15 @@ TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
+    auto buildUUID = UUID::gen();
+    // Store the commit quorum value for the index build in config.system.indexBuilds collection.
+    _insertDocument(_opCtx.get(),
+                    NamespaceString::kIndexBuildEntryNamespace,
+                    BSON("_id" << buildUUID << "collectionUUID" << options.uuid.get()
+                               << "indexNames" << BSON_ARRAY(idxName("0")) << "commitQuorum" << 0));
+
     auto commonOp = makeOpAndRecordId(1);
 
-    auto buildUUID = UUID::gen();
     auto abortIndexBuild = makeAbortIndexBuildOplogEntry(coll, buildUUID, indexSpec, 2);
 
     // Roll back an abort oplog entry, which will drop and restart the index build.
@@ -1110,6 +1122,13 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
     int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
+    auto buildUUID = UUID::gen();
+    // Store the commit quorum value for the index build in config.system.indexBuilds collection.
+    _insertDocument(_opCtx.get(),
+                    NamespaceString::kIndexBuildEntryNamespace,
+                    BSON("_id" << buildUUID << "collectionUUID" << options.uuid.get()
+                               << "indexNames" << BSON_ARRAY(idxName("0")) << "commitQuorum" << 0));
+
     auto commonOp = makeOpAndRecordId(1);
 
     // Don't roll-back anything.
@@ -1119,7 +1138,6 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
     // Even though the index has already completed, simulate that we aborted the index build before
     // rollback. We expect the index to be dropped and rebuilt.
     IndexBuildDetails build(coll->uuid());
-    auto buildUUID = UUID::gen();
     build.indexSpecs.push_back(indexSpec);
 
     IndexBuilds abortedBuilds{{buildUUID, build}};

@@ -291,7 +291,7 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
                 replCoord->isReplEnabled());
         uassert(ErrorCodes::BadValue,
                 str::stream() << "commitQuorum is supported only for two phase index builds with "
-                                 "majority commit quorum support enabled ",
+                                 "commit quorum support enabled ",
                 (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
         CommitQuorumOptions commitQuorum;
         uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));

@@ -894,6 +894,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_planner",
         "$BUILD_DIR/mongo/util/net/network",
+        "repl/local_oplog_info",
     ],
 )
 
@@ -913,9 +914,11 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/authentication',
+        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         'catalog/database_holder',
         'commands/list_collections_filter',
         'index_builds_coordinator_interface',
+        'index_build_entry_helpers'
     ],
 )
 

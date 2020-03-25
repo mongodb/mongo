@@ -76,18 +76,15 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx);
  *
  * Returns an error if collection is missing.
  */
-Status persistCommitReadyMemberInfo(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry);
+Status persistCommitReadyMemberInfo(OperationContext* opCtx,
+                                    const IndexBuildEntry& indexBuildEntry);
 
 /**
  * Persist the new commit quorum value for an index build into config.system.indexBuilds collection.
- * We will update the commit quorum value only if 'currentCommitQuorum' matches the value read from
- * the "config.system.indexBuilds" collection for that index build.
  *
  * Returns an error if collection is missing.
  */
-Status setIndexCommitQuorum(OperationContext* opCtx,
-                            IndexBuildEntry& indexBuildEntry,
-                            CommitQuorumOptions currentCommitQuorum);
+Status persistIndexCommitQuorum(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry);
 
 /**
  * Writes the 'indexBuildEntry' to the disk.
@@ -98,7 +95,7 @@ Status setIndexCommitQuorum(OperationContext* opCtx,
  * Returns 'DuplicateKey' error code if a document already exists on the disk with the same
  * 'indexBuildUUID'.
  */
-Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry);
+Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry);
 
 /**
  * Removes the IndexBuildEntry from the disk.
@@ -112,7 +109,8 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
 
 /**
  * Returns the IndexBuildEntry matching the document with 'indexBuildUUID' from the disk if it
- * exists.
+ * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
+ * data.
  *
  * If the stored IndexBuildEntry on disk contains invalid BSON, the 'InvalidBSON' error code is
  * returned.

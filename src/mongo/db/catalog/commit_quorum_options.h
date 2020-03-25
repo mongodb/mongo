@@ -78,6 +78,10 @@ public:
         mode = "";
     }
 
+    bool isInitialized() const {
+        return !(mode.empty() && numNodes == kUninitializedNumNodes);
+    }
+
     inline bool operator==(const CommitQuorumOptions& rhs) const {
         return (numNodes == rhs.numNodes && mode == rhs.mode) ? true : false;
     }

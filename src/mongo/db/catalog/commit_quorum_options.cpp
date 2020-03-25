@@ -52,7 +52,8 @@ const BSONObj CommitQuorumOptions::VotingMembers(BSON(kCommitQuorumField
 CommitQuorumOptions::CommitQuorumOptions(int numNodesOpts) {
     reset();
     numNodes = numNodesOpts;
-    invariant(numNodes >= 0);
+    invariant(numNodes >= 0 &&
+              numNodes <= static_cast<decltype(numNodes)>(repl::ReplSetConfig::kMaxMembers));
 }
 
 CommitQuorumOptions::CommitQuorumOptions(const std::string& modeOpts) {
@@ -77,6 +78,10 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
         numNodes = static_cast<decltype(numNodes)>(cNumNodes);
     } else if (commitQuorumElement.type() == String) {
         mode = commitQuorumElement.valuestrsafe();
+        if (mode.empty()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "commitQuorum can't be an empty string");
+        }
     } else {
         return Status(ErrorCodes::FailedToParse, "commitQuorum has to be a number or a string");
     }

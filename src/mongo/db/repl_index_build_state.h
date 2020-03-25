@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
@@ -225,16 +226,16 @@ struct ReplIndexBuildState {
                         const UUID& collUUID,
                         const std::string& dbName,
                         const std::vector<BSONObj>& specs,
-                        IndexBuildProtocol protocol,
-                        boost::optional<CommitQuorumOptions> commitQuorum)
+                        IndexBuildProtocol protocol)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
           dbName(dbName),
           indexNames(extractIndexNames(specs)),
           indexSpecs(specs),
-          protocol(protocol),
-          commitQuorum(commitQuorum) {
+          protocol(protocol) {
         waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
+        if (protocol == IndexBuildProtocol::kTwoPhase)
+            commitQuorumLock.emplace(indexBuildUUID.toString());
     }
 
     // Uniquely identifies this index build across replica set members.
@@ -262,13 +263,19 @@ struct ReplIndexBuildState {
     // Protects the state below.
     mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");
 
-    // Secondaries do not set this information, so it is only set on primaries or on
-    // transition to primary.
-    boost::optional<CommitQuorumOptions> commitQuorum;
-
-    // Tracks the members of the replica set that have finished building the index(es) and are ready
-    // to commit the index(es).
-    std::vector<HostAndPort> commitReadyMembers;
+    /*
+     * Readers who read the commit quorum value from "config.system.indexBuilds" collection
+     * to decide if the commit quorum got satisfied for an index build, should take this lock in
+     * shared mode.
+     *
+     * Writers (setCommitQuorum) who update the commit quorum value of an existing index build
+     * entry in "config.system.indexBuilds" collection should take this lock in exclusive mode.
+     *
+     * Resource mutex will be initialized only for 2 phase index protocol.
+     * Mutex lock order:
+     * commitQuorumLock -> mutex.
+     */
+    boost::optional<Lock::ResourceMutex> commitQuorumLock;
 
     using IndexCatalogStats = struct {
         int numIndexesBefore = 0;

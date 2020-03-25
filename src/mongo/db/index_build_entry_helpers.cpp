@@ -52,6 +52,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -60,7 +61,7 @@ namespace mongo {
 
 namespace {
 
-Status upsert(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
+Status upsert(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
 
     return writeConflictRetry(opCtx,
                               "upsertIndexBuildEntry",
@@ -87,30 +88,21 @@ Status upsert(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
 }
 
 std::pair<const BSONObj, const BSONObj> buildIndexBuildEntryFilterAndUpdate(
-    IndexBuildEntry& indexBuildEntry,
-    boost::optional<CommitQuorumOptions> currentCommitQuorum = boost::none) {
+    const IndexBuildEntry& indexBuildEntry) {
     // Construct the filter.
-    const auto buildUUID =
+    const auto filter =
         BSON(IndexBuildEntry::kBuildUUIDFieldName << indexBuildEntry.getBuildUUID());
-    const auto collectionUUID =
-        BSON(IndexBuildEntry::kCollectionUUIDFieldName << indexBuildEntry.getCollectionUUID());
-    const auto indexNameList =
-        BSON(IndexBuildEntry::kIndexNamesFieldName << indexBuildEntry.getIndexNames());
-    BSONObjBuilder commitQuorumFilter;
-    if (!currentCommitQuorum) {
-        currentCommitQuorum = indexBuildEntry.getCommitQuorum();
-    }
-    currentCommitQuorum->appendToBuilder(IndexBuildEntry::kCommitQuorumFieldName,
-                                         &commitQuorumFilter);
-    const auto filter = BSON("$and" << BSON_ARRAY(buildUUID << collectionUUID << indexNameList
-                                                            << commitQuorumFilter.obj()));
+
     // Construct the update.
     BSONObjBuilder updateMod;
-    BSONObjBuilder commitQuorumUpdate;
-    indexBuildEntry.getCommitQuorum().appendToBuilder(IndexBuildEntry::kCommitQuorumFieldName,
-                                                      &commitQuorumUpdate);
+
     // If the update commit quorum is same as the value on-disk, we don't update it.
-    updateMod.append("$set", commitQuorumUpdate.obj());
+    if (indexBuildEntry.getCommitQuorum().isInitialized()) {
+        BSONObjBuilder commitQuorumUpdate;
+        indexBuildEntry.getCommitQuorum().appendToBuilder(IndexBuildEntry::kCommitQuorumFieldName,
+                                                          &commitQuorumUpdate);
+        updateMod.append("$set", commitQuorumUpdate.obj());
+    }
 
     // '$addToSet' to prevent any duplicate entries written to "commitReadyMembers" field.
     if (auto commitReadyMembers = indexBuildEntry.getCommitReadyMembers()) {
@@ -185,47 +177,52 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                        });
 }
 
-Status persistCommitReadyMemberInfo(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
-    invariant(indexBuildEntry.getCommitReadyMembers());
+Status persistCommitReadyMemberInfo(OperationContext* opCtx,
+                                    const IndexBuildEntry& indexBuildEntry) {
+    invariant(indexBuildEntry.getCommitReadyMembers() &&
+              !indexBuildEntry.getCommitQuorum().isInitialized());
 
     auto [filter, updateMod] = buildIndexBuildEntryFilterAndUpdate(indexBuildEntry);
     return upsert(opCtx, filter, updateMod);
 }
 
-Status setIndexCommitQuorum(OperationContext* opCtx,
-                            IndexBuildEntry& indexBuildEntry,
-                            CommitQuorumOptions currentCommitQuorum) {
-    invariant(!indexBuildEntry.getCommitReadyMembers());
+Status persistIndexCommitQuorum(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
+    invariant(!indexBuildEntry.getCommitReadyMembers() &&
+              indexBuildEntry.getCommitQuorum().isInitialized());
 
-    auto [filter, updateMod] =
-        buildIndexBuildEntryFilterAndUpdate(indexBuildEntry, currentCommitQuorum);
+    auto [filter, updateMod] = buildIndexBuildEntryFilterAndUpdate(indexBuildEntry);
     return upsert(opCtx, filter, updateMod);
 }
 
-Status addIndexBuildEntry(OperationContext* opCtx, IndexBuildEntry& indexBuildEntry) {
-    return writeConflictRetry(opCtx,
-                              "addIndexBuildEntry",
-                              NamespaceString::kIndexBuildEntryNamespace.ns(),
-                              [&]() -> Status {
-                                  AutoGetCollection autoCollection(
-                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  Collection* collection = autoCollection.getCollection();
-                                  if (!collection) {
-                                      str::stream ss;
-                                      ss << "Collection not found: "
-                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
-                                      return Status(ErrorCodes::NamespaceNotFound, ss);
-                                  }
+Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
+    return writeConflictRetry(
+        opCtx,
+        "addIndexBuildEntry",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() -> Status {
+            AutoGetCollection autoCollection(
+                opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+            Collection* collection = autoCollection.getCollection();
+            if (!collection) {
+                str::stream ss;
+                ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
+                return Status(ErrorCodes::NamespaceNotFound, ss);
+            }
 
-                                  WriteUnitOfWork wuow(opCtx);
-                                  Status status = collection->insertDocument(
-                                      opCtx, InsertStatement(indexBuildEntry.toBSON()), nullptr);
-                                  if (!status.isOK()) {
-                                      return status;
-                                  }
-                                  wuow.commit();
-                                  return Status::OK();
-                              });
+            WriteUnitOfWork wuow(opCtx);
+            // Reserve a slot in the oplog.
+            auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+            auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
+            Status status = collection->insertDocument(
+                opCtx,
+                InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
+                nullptr);
+            if (!status.isOK()) {
+                return status;
+            }
+            wuow.commit();
+            return Status::OK();
+        });
 }
 
 Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
@@ -260,6 +257,8 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
 }
 
 StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
+    // Read the most up to date data.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
     if (!collection) {

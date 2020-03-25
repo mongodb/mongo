@@ -121,6 +121,11 @@ public:
     static bool supportsTwoPhaseIndexBuild();
 
     /**
+     * Returns index names listed from the index specs list "specs".
+     */
+    static std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs);
+
+    /**
      * Sets up the in-memory and durable state of the index build. When successful, returns after
      * the index build has started and the first catalog write has been made, and if called on a
      * primary, when the startIndexBuild oplog entry has been written.
@@ -494,8 +499,7 @@ protected:
                                  CollectionUUID collectionUUID,
                                  const std::vector<BSONObj>& specs,
                                  const UUID& buildUUID,
-                                 IndexBuildProtocol protocol,
-                                 boost::optional<CommitQuorumOptions> commitQuorum);
+                                 IndexBuildProtocol protocol);
 
     /**
      * Sets up the durable state of the index build.
@@ -504,7 +508,8 @@ protected:
      */
     Status _setUpIndexBuild(OperationContext* opCtx,
                             const UUID& buildUUID,
-                            Timestamp startTimestamp);
+                            Timestamp startTimestamp,
+                            boost::optional<CommitQuorumOptions> commitQuorum);
 
     /**
      * Acquires locks and sets up index build. Throws on error.
@@ -514,7 +519,8 @@ protected:
     enum class PostSetupAction { kContinueIndexBuild, kCompleteIndexBuildEarly };
     PostSetupAction _setUpIndexBuildInner(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState,
-                                          Timestamp startTimestamp);
+                                          Timestamp startTimestamp,
+                                          boost::optional<CommitQuorumOptions> commitQuorum);
 
     /**
      * Sets up the in-memory and durable state of the index build for two-phase recovery.
@@ -619,9 +625,8 @@ protected:
      * Skips the voting process and directly signal primary to commit index build if
      * commit quorum is not enabled.
      */
-    virtual bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
-                                                 std::shared_ptr<ReplIndexBuildState> replState,
-                                                 bool onStepUp) = 0;
+    virtual bool _signalIfCommitQuorumNotEnabled(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
 
     /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
