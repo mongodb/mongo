@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_map.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
@@ -112,14 +111,10 @@ void addWCError(BatchedCommandResponse* response) {
     response->setWriteConcernError(error.release());
 }
 
-class WriteOpTestFixture : public unittest::Test {
+class WriteOpTestFixture : public ServiceContextTest {
 protected:
-    OperationContext* operationContext() {
-        return &_opCtx;
-    }
-
-private:
-    OperationContextNoop _opCtx;
+    const ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
+    OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
 using BatchWriteOpTest = WriteOpTestFixture;
@@ -137,7 +132,7 @@ TEST_F(BatchWriteOpTest, SingleOp) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -170,7 +165,7 @@ TEST_F(BatchWriteOpTest, SingleError) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -209,7 +204,7 @@ TEST_F(BatchWriteOpTest, SingleTargetError) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -244,7 +239,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     }());
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -285,7 +280,7 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -341,7 +336,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
         return updateOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -383,7 +378,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
         return updateOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -421,7 +416,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -493,7 +488,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -535,7 +530,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -596,7 +591,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
         return updateOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -647,7 +642,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -745,7 +740,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
         return updateOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -791,7 +786,7 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -852,7 +847,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -911,7 +906,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -969,7 +964,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
         return deleteOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1035,7 +1030,7 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     }());
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1080,7 +1075,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     }());
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1131,7 +1126,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
 
     // Do single-target, multi-doc batch write op
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1191,7 +1186,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
 
     // Do single-target, multi-doc batch write op
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1239,7 +1234,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1292,7 +1287,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1344,7 +1339,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1394,7 +1389,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     WriteErrorDetail abortError;
     abortError.setStatus({ErrorCodes::UnknownError, "mock abort"});
@@ -1431,7 +1426,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
     }());
     request.setWriteConcern(BSON("w" << 3));
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1488,7 +1483,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
         return insertOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
@@ -1519,7 +1514,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
         return updateOp;
     }());
 
-    BatchWriteOp batchOp(operationContext(), request);
+    BatchWriteOp batchOp(_opCtx, request);
 
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();

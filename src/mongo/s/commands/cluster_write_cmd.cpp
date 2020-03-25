@@ -360,13 +360,13 @@ private:
      * Does *not* retry or retarget if the metadata is stale.
      */
     static Status _commandOpWrite(OperationContext* opCtx,
-                                  const std::string& dbName,
+                                  const NamespaceString& nss,
                                   const BSONObj& command,
                                   BatchItemRef targetingBatchItem,
                                   std::vector<Strategy::CommandResult>* results) {
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
-        ChunkManagerTargeter targeter(targetingBatchItem.getRequest()->getNS());
+        ChunkManagerTargeter targeter(nss);
         Status status = targeter.init(opCtx);
         if (!status.isOK())
             return status;
@@ -407,7 +407,7 @@ private:
         MultiStatementTransactionRequestsSender ars(
             opCtx,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            dbName,
+            nss.db(),
             requests,
             readPref,
             Shard::RetryPolicy::kNoRetry);
@@ -596,11 +596,8 @@ private:
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&_batchedRequest, 0);
         std::vector<Strategy::CommandResult> shardResults;
-        uassertStatusOK(_commandOpWrite(opCtx,
-                                        _request->getDatabase().toString(),
-                                        explainCmd,
-                                        targetingBatchItem,
-                                        &shardResults));
+        uassertStatusOK(_commandOpWrite(
+            opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResults));
         auto bodyBuilder = result->getBodyBuilder();
         uassertStatusOK(ClusterExplain::buildExplainResult(
             opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));

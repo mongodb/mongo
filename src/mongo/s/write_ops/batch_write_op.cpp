@@ -301,8 +301,6 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
     TargetedBatchMap batchMap;
     std::set<ShardId> targetedShards;
 
-    int numTargetErrors = 0;
-
     const size_t numWriteOps = _clientRequest.sizeWriteOps();
 
     for (size_t i = 0; i < numWriteOps; ++i) {
@@ -328,7 +326,6 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
             if (TransactionRouter::get(_opCtx)) {
                 writeOp.setOpError(targetError);
-                ++numTargetErrors;
 
                 // Cleanup all the writes we have targetted in this call so far since we are going
                 // to abort the entire transaction.
@@ -343,7 +340,6 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
                 // Record an error for this batch
 
                 writeOp.setOpError(targetError);
-                ++numTargetErrors;
 
                 if (ordered)
                     return Status::OK();

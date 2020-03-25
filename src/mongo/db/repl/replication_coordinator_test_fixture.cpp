@@ -37,7 +37,6 @@
 #include <memory>
 
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_settings.h"

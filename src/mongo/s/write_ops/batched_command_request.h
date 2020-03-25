@@ -204,46 +204,36 @@ private:
 };
 
 /**
- * Similar to above, this class wraps the write items of a command request into a generically
- * usable type.  Very thin wrapper, does not own the write item itself.
- *
- * TODO: Use in BatchedCommandRequest above
+ * Similar to above, this class wraps the write items of a command request into a generically usable
+ * type. Very thin wrapper, does not own the write item itself.
  */
 class BatchItemRef {
 public:
-    BatchItemRef(const BatchedCommandRequest* request, int itemIndex)
-        : _request(request), _itemIndex(itemIndex) {}
+    BatchItemRef(const BatchedCommandRequest* request, int index);
 
-    const BatchedCommandRequest* getRequest() const {
-        return _request;
+    BatchedCommandRequest::BatchType getOpType() const {
+        return _request.getBatchType();
     }
 
     int getItemIndex() const {
-        return _itemIndex;
-    }
-
-    BatchedCommandRequest::BatchType getOpType() const {
-        return _request->getBatchType();
+        return _index;
     }
 
     const auto& getDocument() const {
-        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getInsertRequest().getDocuments().at(_itemIndex);
+        return _request.getInsertRequest().getDocuments()[_index];
     }
 
     const auto& getUpdate() const {
-        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getUpdateRequest().getUpdates().at(_itemIndex);
+        return _request.getUpdateRequest().getUpdates()[_index];
     }
 
     const auto& getDelete() const {
-        dassert(_itemIndex < static_cast<int>(_request->sizeWriteOps()));
-        return _request->getDeleteRequest().getDeletes().at(_itemIndex);
+        return _request.getDeleteRequest().getDeletes()[_index];
     }
 
 private:
-    const BatchedCommandRequest* _request;
-    const int _itemIndex;
+    const BatchedCommandRequest& _request;
+    const int _index;
 };
 
 }  // namespace mongo

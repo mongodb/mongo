@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/unittest/unittest.h"
@@ -59,13 +55,9 @@ struct MockRange {
  */
 class MockNSTargeter : public NSTargeter {
 public:
-    MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges)
-        : _nss(nss), _mockRanges(std::move(mockRanges)) {
-        ASSERT(_nss.isValid());
-        ASSERT(!_mockRanges.empty());
-    }
+    MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges);
 
-    const NamespaceString& getNS() const {
+    const NamespaceString& getNS() const override {
         return _nss;
     }
 
@@ -96,7 +88,7 @@ public:
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
     StatusWith<std::vector<ShardEndpoint>> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const {
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const override {
         return _targetQuery(deleteDoc.getQ());
     }
 
@@ -141,29 +133,7 @@ public:
     }
 
 private:
-    static ChunkRange _parseRange(const BSONObj& query) {
-        const StringData fieldName(query.firstElement().fieldName());
-
-        if (query.firstElement().isNumber()) {
-            return {BSON(fieldName << query.firstElement().numberInt()),
-                    BSON(fieldName << query.firstElement().numberInt() + 1)};
-        } else if (query.firstElement().type() == Object) {
-            BSONObj queryRange = query.firstElement().Obj();
-
-            ASSERT(!queryRange[GTE.l_].eoo());
-            ASSERT(!queryRange[LT.l_].eoo());
-
-            BSONObjBuilder minKeyB;
-            minKeyB.appendAs(queryRange[GTE.l_], fieldName);
-            BSONObjBuilder maxKeyB;
-            maxKeyB.appendAs(queryRange[LT.l_], fieldName);
-
-            return {minKeyB.obj(), maxKeyB.obj()};
-        }
-
-        FAIL("Invalid query");
-        MONGO_UNREACHABLE;
-    }
+    static ChunkRange _parseRange(const BSONObj& query);
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
@@ -191,10 +161,6 @@ private:
     std::vector<MockRange> _mockRanges;
 };
 
-inline void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB) {
-    ASSERT_EQUALS(endpointA.shardName, endpointB.shardName);
-    ASSERT_EQUALS(endpointA.shardVersion.toLong(), endpointB.shardVersion.toLong());
-    ASSERT_EQUALS(endpointA.shardVersion.epoch(), endpointB.shardVersion.epoch());
-}
+void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);
 
 }  // namespace mongo

@@ -178,4 +178,9 @@ BatchedCommandRequest BatchedCommandRequest::cloneInsertWithIds(
     return newCmdRequest;
 }
 
+BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
+    : _request(*request), _index(index) {
+    invariant(index < int(request->sizeWriteOps()));
+}
+
 }  // namespace mongo

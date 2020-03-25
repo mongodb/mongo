@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"

@@ -343,7 +343,6 @@ env.CppUnitTest(
         'chunk_splitter',
         'sharding_logging',
         'sharding_runtime_d',
-        'sharding_runtime_d',
         'type_shard_identity',
     ],
 )

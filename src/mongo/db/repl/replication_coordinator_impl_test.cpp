@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/optime.h"

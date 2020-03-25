@@ -48,13 +48,8 @@ class OperationContext;
 struct ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
                   const ChunkVersion& shardVersion,
-                  const boost::optional<DatabaseVersion> dbVersion = boost::none)
-        : shardName(shardName), shardVersion(shardVersion), databaseVersion(dbVersion) {}
-
-    ShardEndpoint(const ShardEndpoint& other)
-        : shardName(other.shardName), shardVersion(other.shardVersion) {
-        databaseVersion = other.databaseVersion;
-    }
+                  boost::optional<DatabaseVersion> dbVersion = boost::none)
+        : shardName(shardName), shardVersion(shardVersion), databaseVersion(std::move(dbVersion)) {}
 
     ShardId shardName;
     ChunkVersion shardVersion;
@@ -88,7 +83,7 @@ struct ShardEndpoint {
  */
 class NSTargeter {
 public:
-    virtual ~NSTargeter() {}
+    virtual ~NSTargeter() = default;
 
     /**
      * Returns the namespace targeted.

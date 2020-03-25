@@ -42,7 +42,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/read_concern_level.h"

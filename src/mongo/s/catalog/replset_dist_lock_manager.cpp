@@ -37,7 +37,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"

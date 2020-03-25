@@ -63,7 +63,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options_storage_gen.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
