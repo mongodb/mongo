@@ -167,6 +167,10 @@ __wt_las_create(WT_SESSION_IMPL *session, const char **cfg)
     if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
+    /* The history store file may exist on a downgrade. Discard it. */
+    WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(session, "file:WiredTigerHS.wt", drop_cfg));
+    WT_RET(ret);
+
     /*
      * Done at startup: we cannot do it on demand because we require the schema lock to create and
      * drop the table, and it may not always be available.

@@ -320,6 +320,15 @@ static inline bool
 __unstable_skip(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
     /*
+     * We should never see a prepared cell, it implies an unclean shutdown followed by a downgrade
+     * (clean shutdown rolls back any prepared cells). Complain and ignore the row.
+     */
+    if (F_ISSET(unpack, WT_CELL_UNPACK_PREPARE)) {
+        __wt_err(session, EINVAL, "unexpected prepared cell found, ignored");
+        return (true);
+    }
+
+    /*
      * Skip unstable entries after downgrade to releases without validity windows and from previous
      * wiredtiger_open connections.
      */

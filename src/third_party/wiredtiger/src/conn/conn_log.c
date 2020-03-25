@@ -104,18 +104,18 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
      * does not mean the direction of change from the release we may be running currently.
      */
     if (conn->compat_major < WT_LOG_V2_MAJOR) {
-        new_version = 1;
         first_record = WT_LOG_END_HEADER;
+        new_version = 1;
         downgrade = true;
     } else {
-        /*
-         * Assume current version unless the minor compatibility setting is the earlier version.
-         */
         first_record = WT_LOG_END_HEADER + log->allocsize;
         new_version = WT_LOG_VERSION;
         downgrade = false;
         if (conn->compat_minor == WT_LOG_V2_MINOR) {
             new_version = 2;
+            downgrade = true;
+        } else if (conn->compat_minor < WT_LOG_V4_MINOR) {
+            new_version = 3;
             downgrade = true;
         }
     }
@@ -128,6 +128,8 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
             conn->log_req_max = 1;
         else if (conn->req_max_minor == WT_LOG_V2_MINOR)
             conn->log_req_max = 2;
+        else if (conn->req_max_minor < WT_LOG_V4_MINOR)
+            conn->log_req_max = 3;
         else
             conn->log_req_max = WT_LOG_VERSION;
     }
@@ -136,6 +138,8 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
             conn->log_req_min = 1;
         else if (conn->req_min_minor == WT_LOG_V2_MINOR)
             conn->log_req_min = 2;
+        else if (conn->req_min_minor < WT_LOG_V4_MINOR)
+            conn->log_req_min = 3;
         else
             conn->log_req_min = WT_LOG_VERSION;
     }

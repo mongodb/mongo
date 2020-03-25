@@ -441,6 +441,7 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
+WiredTigerHS
 WiredTigerInit
 WiredTigerLAS
 WiredTigerLog

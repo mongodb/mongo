@@ -116,8 +116,8 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
 
     val = &r->v;
     if (deleted) {
-        val->cell_len = __wt_cell_pack_del(
-          session, &val->cell, WT_TS_NONE, WT_TXN_NONE, WT_TS_MAX, WT_TXN_MAX, cbulk->rle);
+        val->cell_len = __wt_cell_pack_del(session, &val->cell, WT_TS_NONE, WT_TS_NONE, WT_TXN_NONE,
+          WT_TS_NONE, WT_TS_MAX, WT_TXN_MAX, cbulk->rle);
         val->buf.data = NULL;
         val->buf.size = 0;
         val->len = val->cell_len;
@@ -537,14 +537,14 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
     }
 
     if (deleted) {
-        val->cell_len =
-          __wt_cell_pack_del(session, &val->cell, start_ts, start_txn, stop_ts, stop_txn, rle);
+        val->cell_len = __wt_cell_pack_del(
+          session, &val->cell, WT_TS_NONE, start_ts, start_txn, WT_TS_NONE, stop_ts, stop_txn, rle);
         val->buf.data = NULL;
         val->buf.size = 0;
         val->len = val->cell_len;
     } else if (overflow_type) {
-        val->cell_len = __wt_cell_pack_ovfl(session, &val->cell, WT_CELL_VALUE_OVFL, start_ts,
-          start_txn, stop_ts, stop_txn, rle, value->size);
+        val->cell_len = __wt_cell_pack_ovfl(session, &val->cell, WT_CELL_VALUE_OVFL, WT_TS_NONE,
+          start_ts, start_txn, WT_TS_NONE, stop_ts, stop_txn, rle, value->size);
         val->buf.data = value->data;
         val->buf.size = value->size;
         val->len = val->cell_len + value->size;
