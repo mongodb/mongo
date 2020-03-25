@@ -668,6 +668,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "verbose=[recovery_progress,checkpoint_progress],";
     }
 
+    // MongoDB 4.2.6+ will also understand WT compatibility version 3.3. However it should only
+    // write data in compatibility version 3.2.
+    ss << "compatibility=(release=3.2,require_max=\"3.3.0\"),";
+
     // Enable debug write-ahead logging for all tables under debug build.
     if (kDebugBuild) {
         ss << "debug_mode=(table_logging=true),";
