@@ -120,6 +120,27 @@ private:
 };
 
 /**
+ * Used to submit a range deletion task once it is certain that the update/insert to
+ * config.rangeDeletions is committed.
+ */
+class SubmitRangeDeletionHandler final : public RecoveryUnit::Change {
+public:
+    SubmitRangeDeletionHandler(OperationContext* opCtx, RangeDeletionTask task)
+        : _opCtx(opCtx), _task(std::move(task)) {}
+
+    void commit(boost::optional<Timestamp>) override {
+        migrationutil::submitRangeDeletionTask(_opCtx, _task).getAsync([](auto) {});
+    }
+
+    void rollback() override {}
+
+private:
+    OperationContext* _opCtx;
+    RangeDeletionTask _task;
+};
+
+
+/**
  * Invalidates the in-memory routing table cache when a collection is dropped, so the next caller
  * with routing information will provoke a routing table refresh and see the drop.
  *
@@ -254,8 +275,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
 
-            if (!deletionTask.getPending())
-                migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
+            if (!deletionTask.getPending()) {
+                opCtx->recoveryUnit()->registerChange(
+                    std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
+            }
         }
 
         if (collDesc.isSharded()) {
@@ -377,7 +400,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
                 // Range deletion tasks for moved away chunks are scheduled through the
                 // MigrationCoordinator, so only schedule a task for received chunks.
-                migrationutil::submitRangeDeletionTask(opCtx, deletionTask).getAsync([](auto) {});
+                opCtx->recoveryUnit()->registerChange(
+                    std::make_unique<SubmitRangeDeletionHandler>(opCtx, deletionTask));
             }
         }
     }
