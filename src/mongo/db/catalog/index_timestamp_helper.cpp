@@ -40,6 +40,19 @@
 namespace mongo {
 
 namespace {
+Status setGhostTimestamp(OperationContext* opCtx, Timestamp timestamp) {
+    if (auto status = opCtx->recoveryUnit()->setTimestamp(timestamp); !status.isOK()) {
+        return status;
+    }
+    opCtx->recoveryUnit()->setOrderedCommit(false);
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    opCtx->recoveryUnit()->onCommit(
+        [replCoord](auto commitTime) { replCoord->attemptToAdvanceStableTimestamp(); });
+
+    return Status::OK();
+}
+
 bool requiresGhostCommitTimestampForWrite(OperationContext* opCtx, const NamespaceString& nss) {
     if (!nss.isReplicated()) {
         return false;
@@ -92,7 +105,7 @@ void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opC
                             << " cannot be older than current read timestamp "
                             << mySnapshot->toString());
 
-    auto status = opCtx->recoveryUnit()->setTimestamp(commitTimestamp);
+    auto status = setGhostTimestamp(opCtx, commitTimestamp);
     if (status.code() == ErrorCodes::BadValue) {
         log() << "Temporarily could not apply ghost commit timestamp. " << status.reason();
         throw WriteConflictException();
@@ -152,8 +165,8 @@ bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationConte
     if (!requiresGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
         return false;
     }
-    auto status = opCtx->recoveryUnit()->setTimestamp(
-        LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
+    auto status =
+        setGhostTimestamp(opCtx, LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
     if (status.code() == ErrorCodes::BadValue) {
         log() << "Temporarily could not timestamp the index build commit, retrying. "
               << status.reason();
