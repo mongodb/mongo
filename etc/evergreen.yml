@@ -7165,15 +7165,16 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 31
 
-- name: sharding_last_stable_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "multiversion"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      use_multiversion: /data/multiversion
-      resmoke_args: ""
-      fallback_num_sub_suites: 24
+# TODO SERVER-47147: Enable this suite when FCV is bumped to 4.6
+#- name: sharding_last_stable_mongos_and_mixed_shards_gen
+#  tags: ["sharding", "common", "multiversion"]
+#  commands:
+#  - func: "generate resmoke tasks"
+#    vars:
+#      use_large_distro: "true"
+#      use_multiversion: /data/multiversion
+#      resmoke_args: ""
+#      fallback_num_sub_suites: 24
 
 - <<: *task_template
   name: snmp
