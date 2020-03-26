@@ -1172,9 +1172,10 @@ function appendSetParameterArgs(argArray) {
             // New mongod-specific option in 4.3.x.
             if (!programMajorMinorVersion || programMajorMinorVersion >= 430) {
                 // Allow the parameter to be overridden if set explicitly via TestData.
-                if (jsTest.options()
-                            .setParameters['oplogApplicationEnforcesSteadyStateConstraints'] ===
-                        undefined &&
+                if ((jsTest.options().setParameters === undefined ||
+                     jsTest.options()
+                             .setParameters['oplogApplicationEnforcesSteadyStateConstraints'] ===
+                         undefined) &&
                     !argArrayContainsSetParameterValue(
                         'oplogApplicationEnforcesSteadyStateConstraints=')) {
                     argArray.push(...['--setParameter',
