@@ -364,14 +364,16 @@ public:
 
             if (!status.isOK()) {
                 // The reload itself was interrupted or confused here
-
-                errmsg = str::stream()
-                    << "could not refresh metadata for " << nss.ns()
-                    << " with requested shard version " << requestedVersion.toString()
-                    << ", stored shard version is " << currVersion.toString()
-                    << causedBy(redact(status));
-
-                LOGV2_WARNING(22058, "{errmsg}", "errmsg"_attr = errmsg);
+                LOGV2_WARNING(
+                    22058,
+                    "Could not refresh metadata for the namespace {namespace} with the requested "
+                    "shard version {requestedShardVersion}; the current shard version is "
+                    "{currentShardVersion}: {error}",
+                    "Could not refresh metadata",
+                    "namespace"_attr = nss.ns(),
+                    "requestedShardVersion"_attr = requestedVersion,
+                    "currentShardVersion"_attr = currVersion,
+                    "error"_attr = redact(status));
 
                 result.append("ns", nss.ns());
                 result.append("code", status.code());
@@ -383,14 +385,19 @@ public:
             } else if (!requestedVersion.isWriteCompatibleWith(currVersion)) {
                 // We reloaded a version that doesn't match the version mongos was trying to
                 // set.
-                errmsg = str::stream() << "requested shard version differs from"
-                                       << " config shard version for " << nss.ns()
-                                       << ", requested version is " << requestedVersion.toString()
-                                       << " but found version " << currVersion.toString();
-
                 static Occasionally sampler;
                 if (sampler.tick()) {
-                    LOGV2_WARNING(22059, "{errmsg}", "errmsg"_attr = errmsg);
+                    LOGV2_WARNING(
+                        22059,
+                        "Requested shard version differs from the authoritative (current) shard "
+                        "version for the namespace {namespace}; the requested version is "
+                        "{requestedShardVersion}, but the current version is "
+                        "{currentShardVersion}",
+                        "Requested shard version differs from the authoritative (current) shard "
+                        "version for this namespace",
+                        "namespace"_attr = nss.ns(),
+                        "requestedShardVersion"_attr = requestedVersion,
+                        "currentShardVersion"_attr = currVersion);
                 }
 
                 // WARNING: the exact fields below are important for compatibility with mongos
