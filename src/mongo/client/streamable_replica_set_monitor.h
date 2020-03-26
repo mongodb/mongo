@@ -229,6 +229,7 @@ private:
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     std::unique_ptr<StreamableReplicaSetMonitorErrorHandler> _errorHandler;
     ServerIsMasterMonitorPtr _isMasterMonitor;
+    std::shared_ptr<ServerPingMonitor> _pingMonitor;
 
     // This object will be registered as a TopologyListener if there are
     // any outstanding queries for this RSM instance.

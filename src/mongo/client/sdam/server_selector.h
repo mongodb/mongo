@@ -177,10 +177,12 @@ private:
 // This is used to filter out servers based on their current latency measurements.
 struct LatencyWindow {
     const IsMasterRTT lower;
-    const IsMasterRTT upper;
+    IsMasterRTT upper;
 
     explicit LatencyWindow(const IsMasterRTT lowerBound, const IsMasterRTT windowWidth)
-        : lower(lowerBound), upper(lowerBound + windowWidth) {}
+        : lower(lowerBound) {
+        upper = (lowerBound == IsMasterRTT::max()) ? lowerBound : lowerBound + windowWidth;
+    }
 
     bool isWithinWindow(IsMasterRTT latency);
 

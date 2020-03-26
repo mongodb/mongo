@@ -117,7 +117,8 @@ private:
     void parseTypeFromIsMaster(const BSONObj isMaster);
 
 
-    void calculateRtt(const IsMasterRTT currentRtt, const boost::optional<IsMasterRTT> lastRtt);
+    void calculateRtt(const boost::optional<IsMasterRTT> currentRtt,
+                      const boost::optional<IsMasterRTT> lastRtt);
     void saveLastWriteInfo(BSONObj lastWriteBson);
 
     void storeHostListIfPresent(const std::string key,
