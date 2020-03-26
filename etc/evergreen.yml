@@ -6148,6 +6148,15 @@ tasks:
       fallback_num_sub_suites: 1
 
 - <<: *task_template
+  name: causally_consistent_hedged_reads_jscore_passthrough
+  tags: ["causally_consistent"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=causally_consistent_hedged_reads_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharded_collections_causally_consistent_jscore_txns_passthrough
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
   commands:
