@@ -33,4 +33,13 @@ namespace mongo {
 
 void setWindowsUnhandledExceptionFilter();
 
+#ifdef _WIN32
+
+/**
+ * Windows unhandled exception filter
+ */
+LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers);
+
+#endif
+
 }  // namespace mongo

@@ -130,6 +130,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
 
     CloseHandle(hFile);
 }
+}  // namespace
 
 LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
     char exceptionString[128];
@@ -193,7 +194,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
     // We won't reach here
     return EXCEPTION_EXECUTE_HANDLER;
 }
-}  // namespace
+
 
 LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
 
