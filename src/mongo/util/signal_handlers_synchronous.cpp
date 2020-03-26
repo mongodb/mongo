@@ -76,8 +76,31 @@ const char* strsignal(int signalNum) {
     }
 }
 
+int sehExceptionFilter(unsigned int code, struct _EXCEPTION_POINTERS* excPointers) {
+    exceptionFilter(excPointers);
+
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// Follow SEH conventions by defining a status code per their conventions
+// Bit 31-30: 11 = ERROR
+// Bit 29:     1 = Client bit, i.e. a user-defined code
+#define STATUS_EXIT_ABRUPT 0xE0000001
+
+// Historically we relied on raising SEH exception and letting the unhandled exception handler then
+// handle it to that we can dump the process. This works in all but one case.
+// The C++ terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
+// exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
+// exception and take the dump bypassing the unhandled exception handler.
+//
 void endProcessWithSignal(int signalNum) {
-    RaiseException(EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+
+    __try {
+        RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+    } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
+        // The exception filter exits the process
+        quickExit(EXIT_ABRUPT);
+    }
 }
 
 #else
