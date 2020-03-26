@@ -241,7 +241,10 @@ void MigrationDestinationManager::setState(State newState) {
 }
 
 void MigrationDestinationManager::_setStateFail(StringData msg) {
-    LOGV2(21998, "{msg}", "msg"_attr = msg);
+    LOGV2(21998,
+          "Error during migration: {error}",
+          "Error during migration",
+          "error"_attr = redact(msg));
     {
         stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
@@ -253,7 +256,10 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
 }
 
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
-    LOGV2_WARNING(22010, "{msg}", "msg"_attr = msg);
+    LOGV2_WARNING(22010,
+                  "Error during migration: {error}",
+                  "Error during migration",
+                  "error"_attr = redact(msg));
     {
         stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
@@ -433,8 +439,9 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Error(51008));
             LOGV2(21999,
-                  "Batch insertion failed {causedBy_exceptionToStatus}",
-                  "causedBy_exceptionToStatus"_attr = causedBy(redact(exceptionToStatus())));
+                  "Batch insertion failed: {error}",
+                  "Batch insertion failed",
+                  "error"_attr = redact(exceptionToStatus()));
         }
     }};
 
@@ -817,13 +824,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     invariant(!_max.isEmpty());
 
     LOGV2(22000,
-          "Starting receiving end of migration of chunk {min} -> {max} for collection {nss_ns} "
-          "from {fromShard} at epoch {epoch} with session id {sessionId}",
-          "min"_attr = redact(_min),
-          "max"_attr = redact(_max),
-          "nss_ns"_attr = _nss.ns(),
+          "Starting receiving end of migration of chunk {chunkMin} -> {chunkMax} for collection "
+          "{namespace} from {fromShard} at epoch {epoch} with session id {sessionId}",
+          "Starting receiving end of chunk migration",
+          "chunkMin"_attr = redact(_min),
+          "chunkMax"_attr = redact(_max),
+          "namespace"_attr = _nss.ns(),
           "fromShard"_attr = _fromShard,
-          "epoch"_attr = _epoch.toString(),
+          "epoch"_attr = _epoch,
           "sessionId"_attr = *_sessionId,
           "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
 
@@ -834,7 +842,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     if (initialState == ABORT) {
         LOGV2_ERROR(22013,
-                    "Migration abort requested before it started",
+                    "Migration abort requested before the migration started",
                     "migrationId"_attr =
                         _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
         return;
@@ -857,9 +865,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             while (migrationutil::checkForConflictingDeletions(
                 outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
                 LOGV2(22001,
-                      "Migration paused because range overlaps with a "
-                      "range that is scheduled for deletion: collection: {nss_ns} range: {range}",
-                      "nss_ns"_attr = _nss.ns(),
+                      "Migration paused because the requested range {range} for {namespace} "
+                      "overlaps with a range already scheduled for deletion",
+                      "Migration paused because the requested range overlaps with a range already "
+                      "scheduled for deletion",
+                      "namespace"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()),
                       "migrationId"_attr =
                           _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
@@ -1005,8 +1015,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                             _writeConcern);
                     if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                         LOGV2_WARNING(22011,
-                                      "secondaryThrottle on, but doc insert timed out; "
-                                      "continuing",
+                                      "secondaryThrottle on, but doc insert timed out; continuing",
                                       "migrationId"_attr = _enableResumableRangeDeleter
                                           ? _migrationId->toBSON()
                                           : BSONObj());
@@ -1292,18 +1301,25 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                                     autoColl.getDb(),
                                     updatedDoc,
                                     &localDoc)) {
-                const std::string errMsg = str::stream()
-                    << "cannot migrate chunk, local document " << redact(localDoc)
-                    << " has same _id as reloaded remote document " << redact(updatedDoc);
-                LOGV2_WARNING(22012,
-                              "{errMsg}",
-                              "errMsg"_attr = errMsg,
-                              "migrationId"_attr = _enableResumableRangeDeleter
-                                  ? _migrationId->toBSON()
-                                  : BSONObj());
+                const auto migrationId =
+                    _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj();
+
+                LOGV2_WARNING(
+                    22012,
+                    "Cannot migrate chunk because the local document {localDoc} has the same _id "
+                    "as the reloaded remote document {remoteDoc}",
+                    "Cannot migrate chunk because the local document has the same _id as the "
+                    "reloaded remote document",
+                    "localDoc"_attr = redact(localDoc),
+                    "remoteDoc"_attr = redact(updatedDoc),
+                    "migrationId"_attr = migrationId);
 
                 // Exception will abort migration cleanly
-                uasserted(16977, errMsg);
+                uasserted(16977,
+                          str::stream() << "Cannot migrate chunk because the local document "
+                                        << redact(localDoc)
+                                        << " has the same _id as the reloaded remote document "
+                                        << redact(updatedDoc) << "; migrationId: " << migrationId);
             }
 
             // We are in write lock here, so sure we aren't killing
@@ -1326,12 +1342,14 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
         static Occasionally sampler;
         if (sampler.tick()) {
             LOGV2(22007,
-                  "migrate commit waiting for a majority of slaves for '{nss_ns}' {min} -> {max} "
-                  "waiting for: {op}",
-                  "nss_ns"_attr = _nss.ns(),
-                  "min"_attr = redact(_min),
-                  "max"_attr = redact(_max),
-                  "op"_attr = op,
+                  "Migration commit waiting for majority replication for {namespace}, "
+                  "{chunkMin} -> {chunkMax}; waiting to reach this operation: {lastOpApplied}",
+                  "Migration commit waiting for majority replication; waiting until the last "
+                  "operation applied has been replicated",
+                  "namespace"_attr = _nss.ns(),
+                  "chunkMin"_attr = redact(_min),
+                  "chunkMax"_attr = redact(_max),
+                  "lastOpApplied"_attr = op,
                   "migrationId"_attr =
                       _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
         }
@@ -1339,10 +1357,11 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     }
 
     LOGV2(22008,
-          "migrate commit succeeded flushing to secondaries for '{nss_ns}' {min} -> {max}",
-          "nss_ns"_attr = _nss.ns(),
-          "min"_attr = redact(_min),
-          "max"_attr = redact(_max),
+          "Migration commit succeeded flushing to secondaries for {namespace}, {min} -> {max}",
+          "Migration commit succeeded flushing to secondaries",
+          "namespace"_attr = _nss.ns(),
+          "chunkMin"_attr = redact(_min),
+          "chunkMax"_attr = redact(_max),
           "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
 
     return true;
@@ -1395,9 +1414,11 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
     if (!optMetadata || !(*optMetadata)->isSharded() ||
         (_collUuid && !(*optMetadata)->uuidMatches(*_collUuid))) {
         LOGV2(22009,
-              "No need to forget pending chunk {range} because the uuid for {nss_ns} changed",
+              "No need to forget pending chunk {range} because the UUID for {namespace} changed",
+              "No need to forget pending chunk for the requested range, because the UUID for the "
+              "namespace changed",
               "range"_attr = redact(range.toString()),
-              "nss_ns"_attr = _nss.ns());
+              "namespace"_attr = _nss.ns());
         return;
     }
 

@@ -88,8 +88,10 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
             LOGV2(22053,
-                  "Failed to handle stale version exception{causedBy_handleMismatchStatus}",
-                  "causedBy_handleMismatchStatus"_attr = causedBy(redact(handleMismatchStatus)));
+                  "Failed to handle stale version exception as part of the current operation: "
+                  "{error}",
+                  "Failed to handle stale version exception as part of the current operation",
+                  "error"_attr = redact(handleMismatchStatus));
     } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
         auto handleMismatchStatus = onDbVersionMismatchNoExcept(_opCtx,
                                                                 staleInfo->getDb(),
@@ -97,8 +99,10 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                                                                 staleInfo->getVersionWanted());
         if (!handleMismatchStatus.isOK())
             LOGV2(22054,
-                  "Failed to handle database version exception{causedBy_handleMismatchStatus}",
-                  "causedBy_handleMismatchStatus"_attr = causedBy(redact(handleMismatchStatus)));
+                  "Failed to handle database version exception as part of the current operation: "
+                  "{error}",
+                  "Failed to database version exception as part of the current operation",
+                  "error"_attr = redact(handleMismatchStatus));
     }
 }
 

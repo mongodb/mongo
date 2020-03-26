@@ -75,8 +75,9 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     LOGV2(22042,
-          "Moving {dbname} primary from: {fromShard} to: {toShard}",
-          "dbname"_attr = _dbname,
+          "Moving {db} primary from: {fromShard} to: {toShard}",
+          "Moving primary for database",
+          "db"_attr = _dbname,
           "fromShard"_attr = _fromShard,
           "toShard"_attr = _toShard);
 
@@ -231,8 +232,10 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         // done
         LOGV2(22044,
               "Error occurred while committing the movePrimary. Performing a majority write "
-              "against the config server to obtain its latest optime{causedBy_commitStatus}",
-              "causedBy_commitStatus"_attr = causedBy(redact(commitStatus)));
+              "against the config server to obtain its latest optime: {error}",
+              "Error occurred while committing the movePrimary. Performing a majority write "
+              "against the config server to obtain its latest optime",
+              "error"_attr = redact(commitStatus));
 
         Status validateStatus = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
@@ -324,9 +327,10 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
         Status dropStatus = getStatusFromCommandResult(dropCollResult);
         if (!dropStatus.isOK()) {
             LOGV2(22045,
-                  "failed to drop cloned collection {coll}{causedBy_dropStatus}",
-                  "coll"_attr = coll,
-                  "causedBy_dropStatus"_attr = causedBy(redact(dropStatus)));
+                  "Failed to drop cloned collection {namespace} in movePrimary: {error}",
+                  "Failed to drop cloned collection in movePrimary",
+                  "namespace"_attr = coll,
+                  "error"_attr = redact(dropStatus));
         }
     }
 
@@ -353,9 +357,11 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
         BSONObjBuilder requestArgsBSON;
         _requestArgs.serialize(&requestArgsBSON);
         LOGV2_WARNING(22046,
-                      "Failed to clean up movePrimary: {requestArgsBSON_obj}due to: {ex}",
-                      "requestArgsBSON_obj"_attr = redact(requestArgsBSON.obj()),
-                      "ex"_attr = redact(ex));
+                      "Failed to clean up movePrimary with request parameters {request} due to: "
+                      "{error}",
+                      "Failed to clean up movePrimary",
+                      "request"_attr = redact(requestArgsBSON.obj()),
+                      "error"_attr = redact(ex));
     }
 }
 

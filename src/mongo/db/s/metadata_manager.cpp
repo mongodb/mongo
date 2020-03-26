@@ -225,19 +225,25 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
         activeMetadata.getCollVersion() >= remoteMetadata.getCollVersion()) {
         LOGV2_DEBUG(21984,
                     1,
-                    "Ignoring update of active metadata {activeMetadata_Basic} with an older "
-                    "{remoteMetadata_Basic}",
-                    "activeMetadata_Basic"_attr = activeMetadata.toStringBasic(),
-                    "remoteMetadata_Basic"_attr = remoteMetadata.toStringBasic());
+                    "Ignoring incoming metadata update {activeMetadata} for {namespace} because "
+                    "the active (current) metadata {remoteMetadata} has the same or a newer "
+                    "collection version",
+                    "Ignoring incoming metadata update for this namespace because the active "
+                    "(current) metadata has the same or a newer collection version",
+                    "namespace"_attr = _nss.ns(),
+                    "activeMetadata"_attr = activeMetadata.toStringBasic(),
+                    "remoteMetadata"_attr = remoteMetadata.toStringBasic());
         return;
     }
 
     LOGV2(21985,
-          "Updating metadata for collection {nss_ns} from {activeMetadata_Basic} to "
-          "{remoteMetadata_Basic} due to version change",
-          "nss_ns"_attr = _nss.ns(),
-          "activeMetadata_Basic"_attr = activeMetadata.toStringBasic(),
-          "remoteMetadata_Basic"_attr = remoteMetadata.toStringBasic());
+          "Updating metadata {activeMetadata} for {namespace} because the remote metadata "
+          "{remoteMetadata} has a newer collection version",
+          "Updating metadata for this namespace because the remote metadata has a newer "
+          "collection version",
+          "namespace"_attr = _nss.ns(),
+          "activeMetadata"_attr = activeMetadata.toStringBasic(),
+          "remoteMetadata"_attr = remoteMetadata.toStringBasic());
 
     // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
@@ -252,10 +258,11 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
         // deem it successfully received
         LOGV2_DEBUG(21986,
                     2,
-                    "Verified chunk {receivingRange} for collection {nss_ns} has been migrated to "
-                    "this shard earlier",
-                    "receivingRange"_attr = redact(receivingRange.toString()),
-                    "nss_ns"_attr = _nss.ns());
+                    "Chunk {range} for {namespace} has already been migrated to this "
+                    "shard",
+                    "The incoming chunk migration for this shard has already been completed",
+                    "range"_attr = redact(receivingRange.toString()),
+                    "namespace"_attr = _nss.ns());
 
         _receivingChunks.erase(it);
         it = _receivingChunks.begin();
@@ -361,9 +368,11 @@ SharedSemiFuture<void> MetadataManager::beginReceive(ChunkRange const& range) {
 
     LOGV2_OPTIONS(21987,
                   {logv2::LogComponent::kShardingMigration},
-                  "Scheduling deletion of any documents in {nss_ns} range {range} before migrating "
-                  "in a chunk covering the range",
-                  "nss_ns"_attr = _nss.ns(),
+                  "Scheduling deletion of any documents in {namespace} range {range} before "
+                  "migrating in a chunk covering the range",
+                  "Scheduling deletion of any documents in the collection's specified range "
+                  "before migrating chunks into said range",
+                  "namespace"_attr = _nss.ns(),
                   "range"_attr = redact(range.toString()));
 
     return _submitRangeForDeletion(lg,
@@ -379,12 +388,15 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
     // This is potentially a partially received chunk, which needs to be cleaned up. We know none
     // of these documents are in use, so they can go straight to the deletion queue.
-    LOGV2_OPTIONS(21988,
-                  {logv2::LogComponent::kShardingMigration},
-                  "Abandoning in-migration of {nss_ns} range {range}; scheduling deletion of any "
-                  "documents already copied",
-                  "nss_ns"_attr = _nss.ns(),
-                  "range"_attr = range);
+    LOGV2_OPTIONS(
+        21988,
+        {logv2::LogComponent::kShardingMigration},
+        "Abandoning incoming migration for {namespace} range {range}; scheduling deletion of any "
+        "documents already copied",
+        "Abandoning migration for the collection's specified range; scheduling deletion of any "
+        "documents already copied",
+        "namespace"_attr = _nss.ns(),
+        "range"_attr = redact(range.toString()));
 
     invariant(!_overlapsInUseChunk(lg, range));
 
@@ -422,9 +434,11 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
     if (overlapMetadata) {
         LOGV2_OPTIONS(21989,
                       {logv2::LogComponent::kShardingMigration},
-                      "Deletion of {nss_ns} range {range} will be scheduled after all possibly "
+                      "Deletion of {namespace} range {range} will be scheduled after all possibly "
                       "dependent queries finish",
-                      "nss_ns"_attr = _nss.ns(),
+                      "Deletion of the collection's specified range will be scheduled after all "
+                      "possibly dependent queries finish",
+                      "namespace"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()));
         ++overlapMetadata->numContingentRangeDeletionTasks;
         // Schedule the range for deletion once the overlapping metadata object is destroyed
@@ -439,8 +453,9 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         // No running queries can depend on this range, so queue it for deletion immediately.
         LOGV2_OPTIONS(21990,
                       {logv2::LogComponent::kShardingMigration},
-                      "Scheduling deletion of {nss_ns} range {range}",
-                      "nss_ns"_attr = _nss.ns(),
+                      "Scheduling deletion of {namespace} range {range}",
+                      "Scheduling deletion of the collection's specified range",
+                      "namespace"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()));
 
         return _submitRangeForDeletion(lg,

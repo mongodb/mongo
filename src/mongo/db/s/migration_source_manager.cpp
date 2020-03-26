@@ -153,10 +153,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             _args.getFromShardId() != _args.getToShardId());
 
     LOGV2(22016,
-          "Starting chunk migration {args} with expected collection version epoch "
-          "{args_getVersionEpoch}",
-          "args"_attr = redact(_args.toString()),
-          "args_getVersionEpoch"_attr = _args.getVersionEpoch(),
+          "Starting chunk migration donation {requestParameters} with expected collection epoch "
+          "{collectionEpoch}",
+          "Starting chunk migration donation",
+          "requestParameters"_attr = redact(_args.toString()),
+          "collectionEpoch"_attr = _args.getVersionEpoch(),
           "resumableRangeDeleterEnabled"_attr = _enableResumableRangeDeleter);
 
     // Force refresh of the metadata to ensure we have the latest
@@ -501,11 +502,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     }
 
     // Migration succeeded
-    LOGV2(
-        22018,
-        "Migration succeeded and updated collection version to {refreshedMetadata_getCollVersion}",
-        "refreshedMetadata_getCollVersion"_attr = refreshedMetadata->getCollVersion(),
-        "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
+    LOGV2(22018,
+          "Migration succeeded and updated collection version to {updatedCollectionVersion}",
+          "Migration succeeded and updated collection version",
+          "updatedCollectionVersion"_attr = refreshedMetadata->getCollVersion(),
+          "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
 
     if (_enableResumableRangeDeleter) {
         _coordinator->setMigrationDecision(
@@ -550,8 +551,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (_enableResumableRangeDeleter) {
         if (_args.getWaitForDelete()) {
             LOGV2(22019,
-                  "Waiting for cleanup of {getNss_ns} range {range}",
-                  "getNss_ns"_attr = getNss().ns(),
+                  "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
+                  "and range {range}",
+                  "Waiting for migration cleanup after chunk commit",
+                  "namespace"_attr = getNss().ns(),
                   "range"_attr = redact(range.toString()),
                   "migrationId"_attr = _coordinator->getMigrationId());
 
@@ -574,8 +577,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
         if (_args.getWaitForDelete()) {
             LOGV2(22020,
-                  "Waiting for cleanup of {getNss_ns} range {range}",
-                  "getNss_ns"_attr = getNss().ns(),
+                  "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
+                  "and range {range}",
+                  "Waiting for migration cleanup after chunk commit",
+                  "namespace"_attr = getNss().ns(),
                   "range"_attr = redact(range.toString()));
 
             auto deleteStatus = cleanupCompleteFuture.getNoThrow(_opCtx);
@@ -593,8 +598,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                     orphanedRangeCleanUpErrMsg + redact(cleanupCompleteFuture.getNoThrow(_opCtx))};
         } else {
             LOGV2(22021,
-                  "Leaving cleanup of {getNss_ns} range {range} to complete in background",
-                  "getNss_ns"_attr = getNss().ns(),
+                  "Leaving migration cleanup after chunk commit to complete in background; "
+                  "namespace: {namespace}, range: {range}",
+                  "Leaving migration cleanup after chunk commit to complete in background",
+                  "namespace"_attr = getNss().ns(),
                   "range"_attr = redact(range.toString()));
         }
     }
@@ -619,9 +626,11 @@ void MigrationSourceManager::cleanupOnError() {
         _cleanup();
     } catch (const DBException& ex) {
         LOGV2_WARNING(22022,
-                      "Failed to clean up migration: {args}due to: {ex}",
-                      "args"_attr = redact(_args.toString()),
-                      "ex"_attr = redact(ex),
+                      "Failed to clean up migration with request parameters "
+                      "{chunkMigrationRequestParameters} due to: {error}",
+                      "Failed to clean up migration",
+                      "chunkMigrationRequestParameters"_attr = redact(_args.toString()),
+                      "error"_attr = redact(ex),
                       "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
     }
 }
