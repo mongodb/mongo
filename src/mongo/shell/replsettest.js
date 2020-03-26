@@ -1204,6 +1204,55 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        // Wait for 2 keys to appear before adding the other nodes. This is to prevent replica
+        // set configurations from interfering with the primary to generate the keys. One example
+        // of problematic configuration are delayed secondaries, which impedes the primary from
+        // generating the second key due to timeout waiting for write concern.
+        let shouldWaitForKeys = true;
+        if (self.waitForKeys != undefined) {
+            shouldWaitForKeys = self.waitForKeys;
+            print("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
+        } else {
+            Object.keys(self.nodeOptions).forEach(function(key, index) {
+                let val = self.nodeOptions[key];
+                if (typeof (val) === "object" &&
+                    (val.hasOwnProperty("shardsvr") ||
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
+                    shouldWaitForKeys = false;
+                    print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
+                }
+            });
+            if (self.startOptions != undefined) {
+                let val = self.startOptions;
+                if (typeof (val) === "object" &&
+                    (val.hasOwnProperty("shardsvr") ||
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
+                    shouldWaitForKeys = false;
+                    print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
+                }
+            }
+        }
+        /**
+         * Blocks until the primary node generates cluster time sign keys.
+         */
+        if (shouldWaitForKeys) {
+            var timeout = self.kDefaultTimeoutMS;
+            asCluster(this.nodes, function(timeout) {
+                print("Waiting for keys to sign $clusterTime to be generated");
+                assert.soonNoExcept(function(timeout) {
+                    var keyCnt = self.getPrimary(timeout)
+                                     .getCollection('admin.system.keys')
+                                     .find({purpose: 'HMAC'})
+                                     .itcount();
+                    return keyCnt >= 2;
+                }, "Awaiting keys", timeout);
+            });
+        }
+
         // Allow nodes to find sync sources more quickly. We also turn down the heartbeat interval
         // to speed up the initiation process. We use a failpoint so that we can easily turn this
         // behavior on/off without doing a reconfig. This is only an optimization so it's OK if we
@@ -1270,51 +1319,6 @@ var ReplSetTest = function(opts) {
             print("Running awaitHighestPriorityNodeIsPrimary() during ReplSetTest initialization " +
                   "failed with Unauthorized error, proceeding even though we aren't guaranteed " +
                   "that the highest priority node is primary");
-        }
-
-        let shouldWaitForKeys = true;
-        if (self.waitForKeys != undefined) {
-            shouldWaitForKeys = self.waitForKeys;
-            print("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
-        } else {
-            Object.keys(self.nodeOptions).forEach(function(key, index) {
-                let val = self.nodeOptions[key];
-                if (typeof (val) === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                     val.hasOwnProperty("binVersion") &&
-                         // Should not wait for keys if version is less than 3.6
-                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
-                    shouldWaitForKeys = false;
-                    print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
-                }
-            });
-            if (self.startOptions != undefined) {
-                let val = self.startOptions;
-                if (typeof (val) === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                     val.hasOwnProperty("binVersion") &&
-                         // Should not wait for keys if version is less than 3.6
-                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
-                    shouldWaitForKeys = false;
-                    print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
-                }
-            }
-        }
-        /**
-         * Blocks until the primary node generates cluster time sign keys.
-         */
-        if (shouldWaitForKeys) {
-            var timeout = self.kDefaultTimeoutMS;
-            asCluster(this.nodes, function(timeout) {
-                print("Waiting for keys to sign $clusterTime to be generated");
-                assert.soonNoExcept(function(timeout) {
-                    var keyCnt = self.getPrimary(timeout)
-                                     .getCollection('admin.system.keys')
-                                     .find({purpose: 'HMAC'})
-                                     .itcount();
-                    return keyCnt >= 2;
-                }, "Awaiting keys", timeout);
-            });
         }
 
         // Set 'featureCompatibilityVersion' for the entire replica set, if specified.
