@@ -619,7 +619,7 @@ def process_ecdsa_leaf(cert):
             if cert.get('tags'):
                 if "ocsp" in cert['tags']:
                     if not "responder" in cert['tags']:
-                        f.write('authorityInfoAccess = OCSP;URI:http://localhost:9001/power/level/,OCSP;URI:http://localhost:8100/status/\n')
+                        f.write('authorityInfoAccess = OCSP;URI:http://localhost:9001/power/level,OCSP;URI:http://localhost:8100/status\n')
                         if "must-staple" in cert['tags']:
                             f.write(f'{MUST_STAPLE_KEY_STR}={MUST_STAPLE_VALUE_STR}\n')
         x509args.append('-extfile')
