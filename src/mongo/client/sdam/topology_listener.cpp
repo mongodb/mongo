@@ -26,11 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
-
 #include "mongo/client/sdam/topology_listener.h"
-
-#include "mongo/util/log.h"
 
 namespace mongo::sdam {
 
@@ -120,10 +116,30 @@ void TopologyEventsPublisher::_scheduleNextDelivery() {
 }
 
 void TopologyEventsPublisher::onServerPingFailedEvent(const ServerAddress& hostAndPort,
-                                                      const Status& status) {}
+                                                      const Status& status) {
+    {
+        stdx::lock_guard lock(_eventQueueMutex);
+        EventPtr event = std::make_unique<Event>();
+        event->type = EventType::PING_FAILURE;
+        event->hostAndPort = hostAndPort;
+        event->status = status;
+        _eventQueue.push_back(std::move(event));
+    }
+    _scheduleNextDelivery();
+}
 
 void TopologyEventsPublisher::onServerPingSucceededEvent(IsMasterRTT durationMS,
-                                                         const ServerAddress& hostAndPort) {}
+                                                         const ServerAddress& hostAndPort) {
+    {
+        stdx::lock_guard lock(_eventQueueMutex);
+        EventPtr event = std::make_unique<Event>();
+        event->type = EventType::PING_SUCCESS;
+        event->duration = duration_cast<IsMasterRTT>(durationMS);
+        event->hostAndPort = hostAndPort;
+        _eventQueue.push_back(std::move(event));
+    }
+    _scheduleNextDelivery();
+}
 
 // note that this could be done in batches if it is a bottleneck.
 void TopologyEventsPublisher::_nextDelivery() {
@@ -177,6 +193,13 @@ void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Eve
                 sdam::IsMasterRTT(duration_cast<Milliseconds>(event.duration)),
                 event.hostAndPort,
                 event.reply);
+            break;
+        case EventType::PING_SUCCESS:
+            listener->onServerPingSucceededEvent(duration_cast<IsMasterRTT>(event.duration),
+                                                 event.hostAndPort);
+            break;
+        case EventType::PING_FAILURE:
+            listener->onServerPingFailedEvent(event.hostAndPort, event.status);
             break;
         default:
             MONGO_UNREACHABLE;

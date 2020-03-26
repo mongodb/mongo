@@ -79,8 +79,10 @@ class IsMasterOutcome {
     IsMasterOutcome() = delete;
 
 public:
-    // success constructor
-    IsMasterOutcome(ServerAddress server, BSONObj response, IsMasterRTT rtt)
+    // Success constructor.
+    IsMasterOutcome(ServerAddress server,
+                    BSONObj response,
+                    boost::optional<IsMasterRTT> rtt = boost::none)
         : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
@@ -89,7 +91,7 @@ public:
         }
     }
 
-    // failure constructor
+    // Failure constructor.
     IsMasterOutcome(ServerAddress server, BSONObj response, std::string errorMsg)
         : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {
         const auto topologyVersionField = response.getField("topologyVersion");
@@ -108,16 +110,17 @@ public:
 
 private:
     ServerAddress _server;
-    // indicating the success or failure of the attempt
+    // Indicates the success or failure of the attempt.
     bool _success;
-    // an error message in case of failure
+    // An error message in case of failure.
     std::string _errorMsg;
-    // a document containing the command response (or boost::none if it failed)
+    // A document containing the command response (or boost::none if it failed).
     boost::optional<BSONObj> _response;
-    // the round trip time to execute the command (or null if it failed)
+    // The round trip time to execute the command (or boost::none if it failed or is not the outcome
+    // from an initial handshake exchange).
     boost::optional<IsMasterRTT> _rtt;
-    // indicates how fresh the topology information in this reponse is (or boost::none if it failed
-    // or the response did not include this)
+    // Indicates how fresh the topology information in this reponse is (or boost::none if it failed
+    // or the response did not include this).
     boost::optional<TopologyVersion> _topologyVersion;
 };
 

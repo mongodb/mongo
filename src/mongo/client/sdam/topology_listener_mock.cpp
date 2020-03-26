@@ -34,20 +34,29 @@
 
 namespace mongo::sdam {
 
-void TopologyListenerMock::onServerPingFailedEvent(const ServerAddress& hostAndPort,
-                                                   const Status& status) {
-    stdx::lock_guard lk(_mutex);
-    invariant(!_hasPingResponse_inlock(hostAndPort));
-    _serverPingRTTs.emplace(hostAndPort, status);
-}
-
-void TopologyListenerMock::onServerPingSucceededEvent(IsMasterRTT durationMS,
+void TopologyListenerMock::onServerPingSucceededEvent(IsMasterRTT latency,
                                                       const ServerAddress& hostAndPort) {
     stdx::lock_guard lk(_mutex);
-    invariant(!_hasPingResponse_inlock(hostAndPort));
-    _serverPingRTTs.emplace(hostAndPort, durationMS);
+    auto it = _serverPingRTTs.find(hostAndPort);
+    if (it != _serverPingRTTs.end()) {
+        it->second.emplace_back(latency);
+    } else {
+        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<IsMasterRTT>>{latency});
+    }
 }
 
+void TopologyListenerMock::onServerPingFailedEvent(const ServerAddress& hostAndPort,
+                                                   const Status& errorStatus) {
+    stdx::lock_guard lk(_mutex);
+    // If the map already contains an element for hostAndPort, append to its already existing
+    // vector. Otherwise, create a new vector.
+    auto it = _serverPingRTTs.find(hostAndPort);
+    if (it != _serverPingRTTs.end()) {
+        it->second.emplace_back(errorStatus);
+    } else {
+        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<IsMasterRTT>>{errorStatus});
+    }
+}
 bool TopologyListenerMock::hasPingResponse(const ServerAddress& hostAndPort) {
     stdx::lock_guard lk(_mutex);
     return _hasPingResponse_inlock(hostAndPort);
@@ -57,7 +66,8 @@ bool TopologyListenerMock::_hasPingResponse_inlock(const ServerAddress& hostAndP
     return _serverPingRTTs.find(hostAndPort) != _serverPingRTTs.end();
 }
 
-StatusWith<IsMasterRTT> TopologyListenerMock::getPingResponse(const ServerAddress& hostAndPort) {
+std::vector<StatusWith<IsMasterRTT>> TopologyListenerMock::getPingResponse(
+    const ServerAddress& hostAndPort) {
     stdx::lock_guard lk(_mutex);
     invariant(_hasPingResponse_inlock(hostAndPort));
     auto it = _serverPingRTTs.find(hostAndPort);

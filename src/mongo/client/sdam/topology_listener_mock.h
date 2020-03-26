@@ -39,9 +39,10 @@ class TopologyListenerMock : public TopologyListener {
 public:
     TopologyListenerMock() = default;
     virtual ~TopologyListenerMock() = default;
+
+    void onServerPingSucceededEvent(IsMasterRTT latency, const ServerAddress& hostAndPort) override;
+
     void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status) override;
-    void onServerPingSucceededEvent(IsMasterRTT durationMS,
-                                    const ServerAddress& hostAndPort) override;
 
     /**
      * Acquires _mutex before calling _hasPingResponse_inlock().
@@ -58,11 +59,11 @@ public:
      * Returns the response for the most recent onServerPing event. MUST be called after a ping has
      * been sent and proccessed in order to remove it from the map and make room for the next.
      */
-    StatusWith<IsMasterRTT> getPingResponse(const ServerAddress& hostAndPort);
+    std::vector<StatusWith<IsMasterRTT>> getPingResponse(const ServerAddress& hostAndPort);
 
 private:
     Mutex _mutex;
-    stdx::unordered_map<ServerAddress, StatusWith<IsMasterRTT>> _serverPingRTTs;
+    stdx::unordered_map<ServerAddress, std::vector<StatusWith<IsMasterRTT>>> _serverPingRTTs;
 };
 
 }  // namespace mongo::sdam

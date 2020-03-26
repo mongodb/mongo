@@ -62,7 +62,7 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
 
         // type must be parsed before RTT is calculated.
         parseTypeFromIsMaster(response);
-        calculateRtt(*isMasterOutcome.getRtt(), lastRtt);
+        calculateRtt(isMasterOutcome.getRtt(), lastRtt);
 
         _lastUpdateTime = clockSource->now();
         _minWireVersion = response["minWireVersion"].numberInt();
@@ -160,7 +160,7 @@ void ServerDescription::saveStreamable(BSONElement streamableField) {
     _streamable = streamableField && streamableField.Bool();
 }
 
-void ServerDescription::calculateRtt(const IsMasterRTT currentRtt,
+void ServerDescription::calculateRtt(const boost::optional<IsMasterRTT> currentRtt,
                                      const boost::optional<IsMasterRTT> lastRtt) {
     if (getType() == ServerType::kUnknown) {
         // if a server's type is Unknown, it's RTT is null
@@ -169,12 +169,28 @@ void ServerDescription::calculateRtt(const IsMasterRTT currentRtt,
         return;
     }
 
-    if (lastRtt) {
-        // new_rtt = alpha * x + (1 - alpha) * old_rtt
-        _rtt = IsMasterRTT(static_cast<IsMasterRTT::rep>(kRttAlpha * currentRtt.count() +
-                                                         (1 - kRttAlpha) * lastRtt.get().count()));
-    } else {
+    if (currentRtt == boost::none) {
+        // An onServerHeartbeatSucceededEvent occured. Note: This should not be reached by an
+        // onServerHeartbeatFailedEvent. Upon the failed event, the type is set to
+        // ServerType::Unknown.
+
+        // The ServerType is no longer ServerType::Unknown, but the ServerPingMonitor has not
+        // updated the RTT yet. Set the _rtt to max() until the ServerPingMonitor provides the
+        // accurate RTT measurement.
+        if (lastRtt == boost::none) {
+            _rtt = IsMasterRTT::max();
+            return;
+        }
+
+        // Do not update the RTT upon an onServerHeartbeatSucceededEvent.
+        _rtt = lastRtt;
+    } else if (lastRtt == boost::none || lastRtt == IsMasterRTT::max()) {
+        // The lastRtt either does not exist or is not accurate. Discard it and use the currentRtt.
         _rtt = currentRtt;
+    } else {
+        // new_rtt = alpha * x + (1 - alpha) * old_rtt
+        _rtt = IsMasterRTT(static_cast<IsMasterRTT::rep>(kRttAlpha * currentRtt.get().count() +
+                                                         (1 - kRttAlpha) * lastRtt.get().count()));
     }
 }
 
@@ -429,7 +445,8 @@ std::string ServerDescription::toString() const {
 
 ServerDescriptionPtr ServerDescription::cloneWithRTT(IsMasterRTT rtt) {
     auto newServerDescription = std::make_shared<ServerDescription>(*this);
-    newServerDescription->_rtt = rtt;
+    auto lastRtt = newServerDescription->getRtt();
+    newServerDescription->calculateRtt(rtt, lastRtt);
     return newServerDescription;
 }
 

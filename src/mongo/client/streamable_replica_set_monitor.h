@@ -40,6 +40,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_ping_monitor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -201,6 +202,7 @@ private:
     sdam::ServerSelectorPtr _serverSelector;
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     ServerIsMasterMonitorPtr _isMasterMonitor;
+    std::shared_ptr<ServerPingMonitor> _pingMonitor;
 
     // This object will be registered as a TopologyListener if there are
     // any outstanding queries for this RSM instance.
