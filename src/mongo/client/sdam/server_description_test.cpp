@@ -364,35 +364,41 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreRTTNullWhenServerTypeIsUnknown) 
 }
 
 TEST_F(ServerDescriptionTestFixture,
-       ShouldStoreMovingAverageRTTWhenChangingFromOneKnownServerTypeToAnother) {
-    auto response = IsMasterOutcome("foo:1234", kBsonRsPrimary, mongo::Milliseconds(40));
+       ShouldStoreConstantRTTWhenChangingFromOneKnownServerTypeToAnother) {
+    // Simulate a non-ping monitoring response.
+    auto response = IsMasterOutcome("foo:1234", kBsonRsPrimary);
     auto lastServerDescription = ServerDescriptionBuilder()
                                      .withType(ServerType::kRSSecondary)
                                      .withRtt(mongo::Milliseconds(20))
                                      .instance();
-    auto description = ServerDescription(clockSource, response, lastServerDescription->getRtt());
-    ASSERT_EQUALS(24, durationCount<mongo::Milliseconds>(*description.getRtt()));
 
-    auto response2 = IsMasterOutcome("foo:1234", kBsonRsPrimary, mongo::Milliseconds(30));
+    // Check the RTT is unchanged since the IsMasterOutcome does not contain an RTT.
+    auto description = ServerDescription(clockSource, response, lastServerDescription->getRtt());
+    ASSERT_EQUALS(20, durationCount<mongo::Milliseconds>(*description.getRtt()));
+
+    auto response2 = IsMasterOutcome("foo:1234", kBsonRsPrimary);
     auto description2 = ServerDescription(clockSource, response2, description.getRtt());
-    ASSERT_EQUALS(25, durationCount<mongo::Milliseconds>(*description2.getRtt()));
+    ASSERT_EQUALS(20, durationCount<mongo::Milliseconds>(*description2.getRtt()));
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreLastWriteDate) {
-    auto response = IsMasterOutcome("foo:1234", kBsonLastWrite, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonLastWrite, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kLastWriteDate, description.getLastWriteDate());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreOpTime) {
-    auto response = IsMasterOutcome("foo:1234", kBsonLastWrite, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonLastWrite, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kOpTime, description.getOpTime());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreLastUpdateTime) {
     auto testStart = clockSource->now();
-    auto response = IsMasterOutcome("foo:1234", kBsonRsPrimary, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonRsPrimary, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_GREATER_THAN_OR_EQUALS(description.getLastUpdateTime(), testStart);
 }
@@ -400,7 +406,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreLastUpdateTime) {
 // Disabling these tests since this causes jstest failures when
 // running on a host with a mixed case hostname.
 // TEST_F(ServerDescriptionTestFixture, ShouldStoreHostNamesAsLowercase) {
-//    auto response = IsMasterOutcome("FOO:1234", kBsonHostNames, mongo::Milliseconds(40));
+//    auto response = IsMasterOutcome("FOO:1234", kBsonHostNames,
+//    duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
 //    auto description = ServerDescription(clockSource, response);
 //
 //    ASSERT_EQUALS("foo:1234", description.getAddress());
@@ -419,20 +426,23 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreLastUpdateTime) {
 //}
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreMinMaxWireVersion) {
-    auto response = IsMasterOutcome("foo:1234", kBsonWireVersion, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonWireVersion, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kBsonWireVersion["minWireVersion"].Int(), description.getMinWireVersion());
     ASSERT_EQUALS(kBsonWireVersion["maxWireVersion"].Int(), description.getMaxWireVersion());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreTags) {
-    auto response = IsMasterOutcome("foo:1234", kBsonTags, mongo::Milliseconds(40));
+    auto response =
+        IsMasterOutcome("foo:1234", kBsonTags, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(toStringMap(kBsonTags["tags"].Obj()), description.getTags());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreSetVersionAndName) {
-    auto response = IsMasterOutcome("foo:1234", kBsonSetVersionName, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonSetVersionName, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kBsonSetVersionName.getIntField("setVersion"), description.getSetVersion());
     ASSERT_EQUALS(std::string(kBsonSetVersionName.getStringField("setName")),
@@ -440,27 +450,31 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreSetVersionAndName) {
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreElectionId) {
-    auto response = IsMasterOutcome("foo:1234", kBsonElectionId, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonElectionId, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kBsonElectionId.getField("electionId").OID(), description.getElectionId());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStorePrimary) {
-    auto response = IsMasterOutcome("foo:1234", kBsonPrimary, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kBsonPrimary, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(std::string(kBsonPrimary.getStringField("primary")), description.getPrimary());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreLogicalSessionTimeout) {
-    auto response =
-        IsMasterOutcome("foo:1234", kBsonLogicalSessionTimeout, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome("foo:1234",
+                                    kBsonLogicalSessionTimeout,
+                                    duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(kBsonLogicalSessionTimeout.getIntField("logicalSessionTimeoutMinutes"),
                   description.getLogicalSessionTimeoutMinutes());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
-    auto response = IsMasterOutcome("foo:1234", kTopologyVersion, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kTopologyVersion, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto topologyVersion =
         TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                kTopologyVersion.getObjectField("topologyVersion"));
@@ -475,13 +489,15 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreStreamable) {
-    auto response = IsMasterOutcome("foo:1234", kStreamable, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kStreamable, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(true, description.isStreamable());
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStorePoolResetCounter) {
-    auto response = IsMasterOutcome("foo:1234", kStreamable, mongo::Milliseconds(40));
+    auto response = IsMasterOutcome(
+        "foo:1234", kStreamable, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(
         clockSource, response, boost::none /*lastRtt*/, boost::none /*topologyVersion*/, 1);
     ASSERT_EQUALS(1, description.getPoolResetCounter());
@@ -495,7 +511,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreServerAddressOnError) {
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnSuccess) {
-    auto response = IsMasterOutcome("foo:1234", kBsonOk, mongo::Milliseconds(40));
+    auto response =
+        IsMasterOutcome("foo:1234", kBsonOk, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(boost::none, description.getError());
     ASSERT_EQUALS(boost::none, description.getLastWriteDate());

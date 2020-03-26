@@ -33,7 +33,7 @@
 
 #include <memory>
 
-#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/sdam.h"
 #include "mongo/client/sdam/topology_listener_mock.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -161,8 +161,10 @@ protected:
         ASSERT_TRUE(_topologyListener->hasPingResponse(hostAndPort));
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
-        ASSERT(pingResponse.isOK());
 
+        // There should only be one isMaster response queued up.
+        ASSERT_EQ(pingResponse.size(), 1);
+        ASSERT(pingResponse[0].isOK());
         checkNoActivityBefore(deadline, hostAndPort);
     }
 
@@ -176,6 +178,40 @@ protected:
             ASSERT_FALSE(_topologyListener->hasPingResponse(hostAndPort));
             advanceTime(Milliseconds(100));
         }
+    }
+
+    /**
+     * Since the SingleServerPingMonitor is removed upon an onTopologyDescriptionChangedEvent,
+     * prompt the event with a new TopologyDescription that does not include hostToDrop.
+     */
+    void closeMonitor(MockReplicaSet* replSet,
+                      sdam::ServerAddress hostToDrop,
+                      ServerPingMonitor* pingMonitor) {
+        auto hostAndPorts = replSet->getHosts();
+        std::vector<sdam::ServerAddress> hosts;
+        std::transform(hostAndPorts.begin(),
+                       hostAndPorts.end(),
+                       std::back_inserter(hosts),
+                       [](const auto& hostAndPort) { return hostAndPort.toString(); });
+
+        auto sdamConfigOld = sdam::SdamConfiguration(hosts);
+        auto topologyDescriptionOld = std::make_shared<sdam::TopologyDescription>(sdamConfigOld);
+
+
+        std::vector<sdam::ServerAddress> hostsNew(hosts.begin(), hosts.end());
+        hostsNew.erase(std::remove_if(hostsNew.begin(),
+                                      hostsNew.end(),
+                                      [&](auto host) { return host == hostToDrop; }),
+                       hostsNew.end());
+        // Since the seedlist cannot be empty, the new TopologyDescription contains an empty
+        // HostAndPort.
+        if (hostsNew.size() == 0) {
+            hostsNew.emplace_back(HostAndPort().toString());
+        }
+        auto sdamConfigNew = sdam::SdamConfiguration(hostsNew);
+        auto topologyDescriptionNew = std::make_shared<sdam::TopologyDescription>(sdamConfigNew);
+        pingMonitor->onTopologyDescriptionChangedEvent(
+            UUID::gen(), topologyDescriptionOld, topologyDescriptionNew);
     }
 
 private:
@@ -215,8 +251,11 @@ protected:
      * Sets up a SingleServerPingMonitor that starts pinging the server.
      */
     std::shared_ptr<SingleServerPingMonitor> initSingleServerPingMonitor(Seconds pingFrequency) {
-        auto ssPingMonitor = std::make_shared<SingleServerPingMonitor>(
-            _hostAndPort, getTopologyListener(), pingFrequency, getExecutor());
+        auto ssPingMonitor = std::make_shared<SingleServerPingMonitor>(getReplSet()->getURI(),
+                                                                       _hostAndPort,
+                                                                       getTopologyListener(),
+                                                                       pingFrequency,
+                                                                       getExecutor());
         ssPingMonitor->init();
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
@@ -277,7 +316,8 @@ TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
 
         ASSERT_TRUE(topologyListener->hasPingResponse(hostAndPort));
         auto pingResponse = topologyListener->getPingResponse(hostAndPort);
-        ASSERT_EQ(ErrorCodes::HostUnreachable, pingResponse.getStatus());
+        ASSERT_EQ(pingResponse.size(), 1);
+        ASSERT_EQ(ErrorCodes::HostUnreachable, pingResponse[0].getStatus());
 
         checkNoActivityBefore(deadline);
     };
@@ -309,24 +349,23 @@ TEST_F(SingleServerPingMonitorTest, noPingAfterSingleServerPingMonitorClosed) {
 
 class ServerPingMonitorTest : public ServerPingMonitorTestFixture {
 protected:
-    std::unique_ptr<ServerPingMonitor> makeServerPingMonitor(Seconds pingFrequency) {
-        auto executor = boost::optional<std::shared_ptr<executor::TaskExecutor>>(getExecutor());
-        return std::make_unique<ServerPingMonitor>(getTopologyListener(), pingFrequency, executor);
+    std::unique_ptr<ServerPingMonitor> makeServerPingMonitor(const MongoURI& setUri,
+                                                             Seconds pingFrequency) {
+        return std::make_unique<ServerPingMonitor>(
+            setUri, getTopologyListener(), pingFrequency, getExecutor());
     }
 };
 
 /**
- * Adds and removes a SingleServerPingMonitor from the ServerPingMonitor via
- * onServerHandshakeCompleteEvent and onServerClosedEvent.
+ * Adds and removes a SingleServerPingMonitor from the ServerPingMonitor.
  */
 TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
     auto pingFrequency = Seconds(10);
-    auto serverPingMonitor = makeServerPingMonitor(pingFrequency);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+    auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
 
     auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]).toString();
-    auto oid = OID::gen();
 
     // Add a SingleServerPingMonitor to the ServerPingMonitor. Confirm pings are sent to the server
     // at pingFrequency.
@@ -336,7 +375,7 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
 
     // Close the SingleServerMonitor before the third ping and confirm ping activity to the server
     // is stopped.
-    serverPingMonitor->onServerClosedEvent(hostAndPort, oid);
+    closeMonitor(replSet.get(), hostAndPort, serverPingMonitor.get());
     checkNoActivityBefore(elapsed() + pingFrequency * 2, hostAndPort);
 }
 
@@ -346,14 +385,13 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
  */
 TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
     auto pingFrequency = Seconds(10);
-    auto serverPingMonitor = makeServerPingMonitor(pingFrequency);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+    auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
 
     auto hosts = replSet->getHosts();
     auto host0 = hosts[0].toString();
     auto host1 = hosts[1].toString();
-    auto oid0 = OID::gen();
 
     // Add SingleServerPingMonitors for host0 and host1 where host1 is added host1Delay seconds
     // after host0.
@@ -364,7 +402,7 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
     serverPingMonitor->onServerHandshakeCompleteEvent(initialRTT, host1);
     checkSinglePing(pingFrequency - Seconds(2), host1, replSet.get());
 
-    serverPingMonitor->onServerClosedEvent(host0, oid0);
+    closeMonitor(replSet.get(), host0, serverPingMonitor.get());
     checkNoActivityBefore(pingFrequency + host1Delay, host0);
 
     // Confirm that host1's SingleServerPingMonitor continues ping activity.
@@ -378,9 +416,9 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
  */
 TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorMutlipleShutdown) {
     auto pingFrequency = Seconds(10);
-    auto serverPingMonitor = makeServerPingMonitor(pingFrequency);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+    auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
 
     auto hosts = replSet->getHosts();
     auto host0 = hosts[0].toString();

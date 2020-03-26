@@ -74,8 +74,9 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = IsMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionLow, mongo::Milliseconds(40));
+    auto isMasterOutcome = IsMasterOutcome(serverDescription->getAddress(),
+                                           kBsonTopologyVersionLow,
+                                           duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
@@ -83,8 +84,9 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
                       kBsonTopologyVersionLow.getObjectField("topologyVersion"));
 
     // If previous topologyVersion is <= new topologyVersion, should update to new topologyVersion
-    isMasterOutcome = IsMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionHigh, mongo::Milliseconds(40));
+    isMasterOutcome = IsMasterOutcome(serverDescription->getAddress(),
+                                      kBsonTopologyVersionHigh,
+                                      duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
@@ -102,8 +104,9 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnErrorIfSent) {
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = IsMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionLow, mongo::Milliseconds(40));
+    auto isMasterOutcome = IsMasterOutcome(serverDescription->getAddress(),
+                                           kBsonTopologyVersionLow,
+                                           duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
@@ -130,8 +133,9 @@ TEST_F(TopologyManagerTestFixture, ShouldNotUpdateServerDescriptionIfNewTopology
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = IsMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionHigh, mongo::Milliseconds(40));
+    auto isMasterOutcome = IsMasterOutcome(serverDescription->getAddress(),
+                                           kBsonTopologyVersionHigh,
+                                           duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
@@ -139,8 +143,7 @@ TEST_F(TopologyManagerTestFixture, ShouldNotUpdateServerDescriptionIfNewTopology
                       kBsonTopologyVersionHigh.getObjectField("topologyVersion"));
 
     // If isMasterOutcome is not successful, should preserve old topologyVersion
-    isMasterOutcome = IsMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionLow, mongo::Milliseconds(40));
+    isMasterOutcome = IsMasterOutcome(serverDescription->getAddress(), kBsonTopologyVersionLow);
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
@@ -158,8 +161,7 @@ TEST_F(TopologyManagerTestFixture, ShouldNowIncrementPoolResetCounterOnSuccess) 
     ASSERT_EQUALS(serverDescription->getPoolResetCounter(), 0);
 
     // If isMasterOutcome is successful, poolResetCounter should remain the same
-    IsMasterOutcome isMasterOutcome(
-        serverDescription->getAddress(), kBsonOk, mongo::Milliseconds(40));
+    IsMasterOutcome isMasterOutcome(serverDescription->getAddress(), kBsonOk);
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];

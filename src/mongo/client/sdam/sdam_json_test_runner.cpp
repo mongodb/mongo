@@ -192,7 +192,8 @@ public:
             if (bsonIsMaster.nFields() == 0) {
                 _isMasterResponses.push_back(IsMasterOutcome(address, BSONObj(), "network error"));
             } else {
-                _isMasterResponses.push_back(IsMasterOutcome(address, bsonIsMaster, kLatency));
+                _isMasterResponses.push_back(
+                    IsMasterOutcome(address, bsonIsMaster, duration_cast<IsMasterRTT>(kLatency)));
             }
         }
         _topologyOutcome = phase["outcome"].Obj();
