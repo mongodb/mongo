@@ -1,0 +1,164 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # In MongoDB 4.0, transactions are not supported in sharded clusters.
+  - jstests/core/txns/**/*.js
+  # Cannot specify afterClusterTime and afterOpTime.
+  - jstests/core/read_after_optime.js
+  # Not expected to pass with replica-sets.
+  - jstests/core/opcounters_write_cmd.js
+  # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
+  # when connected to mongos.
+  - jstests/core/write_result.js
+  # The following tests fail because a certain command or functionality is not supported on
+  # mongos. This command or functionality is placed in a comment next to the failing test.
+  - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine
+  - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
+  - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
+  - jstests/core/capped_empty.js  # emptycapped.
+  - jstests/core/capped_update.js # uses godinsert and can't run under replication.
+  - jstests/core/check_shard_index.js  # checkShardingIndex.
+  - jstests/core/collection_truncate.js  # emptycapped.
+  - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
+  - jstests/core/compact_keeps_indexes.js  # compact.
+  - jstests/core/currentop.js  # uses fsync.
+  - jstests/core/dbadmin.js  # "local" database.
+  - jstests/core/dbhash.js  # dbhash.
+  - jstests/core/dbhash2.js  # dbhash.
+  - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/dropdb_race.js  # syncdelay.
+  - jstests/core/fsync.js  # uses fsync.
+  - jstests/core/geo_haystack*.js  # geoSearch.
+  - jstests/core/geo_update_btree2.js  # notablescan.
+  - jstests/core/index_id_options.js  # "local" database.
+  - jstests/core/index9.js  # "local" database.
+  - jstests/core/queryoptimizera.js  # "local" database.
+  - jstests/core/stages*.js  # stageDebug.
+  # The following tests fail because mongos behaves differently from mongod when testing certain
+  # functionality. The differences are in a comment next to the failing test.
+  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.
+  - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
+  - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
+  - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+  - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  # Tests that need triaging & remediation | blacklist decision
+  # Comments list possible problem point under review.
+  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+  # Tests that fail for Causal Consistency as they have statements that do not support
+  # non-local read concern.
+  - jstests/core/geo_big_polygon3.js
+  - jstests/core/mr*.js
+  - jstests/core/collation.js
+  - jstests/core/loadserverscripts.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/capped_max1.js
+  - jstests/core/commands_namespace_parsing.js
+  - jstests/core/tailable_cursor_invalidation.js
+  - jstests/core/tailable_getmore_batch_size.js
+  - jstests/core/tailable_skip_limit.js
+  - jstests/core/constructors.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/or4.js
+  - jstests/core/recursion.js
+  # An index drop does not necessarily cause cursors to be killed on the secondary.
+  - jstests/core/ord.js
+  # Parallel shell is not causally consistent
+  - jstests/core/benchrun_pipeline_updates.js
+  - jstests/core/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/cursora.js
+  - jstests/core/find_and_modify_concurrent_update.js
+  - jstests/core/removec.js
+  - jstests/core/shellstartparallel.js
+  # TODO SERVER-30466
+  - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_shell_helpers.js
+  - jstests/core/index_partial_read_ops.js
+  - jstests/core/update_arrayFilters.js
+  # TODO: SERVER-30488
+  - jstests/core/apitest_dbcollection.js
+  - jstests/core/getmore_invalidated_cursors.js
+  - jstests/core/orf.js #explain.executionStats is not CC
+  - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
+  # The following tests fail because of divergent dropCollection behavior between standalones and
+  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+  # we expect a second drop to return status OK.
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
+  # The `dbstats` command builds in-memory structures that are not causally consistent.
+  - jstests/core/dbstats.js
+
+  # The tests below use applyOps, SERVER-1439.
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/rename_stayTemp.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+
+  exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
+  ##
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  ##
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  - requires_collstats
+  # The system.profile collection is not replicated. So the reads from secondaries will not be
+  # consistent with primary.
+  - requires_profiling
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        load("jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js");
+        load('jstests/libs/override_methods/enable_hedged_reads.js');
+        load('jstests/libs/override_methods/causally_consistent_index_builds.js');
+      readMode: commands
+  hooks:
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        #TODO SERVER-47117
+        maxTimeMSForHedgedReads: 10000
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          tracking: 0
+    mongod_options:
+      enableMajorityReadConcern: ''
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          replication:
+            heartbeats: 2
+          tracking: 0
+    num_rs_nodes_per_shard: 3
+    enable_sharding:
+    - test
