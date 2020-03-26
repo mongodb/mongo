@@ -121,7 +121,7 @@ public:
         Registerer& operator=(const Registerer&) = delete;
 
     public:
-        Registerer(std::string name, std::vector<std::string> prereqs = {})
+        explicit Registerer(std::string name, std::vector<std::string> prereqs = {})
             : _registerer(std::move(name),
                           std::move(prereqs),
                           [&](ServiceContext* serviceContext) {
@@ -193,8 +193,7 @@ protected:
      * Used when services need to get a reference to the serviceContext that they are decorating.
      */
     ServiceContext* getServiceContext() {
-        auto* actualService = dynamic_cast<ActualService*>(this);
-        invariant(actualService);
+        auto* actualService = checked_cast<ActualService*>(this);
         return &_decoration.owner(*actualService);
     }
 
