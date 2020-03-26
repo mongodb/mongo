@@ -1,7 +1,5 @@
 /**
- * Test to make sure that the createIndex command gets sent to all shards if the mongos
- * version is last-stable, and to shards that own chunks only if the mongos version is
- * latest.
+ * Test to make sure that the createIndex command gets sent to shards that own chunks.
  */
 (function() {
 'use strict';

@@ -2,10 +2,7 @@
  * Mongos has special targeting behavior for createIndex, reIndex, dropIndex, and collMod:
  *
  * - If called on an unsharded collection, the request is routed only to the primary shard.
- * - If called on a sharded collection, in v4.4 the request is broadcast to shards with chunks;
- *   in previous versions, the request is broadcast to all shards but NamespaceNotFound and
- *   CannotImplicitlyCreateCollection errors do not lead to command failure (though these errors
- *   are reported in the 'raw' shard responses) as long as at least one shard returns success.
+ * - If called on a sharded collection, the request is broadcast to shards with chunks.
  *
  * This test verifies this behavior.
  */

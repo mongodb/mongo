@@ -1,8 +1,6 @@
 /**
  * Tests that the 'allowPartialResults' option to find is respected, and that aggregation does not
  * accept the 'allowPartialResults' option.
- *
- * @tags: [need_fixing_for_46]
  */
 
 // This test shuts down a shard.
@@ -14,7 +12,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
-const isLastStable = (jsTestOptions().mongosBinVersion == "last-stable");
 
 const st = new ShardingTest({shards: 2});
 
@@ -82,7 +79,7 @@ getMoreRes = coll.runCommand(
     {getMore: findRes.cursor.id, collection: collName, batchSize: nRemainingDocs + 1});
 assert.commandWorked(getMoreRes);
 assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
-assert.eq(isLastStable ? undefined : true, getMoreRes.cursor.partialResultsReturned);
+assert.eq(true, getMoreRes.cursor.partialResultsReturned);
 
 jsTest.log("Without 'allowPartialResults', if some shards are down, find fails.");
 assert.commandFailed(coll.runCommand({find: collName}));
@@ -97,7 +94,7 @@ jsTest.log(
 findRes = coll.runCommand({find: collName, allowPartialResults: true, batchSize: batchSize});
 assert.commandWorked(findRes);
 assert.eq(batchSize, findRes.cursor.firstBatch.length);
-assert.eq(isLastStable ? undefined : true, findRes.cursor.partialResultsReturned);
+assert.eq(true, findRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
 jsTest.log(
@@ -106,7 +103,7 @@ getMoreRes =
     coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
 assert.commandWorked(getMoreRes);
 assert.eq(batchSize, getMoreRes.cursor.nextBatch.length);
-assert.eq(isLastStable ? undefined : true, getMoreRes.cursor.partialResultsReturned);
+assert.eq(true, getMoreRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
 jsTest.log(
@@ -114,7 +111,7 @@ jsTest.log(
 getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName});
 assert.commandWorked(getMoreRes);
 assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
-assert.eq(isLastStable ? undefined : true, getMoreRes.cursor.partialResultsReturned);
+assert.eq(true, getMoreRes.cursor.partialResultsReturned);
 
 jsTest.log("The allowPartialResults option does not currently apply to aggregation.");
 assert.commandFailedWithCode(coll.runCommand({
