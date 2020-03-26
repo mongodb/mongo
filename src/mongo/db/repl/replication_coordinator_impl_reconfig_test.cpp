@@ -711,6 +711,9 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
 
 class ReplCoordReconfigTest : public ReplCoordTest {
 public:
+    int counter = 0;
+    std::vector<HostAndPort> initialSyncNodes;
+
     void setUp() {
         setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
     }
@@ -727,14 +730,23 @@ public:
     }
 
     void respondToHeartbeat() {
+        counter++;
+        unittest::log() << "Going to respond to heartbeat " << counter;
         auto net = getNet();
         auto noi = net->getNextReadyRequest();
         auto&& request = noi->getRequest();
+        unittest::log() << "Going to respond to heartbeat request " << counter << ": "
+                        << request.cmdObj << " from " << request.target;
         repl::ReplSetHeartbeatArgsV1 hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
-        hbResp.setState(MemberState::RS_SECONDARY);
+        if (std::find(initialSyncNodes.begin(), initialSyncNodes.end(), request.target) !=
+            initialSyncNodes.end()) {
+            hbResp.setState(MemberState::RS_STARTUP2);
+        } else {
+            hbResp.setState(MemberState::RS_SECONDARY);
+        }
         // Secondaries learn of the config version and term immediately.
         hbResp.setConfigVersion(getReplCoord()->getConfig().getConfigVersion());
         hbResp.setConfigTerm(getReplCoord()->getConfig().getConfigTerm());
@@ -743,8 +755,12 @@ public:
         hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
+        unittest::log() << "Scheduling response to heartbeat request " << counter
+                        << " with response " << hbResp.toBSON();
         net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+        unittest::log() << "Responding to heartbeat request " << counter;
         net->runReadyNetworkOperations();
+        unittest::log() << "Responded to heartbeat request " << counter;
     }
 
     void setUpNewlyAddedFieldTest() {
@@ -775,19 +791,23 @@ public:
     }
 
     void respondToNHeartbeats(int n) {
+        unittest::log() << "Responding to " << n << " heartbeats";
         enterNetwork();
         for (int i = 0; i < n; i++) {
             respondToHeartbeat();
         }
         exitNetwork();
+        unittest::log() << "Responded to " << n << " heartbeats";
     }
 
     void respondToAllHeartbeats() {
+        unittest::log() << "Responding to all heartbeats";
         enterNetwork();
         while (getNet()->hasReadyRequests()) {
             respondToHeartbeat();
         }
         exitNetwork();
+        unittest::log() << "Responded to all heartbeats";
     }
 
     Status doSafeReconfig(OperationContext* opCtx,
@@ -809,6 +829,7 @@ public:
 
         // Consume any outstanding heartbeats that were scheduled after reconfig finished.
         respondToAllHeartbeats();
+
         return status;
     }
 
@@ -1538,7 +1559,7 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
                       "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
-TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedField) {
+TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMember) {
     // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
@@ -1549,6 +1570,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedField) {
     auto opCtx = makeOperationContext();
     // Do a reconfig that adds a new member.
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
+    initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
@@ -1599,6 +1621,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     auto opCtx = makeOperationContext();
     // Do a reconfig that adds a new member.
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
+    initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
@@ -1623,6 +1646,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     // Add another new member to the set.
     members = BSON_ARRAY(member(1, "n1:1")
                          << member(2, "n2:1") << member(3, "n3:1") << member(4, "n4:1"));
+    initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
@@ -1688,6 +1712,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
                                                 << BSON("_id" << 3 << "host"
                                                               << "n3:1"
                                                               << "priority" << 3));
+    initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
@@ -1719,6 +1744,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
                                            << BSON("_id" << 4 << "host"
                                                          << "n4:1"
                                                          << "priority" << 4));
+    initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     startCapturingLogMessages();
     ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));

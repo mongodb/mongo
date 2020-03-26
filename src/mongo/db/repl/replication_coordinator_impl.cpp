@@ -3187,9 +3187,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                     if (newMem.isArbiter()) {
                         continue;
                     }
-
-                    const int newMemId = newMem.getId().getData();
-                    const auto oldMem = oldConfig.findMemberByID(newMemId);
+                    const auto newMemId = newMem.getId();
+                    const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
 
                     const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
                     const bool isCurrentlyNewlyAdded =
@@ -3199,7 +3198,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                     // 1) Is a new, voting node
                     // 2) Already has a 'newlyAdded' field in the old config
                     if (isNewVotingMember || isCurrentlyNewlyAdded) {
-                        newConfig.setNewlyAddedFieldForMemberAtIndex(i, true);
+                        newConfig.addNewlyAddedFieldForMember(newMemId);
                         addedNewlyAddedField = true;
                     }
                 }
@@ -3506,6 +3505,70 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     return Status::OK();
 }
 
+
+void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
+    const executor::TaskExecutor::CallbackArgs& cbData,
+    MemberId memberId,
+    ConfigVersionAndTerm versionAndTerm) {
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        LOGV2_DEBUG(4634502,
+                    2,
+                    "Failed to remove 'newlyAdded' config field",
+                    "memberId"_attr = memberId.getData(),
+                    "error"_attr = cbData.status);
+        // We will retry on the next heartbeat.
+        return;
+    }
+
+    LOGV2(4634505,
+          "Beginning automatic reconfig to remove 'newlyAdded' config field",
+          "memberId"_attr = memberId.getData());
+
+    auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig,
+                            long long term) -> StatusWith<ReplSetConfig> {
+        // Even though memberIds should properly identify nodes across config changes, to be safe we
+        // only want to do an automatic reconfig where the base config is the one that specified
+        // this memberId.
+        if (oldConfig.getConfigVersionAndTerm() != versionAndTerm) {
+            return Status(ErrorCodes::StaleConfig,
+                          str::stream()
+                              << "Current config is no longer consistent with heartbeat "
+                                 "data. Current config version: "
+                              << oldConfig.getConfigVersionAndTerm().toString()
+                              << ", heartbeat data config version: " << versionAndTerm.toString());
+        }
+
+        auto newConfig = oldConfig;
+        newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
+
+        const auto hasNewlyAddedField =
+            oldConfig.findMemberByID(memberId.getData())->isNewlyAdded();
+        if (!hasNewlyAddedField) {
+            return Status(ErrorCodes::NoSuchKey, "Old config no longer has 'newlyAdded' field");
+        }
+
+        newConfig.removeNewlyAddedFieldForMember(memberId);
+        return newConfig;
+    };
+
+    auto opCtx = cc().makeOperationContext();
+    auto status = doReplSetReconfig(opCtx.get(), getNewConfig, false /* force */);
+
+    if (!status.isOK()) {
+        LOGV2_DEBUG(4634503,
+                    2,
+                    "Failed to remove 'newlyAdded' config field",
+                    "memberId"_attr = memberId.getData(),
+                    "error"_attr = status);
+        // It is safe to do nothing here as we will retry this on the next heartbeat, or we may
+        // instead find out the reconfig already took place and is no longer necessary.
+        return;
+    }
+
+    // We intentionally do not wait for config commitment. If the config does not get committed, we
+    // will try again on the next heartbeat.
+    LOGV2(4634504, "Removed 'newlyAdded' config field", "memberId"_attr = memberId.getData());
+}
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCtx,
                                                           const BSONObj& configObj,

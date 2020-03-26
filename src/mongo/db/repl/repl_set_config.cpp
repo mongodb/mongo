@@ -739,6 +739,15 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
     return nullptr;
 }
 
+MemberConfig* ReplSetConfig::_findMemberByID(MemberId id) {
+    for (std::vector<MemberConfig>::iterator it = _members.begin(); it != _members.end(); ++it) {
+        if (it->getId() == id) {
+            return &(*it);
+        }
+    }
+    return nullptr;
+}
+
 int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
@@ -994,12 +1003,22 @@ bool ReplSetConfig::containsArbiter() const {
     return false;
 }
 
-void ReplSetConfig::setNewlyAddedFieldForMemberAtIndex(int memberIndex, bool newlyAdded) {
-    _members[memberIndex].setNewlyAdded(newlyAdded);
+void ReplSetConfig::addNewlyAddedFieldForMember(MemberId memberId) {
+    _findMemberByID(memberId)->setNewlyAdded(true);
 
     // We must recalculate the majority, since nodes with the 'newlyAdded' field set
     // should be treated as non-voting nodes.
     _calculateMajorities();
+    _addInternalWriteConcernModes();
+}
+
+void ReplSetConfig::removeNewlyAddedFieldForMember(MemberId memberId) {
+    _findMemberByID(memberId)->setNewlyAdded(boost::none);
+
+    // We must recalculate the majority, since nodes with the 'newlyAdded' field removed
+    // should be treated as voting nodes.
+    _calculateMajorities();
+    _addInternalWriteConcernModes();
 }
 
 }  // namespace repl

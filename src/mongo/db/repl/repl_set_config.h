@@ -490,9 +490,14 @@ public:
     bool containsArbiter() const;
 
     /**
-     * Sets the 'newlyAdded' field of the MemberConfig at memberIndex to the value passed in.
+     * Adds 'newlyAdded=true' to the MemberConfig of the specified member.
      */
-    void setNewlyAddedFieldForMemberAtIndex(int memberIndex, bool newlyAdded);
+    void addNewlyAddedFieldForMember(MemberId memberId);
+
+    /**
+     * Removes the 'newlyAdded' field from the MemberConfig of the specified member.
+     */
+    void removeNewlyAddedFieldForMember(MemberId memberId);
 
 private:
     /**
@@ -514,6 +519,11 @@ private:
      * Populate _connectionString based on the contents of _members and _replSetName.
      */
     void _initializeConnectionString();
+
+    /**
+     * Returns a pointer to a mutable MemberConfig.
+     */
+    MemberConfig* _findMemberByID(MemberId id);
 
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not

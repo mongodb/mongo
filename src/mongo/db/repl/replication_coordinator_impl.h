@@ -1419,6 +1419,14 @@ private:
                                              const std::string& dbName,
                                              const BSONObj& cmdObj);
 
+    /**
+     * This is called by a primary when they become aware that a node has completed initial sync.
+     * That primary initiates a reconfig to remove the 'newlyAdded' for that node, if it was set.
+     */
+    void _reconfigToRemoveNewlyAddedField(const executor::TaskExecutor::CallbackArgs& cbData,
+                                          MemberId memberId,
+                                          ConfigVersionAndTerm versionAndTerm);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

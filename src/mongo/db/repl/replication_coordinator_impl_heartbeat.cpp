@@ -47,6 +47,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -275,6 +276,43 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
         // Wake up replication waiters on optime changes or updated configs.
         _wakeReadyWaiters(lk);
+    }
+
+    if (enableAutomaticReconfig) {
+        // When receiving a heartbeat response indicating that the remote is in a state past
+        // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
+        // node (if present). This field is normally set when we add new members with votes:1 to the
+        // set.
+        if (_getMemberState_inlock().primary() && hbStatusResponse.isOK() &&
+            hbStatusResponse.getValue().hasState()) {
+            auto remoteState = hbStatusResponse.getValue().getState();
+            if (remoteState == MemberState::RS_SECONDARY ||
+                remoteState == MemberState::RS_RECOVERING ||
+                remoteState == MemberState::RS_ROLLBACK) {
+                const auto mem = _rsConfig.getMemberAt(targetIndex);
+                const auto memId = mem.getId();
+                if (mem.isNewlyAdded()) {
+                    auto status = _replExecutor->scheduleWork(
+                        [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                            _reconfigToRemoveNewlyAddedField(
+                                cbData, memId, _rsConfig.getConfigVersionAndTerm());
+                        });
+
+                    if (!status.isOK()) {
+                        LOGV2_DEBUG(4634500,
+                                    1,
+                                    "Failed to schedule work for removing 'newlyAdded' field.",
+                                    "memberId"_attr = memId.getData(),
+                                    "error"_attr = status.getStatus());
+                    } else {
+                        LOGV2_DEBUG(4634501,
+                                    1,
+                                    "Scheduled automatic reconfig to remove 'newlyAdded' field.",
+                                    "memberId"_attr = memId.getData());
+                    }
+                }
+            }
+        }
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.

@@ -20,6 +20,8 @@ var clearFailPoint;
 var isConfigCommitted;
 var waitForConfigReplication;
 var assertSameConfigContent;
+var isMemberNewlyAdded;
+var waitForNewlyAddedRemovalForNodeToBeCommitted;
 
 (function() {
 "use strict";
@@ -711,5 +713,41 @@ assertSameConfigContent = function(configA, configB) {
     configA.term = termA;
     configB.version = versionB;
     configB.term = termB;
+};
+
+isMemberNewlyAdded = function(node, memberIndex) {
+    // The in-memory config will not include the 'newlyAdded' field, so we must consult the on-disk
+    // version. However, the in-memory config is updated after the config is persisted to disk, so
+    // we must confirm that the in-memory config agrees with the on-disk config, before returning
+    // true or false.
+    const configInMemory = assert.commandWorked(node.adminCommand({replSetGetConfig: 1})).config;
+    const configVersion = configInMemory.version;
+    const configTerm = configInMemory.term;
+    if (!configVersion || !configTerm) {
+        throw new Error("isMemberNewlyAdded: in-memory config has no version or term: " +
+                        tojsononeline(configInMemory));
+    }
+
+    const configOnDisk = node.getDB("local").system.replset.findOne();
+    if ((configOnDisk.version !== configVersion) || (configOnDisk.term !== configTerm)) {
+        throw new error(
+            "isMemberNewlyAdded: in-memory config version/term does not match on-disk config." +
+            " in-memory: " + tojsononeline(configInMemory) +
+            ", on-disk: " + tojsononeline(configOnDisk));
+    }
+
+    const memberConfigOnDisk = configOnDisk.members[memberIndex];
+    if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
+        assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
+        return true;
+    }
+    return false;
+};
+
+waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex) {
+    jsTestLog("Waiting for member " + memberIndex + " to no longer be 'newlyAdded'");
+    assert.soonNoExcept(function() {
+        return !isMemberNewlyAdded(node, memberIndex) && isConfigCommitted(node);
+    }, () => tojson(node.getDB("local").system.replset.findOne()));
 };
 }());

@@ -912,13 +912,84 @@ TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
                                      << "rs0"
                                      << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                              << "localhost:12345")))));
+                                                              << "n1:1")
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "n2:1")))));
 
     // The member should have its 'newlyAdded' field set to false by default.
     ASSERT_FALSE(config.findMemberByID(1)->isNewlyAdded());
+    ASSERT_EQ(2, config.getTotalVotingMembers());
+    ASSERT_EQ(2, config.getMajorityVoteCount());
+    ASSERT_EQ(2, config.getWriteMajority());
+    ASSERT_EQ(2, config.getWritableVotingMembersCount());
 
-    config.setNewlyAddedFieldForMemberAtIndex(0, true);
+    {
+        auto modeSW = config.findCustomWriteMode("$majority");
+        ASSERT(modeSW.isOK());
+        auto modeIt = modeSW.getValue().constraintsBegin();
+        ASSERT_EQ(modeIt->getMinCount(), 2);
+    }
+
+    config.addNewlyAddedFieldForMember(MemberId(1));
+
     ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
+    ASSERT_EQ(1, config.getTotalVotingMembers());
+    ASSERT_EQ(1, config.getMajorityVoteCount());
+    ASSERT_EQ(1, config.getWriteMajority());
+    ASSERT_EQ(1, config.getWritableVotingMembersCount());
+
+    {
+        auto modeSW = config.findCustomWriteMode("$majority");
+        ASSERT(modeSW.isOK());
+        auto modeIt = modeSW.getValue().constraintsBegin();
+        ASSERT_EQ(modeIt->getMinCount(), 1);
+    }
+}
+
+TEST(ReplSetConfig, RemoveNewlyAddedFieldForMemberConfig) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "n1:1"
+                                                              << "newlyAdded" << true)
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "n2:1")))));
+
+
+    ASSERT_TRUE(config.findMemberByID(1)->isNewlyAdded());
+    ASSERT_EQ(1, config.getTotalVotingMembers());
+    ASSERT_EQ(1, config.getMajorityVoteCount());
+    ASSERT_EQ(1, config.getWriteMajority());
+    ASSERT_EQ(1, config.getWritableVotingMembersCount());
+
+    {
+        auto modeSW = config.findCustomWriteMode("$majority");
+        ASSERT(modeSW.isOK());
+        auto modeIt = modeSW.getValue().constraintsBegin();
+        ASSERT_EQ(modeIt->getMinCount(), 1);
+    }
+
+    config.removeNewlyAddedFieldForMember(MemberId(1));
+
+    ASSERT_FALSE(config.findMemberByID(1)->isNewlyAdded());
+    ASSERT_EQ(2, config.getTotalVotingMembers());
+    ASSERT_EQ(2, config.getMajorityVoteCount());
+    ASSERT_EQ(2, config.getWriteMajority());
+    ASSERT_EQ(2, config.getWritableVotingMembersCount());
+
+    {
+        auto modeSW = config.findCustomWriteMode("$majority");
+        ASSERT(modeSW.isOK());
+        auto modeIt = modeSW.getValue().constraintsBegin();
+        ASSERT_EQ(modeIt->getMinCount(), 2);
+    }
 }
 
 TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
@@ -954,19 +1025,6 @@ TEST(ReplSetConfig, ParseFailsWithNewlyAddedSetToFalse) {
                                                                     << "newlyAdded" << false))));
 
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-}
-
-TEST(ReplSetConfig, CannotSetNewlyAddedFieldToFalseForMemberConfig) {
-    ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                              << "localhost:12345")))));
-    // Cannot set 'newlyAdded' field to false.
-    ASSERT_THROWS_CODE(config.setNewlyAddedFieldForMemberAtIndex(0, false),
-                       AssertionException,
-                       ErrorCodes::InvalidReplicaSetConfig);
 }
 
 TEST(ReplSetConfig, NodeWithNewlyAddedFieldHasVotesZero) {
