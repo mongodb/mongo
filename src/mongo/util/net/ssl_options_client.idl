@@ -118,7 +118,7 @@ configs:
       preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
 
   "tls.disabledProtocols":
-    description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]"
+    description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2,TLS1_3]"
     short_name: tlsDisabledProtocols
     deprecated_name: "ssl.disabledProtocols"
     deprecated_short_name: sslDisabledProtocols

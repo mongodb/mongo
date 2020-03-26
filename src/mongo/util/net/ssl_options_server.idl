@@ -121,7 +121,7 @@ configs:
     arg_vartype: String
     hidden: true
   "net.tls.disabledProtocols":
-    description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]"
+    description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2,TLS1_3]"
     short_name: tlsDisabledProtocols
     deprecated_name: "net.ssl.disabledProtocols"
     deprecated_short_name: sslDisabledProtocols
@@ -183,7 +183,7 @@ configs:
       preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
 
   "net.tls.logVersions":
-    description: "Comma separated list of TLS protocols to log on connect [TLS1_0,TLS1_1,TLS1_2]"
+    description: "Comma separated list of TLS protocols to log on connect [TLS1_0,TLS1_1,TLS1_2,TLS1_3]"
     short_name: tlsLogVersions
     arg_vartype: String
 
