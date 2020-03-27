@@ -5420,7 +5420,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_secondary_reads
-  tags: ["aggregation", "secondary_reads"]
+  tags: ["aggregation", "secondary_reads", "large"]
   depends_on:
   - name: aggregation
   commands:
@@ -5428,6 +5428,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_secondary_reads --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
@@ -9336,7 +9337,10 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2019-large
-  - name: .aggregation !.auth !.encrypt
+  - name: .aggregation !.auth !.encrypt !.large
+  - name: .aggregation .large
+    distros:
+    - windows-64-vs2019-large
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
   - name: auth_gen
@@ -9583,7 +9587,10 @@ buildvariants:
     distros:
     - windows-64-vs2019-large
   - name: .aggfuzzer
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggregation !.auth !.encrypt !.unwind !.large
+  - name: .aggregation .large
+    distros:
+    - windows-64-vs2019-large
   - name: auth_gen
   - name: .auth .gle
   - name: causally_consistent_jscore_txns_passthrough
