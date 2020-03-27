@@ -97,11 +97,17 @@ public:
      * Notifies this Monitor that a host has failed because of the specified error 'status' and
      * should be considered down.
      *
-     * Call this when you get a connection error. If you get an error while trying to refresh our
-     * view of a host, call Refresher::failedHost instead because it bypasses taking the monitor's
-     * mutex.
+     * The sdam version of the Monitor makes a distinction between failures happening before or
+     * after the initial handshake for the connection. The failedHost method is kept for backwards
+     * compatibility, and is equivalent to failedHostPostHandshake.
      */
     virtual void failedHost(const HostAndPort& host, const Status& status) = 0;
+    virtual void failedHostPreHandshake(const HostAndPort& host,
+                                        const Status& status,
+                                        BSONObj bson) = 0;
+    virtual void failedHostPostHandshake(const HostAndPort& host,
+                                         const Status& status,
+                                         BSONObj bson) = 0;
 
     /**
      * Returns true if this node is the master based ONLY on local data. Be careful, return may

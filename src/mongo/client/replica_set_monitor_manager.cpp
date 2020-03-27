@@ -87,8 +87,23 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
 
             auto publisher = streamableMonitor->getEventsPublisher();
             if (publisher) {
-                publisher->onServerHandshakeCompleteEvent(
-                    isMasterReply.elapsedMillis.get(), remoteHost.toString(), isMasterReply.data);
+                try {
+                    if (isMasterReply.status.isOK()) {
+                        publisher->onServerHandshakeCompleteEvent(isMasterReply.elapsedMillis.get(),
+                                                                  remoteHost.toString(),
+                                                                  isMasterReply.data);
+                    } else {
+                        publisher->onServerHandshakeFailedEvent(
+                            remoteHost.toString(), isMasterReply.status, isMasterReply.data);
+                    }
+                } catch (const DBException& exception) {
+                    LOGV2_ERROR(4712101,
+                                "An error occurred publishing a ReplicaSetMonitor handshake event",
+                                "error"_attr = exception.toStatus(),
+                                "setName"_attr = monitor->getName(),
+                                "handshakeStatus"_attr = isMasterReply.status);
+                    return exception.toStatus();
+                }
             }
         }
     }
@@ -133,10 +148,14 @@ void ReplicaSetMonitorManager::_setupTaskExecutorInLock() {
     // construct task executor
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     auto networkConnectionHook = std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>();
-    auto net = executor::makeNetworkInterface(
+
+    std::shared_ptr<NetworkInterface> networkInterface = executor::makeNetworkInterface(
         "ReplicaSetMonitor-TaskExecutor", std::move(networkConnectionHook), std::move(hookList));
-    auto pool = std::make_unique<NetworkInterfaceThreadPool>(net.get());
-    _taskExecutor = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    _connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(networkInterface);
+
+    auto pool = std::make_unique<NetworkInterfaceThreadPool>(networkInterface.get());
+
+    _taskExecutor = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
     _taskExecutor->startup();
 }
 
@@ -173,7 +192,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
         newMonitor->init();
     } else {
         LOGV2(4333205, "Starting Streamable ReplicaSetMonitor", "uri"_attr = uri.toString());
-        newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor());
+        newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor(), _getConnectionManager());
     }
     _monitors[setName] = newMonitor;
     return newMonitor;
@@ -220,6 +239,7 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
 void ReplicaSetMonitorManager::shutdown() {
     decltype(_monitors) monitors;
     decltype(_taskExecutor) taskExecutor;
+    decltype(_connectionManager) connectionManager;
     {
         stdx::lock_guard<Latch> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
@@ -227,6 +247,7 @@ void ReplicaSetMonitorManager::shutdown() {
         }
 
         monitors = std::exchange(_monitors, {});
+        connectionManager = std::exchange(_connectionManager, {});
         taskExecutor = std::exchange(_taskExecutor, {});
     }
 
@@ -278,6 +299,11 @@ std::shared_ptr<executor::TaskExecutor> ReplicaSetMonitorManager::getExecutor() 
     return _taskExecutor;
 }
 
+std::shared_ptr<executor::EgressTagCloser> ReplicaSetMonitorManager::_getConnectionManager() {
+    invariant(_connectionManager);
+    return _connectionManager;
+}
+
 ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
     return _notifier;
 }
@@ -285,5 +311,9 @@ ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
 bool ReplicaSetMonitorManager::isShutdown() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _isShutdown;
+}
+
+void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& hostAndPort) {
+    _network->dropConnections(hostAndPort);
 }
 }  // namespace mongo

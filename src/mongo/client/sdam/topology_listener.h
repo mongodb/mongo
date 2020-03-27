@@ -64,6 +64,10 @@ public:
                                                 const sdam::ServerAddress& address,
                                                 const BSONObj reply = BSONObj()){};
 
+    virtual void onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
+                                              const Status& status,
+                                              const BSONObj reply){};
+
     /**
      * Called when a ServerHeartBeatSucceededEvent is published - A heartbeat sent to the server at
      * hostAndPort succeeded. durationMS is the execution time of the event, including the time it
@@ -108,6 +112,11 @@ public:
     virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
                                                 const sdam::ServerAddress& address,
                                                 const BSONObj reply = BSONObj()) override;
+
+    void onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
+                                      const Status& status,
+                                      const BSONObj reply) override;
+
     void onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
                                          const ServerAddress& hostAndPort,
                                          const BSONObj reply) override;
@@ -126,8 +135,10 @@ private:
         PING_SUCCESS,
         PING_FAILURE,
         TOPOLOGY_DESCRIPTION_CHANGED,
-        HANDSHAKE_COMPLETE
+        HANDSHAKE_COMPLETE,
+        HANDSHAKE_FAILURE
     };
+
     struct Event {
         EventType type;
         ServerAddress hostAndPort;

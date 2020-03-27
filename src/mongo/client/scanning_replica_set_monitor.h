@@ -72,7 +72,18 @@ public:
 
     HostAndPort getMasterOrUassert() override;
 
+    /*
+     * For the ScanningReplicaSetMonitor, all the failedHost methods are equivalent.
+     */
     void failedHost(const HostAndPort& host, const Status& status) override;
+
+    void failedHostPreHandshake(const HostAndPort& host,
+                                const Status& status,
+                                BSONObj bson) override;
+
+    void failedHostPostHandshake(const HostAndPort& host,
+                                 const Status& status,
+                                 BSONObj bson) override;
 
     bool isPrimary(const HostAndPort& host) const override;
 

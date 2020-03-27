@@ -1,6 +1,7 @@
 # Group related errors into categories,can be checked against ErrorCodes::isXXXClassName methods.
 error_categories:
     - NetworkError
+    - NetworkTimeoutError
     - Interruption
     # isNotMasterError() includes all codes that indicate that the node that received the request
     # was not master at some point during command processing,regardless of whether some write may
@@ -110,7 +111,7 @@ error_codes:
     - {code: 86,name: IndexKeySpecsConflict}
     - {code: 87,name: CannotSplit}
     - {code: 88,name: SplitFailed_OBSOLETE}
-    - {code: 89,name: NetworkTimeout,categories: [NetworkError,RetriableError]}
+    - {code: 89,name: NetworkTimeout,categories: [NetworkError,RetriableError,NetworkTimeoutError]}
     - {code: 90,name: CallbackCanceled,categories: [CancelationError]}
     - {code: 91,name: ShutdownInProgress,categories: [ShutdownError,CancelationError,RetriableError]}
     - {code: 92,name: SecondaryAheadOfPrimary}
@@ -221,7 +222,7 @@ error_codes:
     - {code: 199,name: ReplicaSetMonitorRemoved}
     - {code: 200,name: ChunkRangeCleanupPending}
     - {code: 201,name: CannotBuildIndexKeys}
-    - {code: 202,name: NetworkInterfaceExceededTimeLimit,categories: [ExceededTimeLimitError]}
+    - {code: 202,name: NetworkInterfaceExceededTimeLimit,categories: [ExceededTimeLimitError,NetworkTimeoutError]}
     - {code: 203,name: ShardingStateNotInitialized}
     - {code: 204,name: TimeProofMismatch}
     - {code: 205,name: ClusterTimeFailsRateLimiter}
@@ -285,7 +286,7 @@ error_codes:
     - {code: 259,name: KeyedExecutorRetry}
     - {code: 260,name: InvalidResumeToken}
     - {code: 261,name: TooManyLogicalSessions}
-    - {code: 262,name: ExceededTimeLimit,categories: [Interruption,ExceededTimeLimitError, RetriableError]}
+    - {code: 262,name: ExceededTimeLimit,categories: [Interruption,ExceededTimeLimitError,RetriableError]}
     - {code: 263,name: OperationNotSupportedInTransaction}
     - {code: 264,name: TooManyFilesOpen}
     - {code: 265,name: OrphanedRangeCleanUpFailed}
