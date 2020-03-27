@@ -58,7 +58,8 @@ public:
                     repl::OpTimeAndWallTime committedOpTime,
                     repl::OpTime visibleOpTime,
                     long long configVersion,
-                    OID replicaSetId,
+                    long long configTerm,
+                    OID id,
                     int currentPrimaryIndex,
                     int currentSyncSourceIndex,
                     boost::optional<bool> isPrimary);
@@ -98,6 +99,13 @@ public:
      */
     long long getConfigVersion() const {
         return _configVersion;
+    }
+
+    /**
+     * Returns the ReplSetConfig term number of the sender.
+     */
+    long long getConfigTerm() const {
+        return _configTerm;
     }
 
     /**
@@ -157,6 +165,7 @@ private:
     repl::OpTime _lastOpVisible;
     long long _currentTerm = -1;
     long long _configVersion = -1;
+    long long _configTerm = repl::OpTime::kUninitializedTerm;
     OID _replicaSetId;
     // TODO(SERVER-47125): remove this member variable post-4.4.
     int _currentPrimaryIndex = kNoPrimary;

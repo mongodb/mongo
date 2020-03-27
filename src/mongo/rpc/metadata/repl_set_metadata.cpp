@@ -49,6 +49,7 @@ const char kLastOpCommittedFieldName[] = "lastOpCommitted";
 const char kLastCommittedWallFieldName[] = "lastCommittedWall";
 const char kLastOpVisibleFieldName[] = "lastOpVisible";
 const char kConfigVersionFieldName[] = "configVersion";
+const char kConfigTermFieldName[] = "configTerm";
 const char kReplicaSetIdFieldName[] = "replicaSetId";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
 const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
@@ -63,6 +64,7 @@ ReplSetMetadata::ReplSetMetadata(long long term,
                                  OpTimeAndWallTime committedOpTime,
                                  OpTime visibleOpTime,
                                  long long configVersion,
+                                 long long configTerm,
                                  OID id,
                                  int currentPrimaryIndex,
                                  int currentSyncSourceIndex,
@@ -71,6 +73,7 @@ ReplSetMetadata::ReplSetMetadata(long long term,
       _lastOpVisible(std::move(visibleOpTime)),
       _currentTerm(term),
       _configVersion(configVersion),
+      _configTerm(configTerm),
       _replicaSetId(id),
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex),
@@ -87,6 +90,13 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 
     long long configVersion;
     status = bsonExtractIntegerField(replMetadataObj, kConfigVersionFieldName, &configVersion);
+    if (!status.isOK())
+        return status;
+
+    // TODO(SERVER-47157): require configTerm.
+    long long configTerm;
+    status = bsonExtractIntegerFieldWithDefault(
+        replMetadataObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &configTerm);
     if (!status.isOK())
         return status;
 
@@ -149,6 +159,7 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
                            lastOpCommitted,
                            lastOpVisible,
                            configVersion,
+                           configTerm,
                            id,
                            primaryIndex,
                            syncSourceIndex,
@@ -162,6 +173,7 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     replMetadataBuilder.appendDate(kLastCommittedWallFieldName, _lastOpCommitted.wallTime);
     _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
+    replMetadataBuilder.append(kConfigTermFieldName, _configTerm);
     replMetadataBuilder.append(kReplicaSetIdFieldName, _replicaSetId);
     replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     replMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
@@ -175,6 +187,7 @@ std::string ReplSetMetadata::toString() const {
     str::stream output;
     output << "ReplSetMetadata";
     output << " Config Version: " << _configVersion;
+    output << " Config Term: " << _configTerm;
     output << " Replicaset ID: " << _replicaSetId;
     output << " Term: " << _currentTerm;
     output << " Primary Index: " << _currentPrimaryIndex;

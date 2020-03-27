@@ -447,6 +447,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                           {opTime, wallTime},
                                           opTime,
                                           rsConfig.getConfigVersion(),
+                                          rsConfig.getConfigTerm(),
                                           unexpectedId,
                                           rpc::ReplSetMetadata::kNoPrimary,
                                           -1,

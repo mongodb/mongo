@@ -336,7 +336,7 @@ const rpc::OplogQueryMetadata OplogFetcherTest::staleOqMetadata = rpc::OplogQuer
     {staleOpTime, staleWallTime}, staleOpTime, rbid, primaryIndex, syncSourceIndex);
 
 const rpc::ReplSetMetadata OplogFetcherTest::replSetMetadata = rpc::ReplSetMetadata(
-    1, OpTimeAndWallTime(), OpTime(), 1, OID(), primaryIndex, syncSourceIndex, false);
+    1, OpTimeAndWallTime(), OpTime(), 1, 0, OID(), primaryIndex, syncSourceIndex, false);
 
 void OplogFetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
