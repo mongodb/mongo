@@ -43,7 +43,7 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
         op.connectionId,
         'Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: ' +
             tojson(op));
-    assert.eq('',
+    assert.eq(coll.getFullName(),
               op.ns,
               'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
 });

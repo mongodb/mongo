@@ -1325,6 +1325,7 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
     auto opDescObj = builder.obj();
     curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
+    curOp->setNS_inlock(nss.ns());
     curOp->ensureStarted();
 }
 

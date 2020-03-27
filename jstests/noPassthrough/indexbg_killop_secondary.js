@@ -41,7 +41,7 @@ const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
     jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
-    assert.eq('',
+    assert.eq(coll.getFullName(),
               op.ns,
               'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
 });
