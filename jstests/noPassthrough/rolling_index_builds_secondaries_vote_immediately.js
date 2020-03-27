@@ -12,8 +12,6 @@
 (function() {
 'use strict';
 
-load('jstests/noPassthrough/libs/index_build.js');
-
 const replTest = new ReplSetTest({
     nodes: [
         {},
@@ -43,13 +41,6 @@ const collName = 't';
 let primary = replTest.getPrimary();
 let primaryDB = primary.getDB(dbName);
 let coll = primaryDB.getCollection(collName);
-
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary) ||
-    !IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-    jsTestLog('Two phase index builds or commit quorum are not supported, skipping test.');
-    replTest.stopSet();
-    return;
-}
 
 // Populate the collection to avoid empty collection index build optimization.
 assert.commandWorked(coll.insert({x: 1, y: 1}));
