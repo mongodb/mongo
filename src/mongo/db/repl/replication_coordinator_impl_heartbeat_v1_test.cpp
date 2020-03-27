@@ -784,7 +784,8 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
                                       rsConfig.getConfigVersion(),
                                       unexpectedId,
                                       1,
-                                      -1);
+                                      -1,
+                                      true);
         uassertStatusOK(metadata.writeToMetadata(&responseBuilder));
 
         heartbeatResponse = makeResponseStatus(responseBuilder.obj());
@@ -867,9 +868,10 @@ TEST_F(ReplCoordHBV1Test,
         {commitPoint, Date_t() + Seconds(commitPoint.getSecs())},  // committed OpTime
         commitPoint,                                               // visibleOpTime
         config.getConfigVersion(),
-        {},  // replset id
-        1,   // currentPrimaryIndex,
-        1);  // currentSyncSourceIndex
+        {},     // replset id
+        1,      // currentPrimaryIndex,
+        1,      // currentSyncSourceIndex
+        true);  // isPrimary
 
     auto net = getNet();
     BSONObjBuilder responseBuilder;
@@ -942,9 +944,10 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
         {commitPoint, Date_t() + Seconds(commitPoint.getSecs())},  // committed OpTime
         commitPoint,                                               // visibleOpTime
         config.getConfigVersion(),
-        {},  // replset id
-        1,   // currentPrimaryIndex,
-        1);  // currentSyncSourceIndex
+        {},     // replset id
+        1,      // currentPrimaryIndex,
+        1,      // currentSyncSourceIndex
+        true);  // isPrimary
 
     auto net = getNet();
     BSONObjBuilder responseBuilder;
