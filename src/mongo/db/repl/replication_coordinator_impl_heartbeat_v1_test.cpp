@@ -782,6 +782,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
                                       {opTime, Date_t()},
                                       opTime,
                                       rsConfig.getConfigVersion(),
+                                      0,
                                       unexpectedId,
                                       1,
                                       -1,
@@ -868,6 +869,7 @@ TEST_F(ReplCoordHBV1Test,
         {commitPoint, Date_t() + Seconds(commitPoint.getSecs())},  // committed OpTime
         commitPoint,                                               // visibleOpTime
         config.getConfigVersion(),
+        0,
         {},     // replset id
         1,      // currentPrimaryIndex,
         1,      // currentSyncSourceIndex
@@ -944,6 +946,7 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
         {commitPoint, Date_t() + Seconds(commitPoint.getSecs())},  // committed OpTime
         commitPoint,                                               // visibleOpTime
         config.getConfigVersion(),
+        0,
         {},     // replset id
         1,      // currentPrimaryIndex,
         1,      // currentSyncSourceIndex

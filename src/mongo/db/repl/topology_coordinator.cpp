@@ -3026,6 +3026,7 @@ rpc::ReplSetMetadata TopologyCoordinator::prepareReplSetMetadata(
                                 _lastCommittedOpTimeAndWallTime,
                                 lastVisibleOpTime,
                                 _rsConfig.getConfigVersion(),
+                                _rsConfig.getConfigTerm(),
                                 _rsConfig.getReplicaSetId(),
                                 _currentPrimaryIndex,
                                 _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
