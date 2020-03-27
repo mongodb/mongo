@@ -36,7 +36,17 @@ const createIdx =
 // When the index build starts, find its op id.
 const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
-IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
+IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
+    jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
+    assert.eq(
+        undefined,
+        op.connectionId,
+        'Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: ' +
+            tojson(op));
+    assert.eq('',
+              op.ns,
+              'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+});
 
 // Kill the index builder thread.
 assert.commandWorked(testDB.killOp(opId));

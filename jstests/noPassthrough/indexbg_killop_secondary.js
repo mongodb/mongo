@@ -39,7 +39,12 @@ const createIdx =
 const secondaryDB = secondary.getDB(testDB.getName());
 const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
-IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId);
+IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
+    jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
+    assert.eq('',
+              op.ns,
+              'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+});
 
 // Kill the index build. This should have no effect.
 assert.commandWorked(secondaryDB.killOp(opId));
