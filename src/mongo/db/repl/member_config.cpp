@@ -127,6 +127,10 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
         if (_tags.size() != 2) {
             uasserted(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
         }
+
+        if (isNewlyAdded()) {
+            uasserted(ErrorCodes::BadValue, "Arbiter cannot have newlyAdded field set");
+        }
     }
 
     // Check for additional electable requirements, when priority is non zero.

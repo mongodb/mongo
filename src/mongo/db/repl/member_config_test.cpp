@@ -462,6 +462,22 @@ TEST(MemberConfig, NodeShouldStillHavePriorityAfterToBSON) {
     ASSERT_EQ(3, mc2.getPriority());
 }
 
+TEST(MemberConfig, ArbiterCannotHaveNewlyAddedFieldSet) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    // Verify that an exception is thrown when we try to create an arbiter with 'newlyAdded' field.
+    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
+                                          << "h"
+                                          << "arbiterOnly" << true << "newlyAdded" << true),
+                               &tagConfig),
+                  ExceptionFor<ErrorCodes::BadValue>);
+}
+
 TEST(MemberConfig, ParseHidden) {
     ReplSetTagConfig tagConfig;
     {

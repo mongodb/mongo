@@ -1742,6 +1742,66 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     ASSERT_EQUALS(0, secondNewMember->getPriority());
 }
 
+TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    // Do a reconfig that adds a new arbiter.
+    auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                << BSON("_id" << 3 << "host"
+                                                              << "n3:1"
+                                                              << "arbiterOnly" << true));
+
+    startCapturingLogMessages();
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 1 /* quorumHbs */));
+    stopCapturingLogMessages();
+
+    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    const auto arbiterNode = rsConfig.findMemberByID(3);
+
+    // Verify that the node did not have 'newlyAdded' set.
+    ASSERT_FALSE(arbiterNode->isNewlyAdded());
+
+    // Verify that the node is a voting member.
+    ASSERT_TRUE(arbiterNode->isVoter());
+
+    // Verify that a log message was not created for adding the 'newlyAdded' field.
+    ASSERT_EQUALS(0,
+                  countTextFormatLogLinesContaining(
+                      "Appended the 'newlyAdded' field to a node in the new config."));
+}
+
+TEST_F(ReplCoordReconfigTest, ForceReconfigShouldThrowIfArbiterNodesHaveNewlyAddedField) {
+    // Set the flag to add the `newlyAdded` field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    setUpNewlyAddedFieldTest();
+
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Do a force reconfig that tries to add an arbiter with 'newlyAdded: true'.
+    args.newConfigObj =
+        configWithMembers(2,
+                          0,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1")
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "n3:1"
+                                                                     << "arbiterOnly" << true
+                                                                     << "newlyAdded" << true)));
+
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo

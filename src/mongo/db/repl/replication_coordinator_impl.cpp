@@ -3184,6 +3184,11 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                         return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
                     }
 
+                    // We should never set the 'newlyAdded' field for arbiters.
+                    if (newMem.isArbiter()) {
+                        continue;
+                    }
+
                     const int newMemId = newMem.getId().getData();
                     const auto oldMem = oldConfig.findMemberByID(newMemId);
 
