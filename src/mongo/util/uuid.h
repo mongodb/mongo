@@ -46,6 +46,7 @@ namespace repl {
 class CollectionInfo;
 class OplogEntryBase;
 class DurableReplOperation;
+class InitialSyncIdDocument;
 }  // namespace repl
 
 namespace idl {
@@ -83,6 +84,7 @@ class UUID {
     friend class repl::CollectionInfo;
     friend class repl::OplogEntryBase;
     friend class repl::DurableReplOperation;
+    friend class repl::InitialSyncIdDocument;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;
     friend class VoteCommitIndexBuild;

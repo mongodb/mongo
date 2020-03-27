@@ -31,6 +31,7 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -74,6 +75,11 @@ void ClonerTestFixture::setUp() {
 
     // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.
     getServiceContext()->setStorageEngine(std::make_unique<StorageEngineMock>());
+
+    // Set the initial sync ID on the mock server.
+    _mockServer->insert(
+        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+        BSON("_id" << _initialSyncId));
 }
 
 void ClonerTestFixture::tearDown() {
@@ -82,6 +88,12 @@ void ClonerTestFixture::tearDown() {
     logger::globalLogDomain()->setMinimumLoggedSeverity(
         logger::LogComponent::kReplicationInitialSync, logger::LogSeverity::Debug(0));
     unittest::Test::tearDown();
+}
+
+void ClonerTestFixture::setInitialSyncId() {
+    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    _sharedData->setSyncSourceWireVersion(lk, WireVersion::RESUMABLE_INITIAL_SYNC);
+    _sharedData->setInitialSyncSourceId(lk, _initialSyncId);
 }
 
 }  // namespace repl

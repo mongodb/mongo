@@ -34,8 +34,10 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -83,6 +85,34 @@ public:
 
     int getTotalRetries(WithLock lk) {
         return _totalRetries;
+    }
+
+    /**
+     * Sets the wire version of the sync source.
+     */
+    void setSyncSourceWireVersion(WithLock, WireVersion wireVersion) {
+        _syncSourceWireVersion = wireVersion;
+    }
+
+    /**
+     * Returns the wire version of the sync source, if previously set.
+     */
+    boost::optional<WireVersion> getSyncSourceWireVersion(WithLock) {
+        return _syncSourceWireVersion;
+    }
+
+    /**
+     * Sets the initial sync ID of the sync source.
+     */
+    void setInitialSyncSourceId(WithLock, boost::optional<UUID> syncSourceId) {
+        _initialSyncSourceId = syncSourceId;
+    }
+
+    /**
+     * Gets the previously-set initial sync ID of the sync source.
+     */
+    boost::optional<UUID> getInitialSyncSourceId(WithLock) {
+        return _initialSyncSourceId;
     }
 
     /**
@@ -221,6 +251,12 @@ private:
     // The total time across all outages in this initial sync attempt, but excluding any current
     // outage, that we were retrying because we were unable to reach the sync source.
     Milliseconds _totalTimeUnreachable;
+
+    // The sync source wire version at the start of data cloning.
+    boost::optional<WireVersion> _syncSourceWireVersion;
+
+    // The initial sync ID on the source at the start of data cloning.
+    boost::optional<UUID> _initialSyncSourceId;
 };
 }  // namespace repl
 }  // namespace mongo

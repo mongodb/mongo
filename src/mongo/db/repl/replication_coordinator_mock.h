@@ -227,8 +227,6 @@ public:
 
     virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten);
 
-    virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
-
     virtual WriteConcernOptions getGetLastErrorDefault();
 
     virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);

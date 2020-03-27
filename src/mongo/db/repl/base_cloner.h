@@ -112,11 +112,13 @@ protected:
         }
 
         /**
-         * Returns true if the rollback ID should be checked before retrying.
-         * This is provided because the "connect" stage must complete successfully
-         * before checking rollback ID.
+         * Returns true if the sync source validity should be checked before retrying.
+         * This includes checking the sync source member state, checking the rollback ID,
+         * and checking the sync source initial sync ID.
+         * This method is provided because early stages which connect and collect
+         * the initial sync ID must complete successfully before checking sync source validity.
          */
-        virtual bool checkRollBackIdOnRetry() {
+        virtual bool checkSyncSourceValidityOnRetry() {
             return true;
         }
 
@@ -226,10 +228,23 @@ private:
     AfterStageBehavior runStageWithRetries(BaseClonerStage* stage);
 
     /**
+     * Make sure the initial sync ID on the sync source has not changed.  Throws an exception
+     * if it has.  Returns a not-OK status if a network error occurs.
+     */
+    Status checkInitialSyncIdIsUnchanged();
+
+    /**
      * Make sure the rollback ID has not changed.  Throws an exception if it has.  Returns
      * a not-OK status if a network error occurs.
      */
     Status checkRollBackIdIsUnchanged();
+
+    /**
+     * Does validity checks on the sync source.  If the sync source is now no longer usable,
+     * throws an exception. Returns a not-OK status if a network error occurs or if the sync
+     * source is temporarily unusable (e.g. restarting).
+     */
+    Status checkSyncSourceIsStillValid();
 
     /**
      * Supports pausing at certain stages for the initial sync fuzzer test framework.

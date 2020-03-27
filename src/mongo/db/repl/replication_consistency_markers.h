@@ -72,6 +72,16 @@ class StorageInterface;
  * }
  *
  * See below for explanations of each field.
+ *
+ * The initialSyncId document, in 'local.replset.initialSyncId', is used to detect when nodes have
+ * been resynced. It is set at the end of initial sync, or whenever replication is started when the
+ * document does not exist.
+ *
+ * Example of all fields:
+ * {
+ *      _id: <UUID>,
+ *      wallTime: <Date_t>
+ * }
  */
 class ReplicationConsistencyMarkers {
     ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
@@ -254,6 +264,22 @@ public:
      * or `oplogTruncateAfterPoint`.
      */
     virtual Status createInternalCollections(OperationContext* opCtx) = 0;
+
+    /**
+     * Set the initial sync ID and wall time if it is not already set.  This will create the
+     * collection if necessary.
+     */
+    virtual void setInitialSyncIdIfNotSet(OperationContext* opCtx) = 0;
+
+    /**
+     * Clears the initial sync ID by dropping the collection.
+     */
+    virtual void clearInitialSyncId(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns the initial sync id object, or an empty object if none.
+     */
+    virtual BSONObj getInitialSyncId(OperationContext* opCtx) = 0;
 };
 
 }  // namespace repl

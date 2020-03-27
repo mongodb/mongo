@@ -56,6 +56,8 @@ protected:
 
     void tearDown() override;
 
+    void setInitialSyncId();
+
     StorageInterfaceMock _storageInterface;
     HostAndPort _source;
     std::unique_ptr<ThreadPool> _dbWorkThreadPool;
@@ -63,6 +65,7 @@ protected:
     std::unique_ptr<DBClientConnection> _mockClient;
     std::unique_ptr<InitialSyncSharedData> _sharedData;
     ClockSourceMock _clock;
+    UUID _initialSyncId = UUID::gen();
 
 private:
     static constexpr int kInitialRollbackId = 1;

@@ -135,5 +135,13 @@ Status ReplicationConsistencyMarkersMock::createInternalCollections(OperationCon
     return Status::OK();
 }
 
+void ReplicationConsistencyMarkersMock::setInitialSyncIdIfNotSet(OperationContext* opCtx) {}
+
+void ReplicationConsistencyMarkersMock::clearInitialSyncId(OperationContext* opCtx) {}
+
+BSONObj ReplicationConsistencyMarkersMock::getInitialSyncId(OperationContext* opCtx) {
+    return BSONObj();
+}
+
 }  // namespace repl
 }  // namespace mongo
