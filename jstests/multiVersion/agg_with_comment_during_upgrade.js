@@ -61,22 +61,50 @@ const runAggregateWithPrimaryShardMerger = function() {
     assert(testDb.destination.drop());
 };
 
+function upgradeSet(rs, options) {
+    rs.upgradeSet(options);
+
+    // Wait for the shard to become available.
+    rs.awaitSecondaryNodes();
+
+    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of both shards.
+    for (let client of [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()]) {
+        awaitRSClientHosts(
+            client, [st.rs0.getPrimary(), st.rs1.getPrimary()], {ok: true, ismaster: true});
+    }
+}
+
+function upgradeCluster(version, components) {
+    st.upgradeCluster(version, components);
+
+    // Wait for the config server and shards to become available.
+    st.configRS.awaitSecondaryNodes();
+    st.rs0.awaitSecondaryNodes();
+    st.rs1.awaitSecondaryNodes();
+
+    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of both shards.
+    for (let client of [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()]) {
+        awaitRSClientHosts(
+            client, [st.rs0.getPrimary(), st.rs1.getPrimary()], {ok: true, ismaster: true});
+    }
+}
+
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the primary shard to "latest", and verify that the agg command still works correctly.
-st.rs1.upgradeSet({binVersion: "latest"});
+upgradeSet(st.rs1, {binVersion: "latest"});
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the other shard and repeat the test.
-st.rs0.upgradeSet({binVersion: "latest"});
+upgradeSet(st.rs0, {binVersion: "latest"});
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the config servers and repeat the test.
-st.upgradeCluster("latest", {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false});
+upgradeCluster("latest", {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false});
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the mongos and repeat the test.
-st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
+upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
 runAggregateWithPrimaryShardMerger();
 
 // Set the FCV to "4.4" to complete the upgrade and repeat the test.
