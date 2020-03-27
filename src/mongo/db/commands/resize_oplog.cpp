@@ -93,13 +93,15 @@ public:
         auto params =
             ReplSetResizeOplogRequest::parse(IDLParserErrorContext("replSetResizeOplog"), jsobj);
 
-        auto sizeMB = params.getSize();
-        const long long size = sizeMB * 1024 * 1024;  // sizeInMB * numByteInMB
-
         return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns().ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(coll->getRecordStore()->updateCappedSize(opCtx, size));
-            DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->getCatalogId(), size);
+
+            if (auto sizeMB = params.getSize()) {
+                const long long sizeBytes = *sizeMB * 1024 * 1024;
+                uassertStatusOK(coll->getRecordStore()->updateCappedSize(opCtx, sizeBytes));
+                DurableCatalog::get(opCtx)->updateCappedSize(
+                    opCtx, coll->getCatalogId(), sizeBytes);
+            }
 
             if (auto minRetentionHoursOpt = params.getMinRetentionHours()) {
                 storageGlobalParams.oplogMinRetentionHours.store(*minRetentionHoursOpt);
@@ -107,9 +109,11 @@ public:
             wunit.commit();
 
             LOGV2(20497,
-                  "replSetResizeOplog success. Size: {size}, minRetentionHours: {retention}",
-                  "size"_attr = size,
-                  "retention"_attr = storageGlobalParams.oplogMinRetentionHours.load());
+                  "replSetResizeOplog success.",
+                  "size"_attr = DurableCatalog::get(opCtx)
+                                    ->getCollectionOptions(opCtx, coll->getCatalogId())
+                                    .cappedSize,
+                  "minRetentionHours"_attr = storageGlobalParams.oplogMinRetentionHours.load());
             return true;
         });
     }
