@@ -7,6 +7,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/sharding/*.js
+  - jstests/sharding/change_streams/*.js
+  - jstests/sharding/query/*.js
 
 executor:
   config:

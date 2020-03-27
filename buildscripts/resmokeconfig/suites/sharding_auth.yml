@@ -8,11 +8,12 @@ test_kind: js_test
 selector:
   roots:
   - jstests/sharding/*.js
+  - jstests/sharding/change_streams/*.js
+  - jstests/sharding/query/*.js
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/sharding/*[aA]uth*.js
   - jstests/sharding/advance_cluster_time_action_type.js
-  - jstests/sharding/aggregation_currentop.js # SERVER-19318
   - jstests/sharding/kill_sessions.js
   # Skip these additional tests when running with auth enabled.
   - jstests/sharding/parallel.js

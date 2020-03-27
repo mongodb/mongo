@@ -3,24 +3,26 @@ test_kind: js_test
 selector:
   roots:
   - jstests/sharding/*.js
+  - jstests/sharding/change_streams/*.js
+  - jstests/sharding/query/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_44
   - need_fixing_for_46
   exclude_files:
   # Requires fix to SERVER-31689
-  - jstests/sharding/aggregation_currentop.js
+  - jstests/sharding/query/aggregation_currentop.js
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against
   # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.
   - jstests/sharding/aggregations_in_session.js
   # Enable when SERVER-43860 is backported by BACKPORT-5471 or 4.4 becomes last-stable
   - jstests/sharding/agg_merge_hashed.js
   - jstests/sharding/merge_from_stale_mongos.js
-  - jstests/sharding/merge_stale_on_fields.js
+  - jstests/sharding/query/merge_stale_on_fields.js
   - jstests/sharding/refresh_sessions.js
-  - jstests/sharding/lookup.js
+  - jstests/sharding/query/lookup.js
   # Enable when 4.4 becomes last stable
-  - jstests/sharding/out_fails_to_replace_sharded_collection.js
+  - jstests/sharding/query/out_fails_to_replace_sharded_collection.js
   - jstests/sharding/merge_from_stale_mongos.js
   - jstests/sharding/migration_coordinator_basic.js
   - jstests/sharding/migration_coordinator_killop_in_critical_section.js
