@@ -320,6 +320,7 @@ It then creates a `ReplSetHeartbeatResponse` object. This includes:
 7. The state of the receiving node
 8. The receiving node's sync source
 9. The receiving node's `ReplicaSetConfig` version
+10. Whether the receiving node is primary
 
 When the sending node receives the response to the heartbeat, it first processes its
 `ReplSetMetadata` like before.

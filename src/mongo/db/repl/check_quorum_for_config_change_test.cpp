@@ -449,7 +449,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                           rsConfig.getConfigVersion(),
                                           unexpectedId,
                                           rpc::ReplSetMetadata::kNoPrimary,
-                                          -1);
+                                          -1,
+                                          false);
             BSONObjBuilder bob;
             uassertStatusOK(metadata.writeToMetadata(&bob));
 

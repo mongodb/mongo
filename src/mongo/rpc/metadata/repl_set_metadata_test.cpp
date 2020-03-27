@@ -40,17 +40,18 @@ namespace {
 using repl::OpTime;
 using repl::OpTimeAndWallTime;
 
+static const OpTime opTime(Timestamp(1234, 100), 5);
+static const OpTime opTime2(Timestamp(7777, 100), 6);
+static const Date_t committedWallTime = Date_t() + Seconds(opTime.getSecs());
+static const ReplSetMetadata metadata(
+    3, {opTime, committedWallTime}, opTime2, 6, OID("abcdefabcdefabcdefabcdef"), 12, -1, false);
+
 TEST(ReplResponseMetadataTest, ReplicaSetIdNotSet) {
-    ASSERT_FALSE(
-        ReplSetMetadata(3, OpTimeAndWallTime(), OpTime(), 6, OID(), 12, -1).hasReplicaSetId());
+    ASSERT_FALSE(ReplSetMetadata(3, OpTimeAndWallTime(), OpTime(), 6, OID(), 12, -1, false)
+                     .hasReplicaSetId());
 }
 
 TEST(ReplResponseMetadataTest, Roundtrip) {
-    OpTime opTime(Timestamp(1234, 100), 5);
-    OpTime opTime2(Timestamp(7777, 100), 6);
-    Date_t committedWallTime = Date_t() + Seconds(opTime.getSecs());
-    ReplSetMetadata metadata(3, {opTime, committedWallTime}, opTime2, 6, OID::gen(), 12, -1);
-
     ASSERT_EQ(opTime, metadata.getLastOpCommitted().opTime);
     ASSERT_EQ(committedWallTime, metadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(opTime2, metadata.getLastOpVisible());
@@ -59,14 +60,14 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder).transitional_ignore();
 
-    BSONObj expectedObj(
-        BSON(kReplSetMetadataFieldName
-             << BSON("term" << 3 << "lastOpCommitted"
-                            << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
-                            << "lastCommittedWall" << committedWallTime << "lastOpVisible"
-                            << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
-                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
+    BSONObj expectedObj(BSON(
+        kReplSetMetadataFieldName << BSON(
+            "term" << 3 << "lastOpCommitted"
+                   << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
+                   << "lastCommittedWall" << committedWallTime << "lastOpVisible"
+                   << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
+                   << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
+                   << "primaryIndex" << 12 << "syncSourceIndex" << -1 << "isPrimary" << false)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
@@ -89,19 +90,36 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
 }
 
 TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingOplogQueryMetadataFields) {
-    auto id = OID::gen();
-    Date_t committedWallTime = Date_t();
     BSONObj obj(BSON(kReplSetMetadataFieldName
-                     << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId" << id
-                                    << "lastCommittedWall" << committedWallTime)));
+                     << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId"
+                                    << metadata.getReplicaSetId() << "lastCommittedWall"
+                                    << committedWallTime << "isPrimary" << false)));
 
     auto status = ReplSetMetadata::readFromMetadata(obj);
     ASSERT_OK(status.getStatus());
 
     const auto& metadata = status.getValue();
     ASSERT_EQ(metadata.getConfigVersion(), 6);
-    ASSERT_EQ(metadata.getReplicaSetId(), id);
+    ASSERT_EQ(metadata.getReplicaSetId(), metadata.getReplicaSetId());
     ASSERT_EQ(metadata.getTerm(), 3);
+}
+
+TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingIsPrimary) {
+    // TODO(SERVER-47125): delete this test in 4.6 when we can rely on the isPrimary field.
+    BSONObj obj(
+        BSON(kReplSetMetadataFieldName
+             << BSON("term" << 3 << "lastOpCommitted"
+                            << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
+                            << "lastCommittedWall" << committedWallTime << "lastOpVisible"
+                            << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
+                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
+                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
+
+    auto status = ReplSetMetadata::readFromMetadata(obj);
+    ASSERT_OK(status.getStatus());
+
+    const auto& metadata = status.getValue();
+    ASSERT_FALSE(metadata.getIsPrimary().is_initialized());
 }
 
 }  // unnamed namespace

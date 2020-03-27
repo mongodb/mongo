@@ -53,6 +53,7 @@ const char kReplicaSetIdFieldName[] = "replicaSetId";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
 const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
 const char kTermFieldName[] = "term";
+const char kIsPrimaryFieldName[] = "isPrimary";
 
 }  // unnamed namespace
 
@@ -64,14 +65,16 @@ ReplSetMetadata::ReplSetMetadata(long long term,
                                  long long configVersion,
                                  OID id,
                                  int currentPrimaryIndex,
-                                 int currentSyncSourceIndex)
+                                 int currentSyncSourceIndex,
+                                 boost::optional<bool> isPrimary)
     : _lastOpCommitted(std::move(committedOpTime)),
       _lastOpVisible(std::move(visibleOpTime)),
       _currentTerm(term),
       _configVersion(configVersion),
       _replicaSetId(id),
       _currentPrimaryIndex(currentPrimaryIndex),
-      _currentSyncSourceIndex(currentSyncSourceIndex) {}
+      _currentSyncSourceIndex(currentSyncSourceIndex),
+      _isPrimary(isPrimary) {}
 
 StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj) {
     BSONElement replMetadataElement;
@@ -105,6 +108,17 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
+    // TODO(SERVER-47125): require the isPrimary field.
+    boost::optional<bool> isPrimary;
+    if (replMetadataObj.hasField(kIsPrimaryFieldName)) {
+        bool isPrimaryBool;
+        status = bsonExtractBooleanField(replMetadataObj, kIsPrimaryFieldName, &isPrimaryBool);
+        if (!status.isOK())
+            return status;
+
+        isPrimary = isPrimaryBool;
+    }
+
     long long term;
     status = bsonExtractIntegerField(replMetadataObj, kTermFieldName, &term);
     if (!status.isOK())
@@ -131,8 +145,14 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     }
 
     lastOpCommitted.wallTime = wallClockTimeElement.Date();
-    return ReplSetMetadata(
-        term, lastOpCommitted, lastOpVisible, configVersion, id, primaryIndex, syncSourceIndex);
+    return ReplSetMetadata(term,
+                           lastOpCommitted,
+                           lastOpVisible,
+                           configVersion,
+                           id,
+                           primaryIndex,
+                           syncSourceIndex,
+                           isPrimary);
 }
 
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
@@ -145,6 +165,7 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     replMetadataBuilder.append(kReplicaSetIdFieldName, _replicaSetId);
     replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     replMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
+    replMetadataBuilder.append(kIsPrimaryFieldName, _isPrimary.get());
     replMetadataBuilder.doneFast();
 
     return Status::OK();
@@ -158,6 +179,7 @@ std::string ReplSetMetadata::toString() const {
     output << " Term: " << _currentTerm;
     output << " Primary Index: " << _currentPrimaryIndex;
     output << " Sync Source Index: " << _currentSyncSourceIndex;
+    output << " Is Primary: " << _isPrimary;
     output << " Last Op Committed: " << _lastOpCommitted.toString();
     output << " Last Op Visible: " << _lastOpVisible.toString();
     return output;

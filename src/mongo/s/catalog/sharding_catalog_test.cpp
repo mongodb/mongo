@@ -123,7 +123,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
                                      100,
                                      OID(),
                                      30,
-                                     -1);
+                                     -1,
+                                     true);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -196,7 +197,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
                                  100,
                                  OID(),
                                  30,
-                                 -1);
+                                 -1,
+                                 true);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -423,7 +425,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                                      100,
                                      OID(),
                                      30,
-                                     -1);
+                                     -1,
+                                     true);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -824,7 +827,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
                                  100,
                                  OID(),
                                  30,
-                                 -1);
+                                 -1,
+                                 true);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder).transitional_ignore();
 

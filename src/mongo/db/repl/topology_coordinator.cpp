@@ -3022,7 +3022,8 @@ rpc::ReplSetMetadata TopologyCoordinator::prepareReplSetMetadata(
                                 _rsConfig.getConfigVersion(),
                                 _rsConfig.getReplicaSetId(),
                                 _currentPrimaryIndex,
-                                _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
+                                _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
+                                _role == Role::kLeader /* isPrimary */);
 }
 
 rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid) const {

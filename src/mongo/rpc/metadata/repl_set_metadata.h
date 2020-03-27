@@ -59,7 +59,8 @@ public:
                     long long configVersion,
                     OID replicaSetId,
                     int currentPrimaryIndex,
-                    int currentSyncSourceIndex);
+                    int currentSyncSourceIndex,
+                    boost::optional<bool> isPrimary);
 
     /**
      * format:
@@ -70,7 +71,8 @@ public:
      *     configVersion: 0,
      *     replicaSetId: ObjectId("..."), // Only present in certain versions and above.
      *     primaryIndex: 0,
-     *     syncSourceIndex: 0
+     *     syncSourceIndex: 0,
+     *     isPrimary: false // 4.4 and later
      * }
      */
     static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
@@ -128,6 +130,15 @@ public:
     }
 
     /**
+     * Returns true if the sender is primary, false if it isn't, and boost::none if this metadata
+     * is from a pre-4.4 node that doesn't send isPrimary.
+     */
+    // TODO(SERVER-47125): make this a regular bool post-4.4.
+    boost::optional<bool> getIsPrimary() const {
+        return _isPrimary;
+    }
+
+    /**
      * Returns the current term from the perspective of the sender.
      */
     long long getTerm() const {
@@ -147,6 +158,7 @@ private:
     OID _replicaSetId;
     int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;
+    boost::optional<bool> _isPrimary;
 };
 
 }  // namespace rpc

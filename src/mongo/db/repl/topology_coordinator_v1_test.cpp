@@ -221,13 +221,15 @@ protected:
                                         int syncSourceIndex = -1,
                                         long long configVersion = -1) {
         auto configIn = (configVersion != -1) ? configVersion : _currentConfig.getConfigVersion();
+        auto isPrimary = primaryIndex != -1 && _topo->getCurrentPrimaryIndex() == primaryIndex;
         return ReplSetMetadata(_topo->getTerm(),
                                OpTimeAndWallTime(),
                                visibleOpTime,
                                configIn,
                                OID(),
                                primaryIndex,
-                               syncSourceIndex);
+                               syncSourceIndex,
+                               isPrimary);
     }
 
     // Make the OplogQueryMetadata coming from sync source.
@@ -4297,7 +4299,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberHasYetToHeart
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) {
     // In this test, the TopologyCoordinator should tell us to change sync sources away from
     // "host4" since "host4" is absent from the config of version 10.
-    ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, OID(), -1, -1);
+    ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, OID(), -1, -1, false);
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), now()));
 }
