@@ -47,6 +47,7 @@ namespace repl {
 
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
+constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace;
 
 namespace {
 const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
@@ -60,15 +61,18 @@ ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
           storageInterface,
           NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
           NamespaceString(
-              ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace)) {}
+              ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace),
+          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace)) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface,
     NamespaceString minValidNss,
-    NamespaceString oplogTruncateAfterPointNss)
+    NamespaceString oplogTruncateAfterPointNss,
+    NamespaceString initialSyncIdNss)
     : _storageInterface(storageInterface),
       _minValidNss(minValidNss),
-      _oplogTruncateAfterPointNss(oplogTruncateAfterPointNss) {}
+      _oplogTruncateAfterPointNss(oplogTruncateAfterPointNss),
+      _initialSyncIdNss(initialSyncIdNss) {}
 
 boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinValidDocument(
     OperationContext* opCtx) const {
@@ -524,6 +528,45 @@ Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationCon
         }
     }
     return Status::OK();
+}
+
+void ReplicationConsistencyMarkersImpl::setInitialSyncIdIfNotSet(OperationContext* opCtx) {
+    auto status =
+        _storageInterface->createCollection(opCtx, _initialSyncIdNss, CollectionOptions());
+    if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
+        LOGV2_FATAL(
+            4608500, "Failed to create collection", "namespace"_attr = _initialSyncIdNss.ns());
+        fassertFailedWithStatus(4608502, status);
+    }
+
+    auto prevId = _storageInterface->findSingleton(opCtx, _initialSyncIdNss);
+    if (prevId.getStatus() == ErrorCodes::CollectionIsEmpty) {
+        auto doc = BSON("_id" << UUID::gen() << "wallTime"
+                              << opCtx->getServiceContext()->getPreciseClockSource()->now());
+        fassert(4608503,
+                _storageInterface->insertDocument(opCtx,
+                                                  _initialSyncIdNss,
+                                                  TimestampedBSONObj{doc, Timestamp()},
+                                                  OpTime::kUninitializedTerm));
+    } else if (!prevId.isOK()) {
+        fassertFailedWithStatus(4608504, prevId.getStatus());
+    }
+}
+
+void ReplicationConsistencyMarkersImpl::clearInitialSyncId(OperationContext* opCtx) {
+    fassert(4608501, _storageInterface->dropCollection(opCtx, _initialSyncIdNss));
+}
+
+BSONObj ReplicationConsistencyMarkersImpl::getInitialSyncId(OperationContext* opCtx) {
+    auto idStatus = _storageInterface->findSingleton(opCtx, _initialSyncIdNss);
+    if (idStatus.isOK()) {
+        return idStatus.getValue();
+    }
+    if (idStatus.getStatus() != ErrorCodes::CollectionIsEmpty &&
+        idStatus.getStatus() != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOK(idStatus);
+    }
+    return BSONObj();
 }
 
 }  // namespace repl

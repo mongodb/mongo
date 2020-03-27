@@ -53,11 +53,13 @@ public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
     static constexpr StringData kDefaultOplogTruncateAfterPointNamespace =
         "local.replset.oplogTruncateAfterPoint"_sd;
+    static constexpr StringData kDefaultInitialSyncIdNamespace = "local.replset.initialSyncId"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
                                       NamespaceString minValidNss,
-                                      NamespaceString oplogTruncateAfterNss);
+                                      NamespaceString oplogTruncateAfterNss,
+                                      NamespaceString initialSyncIdNss);
 
     void initializeMinValidDocument(OperationContext* opCtx) override;
 
@@ -89,7 +91,11 @@ public:
     void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 
-    Status createInternalCollections(OperationContext* opCtx);
+    Status createInternalCollections(OperationContext* opCtx) override;
+
+    void setInitialSyncIdIfNotSet(OperationContext* opCtx) override;
+    void clearInitialSyncId(OperationContext* opCtx) override;
+    BSONObj getInitialSyncId(OperationContext* opCtx) override;
 
 private:
     /**
@@ -124,6 +130,7 @@ private:
     StorageInterface* _storageInterface;
     const NamespaceString _minValidNss;
     const NamespaceString _oplogTruncateAfterPointNss;
+    const NamespaceString _initialSyncIdNss;
 
     // Protects modifying and reading _isPrimary below.
     mutable Mutex _truncatePointIsPrimaryMutex =

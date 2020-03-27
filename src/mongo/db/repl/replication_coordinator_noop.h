@@ -198,8 +198,6 @@ public:
 
     std::vector<HostAndPort> getHostsWrittenTo(const OpTime&, bool) final;
 
-    std::vector<HostAndPort> getOtherNodesInReplSet() const final;
-
     Status checkReplEnabledForCommand(BSONObjBuilder*) final;
 
     HostAndPort chooseNewSyncSource(const OpTime&) final;

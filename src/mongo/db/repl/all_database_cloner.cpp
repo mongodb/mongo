@@ -35,6 +35,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/all_database_cloner.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 namespace mongo {
@@ -47,10 +49,11 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      ThreadPool* dbPool)
     : BaseCloner("AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
+      _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage) {}
 
 BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
-    return {&_connectStage, &_listDatabasesStage};
+    return {&_connectStage, &_getInitialSyncIdStage, &_listDatabasesStage};
 }
 
 Status AllDatabaseCloner::ensurePrimaryOrSecondary(
@@ -65,12 +68,29 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     // There is a window during startup where a node has an invalid configuration and will have
     // an isMaster response the same as a removed node.  So we must check to see if the node is
     // removed by checking local configuration.
-    auto otherNodes =
-        ReplicationCoordinator::get(getGlobalServiceContext())->getOtherNodesInReplSet();
-    if (std::find(otherNodes.begin(), otherNodes.end(), getSource()) == otherNodes.end()) {
+    auto memberData = ReplicationCoordinator::get(getGlobalServiceContext())->getMemberData();
+    auto syncSourceIter = std::find_if(
+        memberData.begin(), memberData.end(), [source = getSource()](const MemberData& member) {
+            return member.getHostAndPort() == source;
+        });
+    if (syncSourceIter == memberData.end()) {
         Status status(ErrorCodes::NotMasterOrSecondary,
                       str::stream() << "Sync source " << getSource()
                                     << " has been removed from the replication configuration.");
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        // Setting the status in the shared data will cancel the initial sync.
+        getSharedData()->setInitialSyncStatusIfOK(lk, status);
+        return status;
+    }
+
+    // We also check if the sync source has gone into initial sync itself.  If so, we'll never be
+    // able to sync from it and we should abort the attempt.  Because there is a window during
+    // startup where a node will report being in STARTUP2 even if it is not in initial sync,
+    // we also check to see if it has a sync source.  A node in STARTUP2 will not have a sync
+    // source unless it is in initial sync.
+    if (syncSourceIter->getState().startup2() && !syncSourceIter->getSyncSource().empty()) {
+        Status status(ErrorCodes::NotMasterOrSecondary,
+                      str::stream() << "Sync source " << getSource() << " has been resynced.");
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
         getSharedData()->setInitialSyncStatusIfOK(lk, status);
@@ -96,6 +116,30 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     }
     uassertStatusOK(replAuthenticate(client).withContext(
         str::stream() << "Failed to authenticate to " << getSource()));
+    return kContinueNormally;
+}
+
+BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
+    auto wireVersion = static_cast<WireVersion>(getClient()->getMaxWireVersion());
+    {
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        getSharedData()->setSyncSourceWireVersion(lk, wireVersion);
+    }
+
+    // Wire versions prior to resumable initial sync don't have a sync source id.
+    if (wireVersion < WireVersion::RESUMABLE_INITIAL_SYNC)
+        return kContinueNormally;
+    auto initialSyncId = getClient()->findOne(
+        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(), Query());
+    uassert(ErrorCodes::InitialSyncFailure,
+            "Cannot retrieve sync source initial sync ID",
+            !initialSyncId.isEmpty());
+    InitialSyncIdDocument initialSyncIdDoc =
+        InitialSyncIdDocument::parse(IDLParserErrorContext("initialSyncId"), initialSyncId);
+    {
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        getSharedData()->setInitialSyncSourceId(lk, initialSyncIdDoc.get_id());
+    }
     return kContinueNormally;
 }
 

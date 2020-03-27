@@ -354,10 +354,6 @@ std::vector<HostAndPort> ReplicationCoordinatorNoOp::getHostsWrittenTo(const OpT
     MONGO_UNREACHABLE;
 }
 
-std::vector<HostAndPort> ReplicationCoordinatorNoOp::getOtherNodesInReplSet() const {
-    MONGO_UNREACHABLE;
-}
-
 Status ReplicationCoordinatorNoOp::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions&) const {
     MONGO_UNREACHABLE;

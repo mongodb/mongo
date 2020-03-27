@@ -71,6 +71,7 @@ protected:
 
             return std::move(localLoader);
         };
+        setInitialSyncId();
     }
     std::unique_ptr<DatabaseCloner> makeDatabaseCloner() {
         return std::make_unique<DatabaseCloner>(_dbName,

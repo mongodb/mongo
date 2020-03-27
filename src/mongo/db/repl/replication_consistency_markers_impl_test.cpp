@@ -56,6 +56,7 @@ using namespace mongo::repl;
 
 NamespaceString kMinValidNss("local", "replset.minvalid");
 NamespaceString kOplogTruncateAfterPointNss("local", "replset.oplogTruncateAfterPoint");
+NamespaceString kInitialSyncIdNss("local", "replset.initialSyncId");
 
 /**
  * Returns min valid document.
@@ -121,7 +122,7 @@ bool RecoveryUnitWithDurabilityTracking::waitUntilDurable(OperationContext* opCt
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -145,7 +146,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
 
 TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -164,7 +165,7 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
 
 TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncateAfterPoint) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -187,7 +188,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncat
 
 TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss);
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -240,6 +241,44 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
     ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(
+        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    auto opCtx = getOperationContext();
+
+    // Initially, initialSyncId should be unset.
+    auto initialSyncIdShouldBeUnset = consistencyMarkers.getInitialSyncId(opCtx);
+    ASSERT(initialSyncIdShouldBeUnset.isEmpty()) << initialSyncIdShouldBeUnset;
+
+    // Clearing an already-clear initialSyncId should be OK.
+    consistencyMarkers.clearInitialSyncId(opCtx);
+    initialSyncIdShouldBeUnset = consistencyMarkers.getInitialSyncId(opCtx);
+    ASSERT(initialSyncIdShouldBeUnset.isEmpty()) << initialSyncIdShouldBeUnset;
+
+    consistencyMarkers.setInitialSyncIdIfNotSet(opCtx);
+    auto firstInitialSyncIdBson = consistencyMarkers.getInitialSyncId(opCtx);
+    ASSERT_FALSE(firstInitialSyncIdBson.isEmpty());
+    InitialSyncIdDocument firstInitialSyncIdDoc = InitialSyncIdDocument::parse(
+        IDLParserErrorContext("initialSyncId"), firstInitialSyncIdBson);
+
+    // Setting it twice should change nothing.
+    consistencyMarkers.setInitialSyncIdIfNotSet(opCtx);
+    ASSERT_BSONOBJ_EQ(firstInitialSyncIdBson, consistencyMarkers.getInitialSyncId(opCtx));
+
+    // Clear it; should return to empty.
+    consistencyMarkers.clearInitialSyncId(opCtx);
+    initialSyncIdShouldBeUnset = consistencyMarkers.getInitialSyncId(opCtx);
+    ASSERT(initialSyncIdShouldBeUnset.isEmpty()) << initialSyncIdShouldBeUnset;
+
+    // Set it; it should have a different UUID.
+    consistencyMarkers.setInitialSyncIdIfNotSet(opCtx);
+    auto secondInitialSyncIdBson = consistencyMarkers.getInitialSyncId(opCtx);
+    ASSERT_FALSE(secondInitialSyncIdBson.isEmpty());
+    InitialSyncIdDocument secondInitialSyncIdDoc = InitialSyncIdDocument::parse(
+        IDLParserErrorContext("initialSyncId"), secondInitialSyncIdBson);
+    ASSERT_NE(firstInitialSyncIdDoc.get_id(), secondInitialSyncIdDoc.get_id());
 }
 
 }  // namespace

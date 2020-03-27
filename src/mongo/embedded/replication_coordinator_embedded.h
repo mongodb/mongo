@@ -205,8 +205,6 @@ public:
 
     std::vector<HostAndPort> getHostsWrittenTo(const repl::OpTime&, bool) override;
 
-    std::vector<HostAndPort> getOtherNodesInReplSet() const override;
-
     Status checkReplEnabledForCommand(BSONObjBuilder*) override;
 
     HostAndPort chooseNewSyncSource(const repl::OpTime&) override;

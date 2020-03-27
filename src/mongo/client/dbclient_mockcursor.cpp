@@ -74,7 +74,7 @@ void DBClientMockCursor::_fillNextBatch() {
     int leftInBatch = _batchSize;
     batch.objs.clear();
     while (_iter.more() && (!_batchSize || leftInBatch--)) {
-        batch.objs.emplace_back(_iter.next().Obj());
+        batch.objs.emplace_back(_iter.next().Obj().getOwned());
     }
     batch.pos = 0;
 

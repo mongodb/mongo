@@ -736,6 +736,9 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         auto memberState = getMemberState();
         invariant(memberState.startup2() || memberState.removed());
         invariant(setFollowerMode(MemberState::RS_RECOVERING));
+        // Set an initial sync ID, in case we were upgraded or restored from backup without doing
+        // an initial sync.
+        _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
         _externalState->startSteadyStateReplication(opCtx, this);
         return;
     }
@@ -4254,24 +4257,6 @@ std::vector<HostAndPort> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpT
                                                                        bool durablyWritten) {
     stdx::lock_guard<Latch> lk(_mutex);
     return _topCoord->getHostsWrittenTo(op, durablyWritten);
-}
-
-std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    invariant(_settings.usingReplSets());
-
-    std::vector<HostAndPort> nodes;
-    if (_selfIndex == -1) {
-        return nodes;
-    }
-
-    for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
-        if (i == _selfIndex)
-            continue;
-
-        nodes.push_back(_rsConfig.getMemberAt(i).getHostAndPort());
-    }
-    return nodes;
 }
 
 Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(

@@ -411,10 +411,6 @@ std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpT
     return std::vector<HostAndPort>();
 }
 
-std::vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
-    return std::vector<HostAndPort>();
-}
-
 Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
     return Status::OK();

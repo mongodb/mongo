@@ -750,13 +750,6 @@ public:
     virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten) = 0;
 
     /**
-     * Returns a vector of the members other than ourself in the replica set, as specified in
-     * the replica set config.  Invalid to call if we are not in replica set mode.  Returns
-     * an empty vector if we do not have a valid config.
-     */
-    virtual std::vector<HostAndPort> getOtherNodesInReplSet() const = 0;
-
-    /**
      * Returns a BSONObj containing a representation of the current default write concern.
      */
     virtual WriteConcernOptions getGetLastErrorDefault() = 0;

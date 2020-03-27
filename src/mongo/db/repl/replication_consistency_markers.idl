@@ -71,3 +71,13 @@ structs:
                 type: string
                 description: "Always set to 'oplogTruncateAfterPoint' to easily retrieve it."
 
+    InitialSyncIdDocument:
+        description: A document in which the server stores data related to the initial sync of the server.
+        fields:
+            _id:
+                type: uuid
+                description: "An arbitrary unique identifier associated with the initial sync of the server."
+            wallTime:
+                type: date
+                optional: true
+                description: "The walltime at which the initial sync document was written."

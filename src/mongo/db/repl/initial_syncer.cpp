@@ -511,6 +511,7 @@ void InitialSyncer::waitForCloner_forTest() {
 void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts) {
     // 'opCtx' is passed through from startup().
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
+    _replicationProcess->getConsistencyMarkers()->clearInitialSyncId(opCtx);
 
     auto serviceCtx = opCtx->getServiceContext();
     _storage->setInitialDataTimestamp(serviceCtx, Timestamp::kAllowUnstableCheckpointsSentinel);
@@ -550,6 +551,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
 
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
+    _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
 
     // All updates that represent initial sync must be completed before setting the initial data

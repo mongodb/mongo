@@ -83,6 +83,10 @@ public:
 
     Status createInternalCollections(OperationContext* opCtx) override;
 
+    void setInitialSyncIdIfNotSet(OperationContext* opCtx) override;
+    void clearInitialSyncId(OperationContext* opCtx) override;
+    BSONObj getInitialSyncId(OperationContext* opCtx) override;
+
 private:
     mutable Mutex _initialSyncFlagMutex =
         MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_initialSyncFlagMutex");
