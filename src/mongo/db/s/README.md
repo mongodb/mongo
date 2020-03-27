@@ -19,6 +19,20 @@ corresponding data.
 
 ## The authoritative routing table
 
+The authoritative routing table is stored in a set of unsharded collections in the config database
+on the config server replica set. The schemas of the relevant collections are:
+
+* [**config.databases**](https://docs.mongodb.com/manual/reference/config-database/#config.databases)
+* [**config.collections**](https://docs.mongodb.com/manual/reference/config-database/#config.collections)
+* [**config.chunks**](https://docs.mongodb.com/manual/reference/config-database/#config.chunks)
+* [**config.shards**](https://docs.mongodb.com/manual/reference/config-database/#config.shards)
+
+#### Code references
+
+* The
+[**indexes created**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.cpp#L295-L372)
+on each of these collections for efficient querying
+
 ## The routing table cache
 
 ## Shard versioning and database versioning
