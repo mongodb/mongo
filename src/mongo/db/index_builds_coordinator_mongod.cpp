@@ -220,33 +220,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             sleepmillis(100);
         }
 
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-        auto replState = invariant(_getIndexBuild(buildUUID));
-        if (replCoord->isReplEnabled() && !replCoord->getMemberState().primary() &&
-            replState->alreadyHasIndexesBuilt) {
-            LOGV2(3942301,
-                  "Node already has the requested index(es) finished, will vote for committing the "
-                  "index build",
-                  "collectionUUID"_attr = replState->collectionUUID,
-                  "buildUUID"_attr = replState->buildUUID,
-                  "indexNames"_attr = replState->indexNames,
-                  "indexSpecs"_attr = replState->indexSpecs);
-
-            // Signal that the index build started successfully.
-            startPromise.setWith([] {});
-
-            _signalPrimaryForCommitReadiness(opCtx.get(), replState);
-            _waitForNextIndexBuildAction(opCtx.get(), replState);
-
-            {
-                stdx::unique_lock<Latch> lk(_mutex);
-                _unregisterIndexBuild(lk, replState);
-            }
-
-            replState->sharedPromise.emplaceValue((replState->stats));
-            return;
-        }
-
         // Index builds should never take the PBWM lock, even on a primary. This allows the
         // index build to continue running after the node steps down to a secondary.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(

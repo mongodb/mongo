@@ -1476,44 +1476,6 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(
         return SharedSemiFuture(indexCatalogStats);
     }
 
-    // If all the requested index(es) have already been built on this secondary node due to rolling
-    // index builds, we'll be able to vote for committing the index build once an index builder
-    // thread gets created.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && !replCoord->getMemberState().primary()) {
-        const IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        const bool includeUnfinishedIndexes = true;
-
-        bool indexesAlreadyBuilt =
-            std::all_of(filteredSpecs.begin(), filteredSpecs.end(), [&](const BSONObj& spec) {
-                std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
-                return indexCatalog->findIndexByName(opCtx, name, includeUnfinishedIndexes);
-            });
-
-        if (indexesAlreadyBuilt) {
-            // Register the index build on the secondary. This is needed when the secondary
-            // processes the 'commitIndexBuild' oplog entry otherwise it will be forced to rebuild
-            // the existing index(es).
-            auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(buildUUID,
-                                                                             collectionUUID,
-                                                                             dbName.toString(),
-                                                                             filteredSpecs,
-                                                                             protocol,
-                                                                             commitQuorum);
-
-            replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
-            replIndexBuildState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
-            replIndexBuildState->alreadyHasIndexesBuilt = true;
-
-            status = _registerIndexBuild(lk, replIndexBuildState);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            return boost::none;
-        }
-    }
-
     // Bypass the thread pool if we are building indexes on an empty collection.
     if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection, protocol)) {
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
