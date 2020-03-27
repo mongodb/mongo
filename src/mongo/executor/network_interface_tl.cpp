@@ -420,7 +420,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     bool targetHostsInAlphabeticalOrder =
-        MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail());
+        MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail(
+            [request](const BSONObj&) { return request.hedgeOptions != boost::none; }));
 
     if (targetHostsInAlphabeticalOrder) {
         // Sort the target hosts by host names.

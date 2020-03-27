@@ -43,15 +43,16 @@ function checkServerStatusHedgingMetrics(mongosConn, expectedHedgingMetrics) {
         serverStatusCheckTimeoutMS);
 }
 
-function setCommandDelay(nodeConn, command, delay) {
+function setCommandDelay(nodeConn, command, delay, ns) {
     assert.commandWorked(nodeConn.adminCommand({
         configureFailPoint: "failCommand",
-        mode: "alwaysOn",
+        mode: {times: 1},
         data: {
             failInternalCommands: true,
             blockConnection: true,
             blockTimeMS: delay,
             failCommands: [command],
+            namespace: ns,
         }
     }));
 }
@@ -63,7 +64,21 @@ function clearCommandDelay(nodeConn) {
     }));
 }
 
-const st = new ShardingTest({shards: 1, rs: {nodes: 2}, mongosOptions: {verbose: 2}});
+const st = new ShardingTest({
+    mongos: [{
+        setParameter: {
+            logComponentVerbosity: tojson({network: {verbosity: 2}}),
+            // Force the mongos's replica set monitors to always include all the eligible nodes.
+            "failpoint.scanningServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
+            "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
+            // Force the mongos to send requests to hosts in alphabetical order of host names.
+            "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
+                tojson({mode: "alwaysOn"})
+        }
+    }],
+    shards: 1,
+    rs: {nodes: 2, setParameter: {logComponentVerbosity: tojson({command: {verbosity: 1}})}}
+});
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -103,7 +118,7 @@ jsTestLog("Run commands with hedging enabled, and verify the metrics are as expe
 // Make the command slower on the first target host, and verify there is an advantageous
 // hedged read.
 try {
-    setCommandDelay(sortedNodes[0], "count", 1000);
+    setCommandDelay(sortedNodes[0], "count", 1000, ns);
     assert.commandWorked(testDB.runCommand(
         {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
 } finally {
@@ -119,8 +134,8 @@ checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 // hedged read. Block the command on the first target host for some time to allow the hedged
 // request to get sent to the second target host.
 try {
-    setCommandDelay(sortedNodes[0], "count", 100);
-    setCommandDelay(sortedNodes[1], "count", 1000);
+    setCommandDelay(sortedNodes[0], "count", 100, ns);
+    setCommandDelay(sortedNodes[1], "count", 1000, ns);
 
     assert.commandWorked(testDB.runCommand(
         {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
@@ -132,9 +147,6 @@ try {
 expectedHedgingMetrics.numTotalOperations += 1;
 expectedHedgingMetrics.numTotalHedgedOperations += 1;
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
-
-serverSelectorFailPoint.off();
-sendRequestsFailPoint.off();
 
 st.stop();
 }());
