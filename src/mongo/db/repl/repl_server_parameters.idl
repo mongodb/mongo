@@ -148,28 +148,6 @@ server_parameters:
         cpp_varname: writePeriodicNoops
         default: true
 
-    # From collection_cloner.cpp
-    numInitialSyncCollectionCountAttempts:
-        description: The number of attempts for the count command, which gets the document count.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: numInitialSyncCollectionCountAttempts
-        default: 3
-
-    numInitialSyncListIndexesAttempts:
-        description: The number of attempts for the listIndexes commands.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: numInitialSyncListIndexesAttempts
-        default: 3
-
-    numInitialSyncCollectionFindAttempts:
-        description: The number of attempts for the find command, which gets the data.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: numInitialSyncCollectionFindAttempts
-        default: 3
-
     collectionClonerUsesExhaust:
         description: Whether to use the "exhaust cursor" feature when retrieving collection data.
         set_at: startup
@@ -200,13 +178,6 @@ server_parameters:
         default: 0
         validator:
             gte: 0
-
-    numInitialSyncListCollectionsAttempts:
-        description: The number of attempts for the listCollections commands.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: numInitialSyncListCollectionsAttempts
-        default: 3
 
     # From replication_coordinator_external_state_impl.cpp
     oplogFetcherSteadyStateMaxFetcherRestarts:
