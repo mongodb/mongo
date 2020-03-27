@@ -344,12 +344,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
         return Status(ErrorCodes::ConflictingOperationInProgress,
                       "Can't receive chunk while FCV is upgrading/downgrading");
 
-    // Note: It is expected that the FCV cannot change while the node is donating or receiving a
-    // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
-    // chunks via the ActiveMigrationsRegistry.
-    _enableResumableRangeDeleter =
-        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !disableResumableRangeDeleter.load();
+    _enableResumableRangeDeleter = !disableResumableRangeDeleter.load();
 
     _state = READY;
     _stateChangedCV.notify_all();
@@ -357,7 +352,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
 
     if (_enableResumableRangeDeleter) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                "Missing migrationId in FCV 4.4",
+                "Missing migrationId while Resumable Range Deleter is enabled",
                 cloneRequest.hasMigrationId());
 
         _migrationId = cloneRequest.getMigrationId();

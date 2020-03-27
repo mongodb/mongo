@@ -176,25 +176,22 @@ Status checkChunkMatchesRequest(OperationContext* opCtx,
     const auto currentChunk =
         uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
 
-    // In the FCV 4.4 protocol, additionally check that the chunk's version matches what's in
-    // the request.
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "Config server rejecting commitChunkMigration request that does not have a "
-                "ChunkVersion because config server is in feature compatibility version 4.4",
-                requestedChunk.isVersionSet() && requestedChunk.getVersion().isSet() &&
-                    requestedChunk.getVersion().epoch().isSet());
+    // In the FCV 4.4 protocol, additionally check that the chunk's version matches what's in the
+    // request.
+    uassert(4683300,
+            "Config server rejecting commitChunkMigration request that does not have a "
+            "ChunkVersion",
+            requestedChunk.isVersionSet() && requestedChunk.getVersion().isSet() &&
+                requestedChunk.getVersion().epoch().isSet());
 
-        if (requestedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
-            requestedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
-            return {ErrorCodes::ConflictingOperationInProgress,
-                    str::stream()
-                        << "Rejecting migration request because the version of the requested chunk "
-                        << requestedChunk.toConfigBSON()
-                        << " is older than the version of the current chunk "
-                        << currentChunk.toConfigBSON()};
-        }
+    if (requestedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
+        requestedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream()
+                    << "Rejecting migration request because the version of the requested chunk "
+                    << requestedChunk.toConfigBSON()
+                    << " is older than the version of the current chunk "
+                    << currentChunk.toConfigBSON()};
     }
 
     return Status::OK();

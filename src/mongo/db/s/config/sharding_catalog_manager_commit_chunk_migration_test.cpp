@@ -540,10 +540,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     ASSERT_EQ(ctrlChunkValidAfter, chunkDoc1.getHistory().front().getValidAfter());
 }
 
-TEST_F(CommitChunkMigrate, RejectMissingChunkVersionOnFCV44) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
+TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -586,62 +583,10 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersionOnFCV44) {
                                                   ShardId(shard1.getName()),
                                                   validAfter),
                        DBException,
-                       ErrorCodes::ConflictingOperationInProgress);
+                       4683300);
 }
 
-TEST_F(CommitChunkMigrate, AcceptMissingChunkVersionOnFCV42) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
-
-    ShardType shard0;
-    shard0.setName("shard0");
-    shard0.setHost("shard0:12");
-
-    ShardType shard1;
-    shard1.setName("shard1");
-    shard1.setHost("shard1:12");
-
-    setupShards({shard0, shard1});
-
-    ChunkVersion origVersion(12, 7, OID::gen());
-
-    // Create migrate chunk with no chunk version set.
-    ChunkType migratedChunk;
-    migratedChunk.setName(OID::gen());
-    migratedChunk.setNS(kNamespace);
-    migratedChunk.setShard(shard0.getName());
-    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
-    migratedChunk.setMin(BSON("a" << 1));
-    migratedChunk.setMax(BSON("a" << 10));
-
-    ChunkType currentChunk;
-    currentChunk.setName(OID::gen());
-    currentChunk.setNS(kNamespace);
-    currentChunk.setVersion(origVersion);
-    currentChunk.setShard(shard0.getName());
-    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
-    currentChunk.setMin(BSON("a" << 1));
-    currentChunk.setMax(BSON("a" << 10));
-
-    setupChunks({currentChunk});
-
-    Timestamp validAfter{101, 0};
-    auto result = ShardingCatalogManager::get(operationContext())
-                      ->commitChunkMigration(operationContext(),
-                                             kNamespace,
-                                             migratedChunk,
-                                             origVersion.epoch(),
-                                             ShardId(shard0.getName()),
-                                             ShardId(shard1.getName()),
-                                             validAfter);
-
-    ASSERT_OK(result);
-}
-
-TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
+TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -691,10 +636,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
     ASSERT_EQ(result, ErrorCodes::ConflictingOperationInProgress);
 }
 
-TEST_F(CommitChunkMigrate, RejectMismatchedEpochOnFCV44) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
+TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");

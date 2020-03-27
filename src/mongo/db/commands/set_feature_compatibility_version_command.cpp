@@ -176,8 +176,6 @@ public:
         invariant(!opCtx->lockState()->isLocked());
         Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
-        MigrationBlockingGuard migrationBlockingGuard(opCtx, "setFeatureCompatibilityVersion");
-
         const auto requestedVersion = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
         ServerGlobalParams::FeatureCompatibility::Version actualVersion =

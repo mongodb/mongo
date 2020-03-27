@@ -118,12 +118,6 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
 
-bool isFCVLatest() {
-    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
-
-    return fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
-}
-
 BSONObj getMigrationIdBSON(migrationutil::MigrationCoordinator* coordinator) {
     return coordinator ? coordinator->getMigrationId().toBSON() : BSONObj();
 }
@@ -151,17 +145,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)) {
     invariant(!_opCtx->lockState()->isLocked());
 
-    // Note: It is expected that the FCV cannot change while the node is donating or receiving a
-    // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
-    // chunks via the ActiveMigrationsRegistry.
-    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Can't donate chunk while FCV is upgrading/downgrading",
-            fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44 &&
-                fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
-
-    _enableResumableRangeDeleter = isFCVLatest() && !disableResumableRangeDeleter.load();
+    _enableResumableRangeDeleter = !disableResumableRangeDeleter.load();
 
     // Disallow moving a chunk to ourselves
     uassert(ErrorCodes::InvalidOptions,
@@ -172,7 +156,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           "Starting chunk migration {args} with expected collection version epoch "
           "{args_getVersionEpoch}",
           "args"_attr = redact(_args.toString()),
-          "args_getVersionEpoch"_attr = _args.getVersionEpoch());
+          "args_getVersionEpoch"_attr = _args.getVersionEpoch(),
+          "resumableRangeDeleterEnabled"_attr = _enableResumableRangeDeleter);
 
     // Force refresh of the metadata to ensure we have the latest
     forceShardFilteringMetadataRefresh(_opCtx, getNss());
