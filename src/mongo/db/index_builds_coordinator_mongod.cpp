@@ -58,7 +58,6 @@ using namespace indexbuildentryhelpers;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
-MONGO_FAIL_POINT_DEFINE(hangBeforeSendingCommitQuorumVote);
 MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 
 /**
@@ -236,25 +235,9 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             // Signal that the index build started successfully.
             startPromise.setWith([] {});
 
-            try {
-                _signalPrimaryForCommitReadiness(opCtx.get(), replState);
-                _waitForNextIndexBuildAction(opCtx.get(), replState);
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
-                // This is a blocking call that can take an extended amount of time to finish. We
-                // need to anticipate possible shutdowns or interruptions here.
-                status = ex.toStatus();
+            _signalPrimaryForCommitReadiness(opCtx.get(), replState);
+            _waitForNextIndexBuildAction(opCtx.get(), replState);
 
-                LOGV2(4709502,
-                      "Vote interrupted for committing the index build",
-                      "collectionUUID"_attr = replState->collectionUUID,
-                      "buildUUID"_attr = replState->buildUUID,
-                      "indexNames"_attr = replState->indexNames,
-                      "indexSpecs"_attr = replState->indexSpecs,
-                      "status"_attr = status);
-            }
-
-            // No additional cleanup is necessary other than unregistering the index build as it's
-            // already built.
             {
                 stdx::unique_lock<Latch> lk(_mutex);
                 _unregisterIndexBuild(lk, replState);
@@ -548,11 +531,6 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
         BSONObj voteCmdResponse;
         try {
-            if (MONGO_unlikely(hangBeforeSendingCommitQuorumVote.shouldFail())) {
-                LOGV2(4709501, "Hanging on 'hangBeforeSendingCommitQuorumVote' fail point.");
-                hangBeforeSendingCommitQuorumVote.pauseWhileSet(opCtx);
-            }
-
             voteCmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                 opCtx, "admin", voteCmdRequest, onRemoteCmdScheduled, onRemoteCmdComplete);
         } catch (DBException& ex) {
