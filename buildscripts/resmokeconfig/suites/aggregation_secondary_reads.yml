@@ -61,7 +61,7 @@ executor:
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
-    n: 1
+    n: 20
   fixture:
     class: ReplicaSetFixture
     mongod_options:
