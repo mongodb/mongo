@@ -12,8 +12,6 @@
 (function() {
 'use strict';
 
-load('jstests/noPassthrough/libs/index_build.js');
-
 const replTest = new ReplSetTest({
     nodes: [
         {},
@@ -44,6 +42,7 @@ let primary = replTest.getPrimary();
 let primaryDB = primary.getDB(dbName);
 let coll = primaryDB.getCollection(collName);
 
+<<<<<<< HEAD
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary) ||
     !IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
     jsTestLog('Two phase index builds or commit quorum are not supported, skipping test.');
@@ -51,6 +50,8 @@ if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary) ||
     return;
 }
 
+=======
+>>>>>>> parent of cfe0bb69c9... SERVER-47067 Do not run 'rolling_index_builds_secondaries_vote_immediately.js' with single phase index builds
 // Populate the collection to avoid empty collection index build optimization.
 assert.commandWorked(coll.insert({x: 1, y: 1}));
 
