@@ -7,16 +7,17 @@
 
 load("jstests/libs/fail_point_util.js");
 
-function setCommandDelay(nodeConn, command, delay) {
+function setCommandDelay(nodeConn, command, delay, ns) {
     assert.commandWorked(nodeConn.adminCommand({
         configureFailPoint: "failCommand",
-        mode: "alwaysOn",
+        mode: {times: 1},
         data: {
             failInternalCommands: true,
             blockConnection: true,
             blockTimeMS: delay,
             failCommands: [command],
-        }
+            namespace: ns
+        },
     }));
 }
 
@@ -51,53 +52,50 @@ function checkForOpWithComment(conn, comment) {
     return true;
 }
 
-const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+const st = new ShardingTest({
+    mongos: [{
+        setParameter: {
+            logComponentVerbosity: tojson({network: {verbosity: 2}}),
+            // Force the mongos's replica set monitors to always include all the eligible nodes.
+            "failpoint.scanningServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
+            "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
+            // Force the mongos to send requests to hosts in alphabetical order of host names.
+            "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
+                tojson({mode: "alwaysOn"})
+        }
+    }],
+    shards: 1,
+    rs: {nodes: 2, setParameter: {logComponentVerbosity: tojson({command: {verbosity: 1}})}}
+});
 const dbName = "hedged_reads";
 const collName = "test";
 const ns = dbName + "." + collName;
 const testDB = st.s.getDB(dbName);
 
-const kLargeTimeoutMS = 5 * 60 * 1000;
-const waitKillOpTimeoutMS = 5 * 1000;
+const kBlockCmdTimeMS = 5 * 60 * 1000;
+const kWaitKillOpTimeoutMS = 5 * 1000;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
-// Force the mongos's replica set monitors to always include all the eligible nodes.
-const replicaSetMonitorProtocol =
-    assert.commandWorked(st.s.adminCommand({getParameter: 1, replicaSetMonitorProtocol: 1}))
-        .replicaSetMonitorProtocol;
-let serverSelectorFailPoint = configureFailPoint(st.s,
-                                                 replicaSetMonitorProtocol === "scanning"
-                                                     ? "scanningServerSelectorIgnoreLatencyWindow"
-                                                     : "sdamServerSelectorIgnoreLatencyWindow");
 
 jsTest.log(
     "Verify that maxTimeMS expiration of the additional request does not affect the command result");
 // The hedged read will have the maxTimeMS set to 10ms, hence need to sleep longer than that.
 assert.commandWorked(testDB.runCommand({
-    find: collName,
-    filter: {$where: "sleep(100); return true;"},
+    count: collName,
+    query: {$where: "sleep(100); return true;", x: {$gte: 0}},
     $readPreference: {mode: "nearest"}
 }));
 
-// Force the mongos to send requests to hosts in alphabetical order of host names.
-let sendRequestsFailPoint =
-    configureFailPoint(st.s, "networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder");
 let sortedNodes = [...st.rs0.nodes].sort((node1, node2) => node1.host.localeCompare(node2.host));
-
-st.rs0.nodes.forEach(function(conn) {
-    assert.commandWorked(
-        conn.adminCommand({setParameter: 1, logComponentVerbosity: {command: {verbosity: 1}}}));
-});
-
-assert.commandWorked(
-    st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 2}}}));
 
 jsTest.log("Verify that the initial request is canceled when the hedged request responds first");
 try {
     // Make the initial request block.
-    setCommandDelay(sortedNodes[0], "count", kLargeTimeoutMS);
+    setCommandDelay(sortedNodes[0], "count", kBlockCmdTimeMS, ns);
+
+    // Make the hedged request block for a while to allow the operation to start on the other node.
+    setCommandDelay(sortedNodes[1], "count", 100, ns);
 
     const comment = "test_kill_initial_request_" + ObjectId();
     assert.commandWorked(testDB.runCommand({
@@ -112,7 +110,7 @@ try {
             return !checkForOpWithComment(sortedNodes[0], comment);
         },
         "Timed out waiting for the operation run by the initial request to be killed",
-        waitKillOpTimeoutMS);
+        kWaitKillOpTimeoutMS);
 } finally {
     clearCommandDelay(sortedNodes[0]);
 }
@@ -120,11 +118,14 @@ try {
 jsTest.log(
     "Verify that the additional request is canceled when the initial request responds first");
 try {
-    // Make the additional/hedged request block, set a large maxTimeMSForHedgedReads to prevent
-    // the remote host from killing the operation by itself.
+    // Make the additional/hedged request block, set maxTimeMSForHedgedReads to the block time
+    // to prevent the remote host from killing the operation by itself.
     assert.commandWorked(
-        st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: kLargeTimeoutMS}));
-    setCommandDelay(sortedNodes[1], "count", kLargeTimeoutMS);
+        st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: kBlockCmdTimeMS}));
+    setCommandDelay(sortedNodes[1], "count", kBlockCmdTimeMS, ns);
+
+    // Make the initial request block for a while to allow the operation to start on the other node.
+    setCommandDelay(sortedNodes[0], "count", 100, ns);
 
     const comment = "test_kill_additional_request_" + ObjectId();
     assert.commandWorked(testDB.runCommand({
@@ -139,13 +140,10 @@ try {
             return !checkForOpWithComment(sortedNodes[1], comment);
         },
         "Timed out waiting for the operation run by the additional request to be killed",
-        waitKillOpTimeoutMS);
+        kWaitKillOpTimeoutMS);
 } finally {
     clearCommandDelay(sortedNodes[1]);
 }
-
-serverSelectorFailPoint.off();
-sendRequestsFailPoint.off();
 
 st.stop();
 }());
