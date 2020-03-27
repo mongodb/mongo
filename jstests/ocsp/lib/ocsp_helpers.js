@@ -27,20 +27,25 @@ var clearOCSPCache = function() {
 
 var waitForServer = function(conn) {
     const host = "localhost:" + conn.port;
+    const provider = determineSSLProvider();
 
-    assert.soon(() => {
-        return 0 ===
-            runMongoProgram('./mongo',
-                            '--host',
-                            host,
-                            '--tls',
-                            '--tlsCAFile',
-                            OCSP_CA_CERT,
-                            '--tlsCertificateKeyFile',
-                            OCSP_CLIENT_CERT,
-                            '--tlsAllowInvalidCertificates',
-                            '--tlsAllowInvalidHostnames',
-                            '--eval',
-                            '";"');
-    });
+    if (provider !== "windows") {
+        assert.soon(() => {
+            return 0 ===
+                runMongoProgram('./mongo',
+                                '--host',
+                                host,
+                                '--tls',
+                                '--tlsCAFile',
+                                OCSP_CA_CERT,
+                                '--tlsCertificateKeyFile',
+                                OCSP_CLIENT_CERT,
+                                '--tlsAllowInvalidCertificates',
+                                '--tlsAllowInvalidHostnames',
+                                '--eval',
+                                '";"');
+        });
+    } else {
+        sleep(15000);
+    }
 };
