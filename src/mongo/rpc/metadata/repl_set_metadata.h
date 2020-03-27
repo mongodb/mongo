@@ -50,6 +50,7 @@ public:
      * Default primary index. Also used to indicate in metadata that there is no
      * primary.
      */
+    // TODO(SERVER-47125): remove post-4.4.
     static const int kNoPrimary = -1;
 
     ReplSetMetadata() = default;
@@ -79,7 +80,7 @@ public:
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
-     * Returns the OpTime of the most recent operation with which the client intereacted.
+     * Returns the OpTime of the most recent operation with which the client interacted.
      */
     repl::OpTime getLastOpVisible() const {
         return _lastOpVisible;
@@ -113,6 +114,7 @@ public:
         return _replicaSetId;
     }
 
+    // TODO(SERVER-47125): remove post-4.4.
     /**
      * Returns the index of the current primary from the perspective of the sender.
      * Returns kNoPrimary if there is no primary.
@@ -156,6 +158,7 @@ private:
     long long _currentTerm = -1;
     long long _configVersion = -1;
     OID _replicaSetId;
+    // TODO(SERVER-47125): remove this member variable post-4.4.
     int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;
     boost::optional<bool> _isPrimary;
