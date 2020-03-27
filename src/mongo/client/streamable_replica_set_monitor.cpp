@@ -172,16 +172,11 @@ void StreamableReplicaSetMonitor::init() {
     _topologyManager = std::make_unique<TopologyManager>(
         _sdamConfig, getGlobalServiceContext()->getPreciseClockSource(), _eventsPublisher);
 
-    _eventsPublisher->registerListener(shared_from_this());
-
-    _pingMonitor = std::make_unique<ServerPingMonitor>(
-        _eventsPublisher.get(), sdam::SdamConfiguration::kDefaultHeartbeatFrequencyMs, _executor);
-    _eventsPublisher->registerListener(_pingMonitor);
-
     _isMasterMonitor = std::make_unique<ServerIsMasterMonitor>(
         _uri, _sdamConfig, _eventsPublisher, _topologyManager->getTopologyDescription(), _executor);
-    _eventsPublisher->registerListener(_isMasterMonitor);
 
+    _eventsPublisher->registerListener(shared_from_this());
+    _eventsPublisher->registerListener(_isMasterMonitor);
     _isDropped.store(false);
 
     ReplicaSetMonitorManager::get()->getNotifier().onFoundSet(getName());
@@ -195,7 +190,6 @@ void StreamableReplicaSetMonitor::drop() {
     LOGV2(4333209, "Closing Replica Set Monitor {setName}", "setName"_attr = getName());
     _eventsPublisher->close();
     _queryProcessor->shutdown();
-    _pingMonitor->shutdown();
     _isMasterMonitor->shutdown();
     _failOutstandingWithStatus(
         lock, Status{ErrorCodes::ShutdownInProgress, "the ReplicaSetMonitor is shutting down"});
@@ -568,8 +562,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
 void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(sdam::IsMasterRTT durationMs,
                                                                   const ServerAddress& hostAndPort,
                                                                   const BSONObj reply) {
-    // After the inital handshake, isMasterResponses should not update the RTT with durationMs.
-    IsMasterOutcome outcome(hostAndPort, reply, boost::none);
+    IsMasterOutcome outcome(hostAndPort, reply, durationMs);
     _topologyManager->onServerDescription(outcome);
 }
 
@@ -583,23 +576,11 @@ void StreamableReplicaSetMonitor::onServerHeartbeatFailureEvent(IsMasterRTT dura
 
 void StreamableReplicaSetMonitor::onServerPingFailedEvent(const ServerAddress& hostAndPort,
                                                           const Status& status) {
-    LOGV2_DEBUG(4668133,
-                0,
-                " StreamableReplicaSetMonitor::onServerPingFailedEvent, ServerPingMonitor got "
-                "status{status} ",
-                "addr"_attr = hostAndPort,
-                "status"_attr = status);
     failedHost(HostAndPort(hostAndPort), status);
 }
 
 void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
                                                              const ServerAddress& hostAndPort) {
-    LOGV2_DEBUG(4668132,
-                1,
-                " StreamableReplicaSetMonitor::onServerPingSucceededEvent, ServerPingMonitor for  "
-                "{addr}  with {rtt}",
-                "addr"_attr = hostAndPort,
-                "rtt"_attr = durationMS);
     _topologyManager->onServerRTTUpdated(hostAndPort, durationMS);
 }
 

@@ -44,7 +44,7 @@ class SingleServerPingMonitor : public std::enable_shared_from_this<SingleServer
 public:
     explicit SingleServerPingMonitor(sdam::ServerAddress hostAndPort,
                                      sdam::TopologyListener* rttListener,
-                                     Milliseconds pingFrequency,
+                                     Seconds pingFrequency,
                                      std::shared_ptr<executor::TaskExecutor> executor);
 
     /**
@@ -97,7 +97,7 @@ private:
     /**
      * The frequency at which ping requests should be sent to measure the round trip time.
      */
-    Milliseconds _pingFrequency;
+    Seconds _pingFrequency;
 
     std::shared_ptr<executor::TaskExecutor> _executor;
 
@@ -106,8 +106,6 @@ private:
      * time at _pingFrequency.
      */
     Date_t _nextPingStartDate{};
-
-    static constexpr auto kLogLevel = 0;
 
     /**
      * Must be held to access any of the member variables below.
@@ -134,9 +132,14 @@ class ServerPingMonitor : public sdam::TopologyListener {
     ServerPingMonitor& operator=(const ServerPingMonitor&) = delete;
 
 public:
-    ServerPingMonitor(sdam::TopologyListener* rttListener,
-                      Milliseconds pingFrequency,
-                      std::shared_ptr<executor::TaskExecutor> executor);
+    /**
+     * Note: The ServerPingMonitor creates its own executor by default. It takes in an executor for
+     * testing only.
+     */
+    ServerPingMonitor(
+        sdam::TopologyListener* rttListener,
+        Seconds pingFrequency,
+        boost::optional<std::shared_ptr<executor::TaskExecutor>> executor = boost::none);
     ~ServerPingMonitor();
 
     /**
@@ -145,7 +148,7 @@ public:
     void shutdown();
 
     /**
-     * The first isMaster exchange for a connection to the server succeeded. Creates a new
+     * The first isMaster exchange for a server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
     void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
@@ -153,14 +156,15 @@ public:
                                         const BSONObj reply = BSONObj());
 
     /**
-     * Drop corresponding SingleServerPingMonitors if the server is not included in the
-     * newDescritpion.
+     * The connection to the server was closed. Removes the server from the ServerPingMonitorList.
      */
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           sdam::TopologyDescriptionPtr previousDescription,
-                                           sdam::TopologyDescriptionPtr newDescription);
+    void onServerClosedEvent(const sdam::ServerAddress& address, OID topologyId);
 
 private:
+    /**
+     * Sets up and starts up the _executor if it did not already exist.
+     */
+    void _setupTaskExecutor_inlock();
     /**
      * Listens for when new RTT (Round Trip Time) values are published.
      */
@@ -169,14 +173,12 @@ private:
     /**
      * The interval at which ping requests should be sent to measure the RTT (Round Trip Time).
      */
-    Milliseconds _pingFrequency;
+    Seconds _pingFrequency;
 
     /**
      * Executor for performing server monitoring pings for all of the replica set members.
      */
     std::shared_ptr<executor::TaskExecutor> _executor;
-
-    static constexpr auto kLogLevel = 0;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerPingMonitor::mutex");
 
