@@ -77,6 +77,21 @@ void TopologyEventsPublisher::onServerHandshakeCompleteEvent(IsMasterRTT duratio
     _scheduleNextDelivery();
 }
 
+void TopologyEventsPublisher::onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
+                                                           const Status& status,
+                                                           const BSONObj reply) {
+    {
+        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
+        EventPtr event = std::make_unique<Event>();
+        event->type = EventType::HANDSHAKE_FAILURE;
+        event->hostAndPort = address;
+        event->reply = reply;
+        event->status = status;
+        _eventQueue.push_back(std::move(event));
+    }
+    _scheduleNextDelivery();
+}
+
 void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(IsMasterRTT durationMs,
                                                               const ServerAddress& hostAndPort,
                                                               const BSONObj reply) {
@@ -200,6 +215,9 @@ void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Eve
             break;
         case EventType::PING_FAILURE:
             listener->onServerPingFailedEvent(event.hostAndPort, event.status);
+            break;
+        case EventType::HANDSHAKE_FAILURE:
+            listener->onServerHandshakeFailedEvent(event.hostAndPort, event.status, event.reply);
             break;
         default:
             MONGO_UNREACHABLE;

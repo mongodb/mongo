@@ -199,6 +199,7 @@ clientDriverEnv.Library(
         'scanning_replica_set_monitor.cpp',
         'streamable_replica_set_monitor.cpp',
         'streamable_replica_set_monitor_query_processor.cpp',
+        'streamable_replica_set_monitor_error_handler.cpp',
         'server_is_master_monitor.cpp',
         'server_ping_monitor.cpp',
     ],
@@ -333,6 +334,7 @@ env.CppUnitTest(
         'scanning_replica_set_monitor_scan_test.cpp',
         'scanning_replica_set_monitor_test_concurrent.cpp',
         'scanning_replica_set_monitor_test_fixture.cpp',
+        'streamable_replica_set_monitor_error_handler_test.cpp',
         'server_ping_monitor_test.cpp',
     ],
     LIBDEPS=[

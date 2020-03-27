@@ -107,6 +107,7 @@ public:
     const boost::optional<IsMasterRTT>& getRtt() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
     const std::string& getErrorMsg() const;
+    BSONObj toBSON() const;
 
 private:
     ServerAddress _server;

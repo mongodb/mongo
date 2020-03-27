@@ -145,4 +145,24 @@ const boost::optional<TopologyVersion>& IsMasterOutcome::getTopologyVersion() co
 const std::string& IsMasterOutcome::getErrorMsg() const {
     return _errorMsg;
 }
+
+BSONObj IsMasterOutcome::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("host", _server);
+    builder.append("success", _success);
+
+    if (_errorMsg != "")
+        builder.append("errorMessage", _errorMsg);
+
+    if (_topologyVersion)
+        builder.append("topologyVersion", _topologyVersion->toBSON());
+
+    if (_rtt)
+        builder.append("duration", _rtt->toBSON());
+
+    if (_response)
+        builder.append("response", *_response);
+
+    return builder.obj();
+}
 };  // namespace mongo::sdam

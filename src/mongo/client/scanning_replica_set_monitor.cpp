@@ -356,6 +356,18 @@ void ScanningReplicaSetMonitor::failedHost(const HostAndPort& host, const Status
         _state->checkInvariants();
 }
 
+void ScanningReplicaSetMonitor::failedHostPreHandshake(const HostAndPort& host,
+                                                       const Status& status,
+                                                       BSONObj bson) {
+    failedHost(host, status);
+}
+
+void ScanningReplicaSetMonitor::failedHostPostHandshake(const HostAndPort& host,
+                                                        const Status& status,
+                                                        BSONObj bson) {
+    failedHost(host, status);
+}
+
 bool ScanningReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
     stdx::lock_guard<Latch> lk(_state->mutex);
     Node* node = _state->findNode(host);
