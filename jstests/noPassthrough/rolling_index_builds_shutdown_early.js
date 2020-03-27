@@ -47,9 +47,8 @@ let primary = replTest.getPrimary();
 let primaryDB = primary.getDB(dbName);
 let coll = primaryDB.getCollection(collName);
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary) ||
-    !IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-    jsTestLog('Two phase index builds or commit quorum are not supported, skipping test.');
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
     replTest.stopSet();
     return;
 }
