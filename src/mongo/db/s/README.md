@@ -77,6 +77,104 @@ should be automatically split and balanced.
 
 # DDL operations
 
+Indexes are not stored in the routing table, so a router forwards index operations to all shards
+that own chunks for the collection.
+
+Collections are always created as unsharded, meaning they are not stored in the routing table, so
+a router forwards create collection requests directly to the primary shard for the database. A
+router also forwards rename collection requests directly to the primary shard, since only renaming
+unsharded collections is supported.
+
+A router forwards all other DDL operations, such as dropping a database or sharding a collection,
+to the config server primary. The config server primary serializes conflicting operations, and
+either itself coordinates the DDL operation or hands off the coordination to a shard. Coordinating
+the DDL operation involves applying the operation on the correct set of shards and updating the
+authoritative routing table.
+
+#### Code references
+* Example of a DDL command (create indexes) that mongos
+[**forwards to all shards that own chunks**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/cluster_create_indexes_cmd.cpp#L83),
+* Example of a DDL command (create collection) that mongos
+[**forwards to the primary shard**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/cluster_create_cmd.cpp#L128),
+* Example of a DDL command (drop collection) mongos
+[**forwards to the config server primary**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/cluster_drop_cmd.cpp#L81-L82)
+* Example of a DDL command (drop collection) the config server
+[**coordinates itself**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/configsvr_drop_collection_command.cpp).
+The business logic for most DDL commands that the config server coordinates lives in the
+[**ShardingCatalogManager class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L86),
+including the logic for
+[**dropCollection**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L417).
+However, note that the ShardingCatalogManager class also contains business logic to just commit some
+operations that are otherwise coordinated by a shard.
+* Example of a DDL command (shard collection) for which the config server
+[**hands off coordination**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/configsvr_shard_collection_command.cpp)
+to a shard. The business logic for such commands is in the shard's command body, such as the logic
+for
+[**shardCollection**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/shardsvr_shard_collection.cpp#L7830).
+
+## Important caveats
+
+### Database creation
+
+There is no explicit command to create a database. When a router receives a write command, an entry
+for the database is created in the config.databases collection if one doesn't already exist. Unlike
+all other DDL operations, creating a database only involves choosing a primary shard (the shard with
+the smallest total data size is chosen) and writing the database entry to the authoritative routing
+table. That is, creating a database does not involve modifying any state on shards, since on shards,
+a database only exists once a collection in it is created.
+
+#### Code references
+* Example of mongos
+[**asking the config server to create a database**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/cluster_create_cmd.cpp#L116)
+if needed
+
+### Retrying internally
+
+DDL operations often involve multiple hops between nodes. Generally, if a command is idempotent on
+the receiving node, the sending node will retry it upon receiving a retryable error, such as a
+network or NotMaster error. There are some cases where the sending node retries even though the
+command is not idempotent, such as in shardCollection. In this case, the receiving node may return
+ManualInterventionRequired if the first attempt failed partway.
+
+#### Code references
+* Example of a DDL command (shard collection)
+[**failing with ManualInterventionRequired**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/shardsvr_shard_collection.cpp#L129)
+
+### Serializing conflicting operations
+
+The concurrency control scheme has evolved over time and involves several different locks.
+
+Distributed locks are locks on a string resource, typically a database name or collection name. They
+are acquired by doing a majority write to a document in the `config.locks` collection on the config
+servers. The write includes the identity of the process acquiring the lock. The process holding a
+distributed lock must also periodically "ping" (update) a document in the `config.lockpings`
+collection on the config servers containing its process id. If the process's document is not pinged
+for 15 minutes or more, the process's distributed locks are allowed to be "overtaken" by another
+process. Note that this means a distributed lock can be overtaken even though the original process
+that had acquired the lock continues to believe it owns the lock. See
+[**this blog post**](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) for
+an excellent description of the distributed locking problem.
+
+In the first implementation of distributed locks, a thread would wait for a lock to be released by
+polling the lock document every 500 milliseconds for 20 seconds (and return a LockBusy error if the
+thread never saw the lock as available.) NamespaceSerializer locks were introduced to allow a thread
+to be notified more efficiently when a lock held by another thread on the same node was released.
+NamespaceSerializer locks were added only to DDL operations which were seen to frequently fail with
+"LockBusy" when run concurrently on the same database, such as dropCollection.
+
+Global ResourceMutexes are the most recent, and are taken to serialize modifying specific config
+collections, such as config.shards, config.chunks, and config.tags. For example, splitChunk,
+mergeChunks, and moveChunk all take the chunk ResourceMutex.
+
+#### Code references
+* [**DistLockManager class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/catalog/dist_lock_manager.h)
+* [**DistLockCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/catalog/dist_lock_catalog.h)
+* [**NamespaceSerializer class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/namespace_serializer.h)
+* The interface for acquiring NamespaceSerializer locks
+[**via the ShardingCatalogManager**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L276)
+* The
+[**global ResourceMutexes**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L555-L581)
+
 ---
 
 # The logical clock and causal consistency
