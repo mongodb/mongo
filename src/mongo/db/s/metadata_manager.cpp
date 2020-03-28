@@ -310,8 +310,11 @@ SharedSemiFuture<void> MetadataManager::beginReceive(ChunkRange const& range) {
                   "nss_ns"_attr = _nss.ns(),
                   "range"_attr = redact(range.toString()));
 
-    return _submitRangeForDeletion(
-        lg, SemiFuture<void>::makeReady(), range, Seconds(orphanCleanupDelaySecs.load()));
+    return _submitRangeForDeletion(lg,
+                                   SemiFuture<void>::makeReady(),
+                                   range,
+                                   boost::none,
+                                   Seconds(orphanCleanupDelaySecs.load()));
 }
 
 void MetadataManager::forgetReceive(ChunkRange const& range) {
@@ -333,10 +336,12 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
     invariant(it != _receivingChunks.end());
     _receivingChunks.erase(it);
 
-    std::ignore = _submitRangeForDeletion(lg, SemiFuture<void>::makeReady(), range, Seconds(0));
+    std::ignore =
+        _submitRangeForDeletion(lg, SemiFuture<void>::makeReady(), range, boost::none, Seconds(0));
 }
 
 SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
+                                                     boost::optional<UUID> migrationId,
                                                      bool shouldDelayBeforeDeletion) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
@@ -372,6 +377,7 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         return _submitRangeForDeletion(lg,
                                        overlapMetadata->onDestructionPromise.getFuture().semi(),
                                        range,
+                                       std::move(migrationId),
                                        delayForActiveQueriesOnSecondariesToComplete);
     } else {
         // No running queries can depend on this range, so queue it for deletion immediately.
@@ -381,8 +387,11 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
                       "nss_ns"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()));
 
-        return _submitRangeForDeletion(
-            lg, SemiFuture<void>::makeReady(), range, delayForActiveQueriesOnSecondariesToComplete);
+        return _submitRangeForDeletion(lg,
+                                       SemiFuture<void>::makeReady(),
+                                       range,
+                                       std::move(migrationId),
+                                       delayForActiveQueriesOnSecondariesToComplete);
     }
 }
 
@@ -449,6 +458,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     const WithLock&,
     SemiFuture<void> waitForActiveQueriesToComplete,
     const ChunkRange& range,
+    boost::optional<UUID> migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
 
     int maxToDelete = rangeDeleterBatchSize.load();
@@ -463,6 +473,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
                                *_metadata.back()->metadata->getChunkManager()->getUUID(),
                                _metadata.back()->metadata->getKeyPattern().getOwned(),
                                range,
+                               std::move(migrationId),
                                maxToDelete,
                                delayForActiveQueriesOnSecondariesToComplete,
                                Milliseconds(rangeDeleterBatchDelayMS.load()));

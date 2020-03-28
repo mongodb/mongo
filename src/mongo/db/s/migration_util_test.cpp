@@ -68,12 +68,16 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
 }
 
 template <typename ShardKey>
-RangeDeletionTask createDeletionTask(
-    const NamespaceString& nss, const UUID& uuid, ShardKey min, ShardKey max, bool pending = true) {
+RangeDeletionTask createDeletionTask(const NamespaceString& nss,
+                                     const UUID& uuid,
+                                     ShardKey min,
+                                     ShardKey max,
+                                     ShardId donorShard = ShardId("donorShard"),
+                                     bool pending = true) {
     auto task = RangeDeletionTask(UUID::gen(),
                                   nss,
                                   uuid,
-                                  ShardId("donorShard"),
+                                  donorShard,
                                   ChunkRange{BSON("_id" << min), BSON("_id" << max)},
                                   CleanWhenEnum::kNow);
 
@@ -466,11 +470,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataIsUnknownEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return an empty result when loading the
     // database.
@@ -490,11 +495,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
 TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return an empty result when loading the
     // collection so it is considered unsharded.
@@ -516,11 +522,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfNamespaceIsUnshardedBeforeAndAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Mock an empty result for the task's collection and force a refresh so the node believes the
     // collection is unsharded.
@@ -543,7 +550,12 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Force a metadata refresh with the task's UUID before the task is submitted.
     auto coll = makeCollectionType(collectionUUID, kEpoch);
@@ -565,7 +577,12 @@ TEST_F(
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto coll = makeCollectionType(collectionUUID, kEpoch);
@@ -592,7 +609,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
@@ -623,7 +645,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+
+    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
@@ -641,11 +668,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10);
+    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return an arbitrary UUID.
     const auto otherEpoch = OID::gen();

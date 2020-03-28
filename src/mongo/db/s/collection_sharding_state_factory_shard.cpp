@@ -66,6 +66,8 @@ CollectionShardingStateFactoryShard::_getRangeDeletionExecutor() {
     if (!_rangeDeletionExecutor) {
         const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
 
+        // CAUTION: The safety of range deletion depends on using a task executor that schedules
+        // work on a single thread.
         auto net = executor::makeNetworkInterface(kExecName);
         auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
         auto taskExecutor =

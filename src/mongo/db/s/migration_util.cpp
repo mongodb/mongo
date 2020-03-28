@@ -292,7 +292,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 ? CollectionShardingRuntime::kNow
                 : CollectionShardingRuntime::kDelayed;
 
-            return css->cleanUpRange(deletionTask.getRange(), whenToClean);
+            return css->cleanUpRange(deletionTask.getRange(), deletionTask.getId(), whenToClean);
         })
         .onError([=](const Status status) {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);

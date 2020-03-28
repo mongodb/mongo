@@ -273,6 +273,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     auto cleanupComplete =
         csr().cleanUpRange(ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+                           boost::none,
                            CollectionShardingRuntime::CleanWhen::kNow);
 
     operationContext()->setDeadlineAfterNowBy(Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
@@ -297,10 +298,12 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     auto cleanupCompleteFirst =
         csr().cleanUpRange(ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << middleKey)),
+                           boost::none,
                            CollectionShardingRuntime::CleanWhen::kNow);
 
     auto cleanupCompleteSecond =
         csr().cleanUpRange(ChunkRange(BSON(kShardKey << middleKey), BSON(kShardKey << MAXKEY)),
+                           boost::none,
                            CollectionShardingRuntime::CleanWhen::kNow);
 
     auto status = CollectionShardingRuntime::waitForClean(
@@ -325,6 +328,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     auto cleanupComplete =
         csr().cleanUpRange(ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+                           boost::none,
                            CollectionShardingRuntime::CleanWhen::kNow);
 
     auto status = CollectionShardingRuntime::waitForClean(

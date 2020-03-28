@@ -584,7 +584,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
             return CollectionShardingRuntime::get(_opCtx, getNss())
-                ->cleanUpRange(range, whenToClean);
+                ->cleanUpRange(range, boost::none, whenToClean);
         }();
 
         if (_args.getWaitForDelete()) {

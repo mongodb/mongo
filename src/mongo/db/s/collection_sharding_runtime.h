@@ -142,7 +142,9 @@ public:
      * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
      */
     enum CleanWhen { kNow, kDelayed };
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when);
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
+                                        boost::optional<UUID> migrationId,
+                                        CleanWhen when);
 
     /**
      * Returns a range _not_ owned by this shard that starts no lower than the specified
