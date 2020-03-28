@@ -1285,12 +1285,12 @@ functions:
       file: src/perf.json
 
   "do setup":
+  - *set_task_expansion_macros
   - *fetch_artifacts
   - *update_bypass_expansions
   - *fetch_binaries
   - *fetch_debugsymbols_archive
   - *extract_binaries
-  - *set_task_expansion_macros
   - *set_up_virtualenv
   - *upload_pip_requirements
   - *check_binary_version
