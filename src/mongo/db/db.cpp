@@ -341,7 +341,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
         auto res = tl->setup();
         if (!res.isOK()) {
-            LOGV2_ERROR(20568, "Failed to set up listener: {res}", "res"_attr = res);
+            LOGV2_ERROR(20568,
+                        "Error setting up listener: {error}",
+                        "Error setting up listener",
+                        "error"_attr = res);
             return EXIT_NET_ERROR;
         }
         serviceContext->setTransportLayer(std::move(tl));
@@ -551,8 +554,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         auto status = waitForShardRegistryReload(startupOpCtx.get());
         if (!status.isOK()) {
             LOGV2(20545,
-                  "Failed to load the shard registry as part of startup{causedBy_status}",
-                  "causedBy_status"_attr = causedBy(redact(status)));
+                  "Error loading shard registry at startup {error}",
+                  "Error loading shard registry at startup",
+                  "error"_attr = redact(status));
         }
     }
 
@@ -563,10 +567,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 .refreshIfNecessary(startupOpCtx.get());
         }
     } catch (const DBException& ex) {
-        LOGV2_WARNING(
-            20567,
-            "Failed to load read and write concern defaults at startup{causedBy_ex_toStatus}",
-            "causedBy_ex_toStatus"_attr = causedBy(redact(ex.toStatus())));
+        LOGV2_WARNING(20567,
+                      "Error loading read and write concern defaults at startup",
+                      "error"_attr = redact(ex));
     }
     readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get());
 
@@ -725,22 +728,29 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     auto start = serviceContext->getServiceExecutor()->start();
     if (!start.isOK()) {
-        LOGV2_ERROR(20570, "Failed to start the service executor: {start}", "start"_attr = start);
+        LOGV2_ERROR(20570,
+                    "Error starting service executor: {error}",
+                    "Error starting service executor",
+                    "error"_attr = start);
         return EXIT_NET_ERROR;
     }
 
     start = serviceContext->getServiceEntryPoint()->start();
     if (!start.isOK()) {
-        LOGV2_ERROR(
-            20571, "Failed to start the service entry point: {start}", "start"_attr = start);
+        LOGV2_ERROR(20571,
+                    "Error starting service entry point: {error}",
+                    "Error starting service entry point",
+                    "error"_attr = start);
         return EXIT_NET_ERROR;
     }
 
     if (!storageGlobalParams.repair) {
         start = serviceContext->getTransportLayer()->start();
         if (!start.isOK()) {
-            LOGV2_ERROR(
-                20572, "Failed to start the listener: {start}", "start"_attr = start.toString());
+            LOGV2_ERROR(20572,
+                        "Error starting listener: {error}",
+                        "Error starting listener",
+                        "error"_attr = start);
             return EXIT_NET_ERROR;
         }
     }
@@ -1048,8 +1058,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                 // ignore not master errors
             } catch (const DBException& e) {
                 LOGV2(20561,
-                      "Failed to stepDown in non-command initiated shutdown path {e}",
-                      "e"_attr = e.toString());
+                      "Error stepping down in non-command initiated shutdown path {error}",
+                      "Error stepping down in non-command initiated shutdown path",
+                      "error"_attr = e);
             }
 
             // Even if the replCoordinator failed to step down, ensure we still shut down the
@@ -1184,7 +1195,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         if (!sep->shutdown(Seconds(10))) {
             LOGV2_OPTIONS(20563,
                           {logComponentV1toV2(LogComponent::kNetwork)},
-                          "Service entry point failed to shutdown within timelimit.");
+                          "Service entry point did not shutdown within the time limit");
         }
     }
 
@@ -1194,8 +1205,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         if (!status.isOK()) {
             LOGV2_OPTIONS(20564,
                           {logComponentV1toV2(LogComponent::kNetwork)},
-                          "Service executor failed to shutdown within timelimit: {status_reason}",
-                          "status_reason"_attr = status.reason());
+                          "Service executor did not shutdown within the time limit",
+                          "error"_attr = status);
         }
     }
 #endif
@@ -1247,8 +1258,9 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
         LOGV2_FATAL_OPTIONS(
             20574,
             logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-            "Failed global initialization: {status}",
-            "status"_attr = status);
+            "Error during global initialization: {error}",
+            "Error during global initialization",
+            "error"_attr = status);
         quickExit(EXIT_FAILURE);
     }
 
@@ -1264,8 +1276,9 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
             LOGV2_FATAL_OPTIONS(
                 20575,
                 logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-                "Failed to create service context: {cause}",
-                "cause"_attr = redact(cause));
+                "Error creating service context: {error}",
+                "Error creating service context",
+                "error"_attr = redact(cause));
             quickExit(EXIT_FAILURE);
         }
     }();

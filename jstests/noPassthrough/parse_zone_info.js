@@ -10,8 +10,8 @@ conn = MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/missing_d
 assert.eq(conn, null, "expected launching mongod with bad timezone rules to fail");
 
 // Look for either old or new error message
-assert(rawMongoProgramOutput().indexOf("Failed to create service context") != -1 ||
-       rawMongoProgramOutput().indexOf("Failed global initialization") != -1);
+assert(rawMongoProgramOutput().includes("Error creating service context") ||
+       rawMongoProgramOutput().includes("Failed to create service context"));
 
 // Test that startup can succeed with a good file.
 conn = MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/good_timezone_info"});

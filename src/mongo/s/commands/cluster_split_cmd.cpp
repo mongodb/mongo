@@ -255,13 +255,12 @@ public:
                               ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,
-              "Splitting chunk {ChunkRange_chunk_getMin_chunk_getMax} in collection {nss_ns} on "
-              "shard {chunk_getShardId} at key {splitPoint}",
-              "ChunkRange_chunk_getMin_chunk_getMax"_attr =
-                  redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
-              "nss_ns"_attr = nss.ns(),
-              "chunk_getShardId"_attr = chunk->getShardId(),
-              "splitPoint"_attr = redact(splitPoint));
+              "Splitting chunk {chunkRange} in {namespace} on shard {shardId} at key {splitPoint}",
+              "Splitting chunk",
+              "chunkRange"_attr = redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
+              "splitPoint"_attr = redact(splitPoint),
+              "namespace"_attr = nss.ns(),
+              "shardId"_attr = chunk->getShardId());
 
         uassertStatusOK(
             shardutil::splitChunkAtMultiplePoints(opCtx,

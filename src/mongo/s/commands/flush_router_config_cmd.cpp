@@ -91,11 +91,17 @@ public:
         } else {
             const auto ns = argumentElem.checkAndGetStringData();
             if (nsIsDbOnly(ns)) {
-                LOGV2(22762, "Routing metadata flushed for database {ns}", "ns"_attr = ns);
+                LOGV2(22762,
+                      "Routing metadata flushed for database {db}",
+                      "Routing metadata flushed for database",
+                      "db"_attr = ns);
                 catalogCache->purgeDatabase(ns);
             } else {
                 const NamespaceString nss(ns);
-                LOGV2(22763, "Routing metadata flushed for collection {nss}", "nss"_attr = nss);
+                LOGV2(22763,
+                      "Routing metadata flushed for collection {namespace}",
+                      "Routing metadata flushed for collection",
+                      "namespace"_attr = nss);
                 catalogCache->purgeCollection(nss);
             }
         }
