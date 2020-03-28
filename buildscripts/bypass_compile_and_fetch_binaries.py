@@ -94,6 +94,8 @@ ARTIFACTS_NEEDING_PERMISSIONS = {
 ARTIFACT_ENTRIES_MAP = {
     "mongo_binaries": "Binaries",
     "mongo_debugsymbols": "mongo-debugsymbols.tgz",
+    "mh_archive": "MH Binaries",
+    "mh_debugsymbols": "MH Debuginfo",
 }
 
 TargetBuild = namedtuple("TargetBuild", [
