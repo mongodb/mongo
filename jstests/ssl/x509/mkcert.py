@@ -558,7 +558,7 @@ def process_ecdsa_ca(cert):
     reqargs = ['openssl', 'req', '-new', '-key', key, '-out', csr, '-subj', subject]
     x509args = ['openssl', 'x509', '-in', csr, '-out', pem, '-req', '-signkey', key, '-days', '7300', '-sha256', '-set_serial', serial]
     ecparamargs = (['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key, '-noout']
-                   if (cert.get('tags') and "ocsp" in cert['tags'])
+                   if "ocsp" in cert.get('tags', [])
                    else ['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-out', key])
 
     reqargs = reqargs + ['-reqexts', 'v3_req']
@@ -609,11 +609,11 @@ def process_ecdsa_leaf(cert):
             f.write('subjectAltName=DNS:localhost,IP:127.0.0.1\n')
             f.write('subjectKeyIdentifier=hash\n')
             key_usage = ('keyUsage=nonRepudiation,digitalSignature,keyEncipherment\n'
-                        if (cert.get('tags') and "responder" in cert['tags'])
+                        if "responder" in cert.get('tags', [])
                         else 'keyUsage=digitalSignature,keyEncipherment\n')
             f.write(key_usage)
             extended_key_usage = ('extendedKeyUsage=serverAuth,clientAuth,OCSPSigning\n'
-                                 if (cert.get('tags') and "responder" in cert['tags'])
+                                 if "responder" in cert.get('tags', [])
                                  else 'extendedKeyUsage=serverAuth,clientAuth\n')
             f.write(extended_key_usage)
             if cert.get('tags'):
@@ -629,11 +629,11 @@ def process_ecdsa_leaf(cert):
     subprocess.check_call(reqargs)
     subprocess.check_call(x509args)
 
-    if cert.get('tags') and "responder" in cert['tags']:
+    if 'responder' in cert.get('tags', []):
        # given foo.crt, we'll generate foo.pem and foo.key
        filename = re.search('(.*)\.crt', cert['name']).group(1)
        process_ecdsa_cert(cert, pem, key, dest, filename)
-    elif cert.get('tags') and "ocsp" in cert['tags']:
+    elif "ocsp" in cert.get('tags', []):
        # given foo.pem, we'll regenerate foo.pem and delete foo.crt and foo.key
        filename = re.search('(.*)\.pem', cert['name']).group(1)
        process_ecdsa_cert(cert, pem, key, dest, filename, split_pem=False)
