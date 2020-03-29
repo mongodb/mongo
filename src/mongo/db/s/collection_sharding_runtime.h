@@ -86,12 +86,10 @@ public:
                                               OrphanCleanupPolicy orphanCleanupPolicy) override;
 
     ScopedCollectionDescription getCollectionDescription() override;
-
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
-
-    Status checkShardVersionNoThrow(OperationContext* opCtx) noexcept override;
+    void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) override;
 
     void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) override;
 
@@ -102,7 +100,7 @@ public:
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
         ShardingMigrationCriticalSection::Operation op) const override;
 
-    void report(BSONObjBuilder* builder) override;
+    void appendShardVersion(BSONObjBuilder* builder) override;
 
     void appendInfoForServerStatus(BSONArrayBuilder* builder) override;
 
@@ -172,11 +170,11 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
 
     /**
-     * BSON output of the pending metadata into a BSONArray
+     * Appends information about any chunks for which incoming migration has been requested, but the
+     * shard hasn't yet synchronised with the config server on whether that migration actually
+     * committed.
      */
-    void toBSONPending(BSONArrayBuilder& bb) const override {
-        _metadataManager->toBSONPending(bb);
-    }
+    void appendPendingReceiveChunks(BSONArrayBuilder* builder);
 
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;
@@ -193,18 +191,15 @@ private:
         const boost::optional<LogicalTime>& atClusterTime);
 
     /**
-     * Returns boost::none if the description for the collection is not known yet. Otherwise
-     * returns the most recently refreshed from the config server shard version
-     */
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown();
-
-    /**
      * Returns the latest version of collection metadata with filtering configured for
      * atClusterTime if specified. Throws StaleConfigInfo if the shard version attached to the
      * operation context does not match the shard version on the active metadata object.
      */
-    boost::optional<ScopedCollectionDescription> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
+    enum class TreatUnknownAsUnsharded { kYes, kNo };
+    ScopedCollectionDescription _getMetadataWithVersionCheckAt(
+        OperationContext* opCtx,
+        const boost::optional<mongo::LogicalTime>& atClusterTime,
+        TreatUnknownAsUnsharded treatUnknownAsUnsharded);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

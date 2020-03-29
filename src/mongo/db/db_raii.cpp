@@ -350,7 +350,7 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     // use an empty plan.
     invariant(!_autoCollForRead.getView() || !_autoCollForRead.getCollection());
     auto css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
-    css->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow_DEPRECATED(opCtx);
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
@@ -371,7 +371,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
                 break;
             default:
                 CollectionShardingState::get(_opCtx, NamespaceString(ns))
-                    ->checkShardVersionOrThrow(_opCtx);
+                    ->checkShardVersionOrThrow_DEPRECATED(_opCtx);
                 break;
         }
     }

@@ -1543,10 +1543,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
 
     // This check is for optimization purposes only as since this lock is released after this,
     // and is acquired again when we build the index in _setUpIndexBuild.
-    auto status = CollectionShardingState::get(opCtx, nss)->checkShardVersionNoThrow(opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
+    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
@@ -1599,7 +1596,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol);
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
 
-    status = _registerIndexBuild(lk, replIndexBuildState);
+    auto status = _registerIndexBuild(lk, replIndexBuildState);
     if (!status.isOK()) {
         return status;
     }

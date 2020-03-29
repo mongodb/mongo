@@ -110,7 +110,15 @@ function runCommentParamTest({
     // error upon sending an agg request, causing it to retry the agg command from the top and
     // resulting in more profiler entries than what is expected.
     assert.commandWorked(st.rs0.getPrimary().getDB(testDB.getName()).adminCommand({
+        _flushRoutingTableCacheUpdates: coll.getFullName(),
+        syncFromConfig: true
+    }));
+    assert.commandWorked(st.rs0.getPrimary().getDB(testDB.getName()).adminCommand({
         _flushDatabaseCacheUpdates: testDB.getName(),
+        syncFromConfig: true
+    }));
+    assert.commandWorked(st.rs1.getPrimary().getDB(testDB.getName()).adminCommand({
+        _flushRoutingTableCacheUpdates: coll.getFullName(),
         syncFromConfig: true
     }));
     assert.commandWorked(st.rs1.getPrimary().getDB(testDB.getName()).adminCommand({

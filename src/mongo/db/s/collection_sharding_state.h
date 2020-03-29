@@ -92,40 +92,44 @@ public:
     static void appendInfoForServerStatus(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * Returns the chunk filtering object that the current operation should be using for
-     * the collection.
+     * If the shard currently doesn't know whether the collection is sharded or not, it will throw
+     * StaleShardVersion.
      *
-     * If the operation context contains an 'atClusterTime', the returned filtering object will be
-     * tied to a specific point in time. Otherwise, it will reference the latest time available. If
-     * the operation is not associated with a shard version (refer to
-     * OperationShardingState::isOperationVersioned for more info on that), returns an UNSHARDED
-     * metadata object.
-     * If 'kDisallowOrphanCleanup' is passed as 'OrphanCleanupPolicy', the range deleter won't
-     * delete any orphan chunk associated with this ScopedCollectionFilter until the object is
-     * destroyed. The intended users of this method are callers which need to perform filtering. Use
-     * 'getCurrentMetadata' for other cases, like obtaining information about sharding-related
-     * properties of the collection are necessary that won't change under collection IX/IS lock
-     * (e.g., isSharded or the shard key).
-     *
-     * The returned object is safe to access even after the collection lock has been dropped.
-     */
-
-    enum class OrphanCleanupPolicy { kDisallowOrphanCleanup, kAllowOrphanCleanup };
-
-    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
-                                                      OrphanCleanupPolicy orphanCleanupPolicy) = 0;
-
-    /**
-     * See the comments for 'getOwnershipFilter' above for more information on this method.
+     * The returned object *is not safe* to access after the collection lock has been dropped.
      */
     virtual ScopedCollectionDescription getCollectionDescription() = 0;
 
-    /**
-     * Function added temporary to transition from the current getCollectionDescription
-     * implementation to one where it throws when the collection metadata is unknown and is properly
-     * handled on every code path
-     */
+    // TODO (SERVER-46703): This method must not be used in any new code because it does not provide
+    // the necessary guarantees that getCollectionDescription above does. Specifically, it silently
+    // treats UNKNOWN metadata as UNSHARDED, which can lead to data loss.
     virtual ScopedCollectionDescription getCollectionDescription_DEPRECATED() = 0;
+
+    /**
+     * This method must be called with an OperationShardingState, which specifies an expected shard
+     * version for the collection and it will invariant otherwise.
+     *
+     * If the shard currently doesn't know whether the collection is sharded or not, or if the
+     * expected shard version doesn't match with the one in the OperationShardingState, it will
+     * throw StaleShardVersion.
+     *
+     * If the operation context contains an 'atClusterTime', the returned filtering object will be
+     * tied to a specific point in time. Otherwise, it will reference the latest cluster time
+     * available.
+     *
+     * If 'kDisallowOrphanCleanup' is passed as 'OrphanCleanupPolicy', the range deleter won't
+     * delete any orphan chunk associated with this ScopedCollectionFilter until the object is
+     * destroyed. The intended users of this mode are read operations, which need to yield the
+     * collection lock, but still perform filtering.
+     *
+     * Use 'getCollectionDescription' for other cases, like obtaining information about
+     * sharding-related properties of the collection are necessary that won't change under
+     * collection IX/IS lock (e.g., isSharded or the shard key).
+     *
+     * The returned object *is safe* to access even after the collection lock has been dropped.
+     */
+    enum class OrphanCleanupPolicy { kDisallowOrphanCleanup, kAllowOrphanCleanup };
+    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
+                                                      OrphanCleanupPolicy orphanCleanupPolicy) = 0;
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard
@@ -134,10 +138,10 @@ public:
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) = 0;
 
-    /**
-     * Similar to checkShardVersionOrThrow but returns a status instead of throwing.
-     */
-    virtual Status checkShardVersionNoThrow(OperationContext* opCtx) noexcept = 0;
+    // TODO (SERVER-46703): This method must not be used in any new code because it does not provide
+    // the necessary guarantees that checkShardVersionOrThrow above does. Specifically, it silently
+    // treats UNKNOWN metadata as UNSHARDED, which can lead to data loss.
+    virtual void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) = 0;
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called
@@ -166,18 +170,12 @@ public:
         ShardingMigrationCriticalSection::Operation op) const = 0;
 
     /**
-     * BSON output of the pending metadata into a BSONArray
-     * used for reporting/diagnostic purposes only
+     * Appends information about the shard version of the collection.
      */
-    virtual void toBSONPending(BSONArrayBuilder& bb) const = 0;
+    virtual void appendShardVersion(BSONObjBuilder* builder) = 0;
 
     /**
-     * Reports shard version for collection which have filtering information associated.
-     */
-    virtual void report(BSONObjBuilder* builder) = 0;
-
-    /**
-     * Append info to display in server status.
+     * Append information for the collection to be displayed in server status.
      */
     virtual void appendInfoForServerStatus(BSONArrayBuilder* builder) = 0;
 };

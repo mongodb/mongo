@@ -107,7 +107,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
     }
 
-    csr->checkShardVersionOrThrow(opCtx);
+    csr->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, csr, insertedDoc);
@@ -129,7 +129,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-    csr->checkShardVersionOrThrow(opCtx);
+    csr->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, csr, postImageDoc);
@@ -150,7 +150,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-    csr->checkShardVersionOrThrow(opCtx);
+    csr->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey);

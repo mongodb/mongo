@@ -391,13 +391,6 @@ void checkDatabaseShardingState(OperationContext* opCtx, StringData dbName) {
 }
 
 /**
- * Checks collection sharding state. Throws exception on error.
- */
-void checkCollectionShardingState(OperationContext* opCtx, const NamespaceString& ns) {
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
-}
-
-/**
  * Attempts to create indexes in `specs` on a non-existent collection (or empty collection created
  * in the same multi-document transaction) with namespace `ns`. In the former case, the collection
  * is implicitly created.

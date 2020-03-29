@@ -39,7 +39,6 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
 namespace {
 
 class CollectionShardingStateMap {
@@ -79,7 +78,7 @@ public:
         {
             stdx::lock_guard<Latch> lg(_mutex);
             for (const auto& coll : _collections) {
-                coll.second->report(builder);
+                coll.second->appendShardVersion(builder);
             }
         }
 

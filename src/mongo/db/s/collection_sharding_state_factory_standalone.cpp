@@ -34,11 +34,12 @@
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 
 namespace mongo {
-
 namespace {
+
 class UnshardedCollection : public ScopedCollectionDescription::Impl {
 public:
     UnshardedCollection() = default;
+
     const CollectionMetadata& get() override {
         return _metadata;
     }
@@ -51,30 +52,28 @@ const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
 class CollectionShardingStateStandalone final : public CollectionShardingState {
 public:
-    ScopedCollectionFilter getOwnershipFilter(OperationContext*,
-                                              OrphanCleanupPolicy orphanCleanupPolicy) override {
-        return {kUnshardedCollection};
-    }
     ScopedCollectionDescription getCollectionDescription() override {
         return {kUnshardedCollection};
     }
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
         return {kUnshardedCollection};
     }
-    void checkShardVersionOrThrow(OperationContext*) noexcept override {}
-    Status checkShardVersionNoThrow(OperationContext*) noexcept override {
-        return Status::OK();
+    ScopedCollectionFilter getOwnershipFilter(OperationContext*,
+                                              OrphanCleanupPolicy orphanCleanupPolicy) override {
+        return {kUnshardedCollection};
     }
-    void enterCriticalSectionCatchUpPhase(OperationContext*) noexcept override {}
-    void enterCriticalSectionCommitPhase(OperationContext*) noexcept override {}
-    void exitCriticalSection(OperationContext*) noexcept override {}
+    void checkShardVersionOrThrow(OperationContext*) override {}
+    void checkShardVersionOrThrow_DEPRECATED(OperationContext*) override {}
+
+    void enterCriticalSectionCatchUpPhase(OperationContext*) override {}
+    void enterCriticalSectionCommitPhase(OperationContext*) override {}
+    void exitCriticalSection(OperationContext*) override {}
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation) const noexcept override {
+        ShardingMigrationCriticalSection::Operation) const override {
         return nullptr;
     }
 
-    void toBSONPending(BSONArrayBuilder& bb) const noexcept override {}
-    void report(BSONObjBuilder* builder) override {}
+    void appendShardVersion(BSONObjBuilder* builder) override {}
     void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
 };
 

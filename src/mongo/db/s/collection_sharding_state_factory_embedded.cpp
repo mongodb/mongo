@@ -51,38 +51,31 @@ private:
 
 const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
-class CollectionShardingStateStandalone final : public CollectionShardingState {
+class CollectionShardingStateEmbedded final : public CollectionShardingState {
 public:
+    ScopedCollectionDescription getCollectionDescription() override {
+        return {kUnshardedCollection};
+    }
+    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
+        return {kUnshardedCollection};
+    }
     ScopedCollectionFilter getOwnershipFilter(OperationContext*,
                                               OrphanCleanupPolicy orphanCleanupPolicy) override {
         return {kUnshardedCollection};
     }
-
-    ScopedCollectionDescription getCollectionDescription() override {
-        return {kUnshardedCollection};
-    }
-
-    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
-        return {kUnshardedCollection};
-    }
-
     void checkShardVersionOrThrow(OperationContext*) override {}
+    void checkShardVersionOrThrow_DEPRECATED(OperationContext*) override {}
 
-    Status checkShardVersionNoThrow(OperationContext*) noexcept override {
-        return Status::OK();
-    }
-
-    void enterCriticalSectionCatchUpPhase(OperationContext*) override{};
-    void enterCriticalSectionCommitPhase(OperationContext*) override{};
-    void exitCriticalSection(OperationContext*) override{};
+    void enterCriticalSectionCatchUpPhase(OperationContext*) override {}
+    void enterCriticalSectionCommitPhase(OperationContext*) override {}
+    void exitCriticalSection(OperationContext*) override {}
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
         ShardingMigrationCriticalSection::Operation) const override {
         return nullptr;
     }
 
-    void toBSONPending(BSONArrayBuilder&) const override {}
-    void report(BSONObjBuilder* builder) override {}
-    void appendInfoForServerStatus(BSONArrayBuilder* builder) {}
+    void appendShardVersion(BSONObjBuilder* builder) override {}
+    void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
 };
 
 class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
@@ -93,7 +86,7 @@ public:
     void join() override {}
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
-        return std::make_unique<CollectionShardingStateStandalone>();
+        return std::make_unique<CollectionShardingStateEmbedded>();
     }
 };
 

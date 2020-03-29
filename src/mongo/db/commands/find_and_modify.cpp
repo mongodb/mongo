@@ -183,7 +183,7 @@ void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
 
     // Check for shard version match
     auto css = CollectionShardingState::get(opCtx, nsString);
-    css->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow_DEPRECATED(opCtx);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -274,7 +274,7 @@ public:
                     autoColl.getDb());
 
             auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow(opCtx);
+            css->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
             Collection* const collection = autoColl.getCollection();
 
@@ -300,7 +300,7 @@ public:
                     autoColl.getDb());
 
             auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow(opCtx);
+            css->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
             Collection* const collection = autoColl.getCollection();
             const auto exec =

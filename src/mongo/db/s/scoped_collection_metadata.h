@@ -34,9 +34,10 @@
 namespace mongo {
 
 /**
- * Acts like a shared pointer and exposes sharding filtering metadata to be used by server
- * operations. It is allowed to be referenced outside of collection lock, but all implementations
- * must be able to outlive the object from which they were obtained.
+ * Contains the parts of the sharding state for a particular collection, which do not change due to
+ * chunk move, split and merge. The implementation is allowed to be tighly coupled with the
+ * CollectionShardingState from which it was derived and because of this it must not be accessed
+ * outside of a collection lock.
  */
 class ScopedCollectionDescription {
 public:
@@ -108,11 +109,17 @@ public:
         return _impl->get().getChunkManager()->getShardKeyPattern().extractShardKeyFromDoc(doc);
     }
 
-
 protected:
     std::shared_ptr<Impl> _impl;
 };
 
+/**
+ * Contains the parts of the sharding state for a particular collection, which can change due to
+ * chunk move, split and merge and represents a snapshot in time of these parts, specifically the
+ * chunk ownership. The implementation is allowed to be tightly coupled with the
+ * CollectionShardingState from which it was derived, but it must be allowed to be accessed outside
+ * of collection lock.
+ */
 class ScopedCollectionFilter : public ScopedCollectionDescription {
 public:
     ScopedCollectionFilter(std::shared_ptr<Impl> impl)

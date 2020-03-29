@@ -93,7 +93,7 @@ public:
         }
 
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow_DEPRECATED(opCtx);
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {

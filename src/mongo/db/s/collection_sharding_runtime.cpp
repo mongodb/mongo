@@ -43,7 +43,6 @@
 #include "mongo/util/duration.h"
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -126,22 +125,12 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx, OrphanCleanupPolicy orphanCleanupPolicy) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    if (!optReceivedShardVersion)
-        return {kUnshardedCollection};
-    invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion),
-              "getOwnershipFilter called with an operationContext that has shard version IGNORED");
+    invariant(!optReceivedShardVersion || !ChunkVersion::isIgnoredVersion(*optReceivedShardVersion),
+              "getOwnershipFilter called by operation that doesn't have a valid shard version");
 
-    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
-
-    uassert(StaleConfigInfo(
-                _nss, *optReceivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
-            str::stream() << "sharding status of collection " << _nss.ns()
-                          << " is not currently available for filtering and needs to be recovered "
-                          << "from the config server",
-            optMetadata);
-
-    return {std::move(*optMetadata)};
+    return _getMetadataWithVersionCheckAt(opCtx,
+                                          repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
+                                          TreatUnknownAsUnsharded::kNo);
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
@@ -173,30 +162,12 @@ CollectionShardingRuntime::getCurrentMetadataIfKnown() {
     return _getCurrentMetadataIfKnown(boost::none);
 }
 
-boost::optional<ChunkVersion> CollectionShardingRuntime::getCurrentShardVersionIfKnown() {
-    stdx::lock_guard lk(_metadataManagerLock);
-    switch (_metadataType) {
-        case MetadataType::kUnknown:
-            return boost::none;
-        case MetadataType::kUnsharded:
-            return ChunkVersion::UNSHARDED();
-        case MetadataType::kSharded:
-            return _metadataManager->getActiveShardVersion();
-    };
-    MONGO_UNREACHABLE;
-}
-
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, TreatUnknownAsUnsharded::kNo);
 }
 
-Status CollectionShardingRuntime::checkShardVersionNoThrow(OperationContext* opCtx) noexcept {
-    try {
-        checkShardVersionOrThrow(opCtx);
-        return Status::OK();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
+void CollectionShardingRuntime::checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) {
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, TreatUnknownAsUnsharded::kYes);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
@@ -351,15 +322,13 @@ boost::optional<ScopedCollectionDescription> CollectionShardingRuntime::_getCurr
     MONGO_UNREACHABLE;
 }
 
-boost::optional<ScopedCollectionDescription>
-CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
-    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
+ScopedCollectionDescription CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
+    OperationContext* opCtx,
+    const boost::optional<mongo::LogicalTime>& atClusterTime,
+    TreatUnknownAsUnsharded treatUnknownAsUnsharded) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    if (!optReceivedShardVersion) {
-        return boost::none;
-    }
-
-    auto const shardId = ShardingState::get(opCtx)->shardId();
+    if (!optReceivedShardVersion)
+        return {kUnshardedCollection};
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
 
@@ -369,44 +338,42 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
-    auto wantedShardVersion = [&] {
-        auto optionalWantedShardVersion = getCurrentShardVersionIfKnown();
-        return optionalWantedShardVersion ? *optionalWantedShardVersion : ChunkVersion::UNSHARDED();
-    }();
-
-    auto criticalSectionSignal = [&] {
-        return _critSec.getSignal(opCtx->lockState()->isWriteLocked()
-                                      ? ShardingMigrationCriticalSection::kWrite
-                                      : ShardingMigrationCriticalSection::kRead);
-    }();
-
-    if (criticalSectionSignal) {
-        uasserted(
-            StaleConfigInfo(
-                _nss, receivedShardVersion, wantedShardVersion, shardId, criticalSectionSignal),
-            str::stream() << "migration commit in progress for " << _nss.ns());
+    auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
+    if (!optCurrentMetadata) {
+        uassert(StaleConfigInfo(
+                    _nss, receivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
+                str::stream() << "sharding status of collection " << _nss.ns()
+                              << " is not currently known and needs to be recovered",
+                !ChunkVersion::isIgnoredVersion(receivedShardVersion) &&
+                    treatUnknownAsUnsharded == TreatUnknownAsUnsharded::kYes);
+        optCurrentMetadata.emplace(kUnshardedCollection);
     }
 
-    //
-    // Figure out exactly why not compatible, send appropriate error message
-    // The versions themselves are returned in the error, so not needed in messages here
-    //
+    const auto& currentMetadata = *optCurrentMetadata;
+    auto wantedShardVersion = currentMetadata->getShardVersion();
 
-    StaleConfigInfo sci(_nss, receivedShardVersion, wantedShardVersion, shardId);
+    {
+        auto criticalSectionSignal = _critSec.getSignal(
+            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
+                                                : ShardingMigrationCriticalSection::kRead);
 
-    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
-        uassert(std::move(sci),
-                str::stream()
-                    << "sharding status of collection " << _nss.ns()
-                    << " is not currently known and needs to be recovered from the config server",
-                !receivedShardVersion.getCanThrowSSVOnIgnored() ||
-                    _getCurrentMetadataIfKnown(atClusterTime));
-        return boost::none;
+        uassert(StaleConfigInfo(_nss,
+                                receivedShardVersion,
+                                wantedShardVersion,
+                                ShardingState::get(opCtx)->shardId(),
+                                std::move(criticalSectionSignal)),
+                str::stream() << "migration commit in progress for " << _nss.ns(),
+                !criticalSectionSignal);
     }
 
-    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
-        return _getCurrentMetadataIfKnown(atClusterTime);
-    }
+    if (ChunkVersion::isIgnoredVersion(receivedShardVersion))
+        return {kUnshardedCollection};
+
+    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion))
+        return currentMetadata;
+
+    StaleConfigInfo sci(
+        _nss, receivedShardVersion, wantedShardVersion, ShardingState::get(opCtx)->shardId());
 
     uassert(std::move(sci),
             str::stream() << "epoch mismatch detected for " << _nss.ns(),
@@ -434,11 +401,15 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     MONGO_UNREACHABLE;
 }
 
-void CollectionShardingRuntime::report(BSONObjBuilder* builder) {
+void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) {
     auto optCollDescr = getCurrentMetadataIfKnown();
     if (optCollDescr) {
         builder->appendTimestamp(_nss.ns(), optCollDescr->getShardVersion().toLong());
     }
+}
+
+void CollectionShardingRuntime::appendPendingReceiveChunks(BSONArrayBuilder* builder) {
+    _metadataManager->toBSONPending(*builder);
 }
 
 void CollectionShardingRuntime::appendInfoForServerStatus(BSONArrayBuilder* builder) {

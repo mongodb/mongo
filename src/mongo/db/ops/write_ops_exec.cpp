@@ -208,7 +208,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
             str::stream() << "Not primary while writing to " << ns.ns(),
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                 ->canAcceptWritesFor(opCtx, ns));
-    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow_DEPRECATED(opCtx);
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
