@@ -420,8 +420,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
@@ -477,8 +476,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
@@ -528,8 +526,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
@@ -581,8 +578,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
     store.add(operationContext(), t);
@@ -620,8 +616,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
     store.add(operationContext(), t);
@@ -740,8 +735,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
 
     RangeDeletionTask t(
@@ -779,8 +773,7 @@ TEST_F(RangeDeleterTest,
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(fakeUuid);
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
     RangeDeletionTask t(
         UUID::gen(), kNss, fakeUuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
@@ -818,8 +811,7 @@ TEST_F(RangeDeleterTest,
 
     // Insert range deletion task for this collection and range.
     setFilteringMetadataWithUUID(uuid());
-    PersistentTaskStore<RangeDeletionTask> store(operationContext(),
-                                                 NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);

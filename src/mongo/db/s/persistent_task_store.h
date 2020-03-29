@@ -50,8 +50,7 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 template <typename T>
 class PersistentTaskStore {
 public:
-    PersistentTaskStore(OperationContext* opCtx, NamespaceString storageNss)
-        : _storageNss(std::move(storageNss)) {}
+    PersistentTaskStore(NamespaceString storageNss) : _storageNss(std::move(storageNss)) {}
 
     /**
      * Adds a task to the store.

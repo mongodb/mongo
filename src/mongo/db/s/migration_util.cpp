@@ -233,7 +233,7 @@ Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid) {
 size_t checkForConflictingDeletions(OperationContext* opCtx,
                                     const ChunkRange& range,
                                     const UUID& uuid) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
     return store.count(opCtx, overlappingRangeQuery(range, uuid));
 }
@@ -332,7 +332,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
 }
 
 void submitPendingDeletions(OperationContext* opCtx) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
     auto query = QUERY("pending" << BSON("$exists" << false));
 
@@ -434,8 +434,7 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
         if (deletions.empty())
             return;
 
-        PersistentTaskStore<RangeDeletionTask> store(opCtx,
-                                                     NamespaceString::kRangeDeletionNamespace);
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
         for (const auto& task : deletions) {
             LOGV2_DEBUG(22032,
@@ -475,7 +474,7 @@ void submitOrphanRangesForCleanup(OperationContext* opCtx) {
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
                                         const MigrationCoordinatorDocument& migrationDoc) {
     PersistentTaskStore<MigrationCoordinatorDocument> store(
-        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+        NamespaceString::kMigrationCoordinatorsNamespace);
     try {
         store.add(opCtx, migrationDoc);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
@@ -490,7 +489,7 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
 
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const RangeDeletionTask& deletionTask) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     try {
         store.add(opCtx, deletionTask);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
@@ -509,7 +508,7 @@ void persistCommitDecision(OperationContext* opCtx, const UUID& migrationId) {
             hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(newOpCtx);
 
             PersistentTaskStore<MigrationCoordinatorDocument> store(
-                newOpCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+                NamespaceString::kMigrationCoordinatorsNamespace);
             store.update(newOpCtx,
                          QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
                          BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName
@@ -530,7 +529,7 @@ void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId) {
             hangInPersistMigrateAbortDecisionInterruptible.pauseWhileSet(newOpCtx);
 
             PersistentTaskStore<MigrationCoordinatorDocument> store(
-                newOpCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+                NamespaceString::kMigrationCoordinatorsNamespace);
             store.update(newOpCtx,
                          QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
                          BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName
@@ -578,8 +577,7 @@ void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
     retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "cancel local range deletion", [&](OperationContext* newOpCtx) {
             hangInDeleteRangeDeletionLocallyInterruptible.pauseWhileSet(newOpCtx);
-            PersistentTaskStore<RangeDeletionTask> store(newOpCtx,
-                                                         NamespaceString::kRangeDeletionNamespace);
+            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
             store.remove(
                 newOpCtx, QUERY(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
 
@@ -655,7 +653,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
 }
 
 void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
@@ -675,7 +673,7 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
 
 void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
     PersistentTaskStore<MigrationCoordinatorDocument> store(
-        opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+        NamespaceString::kMigrationCoordinatorsNamespace);
     store.remove(opCtx,
                  QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
                  {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
@@ -802,7 +800,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
             long long migrationRecoveryCount = 0;
             PersistentTaskStore<MigrationCoordinatorDocument> store(
-                opCtx, NamespaceString::kMigrationCoordinatorsNamespace);
+                NamespaceString::kMigrationCoordinatorsNamespace);
             Query query;
             store.forEach(
                 opCtx,

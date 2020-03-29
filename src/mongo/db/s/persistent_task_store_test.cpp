@@ -71,7 +71,7 @@ struct TestTask {
 TEST_F(PersistentTaskStoreTest, TestAdd) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
 
     store.add(opCtx, TestTask{"one", 0, 10});
     store.add(opCtx, TestTask{"two", 10, 20});
@@ -83,7 +83,7 @@ TEST_F(PersistentTaskStoreTest, TestAdd) {
 TEST_F(PersistentTaskStoreTest, TestForEach) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
 
     store.add(opCtx, TestTask{"one", 0, 10});
     store.add(opCtx, TestTask{"two", 10, 20});
@@ -133,7 +133,7 @@ TEST_F(PersistentTaskStoreTest, TestForEach) {
 TEST_F(PersistentTaskStoreTest, TestRemove) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
 
     store.add(opCtx, TestTask{"one", 0, 10});
     store.add(opCtx, TestTask{"two", 10, 20});
@@ -151,7 +151,7 @@ TEST_F(PersistentTaskStoreTest, TestRemove) {
 TEST_F(PersistentTaskStoreTest, TestRemoveMultiple) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
 
     store.add(opCtx, TestTask{"one", 0, 10});
     store.add(opCtx, TestTask{"two", 10, 20});
@@ -168,7 +168,7 @@ TEST_F(PersistentTaskStoreTest, TestRemoveMultiple) {
 TEST_F(PersistentTaskStoreTest, TestUpdate) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
     int originalMin = 0;
     int expectedUpdatedMin = 1;
     store.add(opCtx, TestTask{"one", originalMin, 10});
@@ -194,7 +194,7 @@ TEST_F(PersistentTaskStoreTest, TestUpdate) {
 TEST_F(PersistentTaskStoreTest, TestUpdateOnlyUpdatesOneMatchingDocument) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
     int originalMin = 0;
     int expectedUpdatedMin = 1;
     std::string keyToMatch = "one";
@@ -212,7 +212,7 @@ TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
     auto opCtx = operationContext();
 
     {
-        PersistentTaskStore<TestTask> store(opCtx, kNss);
+        PersistentTaskStore<TestTask> store(kNss);
 
         store.add(opCtx, TestTask{"one", 0, 10});
         store.add(opCtx, TestTask{"two", 10, 20});
@@ -222,7 +222,7 @@ TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
     }
 
     {
-        PersistentTaskStore<TestTask> store(opCtx, kNss);
+        PersistentTaskStore<TestTask> store(kNss);
         ASSERT_EQ(store.count(opCtx), 3);
 
         auto count = store.count(opCtx, QUERY("min" << GTE << 10));
@@ -238,7 +238,7 @@ TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
     }
 
     {
-        PersistentTaskStore<TestTask> store(opCtx, kNss);
+        PersistentTaskStore<TestTask> store(kNss);
         ASSERT_EQ(store.count(opCtx), 2);
 
         auto count = store.count(opCtx, QUERY("min" << GTE << 10));
@@ -249,7 +249,7 @@ TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
 TEST_F(PersistentTaskStoreTest, TestCountWithQuery) {
     auto opCtx = operationContext();
 
-    PersistentTaskStore<TestTask> store(opCtx, kNss);
+    PersistentTaskStore<TestTask> store(kNss);
 
     store.add(opCtx, TestTask{"one", 0, 10});
     store.add(opCtx, TestTask{"two", 10, 20});

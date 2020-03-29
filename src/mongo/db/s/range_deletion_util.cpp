@@ -265,7 +265,7 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& mig
     // corruption. The scheme for checking whether the range deletion task document still exists
     // relies on the executor only having a single thread and that thread being solely responsible
     // for deleting the range deletion task document.
-    PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto count = store.count(opCtx,
                              QUERY(RangeDeletionTask::kIdFieldName
                                    << migrationId << RangeDeletionTask::kPendingFieldName
@@ -361,8 +361,7 @@ void notifySecondariesThatDeletionIsOccurring(const NamespaceString& nss,
 
 void removePersistentRangeDeletionTask(const NamespaceString& nss, UUID migrationId) {
     withTemporaryOperationContext([&](OperationContext* opCtx) {
-        PersistentTaskStore<RangeDeletionTask> store(opCtx,
-                                                     NamespaceString::kRangeDeletionNamespace);
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
         store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << migrationId));
     });
