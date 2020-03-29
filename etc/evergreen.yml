@@ -9047,7 +9047,7 @@ buildvariants:
   display_name: Ubuntu 18.04 s390x
   run_on:
   - ubuntu1804-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -9072,13 +9072,42 @@ buildvariants:
     distros:
     - ubuntu1804-test
 
+- name: enterprise-ubuntu1804-s390x-compile
+  display_name: Enterprise Ubuntu 18.04 s390x Compile
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-zseries-test
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-ubuntu1804
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 2
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: ubuntu1804
+    repo_edition: enterprise
+    multiversion_platform: ubuntu1804
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-zseries-build
+
 - name: enterprise-ubuntu1804-s390x
   display_name: Enterprise Ubuntu 18.04 s390x
   modules:
   - enterprise
   run_on:
   - ubuntu1804-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10851,13 +10880,43 @@ buildvariants:
     distros:
     - rhel70
 
+- name: enterprise-rhel-72-s390x-compile
+  display_name: Enterprise RHEL 7.2 s390x Compile
+  modules:
+  - enterprise
+  run_on:
+  - rhel72-zseries-test
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    release_buid: true
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 2
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: rhel72
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-rhel72
+    repo_edition: enterprise
+    multiversion_platform: rhel72
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel72-zseries-build
+
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
   modules:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10902,12 +10961,39 @@ buildvariants:
     distros:
     - rhel70
 
+
+- name: enterprise-rhel-67-s390x-compile
+  display_name: Enterprise RHEL 6.7 s390x Compile
+  modules:
+  - enterprise
+  run_on:
+  - rhel67-zseries-test
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel67 -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: rhel67
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-rhel67
+    repo_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel67-zseries-build
+
 - name: enterprise-rhel-67-s390x
   display_name: Enterprise RHEL 6.7 s390x
   modules:
   - enterprise
   run_on:
   - rhel67-zseries-test
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10948,6 +11034,7 @@ buildvariants:
 
 - name: rhel-72-s390x
   display_name: RHEL 7.2 s390x
+  batchtime: 525600 # 365 days
   run_on:
   - rhel72-zseries-test
   expansions:
@@ -10974,6 +11061,7 @@ buildvariants:
 
 - name: rhel-67-s390x
   display_name: RHEL 6.7 s390x
+  batchtime: 525600 # 365 days
   run_on:
   - rhel67-zseries-test
   expansions:
@@ -11155,13 +11243,41 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
+- name: enterprise-suse12-s390x-compile
+  display_name: Enterprise SLES 12 s390x Compile
+  modules:
+  - enterprise
+  run_on:
+  - suse12-zseries-test
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-suse12
+    compile_flags: --ssl MONGO_DISTMOD=suse12 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: s390x
+    packager_distro: suse12
+    repo_edition: enterprise
+    multiversion_platform: suse12
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - suse12-zseries-build
+
 - name: enterprise-suse12-s390x
   display_name: Enterprise SLES 12 s390x
   modules:
   - enterprise
   run_on:
   - suse12-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11209,7 +11325,7 @@ buildvariants:
   display_name: SLES 12 s390x
   run_on:
   - suse12-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     push_path: linux
@@ -11749,7 +11865,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 525600 # 365 days
   stepback: false
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
