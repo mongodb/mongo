@@ -33,73 +33,22 @@
 
 #include "mongo/s/write_ops/cluster_write.h"
 
-#include <algorithm>
-
-#include "mongo/base/status.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
-namespace {
-
-void toBatchError(const Status& status, BatchedCommandResponse* response) {
-    response->clear();
-    response->setStatus(status);
-    dassert(response->isValid(nullptr));
-}
-
-}  // namespace
 
 void ClusterWriter::write(OperationContext* opCtx,
                           const BatchedCommandRequest& request,
                           BatchWriteExecStats* stats,
                           BatchedCommandResponse* response,
                           boost::optional<OID> targetEpoch) {
-    const NamespaceString& nss = request.getNS();
-
     LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
 
-    // Config writes and shard writes are done differently
-    if (nss.db() == NamespaceString::kAdminDb) {
-        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
-        return;
-    }
+    ChunkManagerTargeter targeter(opCtx, request.getNS(), targetEpoch);
 
-    ChunkManagerTargeter targeter(request.getNS(), targetEpoch);
-
-    Status targetInitStatus = targeter.init(opCtx);
-    if (!targetInitStatus.isOK()) {
-        toBatchError(targetInitStatus.withContext(
-                         str::stream()
-                         << "unable to initialize targeter for write op for collection "
-                         << request.getNS().ns()),
-                     response);
-        return;
-    }
-
-    bool endpointIsConfigServer;
-    try {
-        endpointIsConfigServer = targeter.endpointIsConfigServer();
-    } catch (DBException& ex) {
-        toBatchError(ex.toStatus(str::stream()
-                                 << "unable to target write op for collection " << request.getNS()),
-                     response);
-        return;
-    }
-
-    if (endpointIsConfigServer) {
+    if (targeter.endpointIsConfigServer()) {
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
         return;
     }

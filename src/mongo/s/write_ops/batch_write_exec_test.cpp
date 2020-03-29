@@ -412,7 +412,7 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        std::vector<ShardEndpoint> targetUpdate(
             OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
@@ -513,7 +513,7 @@ TEST_F(BatchWriteExecTest,
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        std::vector<ShardEndpoint> targetUpdate(
             OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
@@ -629,7 +629,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        std::vector<ShardEndpoint> targetUpdate(
             OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
@@ -756,7 +756,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        std::vector<ShardEndpoint> targetUpdate(
             OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),

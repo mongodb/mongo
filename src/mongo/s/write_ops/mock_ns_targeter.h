@@ -64,35 +64,31 @@ public:
     /**
      * Returns a ShardEndpoint for the doc from the mock ranges
      */
-    StatusWith<ShardEndpoint> targetInsert(OperationContext* opCtx,
-                                           const BSONObj& doc) const override {
-        auto swEndpoints = _targetQuery(doc);
-        if (!swEndpoints.isOK())
-            return swEndpoints.getStatus();
-
-        ASSERT_EQ(1U, swEndpoints.getValue().size());
-        return swEndpoints.getValue().front();
+    ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override {
+        auto endpoints = _targetQuery(doc);
+        ASSERT_EQ(1U, endpoints.size());
+        return endpoints.front();
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    StatusWith<std::vector<ShardEndpoint>> targetUpdate(
-        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
-        return _targetQuery(updateDoc.getQ());
+    std::vector<ShardEndpoint> targetUpdate(
+        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const override {
+        return _targetQuery(updateOp.getQ());
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    StatusWith<std::vector<ShardEndpoint>> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const override {
-        return _targetQuery(deleteDoc.getQ());
+    std::vector<ShardEndpoint> targetDelete(
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const override {
+        return _targetQuery(deleteOp.getQ());
     }
 
-    StatusWith<std::vector<ShardEndpoint>> targetAllShards(OperationContext* opCtx) const override {
+    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override {
         std::vector<ShardEndpoint> endpoints;
         for (const auto& range : _mockRanges) {
             endpoints.push_back(range.endpoint);
@@ -115,11 +111,10 @@ public:
         // No-op
     }
 
-    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override {
+    void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override {
         // No-op
         if (wasChanged)
             *wasChanged = false;
-        return Status::OK();
     }
 
     bool endpointIsConfigServer() const override {
@@ -133,28 +128,11 @@ public:
     }
 
 private:
-    static ChunkRange _parseRange(const BSONObj& query);
-
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
      * the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const BSONObj& query) const {
-        const ChunkRange queryRange(_parseRange(query));
-
-        std::vector<ShardEndpoint> endpoints;
-
-        for (const auto& range : _mockRanges) {
-            if (queryRange.overlapWith(range.range)) {
-                endpoints.push_back(range.endpoint);
-            }
-        }
-
-        if (endpoints.empty())
-            return {ErrorCodes::UnknownError, "no mock ranges found for query"};
-
-        return endpoints;
-    }
+    std::vector<ShardEndpoint> _targetQuery(const BSONObj& query) const;
 
     NamespaceString _nss;
 

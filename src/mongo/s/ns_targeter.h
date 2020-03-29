@@ -67,7 +67,7 @@ struct ShardEndpoint {
  *   1a. On targeting failure we may need to refresh, note that it happened.
  *   1b. On stale config from a child write operation we may need to refresh, note the error.
  *
- *   2. RefreshIfNeeded() to get newer targeting information
+ *   2. refreshIfNeeded() to get newer targeting information
  *
  *   3. Goto 0.
  *
@@ -78,8 +78,7 @@ struct ShardEndpoint {
  * Implementers are free to define more specific targeting error codes to allow more complex
  * error handling.
  *
- * Interface must be externally synchronized if used in multiple threads, for now.
- * TODO: Determine if we should internally synchronize.
+ * The interface must not be used from multiple threads.
  */
 class NSTargeter {
 public:
@@ -91,36 +90,29 @@ public:
     virtual const NamespaceString& getNS() const = 0;
 
     /**
-     * Returns a ShardEndpoint for a single document write.
-     *
-     * Returns !OK with message if document could not be targeted for other reasons.
+     * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is
+     * malformed with respect to the shard key pattern of the collection.
      */
-    virtual StatusWith<ShardEndpoint> targetInsert(OperationContext* opCtx,
-                                                   const BSONObj& doc) const = 0;
+    virtual ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const = 0;
 
     /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard update.
-     *
-     * Returns OK and fills the endpoints; returns a status describing the error otherwise.
+     * Returns a vector of ShardEndpoints for a potentially multi-shard update or throws
+     * ShardKeyNotFound if 'updateOp' misses a shard key, but the type of update requires it.
      */
-    virtual StatusWith<std::vector<ShardEndpoint>> targetUpdate(
-        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const = 0;
+    virtual std::vector<ShardEndpoint> targetUpdate(
+        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const = 0;
 
     /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard delete.
-     *
-     * Returns OK and fills the endpoints; returns a status describing the error otherwise.
+     * Returns a vector of ShardEndpoints for a potentially multi-shard delete or throws
+     * ShardKeyNotFound if 'deleteOp' misses a shard key, but the type of delete requires it.
      */
-    virtual StatusWith<std::vector<ShardEndpoint>> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const = 0;
+    virtual std::vector<ShardEndpoint> targetDelete(
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for all shards.
-     *
-     * Returns !OK with message if all shards could not be targeted.
      */
-    virtual StatusWith<std::vector<ShardEndpoint>> targetAllShards(
-        OperationContext* opCtx) const = 0;
+    virtual std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const = 0;
 
     /**
      * Informs the targeter that a targeting failure occurred during one of the last targeting
@@ -160,9 +152,8 @@ public:
      * information used here was changed.
      *
      * NOTE: This function may block for shared resources or network calls.
-     * Returns !OK with message if could not refresh
      */
-    virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
+    virtual void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
 
     /**
      * Returns whether this write targets the config server. Invariants if the write targets the

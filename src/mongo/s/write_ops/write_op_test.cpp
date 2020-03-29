@@ -113,9 +113,7 @@ TEST_F(WriteOpTest, TargetSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -147,9 +145,7 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpointA);
@@ -182,9 +178,7 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 3u);
     sortByEndpoint(&targeted);
@@ -222,9 +216,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 2u);
     sortByEndpoint(&targeted);
@@ -266,9 +258,7 @@ TEST_F(WriteOpTest, ErrorSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -302,9 +292,7 @@ TEST_F(WriteOpTest, CancelSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -337,9 +325,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -382,10 +368,9 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
 
     // The write should only target shardA and shardB and send real shard versions to each.
-    ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 2u);
     sortByEndpoint(&targeted);
@@ -425,9 +410,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(_opCtx, targeter, &targeted);
-
-    ASSERT(status.isOK());
+    writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 2u);
     sortByEndpoint(&targeted);

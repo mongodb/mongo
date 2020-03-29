@@ -52,23 +52,18 @@ const WriteErrorDetail& WriteOp::getOpError() const {
     return *_error;
 }
 
-Status WriteOp::targetWrites(OperationContext* opCtx,
-                             const NSTargeter& targeter,
-                             std::vector<TargetedWrite*>* targetedWrites) {
-    auto swEndpoints = [&]() -> StatusWith<std::vector<ShardEndpoint>> {
+void WriteOp::targetWrites(OperationContext* opCtx,
+                           const NSTargeter& targeter,
+                           std::vector<TargetedWrite*>* targetedWrites) {
+    auto endpoints = [&] {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            auto swEndpoint = targeter.targetInsert(opCtx, _itemRef.getDocument());
-            if (!swEndpoint.isOK())
-                return swEndpoint.getStatus();
-
-            return std::vector<ShardEndpoint>{std::move(swEndpoint.getValue())};
+            return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
             return targeter.targetUpdate(opCtx, _itemRef.getUpdate());
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
             return targeter.targetDelete(opCtx, _itemRef.getDelete());
-        } else {
-            MONGO_UNREACHABLE;
         }
+        MONGO_UNREACHABLE;
     }();
 
     // Unless executing as part of a transaction, if we're targeting more than one endpoint with an
@@ -77,40 +72,33 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
     // NOTE: Index inserts are currently specially targeted only at the current collection to avoid
     // creating collections everywhere.
     const bool inTransaction = bool(TransactionRouter::get(opCtx));
-    if (swEndpoints.isOK() && swEndpoints.getValue().size() > 1u && !inTransaction) {
-        swEndpoints = targeter.targetAllShards(opCtx);
+    if (endpoints.size() > 1u && !inTransaction) {
+        endpoints = targeter.targetAllShards(opCtx);
     }
 
-    // If we had an error, stop here
-    if (!swEndpoints.isOK())
-        return swEndpoints.getStatus();
-
-    auto& endpoints = swEndpoints.getValue();
-
     for (auto&& endpoint : endpoints) {
-        // if the operation was already successfull on that shard, there is no need to repeat the
-        // write
-        if (!_successfulShardSet.count(endpoint.shardName)) {
-            _childOps.emplace_back(this);
+        // If the operation was already successfull on that shard, do not repeat it
+        if (_successfulShardSet.count(endpoint.shardName))
+            continue;
 
-            WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
+        _childOps.emplace_back(this);
 
-            // Outside of a transaction, multiple endpoints currently imply no versioning, since we
-            // can't retry half a regular multi-write.
-            if (endpoints.size() > 1u && !inTransaction) {
-                endpoint.shardVersion = ChunkVersion::IGNORED();
-                endpoint.shardVersion.canThrowSSVOnIgnored();
-            }
+        WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
 
-            targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
-
-            _childOps.back().pendingWrite = targetedWrites->back();
-            _childOps.back().state = WriteOpState_Pending;
+        // Outside of a transaction, multiple endpoints currently imply no versioning, since we
+        // can't retry half a regular multi-write.
+        if (endpoints.size() > 1u && !inTransaction) {
+            endpoint.shardVersion = ChunkVersion::IGNORED();
+            endpoint.shardVersion.canThrowSSVOnIgnored();
         }
+
+        targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
+
+        _childOps.back().pendingWrite = targetedWrites->back();
+        _childOps.back().state = WriteOpState_Pending;
     }
 
     _state = WriteOpState_Pending;
-    return Status::OK();
 }
 
 size_t WriteOp::getNumTargeted() {

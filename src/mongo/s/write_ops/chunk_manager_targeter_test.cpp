@@ -65,9 +65,7 @@ public:
     ChunkManagerTargeter prepare(BSONObj shardKeyPattern, const std::vector<BSONObj>& splitPoints) {
         chunkManager =
             makeChunkManager(kNss, ShardKeyPattern(shardKeyPattern), nullptr, false, splitPoints);
-        ChunkManagerTargeter cmTargeter(kNss);
-        auto status = cmTargeter.init(operationContext());
-        return cmTargeter;
+        return ChunkManagerTargeter(operationContext(), kNss);
     }
     std::shared_ptr<ChunkManager> chunkManager;
 };
@@ -83,29 +81,24 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {
                               splitPoints);
 
     auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -111}, c: {d: '1'}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: -10}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "2");
+    ASSERT_EQUALS(res.shardName, "2");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 4}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "3");
+    ASSERT_EQUALS(res.shardName, "3");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 1000}, c: null, d: {}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "4");
+    ASSERT_EQUALS(res.shardName, "4");
 
     // Missing field will be treated as null and will be targeted to the chunk which holds null,
     // which is shard '1'.
     res = cmTargeter.targetInsert(operationContext(), BSONObj());
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
+
     res = cmTargeter.targetInsert(operationContext(), BSON("a" << 10));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
 
     // Arrays along shard key path are not allowed.
     ASSERT_THROWS_CODE(cmTargeter.targetInsert(operationContext(), fromjson("{a: [1,2]}")),
@@ -131,14 +124,13 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertsWithVaryingHashedPrefixAndConstant
 
     for (int i = 0; i < 1000; i++) {
         auto insertObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
-        const auto res = cmTargeter.targetInsert(operationContext(), insertObj);
-        ASSERT_OK(res.getStatus());
+        auto res = cmTargeter.targetInsert(operationContext(), insertObj);
 
         // Verify that the given document is being routed based on hashed value of 'i'.
         auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(
             BSON("a.b" << BSONElementHasher::hash64(insertObj["a"]["b"],
                                                     BSONElementHasher::DEFAULT_HASH_SEED)));
-        ASSERT_EQUALS(res.getValue().shardName, chunk.getShardId());
+        ASSERT_EQUALS(res.shardName, chunk.getShardId());
     }
 
     // Arrays along shard key path are not allowed.
@@ -168,29 +160,24 @@ TEST_F(ChunkManagerTargeterTest, TargetInsertsWithConstantHashedPrefixAndVarying
                               splitPoints);
 
     auto res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -111}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: -11}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "2");
+    ASSERT_EQUALS(res.shardName, "2");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 0}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "3");
+    ASSERT_EQUALS(res.shardName, "3");
 
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: {d: 111}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "4");
+    ASSERT_EQUALS(res.shardName, "4");
 
     // Missing field will be treated as null and will be targeted to the chunk which holds null,
     // which is shard '1'.
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
+
     res = cmTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}, c: 5}"));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().shardName, "1");
+    ASSERT_EQUALS(res.shardName, "1");
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
@@ -207,9 +194,8 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
     auto res = cmTargeter.targetUpdate(
         operationContext(),
         buildUpdate(fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "2");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "2");
 
     // When update targets using query.
     res = cmTargeter.targetUpdate(
@@ -217,47 +203,44 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
         buildUpdate(fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
                     fromjson("{$set: {p : 1}}"),
                     false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "3");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "3");
 
     res = cmTargeter.targetUpdate(
         operationContext(),
         buildUpdate(fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "1");
 
     // For op-style updates, query on _id gets targeted to all shards.
     res = cmTargeter.targetUpdate(
         operationContext(), buildUpdate(fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 5);
+    ASSERT_EQUALS(res.size(), 5);
 
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
     res = cmTargeter.targetUpdate(operationContext(),
                                   buildUpdate(fromjson("{_id: 1}"), fromjson("{p: 111}}"), false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "1");
 
 
     // Upsert requires full shard key in query, even if the query can target a single shard.
-    res = cmTargeter.targetUpdate(operationContext(),
-                                  buildUpdate(fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
-                                              fromjson("{a: {b: -111}}"),
-                                              true));
-    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetUpdate(operationContext(),
+                                buildUpdate(fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
+                                            fromjson("{a: {b: -111}}"),
+                                            true)),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
 
     // Upsert success case.
     res = cmTargeter.targetUpdate(
         operationContext(),
         buildUpdate(fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "4");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "4");
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
@@ -282,10 +265,8 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
         // 'updateQueryObj'.
         const auto res = cmTargeter.targetUpdate(
             operationContext(), buildUpdate(updateQueryObj, fromjson("{$set: {p: 1}}"), false));
-        ASSERT_OK(res.getStatus());
-        ASSERT_EQUALS(res.getValue().size(), 1);
-        ASSERT_EQUALS(res.getValue()[0].shardName,
-                      findChunk(updateQueryObj["a"]["b"]).getShardId());
+        ASSERT_EQUALS(res.size(), 1);
+        ASSERT_EQUALS(res[0].shardName, findChunk(updateQueryObj["a"]["b"]).getShardId());
     }
 
     // Range queries on hashed field cannot be used for targeting. In this case, update will be
@@ -293,13 +274,14 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
     const auto updateObj = fromjson("{a: {b: -1}}");
     auto res = cmTargeter.targetUpdate(
         operationContext(), buildUpdate(fromjson("{'a.b': {$gt : 101}}"), updateObj, false));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, findChunk(updateObj["a"]["b"]).getShardId());
-    res = cmTargeter.targetUpdate(
-        operationContext(),
-        buildUpdate(fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false));
-    ASSERT_EQUALS(res.getStatus(), ErrorCodes::InvalidOptions);
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, findChunk(updateObj["a"]["b"]).getShardId());
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetUpdate(
+            operationContext(),
+            buildUpdate(fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false)),
+        DBException,
+        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
@@ -313,33 +295,32 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
                               splitPoints);
 
     // Cannot delete without full shardkey in the query.
-    auto res =
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 2}}")));
-    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
-    res = cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  -101}")));
-    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 2}}"))),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  -101}"))),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
 
     // Delete targeted correctly with full shard key in query.
-    res = cmTargeter.targetDelete(operationContext(),
-                                  buildDelete(fromjson("{'a.b':  -101, 'c.d': 5}")));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "1");
+    auto res = cmTargeter.targetDelete(operationContext(),
+                                       buildDelete(fromjson("{'a.b':  -101, 'c.d': 5}")));
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "1");
 
-    // Query with MinKey value should go to chunk '0' because MinKey is smaller than
-    // BSONNULL.
+    // Query with MinKey value should go to chunk '0' because MinKey is smaller than BSONNULL.
     res = cmTargeter.targetDelete(
         operationContext(),
         buildDelete(BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj()));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "0");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "0");
 
     res =
         cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  0, 'c.d': 5}")));
-    ASSERT_OK(res.getStatus());
-    ASSERT_EQUALS(res.getValue().size(), 1);
-    ASSERT_EQUALS(res.getValue()[0].shardName, "3");
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "3");
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
@@ -362,15 +343,15 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
         // Verify that the given document is being routed based on hashed value of 'i' in
         // 'queryObj'.
         const auto res = cmTargeter.targetDelete(operationContext(), buildDelete(queryObj));
-        ASSERT_OK(res.getStatus());
-        ASSERT_EQUALS(res.getValue().size(), 1);
-        ASSERT_EQUALS(res.getValue()[0].shardName, findChunk(queryObj["a"]["b"]).getShardId());
+        ASSERT_EQUALS(res.size(), 1);
+        ASSERT_EQUALS(res[0].shardName, findChunk(queryObj["a"]["b"]).getShardId());
     }
 
     // Range queries on hashed field cannot be used for targeting.
-    auto res =
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 101}}")));
-    ASSERT_EQUALS(res.getStatus(), ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 101}}"))),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
 }
 
 }  // namespace

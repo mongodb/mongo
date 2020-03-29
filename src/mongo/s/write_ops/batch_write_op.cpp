@@ -318,7 +318,12 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         OwnedPointerVector<TargetedWrite> writesOwned;
         vector<TargetedWrite*>& writes = writesOwned.mutableVector();
 
-        Status targetStatus = writeOp.targetWrites(_opCtx, targeter, &writes);
+        Status targetStatus = Status::OK();
+        try {
+            writeOp.targetWrites(_opCtx, targeter, &writes);
+        } catch (const DBException& ex) {
+            targetStatus = ex.toStatus();
+        }
 
         if (!targetStatus.isOK()) {
             WriteErrorDetail targetError;

@@ -359,39 +359,29 @@ private:
      *
      * Does *not* retry or retarget if the metadata is stale.
      */
-    static Status _commandOpWrite(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const BSONObj& command,
-                                  BatchItemRef targetingBatchItem,
-                                  std::vector<Strategy::CommandResult>* results) {
-        // Note that this implementation will not handle targeting retries and does not completely
-        // emulate write behavior
-        ChunkManagerTargeter targeter(nss);
-        Status status = targeter.init(opCtx);
-        if (!status.isOK())
-            return status;
+    static void _commandOpWrite(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const BSONObj& command,
+                                BatchItemRef targetingBatchItem,
+                                std::vector<Strategy::CommandResult>* results) {
+        auto endpoints = [&] {
+            // Note that this implementation will not handle targeting retries and does not
+            // completely emulate write behavior
+            ChunkManagerTargeter targeter(opCtx, nss);
 
-        auto swEndpoints = [&]() -> StatusWith<std::vector<ShardEndpoint>> {
             if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-                auto swEndpoint = targeter.targetInsert(opCtx, targetingBatchItem.getDocument());
-                if (!swEndpoint.isOK())
-                    return swEndpoint.getStatus();
-                return std::vector<ShardEndpoint>{std::move(swEndpoint.getValue())};
+                return std::vector{targeter.targetInsert(opCtx, targetingBatchItem.getDocument())};
             } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
                 return targeter.targetUpdate(opCtx, targetingBatchItem.getUpdate());
             } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
                 return targeter.targetDelete(opCtx, targetingBatchItem.getDelete());
-            } else {
-                MONGO_UNREACHABLE;
             }
+            MONGO_UNREACHABLE;
         }();
-
-        if (!swEndpoints.isOK())
-            return swEndpoints.getStatus();
 
         // Assemble requests
         std::vector<AsyncRequestsSender::Request> requests;
-        for (const auto& endpoint : swEndpoints.getValue()) {
+        for (const auto& endpoint : endpoints) {
             BSONObj cmdObjWithVersions = BSONObj(command);
             if (endpoint.databaseVersion) {
                 cmdObjWithVersions =
@@ -412,17 +402,10 @@ private:
             readPref,
             Shard::RetryPolicy::kNoRetry);
 
-        // Receive the responses.
-
-        Status dispatchStatus = Status::OK();
         while (!ars.done()) {
             // Block until a response is available.
             auto response = ars.next();
-
-            if (!response.swResponse.isOK()) {
-                dispatchStatus = std::move(response.swResponse.getStatus());
-                break;
-            }
+            uassertStatusOK(response.swResponse);
 
             Strategy::CommandResult result;
 
@@ -435,8 +418,6 @@ private:
 
             results->push_back(result);
         }
-
-        return dispatchStatus;
     }
 };
 
@@ -596,8 +577,8 @@ private:
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&_batchedRequest, 0);
         std::vector<Strategy::CommandResult> shardResults;
-        uassertStatusOK(_commandOpWrite(
-            opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResults));
+        _commandOpWrite(
+            opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResults);
         auto bodyBuilder = result->getBodyBuilder();
         uassertStatusOK(ClusterExplain::buildExplainResult(
             opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));

@@ -12,11 +12,11 @@
 // TODO (SERVER-32198) remove after SERVER-32198 is fixed
 TestData.skipCheckOrphans = true;
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+const st = new ShardingTest({shards: 2, mongos: 2});
 
 // Used to get the shard destination ids for the moveChunks commands
-var shard0Name = st.shard0.shardName;
-var shard1Name = st.shard1.shardName;
+const shard0Name = st.shard0.shardName;
+const shard1Name = st.shard1.shardName;
 
 var database = 'TestDB';
 st.enableSharding(database);

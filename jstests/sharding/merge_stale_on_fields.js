@@ -8,42 +8,41 @@ load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
 const st = new ShardingTest({shards: 2, mongos: 2});
 
 const dbName = "merge_stale_unique_key";
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
 
 const source = st.s0.getDB(dbName).source;
 const target = st.s0.getDB(dbName).target;
+
+st.shardColl(source, {_id: 1} /* shardKey */, {_id: 0} /* splitAt */, {_id: 1} /* chunkToMove*/);
+assert.commandWorked(source.insert({_id: 'seed'}));
 
 // Test that an $merge through a stale mongos can still use the correct "on" fields and succeed.
 (function testDefaultOnFieldsIsRecent() {
     const freshMongos = st.s0;
     const staleMongos = st.s1;
-
-    // Set up two collections for an aggregate with an $merge: The source collection will be
-    // unsharded and the target collection will be sharded amongst the two shards.
     const staleMongosDB = staleMongos.getDB(dbName);
-    st.shardColl(source, {_id: 1}, {_id: 0}, {_id: 1});
 
     (function setupStaleMongos() {
-        // Shard the collection through 'staleMongos', setting up 'staleMongos' to believe the
-        // collection is sharded by {sk: 1, _id: 1}.
+        // Shard the collection through 'staleMongos', setting it up to believe the collection is
+        // sharded by {sk: 1, _id: 1}.
         assert.commandWorked(staleMongosDB.adminCommand(
             {shardCollection: target.getFullName(), key: {sk: 1, _id: 1}}));
         // Perform a query through that mongos to ensure the cache is populated.
         assert.eq(0, staleMongosDB[target.getName()].find().itcount());
 
-        // Drop the collection from the other mongos - it is no longer sharded but the stale
-        // mongos doesn't know that yet.
+        // Drop the collection from the other mongos - it is no longer sharded but the stale mongos
+        // doesn't know that yet.
         target.drop();
     }());
 
-    // At this point 'staleMongos' will believe that the target collection is sharded. This
-    // should not prevent it from running an $merge without "on" fields specified.
+    // At this point 'staleMongos' will believe that the target collection is sharded. This should
+    // not prevent it from running an $merge without "on" fields specified.
+    //
     // Specifically, the mongos should force a refresh of its cache before defaulting the "on"
     // fields.
-    assert.commandWorked(source.insert({_id: 'seed'}));
 
-    // If we had used the stale "on" fields, this aggregation would fail since the documents do
-    // not have an 'sk' field.
+    // If we had used the stale "on" fields, this aggregation would fail since the documents do not
+    // have an 'sk' field.
     assert.doesNotThrow(
         () => staleMongosDB[source.getName()].aggregate(
             [{$merge: {into: target.getName(), whenMatched: 'fail', whenNotMatched: 'insert'}}]));
@@ -51,11 +50,11 @@ const target = st.s0.getDB(dbName).target;
     target.drop();
 }());
 
-// Test that if the collection is dropped and re-sharded during the course of the aggregation
-// that the operation will fail rather than proceed with the old shard key.
+// Test that if the collection is dropped and re-sharded during the course of the aggregation that
+// the operation will fail rather than proceed with the old shard key.
 function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
-    // Converts a single string or an array of strings into it's object spec form. For instance,
-    // for input ["a", "b"] the returned object would be {a: 1, b: 1}.
+    // Converts a single string or an array of strings into it's object spec form. For instance, for
+    // input ["a", "b"] the returned object would be {a: 1, b: 1}.
     function indexSpecFromOnFields(onFields) {
         let spec = {};
         if (typeof (onFields) == "string") {
@@ -68,15 +67,16 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
         return spec;
     }
 
+    // Drop the collection and reshard it with a different shard key
     target.drop();
     if (mergeSpec.hasOwnProperty('on')) {
         assert.commandWorked(
             target.createIndex(indexSpecFromOnFields(mergeSpec.on), {unique: true}));
-        assert.commandWorked(st.s.adminCommand(
+        assert.commandWorked(st.s0.adminCommand(
             {shardCollection: target.getFullName(), key: indexSpecFromOnFields(mergeSpec.on)}));
     } else {
         assert.commandWorked(
-            st.s.adminCommand({shardCollection: target.getFullName(), key: {sk: 1, _id: 1}}));
+            st.s0.adminCommand({shardCollection: target.getFullName(), key: {sk: 1, _id: 1}}));
     }
 
     // Use a failpoint to make the query feeding into the aggregate hang while we drop the
@@ -85,6 +85,7 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
         assert.commandWorked(mongod.adminCommand(
             {configureFailPoint: failpoint, mode: "alwaysOn", data: failpointData || {}}));
     });
+
     let parallelShellJoiner;
     try {
         let parallelCode = `
@@ -97,12 +98,12 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
             `;
 
         if (mergeSpec.hasOwnProperty("on")) {
-            // If a user specifies their own "on" fields, we don't need to fail an aggregation
-            // if the collection is dropped and recreated or the epoch otherwise changes. We are
-            // allowed to fail such an operation should we choose to in the future, but for now
-            // we don't expect to because we do not do anything special on mongos to ensure the
-            // catalog cache is up to date, so do not want to attach mongos's believed epoch to
-            // the command for the shards.
+            // If a user specifies their own "on" fields, we don't need to fail an aggregation if
+            // the collection is dropped and recreated or the epoch otherwise changes. We are
+            // allowed to fail such an operation should we choose to in the future, but for now we
+            // don't expect to because we do not do anything special on mongos to ensure the catalog
+            // cache is up to date, so do not want to attach mongos's believed epoch to the command
+            // for the shards.
             parallelCode = `
                     const source = db.getSiblingDB("${dbName}").${source.getName()};
                     assert.doesNotThrow(() => source.aggregate([
@@ -112,12 +113,12 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
                 `;
         }
 
-        parallelShellJoiner = startParallelShell(parallelCode, st.s.port);
+        parallelShellJoiner = startParallelShell(parallelCode, st.s0.port);
 
-        // Wait for the merging $merge to appear in the currentOp output from the shards. We
-        // should see that the $merge stage has an 'epoch' field serialized from the mongos.
+        // Wait for the merging $merge to appear in the currentOp output from the shards. We should
+        // see that the $merge stage has an 'epoch' field serialized from the mongos.
         const getAggOps = function() {
-            return st.s.getDB("admin")
+            return st.s0.getDB("admin")
                 .aggregate([
                     {$currentOp: {}},
                     {$match: {"cursor.originatingCommand.pipeline": {$exists: true}}}
@@ -135,7 +136,7 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
         };
         assert.soon(hasMergeRunning, () => tojson(getAggOps()));
 
-        // Drop the collection so that the epoch changes.
+        // Drop the collection so that the epoch changes while the merge operation is executing
         target.drop();
     } finally {
         [st.rs0.getPrimary(), st.rs1.getPrimary()].forEach((mongod) => {
@@ -153,9 +154,8 @@ for (let i = 0; i < 1000; ++i) {
 assert.commandWorked(bulk.execute());
 
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
-    // Skip the combination of merge modes which will fail depending on the contents of the
-    // source and target collection, as this will cause a different assertion error from the one
-    // expected.
+    // Skip the combination of merge modes which will fail depending on the contents of the source
+    // and target collection, as this will cause a different assertion error from the one expected.
     if (whenNotMatchedMode == "fail")
         return;
 
@@ -179,8 +179,9 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         failpointData: {namespace: source.getFullName()}
     });
 });
-// Test with some different failpoints to prove we will detect an epoch change in the middle
-// of the inserts or updates.
+
+// Test with some different failpoints to prove we will detect an epoch change in the middle of the
+// inserts or updates.
 testEpochChangeDuringAgg({
     mergeSpec: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"},
     failpoint: "hangDuringBatchInsert",

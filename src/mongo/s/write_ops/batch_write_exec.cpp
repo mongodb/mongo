@@ -403,8 +403,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         abortBatch = true;
 
                         // Throw when there is a transient transaction error since this should be a
-                        // top
-                        // level error and not just a write error.
+                        // top level error and not just a write error.
                         if (isTransientTransactionError(status.code(), false, false)) {
                             uassertStatusOK(status);
                         }
@@ -429,19 +428,18 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         //
 
         bool targeterChanged = false;
-        Status refreshStatus = targeter.refreshIfNeeded(opCtx, &targeterChanged);
-
-        LOGV2_DEBUG(22909,
-                    4,
-                    "executeBatch targeter changed: {targeterChanged}",
-                    "targeterChanged"_attr = targeterChanged);
-
-        if (!refreshStatus.isOK()) {
-            // It's okay if we can't refresh, we'll just record errors for the ops if
-            // needed.
+        try {
+            targeter.refreshIfNeeded(opCtx, &targeterChanged);
+        } catch (const ExceptionFor<ErrorCodes::StaleEpoch>& ex) {
+            batchOp.abortBatch(errorFromStatus(
+                ex.toStatus("collection was dropped in the middle of the operation")));
+            break;
+        } catch (const DBException& ex) {
+            // It's okay if we can't refresh, we'll just record errors for the ops if needed
             LOGV2_WARNING(22911,
-                          "could not refresh targeter{causedBy_refreshStatus_reason}",
-                          "causedBy_refreshStatus_reason"_attr = causedBy(refreshStatus.reason()));
+                          "Could not refresh targeter due to {error}",
+                          "Could not refresh targeter",
+                          "error"_attr = redact(ex));
         }
 
         //
@@ -468,8 +466,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     }
 
     auto nShardsOwningChunks = batchOp.getNShardsOwningChunks();
-    if (nShardsOwningChunks.is_initialized())
-        stats->noteNumShardsOwningChunks(nShardsOwningChunks.get());
+    if (nShardsOwningChunks)
+        stats->noteNumShardsOwningChunks(*nShardsOwningChunks);
 
     batchOp.buildClientResponse(clientResponse);
 

@@ -32,14 +32,9 @@
 #include "mongo/s/write_ops/mock_ns_targeter.h"
 
 namespace mongo {
+namespace {
 
-MockNSTargeter::MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges)
-    : _nss(nss), _mockRanges(std::move(mockRanges)) {
-    ASSERT(_nss.isValid());
-    ASSERT(!_mockRanges.empty());
-}
-
-ChunkRange MockNSTargeter::_parseRange(const BSONObj& query) {
+ChunkRange parseRange(const BSONObj& query) {
     const StringData fieldName(query.firstElement().fieldName());
 
     if (query.firstElement().isNumber()) {
@@ -61,6 +56,29 @@ ChunkRange MockNSTargeter::_parseRange(const BSONObj& query) {
 
     FAIL("Invalid query");
     MONGO_UNREACHABLE;
+}
+
+}  // namespace
+
+MockNSTargeter::MockNSTargeter(const NamespaceString& nss, std::vector<MockRange> mockRanges)
+    : _nss(nss), _mockRanges(std::move(mockRanges)) {
+    ASSERT(_nss.isValid());
+    ASSERT(!_mockRanges.empty());
+}
+
+std::vector<ShardEndpoint> MockNSTargeter::_targetQuery(const BSONObj& query) const {
+    const ChunkRange queryRange(parseRange(query));
+
+    std::vector<ShardEndpoint> endpoints;
+
+    for (const auto& range : _mockRanges) {
+        if (queryRange.overlapWith(range.range)) {
+            endpoints.push_back(range.endpoint);
+        }
+    }
+
+    uassert(ErrorCodes::UnknownError, "no mock ranges found for query", !endpoints.empty());
+    return endpoints;
 }
 
 void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB) {

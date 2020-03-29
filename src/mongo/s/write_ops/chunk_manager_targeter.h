@@ -60,37 +60,28 @@ public:
     enum class UpdateType { kReplacement, kOpStyle, kUnknown };
 
     /**
-     * If 'targetEpoch' is not boost::none, throws a 'StaleEpoch' exception if the collection given
-     * by 'nss' is ever found to not have the target epoch.
-     */
-    ChunkManagerTargeter(const NamespaceString& nss,
-                         boost::optional<OID> targetEpoch = boost::none);
-
-    /**
-     * Initializes the ChunkManagerTargeter with the latest targeting information for the
-     * namespace.  May need to block and load information from a remote config server.
+     * Initializes the targeter with the latest routing information for the namespace, which means
+     * it may have to block and load information from the config server.
      *
-     * Throws a 'StaleEpoch' exception if the collection targeted has an epoch which does not match
-     * '_targetEpoch'
-     * Returns !OK if the information could not be initialized.
+     * If 'expectedEpoch' is specified, the targeter will throws 'StaleEpoch' exception if the epoch
+     * for 'nss' ever becomes different from 'expectedEpoch'. Otherwise, the targeter will continue
+     * targeting even if the collection gets dropped and recreated.
      */
-    Status init(OperationContext* opCtx);
+    ChunkManagerTargeter(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         boost::optional<OID> expectedEpoch = boost::none);
 
     const NamespaceString& getNS() const override;
 
-    // Returns ShardKeyNotFound if document does not have a full shard key.
-    StatusWith<ShardEndpoint> targetInsert(OperationContext* opCtx,
-                                           const BSONObj& doc) const override;
+    ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const override;
 
-    // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
-    StatusWith<std::vector<ShardEndpoint>> targetUpdate(
-        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override;
+    std::vector<ShardEndpoint> targetUpdate(
+        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const override;
 
-    // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
-    StatusWith<std::vector<ShardEndpoint>> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const override;
+    std::vector<ShardEndpoint> targetDelete(
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const override;
 
-    StatusWith<std::vector<ShardEndpoint>> targetAllShards(OperationContext* opCtx) const override;
+    std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override;
 
     void noteCouldNotTarget() override;
 
@@ -109,22 +100,24 @@ public:
      *
      * Also see NSTargeter::refreshIfNeeded().
      */
-    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override;
+    void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override;
 
-    virtual bool endpointIsConfigServer() const override;
+    bool endpointIsConfigServer() const override;
 
     int getNShardsOwningChunks() const override;
 
 private:
-    /**
-     * Performs an actual refresh from the config server.
-     */
-    Status _refreshShardVersionNow(OperationContext* opCtx);
+    void _init(OperationContext* opCtx);
 
     /**
      * Performs an actual refresh from the config server.
      */
-    Status _refreshDbVersionNow(OperationContext* opCtx);
+    void _refreshShardVersionNow(OperationContext* opCtx);
+
+    /**
+     * Performs an actual refresh from the config server.
+     */
+    void _refreshDbVersionNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.

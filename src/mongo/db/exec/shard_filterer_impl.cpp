@@ -29,11 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/matcher/matchable.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 
 namespace mongo {
 

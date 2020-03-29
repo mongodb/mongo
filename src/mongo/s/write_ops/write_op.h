@@ -119,9 +119,9 @@ public:
      * Returns !OK if the targeting process itself fails
      *             (no TargetedWrites will be added, state unchanged)
      */
-    Status targetWrites(OperationContext* opCtx,
-                        const NSTargeter& targeter,
-                        std::vector<TargetedWrite*>* targetedWrites);
+    void targetWrites(OperationContext* opCtx,
+                      const NSTargeter& targeter,
+                      std::vector<TargetedWrite*>* targetedWrites);
 
     /**
      * Returns the number of child writes that were last targeted.
