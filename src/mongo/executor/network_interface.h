@@ -233,16 +233,6 @@ public:
      */
     virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
 
-    /**
-     * Acquire a connection and subsequently release it.
-     * If status is not OK, the connection will be dropped,
-     * otherwise the connection will be returned to the pool.
-     */
-    virtual void testEgress(const HostAndPort& hostAndPort,
-                            transport::ConnectSSLMode sslMode,
-                            Milliseconds timeout,
-                            Status status) = 0;
-
 protected:
     NetworkInterface();
 };
