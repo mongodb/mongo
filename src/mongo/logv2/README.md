@@ -374,13 +374,24 @@ Text | JSON/BSON
 
 ## Combining uassert with log statement
 
-Code that emits a high severity log statement may also need to emit a `uassert` after the log. There is the `UserAssertAfterLog` helper that allows you to re-use the log statement to do the formatting required for the `uassert`. The reason string will be a plain text formatted log (replacement fields filled in format-string).
+Code that emits a high severity log statement may also need to emit a `uassert` after the log. There is the `UserAssertAfterLog` logging option that allows you to re-use the log statement to do the formatting required for the `uassert`. The assertion id can be either the logging ID by passing `UserAssertAfterLog` with no arguments or the assertion id can set by constructing `UserAssertAfterLog` with an `ErrorCodes::Error`. 
+
+The assertion reason string will be a plain text formatted log (replacement fields filled in format-string). If replacement fields are not provided in the message string, attribute values will be missing from the assertion message.
+
 
 ##### Examples
 ```
+LOGV2_ERROR_OPTIONS(1050000, {UserAssertAfterLog()}, "Assertion after log");
+```
+Would emit a `uassert` after performing the log that is equivalent to:
+```
+uasserted(1050000, "Assertion after log");
+```
+Using a named error code:
+```
 LOGV2_ERROR_OPTIONS(1050, {UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)}, "Data corruption detected for {recordId}, "recordId"_attr=RecordId(123456));
 ```
-Would emit an `uassert` after performing the log that is equivalent to:
+Would emit a `uassert` after performing the log that is equivalent to:
 ```
 uasserted(ErrorCodes::DataCorruptionDetected, "Data corruption detected for RecordId(123456)");
 ```

@@ -56,4 +56,6 @@ constexpr StringData kNullOptionalString = "(nothing)"_sd;
 constexpr LogTruncation kDefaultTruncation = LogTruncation::Enabled;
 constexpr int32_t kDefaultMaxAttributeOutputSizeKB = 10;
 
+constexpr int32_t kUserAssertWithLogID = -1;
+
 }  // namespace mongo::logv2::constants
