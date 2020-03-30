@@ -38,9 +38,10 @@ namespace mongo::logv2 {
 
 class UserAssertAfterLog {
 public:
+    UserAssertAfterLog() : errorCode(constants::kUserAssertWithLogID) {}
     explicit UserAssertAfterLog(ErrorCodes::Error code) : errorCode(code) {}
 
-    ErrorCodes::Error errorCode;
+    int32_t errorCode;
 };
 
 enum class FatalMode { kAssert, kAssertNoTrace, kContinue };
@@ -101,7 +102,7 @@ public:
         return _truncation;
     }
 
-    ErrorCodes::Error uassertErrorCode() const {
+    int32_t uassertErrorCode() const {
         return _userAssertErrorCode;
     }
 
@@ -114,7 +115,7 @@ private:
     LogTag _tags;
     LogComponent _component = LogComponent::kAutomaticDetermination;
     LogTruncation _truncation = constants::kDefaultTruncation;
-    ErrorCodes::Error _userAssertErrorCode = ErrorCodes::OK;
+    int32_t _userAssertErrorCode = ErrorCodes::OK;
     FatalMode _fatalMode = FatalMode::kAssert;
 };
 
