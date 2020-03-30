@@ -31,6 +31,16 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_runtime_d_params',
+    source=[
+        env.Idlc('sharding_runtime_d_params.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
+)
+
+env.Library(
     target='sharding_runtime_d',
     source=[
         'active_migrations_registry.cpp',
@@ -73,7 +83,6 @@ env.Library(
         'split_chunk.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
-        env.Idlc('sharding_runtime_d_params.idl')[0],
         env.Idlc('range_deletion_task.idl')[0],
         env.Idlc('migration_coordinator_document.idl')[0],
     ],
@@ -98,6 +107,7 @@ env.Library(
         'sharding_api_d',
         'sharding_catalog_manager',
         'sharding_logging',
+        'sharding_runtime_d_params',
         'transaction_coordinator',
     ],
     LIBDEPS_PRIVATE=[
@@ -211,6 +221,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/replica_set_aware_service',
+        'sharding_runtime_d_params',
     ],
 )
 

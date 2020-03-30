@@ -1181,6 +1181,13 @@ function appendSetParameterArgs(argArray) {
                     argArray.push(...['--setParameter',
                                       'oplogApplicationEnforcesSteadyStateConstraints=true']);
                 }
+
+                if ((jsTest.options().setParameters === undefined ||
+                     jsTest.options().setParameters['minNumChunksForSessionsCollection'] ===
+                         undefined) &&
+                    !argArrayContainsSetParameterValue('minNumChunksForSessionsCollection=')) {
+                    argArray.push(...['--setParameter', "minNumChunksForSessionsCollection=1"]);
+                }
             }
 
             // New mongod-specific options in 4.0.x

@@ -114,3 +114,11 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: shardedIndexConsistencyCheckIntervalMS
         default: 600000
+
+    minNumChunksForSessionsCollection:
+        description: 'The minimum number of chunks for config.system.sessions collection'
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: minNumChunksForSessionsCollection
+        default: 1024
+        validator: { gte: 1, lte: 1000000 }
