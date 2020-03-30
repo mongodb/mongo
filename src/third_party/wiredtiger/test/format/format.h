@@ -338,6 +338,7 @@ WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 void config_clear(void);
+void config_compat(const char **);
 void config_error(void);
 void config_file(const char *);
 void config_print(bool);

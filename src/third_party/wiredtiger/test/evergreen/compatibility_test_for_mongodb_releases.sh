@@ -1,131 +1,119 @@
 #!/usr/bin/env bash
 ##############################################################################################
-# Check releases to ensure forward and backward compatibility.
+# Check releases to ensure backward compatibility.
 ##############################################################################################
 
-###########################################################################
-# Return the most recent version of the tagged release.
-###########################################################################
-get_release()
+set -e
+
+#############################################################
+# build_release:
+#       arg1: release
+#############################################################
+build_release()
 {
-	echo "$(git tag | grep "^mongodb-$1.[0-9]" | sort -V | sed -e '$p' -e d)"
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Building release: \"$1\""
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+        git clone --quiet https://github.com/wiredtiger/wiredtiger.git "$1"
+        cd "$1"
+        git checkout --quiet "$1"
+
+        config=""
+        config+="--enable-diagnostic "
+        config+="--enable-snappy "
+        (sh build_posix/reconf &&
+            ./configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
 }
 
 #############################################################
-# This function will
-#	- checkout git tree of the desired release and build it,
-#	- generate test objects.
-#
-# arg1: MongoDB tagged release number or develop branch identifier.
+# run_format:
+#       arg1: release
+#       arg2: access methods list
 #############################################################
-build_rel()
+run_format()
 {
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	echo "Building release: \"$1\""
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Running format in release: \"$1\""
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-	git clone --quiet https://github.com/wiredtiger/wiredtiger.git "wt.$1" > /dev/null || return 1
-	cd "wt.$1" || return 1
+        cd "$1/test/format"
 
-	config=""
-	config+="--enable-snappy "
+        args=""
+        args+="cache=80 "                       # Medium cache so there's eviction
+        args+="checkpoints=1 "                  # Force periodic writes
+        args+="compression=snappy "             # We only built with snappy, force the choice
+        args+="data_source=table "
+        args+="in_memory=0 "                    # Interested in the on-disk format
+        args+="leak_memory=1 "                  # Faster runs
+        args+="logging_compression=snappy "     # We only built with snappy, force the choice
+        args+="rebalance=0 "                    # Faster runs
+        args+="rows=1000000 "
+        args+="salvage=0 "                      # Faster runs
+        args+="timer=4 "
+        args+="verify=0 "                       # Faster runs
 
-	if [ $1 == "develop" ]; then
-		branch="develop"
-	else
-		branch=$(get_release "$1")
-	fi
-
-	git checkout --quiet -b $branch || return 1
-
-	(sh build_posix/reconf && ./configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null || return 1
-
-	cd test/format || return 1
-
-	# Run a configuration and generate some on-disk files.
-	args=""
-	args+="cache=80 "				# Medium cache so there's eviction
-	args+="checkpoints=1 "				# Force periodic writes
-	args+="compression=snappy "			# We only built with snappy, force the choice
-	args+="data_source=table "
-	args+="in_memory=0 "				# Interested in the on-disk format
-	args+="leak_memory=1 "				# Faster runs
-	args+="logging_compression=snappy "		# We only built with snappy, force the choice
-	args+="quiet=1 "
-	args+="rebalance=0 "				# Faster runs
-	args+="rows=1000000 "
-	args+="salvage=0 "				# Faster runs
-	args+="timer=4 "
-	args+="verify=0 "				# Faster runs
-	for am in fix row var; do
-		./t -h "RUNDIR.$am" -1 "file_type=$am" $args || return 1
-	done
-
-	return 0
+        for am in $2; do
+            dir="RUNDIR.$am"
+            echo "./t running $am access method..."
+            ./t -1q -h $dir "file_type=$am" $args
+        done
 }
 
+EXT="extensions=["
+EXT+="ext/compressors/snappy/.libs/libwiredtiger_snappy.so,"
+EXT+="ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so, "
+EXT+="ext/encryptors/rotn/.libs/libwiredtiger_rotn.so, "
+EXT+="]"
+
 #############################################################
-# This function will
-#	- verify a pair of releases can verify each other's objects.
-#
-# arg1: release #1
-# arg2: release #2
+# verify_backward:
+#       arg1: release #1
+#       arg2: release #2
+#       arg3: access methods list
 #############################################################
-verify()
+verify_backward()
 {
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	echo "Verifying release \"$1\" and \"$2\""
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	a="wt.$1"
-	b="wt.$2"
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Release \"$1\" verifying \"$2\""
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        
+        cd "$1"
+        for am in $3; do
+            dir="$2/test/format/RUNDIR.$am"
+            echo "$1/wt verifying $2 access method $am..."
 
-	EXT="extensions=["
-	EXT+="ext/compressors/snappy/.libs/libwiredtiger_snappy.so,"
-	EXT+="ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so, "
-	EXT+="ext/encryptors/rotn/.libs/libwiredtiger_rotn.so, "
-	EXT+="]"
-	
-	cd $a || return 1
-	for am in fix row var; do
-		echo "$a/wt verifying $b/test/format/RUNDIR.$am..."
-		WIREDTIGER_CONFIG="$EXT" \
-		    ./wt -h ../$b/test/format/RUNDIR.$am verify table:wt || return 1
-	done
-
-	cd ../$b || return 1
-	for am in fix row var; do
-		echo "$b/wt verifying $a/test/format/RUNDIR.$am..."
-		WIREDTIGER_CONFIG="$EXT" \
-		    ./wt -h ../$a/test/format/RUNDIR.$am verify table:wt || return 1
-	done
-
-	return 0
-}
-
-run()
-{
-	# Build test files from each release.
-	(build_rel 3.4) || return 1
-	(build_rel 3.6) || return 1
-	(build_rel 4.0) || return 1
-	(build_rel 4.2) || return 1
-	(build_rel develop) || return 1
-
-	# Verify forward/backward compatibility.
-	(verify 3.4 3.6) || return 1
-	(verify 3.6 4.0) || return 1
-	(verify 4.0 4.2) || return 1
-	(verify 4.2 develop) || return 1
-
-	return 0
+            WIREDTIGER_CONFIG="$EXT" ./wt -h "../$dir" verify table:wt
+        done
 }
 
 # Create a directory in which to do the work.
 top="test-compatibility-run"
-rm -rf $top && mkdir $top && cd $top || {
-	echo "$0: unable to create $top working directory"
-	exit 1
-}
+rm -rf "$top" && mkdir "$top"
+cd "$top"
 
-run
-exit $?
+# Build the releases.
+(build_release mongodb-3.4)
+(build_release mongodb-3.6)
+(build_release mongodb-4.0)
+(build_release mongodb-4.2)
+#(build_release mongodb-4.4)
+(build_release "develop")
+
+# Run format in each release for supported access methods.
+(run_format mongodb-3.4 "fix row var")
+(run_format mongodb-3.6 "fix row var")
+(run_format mongodb-4.0 "fix row var")
+(run_format mongodb-4.2 "fix row var")
+#(run_format mongodb-4.4 "row")
+(run_format "develop" "row")
+
+# Verify backward compatibility for supported access methods.
+(verify_backward mongodb-3.6 mongodb-3.4 "fix row var")
+(verify_backward mongodb-4.0 mongodb-3.6 "fix row var")
+(verify_backward mongodb-4.2 mongodb-4.0 "fix row var")
+#(verify_backward mongodb-4.4 mongodb-4.2 "fix row var")
+#(verify_backward develop mongodb-4.4 "row")
+ (verify_backward develop mongodb-4.2 "fix row var")
+
+exit 0

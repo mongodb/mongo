@@ -487,6 +487,7 @@ err:
         if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
+            F_SET(cursor, WT_CURSTD_DEBUG_COPY_KEY);
         } else
             __wt_free(session, tmp.mem);
     }
@@ -626,6 +627,7 @@ err:
         if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
+            F_SET(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
         } else
             __wt_free(session, tmp.mem);
     }

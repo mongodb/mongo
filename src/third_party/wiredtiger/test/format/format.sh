@@ -434,7 +434,8 @@ format()
 		args=$format_args
 
 		# If abort/recovery testing is configured, do it 5% of the time.
-		[[ $abort_test -ne 0 ]] && [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args abort=1"
+		[[ $abort_test -ne 0 ]] &&
+		    [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args format.abort=1"
 
 		echo "$name: starting job in $dir ($(date))"
 	fi

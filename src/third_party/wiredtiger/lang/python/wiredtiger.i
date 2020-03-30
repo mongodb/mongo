@@ -112,7 +112,7 @@ from packing import pack, unpack
 		PyObject_SetAttrString($result, "value_format",
 		    PyString_InternFromString((*$1)->value_format));
 
-		if (__wt_calloc_def((WT_ASYNC_OP_IMPL *)(*$1), 1, &pcb) != 0)
+		if (__wt_calloc_def(NULL, 1, &pcb) != 0)
 			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
 		else {
 			pcb->pyobj = $result;
@@ -373,6 +373,7 @@ static PyObject *wtError;
 
 static int sessionFreeHandler(WT_SESSION *session_arg);
 static int cursorFreeHandler(WT_CURSOR *cursor_arg);
+static int asyncopFreeHandler(WT_ASYNC_OP *asyncop_arg);
 static int unpackBytesOrString(PyObject *obj, void **data, size_t *size);
 
 #define WT_GETATTR(var, parent, name)					\
@@ -723,7 +724,7 @@ typedef int int_void;
 	}
 
 	int _freecb() {
-		return (cursorFreeHandler($self));
+		return (asyncopFreeHandler($self));
 	}
 
 %pythoncode %{
@@ -1375,6 +1376,18 @@ cursorFreeHandler(WT_CURSOR *cursor)
 	cursor->lang_private = NULL;
 	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
 	return (0);
+}
+
+/* Async Op specific close handler. */
+static int
+asyncopFreeHandler(WT_ASYNC_OP *asyncop)
+{
+        PY_CALLBACK *pcb;
+
+        pcb = (PY_CALLBACK *)asyncop->c.lang_private;
+        asyncop->c.lang_private = NULL;
+        __wt_free(NULL, pcb);
+        return (0);
 }
 
 static int

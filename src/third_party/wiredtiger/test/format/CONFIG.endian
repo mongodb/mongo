@@ -1,6 +1,6 @@
-abort=0
-cache_minimum=20
+cache.minimum=20
+format.abort=0
+logging.archive=0
 logging=1
-logging_archive=0
-rows=1000000
-timer=4
+runs.timer=4
+runs.rows=1000000

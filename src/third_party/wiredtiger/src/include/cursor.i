@@ -25,8 +25,14 @@ static inline int
 __cursor_copy_release(WT_CURSOR *cursor)
 {
     if (F_ISSET(S2C((WT_SESSION_IMPL *)cursor->session), WT_CONN_DEBUG_CURSOR_COPY)) {
-        WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->key));
-        WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->value));
+        if (F_ISSET(cursor, WT_CURSTD_DEBUG_COPY_KEY)) {
+            WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->key));
+            F_CLR(cursor, WT_CURSTD_DEBUG_COPY_KEY);
+        }
+        if (F_ISSET(cursor, WT_CURSTD_DEBUG_COPY_VALUE)) {
+            WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->value));
+            F_CLR(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
+        }
     }
     return (0);
 }

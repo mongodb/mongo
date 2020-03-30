@@ -55,8 +55,8 @@ fi
 echo "$0: using $xray_home as home directory"
 
 # Check symbols to ensure we've compiled with XRay.
-objdump_out=$(objdump -h -j xray_instr_map ./wtperf)
-if test -z "$objdump_out"; then
+objdump -h -j xray_instr_map ./wtperf > /dev/null
+if test "$?" -ne "0"; then
 	echo "$0: wtperf not compiled with xray, add '-fxray-instrument' to your CFLAGS"
 	exit 1
 fi
@@ -75,7 +75,7 @@ rm xray-log.wtperf.* \
 	"$xray_account_path" \
 	"$xray_stack_path" \
 	"$xray_graph_path" \
-	"$xray_flame_path"
+	"$xray_flame_path" &> /dev/null
 
 export XRAY_OPTIONS="patch_premain=true xray_mode=xray-basic verbosity=1"
 ./wtperf -O "$@"

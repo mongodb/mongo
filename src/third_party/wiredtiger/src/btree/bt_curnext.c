@@ -132,7 +132,7 @@ new_page:
      */
     if (cbt->ins != NULL)
 restart_read:
-    WT_RET(__wt_txn_read(session, cbt, cbt->ins->upd, NULL, &upd));
+    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins->upd, NULL, &upd));
     if (upd == NULL) {
         cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
         cbt->iface.value.data = &cbt->v;
@@ -423,7 +423,8 @@ restart_read_insert:
 restart_read_page:
         rip = &page->pg_row[cbt->slot];
         WT_RET(__cursor_row_slot_key_return(cbt, rip, &kpack, &kpack_used));
-        WT_RET(__wt_txn_read(session, cbt, WT_ROW_UPDATE(page, rip), NULL, &upd));
+        WT_RET(__wt_txn_read(
+          session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip), NULL, &upd));
         if (upd == NULL)
             continue;
         if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE) {

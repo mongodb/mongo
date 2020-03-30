@@ -784,28 +784,43 @@ __wt_rec_row_leaf(
 
         /* Look for an update. */
         WT_ERR(__wt_rec_upd_select(session, r, NULL, rip, vpack, &upd_select));
-        if ((upd = upd_select.upd) != NULL) {
+        upd = upd_select.upd;
+
+        /*
+         * Figure out the timestamps. If there's no update and salvaging the file, clear the time
+         * pair information, else take the time pairs from the cell.
+         */
+        if (upd == NULL) {
+            if (!salvage) {
+                start_durable_ts = vpack->durable_start_ts;
+                start_ts = vpack->start_ts;
+                start_txn = vpack->start_txn;
+                stop_durable_ts = vpack->durable_stop_ts;
+                stop_ts = vpack->stop_ts;
+                stop_txn = vpack->stop_txn;
+            } else {
+                start_durable_ts = WT_TS_NONE;
+                start_ts = WT_TS_NONE;
+                start_txn = WT_TXN_NONE;
+                stop_durable_ts = WT_TS_NONE;
+                stop_ts = WT_TS_MAX;
+                stop_txn = WT_TXN_MAX;
+            }
+        } else {
             start_durable_ts = upd_select.start_durable_ts;
             start_ts = upd_select.start_ts;
             start_txn = upd_select.start_txn;
             stop_durable_ts = upd_select.stop_durable_ts;
             stop_ts = upd_select.stop_ts;
             stop_txn = upd_select.stop_txn;
-        } else {
-            start_durable_ts = vpack->durable_start_ts;
-            start_ts = vpack->start_ts;
-            start_txn = vpack->start_txn;
-            stop_durable_ts = vpack->durable_stop_ts;
-            stop_ts = vpack->stop_ts;
-            stop_txn = vpack->stop_txn;
         }
 
         /*
          * If we reconcile an on disk key with a globally visible stop time pair and there are no
          * new updates for that key, skip writing that key.
          */
-        if (upd == NULL && (vpack->stop_txn != WT_TXN_MAX || vpack->stop_ts != WT_TS_MAX) &&
-          __wt_txn_visible_all(session, vpack->stop_txn, vpack->stop_ts))
+        if (upd == NULL && (stop_txn != WT_TXN_MAX || stop_ts != WT_TS_MAX) &&
+          __wt_txn_visible_all(session, stop_txn, stop_ts))
             upd = &upd_tombstone;
 
         /* Build value cell. */

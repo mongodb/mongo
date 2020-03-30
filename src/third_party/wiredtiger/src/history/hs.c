@@ -872,7 +872,7 @@ __hs_restore_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t saved_times
  *     prepare conflict will be returned upon reading a prepared update.
  */
 int
-__wt_find_hs_upd(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **updp,
+__wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDATE **updp,
   bool allow_prepare, WT_ITEM *on_disk_buf)
 {
     WT_CURSOR *hs_cursor;
@@ -880,7 +880,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **upd
     WT_DECL_ITEM(hs_value);
     WT_DECL_ITEM(orig_hs_value_buf);
     WT_DECL_RET;
-    WT_ITEM *key, _key;
+    WT_ITEM recno_key;
     WT_MODIFY_VECTOR modifies;
     WT_TXN *txn;
     WT_UPDATE *mod_upd, *upd;
@@ -889,13 +889,13 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **upd
     size_t notused, size;
     uint64_t hs_counter, hs_counter_tmp, upd_type_full;
     uint32_t hs_btree_id, session_flags;
-    uint8_t *p, recno_key[WT_INTPACK64_MAXSIZE], upd_type;
+    uint8_t *p, recno_key_buf[WT_INTPACK64_MAXSIZE], upd_type;
     int cmp;
     bool is_owner, modify;
 
     *updp = NULL;
+
     hs_cursor = NULL;
-    key = NULL;
     mod_upd = upd = NULL;
     orig_hs_value_buf = NULL;
     __wt_modify_vector_init(session, &modifies);
@@ -907,19 +907,16 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE **upd
     WT_NOT_READ(modify, false);
     is_owner = false;
 
-    /* Row-store has the key available, create the column-store key on demand. */
-    switch (cbt->btree->type) {
-    case BTREE_ROW:
-        key = &cbt->iface.key;
-        break;
-    case BTREE_COL_FIX:
-    case BTREE_COL_VAR:
-        p = recno_key;
-        WT_RET(__wt_vpack_uint(&p, 0, cbt->recno));
-        WT_CLEAR(_key);
-        _key.data = recno_key;
-        _key.size = WT_PTRDIFF(p, recno_key);
-        key = &_key;
+    /* Row-store key is as passed to us, create the column-store key as needed. */
+    WT_ASSERT(
+      session, (key == NULL && recno != WT_RECNO_OOB) || (key != NULL && recno == WT_RECNO_OOB));
+    if (key == NULL) {
+        p = recno_key_buf;
+        WT_RET(__wt_vpack_uint(&p, 0, recno));
+        memset(&recno_key, 0, sizeof(recno_key));
+        key = &recno_key;
+        key->data = recno_key_buf;
+        key->size = WT_PTRDIFF(p, recno_key_buf);
     }
 
     /* Allocate buffers for the history store key/value. */

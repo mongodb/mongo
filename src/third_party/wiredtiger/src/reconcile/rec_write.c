@@ -1843,8 +1843,10 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
             return (__wt_set_return(session, EBUSY));
 
         /* If we need to restore the page to memory, copy the disk image. */
-        if (r->cache_write_restore)
+        if (r->cache_write_restore) {
+            multi->supd_restore = true;
             goto copy_image;
+        }
 
         if (chunk->entries == 0)
             return (0);
@@ -2311,7 +2313,7 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         if (multi->supd != NULL) {
             WT_ERR(__wt_hs_insert_updates(session->hs_cursor, S2BT(session), r->page, multi));
             r->cache_write_hs = true;
-            if (!r->cache_write_restore) {
+            if (!multi->supd_restore) {
                 __wt_free(session, multi->supd);
                 multi->supd_entries = 0;
             }

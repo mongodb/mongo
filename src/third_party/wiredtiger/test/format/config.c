@@ -79,19 +79,19 @@ config_setup(void)
      * Choose a file format and a data source: they're interrelated (LSM is only compatible with
      * row-store) and other items depend on them.
      */
-    if (!config_is_perm("file_type")) {
-        if (config_is_perm("data_source") && DATASOURCE("lsm"))
-            config_single("file_type=row", false);
+    if (!config_is_perm("runs.type")) {
+        if (config_is_perm("runs.source") && DATASOURCE("lsm"))
+            config_single("runs.type=row", false);
         else
             switch (mmrand(NULL, 1, 10)) {
             case 1:
             case 2:
             case 3: /* 30% */
-                config_single("file_type=var", false);
+                config_single("runs.type=var", false);
                 break;
             case 4: /* 10% */
                 if (config_fix()) {
-                    config_single("file_type=fix", false);
+                    config_single("runs.type=fix", false);
                     break;
                 }
                 /* FALLTHROUGH */ /* 60% */
@@ -101,17 +101,17 @@ config_setup(void)
             case 8:
             case 9:
             case 10:
-                config_single("file_type=row", false);
+                config_single("runs.type=row", false);
                 break;
             }
     }
     config_map_file_type(g.c_file_type, &g.type);
 
-    if (!config_is_perm("data_source")) {
-        config_single("data_source=table", false);
+    if (!config_is_perm("runs.source")) {
+        config_single("runs.source=table", false);
         switch (mmrand(NULL, 1, 5)) {
         case 1: /* 20% */
-            config_single("data_source=file", false);
+            config_single("runs.source=file", false);
             break;
         case 2: /* 20% */
 #if !defined(DISABLE_RANDOM_LSM_TESTING)
@@ -125,11 +125,11 @@ config_setup(void)
              */
             if (g.type != ROW || g.c_in_memory)
                 break;
-            if (config_is_perm("transaction_timestamps") && g.c_txn_timestamps)
+            if (config_is_perm("transaction.timestamps") && g.c_txn_timestamps)
                 break;
-            if (config_is_perm("truncate") && g.c_truncate)
+            if (config_is_perm("ops.truncate") && g.c_truncate)
                 break;
-            config_single("data_source=lsm", false);
+            config_single("runs.source=lsm", false);
 #endif
             break;
         case 3:
@@ -172,7 +172,7 @@ config_setup(void)
 
     /* Only row-store tables support collation order. */
     if (g.type != ROW)
-        config_single("reverse=off", false);
+        config_single("btree.reverse=off", false);
 
     /* First, transaction configuration, it configures other features. */
     config_transaction();
@@ -181,8 +181,8 @@ config_setup(void)
     config_backup();
     config_checkpoint();
     config_checksum();
-    config_compression("compression");
-    config_compression("logging_compression");
+    config_compression("btree.compression");
+    config_compression("logging.compression");
     config_encryption();
 
     /* Configuration based on the configuration already chosen. */
@@ -199,16 +199,16 @@ config_setup(void)
     /*
      * Key/value minimum/maximum are related, correct unless specified by the configuration.
      */
-    if (!config_is_perm("key_min") && g.c_key_min > g.c_key_max)
+    if (!config_is_perm("btree.key_min") && g.c_key_min > g.c_key_max)
         g.c_key_min = g.c_key_max;
-    if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
+    if (!config_is_perm("btree.key_max") && g.c_key_max < g.c_key_min)
         g.c_key_max = g.c_key_min;
     if (g.c_key_min > g.c_key_max)
         testutil_die(EINVAL, "key_min may not be larger than key_max");
 
-    if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
+    if (!config_is_perm("btree.value_min") && g.c_value_min > g.c_value_max)
         g.c_value_min = g.c_value_max;
-    if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
+    if (!config_is_perm("btree.value_max") && g.c_value_max < g.c_value_min)
         g.c_value_max = g.c_value_min;
     if (g.c_value_min > g.c_value_max)
         testutil_die(EINVAL, "value_min may not be larger than value_max");
@@ -225,14 +225,14 @@ config_setup(void)
      * operations but the rest of the configuration means operations take a long time to complete
      * (for example, a small cache and many worker threads), don't let it run forever.
      */
-    if (config_is_perm("timer")) {
-        if (!config_is_perm("ops"))
-            config_single("ops=0", false);
+    if (config_is_perm("runs.timer")) {
+        if (!config_is_perm("runs.ops"))
+            config_single("runs.ops=0", false);
     } else {
-        if (!config_is_perm("ops"))
-            config_single("timer=30", false);
+        if (!config_is_perm("runs.ops"))
+            config_single("runs.timer=30", false);
         else
-            config_single("timer=360", false);
+            config_single("runs.timer=360", false);
     }
 
     /* Reset the key count. */
@@ -251,8 +251,8 @@ config_backup(void)
     /*
      * Choose a type of incremental backup.
      */
-    if (!config_is_perm("backup_incremental")) {
-        cstr = "backup_incremental=off";
+    if (!config_is_perm("backup.incremental")) {
+        cstr = "backup.incremental=off";
         switch (mmrand(NULL, 1, 10)) {
         case 1: /* 30% full backup only */
         case 2:
@@ -262,12 +262,13 @@ config_backup(void)
         case 5:
         case 6:
         case 7:
-            cstr = "backup_incremental=block";
+            cstr = "backup.incremental=block";
             break;
         case 8:
         case 9:
         case 10: /* 30% log based incremental */
-            cstr = "backup_incremental=log";
+            if (!g.c_logging_archive)
+                cstr = "backup.incremental=log";
             break;
         }
 
@@ -289,7 +290,7 @@ config_cache(void)
 
     /* Check if a minimum cache size has been specified. */
     if (config_is_perm("cache")) {
-        if (config_is_perm("cache_minimum") && g.c_cache_minimum != 0 &&
+        if (config_is_perm("cache.minimum") && g.c_cache_minimum != 0 &&
           g.c_cache < g.c_cache_minimum)
             testutil_die(EINVAL, "minimum cache set larger than cache (%" PRIu32 " > %" PRIu32 ")",
               g.c_cache_minimum, g.c_cache);
@@ -338,19 +339,19 @@ static void
 config_checkpoint(void)
 {
     /* Choose a checkpoint mode if nothing was specified. */
-    if (!config_is_perm("checkpoints"))
+    if (!config_is_perm("checkpoint"))
         switch (mmrand(NULL, 1, 20)) {
         case 1:
         case 2:
         case 3:
         case 4: /* 20% */
-            config_single("checkpoints=wiredtiger", false);
+            config_single("checkpoint=wiredtiger", false);
             break;
         case 5: /* 5 % */
-            config_single("checkpoints=off", false);
+            config_single("checkpoint=off", false);
             break;
         default: /* 75% */
-            config_single("checkpoints=on", false);
+            config_single("checkpoint=on", false);
             break;
         }
 }
@@ -363,16 +364,16 @@ static void
 config_checksum(void)
 {
     /* Choose a checksum mode if nothing was specified. */
-    if (!config_is_perm("checksum"))
+    if (!config_is_perm("disk.checksum"))
         switch (mmrand(NULL, 1, 10)) {
         case 1: /* 10% */
-            config_single("checksum=on", false);
+            config_single("disk.checksum=on", false);
             break;
         case 2: /* 10% */
-            config_single("checksum=off", false);
+            config_single("disk.checksum=off", false);
             break;
         default: /* 80% */
-            config_single("checksum=uncompressed", false);
+            config_single("disk.checksum=uncompressed", false);
             break;
         }
 }
@@ -396,7 +397,7 @@ config_compression(const char *conf_name)
      * but it's confusing).
      */
     cstr = "none";
-    if (strcmp(conf_name, "logging_compression") == 0 && g.c_logging == 0) {
+    if (strcmp(conf_name, "logging.compression") == 0 && g.c_logging == 0) {
         testutil_check(__wt_snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr));
         config_single(confbuf, false);
         return;
@@ -471,9 +472,9 @@ config_directio(void)
      * direct I/O in Linux won't work. If direct I/O is configured, turn off backups.
      */
     if (g.c_backups) {
-        if (config_is_perm("backups"))
-            testutil_die(EINVAL, "backups are incompatible with direct I/O");
-        config_single("backups=off", false);
+        if (config_is_perm("backup"))
+            testutil_die(EINVAL, "backup are incompatible with direct I/O");
+        config_single("backup=off", false);
     }
 
     /*
@@ -483,14 +484,14 @@ config_directio(void)
      * child process termination, but it's not worth the effort.
      */
     if (g.c_rebalance) {
-        if (config_is_perm("rebalance"))
+        if (config_is_perm("ops.rebalance"))
             testutil_die(EINVAL, "rebalance is incompatible with direct I/O");
-        config_single("rebalance=off", false);
+        config_single("ops.rebalance=off", false);
     }
     if (g.c_salvage) {
-        if (config_is_perm("salvage"))
+        if (config_is_perm("ops.salvage"))
             testutil_die(EINVAL, "salvage is incompatible with direct I/O");
-        config_single("salvage=off", false);
+        config_single("ops.salvage=off", false);
     }
 }
 
@@ -506,8 +507,8 @@ config_encryption(void)
     /*
      * Encryption: choose something if encryption wasn't specified.
      */
-    if (!config_is_perm("encryption")) {
-        cstr = "encryption=none";
+    if (!config_is_perm("disk.encryption")) {
+        cstr = "disk.encryption=none";
         switch (mmrand(NULL, 1, 10)) {
         case 1:
         case 2:
@@ -520,7 +521,7 @@ config_encryption(void)
         case 8:
         case 9:
         case 10: /* 30% rotn */
-            cstr = "encryption=rotn-7";
+            cstr = "disk.encryption=rotn-7";
             break;
         }
 
@@ -536,7 +537,7 @@ static bool
 config_fix(void)
 {
     /* Fixed-length column stores don't support the history store table, so no modify operations. */
-    if (config_is_perm("modify_pct"))
+    if (config_is_perm("ops.pct.modify"))
         return (false);
     return (true);
 }
@@ -554,24 +555,24 @@ config_in_memory(void)
      * don't have to configure in-memory every time we configure something like LSM, that's too
      * painful.
      */
-    if (config_is_perm("backups"))
+    if (config_is_perm("backup"))
         return;
-    if (config_is_perm("checkpoints"))
+    if (config_is_perm("checkpoint"))
         return;
-    if (config_is_perm("compression"))
+    if (config_is_perm("btree.compression"))
         return;
-    if (config_is_perm("data_source") && DATASOURCE("lsm"))
+    if (config_is_perm("runs.source") && DATASOURCE("lsm"))
         return;
     if (config_is_perm("logging"))
         return;
-    if (config_is_perm("rebalance"))
+    if (config_is_perm("ops.rebalance"))
         return;
-    if (config_is_perm("salvage"))
+    if (config_is_perm("ops.salvage"))
         return;
-    if (config_is_perm("verify"))
+    if (config_is_perm("ops.verify"))
         return;
 
-    if (!config_is_perm("in_memory") && mmrand(NULL, 1, 20) == 1)
+    if (!config_is_perm("runs.in_memory") && mmrand(NULL, 1, 20) == 1)
         g.c_in_memory = 1;
 }
 
@@ -585,31 +586,31 @@ config_in_memory_reset(void)
     uint32_t cache;
 
     /* Turn off a lot of stuff. */
-    if (!config_is_perm("alter"))
-        config_single("alter=off", false);
-    if (!config_is_perm("backups"))
-        config_single("backups=off", false);
-    if (!config_is_perm("checkpoints"))
-        config_single("checkpoints=off", false);
-    if (!config_is_perm("compression"))
-        config_single("compression=none", false);
+    if (!config_is_perm("ops.alter"))
+        config_single("ops.alter=off", false);
+    if (!config_is_perm("backup"))
+        config_single("backup=off", false);
+    if (!config_is_perm("checkpoint"))
+        config_single("checkpoint=off", false);
+    if (!config_is_perm("btree.compression"))
+        config_single("btree.compression=none", false);
     if (!config_is_perm("logging"))
         config_single("logging=off", false);
-    if (!config_is_perm("rebalance"))
-        config_single("rebalance=off", false);
-    if (!config_is_perm("salvage"))
-        config_single("salvage=off", false);
-    if (!config_is_perm("verify"))
-        config_single("verify=off", false);
+    if (!config_is_perm("ops.rebalance"))
+        config_single("ops.rebalance=off", false);
+    if (!config_is_perm("ops.salvage"))
+        config_single("ops.salvage=off", false);
+    if (!config_is_perm("ops.verify"))
+        config_single("ops.verify=off", false);
 
     /*
      * Keep keys/values small, overflow items aren't an issue for in-memory configurations and it
      * keeps us from overflowing the cache.
      */
-    if (!config_is_perm("key_max"))
-        config_single("key_max=32", false);
-    if (!config_is_perm("value_max"))
-        config_single("value_max=80", false);
+    if (!config_is_perm("btree.key_max"))
+        config_single("btree.key_max=32", false);
+    if (!config_is_perm("btree.value_max"))
+        config_single("btree.value_max=80", false);
 
     /*
      * Size the cache relative to the initial data set, use 2x the base size as a minimum.
@@ -637,17 +638,17 @@ config_lsm_reset(void)
      * Turn off truncate for LSM runs (some configurations with truncate always result in a
      * timeout).
      */
-    if (!config_is_perm("truncate"))
-        config_single("truncate=off", false);
+    if (!config_is_perm("ops.truncate"))
+        config_single("ops.truncate=off", false);
 
     /*
      * LSM doesn't currently play nicely with timestamps, don't choose the pair unless forced to. If
      * we turn off timestamps, make sure we turn off prepare as well, it requires timestamps. Remove
      * this code with WT-4162.
      */
-    if (!config_is_perm("prepare") && !config_is_perm("transaction_timestamps")) {
-        config_single("prepare=off", false);
-        config_single("transaction_timestamps=off", false);
+    if (!config_is_perm("ops.prepare") && !config_is_perm("transaction.timestamps")) {
+        config_single("ops.prepare=off", false);
+        config_single("transaction.timestamps=off", false);
     }
 }
 
@@ -663,10 +664,10 @@ config_pct(void)
         uint32_t *vp;     /* Value store */
         u_int order;      /* Order of assignment */
     } list[] = {
-      {"delete_pct", &g.c_delete_pct, 0}, {"insert_pct", &g.c_insert_pct, 0},
+      {"ops.pct.delete", &g.c_delete_pct, 0}, {"ops.pct.insert", &g.c_insert_pct, 0},
 #define CONFIG_MODIFY_ENTRY 2
-      {"modify_pct", &g.c_modify_pct, 0}, {"read_pct", &g.c_read_pct, 0},
-      {"write_pct", &g.c_write_pct, 0},
+      {"ops.pct.modify", &g.c_modify_pct, 0}, {"ops.pct.read", &g.c_read_pct, 0},
+      {"ops.pct.write", &g.c_write_pct, 0},
     };
     u_int i, max_order, max_slot, n, pct;
 
@@ -685,7 +686,7 @@ config_pct(void)
 
     /* Cursor modify isn't possible for fixed-length column store. */
     if (g.type == FIX) {
-        if (config_is_perm("modify_pct") && g.c_modify_pct != 0)
+        if (config_is_perm("ops.pct.modify") && g.c_modify_pct != 0)
             testutil_die(EINVAL, "WT_CURSOR.modify not supported by fixed-length column store");
         list[CONFIG_MODIFY_ENTRY].order = 0;
         *list[CONFIG_MODIFY_ENTRY].vp = 0;
@@ -699,7 +700,8 @@ config_pct(void)
      */
     if (g.c_isolation_flag == ISOLATION_READ_COMMITTED ||
       g.c_isolation_flag == ISOLATION_READ_UNCOMMITTED) {
-        if (config_is_perm("isolation") && config_is_perm("modify_pct") && g.c_modify_pct != 0)
+        if (config_is_perm("transaction.isolation") && config_is_perm("ops.pct.modify") &&
+          g.c_modify_pct != 0)
             testutil_die(
               EINVAL, "WT_CURSOR.modify only supported with snapshot isolation transactions");
 
@@ -755,54 +757,55 @@ config_transaction(void)
      */
     prepare_requires_ts = false;
     if (g.c_prepare) {
-        if (config_is_perm("prepare")) {
+        if (config_is_perm("ops.prepare")) {
             if (g.c_logging && config_is_perm("logging"))
                 testutil_die(EINVAL, "prepare is incompatible with logging");
-            if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps"))
+            if (!g.c_txn_timestamps && config_is_perm("transaction.timestamps"))
                 testutil_die(EINVAL, "prepare requires transaction timestamps");
         } else if ((g.c_logging && config_is_perm("logging")) ||
-          (!g.c_txn_timestamps && config_is_perm("transaction_timestamps")))
-            config_single("prepare=off", false);
+          (!g.c_txn_timestamps && config_is_perm("transaction.timestamps")))
+            config_single("ops.prepare=off", false);
         if (g.c_prepare) {
             prepare_requires_ts = true;
             if (g.c_logging)
                 config_single("logging=off", false);
             if (!g.c_txn_timestamps)
-                config_single("transaction_timestamps=on", false);
+                config_single("transaction.timestamps=on", false);
         }
     }
 
     if (g.c_txn_timestamps) {
-        if (prepare_requires_ts || config_is_perm("transaction_timestamps")) {
-            if (g.c_isolation_flag != ISOLATION_SNAPSHOT && config_is_perm("isolation"))
+        if (prepare_requires_ts || config_is_perm("transaction.timestamps")) {
+            if (g.c_isolation_flag != ISOLATION_SNAPSHOT && config_is_perm("transaction.isolation"))
                 testutil_die(
                   EINVAL, "transaction_timestamps or prepare require isolation=snapshot");
-            if (g.c_txn_freq != 100 && config_is_perm("transaction-frequency"))
+            if (g.c_txn_freq != 100 && config_is_perm("transaction.frequency"))
                 testutil_die(
                   EINVAL, "transaction_timestamps or prepare require transaction-frequency=100");
-        } else if ((g.c_isolation_flag != ISOLATION_SNAPSHOT && config_is_perm("isolation")) ||
-          (g.c_txn_freq != 100 && config_is_perm("transaction-frequency")))
-            config_single("transaction_timestamps=off", false);
+        } else if ((g.c_isolation_flag != ISOLATION_SNAPSHOT &&
+                     config_is_perm("transaction.isolation")) ||
+          (g.c_txn_freq != 100 && config_is_perm("transaction.frequency")))
+            config_single("transaction.timestamps=off", false);
     }
     if (g.c_txn_timestamps) {
         if (g.c_isolation_flag != ISOLATION_SNAPSHOT)
-            config_single("isolation=snapshot", false);
+            config_single("transaction.isolation=snapshot", false);
         if (g.c_txn_freq != 100)
-            config_single("transaction-frequency=100", false);
-    } else if (!config_is_perm("isolation"))
+            config_single("transaction.frequency=100", false);
+    } else if (!config_is_perm("transaction.isolation"))
         switch (mmrand(NULL, 1, 4)) {
         case 1:
-            config_single("isolation=random", false);
+            config_single("transaction.isolation=random", false);
             break;
         case 2:
-            config_single("isolation=read-uncommitted", false);
+            config_single("transaction.isolation=read-uncommitted", false);
             break;
         case 3:
-            config_single("isolation=read-committed", false);
+            config_single("transaction.isolation=read-committed", false);
             break;
         case 4:
         default:
-            config_single("isolation=snapshot", false);
+            config_single("transaction.isolation=snapshot", false);
             break;
         }
 }
@@ -854,7 +857,7 @@ config_print(bool error_display)
         testutil_die(errno, "fopen: %s", g.home_config);
 
     fprintf(fp, "############################################\n");
-    fprintf(fp, "#  RUN PARAMETERS\n");
+    fprintf(fp, "#  RUN PARAMETERS: V2\n");
     fprintf(fp, "############################################\n");
 
     /* Display configuration values. */
@@ -942,7 +945,7 @@ config_reset(void)
 {
     CONFIG *cp;
 
-    if (!config_is_perm("isolation"))
+    if (!config_is_perm("transaction.isolation"))
         g.c_isolation_flag = 0;
 
     /* Clear temporary allocated configuration data. */
@@ -1010,6 +1013,8 @@ config_single(const char *s, bool perm)
     u_int i;
     const char *equalp, *vp1, *vp2;
 
+    config_compat(&s);
+
     if ((equalp = strchr(s, '=')) == NULL)
         testutil_die(EINVAL, "%s: %s: illegal configuration value\n", progname, s);
 
@@ -1028,33 +1033,33 @@ config_single(const char *s, bool perm)
             *cp->vstr = NULL;
         }
 
-        if (strncmp(s, "backup_incremental", strlen("backup_incremental")) == 0) {
+        if (strncmp(s, "backup.incremental", strlen("backup.incremental")) == 0) {
             config_map_backup_incr(equalp, &g.c_backup_incr_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "checkpoints", strlen("checkpoints")) == 0) {
+        } else if (strncmp(s, "checkpoint", strlen("checkpoint")) == 0) {
             config_map_checkpoint(equalp, &g.c_checkpoint_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "checksum", strlen("checksum")) == 0) {
+        } else if (strncmp(s, "disk.checksum", strlen("disk.checksum")) == 0) {
             config_map_checksum(equalp, &g.c_checksum_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "compression", strlen("compression")) == 0) {
+        } else if (strncmp(s, "btree.compression", strlen("btree.compression")) == 0) {
             config_map_compression(equalp, &g.c_compression_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
+        } else if (strncmp(s, "runs.source", strlen("runs.source")) == 0 &&
           strncmp("file", equalp, strlen("file")) != 0 &&
           strncmp("lsm", equalp, strlen("lsm")) != 0 &&
           strncmp("table", equalp, strlen("table")) != 0) {
             testutil_die(EINVAL, "Invalid data source option: %s\n", equalp);
-        } else if (strncmp(s, "encryption", strlen("encryption")) == 0) {
+        } else if (strncmp(s, "disk.encryption", strlen("disk.encryption")) == 0) {
             config_map_encryption(equalp, &g.c_encryption_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
+        } else if (strncmp(s, "runs.type", strlen("runs.type")) == 0) {
             config_map_file_type(equalp, &g.type);
             *cp->vstr = dstrdup(config_file_type(g.type));
-        } else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
+        } else if (strncmp(s, "transaction.isolation", strlen("transaction.isolation")) == 0) {
             config_map_isolation(equalp, &g.c_isolation_flag);
             *cp->vstr = dstrdup(equalp);
-        } else if (strncmp(s, "logging_compression", strlen("logging_compression")) == 0) {
+        } else if (strncmp(s, "logging.compression", strlen("logging.compression")) == 0) {
             config_map_compression(equalp, &g.c_logging_compression_flag);
             *cp->vstr = dstrdup(equalp);
         } else
