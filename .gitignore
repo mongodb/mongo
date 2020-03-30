@@ -161,7 +161,7 @@ CMakeLists.txt
 # Visual Studio and VSCode projects
 .vscode/
 .vs/
-x64/
+/x64/
 
 # Windows MSI builder artifacts
 *.msi
