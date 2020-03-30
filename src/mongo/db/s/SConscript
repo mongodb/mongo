@@ -31,6 +31,16 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_runtime_d_params',
+    source=[
+        env.Idlc('sharding_runtime_d_params.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
+)
+
+env.Library(
     target='sharding_runtime_d',
     source=[
         'active_migrations_registry.cpp',
@@ -69,7 +79,6 @@ env.Library(
         'sharding_statistics.cpp',
         'split_chunk.cpp',
         'split_vector.cpp',
-        env.Idlc('sharding_runtime_d_params.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
@@ -91,6 +100,7 @@ env.Library(
         'sharding_api_d',
         'sharding_catalog_manager',
         'sharding_logging',
+        'sharding_runtime_d_params',
         'transaction_coordinator',
     ],
     LIBDEPS_PRIVATE=[
@@ -236,6 +246,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         'sharding_logging',
     ],
+    LIBDEPS_PRIVATE=[
+        'sharding_runtime_d_params',
+    ]
 )
 
 env.CppUnitTest(
