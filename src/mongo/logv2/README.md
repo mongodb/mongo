@@ -26,7 +26,7 @@ The `msg` field predicates a reader's interpretation of the log line. It should 
 
 * Concisely describe what the log line is reporting, providing enough context necessary for interpreting attribute field names and values
 * Avoid unnecessary punctuation and do not conclude with punctuation
-* For new log messages, do __not__ use a format string/substitution for new log messages
+* For new log messages, do __not__ use a format string/substitution
 * For updating existing log messages, provide both a format string/substitution, __and__ a substitution-free message string
 
 ### Attributes (fields in the attr subdocument)
