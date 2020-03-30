@@ -8761,6 +8761,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - ubuntu1804-small
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
@@ -8816,6 +8818,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - ubuntu1804-small
 
 - name: ubuntu1604
   display_name: Ubuntu 16.04
@@ -8879,6 +8883,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - ubuntu1604-small
 
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
@@ -9200,6 +9206,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - amazon1-2018-small
 
 - name: amazon
   display_name: Amazon Linux
@@ -9251,6 +9259,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - amazon1-2018-small
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
@@ -9307,6 +9317,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - amazon2-small
 
 - name: amazon2
   display_name: Amazon Linux 2
@@ -9362,6 +9374,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - amazon2-small
 
 - name: tig-daily-cron
   modules:
@@ -9983,6 +9997,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+        - rhel62-small
   - name: server_discovery_and_monitoring_json_test_TG
 
 - name: enterprise-rhel-62-64-bit-large-txns-format
@@ -10441,7 +10457,7 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: ubi7
   display_name: "UBI 7"
@@ -10518,6 +10534,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - rhel80-small
 
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
@@ -10679,6 +10697,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - rhel62-small
 
 - name: rhel70
   display_name: RHEL 7.0
@@ -10729,7 +10749,7 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -10779,6 +10799,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - rhel80-small
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
@@ -10843,7 +10865,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: enterprise-rhel-72-s390x-compile
   display_name: Enterprise RHEL 7.2 s390x Compile
@@ -10924,7 +10946,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel70
+    - rhel70-small
 
 
 - name: enterprise-rhel-67-s390x-compile
@@ -10995,7 +11017,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .publish
     distros:
-    - rhel62-large
+    - rhel62-small
 
 - name: rhel-72-s390x
   display_name: RHEL 7.2 s390x
@@ -11022,7 +11044,7 @@ buildvariants:
   - name: ssl_gen
   - name: .publish
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: rhel-67-s390x
   display_name: RHEL 6.7 s390x
@@ -11049,7 +11071,7 @@ buildvariants:
   - name: ssl_gen
   - name: .publish
     distros:
-    - rhel62-large
+    - rhel62-small
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -11103,6 +11125,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - ubuntu1604-small
 
 
 - name: enterprise-ubuntu-dynamic-1604-clang
@@ -11207,6 +11231,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - suse12-small
 
 - name: enterprise-suse12-s390x-compile
   display_name: Enterprise SLES 12 s390x Compile
@@ -11362,6 +11388,8 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
+    distros:
+    - suse12-small
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
@@ -11400,6 +11428,8 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
+    distros:
+    - suse15-small
 
 - name: suse15
   display_name: SUSE 15
@@ -11445,6 +11475,8 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
+    distros:
+    - suse15-small
 
 ###########################################
 #          Debian buildvariants           #
@@ -11496,6 +11528,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - debian92-small
 
 - name: debian92
   display_name: Debian 9.2
@@ -11548,6 +11582,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - debian92-small
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
@@ -11595,6 +11631,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - debian10-small
 
 - name: debian10
   display_name: Debian 10
@@ -11647,6 +11685,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
+    distros:
+    - debian10-small
 
 ################################
 # storage engine buildvariants #
