@@ -49,10 +49,6 @@
 
 namespace mongo {
 
-const std::string kWTRepairMsg =
-    "Please read the documentation for starting MongoDB with --repair here: "
-    "http://dochub.mongodb.org/core/repair";
-
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
     : _epoch(epoch),
       _cursorEpoch(cursorEpoch),

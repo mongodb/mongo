@@ -424,6 +424,15 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
             if (sd.find("Version incompatibility detected:") != std::string::npos) {
                 return 0;
             }
+
+            // WT shipped with MongoDB 4.4 can read data left behind by 4.0, but cannot write 4.0
+            // compatible data. Instead of forcing an upgrade on the user, it refuses to start up
+            // with this error string.
+            if (sd.find("WiredTiger version incompatible with current binary") !=
+                std::string::npos) {
+                wtHandler->setWtIncompatible();
+                return 0;
+            }
         }
         LOGV2_ERROR(22435,
                     "WiredTiger error ({errorCode}) {message} Raw: {message2}",

@@ -108,13 +108,17 @@ public:
         _startupSuccessful = true;
     }
 
-private:
-    int suppressibleStartupErrorLog(WT_EVENT_HANDLER* handler,
-                                    WT_SESSION* sesion,
-                                    int errorCode,
-                                    const char* message);
+    bool isWtIncompatible() {
+        return _wtIncompatible;
+    }
 
+    void setWtIncompatible() {
+        _wtIncompatible = true;
+    }
+
+private:
     bool _startupSuccessful = false;
+    bool _wtIncompatible = false;
 };
 
 class WiredTigerUtil {
