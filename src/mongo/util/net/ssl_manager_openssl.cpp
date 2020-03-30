@@ -97,6 +97,22 @@ using UniqueX509StoreCtx =
 
 using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
 
+// This deleter should be used when you have a stack of X509 objects that you own and that
+// needs to be deleted.
+struct X509StackDeleter {
+    void operator()(STACK_OF(X509) * chain) {
+        if (chain) {
+            sk_X509_pop_free(chain, X509_free);
+        }
+    }
+};
+
+// If we have an X509 Stack that is owned by an internal SSL Object, we need to use this
+// deleter.
+struct X509StackDeleterNoOp {
+    void operator()(STACK_OF(X509) * chain) {}
+};
+
 // Modulus for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919
 constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58, 0xA2, 0xBB, 0x4A, 0x9A,
@@ -287,15 +303,7 @@ X509* X509_OBJECT_get0_X509(const X509_OBJECT* a) {
     return a->data.x509;
 }
 
-// On OpenSSL < 1.1.0, this chain isn't attached to
-// the SSL session, so we need it to dispose of itself.
-struct VerifiedChainDeleter {
-    void operator()(STACK_OF(X509) * chain) {
-        if (chain) {
-            sk_X509_pop_free(chain, X509_free);
-        }
-    }
-};
+using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
 
 STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
     auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
@@ -348,13 +356,10 @@ static int const NID_tlsfeature = OBJ_create(tlsFeatureOID.identifier.c_str(),
                                              tlsFeatureOID.longDescription.c_str());
 
 #else
-// No-op deleter for OpenSSL >= 1.1.0
-struct VerifiedChainDeleter {
-    void operator()(STACK_OF(X509) * chain) {}
-};
+using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), X509StackDeleterNoOp>;
+
 #endif
 
-using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), VerifiedChainDeleter>;
 UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
     return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
 }
@@ -1674,6 +1679,8 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
     return convert(std::move(semifuture)).onCompletion(validate).then(refetchIfInvalidAndReturn);
 }
 
+using StoreCtxVerifiedChain = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
+
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
 Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
     if (MONGO_unlikely(disableStapling.shouldFail()) || !tlsOCSPEnabled) {
@@ -1693,14 +1700,26 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
     }
 
     auto fetchAndStaple = [context, cert]() -> Future<Milliseconds> {
-        STACK_OF(X509) * intermediateCertsPtr;
-
-        if (SSL_CTX_get0_chain_certs(context, &intermediateCertsPtr) == 0) {
-            return getSSLFailure("Could not get chain for SSL Context.");
+        // Generate a new verified X509StoreContext to get our own certificate chain
+        UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
+        if (!storeCtx) {
+            return getSSLFailure("Could not create X509 store.");
         }
 
-        UniqueVerifiedChainPolyfill intermediateCerts(intermediateCertsPtr);
+        if (X509_STORE_CTX_init(storeCtx.get(), SSL_CTX_get_cert_store(context), NULL, NULL) == 0) {
+            return getSSLFailure("Could not initialize the X509 Store Context.");
+        }
 
+        X509_STORE_CTX_set_cert(storeCtx.get(), cert);
+
+        if (X509_verify_cert(storeCtx.get()) <= 0) {
+            return getSSLFailure("Could not verify X509 certificate store for OCSP Stapling.");
+        }
+
+        // Extract the chain from the verified X509StoreCtx
+        StoreCtxVerifiedChain intermediateCerts(X509_STORE_CTX_get1_chain(storeCtx.get()));
+
+        // Continue with OCSP Stapling logic
         auto swOCSPContext = extractOcspUris(context, cert, intermediateCerts.get());
         if (!swOCSPContext.isOK()) {
             LOGV2_WARNING(23232, "Could not staple OCSP response to outgoing certificate.");

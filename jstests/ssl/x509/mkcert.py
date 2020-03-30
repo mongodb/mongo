@@ -422,11 +422,21 @@ def create_cert(cert):
         cipher = 'aes256'
 
     header = get_header_comment(cert)
+
+    if bool(cert.get('keyfile', False)) != bool(cert.get('crtfile', False)):
+        raise ValueError("Either include both keyfile and crtfile or neither")
+
     # The OCSP responder certificate needs to have the key and the pem file separated.
-    if cert.get('keyfile', False):
+    # Since there are only a few cases where we need split key and crt files, and since we
+    # sometimes need the unified pem file as well, we can always generate the pem file.
+    if cert.get('keyfile', False) and cert.get('crtfile', False):
         keyfile = cert['keyfile']
+        crtfile = cert['crtfile']
+
         key_path_dict = {'output_path': cert['output_path'], 'name': keyfile}
-        open(make_filename(cert), 'wt').write(
+        crt_path_dict = {'output_path': cert['output_path'], 'name': crtfile}
+
+        open(make_filename(crt_path_dict), 'wt').write(
             header +
             OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, x509).decode('ascii'))
 
@@ -434,12 +444,10 @@ def create_cert(cert):
             header +
             OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key, cipher=cipher, passphrase=passphrase).decode('ascii'))
 
-    else:
-        # OCSP certificates cannot have comments because the Mock OCSP responder cannot process comments in Certificates
-        open(make_filename(cert), 'wt').write(
-            header +
-            OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, x509).decode('ascii') +
-            OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key, cipher=cipher, passphrase=passphrase).decode('ascii'))
+    open(make_filename(cert), 'wt').write(
+        header +
+        OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, x509).decode('ascii') +
+        OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key, cipher=cipher, passphrase=passphrase).decode('ascii'))
 
     if cert.get('pkcs1'):
         convert_cert_to_pkcs1(cert)
@@ -594,7 +602,7 @@ def validate_config():
     if not CONFIG.get('certs'):
         raise ValueError('No certificates defined')
 
-    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12', 'version']
+    permissible = ['name', 'description', 'Subject', 'Issuer', 'append_cert', 'extensions', 'passphrase', 'output_path', 'hash', 'include_header', 'key_type', 'keyfile', 'crtfile', 'explicit_subject', 'serial', 'not_before', 'not_after', 'pkcs1', 'pkcs12', 'version']
     for cert in CONFIG.get('certs', []):
         keys = cert.keys()
         if not 'name' in keys:

@@ -4,7 +4,9 @@
 
 load("jstests/ssl/libs/ssl_helpers.js");
 
-const OCSP_CA_CERT = "jstests/libs/ocsp/ca_ocsp.pem";
+const OCSP_CA_PEM = "jstests/libs/ocsp/ca_ocsp.pem";
+const OCSP_CA_CERT = "jstests/libs/ocsp/ca_ocsp.crt";
+const OCSP_CA_KEY = "jstests/libs/ocsp/ca_ocsp.key";
 const OCSP_SERVER_CERT = "jstests/libs/ocsp/server_ocsp.pem";
 const OCSP_CLIENT_CERT = "jstests/libs/ocsp/client_ocsp.pem";
 const OCSP_SERVER_MUSTSTAPLE_CERT = "jstests/libs/ocsp/server_ocsp_mustStaple.pem";
@@ -37,7 +39,7 @@ var waitForServer = function(conn) {
                                 host,
                                 '--tls',
                                 '--tlsCAFile',
-                                OCSP_CA_CERT,
+                                OCSP_CA_PEM,
                                 '--tlsCertificateKeyFile',
                                 OCSP_CLIENT_CERT,
                                 '--tlsAllowInvalidCertificates',
