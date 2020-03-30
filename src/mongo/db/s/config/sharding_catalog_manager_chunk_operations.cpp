@@ -176,8 +176,6 @@ Status checkChunkMatchesRequest(OperationContext* opCtx,
     const auto currentChunk =
         uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
 
-    // In the FCV 4.4 protocol, additionally check that the chunk's version matches what's in the
-    // request.
     uassert(4683300,
             "Config server rejecting commitChunkMigration request that does not have a "
             "ChunkVersion",

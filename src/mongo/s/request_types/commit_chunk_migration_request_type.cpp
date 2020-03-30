@@ -60,9 +60,7 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
 
     ChunkVersion version;
     auto swVersion = ChunkVersion::parseLegacyWithField(fieldObj, ChunkType::lastmod());
-    if (swVersion == ErrorCodes::NoSuchKey) {
-        // TODO (SERVER-45194): Require a ChunkVersion to be present once v4.4 is last stable.
-    } else if (!swVersion.isOK()) {
+    if (!swVersion.isOK()) {
         return swVersion.getStatus();
     } else {
         version = swVersion.getValue();
