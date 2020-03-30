@@ -372,7 +372,6 @@ variables:
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-windows
-  - enterprise-windows-async
   - enterprise-windows-compile-all
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
@@ -383,7 +382,6 @@ variables:
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite
   - ubuntu1804-debug-aubsan-lite_fuzzer
-  - ubuntu1804-debug-aubsan-async
 
 
 # List of all variants that make mh artifacts.
@@ -437,7 +435,6 @@ variables:
   - ubuntu-dynamic-1604-clang
   - ubuntu1804
   - ubuntu1804-arm64
-  - ubuntu1804-debug-aubsan-async
   - ubuntu1804-s390x
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
@@ -9574,38 +9571,6 @@ buildvariants:
     <<: *enterprise-windows-nopush-expansions-template
     use_wt_develop: true
 
-- name: enterprise-windows-async
-  display_name: "~ Enterprise Windows async"
-  modules:
-  - enterprise
-  run_on:
-  - windows-64-vs2019-small
-  stepback: true
-  batchtime: 10080 # 7 days
-  expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
-    msi_target: msi
-    exe: ".exe"
-    content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: '/cygdrive/c/python/python37/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
-        --serviceExecutor=adaptive \
-        --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
-        --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
-  tasks:
-  - name: compile_TG
-    distros:
-    - windows-64-vs2019-large
-  - name: jsCore
-  - name: replica_sets
-  - name: sharding_gen
-
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
   modules:
@@ -12102,55 +12067,6 @@ buildvariants:
   - *libfuzzertests
   tasks:
    - name: libfuzzertests_TG
-
-- name: ubuntu1804-debug-aubsan-async
-  display_name: "~ {A,UB}SAN Enterprise Ubuntu 18.04 async"
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1804-build
-  stepback: true
-  expansions:
-    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
-    variant_path_suffix: /opt/mongodbtoolchain/v3/bin
-    lang_environment: LANG=C
-    san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    multiversion_platform: ubuntu1804
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    is_asan_build: true
-    test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
-        --serviceExecutor=adaptive \
-        --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
-        --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_all_run_unittests_TG
-  - name: .aggregation !.no_async
-  - name: .auth
-  - name: audit
-  - name: .causally_consistent !.wo_snapshot
-  - name: .misc_js
-  - name: .concurrency .common !.kill_terminate
-  - name: concurrency_replication_causal_consistency
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: .integration !.audit
-  - name: .jscore .common
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: jsCore_txns_large_txns_format
-  - name: .logical_session_cache .one_sec
-  - name: multiversion_gen
-  - name: .read_write_concern
-  - name: .replica_sets .san
-  - name: .read_only
-  - name: sasl
-  - name: secondary_reads_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
-  - name: snmp
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
