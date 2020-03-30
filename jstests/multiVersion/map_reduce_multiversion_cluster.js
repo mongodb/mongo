@@ -163,7 +163,7 @@ function runValidMrTests(coll) {
 }
 
 //
-// Test against an all 4.2 cluster.
+// Test against an all 'last-stable' cluster.
 //
 runValidMrTests(sourceColl);
 
@@ -174,7 +174,7 @@ st.upgradeCluster("latest", {upgradeShards: true, upgradeConfigs: true, upgradeM
 
 //
 // Test against a mixed version cluster where the shards are upgraded to the latest binary but still
-// in FCV 4.2. Mongos is still on the 4.2 binary version.
+// in FCV 'last-stable'. Mongos is still on the 'last-stable' binary version.
 //
 runValidMrTests(sourceColl);
 
@@ -192,7 +192,7 @@ sourceColl = mongosConn.getDB(dbName)[collName];
 runValidMrTests(sourceColl);
 
 //
-// Fully upgraded to 4.4.
+// Fully upgraded to 'latest'.
 //
 assert.commandWorked(
     mongosConn.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV}));

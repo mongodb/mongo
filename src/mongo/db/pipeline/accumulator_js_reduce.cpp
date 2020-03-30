@@ -189,10 +189,7 @@ Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression>
     return DOC(getOpName() << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
 }
 
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    accumulator,
-    AccumulatorJs::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorJs::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

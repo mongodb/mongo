@@ -53,11 +53,11 @@ public:
         runAggregationMapReduce(opCtx, cmd, result, verbosity);
     }
 
-    bool _runImpl(OperationContext* opCtx,
-                  const std::string&,
-                  const BSONObj& cmd,
-                  std::string&,
-                  BSONObjBuilder& result) final {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string&,
+                   const BSONObj& cmd,
+                   std::string&,
+                   BSONObjBuilder& result) final {
         return runAggregationMapReduce(opCtx, cmd, result, boost::none);
     }
 } clusterMapReduceCommand;

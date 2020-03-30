@@ -220,14 +220,6 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
                               << ns.db() << " database"};
     }
 
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-        return {ErrorCodes::InvalidOptions,
-                "recordPreImages collection option is only supported when the feature "
-                "compatibility version is set to 4.4 or above"};
-    }
-
     if (serverGlobalParams.clusterRole != ClusterRole::None) {
         return {ErrorCodes::InvalidOptions,
                 "recordPreImages collection option is not supported on shards or config servers"};

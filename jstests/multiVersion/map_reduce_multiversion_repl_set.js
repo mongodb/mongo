@@ -11,7 +11,7 @@ const collName = testName;
 
 TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replset.
 
-// Set up a new replSet consisting of 3 nodes, initially running on 4.2 binaries.
+// Set up a new replSet consisting of 3 nodes, initially running on 'last-stable' binaries.
 const rst = new ReplSetTest({nodes: 3, nodeOptions: {binVersion: "last-stable"}});
 rst.startSet();
 rst.initiate();
@@ -94,22 +94,23 @@ function runValidMrTests(db, coll) {
 }
 
 //
-// Binary version 4.2 and FCV 4.2.
+// Binary version 'last-stable' and FCV 'last-stable'.
 //
 runValidMrTests(sourceDB, sourceColl);
 
-// Upgrade the set to the new binary version, but keep the feature compatibility version at 4.2.
+// Upgrade the set to the new binary version, but keep the feature compatibility version at
+// 'last-stable'.
 rst.upgradeSet({binVersion: "latest"});
 sourceDB = rst.getPrimary().getDB(dbName);
 sourceColl = sourceDB[collName];
 
 //
-// Binary version 4.4 and FCV 4.2.
+// Binary version 'latest' and FCV 'last-stable'.
 //
 runValidMrTests(sourceDB, sourceColl);
 
 //
-// Binary version 4.4 and FCV 4.4.
+// Binary version 'latest' and FCV 'latest'.
 //
 assert.commandWorked(sourceDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 runValidMrTests(sourceDB, sourceColl);

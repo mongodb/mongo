@@ -36,10 +36,8 @@
 
 namespace mongo {
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    _internalJsEmit,
-    ExpressionInternalJsEmit::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
+
 namespace {
 
 /**

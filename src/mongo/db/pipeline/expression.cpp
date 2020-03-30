@@ -562,10 +562,8 @@ Value ExpressionFirst::evaluate(const Document& root, Variables* variables) cons
     return arrayElemAt(this, array, Value(0));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    first,
-    ExpressionFirst::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(first, ExpressionFirst::parse);
+
 const char* ExpressionFirst::getOpName() const {
     return "$first";
 }
@@ -577,10 +575,8 @@ Value ExpressionLast::evaluate(const Document& root, Variables* variables) const
     return arrayElemAt(this, array, Value(-1));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    last,
-    ExpressionLast::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(last, ExpressionLast::parse);
+
 const char* ExpressionLast::getOpName() const {
     return "$last";
 }
@@ -719,10 +715,8 @@ const char* ExpressionArrayToObject::getOpName() const {
 
 /* ------------------------- ExpressionBsonSize -------------------------- */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    bsonSize,
-    ExpressionBsonSize::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(bsonSize, ExpressionBsonSize::parse);
+
 Value ExpressionBsonSize::evaluate(const Document& root, Variables* variables) const {
     Value arg = _children[0]->evaluate(root, variables);
 
@@ -3933,10 +3927,8 @@ intrusive_ptr<Expression> ExpressionReplaceBase::optimize() {
 
 /* ------------------------ ExpressionReplaceOne ------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    replaceOne,
-    ExpressionReplaceOne::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(replaceOne, ExpressionReplaceOne::parse);
+
 intrusive_ptr<Expression> ExpressionReplaceOne::parse(
     const intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
@@ -3967,10 +3959,8 @@ Value ExpressionReplaceOne::_doEval(StringData input,
 
 /* ------------------------ ExpressionReplaceAll ------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    replaceAll,
-    ExpressionReplaceAll::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(replaceAll, ExpressionReplaceAll::parse);
+
 intrusive_ptr<Expression> ExpressionReplaceAll::parse(
     const intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
@@ -4687,10 +4677,8 @@ Value ExpressionBinarySize::evaluate(const Document& root, Variables* variables)
     return Value(binData.length);
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    binarySize,
-    ExpressionBinarySize::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(binarySize, ExpressionBinarySize::parse);
+
 const char* ExpressionBinarySize::getOpName() const {
     return "$binarySize";
 }
@@ -5289,10 +5277,8 @@ Value ExpressionIsNumber::evaluate(const Document& root, Variables* variables) c
     return Value(val.numeric());
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    isNumber,
-    ExpressionIsNumber::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(isNumber, ExpressionIsNumber::parse);
+
 const char* ExpressionIsNumber::getOpName() const {
     return "$isNumber";
 }

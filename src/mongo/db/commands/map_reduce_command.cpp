@@ -68,12 +68,11 @@ public:
         map_reduce_agg::runAggregationMapReduce(opCtx, cmd, result, verbosity);
     }
 
-private:
-    bool _runImpl(OperationContext* opCtx,
-                  const std::string& dbname,
-                  const BSONObj& cmd,
-                  std::string& errmsg,
-                  BSONObjBuilder& result) final {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmd,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) final {
         return map_reduce_agg::runAggregationMapReduce(opCtx, cmd, result, boost::none);
     }
 } mapReduceCommand;

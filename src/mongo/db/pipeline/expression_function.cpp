@@ -31,10 +31,7 @@
 
 namespace mongo {
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    function,
-    ExpressionFunction::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_EXPRESSION(function, ExpressionFunction::parse);
 
 ExpressionFunction::ExpressionFunction(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        boost::intrusive_ptr<Expression> passedArgs,

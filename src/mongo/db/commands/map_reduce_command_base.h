@@ -92,38 +92,15 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            auto builder = result->getBodyBuilder();
-            auto explain = boost::make_optional(verbosity);
-            try {
-                _explainImpl(opCtx, request.body, builder, explain);
-            } catch (...) {
-                return exceptionToStatus();
-            }
-            return Status::OK();
-        } else {
-            return Status(
-                ErrorCodes::IllegalOperation,
-                "explain for mapReduce is not available prior to featureCompatibilityVersion 4.4");
+        auto builder = result->getBodyBuilder();
+        auto explain = boost::make_optional(verbosity);
+        try {
+            _explainImpl(opCtx, request.body, builder, explain);
+        } catch (...) {
+            return exceptionToStatus();
         }
-        MONGO_UNREACHABLE;
+        return Status::OK();
     }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmd,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) {
-        return _runImpl(opCtx, dbname, cmd, errmsg, result);
-    }
-
-private:
-    virtual bool _runImpl(OperationContext* opCtx,
-                          const std::string& dbname,
-                          const BSONObj& cmd,
-                          std::string& errmsg,
-                          BSONObjBuilder& result) = 0;
 };
 
 }  // namespace mongo
