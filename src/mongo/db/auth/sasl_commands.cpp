@@ -318,14 +318,13 @@ bool runSaslStart(OperationContext* opCtx,
     AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
 
     std::string mechanismName;
-    if (!extractMechanism(cmdObj, &mechanismName).isOK()) {
-        return false;
-    }
+    uassertStatusOK(extractMechanism(cmdObj, &mechanismName));
 
     auto status = authCounter.incAuthenticateReceived(mechanismName);
     if (!status.isOK()) {
         audit::logAuthentication(client, mechanismName, UserName("", db), status.code());
-        return false;
+        uassertStatusOK(status);
+        MONGO_UNREACHABLE;
     }
 
     std::string principalName;
