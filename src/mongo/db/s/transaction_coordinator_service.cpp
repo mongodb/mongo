@@ -188,6 +188,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     LOGV2_DEBUG(22451,
                                 3,
                                 "Waiting for OpTime {lastOpTime} to become majority committed",
+                                "Waiting for OpTime to become majority committed",
                                 "lastOpTime"_attr = lastOpTime);
 
                     WriteConcernResult unusedWCResult;
@@ -203,9 +204,11 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
 
                     LOGV2(22452,
-                          "Need to resume coordinating commit for {coordinatorDocs_size} "
+                          "Need to resume coordinating commit for {numPendingTransactions} "
                           "transactions",
-                          "coordinatorDocs_size"_attr = coordinatorDocs.size());
+                          "Need to resume coordinating commit for transactions with an in-progress "
+                          "two-phase commit/abort",
+                          "numPendingTransactions"_attr = coordinatorDocs.size());
 
                     const auto service = opCtx->getServiceContext();
                     const auto clockSource = service->getFastClockSource();
@@ -214,10 +217,12 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     auto& scheduler = catalogAndScheduler->scheduler;
 
                     for (const auto& doc : coordinatorDocs) {
-                        LOGV2_DEBUG(22453,
-                                    3,
-                                    "Going to resume coordinating commit for {doc}",
-                                    "doc"_attr = doc.toBSON());
+                        LOGV2_DEBUG(
+                            22453,
+                            3,
+                            "Going to resume coordinating commit for {transactionCoordinatorInfo}",
+                            "Going to resume coordinating commit",
+                            "transactionCoordinatorInfo"_attr = doc.toBSON());
 
                         const auto lsid = *doc.getId().getSessionId();
                         const auto txnNumber = *doc.getId().getTxnNumber();

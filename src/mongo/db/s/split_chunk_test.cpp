@@ -169,8 +169,8 @@ void SplitChunkTest::expectLock() {
     dynamic_cast<DistLockManagerMock*>(distLock())
         ->expectLock(
             [this](StringData name, StringData whyMessage, Milliseconds) {
-                LOGV2(22105, "{name}", "name"_attr = name);
-                LOGV2(22106, "{whyMessage}", "whyMessage"_attr = whyMessage);
+                LOGV2(22105, "Lock name", "name"_attr = name);
+                LOGV2(22106, "Reason for lock", "reason"_attr = whyMessage);
             },
             Status::OK());
 }
