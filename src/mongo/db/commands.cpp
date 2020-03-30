@@ -49,7 +49,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/commands_in_multi_doc_txn_params_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/jsobj.h"
@@ -111,11 +110,12 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 }
 
 // The command names that are allowed in a multi-document transaction.
-const StringMap<int> txnCmdWhitelistFCV44 = {{"create", 1}, {"createIndexes", 1}};
 const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
                                         {"commitTransaction", 1},
                                         {"coordinateCommitTransaction", 1},
+                                        {"create", 1},
+                                        {"createIndexes", 1},
                                         {"delete", 1},
                                         {"distinct", 1},
                                         {"find", 1},
@@ -480,28 +480,10 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             cmdName != "count"_sd);
 
     auto inTxnWhitelist = txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend();
-    auto inTxnWhitelistFCV44 = txnCmdWhitelistFCV44.find(cmdName) != txnCmdWhitelistFCV44.cend();
-    auto isFullyUpgradedTo44 =
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         serverGlobalParams.featureCompatibility.getVersion() ==
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run '" << cmdName
-                          << "' in a multi-document transaction unless the "
-                             "featureCompatibilityVersion is equal to 4.4.",
-            isFullyUpgradedTo44 || !inTxnWhitelistFCV44);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
-            inTxnWhitelist || inTxnWhitelistFCV44);
-
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run '" << cmdName
-                          << "' in a multi-document transaction "
-                             "because creation of collections and "
-                             "indexes inside multi-document transactions is disabled.",
-            gShouldMultiDocTxnCreateCollectionAndIndexes.load() || !inTxnWhitelistFCV44);
+            inTxnWhitelist);
 
     const auto dbName = nss.db();
 

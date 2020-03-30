@@ -524,7 +524,6 @@ env.Library(
     target="commands",
     source=[
         'commands.cpp',
-        env.Idlc('commands_in_multi_doc_txn_params.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

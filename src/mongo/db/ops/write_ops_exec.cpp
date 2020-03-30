@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands_in_multi_doc_txn_params_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -213,25 +212,6 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
-    auto isFullyUpgradedTo44 =
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         serverGlobalParams.featureCompatibility.getVersion() ==
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
-    auto inTransaction = opCtx->inMultiDocumentTransaction();
-
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream()
-                << "Cannot create namespace " << ns.ns()
-                << " in multi-document transaction unless featureCompatibilityVersion is 4.4.",
-            isFullyUpgradedTo44 || !inTransaction);
-
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot create namespace " << ns.ns()
-                          << " because creation of collections and indexes inside "
-                             "multi-document transactions is disabled.",
-            !inTransaction || gShouldMultiDocTxnCreateCollectionAndIndexes.load());
-
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);

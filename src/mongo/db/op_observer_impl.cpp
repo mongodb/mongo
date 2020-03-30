@@ -249,8 +249,6 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
     if (inMultiDocumentTransaction) {
-        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
         auto operation = MutableOplogEntry::makeCreateIndexesCommand(nss, uuid, indexDoc);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
@@ -641,8 +639,6 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
     if (inMultiDocumentTransaction) {
-        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
         auto operation = MutableOplogEntry::makeCreateCommand(collectionName, options, idIndex);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
