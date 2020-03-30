@@ -1169,6 +1169,17 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            // New mongod-specific option in 4.3.x.
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 430) {
+                // Allow the parameter to be overridden if set explicitly via TestData.
+                if ((jsTest.options().setParameters === undefined ||
+                     jsTest.options().setParameters['minNumChunksForSessionsCollection'] ===
+                         undefined) &&
+                    !argArrayContainsSetParameterValue('minNumChunksForSessionsCollection=')) {
+                    argArray.push(...['--setParameter', "minNumChunksForSessionsCollection=1"]);
+                }
+            }
+
             // New mongod-specific options in 4.0.x
             if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
                 if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {
