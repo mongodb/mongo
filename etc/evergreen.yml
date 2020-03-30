@@ -6041,6 +6041,8 @@ buildvariants:
   - name: tool_WT
   - name: write_concern_majority_passthrough_WT
   - name: push
+    distros:
+    - rhel62-small
 
 - name: linux-64-repeated-execution
   stepback: false
@@ -6359,6 +6361,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - ubuntu1604-small
 
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
@@ -6550,6 +6554,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - linux-64-amzn-small
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -6640,6 +6646,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - linux-64-amzn-small
 
 ###########################################
 #         Windows buildvariants           #
@@ -7616,6 +7624,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel62-small
 
 - name: enterprise-rhel-62-64-bit-majority-read-concern-off
   display_name: "Enterprise RHEL 6.2 (majority read concern off)"
@@ -7969,7 +7979,7 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
@@ -8028,6 +8038,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel80-small
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
@@ -8146,6 +8158,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel62-small
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -8242,7 +8256,7 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: rhel80
   display_name: SSL RHEL 8.0
@@ -8337,6 +8351,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel80-small
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
@@ -8448,7 +8464,7 @@ buildvariants:
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -8540,6 +8556,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - ubuntu1404-small
 
 - name: enterprise-ubuntu1404-64
   display_name: Enterprise Ubuntu 14.04
@@ -8594,6 +8612,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - ubuntu1404-small
 
 - name: enterprise-ubuntu1604-64
   display_name: Enterprise Ubuntu 16.04 (+Dagger)
@@ -8674,6 +8694,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - ubuntu1604-small
 
 
 - name: enterprise-ubuntu1604-clang-3.8-libcxx
@@ -8753,6 +8775,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - suse12-small
 
 - name: suse12
   display_name: SSL SUSE 12
@@ -8839,6 +8863,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - suse12-small
 
 
 ###########################################
@@ -8898,6 +8924,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian81-small
 
 
 - name: enterprise-debian92-64
@@ -8953,6 +8981,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian92-small
 
 
 - name: debian81
@@ -9043,6 +9073,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian81-small
 
 
 - name: debian92
@@ -9135,6 +9167,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian92-small
 
 
 ################################
