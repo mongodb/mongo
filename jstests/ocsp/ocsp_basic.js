@@ -9,7 +9,7 @@ load("jstests/ocsp/lib/mock_ocsp.js");
 var ocsp_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_CERT,
+    sslCAFile: OCSP_CA_PEM,
     sslAllowInvalidHostnames: "",
     setParameter: {
         "failpoint.disableStapling": "{'mode':'alwaysOn'}",

@@ -17,8 +17,9 @@ class MockOCSPServer {
      *
      * @param {string} fault_type
      * @param {number} next_update_secs
+     * @param {boolean} responder_is_ca
      */
-    constructor(fault_type, next_update_secs) {
+    constructor(fault_type, next_update_secs, responder_is_ca = false) {
         this.python = "python3";
         this.fault_type = fault_type;
 
@@ -26,10 +27,16 @@ class MockOCSPServer {
             this.python = "python.exe";
         }
 
+        if (responder_is_ca) {
+            this.ocsp_cert_file = OCSP_CA_CERT;
+            this.ocsp_cert_key = OCSP_CA_KEY;
+        } else {
+            this.ocsp_cert_file = OCSP_RESPONDER_CERT;
+            this.ocsp_cert_key = OCSP_RESPONDER_KEY;
+        }
+
         print("Using python interpreter: " + this.python);
-        this.ca_file = OCSP_CA_CERT;
-        this.ocsp_cert_file = OCSP_RESPONDER_CERT;
-        this.ocsp_cert_key = OCSP_RESPONDER_KEY;
+        this.ca_file = OCSP_CA_PEM;
         // The port must be hard coded to match the port of the
         // responder in the certificates.
         this.port = 8100;

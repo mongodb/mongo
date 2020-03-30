@@ -335,6 +335,8 @@ certs:
   Issuer: self
   include_header: false
   output_path: 'jstests/libs/ocsp/'
+  keyfile: 'ca_ocsp.key'
+  crtfile: 'ca_ocsp.crt'
   extensions:
     basicConstraints:
       critical: true
@@ -425,7 +427,7 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [clientAuth]
 
-- name: 'ocsp_responder.crt'
+- name: 'ocsp_responder.pem'
   description: Certificate and key for the OCSP responder
   Subject:
     CN: 'localhost'
@@ -435,6 +437,7 @@ certs:
   Issuer: 'ca_ocsp.pem'
   include_header: false
   keyfile: 'ocsp_responder.key'
+  crtfile: 'ocsp_responder.crt'
   output_path: 'jstests/libs/ocsp/'
   extensions:
     basicConstraints: {CA: false}
