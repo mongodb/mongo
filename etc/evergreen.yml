@@ -3822,6 +3822,8 @@ buildvariants:
   - name: tool_WT
   - name: write_concern_majority_passthrough_WT
   - name: push
+    distros:
+    - rhel62-small
 
 - name: linux-64-repeated-execution
   stepback: false
@@ -4654,6 +4656,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - linux-64-amzn-small
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -4777,6 +4781,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - linux-64-amzn-small
 
 ###########################################
 #         Windows buildvariants           #
@@ -5338,6 +5344,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel80-small
 
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 2008R2
@@ -5759,6 +5767,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel80-small
 
 - name: osx-108-debug
   display_name: "* OS X 10.8 DEBUG"
@@ -6079,6 +6089,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel62-small
 
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
@@ -6290,6 +6302,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70-small
 
 
 - name: rhel62
@@ -6411,6 +6425,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel62-small
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -6547,6 +6563,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - rhel70-small
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
@@ -6838,6 +6856,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - ubuntu1604-small
 
 ###########################################
 #          SUSE buildvariants             #
@@ -6900,6 +6920,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - suse12-small
 
 
 - name: enterprise-suse12-s390x
@@ -7122,6 +7144,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - suse12-small
 
 
 ###########################################
@@ -7185,6 +7209,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian81-small
 
 
 - name: debian81
@@ -7307,6 +7333,8 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+    distros:
+    - debian81-small
 
 
 ################################
