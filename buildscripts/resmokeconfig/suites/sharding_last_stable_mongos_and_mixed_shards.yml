@@ -112,6 +112,8 @@ selector:
   - jstests/sharding/shard_collection_existing_zones.js
   # Enable when BACKPORT-4652 is released to v3.6
   - jstests/sharding/server_status_crud_metrics.js
+  # Enable after SERVER-45624 gets backported and available on 3.6.
+  - jstests/sharding/balancing_sessions_collection.js
   # Enable after SERVER-31083 is backported and available on 4.2 and 4.0 binaries
   - jstests/sharding/enable_sharding_with_primary.js
   # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.

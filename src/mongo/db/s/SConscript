@@ -134,7 +134,7 @@ env.Library(
 env.Library(
     target='type_shard_identity',
     source=[
-        env.Idlc('add_shard_cmd.idl')[0], 
+        env.Idlc('add_shard_cmd.idl')[0],
         'type_shard_identity.cpp',
     ],
     LIBDEPS=[

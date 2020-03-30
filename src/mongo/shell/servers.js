@@ -1131,8 +1131,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
-                // New mongod-specific options in 4.0.x
-                if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
+                // New mongod-specific options in 4.0.20
+                if (!programMajorMinorVersion || programMajorMinorVersion > 4020) {
                     if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {
                         if (!argArrayContainsSetParameterValue(
                                 "transactionLifetimeLimitSeconds=")) {
@@ -1141,6 +1141,13 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                     "transactionLifetimeLimitSeconds=" +
                                         jsTest.options().transactionLifetimeLimitSeconds]);
                         }
+                    }
+
+                    if ((jsTest.options().setParameters === undefined ||
+                         jsTest.options().setParameters['minNumChunksForSessionsCollection'] ===
+                             undefined) &&
+                        !argArrayContainsSetParameterValue('minNumChunksForSessionsCollection=')) {
+                        argArray.push(...['--setParameter', "minNumChunksForSessionsCollection=1"]);
                     }
                 }
 
