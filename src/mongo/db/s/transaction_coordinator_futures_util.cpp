@@ -232,9 +232,7 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
         if (MONGO_unlikely(hangWhileTargetingRemoteHost.shouldFail())) {
-            LOGV2(22450,
-                  "Hit hangWhileTargetingRemoteHost failpoint for shard {shardId}",
-                  "shardId"_attr = shardId);
+            LOGV2(22450, "Hit hangWhileTargetingRemoteHost failpoint", "shardId"_attr = shardId);
             hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 

@@ -88,9 +88,8 @@ void killClientOpCtx(ServiceContext* service, const std::string& clientName) {
         sleepmillis(50);
     }
 
-    LOGV2_ERROR(22462,
-                "Timed out trying to find and kill client opCtx with name: {clientName}",
-                "clientName"_attr = clientName);
+    LOGV2_ERROR(
+        22462, "Timed out trying to find and kill client opCtx", "clientName"_attr = clientName);
     ASSERT_FALSE(true);
 }
 

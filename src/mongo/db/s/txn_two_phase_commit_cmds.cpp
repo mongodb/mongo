@@ -101,10 +101,10 @@ public:
 
             LOGV2_DEBUG(22483,
                         3,
-                        "Participant shard received prepareTransaction for transaction with "
-                        "txnNumber {opCtx_getTxnNumber} on session {opCtx_getLogicalSessionId}",
-                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                        "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+                        "{sessionId}:{txnNumber} Participant shard received prepareTransaction",
+                        "Participant shard received prepareTransaction",
+                        "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
+                        "txnNumber"_attr = opCtx->getTxnNumber());
 
             // TODO(SERVER-46105) remove
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
@@ -209,11 +209,12 @@ std::set<ShardId> validateParticipants(OperationContext* opCtx,
     LOGV2_DEBUG(
         22484,
         3,
-        "Coordinator shard received request to coordinate commit with "
-        "participant list {ss_str} for {opCtx_getLogicalSessionId_getId}:{opCtx_getTxnNumber}",
-        "ss_str"_attr = ss.str(),
-        "opCtx_getLogicalSessionId_getId"_attr = opCtx->getLogicalSessionId()->getId(),
-        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber());
+        "{sessionId}:{txnNumber} Coordinator shard received request to coordinate commit with "
+        "participant list {participantList}",
+        "Coordinator shard received request to coordinate commit",
+        "sessionId"_attr = opCtx->getLogicalSessionId()->getId(),
+        "txnNumber"_attr = opCtx->getTxnNumber(),
+        "participantList"_attr = ss.str());
 
     return participantsSet;
 }
@@ -287,11 +288,10 @@ public:
 
             LOGV2_DEBUG(22486,
                         3,
-                        "Going to recover decision from local participant for "
-                        "{opCtx_getLogicalSessionId_getId}:{opCtx_getTxnNumber}",
-                        "opCtx_getLogicalSessionId_getId"_attr =
-                            opCtx->getLogicalSessionId()->getId(),
-                        "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber());
+                        "{sessionId}:{txnNumber} Going to recover decision from local participant",
+                        "Going to recover decision from local participant",
+                        "sessionId"_attr = opCtx->getLogicalSessionId()->getId(),
+                        "txnNumber"_attr = opCtx->getTxnNumber());
 
             boost::optional<SharedSemiFuture<void>> participantExitPrepareFuture;
             {

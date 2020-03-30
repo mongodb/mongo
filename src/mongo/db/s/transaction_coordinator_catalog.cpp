@@ -50,8 +50,10 @@ void TransactionCoordinatorCatalog::exitStepUp(Status status) {
     } else {
         LOGV2_WARNING(22444,
                       "Coordinator recovery failed and coordinateCommit requests will not be "
-                      "allowed{causedBy_status}",
-                      "causedBy_status"_attr = causedBy(status));
+                      "allowed: {error}",
+                      "Coordinator recovery failed and coordinateCommit requests will not be "
+                      "allowed",
+                      "error"_attr = status);
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
@@ -84,8 +86,9 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
                                            bool forStepUp) {
     LOGV2_DEBUG(22439,
                 3,
-                "Inserting coordinator {lsid_getId}:{txnNumber} into in-memory catalog",
-                "lsid_getId"_attr = lsid.getId(),
+                "{sessionId}:{txnNumber} Inserting coordinator into in-memory catalog",
+                "Inserting coordinator into in-memory catalog",
+                "sessionId"_attr = lsid.getId(),
                 "txnNumber"_attr = txnNumber);
 
     stdx::unique_lock<Latch> ul(_mutex);
@@ -160,8 +163,9 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
 void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNumber txnNumber) {
     LOGV2_DEBUG(22440,
                 3,
-                "Removing coordinator {lsid_getId}:{txnNumber} from in-memory catalog",
-                "lsid_getId"_attr = lsid.getId(),
+                "{sessionId}:{txnNumber} Removing coordinator from in-memory catalog",
+                "Removing coordinator from in-memory catalog",
+                "sessionId"_attr = lsid.getId(),
                 "txnNumber"_attr = txnNumber);
 
     stdx::lock_guard<Latch> lk(_mutex);
@@ -194,10 +198,15 @@ void TransactionCoordinatorCatalog::join() {
     while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
         LOGV2(22442,
-              "After 5 seconds of wait there are still {coordinatorsBySession_size} sessions left "
+              "After 5 seconds of wait there are still {numSessionsLeft} sessions left "
               "with active coordinators which have not yet completed",
-              "coordinatorsBySession_size"_attr = _coordinatorsBySession.size());
-        LOGV2(22443, "{ul}", "ul"_attr = _toString(ul));
+              "After 5 seconds of wait there are still sessions left with active coordinators "
+              "which have not yet completed",
+              "numSessionsLeft"_attr = _coordinatorsBySession.size());
+        LOGV2(22443,
+              "Active coordinators remaining: {activeCoordinators}",
+              "Active coordinators remaining",
+              "activeCoordinators"_attr = _toString(ul));
     }
 }
 

@@ -202,12 +202,12 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                     if (_decision->getDecision() == CommitDecision::kCommit) {
                         LOGV2_DEBUG(22446,
                                     3,
-                                    "{txn_txnIdToString_lsid_txnNumber} Advancing cluster time to "
-                                    "the commit timestamp {decision_getCommitTimestamp}",
-                                    "txn_txnIdToString_lsid_txnNumber"_attr =
-                                        txn::txnIdToString(_lsid, _txnNumber),
-                                    "decision_getCommitTimestamp"_attr =
-                                        *_decision->getCommitTimestamp());
+                                    "{sessionId}:{txnNumber} Advancing cluster time to "
+                                    "the commit timestamp {commitTimestamp}",
+                                    "Advancing cluster time to the commit timestamp",
+                                    "sessionId"_attr = _lsid.getId(),
+                                    "txnNumber"_attr = _txnNumber,
+                                    "commitTimestamp"_attr = *_decision->getCommitTimestamp());
 
                         uassertStatusOK(LogicalClock::get(_serviceContext)
                                             ->advanceClusterTime(
@@ -389,8 +389,10 @@ void TransactionCoordinator::_done(Status status) {
 
     LOGV2_DEBUG(22447,
                 3,
-                "{txn_txnIdToString_lsid_txnNumber} Two-phase commit completed with {status}",
-                "txn_txnIdToString_lsid_txnNumber"_attr = txn::txnIdToString(_lsid, _txnNumber),
+                "{sessionId}:{txnNumber} Two-phase commit completed with {status}",
+                "Two-phase commit completed",
+                "sessionId"_attr = _lsid.getId(),
+                "txnNumber"_attr = _txnNumber,
                 "status"_attr = redact(status));
 
     stdx::unique_lock<Latch> ul(_mutex);

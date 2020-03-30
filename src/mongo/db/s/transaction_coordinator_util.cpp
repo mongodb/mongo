@@ -108,8 +108,10 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
                                             const std::vector<ShardId>& participantList) {
     LOGV2_DEBUG(22463,
                 3,
-                "{txnIdToString_lsid_txnNumber} Going to write participant list",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber));
+                "{sessionId}:{txnNumber} Going to write participant list",
+                "Going to write participant list",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     if (MONGO_unlikely(hangBeforeWritingParticipantList.shouldFail())) {
         LOGV2(22464, "Hit hangBeforeWritingParticipantList failpoint");
@@ -173,8 +175,9 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22465,
                 3,
-                "{txnIdToString_lsid_txnNumber} Wrote participant list",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber));
+                "{sessionId}:{txnNumber} Wrote participant list",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
@@ -299,9 +302,10 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
     LOGV2_DEBUG(22467,
                 3,
-                "{txnIdToString_lsid_txnNumber} Going to write decision {isCommit_commit_abort}",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber),
-                "isCommit_commit_abort"_attr = (isCommit ? "commit" : "abort"));
+                "{sessionId}:{txnNumber} Going to write decision {decision}",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber,
+                "decision"_attr = (isCommit ? "commit" : "abort"));
 
     if (MONGO_unlikely(hangBeforeWritingDecision.shouldFail())) {
         LOGV2(22468, "Hit hangBeforeWritingDecision failpoint");
@@ -370,9 +374,11 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22469,
                 3,
-                "{txnIdToString_lsid_txnNumber} Wrote decision {isCommit_commit_abort}",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber),
-                "isCommit_commit_abort"_attr = (isCommit ? "commit" : "abort"));
+                "{sessionId}:{txnNumber} Wrote decision {decision}",
+                "Wrote decision",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber,
+                "decision"_attr = (isCommit ? "commit" : "abort"));
 
     return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
@@ -466,8 +472,10 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   TxnNumber txnNumber) {
     LOGV2_DEBUG(22472,
                 3,
-                "{txnIdToString_lsid_txnNumber} Going to delete coordinator doc",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber));
+                "{sessionId}:{txnNumber} Going to delete coordinator doc",
+                "Going to delete coordinator doc",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     if (MONGO_unlikely(hangBeforeDeletingCoordinatorDoc.shouldFail())) {
         LOGV2(22473, "Hit hangBeforeDeletingCoordinatorDoc failpoint");
@@ -524,8 +532,10 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22474,
                 3,
-                "{txnIdToString_lsid_txnNumber} Deleted coordinator doc",
-                "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber));
+                "{sessionId}:{txnNumber} Deleted coordinator doc",
+                "Deleted coordinator doc",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumber"_attr = txnNumber);
 
     hangAfterDeletingCoordinatorDoc.execute([&](const BSONObj& data) {
         LOGV2(22475, "Hit hangAfterDeletingCoordinatorDoc failpoint");
@@ -600,11 +610,13 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
          operationContextFn] {
             LOGV2_DEBUG(22476,
                         3,
-                        "{txnIdToString_lsid_txnNumber} Coordinator going to send command "
-                        "{commandObj} to {isLocalShard_local}shard {shardId}",
-                        "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber),
-                        "commandObj"_attr = commandObj,
-                        "isLocalShard_local"_attr = (isLocalShard ? "local " : ""),
+                        "{sessionId}:{txnNumber} Coordinator going to send command "
+                        "{command} to {localOrRemote} shard {shardId}",
+                        "Coordinator going to send command to shard",
+                        "sessionId"_attr = lsid.getId(),
+                        "txnNumber"_attr = txnNumber,
+                        "command"_attr = commandObj,
+                        "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
                         "shardId"_attr = shardId);
 
             return scheduler
@@ -634,25 +646,27 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                                    << ", which is not an expected behavior. "
                                                       "Interpreting the response as vote to abort");
                             LOGV2(22477,
-                                  "{txnIdToString_lsid_txnNumber} {abortStatus}",
-                                  "txnIdToString_lsid_txnNumber"_attr =
-                                      txnIdToString(lsid, txnNumber),
-                                  "abortStatus"_attr = redact(abortStatus));
+                                  "{sessionId}:{txnNumber} {error}",
+                                  "Coordinator received error from transaction participant",
+                                  "sessionId"_attr = lsid.getId(),
+                                  "txnNumber"_attr = txnNumber,
+                                  "error"_attr = redact(abortStatus));
 
                             return PrepareResponse{
                                 shardId, PrepareVote::kAbort, boost::none, abortStatus};
                         }
 
-                        LOGV2_DEBUG(22478,
-                                    3,
-                                    "{txnIdToString_lsid_txnNumber} Coordinator shard received a "
-                                    "vote to commit from shard {shardId} with prepareTimestamp: "
-                                    "{prepareTimestampField_timestamp}",
-                                    "txnIdToString_lsid_txnNumber"_attr =
-                                        txnIdToString(lsid, txnNumber),
-                                    "shardId"_attr = shardId,
-                                    "prepareTimestampField_timestamp"_attr =
-                                        prepareTimestampField.timestamp());
+                        LOGV2_DEBUG(
+                            22478,
+                            3,
+                            "{sessionId}:{txnNumber} Coordinator shard received a "
+                            "vote to commit from shard {shardId} with prepareTimestamp: "
+                            "{prepareTimestamp}",
+                            "Coordinator shard received a vote to commit from participant shard",
+                            "sessionId"_attr = lsid.getId(),
+                            "txnNumber"_attr = txnNumber,
+                            "shardId"_attr = shardId,
+                            "prepareTimestampField"_attr = prepareTimestampField.timestamp());
 
                         return PrepareResponse{shardId,
                                                PrepareVote::kCommit,
@@ -662,13 +676,14 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
 
                     LOGV2_DEBUG(22479,
                                 3,
-                                "{txnIdToString_lsid_txnNumber} Coordinator shard received "
-                                "{status} from shard {shardId} for {commandObj}",
-                                "txnIdToString_lsid_txnNumber"_attr =
-                                    txnIdToString(lsid, txnNumber),
+                                "{sessionId}:{txnNumber} Coordinator shard received "
+                                "{status} from shard {shardId} for {command}",
+                                "Coordinator shard received response from shard",
+                                "sessionId"_attr = lsid.getId(),
+                                "txnNumber"_attr = txnNumber,
                                 "status"_attr = status,
                                 "shardId"_attr = shardId,
-                                "commandObj"_attr = commandObj);
+                                "command"_attr = commandObj);
 
                     if (ErrorCodes::isVoteAbortError(status.code())) {
                         return PrepareResponse{
@@ -699,9 +714,11 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
         [lsid, txnNumber, shardId](const Status& status) {
             LOGV2_DEBUG(22480,
                         3,
-                        "{txnIdToString_lsid_txnNumber} Prepare stopped retrying due to retrying "
+                        "{sessionId}:{txnNumber} Prepare stopped retrying due to retrying "
                         "being cancelled",
-                        "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber));
+                        "Prepare stopped retrying due to retrying being cancelled",
+                        "sessionId"_attr = lsid.getId(),
+                        "txnNumber"_attr = txnNumber);
             return PrepareResponse{shardId, boost::none, boost::none, status};
         });
 }
@@ -732,11 +749,13 @@ Future<void> sendDecisionToShard(ServiceContext* service,
          commandObj = commandObj.getOwned()] {
             LOGV2_DEBUG(22481,
                         3,
-                        "{txnIdToString_lsid_txnNumber} Coordinator going to send command "
-                        "{commandObj} to {isLocalShard_local}shard {shardId}",
-                        "txnIdToString_lsid_txnNumber"_attr = txnIdToString(lsid, txnNumber),
-                        "commandObj"_attr = commandObj,
-                        "isLocalShard_local"_attr = (isLocalShard ? "local " : ""),
+                        "{sessionId}:{txnNumber} Coordinator going to send command "
+                        "{command} to {localOrRemote} shard {shardId}",
+                        "Coordinator going to send command to shard",
+                        "sessionId"_attr = lsid.getId(),
+                        "txnNumber"_attr = txnNumber,
+                        "command"_attr = commandObj,
+                        "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
                         "shardId"_attr = shardId);
 
             return scheduler
@@ -755,12 +774,13 @@ Future<void> sendDecisionToShard(ServiceContext* service,
 
                     LOGV2_DEBUG(22482,
                                 3,
-                                "{txnIdToString_lsid_txnNumber} Coordinator shard received "
-                                "{status} in response to {commandObj} from shard {shardId}",
-                                "txnIdToString_lsid_txnNumber"_attr =
-                                    txnIdToString(lsid, txnNumber),
+                                "{sessionId}:{txnNumber}  Coordinator shard received "
+                                "{status} in response to {command} from shard {shardId}",
+                                "Coordinator shard received response from shard",
+                                "sessionId"_attr = lsid.getId(),
+                                "txnNumber"_attr = txnNumber,
                                 "status"_attr = status,
-                                "commandObj"_attr = commandObj,
+                                "command"_attr = commandObj,
                                 "shardId"_attr = shardId);
 
                     if (ErrorCodes::isVoteAbortError(status.code())) {
