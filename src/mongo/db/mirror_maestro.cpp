@@ -307,7 +307,11 @@ void MirrorMaestroImpl::_mirror(std::vector<HostAndPort> hosts,
                 return;
             }
 
-            invariant(args.response.isOK());
+            if (MONGO_unlikely(!args.response.isOK())) {
+                LOGV2_FATAL(4717301,
+                            "Received mirroring response with a non-okay status",
+                            "error"_attr = args.response);
+            }
 
             gMirroredReadsSection.resolved.fetchAndAdd(1);
             LOGV2_DEBUG(31457,
