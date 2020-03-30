@@ -828,14 +828,23 @@ env.Library(
     source=[
         'repl_set_command.cpp',
         'repl_set_get_status_cmd.cpp',
+        'repl_set_test_egress.cpp',
+        env.Idlc('repl_set_test_egress.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/connection_pool_executor',
+        '$BUILD_DIR/mongo/executor/network_interface',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_tl',
     ],
 )
 

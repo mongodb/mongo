@@ -528,6 +528,7 @@ let testCases = {
     replSetStepUp: {skip: "does not accept read or write concern"},
     replSetSyncFrom: {skip: "does not accept read or write concern"},
     replSetTest: {skip: "does not accept read or write concern"},
+    replSetTestEgress: {skip: "does not accept read or write concern"},
     replSetUpdatePosition: {skip: "does not accept read or write concern"},
     resetError: {skip: "does not accept read or write concern"},
     resync: {skip: "does not accept read or write concern"},

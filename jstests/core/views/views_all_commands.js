@@ -465,6 +465,7 @@ let viewsCommandTests = {
     replSetStepUp: {skip: isUnrelated},
     replSetSyncFrom: {skip: isUnrelated},
     replSetTest: {skip: isUnrelated},
+    replSetTestEgress: {skip: isUnrelated},
     replSetUpdatePosition: {skip: isUnrelated},
     replSetResizeOplog: {skip: isUnrelated},
     resetError: {skip: isUnrelated},

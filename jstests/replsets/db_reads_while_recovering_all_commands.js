@@ -255,6 +255,7 @@ const allCommands = {
     replSetStepUp: {skip: isNotAUserDataRead},
     replSetSyncFrom: {skip: isNotAUserDataRead},
     replSetTest: {skip: isNotAUserDataRead},
+    replSetTestEgress: {skip: isNotAUserDataRead},
     replSetUpdatePosition: {skip: isNotAUserDataRead},
     replSetResizeOplog: {skip: isNotAUserDataRead},
     resetError: {skip: isNotAUserDataRead},

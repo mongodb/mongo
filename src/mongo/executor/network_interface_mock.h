@@ -139,6 +139,8 @@ public:
 
     void dropConnections(const HostAndPort&) override {}
 
+    void testEgress(const HostAndPort&, transport::ConnectSSLMode, Milliseconds, Status) override {}
+
     ////////////////////////////////////////////////////////////////////////////////
     //
     // Methods for simulating network operations and the passage of time.
