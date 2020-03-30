@@ -17,15 +17,13 @@ if (typeof db === 'undefined') {
         "Expected mongo shell to be connected a mongod, but global 'db' object isn't defined");
 }
 
-const conn = db.getMongo();
-const topology = DiscoverTopology.findConnectedNodes(conn);
-
 /**
  * Returns true if the error code is transient.
  */
 function isIgnorableError(codeName) {
     if (codeName == "ConfigurationInProgress" || codeName == "NotMaster" ||
-        codeName == "InterruptedDueToReplStateChange" || codeName == "PrimarySteppedDown") {
+        codeName == "InterruptedDueToReplStateChange" || codeName == "PrimarySteppedDown" ||
+        codeName === "NodeNotFound" || codeName === "ShutdownInProgress") {
         return true;
     }
     return false;
@@ -102,10 +100,12 @@ function reconfigBackground(primary, numNodes) {
     jsTestLog("Running reconfig to change votes of node at index" + indexToChange);
 
     // Change the priority to correspond to the votes. If the member's current votes field
-    // is 1, only change it to 0 if there are more than 2 voting members in this set.
+    // is 1, only change it to 0 if there are more than 3 voting members in this set.
+    // We want to ensure that there are at least 3 voting nodes so that killing the primary
+    // will not affect a majority.
     config.version++;
     config.members[indexToChange].votes =
-        (config.members[indexToChange].votes === 1 && numVotingNodes > 2) ? 0 : 1;
+        (config.members[indexToChange].votes === 1 && numVotingNodes > 3) ? 0 : 1;
     config.members[indexToChange].priority = config.members[indexToChange].votes;
 
     let votingRes = conn.getDB("admin").runCommand({replSetReconfig: config});
@@ -117,11 +117,27 @@ function reconfigBackground(primary, numNodes) {
     return {ok: 1};
 }
 
-if (topology.type === Topology.kReplicaSet) {
-    var numNodes = topology.nodes.length;
-    let res = reconfigBackground(topology.primary, numNodes);
-    assert.commandWorked(res, "reconfig hook failed: " + tojson(res));
-} else {
-    throw new Error('Unsupported topology configuration: ' + tojson(topology));
+// It is possible that the primary will be killed before actually running the reconfig
+// command. If we fail with a network error, ignore it.
+let res;
+try {
+    const conn = db.getMongo();
+    const topology = DiscoverTopology.findConnectedNodes(conn);
+
+    if (topology.type !== Topology.kReplicaSet) {
+        throw new Error('Unsupported topology configuration: ' + tojson(topology));
+    }
+
+    const numNodes = topology.nodes.length;
+    res = reconfigBackground(topology.primary, numNodes);
+} catch (e) {
+    if (isNetworkError(e)) {
+        jsTestLog("Ignoring network error: " + tojson(e));
+        res = {ok: 1};
+    } else {
+        throw e;
+    }
 }
+
+assert.commandWorked(res, "reconfig hook failed: " + tojson(res));
 })();

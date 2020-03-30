@@ -507,6 +507,16 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         primary = self.get_primary()
         return [node for node in self.nodes if node.port != primary.port]
 
+    def get_voting_members(self):
+        """Return the number of voting nodes in the replica set."""
+        primary = self.get_primary()
+        client = primary.mongo_client()
+
+        members = client.admin.command({"replSetGetConfig": 1})['config']['members']
+        voting_members = [member['host'] for member in members if member['votes'] == 1]
+
+        return voting_members
+
     def get_initial_sync_node(self):
         """Return initial sync node from the replica set."""
         return self.initial_sync_node
