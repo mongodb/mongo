@@ -15,9 +15,12 @@ const kBurstCount = 1000;
 const kDbName = "mirrored_reads_test";
 const kCollName = "test";
 
+function getMirroredReadsStats(rst) {
+    return rst.getPrimary().getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
+}
+
 function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
-    let startMirroredReads =
-        rst.getPrimary().getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
+    let startMirroredReads = getMirroredReadsStats(rst);
 
     jsTestLog(`Sending ${kBurstCount} request burst of ${tojson(cmd)} to primary`);
 
@@ -30,15 +33,13 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
 
     // Verify that the reads have been observed on the primary
     {
-        let currentMirroredReads =
-            rst.getPrimary().getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
-        assert.eq(startMirroredReads.seen + kBurstCount, currentMirroredReads.seen);
+        let currentMirroredReads = getMirroredReadsStats(rst);
+        assert.lte(startMirroredReads.seen + kBurstCount, currentMirroredReads.seen);
     }
 
     // Verify that the reads mirrored to the secondaries have responded
     assert.soon(() => {
-        let currentMirroredReads =
-            rst.getPrimary().getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
+        let currentMirroredReads = getMirroredReadsStats(rst);
 
         let readsSeen = currentMirroredReads.seen - startMirroredReads.seen;
         let readsMirrored = currentMirroredReads.resolved - startMirroredReads.resolved;
