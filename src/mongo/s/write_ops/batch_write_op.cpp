@@ -373,13 +373,27 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             }
         }
 
-        // Account the array overhead once for the actual updates array and once for the statement
-        // ids array, if retryable writes are used
+        // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
+        // corresponding to the statements that got routed to each individual shard, so they need to
+        // be accounted in the potential request size so it does not exceed the max BSON size.
+        //
+        // The constant 4 is chosen as the size of the BSON representation of the stmtId.
         const int writeSizeBytes = getWriteSizeBytes(writeOp) +
             write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
             (_batchTxnNum ? write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 4 : 0);
 
-        if (wouldMakeBatchesTooBig(writes, writeSizeBytes, batchMap)) {
+        // For unordered writes, the router must return an entry for each failed write. This
+        // constant is a pessimistic attempt to ensure that if a request to a shard hits
+        // StaleShardVersion and has to return number of errors equivalent to the number of writes
+        // in the batch, the response size will not exceed the max BSON size.
+        //
+        // The constant of 256 is chosen as an approximation of the size of the BSON representataion
+        // of the StaleConfigInfo (which contains the shard id) and the adjacent error message.
+        const int errorResponsePotentialSizeBytes =
+            ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 256;
+
+        if (wouldMakeBatchesTooBig(
+                writes, std::max(writeSizeBytes, errorResponsePotentialSizeBytes), batchMap)) {
             invariant(!batchMap.empty());
             writeOp.cancelWrites(nullptr);
             break;
@@ -404,7 +418,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             }
 
             TargetedWriteBatch* batch = batchIt->second;
-            batch->addWrite(write, writeSizeBytes);
+            batch->addWrite(write, std::max(writeSizeBytes, errorResponsePotentialSizeBytes));
         }
 
         // Relinquish ownership of TargetedWrites, now the TargetedBatches own them

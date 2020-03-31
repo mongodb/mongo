@@ -262,14 +262,15 @@ bool handleError(OperationContext* opCtx,
         return false;
     }
 
-    if (ex.extraInfo<StaleConfigInfo>() || ex.extraInfo<StaleDbRoutingVersion>()) {
+    if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex)) {
         if (!opCtx->getClient()->isInDirectClient()) {
             auto& oss = OperationShardingState::get(opCtx);
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
 
-        // Don't try doing more ops since they will fail with the same error.
-        // Command reply serializer will handle repeating this error if needed.
+        // Since this is a routing error, it is guaranteed that all subsequent operations will fail
+        // with the same cause, so don't try doing any more operations. The command reply serializer
+        // will handle repeating this error for unordered writes.
         out->results.emplace_back(ex.toStatus());
         return false;
     }

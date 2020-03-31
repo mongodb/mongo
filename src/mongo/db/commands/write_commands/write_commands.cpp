@@ -92,15 +92,18 @@ void serializeReply(OperationContext* opCtx,
     if (shouldSkipOutput(opCtx))
         return;
 
-    if (continueOnError && !result.results.empty()) {
+    if (continueOnError) {
+        invariant(!result.results.empty());
         const auto& lastResult = result.results.back();
-        if (lastResult == ErrorCodes::StaleConfig || lastResult == ErrorCodes::StaleDbVersion) {
-            // For ordered:false commands we need to duplicate these error results for all ops
-            // after we stopped. See handleError() in write_ops_exec.cpp for more info.
-            auto err = result.results.back();
-            while (result.results.size() < opsInBatch) {
-                result.results.emplace_back(err);
-            }
+
+        if (lastResult == ErrorCodes::StaleDbVersion ||
+            ErrorCodes::isStaleShardVersionError(lastResult.getStatus())) {
+            // For ordered:false commands we need to duplicate these error results for all ops after
+            // we stopped. See handleError() in write_ops_exec.cpp for more info.
+            //
+            // Omit the reason from the duplicate unordered responses so it doesn't consume BSON
+            // object space
+            result.results.resize(opsInBatch, lastResult.getStatus().withReason(""));
         }
     }
 

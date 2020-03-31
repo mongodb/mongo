@@ -90,7 +90,7 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
     int i = 0;
     for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
         WriteErrorDetail* error = new WriteErrorDetail;
-        error->setStatus({ErrorCodes::StaleShardVersion, "mock stale error"});
+        error->setStatus({ErrorCodes::StaleShardVersion, ""});
         error->setErrInfo([&] {
             StaleConfigInfo sci(
                 nss, ChunkVersion(1, 0, epoch), ChunkVersion(2, 0, epoch), ShardId(kShardName1));
@@ -288,7 +288,7 @@ public:
 // Tests for the BatchWriteExec
 //
 
-TEST_F(BatchWriteExecTest, SingleOp) {
+TEST_F(BatchWriteExecTest, SingleOpUnordered) {
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
         insertOp.setWriteCommandBase([] {
@@ -317,7 +317,7 @@ TEST_F(BatchWriteExecTest, SingleOp) {
     future.default_timed_get();
 }
 
-TEST_F(BatchWriteExecTest, MultiOpLarge) {
+TEST_F(BatchWriteExecTest, MultiOpLargeOrdered) {
     const int kNumDocsToInsert = 100'000;
     const std::string kDocValue(200, 'x');
 
@@ -356,7 +356,7 @@ TEST_F(BatchWriteExecTest, MultiOpLarge) {
     future.default_timed_get();
 }
 
-TEST_F(BatchWriteExecTest, SingleOpError) {
+TEST_F(BatchWriteExecTest, SingleOpUnorderedError) {
     BatchedCommandResponse errResponse;
     errResponse.setStatus({ErrorCodes::UnknownError, "mock error"});
 
@@ -388,6 +388,44 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
     });
 
     expectInsertsReturnError({BSON("x" << 1)}, errResponse);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
+    const int kNumDocsToInsert = 100'000;
+
+    std::vector<BSONObj> docsToInsert;
+    docsToInsert.reserve(kNumDocsToInsert);
+    for (int i = 0; i < kNumDocsToInsert; i++) {
+        docsToInsert.push_back(BSON("_id" << i));
+    }
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(docsToInsert);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQ(kNumDocsToInsert, response.getN());
+    });
+
+    expectInsertsReturnStaleVersionErrors({docsToInsert.begin(), docsToInsert.begin() + 63791});
+    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 63791});
+    expectInsertsReturnSuccess({docsToInsert.begin() + 63791, docsToInsert.end()});
 
     future.default_timed_get();
 }
