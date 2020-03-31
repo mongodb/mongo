@@ -97,7 +97,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     initializeStorageEngine(serviceContext,
                             StorageEngineInitFlags::kAllowNoLockFile |
                                 StorageEngineInitFlags::kSkipMetadataFile);
-    StorageControl::startStorageControls(serviceContext);
+    StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
