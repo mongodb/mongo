@@ -16,6 +16,14 @@ for (i = 0; i < 5; i++) {
 }
 replTest.awaitReplication();
 
+// After calling replTest.getPrimary(), the slaveOk bit will be set to true, which will result
+// in running all aggregations with a readPreference of 'secondaryPreferred'. This is
+// problematic in a mixed 4.2/4.4 Replica Set cluster as running $out/$merge with non-primary
+// read preference against a cluster in FCV 4.2 is not allowed. As such, we explicitly set the
+// 'slaveOk' bit to false before running the $out aggregation to ensure that it runs with
+// readPreference 'primary'.
+primary.setSlaveOk(false);
+
 // run one and check for proper replication
 primary.coll.aggregate({$out: "out"}).itcount();
 replTest.awaitReplication();
