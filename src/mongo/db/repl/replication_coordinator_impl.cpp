@@ -3278,8 +3278,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         // Make sure that the latest committed optime from the previous config is committed in the
         // current config. If this is the initial reconfig, then we don't need to check this
         // condition, since there were no prior configs. Also, for force reconfigs we bypass this
-        // safety check condition. In any FCV < 4.4 we also bypass it to preserve client facing
-        // behavior in mixed version sets.
+        // safety check condition.
         auto isInitialReconfig = (_rsConfig.getConfigVersion() == 1);
         // If our config was installed via a "force" reconfig, we bypass the oplog commitment check.
         auto leavingForceConfig = (_rsConfig.getConfigTerm() == OpTime::kUninitializedTerm);

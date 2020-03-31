@@ -53,18 +53,6 @@ function runAwaitableIsMasterBeforeFCVChange(
             {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(serverMaxWireVersion)},
     }));
 
-    // On downgrade from 4.4 to 4.2, the primary will reconfig the replset and signal isMaster.
-    if (prevMinWireVersion === response.minWireVersion) {
-        jsTestLog("Min wire version didn't change: " + prevMinWireVersion + ". Retry isMaster.");
-        topologyVersionField = response.topologyVersion;
-        response = assert.commandWorked(db.runCommand({
-            isMaster: 1,
-            topologyVersion: topologyVersionField,
-            maxAwaitTimeMS: 99999999,
-            internalClient:
-                {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(serverMaxWireVersion)},
-        }));
-    }
     // We only expect to increment the server TopologyVersion when the minWireVersion has changed.
     // This can only happen in two scenarios:
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.

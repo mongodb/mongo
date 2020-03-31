@@ -83,8 +83,6 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
 
-    // In order to be compatible with FCV 4.2, default the config term to -1 if we are unable
-    // parse a configTerm field from the args.
     status = bsonExtractIntegerFieldWithDefault(
         argsObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &_cfgTerm);
     if (!status.isOK())

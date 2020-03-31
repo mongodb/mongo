@@ -1268,28 +1268,6 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
                 "appliedOpTime"_attr = args.appliedOpTime,
                 "durableOpTime"_attr = args.durableOpTime);
 
-    // If we're in FCV 4.4, allow replSetUpdatePosition commands between config versions.
-    if (!serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        if (args.cfgver != _rsConfig.getConfigVersion()) {
-            static constexpr char errmsg[] =
-                "Received replSetUpdatePosition for node whose config version doesn't match our "
-                "config version";
-            LOGV2_DEBUG(21813,
-                        1,
-                        errmsg,
-                        "memberId"_attr = memberId,
-                        "memberConfigVersion"_attr = args.cfgver,
-                        "ourConfigVersion"_attr = _rsConfig.getConfigVersion());
-            *configVersion = _rsConfig.getConfigVersion();
-            return Status(ErrorCodes::InvalidReplicaSetConfig,
-                          str::stream()
-                              << errmsg << ", memberId: " << memberId
-                              << ", member config version: " << args.cfgver
-                              << ", our config version: " << _rsConfig.getConfigVersion());
-        }
-    }
-
     // While we can accept replSetUpdatePosition commands across config versions, we still do not
     // allow receiving them from a node that is not in our config.
     auto* memberData = _findMemberDataByMemberId(memberId.getData());
@@ -2906,24 +2884,6 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
               "Choosing new sync source because the user has requested a sync source",
               "syncSource"_attr = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort());
         return true;
-    }
-
-    // If we're in FCV 4.4, allow data replication between config versions. Otherwise, change
-    // our sync source.
-    if (!serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
-            LOGV2(
-                21830,
-                "Choosing new sync source because the config version supplied by {currentSource}, "
-                "{syncSourceConfigVersion}, does not match ours, {configVersion}",
-                "Choosing new sync source because the config version supplied by the current sync "
-                "source does not match ours",
-                "currentSource"_attr = currentSource,
-                "syncSourceConfigVersion"_attr = replMetadata.getConfigVersion(),
-                "configVersion"_attr = _rsConfig.getConfigVersion());
-            return true;
-        }
     }
 
     // While we can allow data replication across config versions, we still do not allow syncing
