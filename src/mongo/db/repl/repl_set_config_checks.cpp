@@ -140,6 +140,25 @@ Status validateArbiterPriorities(const ReplSetConfig& config) {
 }
 
 /**
+ * Checks that a configuration has no member with a "newlyAdded" field.  Such configurations are
+ * valid for startup and reconfig but not for initiating a new replica set.
+ */
+Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
+    for (ReplSetConfig::MemberIterator iter = config.membersBegin(); iter != config.membersEnd();
+         ++iter) {
+        if (iter->isNewlyAdded()) {
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream()
+                              << "Member " << iter->getHostAndPort().toString() << ", with "
+                              << MemberConfig::kIdFieldName << " " << iter->getId()
+                              << ", has a newlyAdded field, which is not valid for "
+                                 "initial configuration of a replica set.");
+        }
+    }
+    return Status::OK();
+}
+
+/**
  * Compares two initialized and validated replica set configurations and checks to see if the
  * transition from 'oldConfig' to 'newConfig' adds or removes at most 1 voting node.
  *
@@ -321,6 +340,10 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     status = validateArbiterPriorities(newConfig);
     if (!status.isOK()) {
         return StatusWith<int>(status);
+    }
+
+    if (!(status = ensureNoNewlyAddedMembers(newConfig)).isOK()) {
+        return status;
     }
 
     if (newConfig.getConfigVersion() != 1) {
