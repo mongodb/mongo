@@ -41,23 +41,24 @@ class ServiceContext;
 namespace StorageControl {
 
 /**
- * Responsible for initializing independent processes for replication that and interact with the
- * storage layer.
+ * Responsible for initializing independent processes for replication that interact with the storage
+ * layer.
  *
- * Instantiates the JournalFlusher to periodically, and upon request, flush writes to disk.
+ * Instantiates the JournalFlusher to flush writes to disk periodically and upon request. If
+ * 'forTestOnly' is set, then the JournalFlusher will only run upon request so as not to disrupt
+ * unit test expectations.
  *
- * Safe to call again after stopStorageControls has been called, to restart any processes that were
- * stopped.
+ * Safe to call again after stopStorageControls() has been called, to restart any processes that
+ * were stopped.
  */
-void startStorageControls(ServiceContext* serviceContext);
+void startStorageControls(ServiceContext* serviceContext, bool forTestOnly = false);
 
 /**
- * Stops the processes begun by startStorageControls.
+ * Stops the processes begun by startStorageControls().
  *
- * The OplogCapMaintainerThread is unowned and therefore ignored; the JournalFlusher is shut
- * down.
+ * The JournalFlusher is shut down.
  *
- * Safe to call multiple times.
+ * Safe to call multiple times, whether or not startStorageControls() has been called.
  */
 void stopStorageControls(ServiceContext* serviceContext);
 

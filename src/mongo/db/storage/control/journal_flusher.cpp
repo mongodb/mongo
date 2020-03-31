@@ -117,7 +117,8 @@ void JournalFlusher::run() {
         }
 
         // Wait until either journalCommitIntervalMs passes or an immediate journal flush is
-        // requested (or shutdown).
+        // requested (or shutdown). If _disablePeriodicFlushes is set, then the thread will not
+        // wake up until a journal flush is externally requested.
 
         auto deadline =
             Date_t::now() + Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
@@ -125,8 +126,13 @@ void JournalFlusher::run() {
         stdx::unique_lock<Latch> lk(_stateMutex);
 
         MONGO_IDLE_THREAD_BLOCK;
-        _flushJournalNowCV.wait_until(
-            lk, deadline.toSystemTimePoint(), [&] { return _flushJournalNow || _shuttingDown; });
+        if (_disablePeriodicFlushes) {
+            _flushJournalNowCV.wait(lk, [&] { return _flushJournalNow || _shuttingDown; });
+        } else {
+            _flushJournalNowCV.wait_until(lk, deadline.toSystemTimePoint(), [&] {
+                return _flushJournalNow || _shuttingDown;
+            });
+        }
 
         _flushJournalNow = false;
 

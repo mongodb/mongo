@@ -38,9 +38,32 @@ namespace mongo {
 
 class OperationContext;
 
+/**
+ * A periodic and signalable thread that flushes data to disk. Constructor parameter will dictate
+ * whether to periodically flush or only on signal.
+ *
+ * This thread is helpful for two reasons:
+ *  - Periodically flushing data to disk may protect users doing writes with {j: false} from losing
+ *    a great deal of their data across a server crash.
+ *  - Asynchronously grouping data flush requests reduces the total number of flushes executed,
+ *    reducing i/o load on the system and improving write performance. This thread groups both the
+ *    periodic flushes and immediate flush requests from the rest of the system.
+ *
+ * And incidentally helpful for another reason:
+ *  - waitUntilDurable() calls update the replication JournalListener, so more frequent calls may be
+ *    helpful to unblock replication related operations more quickly.
+ */
 class JournalFlusher : public BackgroundJob {
 public:
-    explicit JournalFlusher() : BackgroundJob(/*deleteSelf*/ false) {}
+    /**
+     * Setting 'disablePeriodicFlushes' to true will cause the JournalFlusher thread to only execute
+     * a data flush upon explicit request: flushes will no longer be executed periodically in
+     * addition. This is useful for storage engines that do not want frequent durability updates,
+     * like engines without a journal where the cost of durability is high (using checkpoints
+     * instead).
+     */
+    explicit JournalFlusher(bool disablePeriodicFlushes)
+        : BackgroundJob(/*deleteSelf*/ false), _disablePeriodicFlushes(disablePeriodicFlushes) {}
 
     static JournalFlusher* get(ServiceContext* serviceCtx);
     static JournalFlusher* get(OperationContext* opCtx);
@@ -50,6 +73,11 @@ public:
         return "JournalFlusher";
     }
 
+    /**
+     * Runs data flushes every 'storageGlobalParams.journalCommitIntervalMs' millis (unless
+     * '_disablePeriodicFlushes' is set) or immediately if triggerJournalFlush() or
+     * waitForJournalFlush() is called.
+     */
     void run();
 
     /**
@@ -101,6 +129,11 @@ private:
         std::make_unique<SharedPromise<void>>();
     std::unique_ptr<SharedPromise<void>> _nextSharedPromise =
         std::make_unique<SharedPromise<void>>();
+
+    // Controls whether to ignore the 'storageGlobalParams.journalCommitIntervalMs' setting. If set,
+    // data flushes will only be executed upon explicit request, no longer periodically in addition
+    // to upon request.
+    bool _disablePeriodicFlushes;
 };
 
 }  // namespace mongo

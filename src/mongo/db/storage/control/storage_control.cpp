@@ -43,50 +43,56 @@ namespace mongo {
 
 namespace StorageControl {
 
-void startStorageControls(ServiceContext* serviceContext) {
+namespace {
+
+bool areControlsStarted = false;
+
+}  // namespace
+
+void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     auto storageEngine = serviceContext->getStorageEngine();
 
     // Instantiate a thread to periodically, and upon request, flush writes to disk.
-    if (!storageEngine->isEphemeral() && storageEngine->isDurable()) {
-        std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>();
-        journalFlusher->go();
-        JournalFlusher::set(serviceContext, std::move(journalFlusher));
-    }
+    //
+    // Persisted storage engines that have a journal should periodically flush the journal to disk
+    // to avoid risking much user data loss across a server crash if the user is not doing {j: true}
+    // writes often.
+    //
+    // Non-durable, i.e. no journal, storage engines should only flush upon request because
+    // waitUntilDurable() will perform a checkpoint and checkpoints are costly. Periodic flushes
+    // will be disabled and only requests will provoke a flush.
+    //
+    // Ephemeral engines are not durable -- waitUntilDurable() returns early -- but frequent updates
+    // to replication's JournalListener in the waitUntilDurable() code may help update replication
+    // timestamps more quickly.
+    //
+    // (Note: the ephemeral engine returns false for isDurable(), so we must be careful not to
+    // disable it.)
+    std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
+        /*disablePeriodicFlushes*/ forTestOnly ||
+        (!storageEngine->isDurable() && !storageEngine->isEphemeral()));
+    journalFlusher->go();
+    JournalFlusher::set(serviceContext, std::move(journalFlusher));
+
+    areControlsStarted = true;
 }
 
 void stopStorageControls(ServiceContext* serviceContext) {
-    auto storageEngine = serviceContext->getStorageEngine();
-
-    if (!storageEngine->isEphemeral() && storageEngine->isDurable()) {
+    if (areControlsStarted) {
         JournalFlusher::get(serviceContext)->shutdown();
     }
 }
 
 void triggerJournalFlush(ServiceContext* serviceContext) {
-    auto storageEngine = serviceContext->getStorageEngine();
-
-    if (!storageEngine->isEphemeral() && storageEngine->isDurable()) {
-        JournalFlusher::get(serviceContext)->triggerJournalFlush();
-    }
+    JournalFlusher::get(serviceContext)->triggerJournalFlush();
 }
 
 void waitForJournalFlush(OperationContext* opCtx) {
-    auto serviceContext = opCtx->getServiceContext();
-    auto storageEngine = serviceContext->getStorageEngine();
-
-    if (!storageEngine->isEphemeral() && storageEngine->isDurable()) {
-        JournalFlusher::get(serviceContext)->waitForJournalFlush();
-    } else {
-        opCtx->recoveryUnit()->waitUntilDurable(opCtx);
-    }
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 void interruptJournalFlusherForReplStateChange(ServiceContext* serviceContext) {
-    auto storageEngine = serviceContext->getStorageEngine();
-
-    if (!storageEngine->isEphemeral() && storageEngine->isDurable()) {
-        JournalFlusher::get(serviceContext)->interruptJournalFlusherForReplStateChange();
-    }
+    JournalFlusher::get(serviceContext)->interruptJournalFlusherForReplStateChange();
 }
 
 }  // namespace StorageControl
