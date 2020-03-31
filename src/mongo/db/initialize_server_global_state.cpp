@@ -111,7 +111,7 @@ void signalForkSuccess() {
     if (close(*f) == -1) {
         int savedErr = errno;
         LOGV2_WARNING(4656301,
-                      "Closing write pipe failed",
+                      "closing write pipe failed",
                       "errno"_attr = savedErr,
                       "errnoDesc"_attr = errnoWithDescription(savedErr));
     }
@@ -378,10 +378,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                 boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
                 if (!ec) {
                     LOGV2(20697,
-                          "Moving existing log file \"{oldLogPath}\" to \"{newLogPath}\"",
-                          "Renamed existing log file",
-                          "oldLogPath"_attr = absoluteLogpath,
-                          "newLogPath"_attr = renameTarget);
+                          "log file \"{absoluteLogpath}\" exists; moved to \"{renameTarget}\".",
+                          "absoluteLogpath"_attr = absoluteLogpath,
+                          "renameTarget"_attr = renameTarget);
                 } else {
                     return Status(ErrorCodes::FileRenameFailed,
                                   str::stream()
@@ -428,8 +427,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             javascriptAppender = std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
                 std::make_unique<MessageEventDetailsEncoder>(), writer.getValue());
             if (serverGlobalParams.logAppend && exists) {
-                LOGV2_WARNING_OPTIONS(
-                    20699, {logv2::LogTag::kStartupWarnings}, "***** SERVER RESTARTED *****");
+                LOGV2(20699, "***** SERVER RESTARTED *****");
                 Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
                 if (!status.isOK())
                     return status;
@@ -466,8 +464,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
         Status result = lv2Manager.getGlobalDomainInternal().configure(lv2Config);
         if (result.isOK() && writeServerRestartedAfterLogConfig)
-            LOGV2_WARNING_OPTIONS(
-                20698, {logv2::LogTag::kStartupWarnings}, "***** SERVER RESTARTED *****");
+            LOGV2(20698, "***** SERVER RESTARTED *****");
         return result;
     }
 

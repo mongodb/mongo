@@ -95,11 +95,11 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
 
         if (rsConfig.isInitialized()) {
             LOGV2(20722,
-                  "Node is a member of a replica set",
+                  "Replica Set Config",
                   "config"_attr = rsConfig,
                   "memberState"_attr = replCoord->getMemberState());
         } else {
-            LOGV2(20724, "Node currently has no replica set config");
+            LOGV2(20724, "Node currently has no Replica Set Config.");
         }
     }
 

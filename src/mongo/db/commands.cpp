@@ -614,9 +614,9 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
             if (closeConnection) {
                 opCtx->getClient()->session()->end();
                 LOGV2(20431,
-                      "Failing {command} via 'failCommand' failpoint: closing connection",
-                      "Failing command via 'failCommand' failpoint: closing connection",
-                      "command"_attr = cmd->getName());
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "closing connection.",
+                      "cmd_getName"_attr = cmd->getName());
                 uasserted(50985, "Failing command due to 'failCommand' failpoint");
             }
 
@@ -631,35 +631,32 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                         blockTimeMS >= 0);
 
                 LOGV2(20432,
-                      "Blocking {command} via 'failCommand' failpoint for {blockTime}",
-                      "Blocking command via 'failCommand' failpoint",
-                      "command"_attr = cmd->getName(),
-                      "blockTime"_attr = Milliseconds{blockTimeMS});
+                      "Blocking command '{cmd_getName}' via 'failCommand' failpoint for "
+                      "{blockTimeMS} milliseconds",
+                      "cmd_getName"_attr = cmd->getName(),
+                      "blockTimeMS"_attr = blockTimeMS);
                 opCtx->sleepFor(Milliseconds{blockTimeMS});
                 LOGV2(20433,
-                      "Unblocking {command} via 'failCommand' failpoint",
-                      "Unblocking command via 'failCommand' failpoint",
-                      "command"_attr = cmd->getName());
+                      "Unblocking command '{cmd_getName}' via 'failCommand' failpoint",
+                      "cmd_getName"_attr = cmd->getName());
             }
 
             if (hasExtraInfo) {
                 LOGV2(20434,
-                      "Failing {command} via 'failCommand' failpoint: returning {errorCode} and "
-                      "{errorExtraInfo}",
-                      "Failing command via 'failCommand' failpoint",
-                      "command"_attr = cmd->getName(),
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "returning error code {errorCode} and {errorExtraInfo}.",
+                      "cmd_getName"_attr = cmd->getName(),
                       "errorCode"_attr = errorCode,
                       "errorExtraInfo"_attr = errorExtraInfo);
                 uassertStatusOK(Status(ErrorCodes::Error(errorCode),
                                        "Failing command due to 'failCommand' failpoint",
                                        errorExtraInfo.Obj()));
             } else if (hasErrorCode) {
-                LOGV2(
-                    20435,
-                    "Failing command {command} via 'failCommand' failpoint: returning {errorCode}",
-                    "Failing command via 'failCommand' failpoint",
-                    "command"_attr = cmd->getName(),
-                    "errorCode"_attr = errorCode);
+                LOGV2(20435,
+                      "Failing command '{cmd_getName}' via 'failCommand' failpoint. Action: "
+                      "returning error code {errorCode}.",
+                      "cmd_getName"_attr = cmd->getName(),
+                      "errorCode"_attr = errorCode);
                 uasserted(ErrorCodes::Error(errorCode),
                           "Failing command due to 'failCommand' failpoint");
             }
@@ -744,11 +741,10 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             }
         }
     } catch (const DBException& e) {
-        LOGV2_ERROR_OPTIONS(20436,
-                            {logComponentV1toV2(LogComponent::kAccessControl)},
-                            "Checking authorization failed: {error}",
-                            "Checking authorization failed",
-                            "error"_attr = e.toStatus());
+        LOGV2_OPTIONS(20436,
+                      {logComponentV1toV2(LogComponent::kAccessControl)},
+                      "{e_toStatus}",
+                      "e_toStatus"_attr = e.toStatus());
         CommandHelpers::auditLogAuthEvent(opCtx, this, request, e.code());
         throw;
     }

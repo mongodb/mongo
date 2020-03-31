@@ -82,7 +82,7 @@ void OperationKiller::killOperation(OperationId opId) {
 
     serviceContext->killOperation(target, target->getOperationContext());
 
-    LOGV2(20884, "Killed operation: {opId}", "Killed operation", "opId"_attr = opId);
+    LOGV2(20884, "Killed operation: {opId}", "opId"_attr = opId);
 }
 
 void OperationKiller::killOperation(const OperationKey& opKey) {
