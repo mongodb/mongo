@@ -2863,6 +2863,7 @@ long long TopologyCoordinator::getTerm() const {
 bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                  const rpc::ReplSetMetadata& replMetadata,
                                                  const rpc::OplogQueryMetadata& oqMetadata,
+                                                 const OpTime& lastOpTimeFetched,
                                                  Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
@@ -2909,14 +2910,13 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
 
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
-    const OpTime myLastOpTime = getMyLastAppliedOpTime();
-    if (syncSourceIndex == -1 && currentSourceOpTime <= myLastOpTime &&
+    if (syncSourceIndex == -1 && currentSourceOpTime <= lastOpTimeFetched &&
         !replMetadata.getIsPrimary()) {
         LOGV2(21832,
               "Choosing new sync source. Our current sync source is not primary and does "
               "not have a sync source, so we require that it is ahead of us",
               "syncSource"_attr = currentSource,
-              "lastFetchedOpTime"_attr = myLastOpTime,
+              "lastFetchedOpTime"_attr = lastOpTimeFetched,
               "syncSourceLatestOplogOpTime"_attr = currentSourceOpTime,
               "isPrimary"_attr = replMetadata.getIsPrimary());
         return true;

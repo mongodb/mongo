@@ -4614,10 +4614,11 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
 
 bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                         const rpc::ReplSetMetadata& replMetadata,
-                                                        const rpc::OplogQueryMetadata& oqMetadata) {
+                                                        const rpc::OplogQueryMetadata& oqMetadata,
+                                                        const OpTime& lastOpTimeFetched) {
     stdx::lock_guard<Latch> lock(_mutex);
     return _topCoord->shouldChangeSyncSource(
-        currentSource, replMetadata, oqMetadata, _replExecutor->now());
+        currentSource, replMetadata, oqMetadata, lastOpTimeFetched, _replExecutor->now());
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {

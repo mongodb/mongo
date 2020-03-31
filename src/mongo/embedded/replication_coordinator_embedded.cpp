@@ -411,7 +411,8 @@ void ReplicationCoordinatorEmbedded::resetLastOpTimesFromOplog(OperationContext*
 
 bool ReplicationCoordinatorEmbedded::shouldChangeSyncSource(const HostAndPort&,
                                                             const rpc::ReplSetMetadata&,
-                                                            const rpc::OplogQueryMetadata&) {
+                                                            const rpc::OplogQueryMetadata&,
+                                                            const OpTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

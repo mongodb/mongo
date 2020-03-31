@@ -46,7 +46,8 @@ public:
 
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& replMetadata,
-                            const rpc::OplogQueryMetadata& oqMetadata) override;
+                            const rpc::OplogQueryMetadata& oqMetadata,
+                            const OpTime& lastOpTimeFetched) override;
 };
 
 }  // namespace repl

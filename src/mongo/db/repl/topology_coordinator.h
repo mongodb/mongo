@@ -232,6 +232,7 @@ public:
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& replMetadata,
                                 const rpc::OplogQueryMetadata& oqMetadata,
+                                const OpTime& lastOpTimeFetched,
                                 Date_t now) const;
 
     /**

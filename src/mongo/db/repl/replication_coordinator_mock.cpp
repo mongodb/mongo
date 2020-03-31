@@ -453,7 +453,8 @@ bool ReplicationCoordinatorMock::lastOpTimesWereReset() const {
 
 bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                         const rpc::ReplSetMetadata& replMetadata,
-                                                        const rpc::OplogQueryMetadata& oqMetadata) {
+                                                        const rpc::OplogQueryMetadata& oqMetadata,
+                                                        const OpTime& lastOpTimeFetched) {
     MONGO_UNREACHABLE;
 }
 

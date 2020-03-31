@@ -466,7 +466,10 @@ void OplogFetcherTest::testSyncSourceChecking(const rpc::ReplSetMetadata& replMe
     dataReplicatorExternalState->shouldStopFetchingResult = true;
 
     auto shutdownState =
-        processSingleBatch(makeFirstBatch(0, {firstEntry, secondEntry, thirdEntry}, metadataObj));
+        processSingleBatch(makeFirstBatch(0, {firstEntry, secondEntry, thirdEntry}, metadataObj),
+                           false /* shouldShutdown */,
+                           true /* requireFresherSyncSource */,
+                           true /* lastFetchedShouldAdvance */);
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState->getStatus());
 }
@@ -1686,7 +1689,7 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldReportErrorsThrownFromEnqueueDocument
 TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetcher) {
     testSyncSourceChecking(replSetMetadata, oqMetadata);
 
-    // Sync source optime and "hasSyncSource" can be set if the respone contains metadata.
+    // Sync source optime and "hasSyncSource" can be set if the response contains metadata.
     ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
     ASSERT_EQUALS(oqMetadata.getLastOpApplied(), dataReplicatorExternalState->syncSourceLastOpTime);
     ASSERT_TRUE(dataReplicatorExternalState->syncSourceHasSyncSource);

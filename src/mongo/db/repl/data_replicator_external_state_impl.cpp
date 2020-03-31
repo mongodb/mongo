@@ -91,12 +91,13 @@ void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata
     }
 }
 
-bool DataReplicatorExternalStateImpl::shouldStopFetching(
-    const HostAndPort& source,
-    const rpc::ReplSetMetadata& replMetadata,
-    const rpc::OplogQueryMetadata& oqMetadata) {
+bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& source,
+                                                         const rpc::ReplSetMetadata& replMetadata,
+                                                         const rpc::OplogQueryMetadata& oqMetadata,
+                                                         const OpTime& lastOpTimeFetched) {
     // Re-evaluate quality of sync target.
-    if (_replicationCoordinator->shouldChangeSyncSource(source, replMetadata, oqMetadata)) {
+    if (_replicationCoordinator->shouldChangeSyncSource(
+            source, replMetadata, oqMetadata, lastOpTimeFetched)) {
         LOGV2(21150,
               "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
               "sync source. Current source: {syncSource}, OpTime {lastAppliedOpTime}, "

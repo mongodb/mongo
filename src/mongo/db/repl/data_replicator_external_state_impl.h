@@ -56,7 +56,8 @@ public:
 
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& replMetadata,
-                            const rpc::OplogQueryMetadata& oqMetadata) override;
+                            const rpc::OplogQueryMetadata& oqMetadata,
+                            const OpTime& lastOpTimeFetched) override;
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 

@@ -86,7 +86,8 @@ public:
      */
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,
-                                        const rpc::OplogQueryMetadata& oqMetadata) = 0;
+                                        const rpc::OplogQueryMetadata& oqMetadata,
+                                        const OpTime& lastOpTimeFetched) = 0;
 };
 
 }  // namespace repl

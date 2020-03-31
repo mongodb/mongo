@@ -97,7 +97,8 @@ public:
      */
     virtual bool shouldStopFetching(const HostAndPort& source,
                                     const rpc::ReplSetMetadata& replMetadata,
-                                    const rpc::OplogQueryMetadata& oqMetadata) = 0;
+                                    const rpc::OplogQueryMetadata& oqMetadata,
+                                    const OpTime& lastOpTimeFetched) = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.

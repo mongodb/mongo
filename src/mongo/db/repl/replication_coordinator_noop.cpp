@@ -386,7 +386,8 @@ void ReplicationCoordinatorNoOp::resetLastOpTimesFromOplog(OperationContext*, Da
 
 bool ReplicationCoordinatorNoOp::shouldChangeSyncSource(const HostAndPort&,
                                                         const rpc::ReplSetMetadata&,
-                                                        const rpc::OplogQueryMetadata&) {
+                                                        const rpc::OplogQueryMetadata&,
+                                                        const OpTime&) {
     MONGO_UNREACHABLE;
 }
 

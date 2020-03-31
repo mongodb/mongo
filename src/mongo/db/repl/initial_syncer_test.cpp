@@ -160,8 +160,10 @@ public:
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& replMetadata,
-                                const rpc::OplogQueryMetadata& oqMetadata) override {
-        return _syncSourceSelector->shouldChangeSyncSource(currentSource, replMetadata, oqMetadata);
+                                const rpc::OplogQueryMetadata& oqMetadata,
+                                const OpTime& lastOpTimeFetched) override {
+        return _syncSourceSelector->shouldChangeSyncSource(
+            currentSource, replMetadata, oqMetadata, lastOpTimeFetched);
     }
 
     void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
