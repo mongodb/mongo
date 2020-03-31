@@ -481,6 +481,16 @@ public:
 
     void onConfirmedSet(const State& state) noexcept final {
         auto connStr = state.connStr;
+        try {
+            LOGV2(471693,
+                  "Updating the shard registry with confirmed replica set",
+                  "connectionString"_attr = connStr);
+            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2(471694,
+                  "Unable to update the shard registry with confirmed replica set",
+                  "error"_attr = e);
+        }
 
         auto fun = [serviceContext = _serviceContext, connStr](auto args) {
             if (ErrorCodes::isCancelationError(args.status.code())) {
@@ -492,9 +502,6 @@ public:
                 LOGV2(22846,
                       "Updating sharding state with confirmed replica set",
                       "connectionString"_attr = connStr);
-
-                Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
-
                 if (MONGO_unlikely(failReplicaSetChangeConfigServerUpdateHook.shouldFail())) {
                     return;
                 }
