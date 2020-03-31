@@ -26,7 +26,7 @@ env.Library(
 )
 
 env.Library(
-    target='cluster_write_op',
+    target='cluster_write_ops',
     source=[
         'batch_write_exec.cpp',
         'batch_write_op.cpp',
@@ -36,16 +36,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        'batch_write_types',
-    ],
-)
-
-env.Library(
-    target='cluster_write_op_conversion',
-    source=[
-        'batch_downconvert.cpp',
-    ],
-    LIBDEPS=[
         'batch_write_types',
     ],
 )

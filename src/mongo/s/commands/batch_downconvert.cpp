@@ -29,14 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/s/commands/batch_downconvert.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 
 namespace mongo {
-
-using std::string;
 
 Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
     // DRAGONS
@@ -48,10 +46,10 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
     // Also update extractGLEErrors in batch_api.js for any changes made here.
 
     const bool isOK = gleResponse["ok"].trueValue();
-    const string err = gleResponse["err"].str();
-    const string errMsg = gleResponse["errmsg"].str();
-    const string wNote = gleResponse["wnote"].str();
-    const string jNote = gleResponse["jnote"].str();
+    const std::string err = gleResponse["err"].str();
+    const std::string errMsg = gleResponse["errmsg"].str();
+    const std::string wNote = gleResponse["wnote"].str();
+    const std::string jNote = gleResponse["jnote"].str();
     const int code = gleResponse["code"].numberInt();
     const bool timeout = gleResponse["wtimeout"].trueValue();
 
@@ -149,7 +147,7 @@ BSONObj stripNonWCInfo(const BSONObj& gleResponse) {
     }
 
     if (!errField.eoo()) {
-        string err = errField.str();
+        std::string err = errField.str();
         if (err == "norepl" || err == "noreplset" || err == "timeout") {
             // Append err if it's from a write concern issue
             builder.append(errField);

@@ -42,9 +42,9 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/s/commands/batch_downconvert.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/write_ops/batch_downconvert.h"
 
 namespace mongo {
 namespace {

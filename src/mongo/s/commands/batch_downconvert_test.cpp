@@ -32,16 +32,12 @@
 #include <deque>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/s/commands/batch_downconvert.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
-using std::deque;
-using std::vector;
 
 //
 // Tests for parsing GLE responses into write errors and write concern errors for write
@@ -216,4 +212,6 @@ TEST(LegacyGLESuppress, TimeoutDupError24) {
     ASSERT_EQUALS(stripped["code"].numberInt(), 56789);
     ASSERT(stripped["wtimeout"].trueValue());
 }
+
 }  // namespace
+}  // namespace mongo
