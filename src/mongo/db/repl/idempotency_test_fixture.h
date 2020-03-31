@@ -89,7 +89,17 @@ StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBuf
 
 class IdempotencyTest : public OplogApplierImplTest {
 public:
-    IdempotencyTest() : OplogApplierImplTest("wiredTiger"){};
+    IdempotencyTest() : OplogApplierImplTest("wiredTiger") {
+        globalFailPointRegistry()
+            .find("doUntimestampedWritesForIdempotencyTests")
+            ->setMode(FailPoint::alwaysOn);
+    }
+
+    ~IdempotencyTest() {
+        globalFailPointRegistry()
+            .find("doUntimestampedWritesForIdempotencyTests")
+            ->setMode(FailPoint::off);
+    }
 
 protected:
     enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
