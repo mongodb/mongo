@@ -208,8 +208,8 @@ functions:
           python -m pip install ./src/python
 
           ./scripts/lamp --linux-distro rhel62
-          ./dist/bin/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017' --metrics-output-file genny-perf.csv --metrics-format cedar-csv
-          genny-metrics-legacy-report --report-file "${workdir}/src/perf.json" genny-perf.csv
+          ./scripts/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017'
+          genny-metrics-legacy-report --report-file "${workdir}/src/perf.json" build/genny-metrics.csv
     - command: "json.send"
       params:
         name: "perf"
