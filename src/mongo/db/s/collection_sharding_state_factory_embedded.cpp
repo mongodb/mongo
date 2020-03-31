@@ -62,6 +62,10 @@ public:
         return {kUnshardedCollection};
     }
 
+    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
+        return {kUnshardedCollection};
+    }
+
     boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() override {
         return boost::none;
     }

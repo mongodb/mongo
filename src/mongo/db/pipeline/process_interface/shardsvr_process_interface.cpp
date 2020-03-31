@@ -51,7 +51,9 @@ namespace mongo {
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    return CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded();
+    return CollectionShardingState::get(opCtx, nss)
+        ->getCollectionDescription_DEPRECATED()
+        .isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(

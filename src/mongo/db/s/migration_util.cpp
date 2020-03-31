@@ -279,12 +279,15 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
             uassert(
                 ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                str::stream() << "Even after forced refresh, filtering metadata for namespace in "
-                                 "deletion task "
-                              << (css->getCollectionDescription().isSharded()
-                                      ? " has UUID that does not match UUID of the deletion task"
-                                      : " is unsharded"),
-                css->getCollectionDescription().isSharded() &&
+                str::stream()
+                    << "Even after forced refresh, filtering metadata for namespace in "
+                       "deletion task "
+                    << (css->getCurrentMetadataIfKnown()
+                            ? (css->getCollectionDescription().isSharded()
+                                   ? " has UUID that does not match UUID of the deletion task"
+                                   : " is unsharded")
+                            : " is not known"),
+                css->getCurrentMetadataIfKnown() && css->getCollectionDescription().isSharded() &&
                     css->getCollectionDescription().uuidMatches(deletionTask.getCollectionUuid()));
 
             LOGV2(22026,

@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-using PersistentTaskStoreTest = ShardServerTestFixture;
 
 const NamespaceString kNss{"test.foo"};
 
@@ -65,6 +65,17 @@ struct TestTask {
         BSONObjBuilder builder;
         serialize(builder);
         return builder.obj();
+    }
+};
+
+class PersistentTaskStoreTest : public ShardServerTestFixture {
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
+        CollectionShardingRuntime::get(operationContext(), kNss)
+            ->setFilteringMetadata(operationContext(), CollectionMetadata());
     }
 };
 

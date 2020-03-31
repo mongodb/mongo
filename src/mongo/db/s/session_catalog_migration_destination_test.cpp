@@ -43,6 +43,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/server_options.h"
@@ -137,6 +138,8 @@ public:
                                     std::make_unique<repl::StorageInterfaceImpl>());
         MongoDSessionCatalog::onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+
+        setUnshardedFilteringMetadata(kNs);
     }
 
     void returnOplog(const std::vector<OplogEntry>& oplogList) {
@@ -267,6 +270,13 @@ public:
 
         ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done ==
                     sessionMigration->getState());
+    }
+
+    void setUnshardedFilteringMetadata(const NamespaceString& nss) {
+        AutoGetDb autoDb(operationContext(), nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
+        CollectionShardingRuntime::get(operationContext(), nss)
+            ->setFilteringMetadata(operationContext(), CollectionMetadata());
     }
 
 private:

@@ -72,7 +72,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 BSONObj AuthOpObserver::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
-    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    const auto collDesc =
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
     return collDesc.extractDocumentKey(doc).getOwned();
 }
 

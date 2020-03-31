@@ -31,7 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/split_vector.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -42,13 +44,23 @@ namespace {
 const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kPattern = "_id";
 
+
+void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+    CollectionShardingRuntime::get(opCtx, nss)->setFilteringMetadata(opCtx, CollectionMetadata());
+}
+
 class SplitVectorTest : public ShardServerTestFixture {
 public:
     void setUp() {
         ShardServerTestFixture::setUp();
 
-        DBDirectClient dbclient(operationContext());
+        auto opCtx = operationContext();
+        DBDirectClient dbclient(opCtx);
         ASSERT_TRUE(dbclient.createCollection(kNss.ns()));
+
+        setUnshardedFilteringMetadata(opCtx, kNss);
         dbclient.createIndex(kNss.ns(), BSON(kPattern << 1));
 
         // Insert 100 documents into the collection so the tests can test splitting with different
@@ -283,8 +295,12 @@ public:
     void setUp() {
         ShardServerTestFixture::setUp();
 
-        DBDirectClient dbclient(operationContext());
+        auto opCtx = operationContext();
+        DBDirectClient dbclient(opCtx);
         ASSERT_TRUE(dbclient.createCollection(kJumboNss.ns()));
+
+        setUnshardedFilteringMetadata(opCtx, kJumboNss);
+
         dbclient.createIndex(kJumboNss.ns(), BSON(kJumboPattern << 1));
 
         // Insert 10000 documents into the collection with the same shard key value.
@@ -338,8 +354,11 @@ public:
     void setUp() {
         ShardServerTestFixture::setUp();
 
-        DBDirectClient dbclient(operationContext());
+        auto opCtx = operationContext();
+        DBDirectClient dbclient(opCtx);
         ASSERT_TRUE(dbclient.createCollection(kMaxResponseNss.ns()));
+
+        setUnshardedFilteringMetadata(opCtx, kMaxResponseNss);
         dbclient.createIndex(kMaxResponseNss.ns(), BSON("a" << 1));
 
         for (int i = 0; i < numDocs; ++i) {

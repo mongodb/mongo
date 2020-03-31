@@ -331,7 +331,8 @@ void checkUniqueIndexConstraints(OperationContext* opCtx,
                                  const BSONObj& newIdxKey) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    const auto collDesc =
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
     if (!collDesc.isSharded())
         return;
 

@@ -214,7 +214,9 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
         return true;
 
     // Certain config collections can never be sharded
-    if (ns() == kSessionTransactionsTableNamespace.ns())
+    if (ns() == kSessionTransactionsTableNamespace.ns() || ns() == kRangeDeletionNamespace.ns() ||
+        ns() == kTransactionCoordinatorsNamespace.ns() ||
+        ns() == kMigrationCoordinatorsNamespace.ns())
         return true;
 
     if (isSystemDotProfile())

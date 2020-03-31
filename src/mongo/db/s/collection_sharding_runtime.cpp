@@ -104,7 +104,8 @@ CollectionShardingRuntime::CollectionShardingRuntime(
     std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor)
     : _nss(std::move(nss)),
       _rangeDeleterExecutor(rangeDeleterExecutor),
-      _stateChangeMutex(nss.toString()) {
+      _stateChangeMutex(nss.toString()),
+      _serviceContext(sc) {
     if (isNamespaceAlwaysUnsharded(_nss)) {
         _metadataType = MetadataType::kUnsharded;
     }
@@ -133,10 +134,8 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
 
-    uassert(StaleConfigInfo(_nss,
-                            *optReceivedShardVersion,
-                            getCurrentShardVersionIfKnown(),
-                            ShardingState::get(opCtx)->shardId()),
+    uassert(StaleConfigInfo(
+                _nss, *optReceivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
             str::stream() << "sharding status of collection " << _nss.ns()
                           << " is not currently available for filtering and needs to be recovered "
                           << "from the config server",
@@ -147,10 +146,26 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
+    uassert(
+        StaleConfigInfo(_nss,
+                        ChunkVersion::UNSHARDED(),
+                        boost::none,
+                        ShardingState::get(_serviceContext)->shardId()),
+        str::stream() << "sharding status of collection " << _nss.ns()
+                      << " is not currently available for description and needs to be recovered "
+                      << "from the config server",
+        optMetadata);
+
+    return {std::move(*optMetadata)};
+}
+
+ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription_DEPRECATED() {
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
+
     if (!optMetadata)
         return {kUnshardedCollection};
 
-    return *optMetadata;
+    return {std::move(*optMetadata)};
 }
 
 boost::optional<ScopedCollectionDescription>

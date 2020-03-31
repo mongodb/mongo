@@ -86,7 +86,8 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
                                const BSONObj& newIdxKey) {
     UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx, nss);
 
-    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    const auto collDesc =
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
     if (!collDesc.isSharded())
         return;
 

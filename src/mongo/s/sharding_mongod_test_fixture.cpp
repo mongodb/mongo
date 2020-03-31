@@ -244,7 +244,7 @@ std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCurs
 }
 
 std::unique_ptr<BalancerConfiguration> ShardingMongodTestFixture::makeBalancerConfiguration() {
-    return nullptr;
+    return std::make_unique<BalancerConfiguration>();
 }
 
 Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(

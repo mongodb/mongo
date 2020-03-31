@@ -28,6 +28,8 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/persistent_task_queue.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/thread.h"
@@ -37,7 +39,7 @@
 namespace mongo {
 namespace {
 
-using PersistentTaskQueueTest = ShardServerTestFixture;
+const NamespaceString kNss = NamespaceString("test", "foo");
 
 struct TestTask {
     std::string key;
@@ -79,14 +81,23 @@ void killOps(ServiceContext* serviceCtx) {
     }
 }
 
+class PersistentTaskQueueTest : public ShardServerTestFixture {
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
+        CollectionShardingRuntime::get(operationContext(), kNss)
+            ->setFilteringMetadata(operationContext(), CollectionMetadata());
+    }
+};
+
 // Test that writes to the queue persist across instantiations.
 TEST_F(PersistentTaskQueueTest, TestWritesPersistInstances) {
-    NamespaceString nss("test.foo");
 
     auto opCtx = operationContext();
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 0UL);
         ASSERT_TRUE(q.empty(opCtx));
@@ -100,7 +111,7 @@ TEST_F(PersistentTaskQueueTest, TestWritesPersistInstances) {
     }
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 1UL);
         ASSERT_EQ(q.peek(opCtx).task.key, "age");
@@ -113,7 +124,7 @@ TEST_F(PersistentTaskQueueTest, TestWritesPersistInstances) {
     }
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 0UL);
         ASSERT_TRUE(q.empty(opCtx));
@@ -122,12 +133,10 @@ TEST_F(PersistentTaskQueueTest, TestWritesPersistInstances) {
 
 // Test that the FIFO order of elements is preserved across instances.
 TEST_F(PersistentTaskQueueTest, TestFIFOPreservedAcrossInstances) {
-    NamespaceString nss("test.foo");
-
     auto opCtx = operationContext();
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 0UL);
         ASSERT_TRUE(q.empty(opCtx));
@@ -142,7 +151,7 @@ TEST_F(PersistentTaskQueueTest, TestFIFOPreservedAcrossInstances) {
     }
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 4UL);
         ASSERT_FALSE(q.empty(opCtx));
@@ -164,12 +173,10 @@ TEST_F(PersistentTaskQueueTest, TestFIFOPreservedAcrossInstances) {
 
 // Test that ids are sequential across intances when items are in db.
 TEST_F(PersistentTaskQueueTest, TestIdIsContinueAcrossInstances) {
-    NamespaceString nss("test.foo");
-
     auto opCtx = operationContext();
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 0UL);
         ASSERT_TRUE(q.empty(opCtx));
@@ -187,7 +194,7 @@ TEST_F(PersistentTaskQueueTest, TestIdIsContinueAcrossInstances) {
     }
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 1UL);
         ASSERT_EQ(q.peek(opCtx).task.val, 5);
@@ -211,7 +218,7 @@ TEST_F(PersistentTaskQueueTest, TestIdIsContinueAcrossInstances) {
     }
 
     {
-        PersistentTaskQueue<TestTask> q(opCtx, nss);
+        PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
         ASSERT_EQ(q.size(opCtx), 1UL);
         ASSERT_FALSE(q.empty(opCtx));
@@ -220,22 +227,20 @@ TEST_F(PersistentTaskQueueTest, TestIdIsContinueAcrossInstances) {
 
 // Test interrupting blocking peek call before it starts waiting on the condition variable.
 TEST_F(PersistentTaskQueueTest, TestInterruptedBeforeWaitingOnCV) {
-    NamespaceString nss("test.foo");
-    PersistentTaskQueue<TestTask> q(operationContext(), nss);
+    auto opCtx = operationContext();
+    PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
     // Set interrupted state before waiting on condition variable.
-    q.close(operationContext());
+    q.close(opCtx);
 
     // Assert that wakeup is not lost.
-    ASSERT_THROWS(q.peek(operationContext()), ExceptionFor<ErrorCodes::Interrupted>);
+    ASSERT_THROWS(q.peek(opCtx), ExceptionFor<ErrorCodes::Interrupted>);
 }
 
 // Test wakeup from wait on empty queue.
 TEST_F(PersistentTaskQueueTest, TestWakeupOnEmptyQueue) {
-    NamespaceString nss("test.foo");
     auto opCtx = operationContext();
-
-    PersistentTaskQueue<TestTask> q(opCtx, nss);
+    PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
     auto result = stdx::async(stdx::launch::async, [&q] {
         ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
@@ -252,9 +257,8 @@ TEST_F(PersistentTaskQueueTest, TestWakeupOnEmptyQueue) {
 
 // Test interrupting blocking peek call after it starts waiting on the condition variable.
 TEST_F(PersistentTaskQueueTest, TestInterruptedWhileWaitingOnCV) {
-    NamespaceString nss("test.foo");
-    PersistentTaskQueue<TestTask> q(operationContext(), nss);
     auto opCtx = operationContext();
+    PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
     unittest::Barrier barrier(2);
 
@@ -277,9 +281,8 @@ TEST_F(PersistentTaskQueueTest, TestInterruptedWhileWaitingOnCV) {
 
 // Test that waiting on the condition variable is interrupted when the operation context is killed.
 TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
-    NamespaceString nss("test.foo");
-    PersistentTaskQueue<TestTask> q(operationContext(), nss);
     auto opCtx = operationContext();
+    PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
     unittest::Barrier barrier(2);
 
@@ -307,10 +310,10 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
 
 // Test that pop throws if peek is not called.
 TEST_F(PersistentTaskQueueTest, TestPopThrowsIfPeekNotCalled) {
-    NamespaceString nss("test.foo");
-    PersistentTaskQueue<TestTask> q(operationContext(), nss);
+    auto opCtx = operationContext();
+    PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
-    ASSERT_THROWS(q.pop(operationContext()), std::exception);
+    ASSERT_THROWS(q.pop(opCtx), std::exception);
 }
 
 }  // namespace

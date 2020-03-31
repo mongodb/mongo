@@ -235,7 +235,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
 BSONObj OpObserverImpl::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
-    auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+    auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
     return collDesc.extractDocumentKey(doc).getOwned();
 }
 

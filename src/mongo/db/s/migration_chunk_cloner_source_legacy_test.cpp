@@ -34,6 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -49,7 +50,8 @@ using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
 const NamespaceString kNss("TestDB", "TestColl");
-const BSONObj kShardKeyPattern{BSON("X" << 1)};
+const std::string kShardKey = "X";
+const BSONObj kShardKeyPattern{BSON(kShardKey << 1)};
 const ConnectionString kConfigConnStr =
     ConnectionString::forReplicaSet("Donor",
                                     {HostAndPort("DonorHost1:1234"),
@@ -137,6 +139,35 @@ protected:
      */
     void createShardedCollection(const std::vector<BSONObj>& initialDocs) {
         ASSERT(_client->createCollection(kNss.ns()));
+        const auto uuid = [&] {
+            AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+            return autoColl.getCollection()->uuid();
+        }();
+
+        [&] {
+            const OID epoch = OID::gen();
+
+            auto rt = RoutingTableHistory::makeNew(
+                kNss,
+                uuid,
+                kShardKeyPattern,
+                nullptr,
+                false,
+                epoch,
+                {ChunkType{kNss,
+                           ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
+                           ChunkVersion(1, 0, epoch),
+                           ShardId("dummyShardId")}});
+
+            std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
+
+            AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
+            Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
+            CollectionShardingRuntime::get(operationContext(), kNss)
+                ->setFilteringMetadata(operationContext(),
+                                       CollectionMetadata(cm, ShardId("dummyShardId")));
+        }();
+
         _client->createIndex(kNss.ns(), kShardKeyPattern);
         insertDocsInShardedCollection(initialDocs);
     }

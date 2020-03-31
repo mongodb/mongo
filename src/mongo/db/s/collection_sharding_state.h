@@ -121,6 +121,13 @@ public:
     virtual ScopedCollectionDescription getCollectionDescription() = 0;
 
     /**
+     * Function added temporary to transition from the current getCollectionDescription
+     * implementation to one where it throws when the collection metadata is unknown and is properly
+     * handled on every code path
+     */
+    virtual ScopedCollectionDescription getCollectionDescription_DEPRECATED() = 0;
+
+    /**
      * Returns boost::none if the description for the collection is not known yet. Otherwise
      * returns the most recently refreshed from the config server metadata or shard version.
      *

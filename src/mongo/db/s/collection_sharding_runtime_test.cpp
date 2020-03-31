@@ -58,20 +58,21 @@ CollectionMetadata makeShardedMetadata(UUID uuid = UUID::gen()) {
 
 
 TEST_F(CollectionShardingRuntimeTest,
-       GetCurrentMetadataReturnsUnshardedBeforeSetFilteringMetadataIsCalled) {
+       GetCollectionDescriptionThrowsStaleConfigBeforeSetFilteringMetadataIsCalled) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
-    ASSERT_FALSE(csr.getCollectionDescription().isSharded());
+    ASSERT_THROWS_CODE(csr.getCollectionDescription(), DBException, ErrorCodes::StaleConfig);
 }
 
-TEST_F(CollectionShardingRuntimeTest,
-       GetCurrentMetadataReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
+TEST_F(
+    CollectionShardingRuntimeTest,
+    GetCollectionDescriptionReturnsUnshardedAfterSetFilteringMetadataIsCalledWithUnshardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     csr.setFilteringMetadata(operationContext(), CollectionMetadata());
     ASSERT_FALSE(csr.getCollectionDescription().isSharded());
 }
 
 TEST_F(CollectionShardingRuntimeTest,
-       GetCurrentMetadataReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
+       GetCollectionDescriptionReturnsShardedAfterSetFilteringMetadataIsCalledWithShardedMetadata) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     csr.setFilteringMetadata(operationContext(), makeShardedMetadata());
     ASSERT_TRUE(csr.getCollectionDescription().isSharded());

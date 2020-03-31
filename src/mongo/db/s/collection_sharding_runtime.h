@@ -87,6 +87,8 @@ public:
 
     ScopedCollectionDescription getCollectionDescription() override;
 
+    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
+
     boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() override;
 
     boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override;
@@ -214,6 +216,9 @@ private:
 
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
+
+    // Used to get the shardId if no metadata is known when calling getCollectionDescription
+    ServiceContext* _serviceContext;
 };
 
 /**
