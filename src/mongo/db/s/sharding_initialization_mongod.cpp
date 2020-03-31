@@ -101,10 +101,20 @@ public:
 
     // Update the shard identy config string
     void onConfirmedSet(const State& state) noexcept final {
+        auto connStr = state.connStr;
+        try {
+            LOGV2(471691,
+                  "Updating the shard registry with confirmed replica set",
+                  "connectionString"_attr = connStr);
+            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2(471692, "Unable to update the shard registry", "error"_attr = e);
+        }
+
         Grid::get(_serviceContext)
             ->getExecutorPool()
             ->getFixedExecutor()
-            ->schedule([serviceContext = _serviceContext, connStr = state.connStr](Status status) {
+            ->schedule([serviceContext = _serviceContext, connStr](Status status) {
                 if (ErrorCodes::isCancelationError(status.code())) {
                     LOGV2_DEBUG(22067,
                                 2,
@@ -120,7 +130,6 @@ public:
                           "Updating config server with confirmed replica set {connectionString}",
                           "Updating config server with confirmed replica set",
                           "connectionString"_attr = connStr);
-                    Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
                     if (MONGO_unlikely(failUpdateShardIdentityConfigString.shouldFail())) {
                         return;
