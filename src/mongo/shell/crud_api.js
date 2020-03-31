@@ -241,12 +241,14 @@ DBCollection.prototype.insertOne = function(document, options) {
         // Execute insert
         bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
@@ -350,12 +352,14 @@ DBCollection.prototype.deleteOne = function(filter, options) {
         // Remove the first document that matches the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
@@ -405,12 +409,14 @@ DBCollection.prototype.deleteMany = function(filter, options) {
         // Remove all documents that matche the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
@@ -472,12 +478,14 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
         // Replace the document
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
@@ -549,12 +557,14 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
         // Update the first document that matches the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
@@ -626,12 +636,14 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
         // Update all documents that match the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if (err.hasWriteErrors()) {
-            throw err.getWriteErrorAt(0);
-        }
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
 
-        if (err.hasWriteConcernError()) {
-            throw err.getWriteConcernError();
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
         }
 
         throw err;
