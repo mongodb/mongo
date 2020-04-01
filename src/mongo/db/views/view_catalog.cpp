@@ -438,7 +438,9 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
-    invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     stdx::lock_guard<Latch> lk(_mutex);
 
