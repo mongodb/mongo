@@ -3824,6 +3824,16 @@ tasks:
   name: external_auth_WT
   commands:
   - func: "do setup"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        $python -m pip install -r src/mongo/db/modules/enterprise/jstests/external_auth/lib/external-auth-requirements.txt
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth --storageEngine=wiredTiger
