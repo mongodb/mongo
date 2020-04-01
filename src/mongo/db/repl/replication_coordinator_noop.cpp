@@ -327,7 +327,8 @@ Status ReplicationCoordinatorNoOp::doReplSetReconfig(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::awaitConfigCommitment(OperationContext* opCtx) {
+Status ReplicationCoordinatorNoOp::awaitConfigCommitment(OperationContext* opCtx,
+                                                         bool waitForOplogCommitment) {
     MONGO_UNREACHABLE;
 }
 

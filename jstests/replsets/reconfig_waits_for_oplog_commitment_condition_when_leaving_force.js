@@ -45,27 +45,21 @@ assert(isConfigCommitted(primary));
 jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
 
-jsTestLog("Safe reconfig to add the secondary back in.");
-// We expect this to fail with a time out since the last committed op from the previous config
-// cannot become committed in the current config.
+jsTestLog("Force reconfig to add the secondary back in.");
+// We expect this to succeed but the last committed op from the previous config
+// isn't committed in the current config yet.
 twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
-assert.commandFailedWithCode(
-    primary.adminCommand({replSetReconfig: twoNodeConfig, maxTimeMS: 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig, force: true}));
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-assert.soon(function() {
-    const res = primary.adminCommand({replSetGetStatus: 1});
-    return res.members[1].configVersion === rst.getReplSetConfigFromNode().version;
-});
+waitForConfigReplication(primary);
 
-// Reconfig should fail immediately since we have not committed the last committed op in the current
-// config.
+// Reconfig should succeed even if we have not committed the last committed op in the current
+// config because the current config is from a force reconfig.
 assert.eq(isConfigCommitted(primary), false);
 twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: twoNodeConfig}),
-                             ErrorCodes.ConfigurationInProgress);
+assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig}));
 
 // Make sure we can connect to the secondary after it was REMOVED.
 reconnect(secondary);
@@ -76,6 +70,7 @@ rst.awaitReplication();
 assert.soon(() => isConfigCommitted(primary));
 
 // Now that we can commit the op in the new config, reconfig should succeed.
+twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
 assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig}));
 assert(isConfigCommitted(primary));
 rst.awaitReplication();

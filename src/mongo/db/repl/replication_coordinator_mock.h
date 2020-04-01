@@ -216,7 +216,7 @@ public:
                                      GetNewConfigFn getNewConfig,
                                      bool force);
 
-    Status awaitConfigCommitment(OperationContext* opCtx);
+    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment);
 
     virtual Status processReplSetInitiate(OperationContext* opCtx,
                                           const BSONObj& configObj,

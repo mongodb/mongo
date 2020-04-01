@@ -3226,8 +3226,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         return Status(ErrorCodes::NotMaster,
                       str::stream()
                           << "replSetReconfig should only be run on PRIMARY, but my state is "
-                          << _getMemberState_inlock().toString()
-                          << "; use the \"force\" argument to override");
+                          << _getMemberState_inlock().toString());
     }
     auto topCoordTerm = _topCoord->getTerm();
 
@@ -3239,7 +3238,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
         !force && enableSafeReplicaSetReconfig) {
         if (!_doneWaitingForReplication_inlock(fakeOpTime, configWriteConcern)) {
-            return Status(ErrorCodes::ConfigurationInProgress,
+            return Status(ErrorCodes::CurrentConfigNotCommittedYet,
                           str::stream()
                               << "Cannot run replSetReconfig because the current config: "
                               << _rsConfig.getConfigVersionAndTerm().toString() << " is not "
@@ -3266,7 +3265,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
                   "Oplog config commitment condition failed to be satisfied. The last committed "
                   "optime in the previous config is not committed in current config",
                   "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
-            return Status(ErrorCodes::ConfigurationInProgress,
+            return Status(ErrorCodes::CurrentConfigNotCommittedYet,
                           str::stream() << "Last committed optime from previous config ("
                                         << configOplogCommitmentOpTime.toString()
                                         << ") is not committed in the current config.");
@@ -3431,7 +3430,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     IndexBuildsCoordinator::get(opCtx)->onReplicaSetReconfig();
 }
 
-Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx) {
+Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx,
+                                                         bool waitForOplogCommitment) {
     stdx::unique_lock<Latch> lk(_mutex);
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
@@ -3446,15 +3446,25 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     if (!configAwaitStatus.status.isOK()) {
         std::stringstream ss;
         ss << "Current config with " << currConfig.getConfigVersionAndTerm().toString()
-           << " did not propagate to a majority of nodes.";
+           << " has not yet propagated to a majority of nodes";
         return configAwaitStatus.status.withContext(ss.str());
     }
 
-    // Wait for the latest committed optime in the previous config to be committed in the current
-    // config.
+    logv2::DynamicAttributes attr;
+    attr.add("configVersion", currConfig.getConfigVersion());
+    attr.add("configTerm", currConfig.getConfigTerm());
+    attr.add("configWaitDuration", configAwaitStatus.duration);
+
+    if (!waitForOplogCommitment) {
+        LOGV2(4689401, "Propagated current replica set config to a majority of nodes", attr);
+        return Status::OK();
+    }
+
+    // Wait for the latest committed optime in the previous config to be committed in the
+    // current config.
     LOGV2(51815,
           "Waiting for the last committed optime in the previous config "
-          "({configOplogCommitmentOpTime}) to be committed in the current config.",
+          "to be committed in the current config.",
           "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
     StatusAndDuration oplogAwaitStatus =
         awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);
@@ -3462,17 +3472,13 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
         std::stringstream ss;
         ss << "Last committed optime in the previous config ("
            << configOplogCommitmentOpTime.toString()
-           << ") did not become committed in the current config.";
+           << ") has not yet become committed in the current config with "
+           << currConfig.getConfigVersionAndTerm().toString();
         return oplogAwaitStatus.status.withContext(ss.str());
     }
-
-    LOGV2(4508701,
-          "Committed current replica set config",
-          "configVersion"_attr = currConfig.getConfigVersion(),
-          "configTerm"_attr = currConfig.getConfigTerm(),
-          "configWaitDuration"_attr = configAwaitStatus.duration,
-          "oplogWaitDuration"_attr = oplogAwaitStatus.duration,
-          "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
+    attr.add("oplogWaitDuration", oplogAwaitStatus.duration);
+    attr.add("configOplogCommitmentOpTime", configOplogCommitmentOpTime);
+    LOGV2(4508701, "The current replica set config is committed", attr);
     return Status::OK();
 }
 

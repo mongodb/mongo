@@ -190,7 +190,7 @@ public:
                              GetNewConfigFn getNewConfig,
                              bool force) final;
 
-    Status awaitConfigCommitment(OperationContext* opCtx) final;
+    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) final;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;
 

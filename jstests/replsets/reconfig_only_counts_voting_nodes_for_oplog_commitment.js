@@ -23,23 +23,27 @@ var replTest = new ReplSetTest({
 var nodes = replTest.startSet();
 replTest.initiate();
 var primary = replTest.getPrimary();
-var secondary = replTest.getSecondary();
 
 // Do a write that should not be able to replicate to node1 since we stopped replication.
 stopServerReplication(nodes[1]);
 assert.commandWorked(primary.getDB("test")["test"].insert({x: 1}));
 
-// Run a reconfig that changes node1's votes to 1. This means that node1 must replicate
-// the previous write in order for a new reconfig to succeed.
-// This reconfig has a timeout of 5 seconds, and should fail with a maxTimeMSExpired error.
+// Run a reconfig that changes node1's votes to 1. The reconfig succeeds when it replicates
+// to a majority of nodes.
 jsTestLog("Doing reconfig.");
 var config = primary.getDB("local").system.replset.findOne();
 config.version++;
 config.members[1].votes = 1;
-assert.commandFailedWithCode(
-    primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
+// Node1 must replicate the previous write in order for a current reconfig to succeed.
+// This new reconfig has a timeout of 5 seconds, and should fail with a CurrentConfigNotCommittedYet
+// error.
+config.version++;
+assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, maxTimeMS: 5000}),
+                             ErrorCodes.CurrentConfigNotCommittedYet);
+// Check the latest reconfig is rejected.
+assert.gt(config.version, replTest.getReplSetConfigFromNode().version);
 restartServerReplication(nodes[1]);
 
 replTest.awaitReplication();
