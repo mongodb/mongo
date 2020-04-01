@@ -3,6 +3,8 @@
 //
 
 /**
+ * Upgrade or downgrade replica sets.
+ *
  * @param options {Object} see ReplSetTest.start & MongoRunner.runMongod.
  * @param user {string} optional, user name for authentication.
  * @param pwd {string} optional, password for authentication. Must be set if user is set.
@@ -10,11 +12,11 @@
 ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
     let primary = this.getPrimary();
 
-    this.upgradeSecondaries(primary, options, user, pwd);
-    this.upgradeArbiters(primary, options, user, pwd);
+    this.upgradeSecondaries(primary, Object.assign({}, options), user, pwd);
+    this.upgradeArbiters(primary, Object.assign({}, options), user, pwd);
 
     // Upgrade the primary after stepping down.
-    this.upgradePrimary(primary, options, user, pwd);
+    this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
 };
 
 ReplSetTest.prototype.upgradeMembers = function(primary, members, options, user, pwd) {
@@ -33,11 +35,22 @@ ReplSetTest.prototype.upgradeMembers = function(primary, members, options, user,
     }
 };
 
+ReplSetTest.prototype.getNonArbiterSecondaries = function() {
+    let secs = this.getSecondaries();
+    let arbiters = this.getArbiters();
+    let nonArbiters = secs.filter(x => !arbiters.includes(x));
+    return nonArbiters;
+};
+
 ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
-    this.upgradeMembers(primary, this.getSecondaries(), options, user, pwd);
+    this.upgradeMembers(primary, this.getNonArbiterSecondaries(), options, user, pwd);
 };
 
 ReplSetTest.prototype.upgradeArbiters = function(primary, options, user, pwd) {
+    // We don't support downgrading data files for arbiters. We need to instead delete the dbpath.
+    if (options && options.binVersion == "last-stable") {
+        options["startClean"] = true;
+    }
     this.upgradeMembers(primary, this.getArbiters(), options, user, pwd);
 };
 
