@@ -220,7 +220,7 @@ StringData LogComponent::getNameForLog() const {
         case kShardingCatalogRefresh:
             return "SH_REFR"_sd;
         case kShardingMigration:
-            return "MIGRATION"_sd;
+            return "MIGRATE"_sd;
         case kStorage:
             return "STORAGE"_sd;
         case kStorageRecovery:
