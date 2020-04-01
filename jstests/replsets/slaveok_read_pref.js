@@ -49,5 +49,26 @@ for (let readMode of ["commands", "legacy"]) {
     }
 }
 
+function assertNotMasterNoSlaveOk(func) {
+    secDB.getMongo().forceReadMode("commands");
+    secDB.getMongo().setSlaveOk(false);
+    secDB.getMongo().setReadPref("primary");
+    const res = assert.throws(func);
+    assert.commandFailedWithCode(res, ErrorCodes.NotMasterNoSlaveOk);
+}
+
+// Test that agg with $out/$merge and non-inline mapReduce fail with 'NotMasterNoSlaveOk' when
+// directed at a secondary with "primary" read preference.
+const secondaryColl = secDB.slaveok_read_pref;
+assertNotMasterNoSlaveOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
+assertNotMasterNoSlaveOk(
+    () =>
+        secondaryColl
+            .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
+            .itcount());
+assertNotMasterNoSlaveOk(() => secondaryColl.mapReduce(() => emit(this.a),
+                                                       (k, v) => Array.sum(b),
+                                                       {out: {replace: "target"}}));
+
 rst.stopSet();
 })();
