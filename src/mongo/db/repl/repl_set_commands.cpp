@@ -36,6 +36,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/algorithm/string.hpp>
+#include <fmt/format.h>
 
 #include "mongo/db/repl/repl_set_command.h"
 
@@ -79,6 +80,7 @@ namespace repl {
 
 using std::string;
 using std::stringstream;
+using namespace fmt::literals;
 
 static const std::string kReplSetReconfigNss = "local.replset.reconfig";
 
@@ -418,6 +420,29 @@ public:
         ReplicationCoordinator::ReplSetReconfigArgs parsedArgs;
         parsedArgs.newConfigObj = cmdObj["replSetReconfig"].Obj();
         parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+
+        // For safe reconfig, wait for the current config to be committed before running a new one.
+        // We will check again after acquiring the repl mutex in processReplSetReconfig(), in case
+        // of concurrent reconfigs.
+        if (!parsedArgs.force && enableSafeReplicaSetReconfig) {
+            // Check primary before waiting.
+            auto memberState = replCoord->getMemberState();
+            uassert(ErrorCodes::NotMaster,
+                    "replSetReconfig should only be run on PRIMARY, but my state is {};"_format(
+                        memberState.toString()),
+                    memberState.primary());
+
+            // Skip the waiting if the current config is from a force reconfig.
+            auto oplogWait = replCoord->getConfig().getConfigTerm() != OpTime::kUninitializedTerm;
+            auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
+            status.addContext("New config is rejected");
+            if (status == ErrorCodes::MaxTimeMSExpired) {
+                // Convert the error code to be more specific.
+                uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
+            }
+            uassertStatusOK(status);
+        }
+
         auto status = replCoord->processReplSetReconfig(opCtx, parsedArgs, &result);
 
         {
@@ -445,9 +470,12 @@ public:
         uassertStatusOK(status);
 
         // Now that the new config has been persisted and installed in memory, wait for the new
-        // config to become committed. For force reconfigs we don't need to do this waiting.
+        // config to become replicated. For force reconfigs we don't need to do this waiting.
         if (!parsedArgs.force && enableSafeReplicaSetReconfig) {
-            uassertStatusOK(replCoord->awaitConfigCommitment(opCtx));
+            auto status =
+                replCoord->awaitConfigCommitment(opCtx, false /* waitForOplogCommitment */);
+            uassertStatusOK(
+                status.withContext("Reconfig finished but failed to propagate to a majority"));
         }
 
         return true;

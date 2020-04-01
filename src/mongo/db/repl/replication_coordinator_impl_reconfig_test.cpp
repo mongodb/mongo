@@ -360,9 +360,7 @@ TEST_F(ReplCoordTest,
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
     // first reconfig
-    stdx::thread reconfigThread([&] {
-        doReplSetReconfig(getReplCoord(), &status, opCtx.get(), OpTime::kInitialTerm, true);
-    });
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -956,7 +954,7 @@ TEST_F(ReplCoordReconfigTest,
         [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
 
     reconfigThread.join();
-    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+    ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Reconfig should now succeed after advancing optime of other node.
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, 2, commitPoint));
@@ -1007,7 +1005,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommit
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(1), ErrorCodes::MaxTimeMSExpired);
     stdx::thread reconfigThread =
-        stdx::thread([&] { status = getReplCoord()->awaitConfigCommitment(opCtx.get()); });
+        stdx::thread([&] { status = getReplCoord()->awaitConfigCommitment(opCtx.get(), true); });
 
     // Run clock past the deadline.
     enterNetwork();
@@ -1045,7 +1043,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitte
 
     // Replicate op to ensure config is committed.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(getReplCoord()->awaitConfigCommitment(opCtx.get()));
+    ASSERT_OK(getReplCoord()->awaitConfigCommitment(opCtx.get(), true));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1077,7 +1075,7 @@ TEST_F(ReplCoordReconfigTest,
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
     Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
-    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+    ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
@@ -1116,7 +1114,7 @@ TEST_F(ReplCoordReconfigTest,
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
     Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
-    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+    ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(3, commitPoint);
@@ -1155,7 +1153,7 @@ TEST_F(ReplCoordReconfigTest,
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
     Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
-    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+    ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
@@ -1197,7 +1195,7 @@ TEST_F(ReplCoordReconfigTest,
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
     Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
-    ASSERT_EQUALS(status.code(), ErrorCodes::ConfigurationInProgress);
+    ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);

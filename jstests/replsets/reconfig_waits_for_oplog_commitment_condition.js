@@ -42,9 +42,9 @@ assert(isConfigCommitted(primary));
 //
 // Below we start out in config C1 = {n0}, try to reconfig to C2 = {n0,n1}, and then to C3 =
 // {n0,n1}. When we move from C1 -> C2, the last committed op in C1 cannot become committed in C2,
-// because replication is paused on n1. We will install C2, but time out while waiting for the op to
-// commit in C2. If we try then to execute another reconfig to move from C2 -> C3, it should fail
-// immediately since the last committed op from C1 is still not committed in C2. Once replication is
+// because replication is paused on n1. We will install C2 and succeed, but the op is yet to
+// commit in C2. If we try then to execute another reconfig to move from C2 -> C3, it should time
+// out since the last committed op from C1 is still not committed in C2. Once replication is
 // restarted on n1, the op can commit in C2 and we can complete a reconfig to C3.
 //
 jsTestLog("Test that reconfig waits for last op committed in previous config.");
@@ -64,22 +64,18 @@ jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("Reconfig to add the secondary back in.");
-// We expect this to fail with a time out since the last committed op from C1 cannot become
-// committed in C2.
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C2, maxTimeMS: 1000}),
-                             ErrorCodes.MaxTimeMSExpired);
+// We expect this to succeed but the last committed op from C1 cannot become
+// committed in C2, so the new config is not committed.
+assert.commandWorked(primary.adminCommand({replSetReconfig: C2}));
 assert.eq(isConfigCommitted(primary), false);
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-assert.soon(function() {
-    const res = primary.adminCommand({replSetGetStatus: 1});
-    return res.members[1].configVersion === rst.getReplSetConfigFromNode().version;
-});
+waitForConfigReplication(primary);
 
-// Reconfig should fail immediately since we have not committed the last committed op from C1 in C2.
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C3}),
-                             ErrorCodes.ConfigurationInProgress);
+// Reconfig should time out since we have not committed the last committed op from C1 in C2.
+assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C3, maxTimeMS: 1000}),
+                             ErrorCodes.CurrentConfigNotCommittedYet);
 assert.eq(isConfigCommitted(primary), false);
 
 // Make sure we can connect to the secondary after it was REMOVED.
@@ -88,7 +84,6 @@ reconnect(secondary);
 // Let the last committed op from C1 become committed in the current config.
 restartServerReplication(secondary);
 rst.awaitReplication();
-assert.soon(() => isConfigCommitted(primary));
 
 // Now that we can commit the op in the new config, reconfig should succeed.
 assert.commandWorked(primary.adminCommand({replSetReconfig: C3}));
@@ -131,13 +126,12 @@ waitForConfigReplication(primary);
 // Even though the current config has been replicated to all nodes, reconfig should still fail since
 // the primary has not yet committed an op in its term.
 config.version++;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                             ErrorCodes.ConfigurationInProgress);
+assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, maxTimeMS: 1000}),
+                             ErrorCodes.CurrentConfigNotCommittedYet);
 
 // Restart server replication to let the primary commit an op.
 restartServerReplication(secondary);
 rst.awaitLastOpCommitted();
-assert.soon(() => isConfigCommitted(primary));
 
 // Reconfig should now succeed.
 config.version++;

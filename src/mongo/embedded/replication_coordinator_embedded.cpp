@@ -348,7 +348,8 @@ Status ReplicationCoordinatorEmbedded::doReplSetReconfig(OperationContext* opCtx
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::awaitConfigCommitment(OperationContext* opCtx) {
+Status ReplicationCoordinatorEmbedded::awaitConfigCommitment(OperationContext* opCtx,
+                                                             bool waitForOplogCommitment) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
