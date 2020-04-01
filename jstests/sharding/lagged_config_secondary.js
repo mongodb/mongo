@@ -49,10 +49,9 @@ assert(ErrorCodes.isExceededTimeLimitError(exception.code));
 
 let msgAA = 'command config.$cmd command: find { find: "databases"';
 let msgAB = 'errCode:' + ErrorCodes.ClientDisconnect;
-let msgB = 'Command on database config timed out waiting for read concern to be satisfied.';
+let msgB = 'Command on database config timed out waiting for read concern to be satisfied';
 if (isJsonLogNoConn()) {
-    msgB =
-        /Command on database {request_getDatabase} timed out waiting for read concern to be satisfied.*"request_getDatabase":"config"/;
+    msgB = /Command timed out waiting for read concern to be satisfied.*"db":"config"/;
 }
 
 assert.soon(
