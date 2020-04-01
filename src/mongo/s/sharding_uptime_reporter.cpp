@@ -50,6 +50,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporterPeriodicThread);
+
 const Seconds kUptimeReportInterval(10);
 
 std::string constructInstanceIdString(const std::string& hostName) {
@@ -110,6 +112,11 @@ void ShardingUptimeReporter::startPeriodicThread() {
         const Timer upTimeTimer;
 
         while (!globalInShutdownDeprecated()) {
+            if (MONGO_unlikely(disableShardingUptimeReporterPeriodicThread.shouldFail())) {
+                LOGV2(426322,
+                      "The sharding uptime reporter periodic thread is disabled for testing");
+                return;
+            }
             {
                 auto opCtx = cc().makeOperationContext();
                 reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);

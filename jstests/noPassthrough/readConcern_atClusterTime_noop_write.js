@@ -5,6 +5,7 @@
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");
+load("jstests/libs/fail_point_util.js");
 
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&
@@ -23,7 +24,33 @@ if (!assert.commandWorked(conn.getDB("test").serverStatus())
 }
 MongoRunner.stopMongod(conn);
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+// On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
+// made on collection config.mongos or config.lockping by the distributed lock pinger thread and
+// sharding uptime reporter thread. Hence, it will not write the no-op oplog entry on the config
+// server as part of waiting for read concern.
+// For more deterministic testing of no-op writes to the oplog, disable pinger threads from reaching
+// out to the config server.
+const failpointParams = {
+    setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
+};
+
+// The ShardingUptimeReporter only exists on mongos.
+const mongosFailpointParams = {
+    setParameter: {
+        "failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}",
+        "failpoint.disableShardingUptimeReporterPeriodicThread": "{mode: 'alwaysOn'}"
+    }
+};
+
+const st = new ShardingTest({
+    shards: 2,
+    rs: {nodes: 2},
+    other: {
+        configOptions: failpointParams,
+        rsOptions: failpointParams,
+        mongosOptions: mongosFailpointParams,
+    }
+});
 
 // Create database "test0" on shard 0.
 const testDB0 = st.s.getDB("test0");

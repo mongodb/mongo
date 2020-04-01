@@ -61,6 +61,8 @@ using std::unique_ptr;
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
+
 // How many times to retry acquiring the lock after the first attempt fails
 const int kMaxNumLockAcquireRetries = 2;
 
@@ -136,6 +138,13 @@ void ReplSetDistLockManager::doTask() {
     Client::initThread("replSetDistLockPinger");
 
     while (!isShutDown()) {
+        if (MONGO_unlikely(disableReplSetDistLockManager.shouldFail())) {
+            LOGV2(426321,
+                  "The distributed lock ping thread is disabled for testing",
+                  "processId"_attr = _processID,
+                  "pingInterval"_attr = _pingInterval);
+            return;
+        }
         {
             auto opCtx = cc().makeOperationContext();
             auto pingStatus = _catalog->ping(opCtx.get(), _processID, Date_t::now());
