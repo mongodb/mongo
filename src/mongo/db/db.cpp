@@ -1063,7 +1063,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             try {
                 // For faster tests, we allow a short wait time with setParameter.
                 auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load()
-                    ? Milliseconds(Seconds(10))
+                    ? Milliseconds(Seconds(15))
                     : Milliseconds(100);
                 replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
             } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
