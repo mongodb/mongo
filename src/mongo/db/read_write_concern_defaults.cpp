@@ -176,9 +176,7 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
         (possibleNewDefaults->getUpdateOpTime() > currentDefaultsHandle->getUpdateOpTime())) {
         // Use the new defaults if they have a higher epoch, if there are no defaults in the cache,
         // or if the found defaults have no epoch, meaning there are no defaults in config.settings.
-        LOGV2(20997,
-              "refreshed RWC defaults to {newDefaults}",
-              "newDefaults"_attr = possibleNewDefaults->toBSON());
+        LOGV2(20997, "Refreshed RWC defaults", "newDefaults"_attr = possibleNewDefaults->toBSON());
         setDefault(opCtx, std::move(*possibleNewDefaults));
     }
 }
