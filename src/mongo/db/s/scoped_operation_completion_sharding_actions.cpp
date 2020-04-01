@@ -78,11 +78,7 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             oss.setMigrationCriticalSectionSignal(staleInfo->getCriticalSectionSignal());
         }
 
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
-            invariant(staleInfo->getShardId());
-        }
+        invariant(staleInfo->getShardId());
 
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(
             _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
