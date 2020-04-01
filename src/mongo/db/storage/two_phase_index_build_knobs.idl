@@ -46,3 +46,18 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "enableIndexBuildCommitQuorum"
     default: true
+
+  maxNumActiveUserIndexBuilds:
+    description: >
+      Specifies the maximum number of active user index builds that can be built simultaneously on
+      the primary node. Index builds initiated by the system are not subject to this limitation.
+
+      Additionally, active index builds initiated by the system count towards the limit and can
+      delay scheduling user index builds even when the number of active user index builds is below
+      the limit.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: maxNumActiveUserIndexBuilds
+    default: 3
+    validator:
+      gte: 0
