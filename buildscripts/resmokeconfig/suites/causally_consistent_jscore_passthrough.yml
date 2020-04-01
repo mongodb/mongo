@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # In MongoDB 4.0, transactions are not supported in sharded clusters.
+  # These tests are run in causally_consistent_jscore_txns_passthrough.yml.
   - jstests/core/txns/**/*.js
   # Cannot specify afterClusterTime and afterOpTime.
   - jstests/core/read_after_optime.js

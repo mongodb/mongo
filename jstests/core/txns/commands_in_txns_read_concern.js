@@ -5,6 +5,7 @@
  *         # Creating collections inside multi-document transactions is supported only in v4.4
  *         # onwards.
  *         requires_fcv_44,
+ *         assumes_no_implicit_collection_creation_after_drop,
  *         uses_snapshot_read_concern]
  */
 (function() {
