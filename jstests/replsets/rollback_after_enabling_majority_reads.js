@@ -59,6 +59,10 @@ jsTest.log(
 const allowedExitCode = 14;
 rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "false"}, allowedExitCode);
 
+// Ensure that the secondary has completed rollback by waiting for its last optime to equal the
+// primary's.
+rollbackTest.awaitReplication();
+
 // Fix counts for "local.startup_log", since they are corrupted by this rollback.
 // transitionToSteadyStateOperations() checks collection counts.
 assert.commandWorked(rollbackNode.getDB("local").runCommand({validate: "startup_log"}));
