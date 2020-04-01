@@ -6,7 +6,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # In MongoDB 4.0, transactions are not supported in sharded clusters.
+  # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
   - jstests/core/txns/**/*.js
   # Not expected to pass with replica-sets.
   - jstests/core/opcounters_write_cmd.js
