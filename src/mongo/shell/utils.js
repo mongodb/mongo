@@ -360,6 +360,11 @@ jsTestOptions = function() {
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             isAsanBuild: TestData.isAsanBuild,
             inEvergreen: TestData.inEvergreen || false,
+            // The ReplSetTest sets the slaveOk bit to true on its connections to the nodes in
+            // the replset, which will result in running all commands with a readPreference of
+            // 'secondaryPreferred'. However, some tests might not want to implicitly allow
+            // secondary reads. Such tests can set this option to turn off this implicit behavior.
+            shouldSkipSettingSlaveOk: TestData.shouldSkipSettingSlaveOk || false,
         });
     }
     return _jsTestOptions;

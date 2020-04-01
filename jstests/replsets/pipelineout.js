@@ -1,5 +1,13 @@
 // test $out in a replicated environment
 var name = "pipelineout";
+
+// When calling replTest.getPrimary(), the slaveOk bit will be set to true, which will result in
+// running all commands with a readPreference of 'secondaryPreferred'. This is problematic in a
+// mixed 4.2/4.4 Replica Set cluster as running $out/$merge  with non-primary read preference
+// against a cluster in FCV 4.2 is not allowed. As such, setting this test option provides a
+// means to ensure that the commands in this test file run with readPreference 'primary'.
+TestData.shouldSkipSettingSlaveOk = true;
+
 var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.nodeList();
 
@@ -15,14 +23,6 @@ for (i = 0; i < 5; i++) {
     primary.coll.insert({x: i});
 }
 replTest.awaitReplication();
-
-// After calling replTest.getPrimary(), the slaveOk bit will be set to true, which will result
-// in running all aggregations with a readPreference of 'secondaryPreferred'. This is
-// problematic in a mixed 4.2/4.4 Replica Set cluster as running $out/$merge with non-primary
-// read preference against a cluster in FCV 4.2 is not allowed. As such, we explicitly set the
-// 'slaveOk' bit to false before running the $out aggregation to ensure that it runs with
-// readPreference 'primary'.
-primary.setSlaveOk(false);
 
 // run one and check for proper replication
 primary.coll.aggregate({$out: "out"}).itcount();

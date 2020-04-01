@@ -131,7 +131,8 @@ var ReplSetTest = function(opts) {
         var twoPrimaries = false;
         self.nodes.forEach(function(node) {
             try {
-                node.setSlaveOk();
+                if (!jsTestOptions().shouldSkipSettingSlaveOk)
+                    node.setSlaveOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 self._liveNodes.push(node);
                 if (n.ismaster == true) {

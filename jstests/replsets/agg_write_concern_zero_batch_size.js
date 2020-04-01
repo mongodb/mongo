@@ -6,6 +6,13 @@
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachKindOfWriteStage.
 load("jstests/libs/write_concern_util.js");           // For [stop|restart]ServerReplication.
 
+// When calling replTest.getPrimary(), the slaveOk bit will be set to true, which will result in
+// running all commands with a readPreference of 'secondaryPreferred'. This is problematic in a
+// mixed 4.2/4.4 Replica Set cluster as running $out/$merge  with non-primary read preference
+// against a cluster in FCV 4.2 is not allowed. As such, setting this test option provides a
+// means to ensure that the commands in this test file run with readPreference 'primary'.
+TestData.shouldSkipSettingSlaveOk = true;
+
 // Start a replica set with two nodes: one with the default configuration and one with priority
 // zero to ensure we don't have any elections.
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
