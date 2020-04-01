@@ -276,17 +276,14 @@ public:
     void syncSizeInfo(bool sync) const;
 
     /*
-     * An oplog manager is always accessible, but this method will start the background thread to
+     * The oplog manager is always accessible, but this method will start the background thread to
      * control oplog entry visibility for reads.
      *
-     * On mongod, the background thread will be started when the first oplog record store is
-     * created, and stopped when the last oplog record store is destroyed, at shutdown time. For
-     * unit tests, the background thread may be started and stopped multiple times as tests create
-     * and destroy oplog record stores.
+     * On mongod, the background thread will be started when the oplog record store is created, and
+     * stopped when the oplog record store is destroyed. For unit tests, the background thread may
+     * be started and stopped multiple times as tests create and destroy the oplog record store.
      */
-    void startOplogManager(OperationContext* opCtx,
-                           const std::string& uri,
-                           WiredTigerRecordStore* oplogRecordStore);
+    void startOplogManager(OperationContext* opCtx, WiredTigerRecordStore* oplogRecordStore);
     void haltOplogManager();
 
     /*

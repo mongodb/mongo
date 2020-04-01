@@ -275,8 +275,8 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
 // Test that even when the oplog durability loop is paused, we can still advance the commit point as
 // long as the commit for each insert comes before the next insert starts.
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
-    ON_BLOCK_EXIT([] { WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off); });
-    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
+    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
 
     unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("local.oplog.rs", 100000, -1));
@@ -304,8 +304,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 // Test that Oplog entries inserted while there are hidden entries do not become visible until the
 // op and all earlier ops are durable.
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
-    ON_BLOCK_EXIT([] { WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off); });
-    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
+    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
 
     unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("local.oplog.rs", 100000, -1));
@@ -342,7 +342,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ASSERT(wtrs->isOpHidden_forTest(id1));
     ASSERT(wtrs->isOpHidden_forTest(id2));
 
-    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off);
+    WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off);
 
     rs->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get());
 
