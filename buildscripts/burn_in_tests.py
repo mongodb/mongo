@@ -52,6 +52,7 @@ AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
+DEFAULT_VARIANT = "enterprise-rhel-62-64-bit"
 DEFAULT_REPO_LOCATIONS = [".", "./src/mongo/db/modules/enterprise"]
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
@@ -738,7 +739,7 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
               help="Do not execute the found tests.")
 @click.option("--generate-tasks-file", "generate_tasks_file", default=None, metavar='FILE',
               help="Run in 'generate.tasks' mode. Store task config to given file.")
-@click.option("--build-variant", "build_variant", default=None, metavar='BUILD_VARIANT',
+@click.option("--build-variant", "build_variant", default=DEFAULT_VARIANT, metavar='BUILD_VARIANT',
               help="Tasks to run will be selected from this build variant.")
 @click.option("--run-build-variant", "run_build_variant", default=None, metavar='BUILD_VARIANT',
               help="Burn in tasks will be generated on this build variant.")
