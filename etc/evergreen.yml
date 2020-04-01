@@ -6091,6 +6091,15 @@ tasks:
       resmoke_args: --suites=sharded_jscore_txns --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: sharded_jscore_op_query_txns
+  tags: ["sharding", "jscore", "txns"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_jscore_op_query_txns --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharded_jscore_txns_without_snapshot
   tags: ["sharding", "wo_snapshot", "jscore"]
   commands:
@@ -7346,6 +7355,17 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 48
+
+- name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
+  tags: ["logical_session_cache"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 10
 
 - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
