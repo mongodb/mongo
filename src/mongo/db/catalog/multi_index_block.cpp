@@ -201,7 +201,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                                                        Collection* collection,
                                                        const std::vector<BSONObj>& indexSpecs,
                                                        OnInitFn onInit) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX),
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
                             << collection->uuid() << " is holding the incorrect lock");
     if (State::kAborted == _getState()) {
