@@ -45,13 +45,28 @@ MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 }  // namespace
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
-    : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
+    : _opCtx(opCtx), _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
     auto dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
     dss->checkDbVersion(opCtx, dssLock);
+}
+
+Database* AutoGetDb::ensureDbExists() {
+    if (_db) {
+        return _db;
+    }
+
+    auto databaseHolder = DatabaseHolder::get(_opCtx);
+    _db = databaseHolder->openDb(_opCtx, _dbName, nullptr);
+
+    auto dss = DatabaseShardingState::get(_opCtx, _dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(_opCtx, dss);
+    dss->checkDbVersion(_opCtx, dssLock);
+
+    return _db;
 }
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
@@ -136,18 +151,8 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
                                      StringData dbName,
                                      LockMode mode,
                                      Date_t deadline)
-    : _autoDb(opCtx, dbName, mode, deadline) {
+    : _autoDb(opCtx, dbName, mode, deadline), _db(_autoDb.ensureDbExists()) {
     invariant(mode == MODE_IX || mode == MODE_X);
-
-    _db = _autoDb.getDb();
-    if (!_db) {
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        _db = databaseHolder->openDb(opCtx, dbName, &_justCreated);
-    }
-
-    auto dss = DatabaseShardingState::get(opCtx, dbName);
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    dss->checkDbVersion(opCtx, dssLock);
 }
 
 ConcealCollectionCatalogChangesBlock::ConcealCollectionCatalogChangesBlock(OperationContext* opCtx)

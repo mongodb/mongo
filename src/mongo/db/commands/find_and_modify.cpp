@@ -438,17 +438,12 @@ public:
                 ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
                 uassertStatusOK(parsedUpdate.parseRequest());
 
-                // These are boost::optional, because if the database or collection does not exist,
-                // they will have to be reacquired in MODE_X
-                boost::optional<AutoGetOrCreateDb> autoDb;
-                boost::optional<AutoGetCollection> autoColl;
-
-                autoColl.emplace(opCtx, nsString, MODE_IX);
+                AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
+                Database* db = autoColl.ensureDbExists();
 
                 {
                     boost::optional<int> dbProfilingLevel;
-                    if (autoColl->getDb())
-                        dbProfilingLevel = autoColl->getDb()->getProfilingLevel();
+                    dbProfilingLevel = db->getProfilingLevel();
 
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
@@ -456,7 +451,7 @@ public:
 
                 assertCanWrite(opCtx, nsString);
 
-                Collection* collection = autoColl->getCollection();
+                Collection* collection = autoColl.getCollection();
 
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
@@ -469,23 +464,16 @@ public:
                                           << " in multi-document transaction.",
                             !inTransaction);
 
-                    // Release the collection lock and reacquire a lock on the database in exclusive
-                    // mode in order to create the collection
-                    autoColl.reset();
-                    autoDb.emplace(opCtx, dbName, MODE_X);
-
                     assertCanWrite(opCtx, nsString);
 
                     collection =
                         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
-                    ;
 
                     // If someone else beat us to creating the collection, do nothing
                     if (!collection) {
                         uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
                         WriteUnitOfWork wuow(opCtx);
                         CollectionOptions defaultCollectionOptions;
-                        auto db = autoDb->getDb();
                         uassertStatusOK(
                             db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
                         wuow.commit();

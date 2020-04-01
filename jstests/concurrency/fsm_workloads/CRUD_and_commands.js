@@ -65,6 +65,51 @@ var $config = (function() {
             }
         },
 
+        findAndModifyDocs: function findAndModifyDocs(db, collName) {
+            for (let i = 0; i < 5; ++i) {
+                let indexToUpdate = Math.floor(Math.random() * this.numIds);
+                let res;
+                try {
+                    res = db.runCommand({
+                        findAndModify: collName,
+                        query: {_id: indexToUpdate},
+                        update: {$inc: {num: 1}},
+                        upsert: true
+                    });
+                    assertWhenOwnColl.commandWorked(res);
+                } catch (e) {
+                    // We propagate TransientTransactionErrors to allow the state function to
+                    // automatically be retried when TestData.runInsideTransaction=true
+                    if (e.hasOwnProperty('errorLabels') &&
+                        e.errorLabels.includes('TransientTransactionError')) {
+                        throw e;
+                    } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
+                        // dropCollection in sharding can disrupt routing cache refreshes.
+                        if (TestData.runInsideTransaction) {
+                            e["errorLabels"] = ["TransientTransactionError"];
+                            throw e;
+                        }
+                    } else if (e.code === ErrorCodes.OperationNotSupportedInTransaction) {
+                        // TODO (SERVER-45956): Remove this case once fineAndModify with upsert=true
+                        // is allowed in transactions.
+                        throw e;
+                    } else {
+                        assertAlways.contains(
+                            e.code,
+                            [
+                                // dropIndex can cause queries to throw if these queries yield.
+                                ErrorCodes.QueryPlanKilled,
+                                // findAndModify may not automatically handle a DuplicateKey error.
+                                // TODO (SERVER-47212): Remove this error code once findAndModify
+                                // retries on DuplicateKey errors automatically.
+                                ErrorCodes.DuplicateKey
+                            ],
+                            'unexpected error code: ' + e.code + ': ' + e.message);
+                    }
+                }
+            }
+        },
+
         readDocs: function readDocs(db, collName) {
             for (let i = 0; i < 5; ++i) {
                 try {
@@ -131,6 +176,7 @@ var $config = (function() {
         init: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.10,
@@ -138,6 +184,7 @@ var $config = (function() {
         insertDocs: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.30,
@@ -145,6 +192,15 @@ var $config = (function() {
         updateDocs: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
+            readDocs: 0.10,
+            deleteDocs: 0.10,
+            dropCollection: 0.30,
+        },
+        findAndModifyDocs: {
+            insertDocs: 0.10,
+            updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.30,
@@ -152,6 +208,7 @@ var $config = (function() {
         readDocs: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.30,
@@ -159,6 +216,7 @@ var $config = (function() {
         deleteDocs: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.30,
@@ -166,6 +224,7 @@ var $config = (function() {
         dropCollection: {
             insertDocs: 0.10,
             updateDocs: 0.10,
+            findAndModifyDocs: 0.10,
             readDocs: 0.10,
             deleteDocs: 0.10,
             dropCollection: 0.10,
