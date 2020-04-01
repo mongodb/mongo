@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -44,11 +44,15 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
+MONGO_FAIL_POINT_DEFINE(WTPauseOplogVisibilityUpdateLoop);
 
-void WiredTigerOplogManager::start(OperationContext* opCtx,
-                                   const std::string& uri,
-                                   WiredTigerRecordStore* oplogRecordStore) {
+// Arbitrary. Using the storageGlobalParams.journalCommitIntervalMs default, which used to
+// dynamically control the visibility thread's delay back when the visibility thread also flushed
+// the journal.
+const int kDelayMillis = 100;
+
+void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
+                                                   WiredTigerRecordStore* oplogRecordStore) {
     invariant(!_isRunning);
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
@@ -59,12 +63,12 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         // event of a secondary crashing, replication recovery will truncate the oplog, resetting
         // visibility to the truncate point. In the event of a primary crashing, it will perform
         // rollback before servicing oplog reads.
-        auto oplogVisibility = Timestamp(lastRecord->id.repr());
-        setOplogReadTimestamp(oplogVisibility);
+        auto topOfOplogTimestamp = Timestamp(lastRecord->id.repr());
+        setOplogReadTimestamp(topOfOplogTimestamp);
         LOGV2_DEBUG(22368,
                     1,
-                    "Setting oplog visibility at startup. Val: {oplogVisibility}",
-                    "oplogVisibility"_attr = oplogVisibility);
+                    "Initializing the oplog read timestamp (oplog visibility).",
+                    "oplogReadTimestamp"_attr = topOfOplogTimestamp);
     } else {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
         setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
@@ -73,16 +77,16 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
     // see _shuttingDown as true and quit prematurely.
     stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-    _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
-                                       this,
-                                       WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
-                                       oplogRecordStore);
+    _oplogVisibilityThread = stdx::thread(&WiredTigerOplogManager::_updateOplogVisibilityLoop,
+                                          this,
+                                          WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
+                                          oplogRecordStore);
 
     _isRunning = true;
     _shuttingDown = false;
 }
 
-void WiredTigerOplogManager::halt() {
+void WiredTigerOplogManager::haltVisibilityThread() {
     {
         stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
         invariant(_isRunning);
@@ -90,9 +94,17 @@ void WiredTigerOplogManager::halt() {
         _isRunning = false;
     }
 
-    if (_oplogJournalThread.joinable()) {
-        _opsWaitingForJournalCV.notify_one();
-        _oplogJournalThread.join();
+    if (_oplogVisibilityThread.joinable()) {
+        _oplogVisibilityThreadCV.notify_one();
+        _oplogVisibilityThread.join();
+    }
+}
+
+void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
+    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
+    if (!_triggerOplogVisibilityUpdate) {
+        _triggerOplogVisibilityUpdate = true;
+        _oplogVisibilityThreadCV.notify_one();
     }
 }
 
@@ -104,119 +116,115 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // prior to querying the end of the oplog.
     auto currentLatestVisibleTimestamp = getOplogReadTimestamp();
 
-    // Procedure: issue a read on a reverse cursor (which is not subject to the oplog visibility
-    // rules), see what is last, and wait for that to become visible.
+    // Use a reverse oplog cursor that is not subject to the oplog visibility rules to see the
+    // latest oplog entry timestamp. Then we will wait for that timestamp to become visible.
+    //
     std::unique_ptr<SeekableRecordCursor> cursor =
-        oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
-    auto lastRecord = cursor->next();
-    if (!lastRecord) {
-        LOGV2_DEBUG(22369, 2, "Trying to query an empty oplog");
+        oplogRecordStore->getCursor(opCtx, false /* select a reverse cursor */);
+    auto lastOplogRecord = cursor->next();
+    if (!lastOplogRecord) {
+        LOGV2_DEBUG(22369, 2, "The oplog does not exist. Not going to wait for oplog visibility.");
         opCtx->recoveryUnit()->abandonSnapshot();
         return;
     }
-    const auto waitingFor = lastRecord->id;
+    const auto waitingFor = lastOplogRecord->id;
+
     // Close transaction before we wait.
     opCtx->recoveryUnit()->abandonSnapshot();
 
     stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
 
-    // Prevent any scheduled journal flushes from being delayed and blocking this wait excessively.
-    _opsWaitingForVisibility++;
-    invariant(_opsWaitingForVisibility > 0);
-    auto exitGuard = makeGuard([&] { _opsWaitingForVisibility--; });
+    // Prevent any scheduled oplog visibility updates from being delayed for batching and blocking
+    // this wait excessively.
+    ++_opsWaitingForOplogVisibilityUpdate;
+    invariant(_opsWaitingForOplogVisibilityUpdate > 0);
+    auto exitGuard = makeGuard([&] { --_opsWaitingForOplogVisibilityUpdate; });
 
-    opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lk, [&] {
+    // Out of order writes to the oplog always call triggerOplogVisibilityUpdate() on commit to
+    // prompt the OplogVisibiilityThread to run and update the oplog visibility. We simply need to
+    // wait until all of the writes behind and including 'waitingFor' commit so there are no oplog
+    // holes.
+    opCtx->waitForConditionOrInterrupt(_oplogEntriesBecameVisibleCV, lk, [&] {
         auto newLatestVisibleTimestamp = getOplogReadTimestamp();
         if (newLatestVisibleTimestamp < currentLatestVisibleTimestamp) {
             LOGV2_DEBUG(22370,
                         1,
-                        "Oplog latest visible timestamp went backwards. newLatestVisibleTimestamp: "
-                        "{Timestamp_newLatestVisibleTimestamp} currentLatestVisibleTimestamp: "
-                        "{Timestamp_currentLatestVisibleTimestamp}",
-                        "Timestamp_newLatestVisibleTimestamp"_attr =
+                        "The latest visible oplog entry went backwards in time. A rollback likely "
+                        "occurred.",
+                        "latestVisibleOplogEntryTimestamp"_attr =
                             Timestamp(newLatestVisibleTimestamp),
-                        "Timestamp_currentLatestVisibleTimestamp"_attr =
+                        "previouslyFoundLatestVisibleOplogEntryTimestamp"_attr =
                             Timestamp(currentLatestVisibleTimestamp));
-            // If the visibility went backwards, this means a rollback occurred.
-            // Thus, we are finished waiting.
+            // We cannot wait for a write that no longer exists, so we are finished.
             return true;
         }
         currentLatestVisibleTimestamp = newLatestVisibleTimestamp;
-        RecordId latestVisible = RecordId(currentLatestVisibleTimestamp);
-        if (latestVisible < waitingFor) {
+        RecordId newLatestVisible = RecordId(currentLatestVisibleTimestamp);
+        if (newLatestVisible < waitingFor) {
             LOGV2_DEBUG(22371,
                         2,
-                        "Operation is waiting for {Timestamp_waitingFor_repr}; latestVisible is "
-                        "{Timestamp_currentLatestVisibleTimestamp}",
-                        "Timestamp_waitingFor_repr"_attr = Timestamp(waitingFor.repr()),
-                        "Timestamp_currentLatestVisibleTimestamp"_attr =
+                        "Operation is waiting for an entry to become visible in the oplog.",
+                        "awaitedOplogEntryTimestamp"_attr = Timestamp(waitingFor.repr()),
+                        "currentLatestVisibleOplogEntryTimestamp"_attr =
                             Timestamp(currentLatestVisibleTimestamp));
         }
-        return latestVisible >= waitingFor;
+        return newLatestVisible >= waitingFor;
     });
 }
 
-void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
-    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-    if (!_opsWaitingForJournal) {
-        _opsWaitingForJournal = true;
-        _opsWaitingForJournalCV.notify_one();
-    }
-}
-
-void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
-                                                     WiredTigerRecordStore* oplogRecordStore) {
-    Client::initThread("WTOplogJournalThread");
+void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
+                                                        WiredTigerRecordStore* oplogRecordStore) {
+    Client::initThread("OplogVisibilityThread");
 
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
-    // forward cursors.  The timestamp is used to hide oplog entries that might be committed but
-    // have uncommitted entries ahead of them.
+    // forward cursors. The timestamp is used to hide oplog entries that might be committed but have
+    // uncommitted entries behind them. This prevents cursors from seeing 'holes' in the oplog and
+    // consequently missing data that was not there yet when scanning went passed up to a later
+    // timestamp.
     while (true) {
         stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
         {
             MONGO_IDLE_THREAD_BLOCK;
-            _opsWaitingForJournalCV.wait(lk,
-                                         [&] { return _shuttingDown || _opsWaitingForJournal; });
+            _oplogVisibilityThreadCV.wait(
+                lk, [&] { return _shuttingDown || _triggerOplogVisibilityUpdate; });
 
-            // If we're not shutting down and nobody is actively waiting for the oplog to become
-            // durable, delay journaling a bit to reduce the sync rate.
-            auto journalDelay = Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
+            // If we are not shutting down and nobody is actively waiting for the oplog to become
+            // visible, delay a bit to batch more requests into one update and reduce system load.
             auto now = Date_t::now();
-            auto deadline = now + journalDelay;
-            auto shouldSyncOpsWaitingForJournal = [&] {
-                return _shuttingDown || _opsWaitingForVisibility ||
+            auto deadline = now + Milliseconds(kDelayMillis);
+
+            auto wakeUpEarlyForWaitersPredicate = [&] {
+                return _shuttingDown || _opsWaitingForOplogVisibilityUpdate ||
                     oplogRecordStore->haveCappedWaiters();
             };
 
-            // Eventually it would be more optimal to merge this with the normal journal flushing
-            // and block for either oplog tailers or operations waiting for oplog visibility. For
-            // now this loop will poll once a millisecond up to the journalDelay to see if we have
-            // any waiters yet. This reduces sync-related I/O on the primary when secondaries are
-            // lagged, but will avoid significant delays in confirming majority writes on replica
-            // sets with infrequent writes.
-            // Callers of waitForAllEarlierOplogWritesToBeVisible() like causally consistent reads
-            // will preempt this delay.
+            // Check once a millisecond, up to the delay deadline, whether the delay should be
+            // preempted because of waiting callers or shutdown.
             while (now < deadline &&
-                   !_opsWaitingForJournalCV.wait_until(
-                       lk, now.toSystemTimePoint(), shouldSyncOpsWaitingForJournal)) {
+                   !_oplogVisibilityThreadCV.wait_until(
+                       lk, now.toSystemTimePoint(), wakeUpEarlyForWaitersPredicate)) {
                 now += Milliseconds(1);
             }
         }
 
-        while (!_shuttingDown && MONGO_unlikely(WTPausePrimaryOplogDurabilityLoop.shouldFail())) {
+        while (!_shuttingDown && MONGO_unlikely(WTPauseOplogVisibilityUpdateLoop.shouldFail())) {
             lk.unlock();
             sleepmillis(10);
             lk.lock();
         }
 
         if (_shuttingDown) {
-            LOGV2(22372, "Oplog journal thread loop shutting down");
+            LOGV2(22372, "Oplog visibility thread shutting down.");
             return;
         }
-        invariant(_opsWaitingForJournal);
-        _opsWaitingForJournal = false;
+
+        invariant(_triggerOplogVisibilityUpdate);
+        _triggerOplogVisibilityUpdate = false;
+
         lk.unlock();
 
+        // Fetch the all_durable timestamp from the storage engine, which is guaranteed not to have
+        // any holes behind it in-memory.
         const uint64_t newTimestamp = fetchAllDurableValue(sessionCache->conn());
 
         // The newTimestamp may actually go backward during secondary batch application,
@@ -225,20 +233,24 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         if (newTimestamp <= _oplogReadTimestamp.load()) {
             LOGV2_DEBUG(22373,
                         2,
-                        "No new oplog entries were made visible: {Timestamp_newTimestamp}",
-                        "Timestamp_newTimestamp"_attr = Timestamp(newTimestamp));
+                        "No new oplog entries became visible.",
+                        "aNoHolesOplogTimestamp"_attr = Timestamp(newTimestamp));
             continue;
         }
 
         lk.lock();
-        // Publish the new timestamp value.  Avoid going backward.
-        auto oldTimestamp = getOplogReadTimestamp();
-        if (newTimestamp > oldTimestamp) {
+        // Publish the new timestamp value. Avoid going backward.
+        auto currentVisibleTimestamp = getOplogReadTimestamp();
+        if (newTimestamp > currentVisibleTimestamp) {
             _setOplogReadTimestamp(lk, newTimestamp);
         }
         lk.unlock();
 
-        // Wake up any await_data cursors and tell them more data might be visible now.
+        // Wake up any awaitData cursors and tell them more data might be visible now.
+        //
+        // We normally notify waiters on capped collection inserts/updates, but oplog entries will
+        // not become visible immediately upon insert, so we notify waiters here as well, when new
+        // oplog entries actually become visible to cursors.
         oplogRecordStore->notifyCappedWaitersIfNeeded();
     }
 }
@@ -254,11 +266,11 @@ void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
 
 void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimestamp) {
     _oplogReadTimestamp.store(newTimestamp);
-    _opsBecameVisibleCV.notify_all();
+    _oplogEntriesBecameVisibleCV.notify_all();
     LOGV2_DEBUG(22374,
                 2,
-                "Setting new oplogReadTimestamp: {Timestamp_newTimestamp}",
-                "Timestamp_newTimestamp"_attr = Timestamp(newTimestamp));
+                "Updating the oplogReadTimestamp.",
+                "newOplogReadTimestamp"_attr = Timestamp(newTimestamp));
 }
 
 uint64_t WiredTigerOplogManager::fetchAllDurableValue(WT_CONNECTION* conn) {

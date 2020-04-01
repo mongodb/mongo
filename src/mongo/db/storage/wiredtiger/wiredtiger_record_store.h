@@ -544,7 +544,6 @@ private:
     KVPrefix _prefix;
 };
 
-
 // WT failpoint to throw write conflict exceptions randomly
 extern FailPoint WTWriteConflictException;
 extern FailPoint WTWriteConflictExceptionForReads;
@@ -552,5 +551,5 @@ extern FailPoint WTWriteConflictExceptionForReads;
 // Prevents oplog writes from becoming visible asynchronously. Once activated, new writes will not
 // be seen by regular readers until deactivated. It is unspecified whether writes that commit before
 // activation will become visible while active.
-extern FailPoint WTPausePrimaryOplogDurabilityLoop;
+extern FailPoint WTPauseOplogVisibilityUpdateLoop;
 }  // namespace mongo

@@ -914,7 +914,7 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
 
     if (_isOplog) {
         invariant(_kvEngine);
-        _kvEngine->startOplogManager(opCtx, _uri, this);
+        _kvEngine->startOplogManager(opCtx, this);
     }
 }
 
@@ -1519,7 +1519,7 @@ bool WiredTigerRecordStore::haveCappedWaiters() {
 
 void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
     stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
-    // This wakes up cursors blocking in await_data.
+    // This wakes up cursors blocking for awaitData.
     if (_cappedCallback) {
         _cappedCallback->notifyCappedWaitersIfNeeded();
     }
