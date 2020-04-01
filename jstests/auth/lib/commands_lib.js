@@ -282,7 +282,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -313,7 +313,6 @@ var authCommandsLib = {
               }]
           },
           skipSharded: true,
-          setup: function(db) {},
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
           },
@@ -350,7 +349,6 @@ var authCommandsLib = {
               }]
           },
           skipSharded: true,
-          setup: function(db) {},
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
           },
@@ -378,7 +376,6 @@ var authCommandsLib = {
               }]
           },
           skipSharded: true,
-          setup: function(db) {},
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
           },
@@ -405,7 +402,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -446,7 +443,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -484,7 +481,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -541,7 +538,8 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
+              // SERVER-47441 `movePrimary` is a mongos only command.
               db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
               db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
           },
@@ -577,7 +575,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -607,7 +605,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -644,7 +642,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -683,7 +681,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -764,8 +762,8 @@ var authCommandsLib = {
               db.getSisterDB(firstDbName).x.drop();
               db.getSisterDB(firstDbName).y.drop();
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
-              sibling.runCommand({create: "y"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
+              assert.commandWorked(sibling.runCommand({create: "y"}));
               return {x_uuid: getUUIDFromListCollections(sibling, sibling.x.getName())};
           },
           teardown: function(db) {
@@ -803,8 +801,8 @@ var authCommandsLib = {
               db.getSisterDB(firstDbName).x.drop();
               db.getSisterDB(firstDbName).y.drop();
               var sibling = db.getSisterDB(firstDbName);
-              sibling.runCommand({create: "x"});
-              sibling.runCommand({create: "y"});
+              assert.commandWorked(sibling.runCommand({create: "x"}));
+              assert.commandWorked(sibling.runCommand({create: "y"}));
               return {x_uuid: getUUIDFromListCollections(sibling, sibling.x.getName())};
           },
           teardown: function(db) {
@@ -837,7 +835,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({_id: 1, data: 1}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -865,7 +863,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({_id: 1, data: 1}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -897,7 +895,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.x.save({_id: 1, data: 1});
+              assert.writeOK(sibling.x.save({_id: 1, data: 1}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -935,7 +933,7 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               var sibling = db.getSisterDB(firstDbName);
-              sibling.x.save({_id: 1, data: 1});
+              assert.writeOK(sibling.x.save({_id: 1, data: 1}));
 
               return {
                   collName: sibling.x.getFullName(),
@@ -960,7 +958,7 @@ var authCommandsLib = {
           command: {applyOps: [{"op": "d", "ns": firstDbName + ".x", "o": {"_id": 1}}]},
           skipSharded: true,
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({_id: 1, data: 1}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -996,7 +994,7 @@ var authCommandsLib = {
         {
           testname: "aggregate_readonly_views",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1038,7 +1036,7 @@ var authCommandsLib = {
         {
           testname: "aggregate_explain_views",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1075,8 +1073,8 @@ var authCommandsLib = {
               assert.commandWorked(db.getSiblingDB(secondDbName).foo.insert({}));
           },
           teardown: function(db) {
-              db.getSiblingDB(firstDbName).dropDatabase();
-              db.getSiblingDB(secondDbName).dropDatabase();
+              assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+              assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
           },
           testcases: [
               {
@@ -1129,8 +1127,8 @@ var authCommandsLib = {
               assert.commandWorked(db.getSiblingDB(secondDbName).foo.insert({}));
           },
           teardown: function(db) {
-              db.getSiblingDB(firstDbName).dropDatabase();
-              db.getSiblingDB(secondDbName).dropDatabase();
+              assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+              assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
           },
           testcases: [
               {
@@ -1353,7 +1351,7 @@ var authCommandsLib = {
         {
           testname: "aggregate_readView_writeCollection",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1383,7 +1381,7 @@ var authCommandsLib = {
         {
           testname: "aggregate_writeView",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1416,7 +1414,7 @@ var authCommandsLib = {
           testname: "aggregate_indexStats",
           command: {aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {}},
           setup: function(db) {
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1441,7 +1439,7 @@ var authCommandsLib = {
           command: {aggregate: "foo", pipeline: [{$planCacheStats: {}}], cursor: {}},
           skipSharded: true,
           setup: function(db) {
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1544,8 +1542,8 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("bar");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("bar"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1584,9 +1582,9 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("bar");
-              db.createCollection("baz");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("bar"));
+              assert.commandWorked(db.createCollection("baz"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1618,7 +1616,7 @@ var authCommandsLib = {
           testname: "aggregate_lookup_views",
           setup: function(db) {
               db.createView("view", "collection", [{$match: {}}]);
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1667,8 +1665,8 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("bar");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("bar"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1697,7 +1695,7 @@ var authCommandsLib = {
           testname: "aggregate_graphLookup_views",
           setup: function(db) {
               db.createView("view", "collection", [{$match: {}}]);
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.view.drop();
@@ -1740,7 +1738,7 @@ var authCommandsLib = {
           testname: "aggregate_collStats",
           command: {aggregate: "foo", pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}},
           setup: function(db) {
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1793,7 +1791,7 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1836,8 +1834,8 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("lookupColl");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("lookupColl"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1864,8 +1862,8 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("unionColl");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("unionColl"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1910,9 +1908,9 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createCollection("bar");
-              db.createCollection("baz");
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createCollection("bar"));
+              assert.commandWorked(db.createCollection("baz"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -1968,11 +1966,11 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("foo");
-              db.createView("view1", "bar", [
+              assert.commandWorked(db.createCollection("foo"));
+              assert.commandWorked(db.createView("view1", "bar", [
                   {$lookup: {from: "qux", localField: "_id", foreignField: "_id", as: "results"}}
-              ]);
-              db.createView("view2", "baz", [{
+              ]));
+              assert.commandWorked((db.createView("view2", "baz", [{
                                 $graphLookup: {
                                     from: "quz",
                                     startWith: [1],
@@ -1980,7 +1978,7 @@ var authCommandsLib = {
                                     connectToField: "_id",
                                     as: "results"
                                 }
-                            }]);
+                            }])));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -2014,7 +2012,7 @@ var authCommandsLib = {
           testname: "aggregate_changeStream_one_collection",
           command: {aggregate: "foo", pipeline: [{$changeStream: {}}], cursor: {}},
           setup: function(db) {
-              db.createCollection("foo");
+              assert.commandWorked(db.createCollection("foo"));
           },
           teardown: function(db) {
               db.foo.drop();
@@ -2183,7 +2181,7 @@ var authCommandsLib = {
           command: {cloneCollectionAsCapped: "x", toCollection: "y", size: 1000},
           skipSharded: true,
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
               db.y.drop();
           },
           teardown: function(db) {
@@ -2219,7 +2217,7 @@ var authCommandsLib = {
           testname: "collMod",
           command: {collMod: "foo"},
           setup: function(db) {
-              db.foo.save({});
+              assert.writeOK(db.foo.save({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -2242,7 +2240,7 @@ var authCommandsLib = {
         {
           testname: "collMod_views",
           setup: function(db) {
-              db.createView("view", "foo", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "foo", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -2294,7 +2292,7 @@ var authCommandsLib = {
         {
           testname: "collMod_views_lookup",
           setup: function(db) {
-              db.createView("view", "foo", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "foo", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -2354,7 +2352,7 @@ var authCommandsLib = {
         {
           testname: "collMod_views_graphLookup",
           setup: function(db) {
-              db.createView("view", "foo", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "foo", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -2421,7 +2419,7 @@ var authCommandsLib = {
         {
           testname: "collMod_views_facet",
           setup: function(db) {
-              db.createView("view", "foo", []);
+              assert.commandWorked(db.createView("view", "foo", []));
           },
           teardown: function(db) {
               db.view.drop();
@@ -2504,10 +2502,10 @@ var authCommandsLib = {
           testname: "collStats",
           command: {collStats: "bar", scale: 1},
           setup: function(db) {
-              db.bar.save({});
+              assert.writeOK(db.bar.save({}));
           },
           teardown: function(db) {
-              db.dropDatabase();
+              assert.commandWorked(db.dropDatabase());
           },
           testcases: [
               {
@@ -2563,10 +2561,10 @@ var authCommandsLib = {
           command: {compact: "foo"},
           skipSharded: true,
           setup: function(db) {
-              db.foo.save({});
+              assert.writeOK(db.foo.save({}));
           },
           teardown: function(db) {
-              db.dropDatabase();
+              assert.commandWorked(db.dropDatabase());
           },
           testcases: [
               {
@@ -2627,7 +2625,7 @@ var authCommandsLib = {
           testname: "convertToCapped",
           command: {convertToCapped: "toCapped", size: 1000},
           setup: function(db) {
-              db.toCapped.save({});
+              assert.writeOK(db.toCapped.save({}));
           },
           teardown: function(db) {
               db.toCapped.drop();
@@ -2796,7 +2794,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.runCommand({create: "foo"});
+              assert.commandWorked(db.runCommand({create: "foo"}));
 
               return {uuid: getUUIDFromListCollections(db, db.foo.getName())};
           },
@@ -3265,7 +3263,7 @@ var authCommandsLib = {
           testname: "dataSize_2",
           command: {dataSize: secondDbName + ".x"},
           setup: function(db) {
-              db.x.insert({});
+              assert.writeOK(db.x.insert({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -3360,7 +3358,7 @@ var authCommandsLib = {
           testname: "drop",
           command: {drop: "x"},
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           testcases: [
               {
@@ -3382,7 +3380,11 @@ var authCommandsLib = {
         {
           testname: "drop_views",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              db.view.drop();
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
+          },
+          teardown: function(db) {
+              db.view.drop();
           },
           command: {drop: "view"},
           testcases: [
@@ -3408,10 +3410,10 @@ var authCommandsLib = {
           testname: "dropDatabase",
           command: {dropDatabase: 1},
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           teardown: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           testcases: [
               {
@@ -3481,8 +3483,8 @@ var authCommandsLib = {
           command: {filemd5: 1, root: "fs"},
           setup: function(db) {
               db.fs.chunks.drop();
-              db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "test")});
-              db.fs.chunks.ensureIndex({files_id: 1, n: 1});
+              assert.writeOK(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "test")}));
+              assert.commandWorked(db.fs.chunks.ensureIndex({files_id: 1, n: 1}));
           },
           teardown: function(db) {
               db.fs.chunks.drop();
@@ -3687,7 +3689,7 @@ var authCommandsLib = {
         {
           testname: "find_views",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
           },
           teardown: function(db) {
               db.view.drop();
@@ -3731,7 +3733,7 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.runCommand({create: "foo"});
+              assert.commandWorked(db.runCommand({create: "foo"}));
 
               return {uuid: getUUIDFromListCollections(db, db.foo.getName())};
           },
@@ -3754,7 +3756,7 @@ var authCommandsLib = {
           command: {findAndModify: "x", query: {_id: "abc"}, update: {$inc: {n: 1}}},
           setup: function(db) {
               db.x.drop();
-              db.x.save({_id: "abc", n: 0});
+              assert.writeOK(db.x.save({_id: "abc", n: 0}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -3824,8 +3826,8 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               db.x.drop();
-              db.x.save({loc: {long: 50, lat: 50}});
-              db.x.ensureIndex({loc: "geoHaystack", type: 1}, {bucketSize: 1});
+              assert.writeOK(db.x.save({loc: {long: 50, lat: 50}}));
+              assert.commandWorked(db.x.ensureIndex({loc: "geoHaystack", type: 1}, {bucketSize: 1}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4078,7 +4080,7 @@ var authCommandsLib = {
           command: {insert: "oplog.$main", documents: [{ts: Timestamp()}]},
           skipSharded: true,
           setup: function(db) {
-              db.createCollection("oplog.$main", {capped: true, size: 10000});
+              assert.commandWorked(db.createCollection("oplog.$main", {capped: true, size: 10000}));
           },
           teardown: function(db) {
               db.oplog.$main.drop();
@@ -4164,10 +4166,14 @@ var authCommandsLib = {
         },
         {
           testname: "insert_system_users",
-          command: {insert: "system.users", documents: [{data: 5}]},
+          command: {insert: "system.users", documents: [{user: "unique", db: "test"}]},
           setup: function(db) {
               // Ensure unique indexes consistently cause insertion failure
-              db.system.users.insert({data: 5});
+              db.system.users.remove({user: "unique", db: "test"});
+              assert.writeOK(db.system.users.insert({user: "unique", db: "test"}));
+          },
+          teardown: function(db) {
+              db.system.users.remove({user: "unique", db: "test"});
           },
           testcases: [
               {
@@ -4337,8 +4343,8 @@ var authCommandsLib = {
           testname: "listCollections",
           command: {listCollections: 1},
           setup: function(db) {
-              db.x.insert({_id: 5});
-              db.y.insert({_id: 6});
+              assert.writeOK(db.x.insert({_id: 5}));
+              assert.writeOK(db.y.insert({_id: 6}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4367,8 +4373,8 @@ var authCommandsLib = {
           testname: "listOwnCollections",
           command: {listCollections: 1, nameOnly: true, authorizedCollections: true},
           setup: function(db) {
-              db.x.insert({_id: 5});
-              db.y.insert({_id: 6});
+              assert.writeOK(db.x.insert({_id: 5}));
+              assert.writeOK(db.y.insert({_id: 6}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4432,8 +4438,8 @@ var authCommandsLib = {
           testname: "listIndexes",
           command: {listIndexes: "x"},
           setup: function(db) {
-              db.x.insert({_id: 5});
-              db.x.insert({_id: 6});
+              assert.writeOK(db.x.insert({_id: 5}));
+              assert.writeOK(db.x.insert({_id: 6}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4463,8 +4469,8 @@ var authCommandsLib = {
           },
           skipSharded: true,
           setup: function(db) {
-              db.x.insert({_id: 5});
-              db.x.insert({_id: 6});
+              assert.writeOK(db.x.insert({_id: 5}));
+              assert.writeOK(db.x.insert({_id: 6}));
 
               return {uuid: getUUIDFromListCollections(db, db.x.getName())};
           },
@@ -4521,8 +4527,8 @@ var authCommandsLib = {
               out: {inline: 1}
           },
           setup: function(db) {
-              db.x.insert({groupby: 1, n: 5});
-              db.x.insert({groupby: 1, n: 6});
+              assert.writeOK(db.x.insert({groupby: 1, n: 5}));
+              assert.writeOK(db.x.insert({groupby: 1, n: 6}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4553,8 +4559,8 @@ var authCommandsLib = {
               out: "mr_out"
           },
           setup: function(db) {
-              db.x.insert({groupby: 1, n: 5});
-              db.x.insert({groupby: 1, n: 6});
+              assert.writeOK(db.x.insert({groupby: 1, n: 5}));
+              assert.writeOK(db.x.insert({groupby: 1, n: 6}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4679,7 +4685,7 @@ var authCommandsLib = {
           command: {planCacheClearFilters: "x"},
           skipSharded: true,
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4708,7 +4714,7 @@ var authCommandsLib = {
           command: {planCacheClear: "x"},
           skipSharded: true,
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -4897,7 +4903,7 @@ var authCommandsLib = {
           testname: "renameCollection_sameDb",
           command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -4925,7 +4931,7 @@ var authCommandsLib = {
           testname: "renameCollection_sameDb_failure",
           command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y"},
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -4949,7 +4955,8 @@ var authCommandsLib = {
           testname: "renameCollection_twoDbs",
           command: {renameCollection: firstDbName + ".x", to: secondDbName + ".y"},
           setup: function(db) {
-              db.getSisterDB(firstDbName).x.save({});
+              assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
+              // SERVER-47441 `movePrimary` is a mongos only command.
               db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
               db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
           },
@@ -4981,7 +4988,7 @@ var authCommandsLib = {
           command: {reIndex: "x"},
           skipSharded: true,
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -5370,8 +5377,8 @@ var authCommandsLib = {
                     testname: "storageDetails",
                     command: {storageDetails: "x", analyze: "diskStorage"},
                     skipSharded: true,
-                    setup: function (db) { db.x.save( {} ); },
-                    teardown: function (db) { db.x.drop(); },
+                    setup: function (db) { assert.writeOK(db.x.save( {} )); },
+                    teardown: function (db) { assert(db.x.drop()); },
                     testcases: [
                         {
                             runOnDb: firstDbName,
@@ -5424,12 +5431,12 @@ var authCommandsLib = {
           testname: "updateRole_authenticationRestrictions",
           command: {updateRole: "testRole", authenticationRestrictions: []},
           setup: function(db) {
-              db.runCommand({
+              assert.commandWorked(db.runCommand({
                   createRole: "testRole",
                   roles: [],
                   privileges: [],
                   authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
-              });
+              }));
           },
           teardown: function(db) {
               db.runCommand({dropRole: "testRole"});
@@ -5464,15 +5471,15 @@ var authCommandsLib = {
           testname: "updateUser_authenticationRestrictions",
           command: {updateUser: "testUser", authenticationRestrictions: []},
           setup: function(db) {
-              db.runCommand({
+              assert.commandWorked(db.runCommand({
                   createUser: "testUser",
                   pwd: "test",
                   roles: [],
                   authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
-              });
+              }));
           },
           teardown: function(db) {
-              db.runCommand({dropUser: "testUser"});
+              assert.commandWorked(db.runCommand({dropUser: "testUser"}));
           },
           testcases: [
               {
@@ -5497,7 +5504,7 @@ var authCommandsLib = {
           testname: "validate",
           command: {validate: "x"},
           setup: function(db) {
-              db.x.save({});
+              assert.writeOK(db.x.save({}));
           },
           teardown: function(db) {
               db.x.drop();
@@ -5744,8 +5751,12 @@ var authCommandsLib = {
               {runOnDb: adminDbName, roles: roles_hostManager},
           ],
           setup: function(db) {
-              db.runCommand({startRecordingTraffic: 1, filename: "notARealPath"});
-          }
+              db.runCommand({stopRecordingTraffic: 1});
+              assert.commandWorked(db.runCommand({startRecordingTraffic: 1, filename: "notARealPath"}));
+          },
+          teardown: function(db) {
+            db.runCommand({stopRecordingTraffic: 1});
+          },
         },
         {
           testname: "clearJumboFlag",
@@ -5800,8 +5811,8 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("baseColl");
-              db.createCollection("unionColl");
+              assert.commandWorked(db.createCollection("baseColl"));
+              assert.commandWorked(db.createCollection("unionColl"));
           },
           teardown: function(db) {
               db.baseColl.drop();
@@ -5847,9 +5858,9 @@ var authCommandsLib = {
               cursor: {}
           },
           setup: function(db) {
-              db.createCollection("baseColl");
-              db.createCollection("unionColl");
-              db.createCollection("lookupColl");
+              assert.commandWorked(db.createCollection("baseColl"));
+              assert.commandWorked(db.createCollection("unionColl"));
+              assert.commandWorked(db.createCollection("lookupColl"));
           },
           teardown: function(db) {
               db.baseColl.drop();
