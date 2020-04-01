@@ -128,7 +128,7 @@ public:
      *
      * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
      *
-     * Requires holding an intent lock on the collection.
+     * Requires holding an exclusive lock on the collection.
      */
     using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
