@@ -149,7 +149,10 @@ void UserCacheInvalidator::run() {
         Date_t sleepUntil =
             lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
         Date_t now = Date_t::now();
-        while (now < sleepUntil) {
+
+        // The second clause in the if statement is if we've jumped back in time due to an NTP
+        // sync; we should always trigger a cache refresh in that case.
+        while (now < sleepUntil && now >= lastInvalidationTime) {
             MONGO_IDLE_THREAD_BLOCK;
             invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
             sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
