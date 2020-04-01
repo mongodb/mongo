@@ -508,6 +508,30 @@
         assert.commandFailed(localDB.runCommand(cmd));
     }
 
+    function runRetryableWriteErrorTest(mainConn) {
+        // Test TransactionTooOld error message on retryable writes
+
+        const lsid = UUID();
+        const testDb = mainConn.getDB('TestDB');
+        assert.commandWorked(testDb.runCommand({
+            insert: 'user',
+            documents: [{x: 1}],
+            ordered: true,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(2)
+        }));
+        const writeResult = testDb.runCommand({
+            update: 'user',
+            updates: [{q: {x: 1}, u: {$inc: {x: 1}}}],
+            ordered: true,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(1)
+        });
+        assert.commandFailedWithCode(writeResult, ErrorCodes.TransactionTooOld);
+        assert(writeResult.errmsg.includes("Retryable write with txnNumber 1 is prohibited"),
+               writeResult);
+    }
+
     // Tests for replica set
     var replTest = new ReplSetTest({nodes: 2});
     replTest.startSet({verbose: 5});
@@ -519,6 +543,7 @@
     runFailpointTests(priConn, priConn);
     runMultiTests(priConn);
     runInvalidTests(priConn);
+    runRetryableWriteErrorTest(priConn);
 
     replTest.stopSet();
 

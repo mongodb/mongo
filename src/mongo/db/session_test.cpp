@@ -921,6 +921,84 @@ TEST_F(SessionTest, CannotSpecifyStartTransactionOnInProgressTxn) {
                        ErrorCodes::ConflictingOperationInProgress);
 }
 
+TEST_F(SessionTest, OlderTransactionFailsOnSessionWithNewerTransaction) {
+    // Will start the transaction.
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const bool autocommit = false;
+    const bool startTransaction = true;
+    const TxnNumber txnNum = 20;
+    session.beginOrContinueTxn(opCtx(), txnNum, autocommit, startTransaction, "testDB", "insert");
+
+    StringBuilder sb;
+    sb << "Cannot start transaction 19 on session " << sessionId
+       << " because a newer transaction with txnNumber 20 has already started on this session.";
+    ASSERT_THROWS_WHAT(session.beginOrContinueTxn(
+                           opCtx(), txnNum - 1, autocommit, startTransaction, "testDB", "insert"),
+                       AssertionException,
+                       sb.str());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
+}
+
+TEST_F(SessionTest, OldRetryableWriteFailsOnSessionWithNewerTransaction) {
+    // Will start the transaction.
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const bool autocommit = false;
+    const bool startTransaction = true;
+    const TxnNumber txnNum = 20;
+    session.beginOrContinueTxn(opCtx(), txnNum, autocommit, startTransaction, "testDB", "insert");
+
+    StringBuilder sb;
+    sb << "Retryable write with txnNumber 19 is prohibited on session " << sessionId
+       << " because a newer transaction with txnNumber 20 has already started on this session.";
+    ASSERT_THROWS_WHAT(session.beginOrContinueTxn(
+                           opCtx(), txnNum - 1, boost::none, boost::none, "testDB", "insert"),
+                       AssertionException,
+                       sb.str());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
+}
+
+TEST_F(SessionTest, OlderRetryableWriteFailsOnSessionWithNewerRetryableWrite) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+    const TxnNumber txnNum = 22;
+
+    StringBuilder sb;
+    sb << "Retryable write with txnNumber 21 is prohibited on session " << sessionId
+       << " because a newer retryable write with txnNumber 22 has already started on this session.";
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
+    ASSERT_THROWS_WHAT(session.beginOrContinueTxn(
+                           opCtx(), txnNum - 1, boost::none, boost::none, "testDB", "insert"),
+                       AssertionException,
+                       sb.str());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
+}
+
+TEST_F(SessionTest, OldTransactionFailsOnSessionWithNewerRetryableWrite) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 22;
+    const auto autocommit = false;
+
+    StringBuilder sb;
+    sb << "Cannot start transaction 21 on session " << sessionId
+       << " because a newer retryable write with txnNumber 22 has already started on this session.";
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
+    ASSERT_THROWS_WHAT(session.beginOrContinueTxn(
+                           opCtx(), txnNum - 1, autocommit, boost::none, "testDB", "insert"),
+                       AssertionException,
+                       sb.str());
+    ASSERT(session.getLastWriteOpTime(txnNum).isNull());
+}
+
 TEST_F(SessionTest, AutocommitRequiredOnEveryTxnOp) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);

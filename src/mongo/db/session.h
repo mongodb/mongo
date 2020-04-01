@@ -421,9 +421,10 @@ private:
     // Checks if there is a conflicting operation on the current Session
     void _checkValid(WithLock) const;
 
-    // Checks that a new txnNumber is higher than the activeTxnNumber so
-    // we don't start a txn that is too old.
-    void _checkTxnValid(WithLock, TxnNumber txnNumber) const;
+    // Checks that a new txnNumber is higher than the activeTxnNumber so we don't start a
+    // transaction or retryable write that is older
+    // than the current one.
+    void _checkTxnValid(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit) const;
 
     void _setActiveTxn(WithLock, TxnNumber txnNumber);
 

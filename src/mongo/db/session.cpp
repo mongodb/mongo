@@ -504,7 +504,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
 
     // Check if the given transaction number is valid for this session. The transaction number must
     // be >= the active transaction number.
-    _checkTxnValid(wl, txnNumber);
+    _checkTxnValid(wl, txnNumber, autocommit);
 
     //
     // Continue an active transaction.
@@ -610,14 +610,33 @@ void Session::_beginOrContinueTxn(WithLock wl,
     invariant(_transactionOperations.empty());
 }
 
-void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
-    uassert(ErrorCodes::TransactionTooOld,
-            str::stream() << "Cannot start transaction " << txnNumber << " on session "
-                          << getSessionId()
-                          << " because a newer transaction "
-                          << _activeTxnNumber
-                          << " has already started.",
-            txnNumber >= _activeTxnNumber);
+void Session::_checkTxnValid(WithLock,
+                             TxnNumber txnNumber,
+                             boost::optional<bool> autocommit) const {
+    if (txnNumber < _activeTxnNumber) {
+        const std::string currOperation =
+            _txnState == MultiDocumentTransactionState::kNone ? "retryable write" : "transaction";
+        if (!autocommit) {
+            uasserted(ErrorCodes::TransactionTooOld,
+                      str::stream() << "Retryable write with txnNumber " << txnNumber
+                                    << " is prohibited on session "
+                                    << _sessionId
+                                    << " because a newer "
+                                    << currOperation
+                                    << " with txnNumber "
+                                    << _activeTxnNumber
+                                    << " has already started on this session.");
+        } else {
+            uasserted(ErrorCodes::TransactionTooOld,
+                      str::stream() << "Cannot start transaction " << txnNumber << " on session "
+                                    << _sessionId
+                                    << " because a newer "
+                                    << currOperation
+                                    << " with txnNumber "
+                                    << _activeTxnNumber
+                                    << " has already started on this session.");
+        }
+    }
 }
 
 Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
@@ -994,7 +1013,10 @@ void Session::_abortTransaction(WithLock wl) {
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
     _checkValid(wl);
-    _checkTxnValid(wl, txnNumber);
+    // The value for 'autocommit' is only used to
+    // generate the uassert error message. In this case, the exception will never be
+    // propagated to the user.
+    _checkTxnValid(wl, txnNumber, boost::optional<bool>());
 
     // Check for continuing an existing transaction
     if (txnNumber == _activeTxnNumber)
