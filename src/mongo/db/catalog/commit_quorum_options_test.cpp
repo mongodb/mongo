@@ -83,12 +83,12 @@ TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIskMajorityString) {
     ASSERT_EQUALS(CommitQuorumOptions::kMajority, options.mode);
 }
 
-TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIskAllString) {
+TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIskVotingMembersString) {
     CommitQuorumOptions options;
-    BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kAll);
+    BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kVotingMembers);
     ASSERT_OK(options.parse(obj.getField("commitQuorum")));
     ASSERT_EQUALS(-1, options.numNodes);
-    ASSERT_EQUALS(CommitQuorumOptions::kAll, options.mode);
+    ASSERT_EQUALS(CommitQuorumOptions::kVotingMembers, options.mode);
 }
 
 TEST(CommitQuorumOptionsTest, ToBSON) {

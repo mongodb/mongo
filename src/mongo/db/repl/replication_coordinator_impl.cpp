@@ -1766,8 +1766,8 @@ bool ReplicationCoordinatorImpl::isCommitQuorumSatisfied(
     StringData patternName;
     if (commitQuorum.mode == CommitQuorumOptions::kMajority) {
         patternName = ReplSetConfig::kMajorityWriteConcernModeName;
-    } else if (commitQuorum.mode == CommitQuorumOptions::kAll) {
-        patternName = ReplSetConfig::kAllWriteConcernModeName;
+    } else if (commitQuorum.mode == CommitQuorumOptions::kVotingMembers) {
+        patternName = ReplSetConfig::kVotingMembersWriteConcernModeName;
     } else {
         patternName = commitQuorum.mode;
     }

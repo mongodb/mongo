@@ -3242,7 +3242,7 @@ TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestartPerMember() const {
 bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
     const CommitQuorumOptions& commitQuorum) const {
     if (!commitQuorum.mode.empty() && commitQuorum.mode != CommitQuorumOptions::kMajority &&
-        commitQuorum.mode != CommitQuorumOptions::kAll) {
+        commitQuorum.mode != CommitQuorumOptions::kVotingMembers) {
         StatusWith<ReplSetTagPattern> tagPatternStatus =
             _rsConfig.findCustomWriteMode(commitQuorum.mode);
         if (!tagPatternStatus.isOK()) {
@@ -3267,7 +3267,7 @@ bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
     if (!commitQuorum.mode.empty()) {
         if (commitQuorum.mode == CommitQuorumOptions::kMajority) {
             nodesRemaining = _rsConfig.getWriteMajority();
-        } else if (commitQuorum.mode == CommitQuorumOptions::kAll) {
+        } else if (commitQuorum.mode == CommitQuorumOptions::kVotingMembers) {
             nodesRemaining = _rsConfig.getWritableVotingMembersCount();
         }
     }

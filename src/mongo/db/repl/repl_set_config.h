@@ -118,7 +118,7 @@ public:
     static const std::string kVersionFieldName;
     static const std::string kTermFieldName;
     static constexpr char kMajorityWriteConcernModeName[] = "$majority";
-    static constexpr char kAllWriteConcernModeName[] = "$all";
+    static constexpr char kVotingMembersWriteConcernModeName[] = "$votingMembers";
     static constexpr char kConfigMajorityWriteConcernModeName[] = "$configMajority";
     static constexpr char kConfigAllWriteConcernName[] = "$configAll";
 

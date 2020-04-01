@@ -7219,9 +7219,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7245,9 +7245,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7271,9 +7271,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7297,9 +7297,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7325,9 +7325,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7354,9 +7354,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions allNodesCQ;
         allNodesCQ.numNodes = 5;
@@ -7382,9 +7382,9 @@ TEST_F(ReplCoordTest, CheckIfCommitQuorumHasReached) {
         majorityModeCQ.mode = "majority";
         ASSERT_TRUE(replCoord->isCommitQuorumSatisfied(majorityModeCQ, commitReadyMembers));
 
-        CommitQuorumOptions allModeCQ;
-        allModeCQ.mode = "all";
-        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(allModeCQ, commitReadyMembers));
+        CommitQuorumOptions votingMembersModeCQ;
+        votingMembersModeCQ.mode = "votingMembers";
+        ASSERT_FALSE(replCoord->isCommitQuorumSatisfied(votingMembersModeCQ, commitReadyMembers));
 
         CommitQuorumOptions numNodesCQ;
         numNodesCQ.numNodes = 4;

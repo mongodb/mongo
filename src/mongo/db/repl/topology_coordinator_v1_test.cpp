@@ -6151,9 +6151,9 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
     majorityCQ.mode = "majority";
     ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityCQ));
 
-    CommitQuorumOptions allCQ;
-    allCQ.mode = "all";
-    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(allCQ));
+    CommitQuorumOptions votingMembersCQ;
+    votingMembersCQ.mode = "votingMembers";
+    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(votingMembersCQ));
 
     CommitQuorumOptions validModeCQ;
     validModeCQ.mode = "valid";
