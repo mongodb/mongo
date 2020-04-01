@@ -58,7 +58,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             LOGV2_WARNING_OPTIONS(
                 22117,
                 {logv2::LogTag::kStartupWarnings},
-                "This is a development version of MongoDB. Not recommended for production.",
+                "This is a development version of MongoDB. Not recommended for production",
                 "version"_attr = vii.version());
         }
     }
@@ -67,7 +67,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         LOGV2_WARNING_OPTIONS(22120,
                               {logv2::LogTag::kStartupWarnings},
                               "Access control is not enabled for the database. Read and write "
-                              "access to data and configuration is unrestricted.");
+                              "access to data and configuration is unrestricted");
     }
 
     const bool is32bit = sizeof(int*) == 4;
@@ -82,7 +82,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             22124,
             {logv2::LogTag::kStartupWarnings},
             "While invalid X509 certificates may be used to connect to this server, they will not "
-            "be considered permissible for authentication.");
+            "be considered permissible for authentication");
     }
 
     if (sslGlobalParams.sslAllowInvalidHostnames) {
@@ -90,7 +90,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             22128,
             {logv2::LogTag::kStartupWarnings},
             "This server will not perform X.509 hostname validation. This may allow your server to "
-            "make or accept connections to untrusted parties.");
+            "make or accept connections to untrusted parties");
     }
 #endif
 
@@ -107,11 +107,11 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         LOGV2_WARNING(22132,
                       "No client certificate validation can be performed since no CA file has been "
                       "provided and no sslCertificateSelector has been specified. Please specify "
-                      "an sslCAFile parameter.");
+                      "an sslCAFile parameter");
 #else
         LOGV2_WARNING(22133,
                       "No client certificate validation can be performed since no CA file has been "
-                      "provided. Please specify an sslCAFile parameter.");
+                      "provided. Please specify an sslCAFile parameter");
 #endif
     }
 
@@ -123,7 +123,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         LOGV2_OPTIONS(22135,
                       {logv2::LogTag::kStartupWarnings},
                       "This is a 32-bit MongoDB binary running on a 64-bit operating system. "
-                      "Switch to a 64-bit build of MongoDB to support larger databases.");
+                      "Switch to a 64-bit build of MongoDB to support larger databases");
     }
 #endif
 
@@ -132,7 +132,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         LOGV2_WARNING_OPTIONS(
             22138,
             {logv2::LogTag::kStartupWarnings},
-            "You are running this process as the root user, which is not recommended.");
+            "You are running this process as the root user, which is not recommended");
     }
 #endif
 
@@ -144,7 +144,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             "server. Start the server with --bind_ip <address> to specify which IP addresses it "
             "should serve responses from, or with --bind_ip_all to bind to all interfaces. If this "
             "behavior is desired, start the server with --bind_ip 127.0.0.1 to disable this "
-            "warning.");
+            "warning");
     }
 
     if (auth::hasMultipleInternalAuthKeys()) {

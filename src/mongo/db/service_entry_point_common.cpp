@@ -137,23 +137,26 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     if (queryMessage.query.valid(BSONVersion::kLatest))
         LOGV2_OPTIONS(51777,
                       {logv2::LogComponent::kQuery},
-                      "assertion {exception} ns: {ns} query: {query}",
-                      "exception"_attr = exception,
-                      "ns"_attr = queryMessage.ns,
+                      "Assertion {error} ns: {namespace} query: {query}",
+                      "Assertion for valid query",
+                      "error"_attr = exception,
+                      "namespace"_attr = queryMessage.ns,
                       "query"_attr = redact(queryMessage.query));
     else
         LOGV2_OPTIONS(51778,
                       {logv2::LogComponent::kQuery},
-                      "assertion {exception} ns: {ns} query object is corrupt",
-                      "exception"_attr = exception,
-                      "ns"_attr = queryMessage.ns);
+                      "Assertion {error} ns: {namespace} query object is corrupt",
+                      "Assertion for query with corrupted object",
+                      "error"_attr = exception,
+                      "namespace"_attr = queryMessage.ns);
 
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         LOGV2_OPTIONS(21952,
                       {logComponentV1toV2(LogComponent::kQuery)},
-                      " ntoskip:{queryMessage_ntoskip} ntoreturn:{queryMessage_ntoreturn}",
-                      "queryMessage_ntoskip"_attr = queryMessage.ntoskip,
-                      "queryMessage_ntoreturn"_attr = queryMessage.ntoreturn);
+                      "Query's nToSkip = {nToSkip} and nToReturn = {nToReturn}",
+                      "Assertion for query with nToSkip and/or nToReturn",
+                      "nToSkip"_attr = queryMessage.ntoskip,
+                      "nToReturn"_attr = queryMessage.ntoreturn);
     }
 
     BSONObjBuilder err;
@@ -170,9 +173,10 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     if (isStaleConfig) {
         LOGV2_OPTIONS(21953,
                       {logComponentV1toV2(LogComponent::kQuery)},
-                      "stale version detected during query over {queryMessage_ns} : {errObj}",
-                      "queryMessage_ns"_attr = queryMessage.ns,
-                      "errObj"_attr = errObj);
+                      "Stale version detected during query over {namespace}: {error}",
+                      "Detected stale version while querying namespace",
+                      "namespace"_attr = queryMessage.ns,
+                      "error"_attr = errObj);
     }
 
     BufBuilder bb;
@@ -286,8 +290,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 if (!readConcernArgs.isSpecified()) {
                     // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                    // LOGV2(21954, "Missing readConcern on {invocation_definition_getName}",
-                    // "invocation_definition_getName"_attr = invocation->definition()->getName());
+                    // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
+                    // "for command", "command"_attr = invocation->definition()->getName());
                 }
             }
         }
@@ -306,11 +310,11 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                     readConcernArgs = std::move(*rcDefault);
                     LOGV2_DEBUG(21955,
                                 2,
-                                "Applying default readConcern on {invocation_definition_getName} "
-                                "of {rcDefault}",
-                                "invocation_definition_getName"_attr =
-                                    invocation->definition()->getName(),
-                                "rcDefault"_attr = *rcDefault);
+                                "Applying default readConcern on {command} of {readConcernDefault} "
+                                "on {command}",
+                                "Applying default readConcern on command",
+                                "readConcernDefault"_attr = *rcDefault,
+                                "command"_attr = invocation->definition()->getName());
                     // Update the readConcernSupport, since the default RC was applied.
                     readConcernSupport =
                         invocation->supportsReadConcern(readConcernArgs.getLevel());
@@ -530,15 +534,14 @@ void _abortUnpreparedOrStashPreparedTransaction(
             txnParticipant->abortTransaction(opCtx);
     } catch (...) {
         // It is illegal for this to throw so we catch and log this here for diagnosability.
-        LOGV2_FATAL_CONTINUE(
-            21974,
-            "Caught exception during transaction "
-            "{opCtx_getTxnNumber}{isPrepared_stash_abort}{opCtx_getLogicalSessionId}: "
-            "{exceptionToStatus}",
-            "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-            "isPrepared_stash_abort"_attr = (isPrepared ? " stash " : " abort "),
-            "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
-            "exceptionToStatus"_attr = exceptionToStatus());
+        LOGV2_FATAL_CONTINUE(21974,
+                             "Caught exception during transaction {txnNumber} {operation} "
+                             "{logicalSessionId}: {error}",
+                             "Unable to stash/abort transaction",
+                             "operation"_attr = (isPrepared ? "stash" : "abort"),
+                             "txnNumber"_attr = opCtx->getTxnNumber(),
+                             "logicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
+                             "error"_attr = exceptionToStatus());
         std::terminate();
     }
 }
@@ -758,8 +761,8 @@ bool runCommandImpl(OperationContext* opCtx,
                                serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                         if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
                             // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                            // LOGV2(21959, "Missing writeConcern on {command_getName}",
-                            // "command_getName"_attr = command->getName());
+                            // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
+                            // "writeConcern on command", "command"_attr = command->getName());
                         }
                     }
                 }
@@ -812,6 +815,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 LOGV2(21960,
                       "failWithErrorCodeInRunCommand enabled - failing command with error "
                       "code: {errorCode}",
+                      "failWithErrorCodeInRunCommand enabled, failing command",
                       "errorCode"_attr = errorCode);
                 BSONObjBuilder errorBuilder;
                 errorBuilder.append("ok", 0.0);
@@ -1062,8 +1066,9 @@ void execCommandDatabase(OperationContext* opCtx,
         if (command->adminOnly()) {
             LOGV2_DEBUG(21961,
                         2,
-                        "command: {request_getCommandName}",
-                        "request_getCommandName"_attr = request.getCommandName());
+                        "Admin only command: {command}",
+                        "Admin only command",
+                        "command"_attr = request.getCommandName());
         }
 
         if (command->maintenanceMode()) {
@@ -1168,7 +1173,8 @@ void execCommandDatabase(OperationContext* opCtx,
             LOGV2_DEBUG_OPTIONS(4615605,
                                 1,
                                 {logv2::LogComponent::kTracking},
-                                "{trackingMetadata}",
+                                "Command metadata: {trackingMetadata}",
+                                "Command metadata",
                                 "trackingMetadata"_attr = rpc::TrackingMetadata::get(opCtx));
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
@@ -1243,17 +1249,16 @@ void execCommandDatabase(OperationContext* opCtx,
         }
         appendClusterAndOperationTime(opCtx, &extraFieldsBuilder, &metadataBob, startOperationTime);
 
-        LOGV2_DEBUG(
-            21962,
-            1,
-            "assertion while executing command '{request_getCommandName}' on database "
-            "'{request_getDatabase}' with arguments "
-            "'{ServiceEntryPointCommon_getRedactedCopyForLogging_command_request_body}': {e}",
-            "request_getCommandName"_attr = request.getCommandName(),
-            "request_getDatabase"_attr = request.getDatabase(),
-            "ServiceEntryPointCommon_getRedactedCopyForLogging_command_request_body"_attr =
-                redact(ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)),
-            "e"_attr = redact(e.toString()));
+        LOGV2_DEBUG(21962,
+                    1,
+                    "Assertion while executing command '{command}' on database '{db}' with "
+                    "arguments '{commandArgs}': {error}",
+                    "Assertion while executing command",
+                    "command"_attr = request.getCommandName(),
+                    "db"_attr = request.getDatabase(),
+                    "commandArgs"_attr = redact(
+                        ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)),
+                    "error"_attr = redact(e.toString()));
 
         generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), extraFieldsBuilder.obj());
     }
@@ -1299,8 +1304,11 @@ DbResponse receivedCommands(OperationContext* opCtx,
             // Otherwise, reply with the parse error. This is useful for cases where parsing fails
             // due to user-supplied input, such as the document too deep error. Since we failed
             // during parsing, we can't log anything about the command.
-            LOGV2_DEBUG(
-                21963, 1, "assertion while parsing command: {ex}", "ex"_attr = ex.toString());
+            LOGV2_DEBUG(21963,
+                        1,
+                        "Assertion while parsing command: {error}",
+                        "Assertion while parsing command",
+                        "error"_attr = ex.toString());
 
             generateErrorResponse(
                 opCtx, replyBuilder.get(), ex, metadataBob.obj(), extraFieldsBuilder.obj());
@@ -1320,18 +1328,21 @@ DbResponse receivedCommands(OperationContext* opCtx,
                 globalCommandRegistry()->incrementUnknownCommands();
                 std::string msg = str::stream()
                     << "no such command: '" << request.getCommandName() << "'";
-                LOGV2_DEBUG(21964, 2, "{msg}", "msg"_attr = msg);
+                LOGV2_DEBUG(21964,
+                            2,
+                            "No such command: {command}",
+                            "Command not found in registry",
+                            "command"_attr = request.getCommandName());
                 uasserted(ErrorCodes::CommandNotFound, str::stream() << msg);
             }
 
-            LOGV2_DEBUG(
-                21965,
-                2,
-                "run command {request_getDatabase}.$cmd "
-                "{ServiceEntryPointCommon_getRedactedCopyForLogging_c_request_body}",
-                "request_getDatabase"_attr = request.getDatabase(),
-                "ServiceEntryPointCommon_getRedactedCopyForLogging_c_request_body"_attr =
-                    redact(ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
+            LOGV2_DEBUG(21965,
+                        2,
+                        "Run command {db}.$cmd {commandArgs}",
+                        "About to run the command",
+                        "db"_attr = request.getDatabase(),
+                        "commandArgs"_attr = redact(
+                            ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
 
             {
                 // Try to set this as early as possible, as soon as we have figured out the command.
@@ -1359,11 +1370,11 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
             LOGV2_DEBUG(21966,
                         1,
-                        "assertion while executing command '{request_getCommandName}' on database "
-                        "'{request_getDatabase}': {ex}",
-                        "request_getCommandName"_attr = request.getCommandName(),
-                        "request_getDatabase"_attr = request.getDatabase(),
-                        "ex"_attr = ex.toString());
+                        "Assertion while executing command '{command}' on database '{db}': {error}",
+                        "Assertion while executing command",
+                        "command"_attr = request.getCommandName(),
+                        "db"_attr = request.getDatabase(),
+                        "error"_attr = ex.toString());
 
             generateErrorResponse(
                 opCtx, replyBuilder.get(), ex, metadataBob.obj(), extraFieldsBuilder.obj());
@@ -1438,12 +1449,24 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     DbMessage dbmessage(m);
     int n = dbmessage.pullInt();
 
-    if (n > 2000) {
-        if (n < 30000)
-            LOGV2_WARNING(4615606, "receivedKillCursors, n={n}", "n"_attr = n);
-        else
-            LOGV2_ERROR(4615607, "receivedKillCursors, n={n}", "n"_attr = n);
-        uassert(51250, "must kill fewer than 30000 cursors", n < 30000);
+    static constexpr int kSoftKillLimit = 2000;
+    static constexpr int kHardKillLimit = 29999;
+
+    if (n > kHardKillLimit) {
+        LOGV2_ERROR(4615607,
+                    "Received killCursors, n={numCursors}",
+                    "Received killCursors, exceeded kHardKillLimit",
+                    "numCursors"_attr = n,
+                    "kHardKillLimit"_attr = kHardKillLimit);
+        uasserted(51250, "Must kill fewer than {} cursors"_format(kHardKillLimit));
+    }
+
+    if (n > kSoftKillLimit) {
+        LOGV2_WARNING(4615606,
+                      "Received killCursors, n={numCursors}",
+                      "Received killCursors, exceeded kSoftKillLimit",
+                      "numCursors"_attr = n,
+                      "kSoftKillLimit"_attr = kSoftKillLimit);
     }
 
     uassert(31289, str::stream() << "must kill at least 1 cursor, n=" << n, n >= 1);
@@ -1457,9 +1480,10 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     if (shouldLog(logv2::LogSeverity::Debug(1)) || found != n) {
         LOGV2_DEBUG(21967,
                     logSeverityV1toV2(found == n ? 1 : 0).toInt(),
-                    "killcursors: found {found} of {n}",
+                    "killCursors: found {found} of {numCursors}",
+                    "killCursors found fewer cursors to kill than requested",
                     "found"_attr = found,
-                    "n"_attr = n);
+                    "numCursors"_attr = n);
     }
 }
 
@@ -1675,8 +1699,9 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 receivedKillCursors(opCtx, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
                 LOGV2(21968,
-                      "    operation isn't supported: {static_cast_int_op}",
-                      "static_cast_int_op"_attr = static_cast<int>(op));
+                      "Operation isn't supported: {operation}",
+                      "Operation is not supported",
+                      "operation"_attr = static_cast<int>(op));
                 currentOp.done();
                 forceLog = true;
             } else {
@@ -1704,9 +1729,10 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
             LastError::get(c).setLastError(ue.code(), ue.reason());
             LOGV2_DEBUG(21969,
                         3,
-                        " Caught Assertion in {networkOpToString_op}, continuing {ue}",
-                        "networkOpToString_op"_attr = networkOpToString(op),
-                        "ue"_attr = redact(ue));
+                        "Caught Assertion in {networkOp}, continuing: {error}",
+                        "Assertion in fire-and-forget operation",
+                        "networkOp"_attr = networkOpToString(op),
+                        "error"_attr = redact(ue));
             debug.errInfo = ue.toStatus();
         }
         // A NotMaster error can be set either within receivedInsert/receivedUpdate/receivedDelete
@@ -1736,15 +1762,15 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     if (currentOp.shouldDBProfile(shouldSample)) {
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
-            LOGV2_DEBUG(21970, 1, "note: not profiling because recursive read lock");
+            LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");
         } else if (c.isInDirectClient()) {
-            LOGV2_DEBUG(21971, 1, "note: not profiling because we are in DBDirectClient");
+            LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
         } else if (behaviors.lockedForWriting()) {
             // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
             // lockedForWriting() call but prior to profile collection lock acquisition.
-            LOGV2_DEBUG(21972, 1, "note: not profiling because doing fsync+lock");
+            LOGV2_DEBUG(21972, 1, "Note: not profiling because doing fsync+lock");
         } else if (storageGlobalParams.readOnly) {
-            LOGV2_DEBUG(21973, 1, "note: not profiling because server is read-only");
+            LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
         } else {
             invariant(!opCtx->lockState()->inAWriteUnitOfWork());
             profile(opCtx, op);

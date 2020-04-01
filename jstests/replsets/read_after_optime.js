@@ -41,9 +41,9 @@ var runTest = function(testDB, primaryConn) {
         ' timed out waiting for read concern to be satisfied. Command:';
 
     if (isJsonLog(testDB.getMongo())) {
-        msg = new RegExp(
-            `Command on database {request_getDatabase} timed out waiting for read concern to be satisfied. Command:.*"attr":{"request_getDatabase":"${
-                testDB.getName()}",.*`);
+        msg =
+            new RegExp(`Command timed out waiting for read concern to be satisfied.*"attr":{"db":"${
+                testDB.getName()}",*`);
     }
 
     checkLog.containsWithCount(testDB.getMongo(), msg, 1);

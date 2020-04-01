@@ -121,7 +121,10 @@ void printCommandLineOpts(std::ostream* os) {
                       tojson(serverGlobalParams.parsedOpts, ExtendedRelaxedV2_0_0, true))
             << std::endl;
     } else {
-        LOGV2(21951, "Options set by command line", "options"_attr = serverGlobalParams.parsedOpts);
+        LOGV2(21951,
+              "Options set by command line: {options}",
+              "Options set by command line",
+              "options"_attr = serverGlobalParams.parsedOpts);
     }
 }
 
