@@ -40,7 +40,7 @@ class Status;
 /**
  * The 'CommitQuorumOptions' has the same range of settings as the 'w' field from
  * 'WriteConcernOptions'. It can be set to an integer starting from 0 and up, or to a string. The
- * string option can either be 'majority' or a replica set tag.
+ * string option can be 'majority', 'votingMembers' or a replica set tag.
  *
  * The principal idea behind 'CommitQuorumOptions' is to figure out when an index build should be
  * committed on the replica set based on the number of commit ready members.
@@ -49,12 +49,12 @@ class CommitQuorumOptions {
 public:
     static const StringData kCommitQuorumField;  // = "commitQuorum"
     static const char kMajority[];               // = "majority"
-    static const char kAll[];                    // = "all"
+    static const char kVotingMembers[];          // = "votingMembers"
 
     static const int kUninitializedNumNodes = -1;
     static const int kDisabled = 0;
-    static const BSONObj Majority;  // = {"commitQuorum": "majority"}
-    static const BSONObj all;       // = {"commitQuorum": "all"}
+    static const BSONObj Majority;       // = {"commitQuorum": "majority"}
+    static const BSONObj VotingMembers;  // = {"commitQuorum": "votingMembers"}
 
     CommitQuorumOptions() {
         reset();
