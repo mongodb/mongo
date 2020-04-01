@@ -124,26 +124,6 @@ void sendToRecipient(OperationContext* opCtx,
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
-// Returns an executor to be used to run commands related to submitting tasks to the range deleter.
-// The executor is initialized on the first call to this function. Uses a shared_ptr
-// because a shared_ptr is required to work with ExecutorFutures.
-static std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
-    static Mutex mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
-    static std::shared_ptr<ThreadPool> executor;
-
-    stdx::lock_guard<Latch> lg(mutex);
-    if (!executor) {
-        ThreadPool::Options options;
-        options.poolName = "MoveChunk";
-        options.minThreads = 0;
-        options.maxThreads = 16;
-        executor = std::make_shared<ThreadPool>(std::move(options));
-        executor->startup();
-    }
-
-    return executor;
-}
-
 /**
  * Runs doWork until it doesn't throw an error, the node is shutting down, the node has stepped
  * down, or the node has stepped down and up.
@@ -206,6 +186,23 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 }
 
 }  // namespace
+
+std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
+    static Mutex mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
+    static std::shared_ptr<ThreadPool> executor;
+
+    stdx::lock_guard<Latch> lg(mutex);
+    if (!executor) {
+        ThreadPool::Options options;
+        options.poolName = "MoveChunk";
+        options.minThreads = 0;
+        options.maxThreads = 16;
+        executor = std::make_shared<ThreadPool>(std::move(options));
+        executor->startup();
+    }
+
+    return executor;
+}
 
 BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const ShardId& fromShard,

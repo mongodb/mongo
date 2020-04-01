@@ -34,6 +34,7 @@
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -63,6 +64,13 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const bool& isDonorShard,
                                     const BSONObj& min,
                                     const BSONObj& max);
+
+/**
+ * Returns an executor to be used to run commands related to submitting tasks to the range deleter.
+ * The executor is initialized on the first call to this function. Uses a shared_ptr
+ * because a shared_ptr is required to work with ExecutorFutures.
+ */
+std::shared_ptr<ThreadPool> getMigrationUtilExecutor();
 
 /**
  * Creates a query object that can used to find overlapping ranges in the pending range deletions

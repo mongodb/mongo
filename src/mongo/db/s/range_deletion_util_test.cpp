@@ -33,6 +33,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -79,6 +80,8 @@ public:
     void tearDown() override {
         DBDirectClient client(operationContext());
         client.dropCollection(kNss.ns());
+
+        migrationutil::getMigrationUtilExecutor()->waitForIdle();
 
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixture::tearDown();
