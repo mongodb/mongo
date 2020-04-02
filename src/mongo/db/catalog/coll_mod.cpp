@@ -272,10 +272,12 @@ Status _collModInternal(OperationContext* opCtx,
                         const BSONObj& cmdObj,
                         BSONObjBuilder* result) {
     StringData dbName = nss.db();
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
-    Database* const db = autoDb.getDb();
-    Collection* coll =
-        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) : nullptr;
+    AutoGetCollection autoColl(opCtx, nss, MODE_X, AutoGetCollection::ViewMode::kViewsPermitted);
+    Lock::CollectionLock systemViewsLock(
+        opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
+
+    Database* const db = autoColl.getDb();
+    Collection* coll = autoColl.getCollection();
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, false, nss);
