@@ -15,7 +15,7 @@ import os
 import re
 import sys
 from distutils.util import strtobool  # pylint: disable=no-name-in-module
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Sequence, Optional, Any, Match
 
 import click
 import requests
@@ -23,22 +23,21 @@ import structlog
 import yaml
 
 from evergreen.api import EvergreenApi, RetryingEvergreenApi
-from shrub.config import Configuration
-from shrub.task import TaskDependency
-from shrub.variant import DisplayTaskDefinition
-from shrub.variant import TaskSpec
+from evergreen.stats import TestStats
+
+from shrub.v2 import Task, TaskDependency, BuildVariant, ExistingTask, ShrubProject
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import buildscripts.resmokelib.parser as _parser  # pylint: disable=wrong-import-position
-import buildscripts.resmokelib.suitesconfig as suitesconfig  # pylint: disable=wrong-import-position
-import buildscripts.util.read_config as read_config  # pylint: disable=wrong-import-position
-import buildscripts.util.taskname as taskname  # pylint: disable=wrong-import-position
-import buildscripts.util.teststats as teststats  # pylint: disable=wrong-import-position
-
 # pylint: disable=wrong-import-position
+import buildscripts.resmokelib.parser as _parser
+import buildscripts.resmokelib.suitesconfig as suitesconfig
+from buildscripts.util.fileops import write_file_to_dir
+import buildscripts.util.read_config as read_config
+import buildscripts.util.taskname as taskname
+import buildscripts.util.teststats as teststats
 from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands
 # pylint: enable=wrong-import-position
 
@@ -165,6 +164,16 @@ class ConfigOptions(object):
         return True
 
     @property
+    def display_task_name(self):
+        """Return the name to use as the display task."""
+        return self.task
+
+    @property
+    def gen_task_set(self):
+        """Return the set of tasks used to generate this configuration."""
+        return {self.task_name}
+
+    @property
     def variant(self):
         """Return build variant is being run on."""
         return self.build_variant
@@ -179,17 +188,6 @@ class ConfigOptions(object):
             return self.formats[item](config[item])
 
         return config.get(item, None)
-
-    def generate_display_task(self, task_names: List[str]) -> DisplayTaskDefinition:
-        """
-        Generate a display task with execution tasks.
-
-        :param task_names: The names of the execution tasks to include under the display task.
-        :return: Display task definition for the generated display task.
-        """
-        return DisplayTaskDefinition(self.task) \
-                .execution_tasks(task_names) \
-                .execution_task("{0}_gen".format(self.task))
 
     def __getattr__(self, item):
         """Determine the value of the given attribute."""
@@ -213,19 +211,7 @@ def enable_logging(verbose):
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
 
-def write_file(directory: str, filename: str, contents: str):
-    """
-    Write the given contents to the specified file.
-
-    :param directory: Directory to write file into.
-    :param filename: Name of file to write to.
-    :param contents: Data to write to file.
-    """
-    with open(os.path.join(directory, filename), "w") as fileh:
-        fileh.write(contents)
-
-
-def write_file_dict(directory: str, file_dict: Dict[str, str]):
+def write_file_dict(directory: str, file_dict: Dict[str, str]) -> None:
     """
     Write files in the given dictionary to disk.
 
@@ -237,11 +223,8 @@ def write_file_dict(directory: str, file_dict: Dict[str, str]):
     :param directory: Directory to write files to.
     :param file_dict: Dictionary of files to write.
     """
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
     for name, contents in file_dict.items():
-        write_file(directory, name, contents)
+        write_file_to_dir(directory, name, contents)
 
 
 def read_yaml(directory: str, filename: str) -> Dict:
@@ -412,7 +395,7 @@ def generate_resmoke_suite_config(source_config, source_file, roots=None, exclud
 
 
 def render_suite_files(suites: List, suite_name: str, test_list: List[str], suite_dir,
-                       create_misc_suite: bool):
+                       create_misc_suite: bool) -> Dict:
     """
     Render the given list of suites.
 
@@ -552,12 +535,10 @@ class Suite(object):
 class EvergreenConfigGenerator(object):
     """Generate evergreen configurations."""
 
-    def __init__(self, shrub_config: Configuration, suites: List[Suite], options: ConfigOptions,
-                 evg_api: EvergreenApi):
+    def __init__(self, suites: List[Suite], options: ConfigOptions, evg_api: EvergreenApi):
         """
         Create new EvergreenConfigGenerator object.
 
-        :param shrub_config: Shrub configuration the generated Evergreen config will be added to.
         :param suites: The suite the Evergreen config will be generated for.
         :param options: The ConfigOptions object containing the config file values.
         :param evg_api: Evergreen API object.
@@ -565,25 +546,38 @@ class EvergreenConfigGenerator(object):
         self.suites = suites
         self.options = options
         self.evg_api = evg_api
-        self.evg_config = shrub_config
         self.task_specs = []
         self.task_names = []
         self.build_tasks = None
 
-    def _set_task_distro(self, task_spec):
+    def _get_distro(self) -> Optional[Sequence[str]]:
+        """Get the distros that the tasks should be run on."""
         if self.options.use_large_distro and self.options.large_distro_name:
-            task_spec.distro(self.options.large_distro_name)
+            return [self.options.large_distro_name]
+        return None
 
-    def _generate_resmoke_args(self, suite_file):
-        resmoke_args = "--suite={0}.yml --originSuite={1} {2}".format(
-            suite_file, self.options.suite, self.options.resmoke_args)
+    def _generate_resmoke_args(self, suite_file: str) -> str:
+        """
+        Generate the resmoke args for the given suite.
+
+        :param suite_file: File containing configuration for test suite.
+        :return: arguments to pass to resmoke.
+        """
+        resmoke_args = (f"--suite={suite_file}.yml --originSuite={self.options.suite} "
+                        f" {self.options.resmoke_args}")
         if self.options.repeat_suites and not string_contains_any_of_args(
                 resmoke_args, ["repeatSuites", "repeat"]):
-            resmoke_args += " --repeatSuites={0} ".format(self.options.repeat_suites)
+            resmoke_args += f" --repeatSuites={self.options.repeat_suites} "
 
         return resmoke_args
 
-    def _get_run_tests_vars(self, suite_file):
+    def _get_run_tests_vars(self, suite_file: str) -> Dict[str, Any]:
+        """
+        Generate a dictionary of the variables to pass to the task.
+
+        :param suite_file: Suite being run.
+        :return: Dictionary containing variables and value to pass to generated task.
+        """
         variables = {
             "resmoke_args": self._generate_resmoke_args(suite_file),
             "run_multiple_jobs": self.options.run_multiple_jobs,
@@ -600,7 +594,8 @@ class EvergreenConfigGenerator(object):
 
         return variables
 
-    def _get_timeout_command(self, max_test_runtime, expected_suite_runtime, use_default):
+    def _get_timeout_command(self, max_test_runtime: int, expected_suite_runtime: int,
+                             use_default: bool) -> TimeoutInfo:
         """
         Add an evergreen command to override the default timeouts to the list of commands.
 
@@ -638,38 +633,56 @@ class EvergreenConfigGenerator(object):
         return TimeoutInfo.default_timeout()
 
     @staticmethod
-    def _is_task_dependency(task, possible_dependency):
-        return re.match("{0}_(\\d|misc)".format(task), possible_dependency)
+    def _is_task_dependency(task: str, possible_dependency: str) -> Optional[Match[str]]:
+        """
+        Determine if the given possible_dependency belongs to the given task.
 
-    def _get_tasks_for_depends_on(self, dependent_task):
+        :param task: Name of dependency being checked.
+        :param possible_dependency: Task to check if dependency.
+        :return: None is task is not a dependency.
+        """
+        return re.match(f"{task}_(\\d|misc)", possible_dependency)
+
+    def _get_tasks_for_depends_on(self, dependent_task: str) -> List[str]:
+        """
+        Get a list of tasks that belong to the given dependency.
+
+        :param dependent_task: Dependency to check.
+        :return: List of tasks that are a part of the given dependency.
+        """
         return [
             str(task.display_name) for task in self.build_tasks
             if self._is_task_dependency(dependent_task, str(task.display_name))
         ]
 
-    def _add_dependencies(self, task):
-        task.dependency(TaskDependency("compile"))
+    def _get_dependencies(self) -> Set[TaskDependency]:
+        """Get the set of dependency tasks for these suites."""
+        dependencies = {TaskDependency("compile")}
         if not self.options.is_patch:
             # Don"t worry about task dependencies in patch builds, only mainline.
             if self.options.depends_on:
                 for dep in self.options.depends_on:
                     depends_on_tasks = self._get_tasks_for_depends_on(dep)
                     for dependency in depends_on_tasks:
-                        task.dependency(TaskDependency(dependency))
+                        dependencies.add(TaskDependency(dependency))
 
-        return task
+        return dependencies
 
-    def _generate_task(self, sub_suite_name, sub_task_name, target_dir, max_test_runtime=None,
-                       expected_suite_runtime=None):
-        """Generate evergreen config for a resmoke task."""
+    def _generate_task(self, sub_suite_name: str, sub_task_name: str, target_dir: str,
+                       max_test_runtime: Optional[int] = None,
+                       expected_suite_runtime: Optional[int] = None) -> Task:
+        """
+        Generate a shrub evergreen config for a resmoke task.
+
+        :param sub_suite_name: Name of suite being generated.
+        :param sub_task_name: Name of task to generate.
+        :param target_dir: Directory containing generated suite files.
+        :param max_test_runtime: Runtime of the longest test in this sub suite.
+        :param expected_suite_runtime: Expected total runtime of this suite.
+        :return: Shrub configuration for the described task.
+        """
         # pylint: disable=too-many-arguments
         LOGGER.debug("Generating task", sub_suite=sub_suite_name)
-        spec = TaskSpec(sub_task_name)
-        self._set_task_distro(spec)
-        self.task_specs.append(spec)
-
-        self.task_names.append(sub_task_name)
-        task = self.evg_config.task(sub_task_name)
 
         # Evergreen always uses a unix shell, even on Windows, so instead of using os.path.join
         # here, just use the forward slash; otherwise the path separator will be treated as
@@ -683,45 +696,65 @@ class EvergreenConfigGenerator(object):
         commands = resmoke_commands("run generated tests", run_tests_vars, timeout_info,
                                     use_multiversion)
 
-        self._add_dependencies(task).commands(commands)
+        return Task(sub_task_name, commands, self._get_dependencies())
 
-    def _generate_all_tasks(self):
-        for idx, suite in enumerate(self.suites):
-            sub_task_name = taskname.name_generated_task(self.options.task, idx, len(self.suites),
-                                                         self.options.variant)
-            max_runtime = None
-            total_runtime = None
-            if suite.should_overwrite_timeout():
-                max_runtime = suite.max_runtime
-                total_runtime = suite.get_runtime()
-            self._generate_task(suite.name, sub_task_name, self.options.generated_config_dir,
-                                max_runtime, total_runtime)
+    def _create_sub_task(self, idx: int, suite: Suite) -> Task:
+        """
+        Create the sub task for the given suite.
+
+        :param idx: Index of suite to created.
+        :param suite: Suite to create.
+        :return: Shrub configuration for the suite.
+        """
+        sub_task_name = taskname.name_generated_task(self.options.task, idx, len(self.suites),
+                                                     self.options.variant)
+        max_runtime = None
+        total_runtime = None
+        if suite.should_overwrite_timeout():
+            max_runtime = suite.max_runtime
+            total_runtime = suite.get_runtime()
+        return self._generate_task(suite.name, sub_task_name, self.options.generated_config_dir,
+                                   max_runtime, total_runtime)
+
+    def _generate_all_tasks(self) -> Set[Task]:
+        """Get a set of shrub task for all the sub tasks."""
+        tasks = {self._create_sub_task(idx, suite) for idx, suite in enumerate(self.suites)}
 
         if self.options.create_misc_suite:
             # Add the misc suite
             misc_suite_name = f"{os.path.basename(self.options.suite)}_misc"
             misc_task_name = f"{self.options.task}_misc_{self.options.variant}"
-            self._generate_task(misc_suite_name, misc_task_name, self.options.generated_config_dir)
+            tasks.add(
+                self._generate_task(misc_suite_name, misc_task_name,
+                                    self.options.generated_config_dir))
 
-    def _generate_variant(self):
-        self._generate_all_tasks()
+        return tasks
 
-        self.evg_config.variant(self.options.variant)\
-            .tasks(self.task_specs)\
-            .display_task(self.options.generate_display_task(self.task_names))
+    def generate_config(self, build_variant: BuildVariant) -> None:
+        """
+        Generate evergreen configuration.
 
-    def generate_config(self):
-        """Generate evergreen configuration."""
+        :param build_variant: Build variant to add generated configuration to.
+        """
         self.build_tasks = self.evg_api.tasks_by_build(self.options.build_id)
-        self._generate_variant()
-        return self.evg_config
+
+        tasks = self._generate_all_tasks()
+        generating_task = {ExistingTask(task_name) for task_name in self.options.gen_task_set}
+        distros = self._get_distro()
+        build_variant.display_task(self.options.display_task_name, execution_tasks=tasks,
+                                   execution_existing_tasks=generating_task, distros=distros)
 
 
 class GenerateSubSuites(object):
     """Orchestrate the execution of generate_resmoke_suites."""
 
-    def __init__(self, evergreen_api, config_options):
-        """Initialize the object."""
+    def __init__(self, evergreen_api: EvergreenApi, config_options: ConfigOptions):
+        """
+        Initialize the object.
+
+        :param evergreen_api: Evergreen API client.
+        :param config_options: Generation configuration options.
+        """
         self.evergreen_api = evergreen_api
         self.config_options = config_options
         self.test_list = []
@@ -729,8 +762,14 @@ class GenerateSubSuites(object):
         # Populate config values for methods like list_tests()
         _parser.set_options()
 
-    def calculate_suites(self, start_date, end_date):
-        """Divide tests into suites based on statistics for the provided period."""
+    def calculate_suites(self, start_date: datetime, end_date: datetime) -> List[Suite]:
+        """
+        Divide tests into suites based on statistics for the provided period.
+
+        :param start_date: Time to start historical analysis.
+        :param end_date: Time to end historical analysis.
+        :return: List of sub suites to be generated.
+        """
         try:
             evg_stats = self.get_evg_stats(self.config_options.project, start_date, end_date,
                                            self.config_options.task, self.config_options.variant)
@@ -751,8 +790,18 @@ class GenerateSubSuites(object):
             else:
                 raise
 
-    def get_evg_stats(self, project, start_date, end_date, task, variant):
-        """Collect test execution statistics data from Evergreen."""
+    def get_evg_stats(self, project: str, start_date: datetime, end_date: datetime, task: str,
+                      variant: str) -> List[TestStats]:
+        """
+        Collect test execution statistics data from Evergreen.
+
+        :param project: Evergreen project to query.
+        :param start_date: Time to start historical analysis.
+        :param end_date: Time to end historical analysis.
+        :param task: Task to query.
+        :param variant: Build variant to query.
+        :return: List of test stats for specified task.
+        """
         # pylint: disable=too-many-arguments
 
         days = (end_date - start_date).days
@@ -761,8 +810,15 @@ class GenerateSubSuites(object):
             before_date=end_date.strftime("%Y-%m-%d"), tasks=[task], variants=[variant],
             group_by="test", group_num_days=days)
 
-    def calculate_suites_from_evg_stats(self, data, execution_time_secs):
-        """Divide tests into suites that can be run in less than the specified execution time."""
+    def calculate_suites_from_evg_stats(self, data: List[TestStats],
+                                        execution_time_secs: int) -> List[Suite]:
+        """
+        Divide tests into suites that can be run in less than the specified execution time.
+
+        :param data: Historical test results for task being split.
+        :param execution_time_secs: Target execution time of each suite (in seconds).
+        :return: List of sub suites calculated.
+        """
         test_stats = teststats.TestStats(data)
         tests_runtimes = self.filter_tests(test_stats.get_tests_runtimes())
         if not tests_runtimes:
@@ -787,7 +843,8 @@ class GenerateSubSuites(object):
                                                     tests_runtimes)
         return tests_runtimes
 
-    def filter_existing_tests(self, tests_runtimes):
+    def filter_existing_tests(self, tests_runtimes: List[teststats.TestRuntime]) \
+            -> List[teststats.TestRuntime]:
         """Filter out tests that do not exist in the filesystem."""
         all_tests = [teststats.normalize_test_name(test) for test in self.list_tests()]
         return [
@@ -795,7 +852,7 @@ class GenerateSubSuites(object):
             if os.path.exists(info.test_name) and info.test_name in all_tests
         ]
 
-    def calculate_fallback_suites(self):
+    def calculate_fallback_suites(self) -> List[Suite]:
         """Divide tests into a fixed number of suites."""
         LOGGER.debug("Splitting tasks based on fallback",
                      fallback=self.config_options.fallback_num_sub_suites)
@@ -806,21 +863,31 @@ class GenerateSubSuites(object):
             suites[idx % num_suites].add_test(test_file, 0)
         return suites
 
-    def list_tests(self):
+    def list_tests(self) -> List[Dict]:
         """List the test files that are part of the suite being split."""
         return suitesconfig.get_suite(self.config_options.suite).tests
 
-    def generate_task_config(self, shrub_config: Configuration, suites: List[Suite]):
+    def add_suites_to_build_variant(self, suites: List[Suite], build_variant: BuildVariant) -> None:
+        """
+        Add the given suites to the build variant specified.
+
+        :param suites: Suites to add.
+        :param build_variant: Build variant to add suite to.
+        """
+        EvergreenConfigGenerator(suites, self.config_options, self.evergreen_api) \
+            .generate_config(build_variant)
+
+    def generate_task_config(self, suites: List[Suite]) -> BuildVariant:
         """
         Generate the evergreen configuration for the new suite.
 
-        :param shrub_config: Shrub configuration the generated Evergreen config will be added to.
         :param suites: The suite the generated Evergreen config will be generated for.
         """
-        EvergreenConfigGenerator(shrub_config, suites, self.config_options,
-                                 self.evergreen_api).generate_config()
+        build_variant = BuildVariant(self.config_options.variant)
+        self.add_suites_to_build_variant(suites, build_variant)
+        return build_variant
 
-    def generate_suites_config(self, suites: List[Suite]) -> Tuple[dict, str]:
+    def generate_suites_config(self, suites: List[Suite]) -> Dict:
         """
         Generate the suites files and evergreen configuration for the generated task.
 
@@ -853,10 +920,10 @@ class GenerateSubSuites(object):
 
         config_dict_of_suites = self.generate_suites_config(suites)
 
-        shrub_config = Configuration()
-        self.generate_task_config(shrub_config, suites)
+        shrub_config = ShrubProject.empty()
+        shrub_config.add_build_variant(self.generate_task_config(suites))
 
-        config_dict_of_suites[self.config_options.task + ".json"] = shrub_config.to_json()
+        config_dict_of_suites[self.config_options.task + ".json"] = shrub_config.json()
         write_file_dict(self.config_options.generated_config_dir, config_dict_of_suites)
 
 

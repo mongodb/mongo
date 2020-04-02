@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 """Generate fuzzer tests to run in evergreen in parallel."""
-
 import argparse
-import math
-import os
-
 from collections import namedtuple
+from typing import Set
 
-from shrub.config import Configuration
-from shrub.command import CommandDefinition
-from shrub.task import TaskDependency
-from shrub.variant import DisplayTaskDefinition
-from shrub.variant import TaskSpec
+from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
 
-import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
+from buildscripts.util.fileops import write_file_to_dir
 import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
 
@@ -81,76 +74,74 @@ def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-m
                          timeout_secs, use_multiversion, suite)
 
 
-def _name_task(parent_name, task_index, total_tasks):
+def build_fuzzer_sub_task(task_name: str, task_index: int, options: ConfigOptions) -> Task:
     """
-    Create a zero-padded sub-task name.
+    Build a shrub task to run the fuzzer.
 
-    :param parent_name: Name of the parent task.
-    :param task_index: Index of this sub-task.
-    :param total_tasks: Total number of sub-tasks being generated.
-    :return: Zero-padded name of sub-task.
+    :param task_name: Parent name of task.
+    :param task_index: Index of sub task being generated.
+    :param options: Options to use for task.
+    :return: Shrub task to run the fuzzer.
     """
-    index_width = int(math.ceil(math.log10(total_tasks)))
-    return "{0}_{1}".format(parent_name, str(task_index).zfill(index_width))
+    sub_task_name = taskname.name_generated_task(task_name, task_index, options.num_tasks,
+                                                 options.variant)
+
+    run_jstestfuzz_vars = {
+        "jstestfuzz_vars":
+            "--numGeneratedFiles {0} {1}".format(options.num_files, options.jstestfuzz_vars),
+        "npm_command":
+            options.npm_command,
+    }
+    suite_arg = f"--suites={options.suite}"
+    run_tests_vars = {
+        "continue_on_failure": options.continue_on_failure,
+        "resmoke_args": f"{suite_arg} {options.resmoke_args}",
+        "resmoke_jobs_max": options.resmoke_jobs_max,
+        "should_shuffle": options.should_shuffle,
+        "task_path_suffix": options.use_multiversion,
+        "timeout_secs": options.timeout_secs,
+        "task": options.name
+    }  # yapf: disable
+
+    commands = [
+        FunctionCall("do setup"),
+        FunctionCall("do multiversion setup") if options.use_multiversion else None,
+        FunctionCall("setup jstestfuzz"),
+        FunctionCall("run jstestfuzz", run_jstestfuzz_vars),
+        FunctionCall("run generated tests", run_tests_vars)
+    ]
+    commands = [command for command in commands if command is not None]
+
+    return Task(sub_task_name, commands, {TaskDependency("compile")})
 
 
-def generate_evg_tasks(options, evg_config, task_name_suffix=None, display_task=None):
+def generate_fuzzer_sub_tasks(task_name: str, options: ConfigOptions) -> Set[Task]:
     """
-    Generate an evergreen configuration for fuzzers based on the options given.
+    Generate evergreen tasks for fuzzers based on the options given.
+
+    :param task_name: Parent name for tasks being generated.
+    :param options: task options.
+    :return: Set of shrub tasks.
+    """
+    sub_tasks = {
+        build_fuzzer_sub_task(task_name, index, options)
+        for index in range(options.num_tasks)
+    }
+    return sub_tasks
+
+
+def create_fuzzer_task(options: ConfigOptions, build_variant: BuildVariant) -> None:
+    """
+    Generate an evergreen configuration for fuzzers and add it to the given build variant.
 
     :param options: task options.
-    :param evg_config: evergreen configuration.
-    :param task_name_suffix: suffix to be appended to each task name.
-    :param display_task: an existing display task definition to append to.
-    :return: An evergreen configuration.
+    :param build_variant: Build variant to add tasks to.
     """
-    task_names = []
-    task_specs = []
+    task_name = options.name
+    sub_tasks = generate_fuzzer_sub_tasks(task_name, options)
 
-    for task_index in range(options.num_tasks):
-        task_name = options.name if not task_name_suffix else f"{options.name}_{task_name_suffix}"
-        name = taskname.name_generated_task(task_name, task_index, options.num_tasks,
-                                            options.variant)
-        task_names.append(name)
-        task_specs.append(TaskSpec(name))
-        task = evg_config.task(name)
-
-        commands = [CommandDefinition().function("do setup")]
-        if options.use_multiversion:
-            commands.append(CommandDefinition().function("do multiversion setup"))
-
-        commands.append(CommandDefinition().function("setup jstestfuzz"))
-        commands.append(CommandDefinition().function("run jstestfuzz").vars({
-            "jstestfuzz_vars":
-                "--numGeneratedFiles {0} {1}".format(options.num_files, options.jstestfuzz_vars),
-            "npm_command":
-                options.npm_command
-        }))
-        # Unix path separators are used because Evergreen only runs this script in unix shells,
-        # even on Windows.
-        suite_arg = f"--suites={options.suite}"
-        run_tests_vars = {
-            "continue_on_failure": options.continue_on_failure,
-            "resmoke_args": f"{suite_arg} {options.resmoke_args}",
-            "resmoke_jobs_max": options.resmoke_jobs_max,
-            "should_shuffle": options.should_shuffle,
-            "task_path_suffix": options.use_multiversion,
-            "timeout_secs": options.timeout_secs,
-            "task": options.name
-        }  # yapf: disable
-
-        commands.append(CommandDefinition().function("run generated tests").vars(run_tests_vars))
-        task.dependency(TaskDependency("compile")).commands(commands)
-
-    # Create a new DisplayTaskDefinition or append to the one passed in.
-    dt = DisplayTaskDefinition(task_name) if not display_task else display_task
-    dt.execution_tasks(task_names)
-    evg_config.variant(options.variant).tasks(task_specs)
-    if not display_task:
-        dt.execution_task("{0}_gen".format(options.name))
-        evg_config.variant(options.variant).display_task(dt)
-
-    return evg_config
+    build_variant.display_task(task_name, sub_tasks,
+                               execution_existing_tasks={ExistingTask(f"{options.name}_gen")})
 
 
 def main():
@@ -184,14 +175,13 @@ def main():
     options = parser.parse_args()
 
     config_options = _get_config_options(options, options.expansion_file)
-    evg_config = Configuration()
-    generate_evg_tasks(config_options, evg_config)
+    build_variant = BuildVariant(config_options.variant)
+    create_fuzzer_task(config_options, build_variant)
 
-    if not os.path.exists(CONFIG_DIRECTORY):
-        os.makedirs(CONFIG_DIRECTORY)
+    shrub_project = ShrubProject.empty()
+    shrub_project.add_build_variant(build_variant)
 
-    with open(os.path.join(CONFIG_DIRECTORY, config_options.name + ".json"), "w") as file_handle:
-        file_handle.write(evg_config.to_json())
+    write_file_to_dir(CONFIG_DIRECTORY, f"{config_options.name}.json", shrub_project.json())
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import collections
 import datetime
+import json
 import os
 import sys
 import subprocess
@@ -14,7 +15,7 @@ from mock import Mock, patch, MagicMock
 
 import requests
 
-from shrub.config import Configuration
+from shrub.v2 import ShrubProject, BuildVariant
 
 import buildscripts.burn_in_tests as under_test
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
@@ -78,7 +79,7 @@ class TestAcceptance(unittest.TestCase):
     def tearDown(self):
         _parser.set_options()
 
-    @patch(ns("_write_json_file"))
+    @patch(ns("write_file"))
     def test_no_tests_run_if_none_changed(self, write_json_mock):
         """
         Given a git repository with no changes,
@@ -99,13 +100,13 @@ class TestAcceptance(unittest.TestCase):
                            repos, None)
 
         write_json_mock.assert_called_once()
-        written_config = write_json_mock.call_args[0][0]
+        written_config = json.loads(write_json_mock.call_args[0][1])
         display_task = written_config["buildvariants"][0]["display_tasks"][0]
         self.assertEqual(1, len(display_task["execution_tasks"]))
         self.assertEqual(under_test.BURN_IN_TESTS_GEN_TASK, display_task["execution_tasks"][0])
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch(ns("_write_json_file"))
+    @patch(ns("write_file"))
     def test_tests_generated_if_a_file_changed(self, write_json_mock):
         """
         Given a git repository with changes,
@@ -130,7 +131,7 @@ class TestAcceptance(unittest.TestCase):
                            None)
 
         write_json_mock.assert_called_once()
-        written_config = write_json_mock.call_args[0][0]
+        written_config = json.loads(write_json_mock.call_args[0][1])
         n_tasks = len(written_config["tasks"])
         # Ensure we are generating at least one task for the test.
         self.assertGreaterEqual(n_tasks, 1)
@@ -468,31 +469,31 @@ TESTS_BY_TASK = {
 class TestCreateGenerateTasksConfig(unittest.TestCase):
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_no_tasks_given(self):
-        evg_config = Configuration()
+        build_variant = BuildVariant("build variant")
         gen_config = MagicMock(run_build_variant="variant")
         repeat_config = MagicMock()
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, {}, gen_config,
-                                                             repeat_config, None)
+        under_test.create_generate_tasks_config(build_variant, {}, gen_config, repeat_config, None)
 
-        evg_config_dict = evg_config.to_map()
-        self.assertNotIn("tasks", evg_config_dict)
+        evg_config_dict = build_variant.as_dict()
+        self.assertEqual(0, len(evg_config_dict["tasks"]))
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_one_task_one_test(self):
         n_tasks = 1
         n_tests = 1
         resmoke_options = "options for resmoke"
-        evg_config = Configuration()
+        build_variant = BuildVariant("build variant")
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
         repeat_config.generate_resmoke_options.return_value = resmoke_options
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+        under_test.create_generate_tasks_config(build_variant, tests_by_task, gen_config,
+                                                repeat_config, None)
 
-        evg_config_dict = evg_config.to_map()
+        shrub_config = ShrubProject.empty().add_build_variant(build_variant)
+        evg_config_dict = shrub_config.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(n_tasks * n_tests, len(tasks))
         cmd = tasks[0]["commands"]
@@ -504,58 +505,30 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
     def test_n_task_m_test(self):
         n_tasks = 3
         n_tests = 5
-        evg_config = Configuration()
+        build_variant = BuildVariant("build variant")
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
 
-        evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+        under_test.create_generate_tasks_config(build_variant, tests_by_task, gen_config,
+                                                repeat_config, None)
 
-        evg_config_dict = evg_config.to_map()
+        evg_config_dict = build_variant.as_dict()
         self.assertEqual(n_tasks * n_tests, len(evg_config_dict["tasks"]))
 
 
 class TestCreateGenerateTasksFile(unittest.TestCase):
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
-    def test_gen_tasks_configuration_is_returned(self, gen_tasks_config_mock):
+    @patch(ns("sys.exit"))
+    @patch(ns("create_generate_tasks_config"))
+    @patch(ns("validate_task_generation_limit"))
+    def test_cap_on_task_generate(self, validate_mock, _, exit_mock):
         evg_api = MagicMock()
         gen_config = MagicMock(use_multiversion=False)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
 
-        task_list = [f"task_{i}" for i in range(10)]
-
-        evg_config = MagicMock()
-        evg_config.to_map.return_value = {
-            "tasks": task_list,
-        }
-
-        gen_tasks_config_mock.return_value = evg_config
-
-        config = under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config,
-                                                       evg_api)
-
-        self.assertEqual(config, evg_config.to_map.return_value)
-
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch("buildscripts.burn_in_tests.sys.exit")
-    @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
-    def test_cap_on_task_generate(self, gen_tasks_config_mock, exit_mock):
-        evg_api = MagicMock()
-        gen_config = MagicMock(use_multiversion=False)
-        repeat_config = MagicMock()
-        tests_by_task = MagicMock()
-
-        task_list = [f"task_{i}" for i in range(1005)]
-
-        evg_config = MagicMock()
-        evg_config.to_map.return_value = {
-            "tasks": task_list,
-        }
-
-        gen_tasks_config_mock.return_value = evg_config
+        validate_mock.return_value = False
 
         exit_mock.side_effect = ValueError("exiting")
         with self.assertRaises(ValueError):

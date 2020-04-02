@@ -9,10 +9,10 @@ import unittest
 
 from mock import MagicMock, patch
 
-from shrub.config import Configuration
+from shrub.v2 import BuildVariant, ShrubProject
 
 import buildscripts.burn_in_tests_multiversion as under_test
-from buildscripts.burn_in_tests import create_generate_tasks_file, _gather_task_info, create_generate_tasks_config
+from buildscripts.burn_in_tests import _gather_task_info, create_generate_tasks_config
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 import buildscripts.resmokelib.parser as _parser
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
@@ -102,20 +102,18 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
 
 class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
     def tests_no_tasks_given(self):
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
         evg_api = MagicMock()
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, {}, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
-        self.assertNotIn("tasks", evg_config_dict)
+        build_variant = under_test.create_multiversion_generate_tasks_config({}, evg_api,
+                                                                             gen_config)
+        evg_config_dict = build_variant.as_dict()
+        self.assertEqual(0, len(evg_config_dict["tasks"]))
 
     def test_tasks_not_in_multiversion_suites(self):
         n_tasks = 1
         n_tests = 1
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
@@ -123,28 +121,27 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
         # Create a tests_by_tasks dict that doesn't contain any multiversion suites.
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, tests_by_task, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
 
         # We should not generate any tasks that are not part of the burn_in_multiversion suite.
-        self.assertNotIn("tasks", evg_config_dict)
+        self.assertEqual(0, len(evg_config_dict["tasks"]))
 
     @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
     def test_one_task_one_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
         n_tests = 1
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
         evg_api = MagicMock()
 
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, tests_by_task, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
@@ -153,16 +150,15 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2
         n_tests = 1
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
         evg_api = MagicMock()
 
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, tests_by_task, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(
             len(tasks),
@@ -173,16 +169,15 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
         n_tests = 2
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
         evg_api = MagicMock()
 
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, tests_by_task, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
@@ -191,16 +186,15 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2
         n_tests = 3
-        evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
                                project="project", build_variant="build_variant", task_id="task_id",
                                target_resmoke_time=60)
         evg_api = MagicMock()
 
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        evg_config = under_test.create_multiversion_generate_tasks_config(
-            evg_config, tests_by_task, evg_api, gen_config)
-        evg_config_dict = evg_config.to_map()
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(
             len(tasks),
@@ -228,7 +222,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
     def test_multiversion_path_is_used(self):
         n_tasks = 1
         n_tests = 1
-        evg_config = Configuration()
+        build_variant = BuildVariant("variant")
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
@@ -236,45 +230,13 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         multiversion_path = "multiversion_path"
         tests_by_task[first_task]["use_multiversion"] = multiversion_path
 
-        evg_config = create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                  repeat_config, None)
+        create_generate_tasks_config(build_variant, tests_by_task, gen_config, repeat_config, None)
 
-        evg_config_dict = evg_config.to_map()
+        shrub_project = ShrubProject.empty().add_build_variant(build_variant)
+        evg_config_dict = shrub_project.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(n_tasks * n_tests, len(tasks))
         self.assertEqual(multiversion_path, tasks[0]["commands"][2]["vars"]["task_path_suffix"])
-
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch(bit_ns("create_generate_tasks_config"))
-    def test_gen_tasks_multiversion_configuration_is_returned(self, gen_tasks_config_mock):  # pylint: disable=invalid-name
-        evg_api = MagicMock()
-        gen_config = MagicMock(run_build_variant="variant", project="project",
-                               build_variant="build_variant", task_id="task_id",
-                               use_multiversion=True)
-        repeat_config = MagicMock()
-        tests_by_task = MagicMock()
-
-        evg_config = MagicMock()
-        evg_config.to_map.return_value = {
-            'buildvariants': [
-                {
-                    'name': 'build_variant',
-                    'display_tasks': [
-                        {
-                            'name': 'burn_in_tests_multiversion',
-                            'execution_tasks': [
-                                'burn_in_tests_multiversion_gen'
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }  # yapf: disable
-
-        gen_tasks_config_mock.return_value = evg_config
-
-        config = create_generate_tasks_file(tests_by_task, gen_config, repeat_config, evg_api)
-        self.assertEqual(config, evg_config.to_map.return_value)
 
 
 class TestGatherTaskInfo(unittest.TestCase):

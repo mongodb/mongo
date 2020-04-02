@@ -3,6 +3,7 @@
 The API also provides methods to access specific fields present in the mongodb/mongo
 configuration file.
 """
+from __future__ import annotations
 
 import datetime
 import distutils.spawn  # pylint: disable=no-name-in-module
@@ -79,7 +80,7 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
         """Get the list of build variant names."""
         return list(self._variants_by_name.keys())
 
-    def get_variant(self, variant_name):
+    def get_variant(self, variant_name: str) -> Variant:
         """Return the variant with the given name as a Variant instance."""
         return self._variants_by_name.get(variant_name)
 
