@@ -114,10 +114,9 @@ CanRollback(i, j) ==
 
 \* Is the config of node i considered 'newer' than the config of node j. This is the condition for
 \* node j to accept the config of node i.
-IsNewerConfig(i, j) ==
-    \/ configTerm[i] > configTerm[j]
-    \/ /\ configTerm[i] = configTerm[j]
-       /\ configVersion[i] >= configVersion[j]
+HasSameConfig(i, j) ==
+    /\ configTerm[i] = configTerm[j]
+    /\ configVersion[i] = configVersion[j]
 
 \* Exchange terms between two nodes and step down the primary if needed.
 UpdateTerms(i, j) ==
@@ -204,9 +203,8 @@ CanVoteFor(voter, candidate, term) ==
     \* Nodes can only vote once per term, and they will never
     \* vote for someone with a lesser term than their own.
     /\ currentTerm[voter] < term
-    \* Only vote for someone if their config version is >= your own,
-    \* such that nodes in stale configs won't interfere with the latest config.
-    /\ IsNewerConfig(candidate, voter)
+    \* Only vote for someone if their config is the same as the vote's.
+    /\ HasSameConfig(candidate, voter)
     /\ logOk
 
 (******************************************************************************)
