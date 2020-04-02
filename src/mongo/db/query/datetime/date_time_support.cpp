@@ -552,9 +552,11 @@ void TimeZone::validateFromStringFormat(StringData format) {
     return validateFormat(format, kDateFromStringFormatMap);
 }
 
-std::string TimeZone::formatDate(StringData format, Date_t date) const {
+StatusWith<std::string> TimeZone::formatDate(StringData format, Date_t date) const {
     StringBuilder formatted;
-    outputDateWithFormat(formatted, format, date);
-    return formatted.str();
+    if (auto status = outputDateWithFormat(formatted, format, date); status != Status::OK())
+        return status;
+    else
+        return formatted.str();
 }
 }  // namespace mongo

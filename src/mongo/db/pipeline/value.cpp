@@ -57,6 +57,7 @@ using std::ostream;
 using std::string;
 using std::stringstream;
 using std::vector;
+using namespace std::string_literals;
 
 constexpr StringData Value::kISOFormatString;
 
@@ -625,7 +626,9 @@ string Value::coerceToString() const {
             return getTimestamp().toStringPretty();
 
         case Date:
-            return TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString, getDate());
+            return uassertStatusOKWithContext(
+                TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString, getDate()),
+                "failed while coercing date to string");
 
         case EOO:
         case jstNULL:
@@ -1161,8 +1164,14 @@ ostream& operator<<(ostream& out, const Value& val) {
         case Undefined:
             return out << "undefined";
         case Date:
-            return out << TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString,
-                                                                 val.coerceToDate());
+            return out << [&] {
+                if (auto string = TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString,
+                                                                         val.coerceToDate());
+                    string.isOK())
+                    return string.getValue();
+                else
+                    return "illegal date"s;
+            }();
         case bsonTimestamp:
             return out << val.getTimestamp().toString();
         case Object:
