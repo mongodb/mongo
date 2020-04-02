@@ -387,12 +387,16 @@ TEST(NewYorkTimeBeforeEpoch, DoesComputeISOWeek) {
 TEST(UTCTimeBeforeEpoch, DoesFormatDate) {
     // Tuesday, Dec 30, 1969 13:42:23:211
     auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
-    ASSERT_EQ(TimeZoneDatabase::utcZone().formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date),
-              "1969/12/30 13:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
-              "isoWeek: 01, isoDayOfWeek: 2, percent: %");
+    auto result = TimeZoneDatabase::utcZone().formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "1969/12/30 13:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
+        "isoWeek: 01, isoDayOfWeek: 2, percent: %",
+        result.getValue());
 }
 
 TEST(NewYorkTimeBeforeEpoch, DoesFormatDate) {
@@ -400,23 +404,28 @@ TEST(NewYorkTimeBeforeEpoch, DoesFormatDate) {
 
     // Tuesday, Dec 30, 1969 13:42:23:211
     auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
-    ASSERT_EQ(newYorkZone.formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date),
-              "1969/12/30 08:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
-              "isoWeek: 01, isoDayOfWeek: 2, percent: %");
+    auto result = newYorkZone.formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "1969/12/30 08:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
+        "isoWeek: 01, isoDayOfWeek: 2, percent: %",
+        result.getValue());
 }
 
 TEST(UTCTimeBeforeEpoch, DoesOutputFormatDate) {
     // Tuesday, Dec 30, 1969 13:42:23:211
     auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
     std::ostringstream os;
-    TimeZoneDatabase::utcZone().outputDateWithFormat(os,
-                                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date);
+    ASSERT_OK(TimeZoneDatabase::utcZone().outputDateWithFormat(
+        os,
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date));
     ASSERT_EQ(os.str(),
               "1969/12/30 13:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
               "isoWeek: 01, isoDayOfWeek: 2, percent: %");
@@ -428,11 +437,11 @@ TEST(NewYorkTimeBeforeEpoch, DoesOutputFormatDate) {
     // Tuesday, Dec 30, 1969 13:42:23:211
     auto date = Date_t::fromMillisSinceEpoch(-123456789LL);
     std::ostringstream os;
-    newYorkZone.outputDateWithFormat(os,
-                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date);
+    ASSERT_OK(newYorkZone.outputDateWithFormat(os,
+                                               "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+                                               "dayOfWeek: %w, week: %U, isoYear: %G, "
+                                               "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+                                               date));
     ASSERT_EQ(os.str(),
               "1969/12/30 08:42:23:211, dayOfYear: 364, dayOfWeek: 3, week: 52, isoYear: 1970, "
               "isoWeek: 01, isoDayOfWeek: 2, percent: %");
@@ -567,12 +576,16 @@ TEST(NewYorkTimeAtEpoch, DoesComputeISOWeek) {
 TEST(UTCTimeAtEpoch, DoesFormatDate) {
     // Thu, Jan 1, 1970 00:00:00:000
     auto date = Date_t::fromMillisSinceEpoch(0);
-    ASSERT_EQ(TimeZoneDatabase::utcZone().formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date),
-              "1970/01/01 00:00:00:000, dayOfYear: 001, dayOfWeek: 5, week: 00, isoYear: 1970, "
-              "isoWeek: 01, isoDayOfWeek: 4, percent: %");
+    auto result = TimeZoneDatabase::utcZone().formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "1970/01/01 00:00:00:000, dayOfYear: 001, dayOfWeek: 5, week: 00, isoYear: 1970, "
+        "isoWeek: 01, isoDayOfWeek: 4, percent: %",
+        result.getValue());
 }
 
 TEST(NewYorkTimeAtEpoch, DoesFormatDate) {
@@ -580,22 +593,27 @@ TEST(NewYorkTimeAtEpoch, DoesFormatDate) {
 
     // Thu, Jan 1, 1970 00:00:00:000Z
     auto date = Date_t::fromMillisSinceEpoch(0);
-    ASSERT_EQ(newYorkZone.formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date),
-              "1969/12/31 19:00:00:000, dayOfYear: 365, dayOfWeek: 4, week: 52, isoYear: 1970, "
-              "isoWeek: 01, isoDayOfWeek: 3, percent: %");
+    auto result = newYorkZone.formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "1969/12/31 19:00:00:000, dayOfYear: 365, dayOfWeek: 4, week: 52, isoYear: 1970, "
+        "isoWeek: 01, isoDayOfWeek: 3, percent: %",
+        result.getValue());
 }
 
 TEST(UTCTimeAtEpoch, DoesOutputFormatDate) {
     auto date = Date_t::fromMillisSinceEpoch(0);
     std::ostringstream os;
-    TimeZoneDatabase::utcZone().outputDateWithFormat(os,
-                                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date);
+    ASSERT_OK(TimeZoneDatabase::utcZone().outputDateWithFormat(
+        os,
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date));
     ASSERT_EQ(os.str(),
               "1970/01/01 00:00:00:000, dayOfYear: 001, dayOfWeek: 5, week: 00, isoYear: 1970, "
               "isoWeek: 01, isoDayOfWeek: 4, percent: %");
@@ -605,11 +623,11 @@ TEST(NewYorkTimeAtEpoch, DoesOutputFormatDate) {
     auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
     auto date = Date_t::fromMillisSinceEpoch(0);
     std::ostringstream os;
-    newYorkZone.outputDateWithFormat(os,
-                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date);
+    ASSERT_OK(newYorkZone.outputDateWithFormat(os,
+                                               "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+                                               "dayOfWeek: %w, week: %U, isoYear: %G, "
+                                               "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+                                               date));
     ASSERT_EQ(os.str(),
               "1969/12/31 19:00:00:000, dayOfYear: 365, dayOfWeek: 4, week: 52, isoYear: 1970, "
               "isoWeek: 01, isoDayOfWeek: 3, percent: %");
@@ -879,47 +897,60 @@ TEST(NewYorkTimeAfterEpoch, DoesComputeISOWeek) {
 TEST(UTCTimeAfterEpoch, DoesFormatDate) {
     // Tue, Jun 6, 2017 19:38:43:234.
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
-    ASSERT_EQ(TimeZoneDatabase::utcZone().formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date),
-              "2017/06/06 19:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
-              "isoWeek: 23, isoDayOfWeek: 2, percent: %");
+    auto result = TimeZoneDatabase::utcZone().formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "2017/06/06 19:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
+        "isoWeek: 23, isoDayOfWeek: 2, percent: %",
+        result.getValue());
 }
 
 TEST(NewYorkTimeAfterEpoch, DoesFormatDate) {
     // 2017-06-06T19:38:43:234Z (Tuesday).
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
     auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
-    ASSERT_EQ(newYorkZone.formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date),
-              "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
-              "isoWeek: 23, isoDayOfWeek: 2, percent: %");
+    auto result = newYorkZone.formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
+        "isoWeek: 23, isoDayOfWeek: 2, percent: %",
+        result.getValue());
 }
 
 TEST(UTCOffsetAfterEpoch, DoesFormatDate) {
     // 2017-06-06T19:38:43:234Z (Tuesday).
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
     auto offsetSpec = kDefaultTimeZoneDatabase.getTimeZone("+02:30");
-    ASSERT_EQ(offsetSpec.formatDate("%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                    "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                    "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                    date),
-              "2017/06/06 22:08:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
-              "isoWeek: 23, isoDayOfWeek: 2, percent: %");
+    auto result = offsetSpec.formatDate(
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date);
+    ASSERT_OK(result);
+    ASSERT_EQ(
+        "2017/06/06 22:08:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
+        "isoWeek: 23, isoDayOfWeek: 2, percent: %",
+        result.getValue());
 }
 
 TEST(UTCTimeAfterEpoch, DoesOutputFormatDate) {
     // Tue, Jun 6, 2017 19:38:43:234.
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
     std::ostringstream os;
-    TimeZoneDatabase::utcZone().outputDateWithFormat(os,
-                                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                                     date);
+    ASSERT_OK(TimeZoneDatabase::utcZone().outputDateWithFormat(
+        os,
+        "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+        "dayOfWeek: %w, week: %U, isoYear: %G, "
+        "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+        date));
     ASSERT_EQ(os.str(),
               "2017/06/06 19:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
               "isoWeek: 23, isoDayOfWeek: 2, percent: %");
@@ -930,11 +961,11 @@ TEST(NewYorkTimeAfterEpoch, DoesOutputFormatDate) {
     auto date = Date_t::fromMillisSinceEpoch(1496777923234LL);
     std::ostringstream os;
     auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
-    newYorkZone.outputDateWithFormat(os,
-                                     "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
-                                     "dayOfWeek: %w, week: %U, isoYear: %G, "
-                                     "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
-                                     date);
+    ASSERT_OK(newYorkZone.outputDateWithFormat(os,
+                                               "%Y/%m/%d %H:%M:%S:%L, dayOfYear: %j, "
+                                               "dayOfWeek: %w, week: %U, isoYear: %G, "
+                                               "isoWeek: %V, isoDayOfWeek: %u, percent: %%",
+                                               date));
     ASSERT_EQ(os.str(),
               "2017/06/06 15:38:43:234, dayOfYear: 157, dayOfWeek: 3, week: 23, isoYear: 2017, "
               "isoWeek: 23, isoDayOfWeek: 2, percent: %");
@@ -965,37 +996,42 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenUnmatchedPercent) {
                        18535);
 }
 
-TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
+TEST(DateFormat, ProducesNonOKStatusGivenDateBeforeYear0) {
     const long long kMillisPerYear = 31556926000;
 
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().formatDate(
-                           "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971))),
-                       AssertionException,
-                       18537);
+    ASSERT_EQ(18537,
+              TimeZoneDatabase::utcZone()
+                  .formatDate("%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971)))
+                  .getStatus()
+                  .code());
 
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().formatDate(
-                           "%G", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971))),
-                       AssertionException,
-                       18537);
+    ASSERT_EQ(18537,
+              TimeZoneDatabase::utcZone()
+                  .formatDate("%G", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1971)))
+                  .getStatus()
+                  .code());
 
-    ASSERT_EQ("0000",
-              TimeZoneDatabase::utcZone().formatDate(
-                  "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1970))));
+    auto result = TimeZoneDatabase::utcZone().formatDate(
+        "%Y", Date_t::fromMillisSinceEpoch(-(kMillisPerYear * 1970)));
+    ASSERT_OK(result);
+    ASSERT_EQ("0000", result.getValue());
 }
 
-TEST(DateFormat, ThrowsUserExceptionIfGivenDateAfterYear9999) {
-    ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()), AssertionException, 18537);
+TEST(DateFormat, ProducesNonOKStatusIfGivenDateAfterYear9999) {
+    ASSERT_EQ(18537,
+              TimeZoneDatabase::utcZone().formatDate("%Y", Date_t::max()).getStatus().code());
 
-    ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().formatDate("%G", Date_t::max()), AssertionException, 18537);
+    ASSERT_EQ(18537,
+              TimeZoneDatabase::utcZone().formatDate("%G", Date_t::max()).getStatus().code());
 }
 
 TEST(DateFromString, CorrectlyParsesStringThatMatchesFormat) {
     auto input = "2017-07-04T10:56:02Z";
     auto format = "%Y-%m-%dT%H:%M:%SZ"_sd;
     auto date = kDefaultTimeZoneDatabase.fromString(input, kDefaultTimeZone, format);
-    ASSERT_EQ(TimeZoneDatabase::utcZone().formatDate(format, date), input);
+    auto result = TimeZoneDatabase::utcZone().formatDate(format, date);
+    ASSERT_OK(result);
+    ASSERT_EQ(input, result.getValue());
 }
 
 TEST(DateFromString, RejectsStringWithInvalidYearFormat) {
