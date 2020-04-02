@@ -230,109 +230,116 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            const TypeErasedAttributeStorage& attrs,
                            LogTag tags,
                            LogTruncation truncation) const {
+    namespace c = constants;
+    static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
     StringData severityString = severity.toStringDataCompact();
     StringData componentString = component.getNameForLog();
+    bool local = _timestampFormat == LogTimestampFormat::kISO8601Local;
+    size_t attributeMaxSize = truncation != LogTruncation::Enabled
+        ? 0
+        : (_maxAttributeSizeKB != 0 ? _maxAttributeSizeKB->loadRelaxed() * 1024
+                                    : c::kDefaultMaxAttributeOutputSizeKB * 1024);
+    auto write = [&](StringData s) { buffer.append(s.rawData(), s.rawData() + s.size()); };
 
-    // Put all fields up until the message value
-    static const auto& fmtStrOpen = *new auto(fmt::compile<StringData>(R"({{)"
-                                                                       R"("{}":{{"$date":")"));
-    compiled_format_to(buffer, fmtStrOpen, constants::kTimestampFieldName);
-    switch (_timestampFormat) {
-        case LogTimestampFormat::kISO8601UTC:
-            outputDateAsISOStringUTC(buffer, date);
-            break;
-        case LogTimestampFormat::kISO8601Local:
-            outputDateAsISOStringLocal(buffer, date);
-            break;
+    struct CommaTracker {
+        StringData comma;
+        size_t padDebt = 0;
     };
-    static const auto& fmtStrBody =
-        *new auto(fmt::compile<StringData,  // severity start
-                               StringData,
-                               StringData,
-                               int,
-                               StringData,  // component start
-                               StringData,
-                               StringData,
-                               int,
-                               StringData,  // id start
-                               StringData,
-                               StringData,
-                               int,
-                               StringData,  // context start
-                               StringData,
-                               StringData>  // message start
-                  (R"("}},)"                // close timestamp
-                   R"("{}":"{}"{: <{}})"    // severity with padding for the comma
-                   R"("{}":"{}"{: <{}})"    // component with padding for the comma
-                   R"("{}":{}{: <{}})"      // id with padding for the comma
-                   R"("{}":"{}",)"          // context
-                   R"("{}":")"              // message
-                   ));
-    fmt::format_int idString(id);
-    compiled_format_to(
-        buffer,
-        fmtStrBody,
-        // severity, left align the comma and add padding to create fixed column width
-        constants::kSeverityFieldName,
-        severityString,
-        ","_sd,
-        3 - severityString.size(),
-        // component, left align the comma and add padding to create fixed column width
-        constants::kComponentFieldName,
-        componentString,
-        ","_sd,
-        9 - componentString.size(),
-        // id
-        constants::kIdFieldName,
-        StringData(idString.data(), idString.size()),
-        ","_sd,
-        8 - idString.size(),
-        // context
-        constants::kContextFieldName,
-        context,
-        // message
-        constants::kMessageFieldName);
 
-    str::escapeForJSON(buffer, message);
-    buffer.push_back('"');
-
-    static const auto& fmtStrAttr = *new auto(fmt::compile<StringData>(R"(,"{}":{{)"));
-    static const auto& fmtStrTruncated = *new auto(fmt::compile<StringData>(R"(,"{}":)"));
-    if (!attrs.empty()) {
-        compiled_format_to(buffer, fmtStrAttr, constants::kAttributesFieldName);
-        // comma separated list of attributes (no opening/closing brace are added here)
-        size_t attributeMaxSize = 0;
-        if (truncation == LogTruncation::Enabled) {
-            if (_maxAttributeSizeKB)
-                attributeMaxSize = _maxAttributeSizeKB->loadRelaxed() * 1024;
-            else
-                attributeMaxSize = constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+    // First call to `comma` emits nothing, subsequent calls emit ",", so this is a
+    // prefix used to join elements. If there is any padding debt in the
+    // tracker, then that amount of whitespace is emitted after the comma and the
+    // debt is cleared.
+    auto writeComma = [&](CommaTracker& tracker) {
+        write(tracker.comma);
+        tracker.comma = ","_sd;
+        while (tracker.padDebt) {
+            // Relies on substr's truncation.
+            StringData space = "                "_sd.substr(0, tracker.padDebt);
+            write(space);
+            tracker.padDebt -= space.size();
         }
-        JSONValueExtractor extractor(buffer, attributeMaxSize);
-        attrs.apply(extractor);
-        buffer.push_back('}');
+    };
 
-        if (BSONObj truncated = extractor.truncated(); !truncated.isEmpty()) {
-            compiled_format_to(buffer, fmtStrTruncated, constants::kTruncatedFieldName);
-            truncated.jsonStringBuffer(
-                JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer, 0);
+    // Emit `f()` normally, noting its size. If it is narrower than `width`, we incur a
+    // padding debt which is stored in the `tracker`. The next `comma` emitted by the
+    // `tracker` will be followed by enough whitespace to pay off the debt.
+    auto padNextComma = [&](CommaTracker& tracker, size_t width, auto f) {
+        return [&, width, f] {
+            size_t pre = buffer.size();
+            f();
+            if (size_t wrote = buffer.size() - pre; wrote < width)
+                tracker.padDebt = width - wrote;
+        };
+    };
+
+    auto strFn = [&](StringData s) { return [&, s] { write(s); }; };
+    auto escFn = [&](StringData s) { return [&, s] { str::escapeForJSON(buffer, s); }; };
+    auto intFn = [&](auto x) {
+        return [&, x] {
+            fmt::format_int s{x};
+            write(StringData{s.data(), s.size()});
+        };
+    };
+
+    auto quote = [&](auto f) {
+        return [&, f] {
+            write("\"");
+            f();
+            write("\"");
+        };
+    };
+
+    auto field = [&](CommaTracker& tracker, StringData name, auto f) {
+        writeComma(tracker);
+        quote(strFn(name))();
+        write(":");
+        f();
+    };
+
+    auto jsobj = [&](auto f) {
+        return [&, f] {
+            CommaTracker top;
+            write("{");
+            f(top);
+            write("}");
+        };
+    };
+
+    auto dateFn = [&](Date_t date) {
+        return jsobj([&, date](CommaTracker& tracker) {
+            field(tracker, "$date", quote([&, date] {
+                      write(StringData{DateStringBuffer{}.iso8601(date, local)});
+                  }));
+        });
+    };
+    auto bsonObjFn = [&](BSONObj o) {
+        return [&, o] { o.jsonStringBuffer(kFmt, 0, false, buffer, 0); };
+    };
+    auto bsonArrFn = [&](BSONArray a) {
+        return [&, a] { a.jsonStringBuffer(kFmt, 0, true, buffer, 0); };
+    };
+
+    jsobj([&](CommaTracker& top) {
+        field(top, c::kTimestampFieldName, dateFn(date));
+        field(top, c::kSeverityFieldName, padNextComma(top, 5, quote(strFn(severityString))));
+        field(top, c::kComponentFieldName, padNextComma(top, 11, quote(strFn(componentString))));
+        field(top, c::kIdFieldName, padNextComma(top, 8, intFn(id)));
+        field(top, c::kContextFieldName, quote(strFn(context)));
+        field(top, c::kMessageFieldName, quote(escFn(message)));
+        if (!attrs.empty()) {
+            JSONValueExtractor extractor(buffer, attributeMaxSize);
+            field(top, c::kAttributesFieldName, jsobj([&](CommaTracker&) {
+                      attrs.apply(extractor);
+                  }));
+            if (BSONObj o = extractor.truncated(); !o.isEmpty())
+                field(top, c::kTruncatedFieldName, bsonObjFn(o));
+            if (BSONObj o = extractor.truncatedSizes(); !o.isEmpty())
+                field(top, c::kTruncatedSizeFieldName, bsonObjFn(o));
         }
-
-        if (BSONObj truncatedSizes = extractor.truncatedSizes(); !truncatedSizes.isEmpty()) {
-            compiled_format_to(buffer, fmtStrTruncated, constants::kTruncatedSizeFieldName);
-            truncatedSizes.jsonStringBuffer(
-                JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer, 0);
-        }
-    }
-
-    static const auto& fmtStrTags = *new auto(fmt::compile<StringData>(R"(,"{}":)"));
-    if (tags != LogTag::kNone) {
-        compiled_format_to(buffer, fmtStrTags, constants::kTagsFieldName);
-        tags.toBSONArray().jsonStringBuffer(
-            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
-    }
-
-    buffer.push_back('}');
+        if (tags != LogTag::kNone)
+            field(top, c::kTagsFieldName, bsonArrFn(tags.toBSONArray()));
+    })();
 }
 
 void JSONFormatter::operator()(boost::log::record_view const& rec,

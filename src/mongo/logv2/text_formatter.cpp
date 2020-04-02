@@ -44,20 +44,14 @@ namespace mongo::logv2 {
 
 void TextFormatter::operator()(boost::log::record_view const& rec,
                                boost::log::formatting_ostream& strm) const {
-    using namespace boost::log;
+    using boost::log::extract;
 
-    Date_t timeStamp = extract<Date_t>(attributes::timeStamp(), rec).get();
     fmt::memory_buffer buffer;
-    switch (_timestampFormat) {
-        case LogTimestampFormat::kISO8601UTC:
-            outputDateAsISOStringUTC(buffer, timeStamp);
-            break;
-        case LogTimestampFormat::kISO8601Local:
-            outputDateAsISOStringLocal(buffer, timeStamp);
-            break;
-    };
     fmt::format_to(buffer,
-                   " {:<2} {:<8} [{}] ",
+                   "{} {:<2} {:<8} [{}] ",
+                   StringData{DateStringBuffer{}.iso8601(
+                       extract<Date_t>(attributes::timeStamp(), rec).get(),
+                       _timestampFormat == LogTimestampFormat::kISO8601Local)},
                    extract<LogSeverity>(attributes::severity(), rec).get().toStringDataCompact(),
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog(),
                    extract<StringData>(attributes::threadName(), rec).get());
