@@ -99,23 +99,29 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
             input.getType() == BSONType::Object);
     Document data = input.getDocument();
 
+    // Avoid too many lookups into the Document cache.
+    const Value kField = data["k"];
+    Value vField = data["v"];
+
     uassert(
         31251,
         str::stream() << kAccumulatorName
                       << " requires the 'data' argument to have a 'k' and 'v' field. Instead found"
                       << data.toString(),
-        data.computeSize() == 2ull && !data["k"].missing() && !data["v"].missing());
+        data.computeSize() == 2ull && !kField.missing() && !vField.missing());
 
-    _key = data["k"];
+    _key = kField;
 
-    _values.push_back(data["v"]);
-    _memUsageBytes += data["v"].getApproximateSize();
+    _memUsageBytes += vField.getApproximateSize();
+    _values.push_back(std::move(vField));
 }
 
 Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     if (_values.size() < 1) {
         return Value{};
     }
+
+    const auto keySize = _key.getApproximateSize();
 
     Value result;
     // Keep reducing until we have exactly one value.
@@ -126,8 +132,7 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
             Value val = _values[numLeft - 1];
 
             // Do not insert if doing so would exceed the the maximum allowed BSONObj size.
-            if (bsonValues.len() + _key.getApproximateSize() + val.getApproximateSize() >
-                BSONObjMaxUserSize) {
+            if (bsonValues.len() + keySize + val.getApproximateSize() > BSONObjMaxUserSize) {
                 // If we have reached the threshold for maximum allowed BSONObj size and only have a
                 // single value then no progress will be made on reduce. We must fail when this
                 // scenario is encountered.
@@ -139,7 +144,7 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
         }
 
         auto expCtx = getExpressionContext();
-        auto reduceFunc = makeJsFunc(expCtx, _funcSource.toString());
+        auto reduceFunc = makeJsFunc(expCtx, _funcSource);
 
         // Function signature: reduce(key, values).
         BSONObj params = BSON_ARRAY(_key << bsonValues.arr());

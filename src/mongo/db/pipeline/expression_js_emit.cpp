@@ -39,17 +39,50 @@ namespace mongo {
 REGISTER_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
 
 namespace {
+/**
+ * Helper for extracting fields from a BSONObj in one pass. This is a hot path
+ * for some map reduce workloads so be careful when changing.
+ *
+ * 'elts' must be an array of size >= 2.
+ */
+void extract2Args(const BSONObj& args, BSONElement* elts) {
+    const size_t nToExtract = 2;
+
+    auto fail = []() { uasserted(31220, "emit takes 2 args"); };
+    BSONObjIterator it(args);
+    for (size_t i = 0; i < nToExtract; ++i) {
+        if (!it.more()) {
+            fail();
+        }
+        elts[i] = it.next();
+    }
+
+    // There should be exactly two arguments, no more.
+    if (it.more()) {
+        fail();
+    }
+}
 
 /**
  * This function is called from the JavaScript function provided to the expression.
  */
 BSONObj emitFromJS(const BSONObj& args, void* data) {
-    uassert(31220, "emit takes 2 args", args.nFields() == 2);
+    BSONElement elts[2];
+    extract2Args(args, elts);
+
     auto emitState = static_cast<ExpressionInternalJsEmit::EmitState*>(data);
-    if (args.firstElement().type() == Undefined) {
-        emitState->emit(DOC("k" << BSONNULL << "v" << args["1"]));
+    if (elts[0].type() == Undefined) {
+        MutableDocument md;
+        // Note: Using MutableDocument::addField() is considerably faster than using
+        // MutableDocument::setField() or building a document by hand with the DOC() macros.
+        md.addField("k", Value(BSONNULL));
+        md.addField("v", Value(elts[1]));
+        emitState->emit(md.freeze());
     } else {
-        emitState->emit(DOC("k" << args["0"] << "v" << args["1"]));
+        MutableDocument md;
+        md.addField("k", Value(elts[0]));
+        md.addField("v", Value(elts[1]));
+        emitState->emit(md.freeze());
     }
     return BSONObj();
 }
@@ -109,7 +142,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
 
     // If the scope does not exist and is created by the following call, then make sure to
     // re-bind emit() and the given function to the new scope.
-    auto expCtx = getExpressionContext();
+    ExpressionContext* expCtx = getExpressionContext().get();
 
     auto jsExec = expCtx->getJsExecWithScope();
     // Inject the native "emit" function to be called from the user-defined map function. This
