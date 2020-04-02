@@ -1843,10 +1843,12 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
             return Value(BSONNULL);
         }
 
-        return Value(timeZone->formatDate(formatValue.getStringData(), date.coerceToDate()));
+        return Value(uassertStatusOK(
+            timeZone->formatDate(formatValue.getStringData(), date.coerceToDate())));
     }
 
-    return Value(timeZone->formatDate(Value::kISOFormatString, date.coerceToDate()));
+    return Value(
+        uassertStatusOK(timeZone->formatDate(Value::kISOFormatString, date.coerceToDate())));
 }
 
 void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
@@ -5515,8 +5517,8 @@ public:
         };
         table[BSONType::Date][BSONType::String] = [](ExpressionContext* const expCtx,
                                                      Value inputValue) {
-            auto dateString = TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString,
-                                                                     inputValue.getDate());
+            auto dateString = uassertStatusOK(TimeZoneDatabase::utcZone().formatDate(
+                Value::kISOFormatString, inputValue.getDate()));
             return Value(dateString);
         };
         table[BSONType::Date][BSONType::Bool] = [](ExpressionContext* const expCtx,
