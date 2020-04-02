@@ -134,9 +134,8 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
         // If the FCV document hasn't been read, trust the WT compatibility. MongoD will
         // downgrade to the same compatibility it discovered on startup.
-        return _startupVersion == StartupVersion::IS_42 ||
-            _startupVersion == StartupVersion::IS_40 || _startupVersion == StartupVersion::IS_36 ||
-            _startupVersion == StartupVersion::IS_34;
+        return _startupVersion == StartupVersion::IS_44_FCV_42 ||
+            _startupVersion == StartupVersion::IS_42;
     }
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
@@ -166,22 +165,18 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
 
 std::string WiredTigerFileVersion::getDowngradeString() {
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        invariant(_startupVersion != StartupVersion::IS_44);
+        invariant(_startupVersion != StartupVersion::IS_44_FCV_44);
 
         switch (_startupVersion) {
-            case StartupVersion::IS_34:
-                return "compatibility=(release=2.9)";
-            case StartupVersion::IS_36:
-                return "compatibility=(release=3.0)";
-            case StartupVersion::IS_40:
-                return "compatibility=(release=3.1)";
+            case StartupVersion::IS_44_FCV_42:
+                return "compatibility=(release=3.3)";
             case StartupVersion::IS_42:
-                return "compatibility=(release=3.2)";
+                return "compatibility=(release=3.3)";
             default:
                 MONGO_UNREACHABLE;
         }
     }
-    return "compatibility=(release=3.2)";
+    return "compatibility=(release=3.3)";
 }
 
 using std::set;
@@ -846,38 +841,66 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
 }
 
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
-    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"3.1.0\")";
-
+    // MongoDB 4.4 will always run in compatibility version 10.0.
+    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"10.0.0\")";
     auto wtEventHandler = _eventHandler.getWtEventHandler();
 
     int ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_44_FCV_44};
+        return;
+    }
+
+    if (_eventHandler.isWtIncompatible()) {
+        // WT 4.4+ will refuse to startup on datafiles left behind by 4.0 and earlier. This behavior
+        // is enforced outside of `require_min`. This condition is detected via a specific error
+        // message from WiredTiger.
+        if (_inRepairMode) {
+            // In case this process was started with `--repair`, remove the "repair incomplete"
+            // file.
+            StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(nullptr);
+        }
+        LOGV2_FATAL_NOTRACE(
+            46712005,
+            "This version of MongoDB is too recent to start up on the existing data files. "
+            "Try MongoDB 4.2 or earlier.");
+    }
+
+    // MongoDB 4.4 doing clean shutdown in FCV 4.2 will use compatibility version 3.3.
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.3.0\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_44_FCV_42};
+        return;
+    }
+
+    // MongoDB 4.2 uses compatibility version 3.2.
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.2.0\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
         _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_42};
         return;
     }
 
-    LOGV2_WARNING(22347, "Failed to start up WiredTiger under any compatibility version.");
+    LOGV2_WARNING(22347,
+                  "Failed to start up WiredTiger under any compatibility version. This may be due "
+                  "to an unsupported upgrade or downgrade.");
     if (ret == EINVAL) {
         fassertFailedNoTrace(28561);
     }
 
     if (ret == WT_TRY_SALVAGE) {
         LOGV2_WARNING(22348, "WiredTiger metadata corruption detected");
-
         if (!_inRepairMode) {
-            LOGV2_FATAL_NOTRACE(50944, "{kWTRepairMsg}", "kWTRepairMsg"_attr = kWTRepairMsg);
+            LOGV2_FATAL_NOTRACE(50944, kWTRepairMsg);
         }
     }
 
-    logv2::FatalMode assertMode =
-        _inRepairMode ? logv2::FatalMode::kContinue : logv2::FatalMode::kAssertNoTrace;
-    LOGV2_FATAL_OPTIONS(28595,
-                        {assertMode},
-                        "Reason: {wtRCToStatus_ret_reason}",
-                        "wtRCToStatus_ret_reason"_attr = wtRCToStatus(ret).reason());
+    if (!_inRepairMode) {
+        LOGV2_FATAL_NOTRACE(28595, "Terminating.", "Reason"_attr = wtRCToStatus(ret).reason());
+    }
 
     // Always attempt to salvage metadata regardless of error code when in repair mode.
-
     LOGV2_WARNING(22349, "Attempting to salvage WiredTiger metadata");
     configStr = wtOpenConfig + ",salvage=true";
     ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
@@ -888,9 +911,8 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     }
 
     LOGV2_FATAL_NOTRACE(50947,
-                        "{Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason}",
-                        "Failed_to_salvage_WiredTiger_metadata_wtRCToStatus_ret_reason"_attr =
-                            "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason());
+                        "Failed to salvage WiredTiger metadata.",
+                        "Details"_attr = wtRCToStatus(ret).reason());
 }
 
 void WiredTigerKVEngine::cleanShutdown() {

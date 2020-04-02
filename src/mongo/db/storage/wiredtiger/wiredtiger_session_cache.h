@@ -421,5 +421,7 @@ typedef std::unique_ptr<WiredTigerSession,
                         typename WiredTigerSessionCache::WiredTigerSessionDeleter>
     UniqueWiredTigerSession;
 
-extern const std::string kWTRepairMsg;
+static constexpr char kWTRepairMsg[] =
+    "Please read the documentation for starting MongoDB with --repair here: "
+    "http://dochub.mongodb.org/core/repair";
 }  // namespace mongo
