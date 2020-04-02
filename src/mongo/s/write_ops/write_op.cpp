@@ -115,7 +115,9 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
         }
     }
 
-    _state = WriteOpState_Pending;
+    // If all operations currently targeted were successful on a previous round we might have 0
+    // childOps, that would mean that the operation is finished.
+    _state = _childOps.size() ? WriteOpState_Pending : WriteOpState_Completed;
     return Status::OK();
 }
 
