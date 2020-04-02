@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include <array>
 #include <ctime>
-#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <string>
@@ -263,8 +263,34 @@ private:
     static AtomicWord<long long> lastNowVal;
 };
 
-// uses ISO 8601 dates without trailing Z
-// colonsOk should be false when creating filenames
+class DateStringBuffer {
+public:
+    /** Fill with formatted `date`, either in `local` or UTC. */
+    DateStringBuffer& iso8601(Date_t date, bool local);
+
+    /**
+     * Fill with formatted `date`, in modified ctime format.
+     * Like ctime, but newline and year removed, and milliseconds added.
+     */
+    DateStringBuffer& ctime(Date_t date);
+
+    explicit operator StringData() const {
+        return StringData{_data.data(), _size};
+    }
+
+    explicit operator std::string() const {
+        return std::string{StringData{*this}};
+    }
+
+private:
+    std::array<char, 64> _data;
+    size_t _size = 0;
+};
+
+/**
+ * uses ISO 8601 dates without trailing "Z".
+ * `colonsOk` should be false when creating filenames.
+ */
 std::string terseCurrentTime(bool colonsOk = true);
 
 /**
@@ -272,28 +298,25 @@ std::string terseCurrentTime(bool colonsOk = true);
  */
 std::string terseUTCCurrentTime();
 
+/** @{ */
 /**
- * Formats "date" according to the ISO 8601 extended form standard, including date,
- * and time with milliseconds decimal component, in the UTC timezone.
- *
- * Sample format: "2013-07-23T18:42:14.072Z"
+ * Formats "date" in 3 formats to 3 kinds of output.
+ * Function variants are provided to produce ISO local, ISO UTC, or modified ctime formats.
+ * The ISO formats are according to the ISO 8601 extended form standard, including date and
+ * time with a milliseconds decimal component.
+ * Modified ctime format is like `ctime`, but with milliseconds and no year.
+ *     "2013-07-23T18:42:14.072Z"       // *ToISOStringUTC
+ *     "2013-07-23T18:42:14.072-05:00"  // *ToISOStringLocal
+ *     "Wed Oct 31 13:34:47.996"        // *ToCtimeString (modified ctime)
+ * Output can be a std::string, or put to a std::ostream.
  */
 std::string dateToISOStringUTC(Date_t date);
-
-/**
- * Formats "date" according to the ISO 8601 extended form standard, including date,
- * and time with milliseconds decimal component, in the local timezone.
- *
- * Sample format: "2013-07-23T18:42:14.072-05:00"
- */
 std::string dateToISOStringLocal(Date_t date);
-
-/**
- * Formats "date" in fixed width in the local time zone.
- *
- * Sample format: "Wed Oct 31 13:34:47.996"
- */
 std::string dateToCtimeString(Date_t date);
+void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
+void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
+void outputDateAsCtime(std::ostream& os, Date_t date);
+/** @} */
 
 /**
  * Parses a Date_t from an ISO 8601 std::string representation.
@@ -304,23 +327,6 @@ std::string dateToCtimeString(Date_t date);
  * Local times are currently not supported.
  */
 StatusWith<Date_t> dateFromISOString(StringData dateString);
-
-/**
- * Like dateToISOStringUTC, except outputs to a std::ostream or fmt::memory_buffer.
- */
-void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
-void outputDateAsISOStringUTC(fmt::memory_buffer& buffer, Date_t date);
-
-/**
- * Like dateToISOStringLocal, except outputs to a std::ostream or fmt::memory_buffer.
- */
-void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
-void outputDateAsISOStringLocal(fmt::memory_buffer& buffer, Date_t date);
-
-/**
- * Like dateToCtimeString, except outputs to a std::ostream.
- */
-void outputDateAsCtime(std::ostream& os, Date_t date);
 
 void sleepsecs(int s);
 void sleepmillis(long long ms);

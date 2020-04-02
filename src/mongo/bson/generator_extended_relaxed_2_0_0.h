@@ -82,10 +82,7 @@ public:
         // Date_t::millis is negative (before the epoch).
         if (val.isFormattable()) {
             appendTo(buffer, R"({"$date":")"_sd);
-            if (_localDate)
-                outputDateAsISOStringLocal(buffer, val);
-            else
-                outputDateAsISOStringUTC(buffer, val);
+            appendTo(buffer, StringData{DateStringBuffer{}.iso8601(val, _localDate)});
             appendTo(buffer, R"("})");
         } else {
             ExtendedCanonicalV200Generator::writeDate(buffer, val);
