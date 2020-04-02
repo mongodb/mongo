@@ -326,10 +326,10 @@ path_setup(const char *home)
     g.home_log = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_log, len, "%s/%s", g.home, "log"));
 
-    /* LAS dump file. */
-    len = strlen(g.home) + strlen("LASdump") + 2;
-    g.home_lasdump = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_lasdump, len, "%s/%s", g.home, "LASdump"));
+    /* History store dump file. */
+    len = strlen(g.home) + strlen("HSdump") + 2;
+    g.home_hsdump = dmalloc(len);
+    testutil_check(__wt_snprintf(g.home_hsdump, len, "%s/%s", g.home, "HSdump"));
 
     /* Page dump file. */
     len = strlen(g.home) + strlen("pagedump") + 2;

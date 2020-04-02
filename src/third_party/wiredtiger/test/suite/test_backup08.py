@@ -31,7 +31,7 @@
 #
 
 import os, shutil
-import wiredtiger, wttest
+import unittest, wiredtiger, wttest
 from wtscenario import make_scenarios
 
 def timestamp_str(t):

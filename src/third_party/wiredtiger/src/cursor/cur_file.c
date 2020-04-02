@@ -718,9 +718,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       S2C(session)->compat_major >= WT_LOG_V2_MAJOR)
         cursor->modify = __curfile_modify;
 
-    /*
-     * WiredTiger.wt should not be cached, doing so interferes with named checkpoints.
-     */
+    /* Cursors on metadata should not be cached, doing so interferes with named checkpoints. */
     if (cacheable && strcmp(WT_METAFILE_URI, cursor->internal_uri) != 0)
         F_SET(cursor, WT_CURSTD_CACHEABLE);
 

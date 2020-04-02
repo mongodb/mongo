@@ -24,7 +24,7 @@ struct __wt_thread {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_THREAD_ACTIVE 0x01u     /* thread is active or paused */
 #define WT_THREAD_CAN_WAIT 0x02u   /* WT_SESSION_CAN_WAIT */
-#define WT_THREAD_LOOKASIDE 0x04u  /* open lookaside cursor */
+#define WT_THREAD_HS 0x04u         /* open history store cursor */
 #define WT_THREAD_PANIC_FAIL 0x08u /* panic if the thread fails */
 #define WT_THREAD_RUN 0x10u        /* thread is running */
                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */

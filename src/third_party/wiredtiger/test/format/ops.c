@@ -532,10 +532,10 @@ prepare_transaction(TINFO *tinfo)
  * When in a transaction on the live table with snapshot isolation, track operations for later
  * repetition.
  */
-#define SNAP_TRACK(tinfo, op)                                          \
-    do {                                                               \
-        if (intxn && !ckpt_handle && iso_config == ISOLATION_SNAPSHOT) \
-            snap_track(tinfo, op);                                     \
+#define SNAP_TRACK(tinfo, op)                          \
+    do {                                               \
+        if (intxn && iso_config == ISOLATION_SNAPSHOT) \
+            snap_track(tinfo, op);                     \
     } while (0)
 
 /*
@@ -543,7 +543,7 @@ prepare_transaction(TINFO *tinfo)
  *     Create a new session/cursor pair for the thread.
  */
 static void
-ops_open_session(TINFO *tinfo, bool *ckpt_handlep)
+ops_open_session(TINFO *tinfo)
 {
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
@@ -559,38 +559,13 @@ ops_open_session(TINFO *tinfo, bool *ckpt_handlep)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
-     * 10% of the time, perform some read-only operations from a checkpoint.
-     * Skip if we are using data-sources or LSM, they don't support reading
-     * from checkpoints.
+     * Configure "append", in the case of column stores, we append when inserting new rows.
+     *
+     * WT_SESSION.open_cursor can return EBUSY if concurrent with a metadata operation, retry.
      */
-    cursor = NULL;
-    if (!DATASOURCE("lsm") && mmrand(&tinfo->rnd, 1, 10) == 1) {
-        /*
-         * WT_SESSION.open_cursor can return EBUSY if concurrent with a metadata operation, retry.
-         */
-        while ((ret = session->open_cursor(
-                  session, g.uri, NULL, "checkpoint=WiredTigerCheckpoint", &cursor)) == EBUSY)
-            __wt_yield();
-
-        /*
-         * If the checkpoint hasn't been created yet, ignore the error.
-         */
-        if (ret != ENOENT) {
-            testutil_check(ret);
-            *ckpt_handlep = true;
-        }
-    }
-    if (cursor == NULL) {
-        /*
-         * Configure "append", in the case of column stores, we append when inserting new rows.
-         *
-         * WT_SESSION.open_cursor can return EBUSY if concurrent with a metadata operation, retry.
-         */
-        while ((ret = session->open_cursor(session, g.uri, NULL, "append", &cursor)) == EBUSY)
-            __wt_yield();
-        testutil_checkfmt(ret, "%s", g.uri);
-        *ckpt_handlep = false;
-    }
+    while ((ret = session->open_cursor(session, g.uri, NULL, "append", &cursor)) == EBUSY)
+        __wt_yield();
+    testutil_checkfmt(ret, "%s", g.uri);
 
     tinfo->session = session;
     tinfo->cursor = cursor;
@@ -611,12 +586,11 @@ ops(void *arg)
     uint64_t reset_op, session_op, truncate_op;
     uint32_t range, rnd;
     u_int i, j, iso_config;
-    bool ckpt_handle, greater_than, intxn, next, positioned, prepared;
+    bool greater_than, intxn, next, positioned, prepared;
 
     tinfo = arg;
 
     iso_config = ISOLATION_RANDOM; /* -Wconditional-uninitialized */
-    ckpt_handle = false;           /* -Wconditional-uninitialized */
 
     /* Tracking of transactional snapshot isolation operations. */
     tinfo->snap = tinfo->snap_first = tinfo->snap_list;
@@ -651,7 +625,7 @@ ops(void *arg)
                 intxn = false;
             }
 
-            ops_open_session(tinfo, &ckpt_handle);
+            ops_open_session(tinfo);
 
             /* Pick the next session/cursor close/open. */
             session_op += mmrand(&tinfo->rnd, 100, 5000);
@@ -676,7 +650,7 @@ ops(void *arg)
          * If not in a transaction, have a live handle and running in a timestamp world,
          * occasionally repeat a timestamped operation.
          */
-        if (!intxn && !ckpt_handle && g.c_txn_timestamps && mmrand(&tinfo->rnd, 1, 15) == 1) {
+        if (!intxn && g.c_txn_timestamps && mmrand(&tinfo->rnd, 1, 15) == 1) {
             ++tinfo->search;
             snap_repeat_single(cursor, tinfo);
         }
@@ -695,22 +669,20 @@ ops(void *arg)
 
         /* Select an operation. */
         op = READ;
-        if (!ckpt_handle) {
-            i = mmrand(&tinfo->rnd, 1, 100);
-            if (i < g.c_delete_pct && tinfo->ops > truncate_op) {
-                op = TRUNCATE;
+        i = mmrand(&tinfo->rnd, 1, 100);
+        if (i < g.c_delete_pct && tinfo->ops > truncate_op) {
+            op = TRUNCATE;
 
-                /* Pick the next truncate operation. */
-                truncate_op += mmrand(&tinfo->rnd, 20000, 100000);
-            } else if (i < g.c_delete_pct)
-                op = REMOVE;
-            else if (i < g.c_delete_pct + g.c_insert_pct)
-                op = INSERT;
-            else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct)
-                op = MODIFY;
-            else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct + g.c_write_pct)
-                op = UPDATE;
-        }
+            /* Pick the next truncate operation. */
+            truncate_op += mmrand(&tinfo->rnd, 20000, 100000);
+        } else if (i < g.c_delete_pct)
+            op = REMOVE;
+        else if (i < g.c_delete_pct + g.c_insert_pct)
+            op = INSERT;
+        else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct)
+            op = MODIFY;
+        else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct + g.c_write_pct)
+            op = UPDATE;
 
         /* Select a row. */
         tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
@@ -735,7 +707,7 @@ ops(void *arg)
          * Optionally reserve a row. Reserving a row before a read isn't all that sensible, but not
          * unexpected, either.
          */
-        if (intxn && !ckpt_handle && mmrand(&tinfo->rnd, 0, 20) == 1) {
+        if (intxn && mmrand(&tinfo->rnd, 0, 20) == 1) {
             switch (g.type) {
             case ROW:
                 ret = row_reserve(tinfo, cursor, positioned);
@@ -955,7 +927,7 @@ update_instead_of_chosen_op:
          * Ending a transaction. If on a live handle and the transaction was configured for snapshot
          * isolation, repeat the operations and confirm the results are unchanged.
          */
-        if (intxn && !ckpt_handle && iso_config == ISOLATION_SNAPSHOT) {
+        if (intxn && iso_config == ISOLATION_SNAPSHOT) {
             __wt_yield(); /* Encourage races */
 
             ret = snap_repeat_txn(cursor, tinfo);

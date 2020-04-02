@@ -259,7 +259,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # We have a running transaction with a lower commit_timestamp than we've
         # seen before. So all_durable should return (lowest commit timestamp - 1).
         session1.begin_transaction()
-        cur1[1] = 2
+        cur1[2] = 2
         session1.timestamp_transaction('commit_timestamp=2')
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '1')
@@ -272,7 +272,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # For prepared transactions, we take into account the durable timestamp
         # when calculating all_durable.
         session1.begin_transaction()
-        cur1[1] = 3
+        cur1[3] = 3
         session1.prepare_transaction('prepare_timestamp=6')
 
         # If we have a commit timestamp for a prepared transaction, then we
@@ -290,7 +290,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # All durable moves back when we have a running prepared transaction
         # with a lower durable timestamp than has previously been committed.
         session1.begin_transaction()
-        cur1[1] = 4
+        cur1[4] = 4
         session1.prepare_transaction('prepare_timestamp=3')
 
         # If we have a commit timestamp for a prepared transaction, then we
@@ -310,7 +310,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Now test a scenario with multiple commit timestamps for a single txn.
         session1.begin_transaction()
-        cur1[1] = 5
+        cur1[5] = 5
         session1.timestamp_transaction('commit_timestamp=6')
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '5')
@@ -318,7 +318,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # Make more changes and set a new commit timestamp.
         # Our calculation should use the first commit timestamp so there should
         # be no observable difference to the all_durable value.
-        cur1[1] = 6
+        cur1[6] = 6
         session1.timestamp_transaction('commit_timestamp=7')
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '5')
@@ -345,7 +345,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         cur1[1]=1
         session1.commit_transaction('commit_timestamp=2')
         session1.begin_transaction()
-        cur1[1]=2
+        cur1[2]=2
         session1.commit_transaction('commit_timestamp=4')
         # Confirm all_durable is now 4.
         self.assertTimestampsEqual(
@@ -360,7 +360,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(cur1[1], 1)
         # Commit some data at timestamp 7.
         session2.begin_transaction()
-        cur2[2] = 2
+        cur2[3] = 2
         session2.commit_transaction('commit_timestamp=7')
         # All_durable should now be 7.
         self.assertTimestampsEqual(
@@ -379,7 +379,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         # to the oldest timestamp.
         session2.begin_transaction()
         session2.timestamp_transaction('commit_timestamp=6')
-        cur2[2] = 3
+        cur2[4] = 3
 
         # Confirm all_durable is now equal to oldest.
         self.assertTimestampsEqual(

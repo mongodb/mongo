@@ -35,7 +35,7 @@ continue to read and write the databases while a snapshot is taken.
    files have been copied.
 
 The directory into which the files are copied may subsequently be
-specified as an directory to the ::wiredtiger_open function and
+specified as a directory to the ::wiredtiger_open function and
 accessed as a WiredTiger database home.
 
 Copying the database files for a backup does not require any special
@@ -57,7 +57,7 @@ arguments to a file archiver such as the system tar utility.
 
 During the period the backup cursor is open, database checkpoints can
 be created, but no checkpoints can be deleted.  This may result in
-significant file growth.  Additionally while the backup cursor is open
+significant file growth. Additionally while the backup cursor is open
 automatic log file archiving, even if enabled, will not reclaim any
 log files.
 
@@ -71,6 +71,24 @@ WiredTiger's checkpoint durability guarantees.</b>
 The following is a programmatic example of creating a backup:
 
 @snippet ex_all.c backup
+
+When logging is enabled, opening the backup cursor forces a log file switch.
+The reason is so that only data that was committed and visible at the time of
+the backup is available in the backup when that log file is included in the
+list of files. WiredTiger offers a mechanism to gather additional log files that
+may be created during the backup.
+
+Since backups can take a long time, it may be desirable to catch up at the
+end of a backup with the log files so that operations that occurred during
+backup can be recovered. WiredTiger provides the ability to open a duplicate
+backup cursor with the configuration \c target=log:. This secondary backup
+cursor will return the file names of all log files via \c dup_cursor->get_key().
+There will be overlap with log file names returned in the original cursor. The user
+only needs to copy file names that are new but there is no error copying all
+log file names returned. This secondary cursor must be closed explicitly prior
+to closing the parent backup cursor.
+
+@snippet ex_all.c backup log duplicate
 
 In cases where the backup is desired for a checkpoint other than the
 most recent, applications can discard all checkpoints subsequent to the
@@ -208,7 +226,7 @@ database directory has not been opened and recovery run.  Once recovery
 has run in a backup directory, you can no longer back up to that
 database directory.
 
-An example of opening the backup data source for an incremental backup:
+An example of opening the backup data source for log-based incremental backup:
 
 @snippet ex_all.c incremental backup
 

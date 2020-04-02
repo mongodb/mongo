@@ -34,7 +34,7 @@ import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import make_scenarios
-import wttest
+import unittest, wttest
 
 class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
@@ -51,10 +51,11 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('row', dict(tabletype='row',
                     create_params = 'key_format=i,value_format=S')),
-        ('var', dict(tabletype='var',
-                    create_params = 'key_format=r,value_format=S')),
-        ('fix', dict(tabletype='fix',
-                    create_params = 'key_format=r,value_format=8t')),
+    # The commented columnar tests needs to be enabled once rollback to stable for columnar is fixed in (WT-5548).
+    #    ('var', dict(tabletype='var',
+    #                create_params = 'key_format=r,value_format=S')),
+    #    ('fix', dict(tabletype='fix',
+    #                create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
         ('trunc-all', dict(op1=('all', 0))),
@@ -200,14 +201,9 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
 
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
-        #
-        # Run printlog and make sure it exits with zero status. This should be
-        # run as soon as we can after the crash to try and conflict with the
-        # journal file read.
-        #
 
-        self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
-
+        # Gather statistics - this needs to be done before the connection is
+        # closed or statistics would be reset.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         clen = stat_cursor[stat.conn.log_compress_len][2]
         cmem = stat_cursor[stat.conn.log_compress_mem][2]
@@ -228,6 +224,13 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertEqual(clen < cmem, True)
             self.assertEqual(cwrites > 0, True)
             self.assertEqual((cfails > 0 or csmall > 0), True)
+
+        #
+        # Run printlog and make sure it exits with zero status. This should be
+        # run as soon as we can after the crash to try and conflict with the
+        # journal file read.
+        #
+        self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
 
 if __name__ == '__main__':
     wttest.run()

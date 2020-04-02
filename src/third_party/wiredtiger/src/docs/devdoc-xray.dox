@@ -1,0 +1,151 @@
+/*! @page devdoc-xray Instrumentation and introspection with XRay
+
+# Instrumenting with XRay
+
+XRay is a tool, originally developed at Google and now integrated in LLVM, that
+instruments the program such that when it runs it produces a trace of executed
+functions and their timestamps. This article explains how to instrument
+WiredTiger, collect the XRay traces, and analyze them.  As an example, we will
+show how to trace \c wtperf.
+
+## Step 1: Configure the WiredTiger build with XRay instrumentation
+
+Select \c clang as your C compiler and provide the required flag to get it to
+instrument your \c wtperf binary.
+
+@code
+$ ../configure CC="clang-8" CFLAGS="-fxray-instrument"
+@endcode
+
+## Step 2: Build as usual
+
+@code
+$ cd build_posix
+$ make
+@endcode
+
+## Step 3: Run wtperf
+
+Use the script \c wtperf_xray.sh to launch \c wtperf from the directory
+containing the \c wtperf binary. The first argument to the script must be the
+benchmark configuration file. For example:
+
+@code
+$ cd bench/wtperf
+$ ../../../bench/wtperf/runners/wtperf_xray.sh  ../../../bench/wtperf/runners/small-btree.wtperf
+@endcode
+
+In general the usage is:  
+
+@code
+wtperf_xray.sh <wtperf-config-file> [-h output-directory] [wtperf other arguments]
+@endcode
+
+The \c wtperf_xray.sh produces a few outputs to help analyse performance:
+
+- \c wtperf_account.txt: The top 10 functions where the workload is spending the
+most time with a count, min, max and some percentiles for each one.
+
+- \c wtperf_stacks.txt: The top 10 stack traces where the workload is spending
+the most time. This calculation is done separately per thread.
+
+- \c wtperf_graph.svg: A function call graph showing what functions call each
+other. The edges are labelled and coloured proportionally to represent the ratio
+of time spent in each function call.
+
+- \c wtperf_flame.svg: A graph visualising stack traces and the time spent
+within each stack frame. If \c FLAME_GRAPH_PATH is not specified, this graph
+won't be generated.
+
+The \c wtperf_xray.sh script uses a few optional environment variables to modify
+its behaviour:
+
+- \c XRAY_BINARY: The binary to use to inspect the XRay log. The script defaults
+to using \c llvm-xray however, if you compiled with a particular \c clang
+version, you should use the corresponding \c llvm-xray version. For example, if
+you selected \c clang-8 like the configuration above, you should set
+\c XRAY_BINARY to \c llvm-xray-8.
+
+- \c FLAME_GRAPH_PATH: As part of the script's analysis phase, it can optionally
+produce a FlameGraph. The \c FLAME_GRAPH_PATH variable must be set to your copy
+of Brendan Gregg's FlameGraph script (\c flamegraph.pl).
+
+# Convert XRay logs to the Operation Tracking format (optional)
+
+After running a program instrumented with XRay, a log file will be produced
+containing performance information. There is a tool called \c xray_to_optrack
+which is designed to convert this log to the [Operation Tracking]
+(@ref devdoc-optrack) format.
+
+## Step 1: Take a copy of the wtperf binary and the XRay log
+
+To build the \c xray_to_optrack utility, we'll need to reconfigure and build
+with a new set of flags. Before doing that, we'll need to keep a copy of the
+XRay log and the \c wtperf binary that we used to generate it.
+
+@code
+$ cp <wtperf> <xray_log> .
+@endcode
+
+## Step 2: Install LLVM
+
+The \c xray_to_optrack utility requires LLVM in order to parse the XRay log
+file. So we'll need to install LLVM via our package manager.
+
+@code
+$ sudo apt install llvm
+@endcode
+
+LLVM needs to be version 8 or higher. Check the version like this:
+
+@code
+$ llvm-config –version
+@endcode
+
+If your distribution's default \c llvm-config isn't from the 8 series, you'll
+need to move one with a major version of 8 into the \c $PATH such that it gets
+invoked instead.
+
+The \c llvm-config command line tool is used to supply the required compiler
+and linker flags to build programs such like \c xray_to_optrack on top of LLVM.
+
+## Step 3: Configure the WiredTiger build with LLVM flags
+
+Supply the \c --enable-llvm flag to your configuration to build anything with a
+dependency to LLVM.
+
+@code
+$ ../configure --enable-llvm
+@endcode
+
+Take care NOT to customise \c CC or \c CXX. Customising either of these
+variables will cause C++ programs such as \c workgen or \c xray_to_optrack to be
+skipped since we can't reliably link object files emitted by C and C++ compilers
+unless they are the system's default \c cc and \c c++.
+
+## Step 4: Build as usual
+
+@code
+$ cd build_posix
+$ make
+@endcode
+
+## Step 5: Process the traces
+
+To process the traces, use the \c xray_to_optrack tool in the \c
+tools/xray_to_optrack directory.
+
+Then, run the tool like this:
+
+@code
+$ xray_to_optrack <xray_instrumented_binary> <xray_log>
+@endcode
+
+\c xray_instrumented_binary is the binary that produced the log, \c wtperf in
+our case, and \c xray_log is the log file.
+
+The script will produce one or more files with a prefix \c optrack. You can view
+these files with optrack tools, described in the [optrack documentation]
+(@ref devdoc-optrack).
+
+*/

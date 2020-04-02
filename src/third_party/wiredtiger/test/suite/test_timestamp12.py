@@ -30,7 +30,7 @@
 #   Timestamps: Test the use_timestamp setting when closing the connection.
 #
 
-import shutil, os, wiredtiger, wttest
+import shutil, os, unittest, wiredtiger, wttest
 from wtscenario import make_scenarios
 
 def timestamp_str(t):

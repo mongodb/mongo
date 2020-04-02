@@ -61,8 +61,9 @@
  *
  * Bit 4 marks a value with an additional descriptor byte. If this flag is set,
  * the next byte after the initial cell byte is an additional description byte.
- * The bottom 4 bits describe a validity window of timestamp/transaction IDs.
- * The top 4 bits are currently unused.
+ * The bottom bit in this additional byte indicates that the cell is part of a
+ * prepared, and not yet committed transaction. The next 6 bits describe a validity
+ * and durability window of timestamp/transaction IDs.  The top bit is currently unused.
  *
  * Bits 5-8 are cell "types".
  */
@@ -77,11 +78,13 @@
 #define WT_CELL_64V 0x04         /* Associated value */
 #define WT_CELL_SECOND_DESC 0x08 /* Second descriptor byte */
 
-#define WT_CELL_TS_DURABLE 0x01 /* Newest-durable timestamp */
-#define WT_CELL_TS_START 0x02   /* Oldest-start timestamp */
-#define WT_CELL_TS_STOP 0x04    /* Newest-stop timestamp */
-#define WT_CELL_TXN_START 0x08  /* Oldest-start txn ID */
-#define WT_CELL_TXN_STOP 0x10   /* Newest-stop txn ID */
+#define WT_CELL_PREPARE 0x01          /* Part of prepared transaction */
+#define WT_CELL_TS_DURABLE_START 0x02 /* Start durable timestamp */
+#define WT_CELL_TS_DURABLE_STOP 0x04  /* Stop durable timestamp */
+#define WT_CELL_TS_START 0x08         /* Oldest-start timestamp */
+#define WT_CELL_TS_STOP 0x10          /* Newest-stop timestamp */
+#define WT_CELL_TXN_START 0x20        /* Oldest-start txn ID */
+#define WT_CELL_TXN_STOP 0x40         /* Newest-stop txn ID */
 
 /*
  * WT_CELL_ADDR_INT is an internal block location, WT_CELL_ADDR_LEAF is a leaf block location, and
@@ -125,11 +128,11 @@
  */
 struct __wt_cell {
     /*
-     * Maximum of 62 bytes:
+     * Maximum of 71 bytes:
      *  1: cell descriptor byte
      *  1: prefix compression count
      *  1: secondary descriptor byte
-     * 27: 3 timestamps		(uint64_t encoding, max 9 bytes)
+     * 36: 4 timestamps		(uint64_t encoding, max 9 bytes)
      * 18: 2 transaction IDs	(uint64_t encoding, max 9 bytes)
      *  9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
      *  5: data length		(uint32_t encoding, max 5 bytes)
@@ -138,7 +141,7 @@ struct __wt_cell {
      * count and 64V value overlap, and the validity window, 64V value
      * and data length are all optional in some cases.
      */
-    uint8_t __chunk[1 + 1 + 1 + 6 * WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
+    uint8_t __chunk[1 + 1 + 1 + 7 * WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
 };
 
 /*
@@ -150,17 +153,21 @@ struct __wt_cell_unpack {
 
     uint64_t v; /* RLE count or recno */
 
-    wt_timestamp_t start_ts; /* Value validity window */
-    uint64_t start_txn;
-    wt_timestamp_t stop_ts;
-    uint64_t stop_txn;
+    /* Value validity window */
+    wt_timestamp_t start_ts;         /* default value: WT_TS_NONE */
+    uint64_t start_txn;              /* default value: WT_TXN_NONE */
+    wt_timestamp_t durable_start_ts; /* default value: WT_TS_NONE */
+    wt_timestamp_t stop_ts;          /* default value: WT_TS_MAX */
+    uint64_t stop_txn;               /* default value: WT_TXN_MAX */
+    wt_timestamp_t durable_stop_ts;  /* default value: WT_TS_NONE */
 
     /* Address validity window */
-    wt_timestamp_t newest_durable_ts;
-    wt_timestamp_t oldest_start_ts;
-    uint64_t oldest_start_txn;
-    wt_timestamp_t newest_stop_ts;
-    uint64_t newest_stop_txn;
+    wt_timestamp_t oldest_start_ts;         /* default value: WT_TS_NONE */
+    uint64_t oldest_start_txn;              /* default value: WT_TXN_NONE */
+    wt_timestamp_t newest_start_durable_ts; /* default value: WT_TS_NONE */
+    wt_timestamp_t newest_stop_ts;          /* default value: WT_TS_MAX */
+    uint64_t newest_stop_txn;               /* default value: WT_TXN_MAX */
+    wt_timestamp_t newest_stop_durable_ts;  /* default value: WT_TS_NONE */
 
     /*
      * !!!
@@ -177,5 +184,10 @@ struct __wt_cell_unpack {
     uint8_t raw;  /* Raw cell type (include "shorts") */
     uint8_t type; /* Cell type */
 
-    uint8_t ovfl; /* boolean: cell is an overflow */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_CELL_UNPACK_OVERFLOW 0x1u           /* cell is an overflow */
+#define WT_CELL_UNPACK_PREPARE 0x2u            /* cell is part of a prepared transaction */
+#define WT_CELL_UNPACK_TIME_PAIRS_CLEARED 0x4u /* time pairs are cleared because of restart */
+                                               /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint8_t flags;
 };

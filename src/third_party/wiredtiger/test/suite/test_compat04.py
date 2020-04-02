@@ -45,7 +45,7 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
     # Declare the log versions that do and do not have prevlsn.
     # Log version 1 does not have the prevlsn record.
     # Log version 2 introduced that record.
-    # Log version 3 continues to have that record.
+    # Log versions 3 and higher continue to have that record.
     min_logv = 2
 
     # The outline of this test is that we create the database at the
@@ -55,13 +55,17 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
     # should be successful for all directions.
     #
     create_release = [
-        ('def_rel', dict(create_rel='none', log_crrel=3)),
-        ('32_rel', dict(create_rel='3.2', log_crrel=3)),
+        ('def_rel', dict(create_rel='none', log_crrel=5)),
+        ('100_rel', dict(create_rel="10.0", log_crrel=5)),
+        ('33_rel', dict(create_rel="3.3", log_crrel=4)),
+        ('32_rel', dict(create_rel="3.2", log_crrel=3)),
         ('31_rel', dict(create_rel="3.1", log_crrel=3)),
         ('30_rel', dict(create_rel="3.0", log_crrel=2)),
         ('26_rel', dict(create_rel="2.6", log_crrel=1)),
     ]
     reconfig_release = [
+        ('100_rel', dict(rel="10.0", log_rel=5)),
+        ('33_rel', dict(rel="3.3", log_rel=4)),
         ('32_rel', dict(rel="3.2", log_rel=3)),
         ('31_rel', dict(rel="3.1", log_rel=3)),
         ('30_rel', dict(rel="3.0", log_rel=2)),

@@ -51,6 +51,7 @@
     }
 
 WT_ATOMIC_FUNC(8, uint8_t, uint8_t, 8, char)
+WT_ATOMIC_FUNC(v8, uint8_t, volatile uint8_t, 8, char)
 WT_ATOMIC_FUNC(16, uint16_t, uint16_t, 16, short)
 WT_ATOMIC_FUNC(32, uint32_t, uint32_t, , long)
 WT_ATOMIC_FUNC(v32, uint32_t, volatile uint32_t, , long)

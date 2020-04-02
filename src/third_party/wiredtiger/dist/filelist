@@ -49,7 +49,6 @@ src/btree/col_srch.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
-src/cache/cache_las.c
 src/checksum/arm64/crc32-arm64.c	ARM64_HOST
 src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
@@ -98,6 +97,7 @@ src/evict/evict_file.c
 src/evict/evict_lru.c
 src/evict/evict_page.c
 src/evict/evict_stat.c
+src/history/hs.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c
@@ -209,7 +209,6 @@ src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c
 src/txn/txn_log.c
-src/txn/txn_nsnap.c
 src/txn/txn_recover.c
 src/txn/txn_rollback_to_stable.c
 src/txn/txn_timestamp.c

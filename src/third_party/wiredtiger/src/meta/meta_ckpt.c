@@ -587,23 +587,26 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
     ckpt->size = (uint64_t)a.val;
 
     /* Default to durability. */
-    ret = __wt_config_subgets(session, v, "newest_durable_ts", &a);
+    ret = __wt_config_subgets(session, v, "start_durable_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
-    ckpt->newest_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
+    ckpt->start_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "oldest_start_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->oldest_start_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "oldest_start_txn", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->oldest_start_txn = ret == WT_NOTFOUND || a.len == 0 ? WT_TXN_NONE : (uint64_t)a.val;
+    ret = __wt_config_subgets(session, v, "stop_durable_ts", &a);
+    WT_RET_NOTFOUND_OK(ret);
+    ckpt->stop_durable_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "newest_stop_ts", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->newest_stop_ts = ret == WT_NOTFOUND || a.len == 0 ? WT_TS_MAX : (uint64_t)a.val;
     ret = __wt_config_subgets(session, v, "newest_stop_txn", &a);
     WT_RET_NOTFOUND_OK(ret);
     ckpt->newest_stop_txn = ret == WT_NOTFOUND || a.len == 0 ? WT_TXN_MAX : (uint64_t)a.val;
-    __wt_check_addr_validity(session, ckpt->oldest_start_ts, ckpt->oldest_start_txn,
-      ckpt->newest_stop_ts, ckpt->newest_stop_txn);
+    __wt_check_addr_validity(session, ckpt->start_durable_ts, ckpt->oldest_start_ts,
+      ckpt->oldest_start_txn, ckpt->stop_durable_ts, ckpt->newest_stop_ts, ckpt->newest_stop_txn);
 
     WT_RET(__wt_config_subgets(session, v, "write_gen", &a));
     if (a.len == 0)
@@ -617,59 +620,48 @@ format:
 }
 
 /*
- * __wt_metadata_set_base_write_gen --
- *     Set the connection's base write generation.
+ * __wt_metadata_update_base_write_gen --
+ *     Update the connection's base write generation.
  */
 int
-__wt_metadata_set_base_write_gen(WT_SESSION_IMPL *session)
+__wt_metadata_update_base_write_gen(WT_SESSION_IMPL *session, const char *config)
 {
     WT_CKPT ckpt;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
 
-    WT_RET(__wt_meta_checkpoint(session, WT_METAFILE_URI, NULL, &ckpt));
+    conn = S2C(session);
+    memset(&ckpt, 0, sizeof(ckpt));
 
-    /*
-     * We track the maximum page generation we've ever seen, and I'm not interested in debugging
-     * off-by-ones.
-     */
-    S2C(session)->base_write_gen = ckpt.write_gen + 1;
-
-    __wt_meta_checkpoint_free(session, &ckpt);
+    if ((ret = __ckpt_last(session, config, &ckpt)) == 0) {
+        conn->base_write_gen = WT_MAX(ckpt.write_gen + 1, conn->base_write_gen);
+        __wt_meta_checkpoint_free(session, &ckpt);
+    } else
+        WT_RET_NOTFOUND_OK(ret);
 
     return (0);
 }
 
 /*
- * __ckptlist_review_write_gen --
- *     Review the checkpoint's write generation.
+ * __wt_metadata_init_base_write_gen --
+ *     Initialize the connection's base write generation.
  */
-static void
-__ckptlist_review_write_gen(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
+int
+__wt_metadata_init_base_write_gen(WT_SESSION_IMPL *session)
 {
-    uint64_t v;
+    WT_DECL_RET;
+    char *config;
 
-    /*
-     * Every page written in a given wiredtiger_open() session needs to be in a single "generation",
-     * it's how we know to ignore transactional information found on pages written in previous
-     * generations. We make this work by writing the maximum write generation we've ever seen as the
-     * write-generation of the metadata file's checkpoint. When wiredtiger_open() is called, we copy
-     * that write generation into the connection's name space as the base write generation value.
-     * Then, whenever we open a file, if the file's write generation is less than the base value, we
-     * update the file's write generation so all writes will appear after the base value, and we
-     * ignore transactions on pages where the write generation is less than the base value.
-     *
-     * At every checkpoint, if the file's checkpoint write generation is larger than the
-     * connection's maximum write generation, update the connection.
-     */
-    do {
-        WT_ORDERED_READ(v, S2C(session)->max_write_gen);
-    } while (
-      ckpt->write_gen > v && !__wt_atomic_cas64(&S2C(session)->max_write_gen, v, ckpt->write_gen));
+    /* Initialize the base write gen to 1 */
+    S2C(session)->base_write_gen = 1;
+    /* Retrieve the metadata entry for the metadata file. */
+    WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
+    /* Update base write gen to the write gen of metadata. */
+    WT_ERR(__wt_metadata_update_base_write_gen(session, config));
 
-    /*
-     * If checkpointing the metadata file, update its write generation to be the maximum we've seen.
-     */
-    if (session->dhandle != NULL && WT_IS_METADATA(session->dhandle) && ckpt->write_gen < v)
-        ckpt->write_gen = v;
+err:
+    __wt_free(session, config);
+    return (ret);
 }
 
 /*
@@ -700,8 +692,9 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
                 WT_RET(__wt_raw_to_hex(session, ckpt->raw.data, ckpt->raw.size, &ckpt->addr));
         }
 
-        __wt_check_addr_validity(session, ckpt->oldest_start_ts, ckpt->oldest_start_txn,
-          ckpt->newest_stop_ts, ckpt->newest_stop_txn);
+        __wt_check_addr_validity(session, ckpt->start_durable_ts, ckpt->oldest_start_ts,
+          ckpt->oldest_start_txn, ckpt->stop_durable_ts, ckpt->newest_stop_ts,
+          ckpt->newest_stop_txn);
 
         WT_RET(__wt_buf_catfmt(session, buf, "%s%s", sep, ckpt->name));
         sep = ",";
@@ -714,12 +707,13 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
          */
         WT_RET(__wt_buf_catfmt(session, buf,
           "=(addr=\"%.*s\",order=%" PRId64 ",time=%" PRIu64 ",size=%" PRId64
-          ",newest_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",oldest_start_txn=%" PRId64
-          ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64 ",write_gen=%" PRId64 ")",
+          ",start_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",oldest_start_txn=%" PRId64
+          ",stop_durable_ts=%" PRId64 ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64
+          ",write_gen=%" PRId64 ")",
           (int)ckpt->addr.size, (char *)ckpt->addr.data, ckpt->order, ckpt->sec,
-          (int64_t)ckpt->size, (int64_t)ckpt->newest_durable_ts, (int64_t)ckpt->oldest_start_ts,
-          (int64_t)ckpt->oldest_start_txn, (int64_t)ckpt->newest_stop_ts,
-          (int64_t)ckpt->newest_stop_txn, (int64_t)ckpt->write_gen));
+          (int64_t)ckpt->size, (int64_t)ckpt->start_durable_ts, (int64_t)ckpt->oldest_start_ts,
+          (int64_t)ckpt->oldest_start_txn, (int64_t)ckpt->stop_durable_ts,
+          (int64_t)ckpt->newest_stop_ts, (int64_t)ckpt->newest_stop_txn, (int64_t)ckpt->write_gen));
     }
     WT_RET(__wt_buf_catfmt(session, buf, ")"));
 
@@ -799,10 +793,6 @@ __wt_meta_ckptlist_set(
           ckptlsn->l.file, (uintmax_t)ckptlsn->l.offset));
 
     WT_ERR(__ckpt_set(session, fname, buf->mem, has_lsn));
-
-    /* Review the checkpoint's write generation. */
-    WT_CKPT_FOREACH (ckptbase, ckpt)
-        __ckptlist_review_write_gen(session, ckpt);
 
 err:
     __wt_scr_free(session, &buf);

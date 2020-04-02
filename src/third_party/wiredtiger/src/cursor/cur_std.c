@@ -240,6 +240,10 @@ __wt_cursor_copy_release_item(WT_CURSOR *cursor, WT_ITEM *item) WT_GCC_FUNC_ATTR
 
     session = (WT_SESSION_IMPL *)cursor->session;
 
+    /* Bail out if the item has been cleared. */
+    if (item->data == NULL)
+        return (0);
+
     /*
      * Whether or not we own the memory for the item, make a copy of the data and use that instead.
      * That allows us to overwrite and free memory owned by the item, potentially uncovering
@@ -483,6 +487,7 @@ err:
         if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
+            F_SET(cursor, WT_CURSTD_DEBUG_COPY_KEY);
         } else
             __wt_free(session, tmp.mem);
     }
@@ -622,6 +627,7 @@ err:
         if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
+            F_SET(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
         } else
             __wt_free(session, tmp.mem);
     }

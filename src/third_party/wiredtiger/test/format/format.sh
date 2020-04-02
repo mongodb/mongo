@@ -248,8 +248,10 @@ report_failure()
 	dir=$1
 	log="$dir.log"
 
-	skip_known_errors $log
-	skip_ret=$?
+	# DO NOT CURRENTLY SKIP ANY ERRORS.
+	skip_ret=0
+	#skip_known_errors $log
+	#skip_ret=$?
 
 	echo "$name: failure status reported" > $dir/$status
 	[[ $skip_ret -ne 0 ]] && failure=$(($failure + 1))
@@ -315,6 +317,14 @@ resolve()
 			rm -rf $dir $log
 			success=$(($success + 1))
 			verbose "$name: job in $dir successfully completed"
+			continue
+		}
+
+		# Check for Evergreen running out of disk space, and forcibly quit.
+		grep -E -i 'no space left on device' $log > /dev/null && {
+			rm -rf $dir $log
+			force_quit=1
+			echo "$name: job in $dir ran out of disk space"
 			continue
 		}
 
@@ -424,7 +434,8 @@ format()
 		args=$format_args
 
 		# If abort/recovery testing is configured, do it 5% of the time.
-		[[ $abort_test -ne 0 ]] && [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args abort=1"
+		[[ $abort_test -ne 0 ]] &&
+		    [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args format.abort=1"
 
 		echo "$name: starting job in $dir ($(date))"
 	fi

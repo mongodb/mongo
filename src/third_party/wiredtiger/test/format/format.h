@@ -66,7 +66,7 @@ typedef struct {
     char *home_backup_init;  /* Initialize backup command */
     char *home_config;       /* Run CONFIG file path */
     char *home_init;         /* Initialize home command */
-    char *home_lasdump;      /* LAS dump filename */
+    char *home_hsdump;       /* HS dump filename */
     char *home_log;          /* Operation log file path */
     char *home_pagedump;     /* Page dump filename */
     char *home_rand;         /* RNG log file path */
@@ -90,6 +90,7 @@ typedef struct {
     bool workers_finished; /* Operations completed */
 
     pthread_rwlock_t backup_lock; /* Backup running */
+    uint32_t backup_id;           /* Block incremental id */
 
     WT_RAND_STATE rnd; /* Global RNG state */
 
@@ -118,6 +119,7 @@ typedef struct {
     uint32_t c_assert_read_timestamp;
     uint32_t c_auto_throttle;
     uint32_t c_backups;
+    char *c_backup_incremental;
     uint32_t c_bitcnt;
     uint32_t c_bloom;
     uint32_t c_bloom_bit_count;
@@ -165,6 +167,7 @@ typedef struct {
     uint32_t c_memory_page_max;
     uint32_t c_merge_max;
     uint32_t c_mmap;
+    uint32_t c_mmap_all;
     uint32_t c_modify_pct;
     uint32_t c_ops;
     uint32_t c_prefix_compression;
@@ -186,7 +189,7 @@ typedef struct {
     uint32_t c_timer;
     uint32_t c_timing_stress_aggressive_sweep;
     uint32_t c_timing_stress_checkpoint;
-    uint32_t c_timing_stress_lookaside_sweep;
+    uint32_t c_timing_stress_hs_sweep;
     uint32_t c_timing_stress_split_1;
     uint32_t c_timing_stress_split_2;
     uint32_t c_timing_stress_split_3;
@@ -207,6 +210,11 @@ typedef struct {
 #define ROW 2
 #define VAR 3
     u_int type; /* File type's flag value */
+
+#define INCREMENTAL_BLOCK 1
+#define INCREMENTAL_LOG 2
+#define INCREMENTAL_OFF 3
+    u_int c_backup_incr_flag; /* Incremental backup flag value */
 
 #define CHECKPOINT_OFF 1
 #define CHECKPOINT_ON 2
@@ -330,6 +338,7 @@ WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 void config_clear(void);
+void config_compat(const char **);
 void config_error(void);
 void config_file(const char *);
 void config_print(bool);

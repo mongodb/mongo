@@ -8,7 +8,12 @@ all_TESTS=
 noinst_PROGRAMS=
 
 # The import test is only a shell script
-all_TESTS += import/smoke.sh
+# Temporarily disabled
+# all_TESTS += import/smoke.sh
+
+test_incr_backup_SOURCES = incr_backup/main.c
+noinst_PROGRAMS += test_incr_backup
+all_TESTS += incr_backup/smoke.sh
 
 test_random_abort_SOURCES = random_abort/main.c
 noinst_PROGRAMS += test_random_abort
@@ -52,7 +57,8 @@ all_TESTS += test_wt2246_col_append
 
 test_wt2323_join_visibility_SOURCES = wt2323_join_visibility/main.c
 noinst_PROGRAMS += test_wt2323_join_visibility
-all_TESTS += test_wt2323_join_visibility
+# Temporarily disabled
+# all_TESTS += test_wt2323_join_visibility
 
 test_wt2535_insert_race_SOURCES = wt2535_insert_race/main.c
 noinst_PROGRAMS += test_wt2535_insert_race
@@ -116,7 +122,8 @@ all_TESTS += test_wt3874_pad_byte_collator
 
 test_wt4105_large_doc_small_upd_SOURCES = wt4105_large_doc_small_upd/main.c
 noinst_PROGRAMS += test_wt4105_large_doc_small_upd
-all_TESTS += test_wt4105_large_doc_small_upd
+# Temporarily disabled (WT-5579)
+# all_TESTS += test_wt4105_large_doc_small_upd
 
 test_wt4117_checksum_SOURCES = wt4117_checksum/main.c
 noinst_PROGRAMS += test_wt4117_checksum
@@ -134,9 +141,9 @@ test_wt4699_json_SOURCES = wt4699_json/main.c
 noinst_PROGRAMS += test_wt4699_json
 all_TESTS += test_wt4699_json
 
-test_wt4803_cache_overflow_abort_SOURCES = wt4803_cache_overflow_abort/main.c
-noinst_PROGRAMS += test_wt4803_cache_overflow_abort
-all_TESTS += test_wt4803_cache_overflow_abort
+test_wt4803_history_store_abort_SOURCES = wt4803_history_store_abort/main.c
+noinst_PROGRAMS += test_wt4803_history_store_abort
+all_TESTS += test_wt4803_history_store_abort
 
 test_wt4891_meta_ckptlist_get_alloc_SOURCES=wt4891_meta_ckptlist_get_alloc/main.c
 noinst_PROGRAMS += test_wt4891_meta_ckptlist_get_alloc

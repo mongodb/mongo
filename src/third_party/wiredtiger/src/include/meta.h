@@ -30,8 +30,8 @@
 #define WT_METAFILE_SLVG "WiredTiger.wt.orig" /* Metadata copy */
 #define WT_METAFILE_URI "file:WiredTiger.wt"  /* Metadata table URI */
 
-#define WT_LAS_FILE "WiredTigerLAS.wt"     /* Lookaside table */
-#define WT_LAS_URI "file:WiredTigerLAS.wt" /* Lookaside table URI*/
+#define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
+#define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
 
 #define WT_SYSTEM_PREFIX "system:"             /* System URI prefix */
 #define WT_SYSTEM_CKPT_URI "system:checkpoint" /* Checkpoint URI */
@@ -45,6 +45,14 @@
 #define WT_METADATA_COMPAT "Compatibility version"
 #define WT_METADATA_VERSION "WiredTiger version" /* Version keys */
 #define WT_METADATA_VERSION_STR "WiredTiger version string"
+
+/*
+ * As a result of a data format change WiredTiger is not able to start on versions below 3.2.0, as
+ * it will write out a data format that is not readable by those versions. These version numbers
+ * provide such mechanism.
+ */
+#define WT_MIN_STARTUP_VERSION_MAJOR 3 /* Minimum version we can start on. */
+#define WT_MIN_STARTUP_VERSION_MINOR 2
 
 /*
  * WT_WITH_TURTLE_LOCK --
@@ -126,9 +134,10 @@ struct __wt_ckpt {
     WT_BLOCK_MODS backup_blocks[WT_BLKINCR_MAX];
 
     /* Validity window */
-    wt_timestamp_t newest_durable_ts;
+    wt_timestamp_t start_durable_ts;
     wt_timestamp_t oldest_start_ts;
     uint64_t oldest_start_txn;
+    wt_timestamp_t stop_durable_ts;
     wt_timestamp_t newest_stop_ts;
     uint64_t newest_stop_txn;
 

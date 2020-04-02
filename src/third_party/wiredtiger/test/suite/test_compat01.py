@@ -45,14 +45,16 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
     # Declare the log versions that do and do not have prevlsn.
     # Log version 1 does not have the prevlsn record.
     # Log version 2 introduced that record.
-    # Log version 3 continues to have that record.
+    # Log versions 3 and higher continue to have that record.
     min_logv = 2
-    latest_logv = 3
+    latest_logv = 5
 
     # The API uses only the major and minor numbers but accepts with
     # and without the patch number.  Test both.
     start_compat = [
-        ('def', dict(compat1='none', logv1=3)),
+        ('def', dict(compat1='none', logv1=5)),
+        ('100', dict(compat1='10.0', logv1=5)),
+        ('33', dict(compat1='3.3', logv1=4)),
         ('32', dict(compat1='3.2', logv1=3)),
         ('31', dict(compat1="3.1", logv1=3)),
         ('30', dict(compat1="3.0", logv1=2)),
@@ -62,7 +64,9 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         ('old_patch', dict(compat1="1.8.1", logv1=1)),
     ]
     restart_compat = [
-        ('def2', dict(compat2='none', logv2=3)),
+        ('def2', dict(compat2='none', logv2=5)),
+        ('100_2', dict(compat2='10.0', logv2=5)),
+        ('33_2', dict(compat2='3.3', logv2=4)),
         ('32_2', dict(compat2='3.2', logv2=3)),
         ('31_2', dict(compat2="3.1", logv2=3)),
         ('30_2', dict(compat2="3.0", logv2=2)),

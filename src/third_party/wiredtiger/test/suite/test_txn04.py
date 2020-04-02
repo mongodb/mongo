@@ -33,7 +33,7 @@
 import shutil, os
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
-import wttest
+import unittest, wttest
 
 class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
@@ -183,7 +183,6 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # Backup the target we modified and verify the data.
         # print 'Call hot_backup with ' + self.uri
         self.hot_backup(self.uri, committed)
-
     def test_ops(self):
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         self.session2 = self.conn.open_session()

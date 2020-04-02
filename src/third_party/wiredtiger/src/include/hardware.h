@@ -16,13 +16,6 @@
         (v) = (val);        \
     } while (0)
 
-/* Write after all previous stores are completed. */
-#define WT_ORDERED_WRITE(v, val) \
-    do {                         \
-        WT_WRITE_BARRIER();      \
-        (v) = (val);             \
-    } while (0)
-
 /*
  * Read a shared location and guarantee that subsequent reads do not see any earlier state.
  */

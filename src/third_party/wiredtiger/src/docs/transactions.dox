@@ -129,28 +129,6 @@ re-configured on a per-session basis:
 
 @snippet ex_all.c session isolation re-configuration
 
-@section transaction_named_snapshots Named Snapshots
-
-Applications can create named snapshots by calling WT_SESSION::snapshot
-with a configuration that includes <code>"name=foo"</code>.
-This configuration creates a new named snapshot, as if a snapshot isolation
-transaction were started at the time of the WT_SESSION::snapshot call.
-
-Subsequent transactions can be started "as of" that snapshot by calling
-WT_SESSION::begin_transaction with a configuration that includes
-<code>snapshot=foo</code>.  That transaction will run at snapshot isolation
-as if the transaction started at the time of the WT_SESSION::snapshot
-call that created the snapshot.
-
-Named snapshots keep data pinned in cache as if a real transaction were
-running for the time that the named snapshot is active.  The resources
-associated with named snapshots should be released by calling
-WT_SESSION::snapshot with a configuration that includes
-<code>"drop="</code>. See WT_SESSION::snapshot documentation for details of
-the semantics supported by the drop configuration.
-
-Named snapshots are not durable: they do not survive WT_CONNECTION::close.
-
 @section transaction_timestamps Application-specified Transaction Timestamps
 
 @subsection timestamp_overview Timestamp overview

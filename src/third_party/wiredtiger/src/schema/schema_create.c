@@ -58,7 +58,7 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
       *filecfg[] = {WT_CONFIG_BASE(session, file_meta), config, NULL, NULL};
     char *fileconf;
     uint32_t allocsize;
-    bool is_metadata;
+    bool exists, is_metadata;
 
     fileconf = NULL;
 
@@ -72,6 +72,20 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
         if (exclusive)
             WT_TRET(EEXIST);
         goto err;
+    }
+
+    exists = false;
+    /*
+     * At this moment the uri doesn't exist in the metadata. In scenarios like, the database folder
+     * is copied without a checkpoint into another location and trying to recover from it leads to
+     * that history store file exists on disk but not as part of metadata. As we recreate the
+     * history store file on every restart to ensure that history store file is present. Make sure
+     * to remove the already exist history store file in the directory.
+     */
+    if (strcmp(uri, WT_HS_URI) == 0) {
+        WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
+        if (exists)
+            WT_IGNORE_RET(__wt_fs_remove(session, filename, true));
     }
 
     /* Sanity check the allocation size. */

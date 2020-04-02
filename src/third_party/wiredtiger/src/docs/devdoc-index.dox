@@ -40,6 +40,13 @@ monitoring units (PMU); they measure CPU cycles, cache misses, branches, etc.
 Kernel events include scheduling context switches, page faults and block I/O.
 Here we provide a quick cheat sheet of how to use `perf` with WiredTiger.
 
+@subpage devdoc-xray
+
+XRay is a tool, originally developed at Google and now integrated in LLVM, that
+instruments the program such that when it runs it produces a trace of executed
+functions and their timestamps. This article explains how to instrument
+WiredTiger, collect the XRay traces, and analyze them.
+
 @subpage devdoc-perf-flamegraphs
 
 Why is my CPU busy? FlameGraphs help visually summarize on-CPU call stacks and

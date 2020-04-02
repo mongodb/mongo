@@ -316,13 +316,6 @@ switch_and_jump:
          */
         if (unpack->prefix == 0) {
             /*
-             * The only reason to be here is a Huffman encoded key, a non-encoded key with no prefix
-             * compression should have been directly referenced, and we should not have needed to
-             * unpack its cell.
-             */
-            WT_ASSERT(session, btree->huffman_key != NULL);
-
-            /*
              * If this is the key we originally wanted, we don't
              * care if we're rolling forward or backward, it's
              * what we want.  Take a copy and wrap up.

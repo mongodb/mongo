@@ -112,7 +112,7 @@ rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 
 ...  // There is a second open of turtle here, is it important?
 
-fd = OPEN("./WiredTigerLAS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTigerHS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 
 #ifdef __linux__
 dir = OPEN("./", O_RDONLY|O_CLOEXEC);
@@ -127,7 +127,7 @@ fdatasync(fd);
 #endif /* __linux__ */
 
 close(fd);
-fd = OPEN_EXISTING("./WiredTigerLAS.wt", O_RDWR|O_NOATIME|O_CLOEXEC);
+fd = OPEN_EXISTING("./WiredTigerHS.wt", O_RDWR|O_NOATIME|O_CLOEXEC);
 FTRUNCATE(fd, 0x1000);
 fd = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 close(fd);

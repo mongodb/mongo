@@ -330,8 +330,6 @@ take_incr_backup(WT_SESSION *session, int i)
     const char *filename;
     bool first;
 
-    /*! [incremental backup using block transfer]*/
-
     tmp = NULL;
     tmp_sz = 0;
     /* Open the backup data source for incremental backup. */
@@ -385,7 +383,7 @@ take_incr_backup(WT_SESSION *session, int i)
                     error_sys_check(rfd = open(buf, O_RDONLY, 0));
                     (void)snprintf(h, sizeof(h), "%s.%d", home_incr, i);
                     (void)snprintf(buf, sizeof(buf), "%s/%s", h, filename);
-                    error_sys_check(wfd = open(buf, O_WRONLY, 0));
+                    error_sys_check(wfd = open(buf, O_WRONLY | O_CREAT, 0));
                     first = false;
                 }
 
@@ -439,7 +437,6 @@ take_incr_backup(WT_SESSION *session, int i)
     error_check(backup_cur->close(backup_cur));
     error_check(finalize_files(flist, count));
     free(tmp);
-    /*! [incremental backup using block transfer]*/
 }
 
 int

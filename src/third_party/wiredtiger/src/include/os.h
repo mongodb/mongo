@@ -11,7 +11,7 @@
         /*                                                             \
          * A call returning 0 indicates success; any call where        \
          * 0 is not the only successful return must provide an         \
-         * expression evaluating to 0 in all successful	cases.         \
+         * expression evaluating to 0 in all successful cases.         \
          *                                                             \
          * XXX                                                         \
          * Casting the call's return to int is because CentOS 7.3.1611 \
@@ -139,6 +139,14 @@ struct __wt_file_handle_posix {
     int fd; /* POSIX file handle */
 
     bool direct_io; /* O_DIRECT configured */
+
+    /* The memory buffer and variables if we use mmap for I/O */
+    uint8_t *mmap_buf;
+    bool mmap_file_mappable;
+    int mmap_prot;
+    volatile uint32_t mmap_resizing;
+    wt_off_t mmap_size;
+    volatile uint32_t mmap_usecount;
 };
 #endif
 

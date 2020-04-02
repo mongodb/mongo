@@ -351,8 +351,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
     return (0);
 
 err:
-    if (blk != NULL)
-        __wt_free(session, blk->id_str);
+    __wt_free(session, blk->id_str);
     return (ret);
 }
 
@@ -417,6 +416,10 @@ err:
 /*
  * __backup_config --
  *     Backup configuration.
+ *
+ * NOTE: this function handles all of the backup configuration except for the incremental use of
+ *     force_stop. That is handled at the beginning of __backup_start because we want to deal with
+ *     that setting without any of the other cursor setup.
  */
 static int
 __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[],
@@ -440,19 +443,6 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
      * Per-file offset incremental hot backup configurations take a starting checkpoint and optional
      * maximum transfer size, and the subsequent duplicate cursors take a file object.
      */
-    WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.force_stop", &cval));
-    if (cval.val) {
-        /*
-         * If we're force stopping incremental backup, set the flag. The resources involved in
-         * incremental backup will be released on cursor close and that is the only expected usage
-         * for this cursor.
-         */
-        if (is_dup)
-            WT_RET_MSG(session, EINVAL,
-              "Incremental force stop can only be specified on a primary backup cursor");
-        F_SET(cb, WT_CURBACKUP_FORCE_STOP);
-        return (0);
-    }
     WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.enabled", &cval));
     if (cval.val) {
         if (!F_ISSET(conn, WT_CONN_INCR_BACKUP)) {
@@ -640,6 +630,9 @@ __backup_start(
          * incremental backup will be released on cursor close and that is the only expected usage
          * for this cursor.
          */
+        if (is_dup)
+            WT_RET_MSG(session, EINVAL,
+              "Incremental force stop can only be specified on a primary backup cursor");
         F_SET(cb, WT_CURBACKUP_FORCE_STOP);
         return (0);
     }
@@ -823,10 +816,6 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
       !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "lsm:") &&
       !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) && !WT_PREFIX_MATCH(name, "table:"))
         WT_RET_MSG(session, ENOTSUP, "hot backup is not supported for objects of type %s", name);
-
-    /* Ignore the lookaside table or system info. */
-    if (strcmp(name, WT_LAS_URI) == 0)
-        return (0);
 
     /* Add the metadata entry to the backup file. */
     WT_RET(__wt_metadata_search(session, name, &value));

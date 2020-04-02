@@ -24,8 +24,10 @@ __random_insert_valid(
     cbt->ins_head = ins_head;
     cbt->ins = ins;
     cbt->compare = 0;
+    cbt->tmp->data = WT_INSERT_KEY(ins);
+    cbt->tmp->size = WT_INSERT_KEY_SIZE(ins);
 
-    return (__wt_cursor_valid(cbt, updp, validp));
+    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, updp, validp));
 }
 
 /*
@@ -42,7 +44,7 @@ __random_slot_valid(WT_CURSOR_BTREE *cbt, uint32_t slot, WT_UPDATE **updp, bool 
     cbt->slot = slot;
     cbt->compare = 0;
 
-    return (__wt_cursor_valid(cbt, updp, validp));
+    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, updp, validp));
 }
 
 /* Magic constant: 5000 entries in a skip list is enough to forcibly evict. */
@@ -249,12 +251,10 @@ __random_leaf_disk(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *validp)
     /* This is a relatively cheap test, so try several times. */
     for (retry = 0; retry < WT_RANDOM_DISK_RETRY; ++retry) {
         slot = __wt_random(&session->rnd) % entries;
+        WT_RET(__wt_row_leaf_key(session, page, page->pg_row + slot, cbt->tmp, false));
         WT_RET(__random_slot_valid(cbt, slot, updp, validp));
-        if (!*validp)
-            continue;
-
-        /* The row-store search function builds the key, so we have to as well. */
-        return (__wt_row_leaf_key(session, page, page->pg_row + slot, cbt->tmp, false));
+        if (*validp)
+            break;
     }
     return (0);
 }
@@ -395,10 +395,10 @@ restart:
     /* Search the internal pages of the tree. */
     current = &btree->root;
     for (;;) {
-        page = current->page;
-        if (!WT_PAGE_IS_INTERNAL(page))
+        if (F_ISSET(current, WT_REF_FLAG_LEAF))
             break;
 
+        page = current->page;
         WT_INTL_INDEX_GET(session, page, pindex);
         entries = pindex->entries;
 
@@ -420,15 +420,13 @@ restart:
         descent = NULL;
         for (i = 0; i < entries; ++i) {
             descent = pindex->index[__wt_random(&session->rnd) % entries];
-            if (descent->state == WT_REF_DISK || descent->state == WT_REF_LIMBO ||
-              descent->state == WT_REF_LOOKASIDE || descent->state == WT_REF_MEM)
+            if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
                 break;
         }
         if (i == entries)
             for (i = 0; i < entries; ++i) {
                 descent = pindex->index[i];
-                if (descent->state == WT_REF_DISK || descent->state == WT_REF_LIMBO ||
-                  descent->state == WT_REF_LOOKASIDE || descent->state == WT_REF_MEM)
+                if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
                     break;
             }
         if (i == entries || descent == NULL) {

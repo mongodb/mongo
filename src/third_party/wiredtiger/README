@@ -1,6 +1,6 @@
-WiredTiger 3.2.2: (August 28, 2019)
+WiredTiger 10.0.0: (March 18, 2020)
 
-This is version 3.2.2 of WiredTiger.
+This is version 10.0.0 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
@@ -8,7 +8,7 @@ WiredTiger release packages and documentation can be found at:
 
 The documentation for this specific release can be found at:
 
-	http://source.wiredtiger.com/3.2.2/index.html
+	http://source.wiredtiger.com/10.0.0/index.html
 
 The WiredTiger source code can be found at:
 

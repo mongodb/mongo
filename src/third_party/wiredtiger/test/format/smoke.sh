@@ -3,11 +3,17 @@
 set -e
 
 # Smoke-test format as part of running "make check".
-args="-1 -c "." data_source=table ops=50000 rows=10000 threads=4 compression=none logging_compression=none"
+args="-1 -c . "
+args="$args btree.compression=none "
+args="$args logging_compression=none"
+args="$args runs.ops=50000 "
+args="$args runs.rows=10000 "
+args="$args runs.source=table "
+args="$args runs.threads=4 "
 
-$TEST_WRAPPER ./t $args file_type=fix
-$TEST_WRAPPER ./t $args file_type=row
-$TEST_WRAPPER ./t $args file_type=row data_source=lsm
-$TEST_WRAPPER ./t $args file_type=var
+$TEST_WRAPPER ./t $args runs.type=fix
+$TEST_WRAPPER ./t $args runs.type=row
+$TEST_WRAPPER ./t $args runs.type=row runs.source=lsm
+$TEST_WRAPPER ./t $args runs.type=var
 # Force a rebalance to occur with statistics logging to test the utility
-$TEST_WRAPPER ./t $args file_type=row statistics_server=1 rebalance=1
+$TEST_WRAPPER ./t $args runs.type=row statistics.server=1 ops.rebalance=1

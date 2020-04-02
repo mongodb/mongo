@@ -28,7 +28,6 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
     btree = S2BT(session);
     cache = S2C(session)->cache;
-    next_walk = NULL;
     gen_gap_max = gen_gap_sum = max_pagesize = 0;
     num_memory = num_not_queueable = num_queued = 0;
     num_smaller_allocsz = pages_clean = pages_dirty = pages_internal = 0;
@@ -37,6 +36,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     walk_count = written_size_cnt = written_size_sum = 0;
     min_written_size = UINT64_MAX;
 
+    next_walk = NULL;
     while (__wt_tree_walk_count(session, &next_walk, &walk_count,
              WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT) == 0 &&
       next_walk != NULL) {
@@ -69,7 +69,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
         } else
             ++num_memory;
 
-        if (WT_PAGE_IS_INTERNAL(page))
+        if (F_ISSET(next_walk, WT_REF_FLAG_INTERNAL))
             ++pages_internal;
         else
             ++pages_leaf;

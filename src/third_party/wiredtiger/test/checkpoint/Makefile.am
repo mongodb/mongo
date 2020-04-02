@@ -9,7 +9,8 @@ t_LDADD = $(top_builddir)/test/utility/libtest_util.la
 t_LDADD +=$(top_builddir)/libwiredtiger.la
 t_LDFLAGS = -static
 
-TESTS = smoke.sh
+# Temporarily disabled
+# TESTS = smoke.sh
 
 clean-local:
 	rm -rf WT_TEST core.* *.core

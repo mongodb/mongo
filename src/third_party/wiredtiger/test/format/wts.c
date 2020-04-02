@@ -198,7 +198,7 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     CONFIG_APPEND(p, ",buffer_alignment=512");
 #endif
 
-    CONFIG_APPEND(p, ",mmap=%d", g.c_mmap ? 1 : 0);
+    CONFIG_APPEND(p, ",mmap=%d,mmap_all=%d", g.c_mmap ? 1 : 0, g.c_mmap_all ? 1 : 0);
 
     if (g.c_direct_io)
         CONFIG_APPEND(p, ",direct_io=(data)");
@@ -228,8 +228,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",aggressive_sweep");
     if (g.c_timing_stress_checkpoint)
         CONFIG_APPEND(p, ",checkpoint_slow");
-    if (g.c_timing_stress_lookaside_sweep)
-        CONFIG_APPEND(p, ",lookaside_sweep_race");
+    if (g.c_timing_stress_hs_sweep)
+        CONFIG_APPEND(p, ",history_store_sweep_race");
     if (g.c_timing_stress_split_1)
         CONFIG_APPEND(p, ",split_1");
     if (g.c_timing_stress_split_2)

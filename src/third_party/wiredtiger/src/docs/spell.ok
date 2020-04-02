@@ -9,6 +9,7 @@ CFLAGS
 CPPFLAGS
 CPUs
 CRC
+CSV
 Cheng
 Christoph
 Collet's
@@ -106,6 +107,7 @@ WiredTigerPanicException
 WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
+XRay
 Yann
 Za
 Zstd
@@ -261,6 +263,7 @@ freelist
 fsync
 ftruncate
 fvisibility
+fxray
 gcc
 gdbm
 ge
@@ -317,6 +320,7 @@ libkvs
 libtool
 libwiredtiger
 lifecycle
+llvm
 lmin
 ln
 loadtext
@@ -482,6 +486,7 @@ startsync
 startuml
 statlog
 stderr
+stdout
 str
 strerror
 strftime
@@ -498,6 +503,7 @@ svg
 sys
 syscalls
 sz
+t2
 tRuE
 tablename
 tcl
@@ -558,6 +564,7 @@ wrlock
 wtperf
 wtstats
 xa
+xray
 yieldcpu
 zlib
 zseries

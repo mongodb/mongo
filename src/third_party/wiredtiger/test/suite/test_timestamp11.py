@@ -31,7 +31,7 @@
 #
 
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wiredtiger, wttest, unittest
 
 def timestamp_str(t):
     return '%x' % t

@@ -1,6 +1,18 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
 </dl><hr>
+@section version_322 Upgrading to Version 3.2.2
+<dl>
+
+<dt>Named snapshots</dt>
+<dd>
+Named snapshot functionality has been removed from WiredTiger as timestamps offer a better solution
+to the general problem of applications wanting fine-grained control over sequencing reads and writes
+across sessions. The WT_SESSION.begin_transaction method's \c snapshot configuration and the
+WT_SESSION::snapshot method have been removed and are no longer available.
+</dd>
+
+</dl><hr>
 @section version_321 Upgrading to Version 3.2.1
 <dl>
 

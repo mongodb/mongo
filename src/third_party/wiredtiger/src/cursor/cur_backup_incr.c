@@ -101,22 +101,11 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, get_value, btree);
     F_CLR(cursor, WT_CURSTD_RAW);
 
-    if (cb->incr_init) {
-        /* Look for the next chunk that had modifications.  */
-        while (cb->bit_offset < cb->nbits)
-            if (__bit_test(cb->bitstring.mem, cb->bit_offset))
-                break;
-            else
-                ++cb->bit_offset;
-
-        /* We either have this object's incremental information or we're done. */
-        if (cb->bit_offset >= cb->nbits)
-            WT_ERR(WT_NOTFOUND);
-        __wt_cursor_set_key(cursor, cb->offset + cb->granularity * cb->bit_offset++,
-          cb->granularity, WT_BACKUP_RANGE);
-    } else if (btree == NULL || F_ISSET(cb, WT_CURBACKUP_FORCE_FULL)) {
-        /* We don't have this object's incremental information, and it's a full file copy. */
-        /* If this is a log file, use the full pathname that may include the log path. */
+    if (!cb->incr_init && (btree == NULL || F_ISSET(cb, WT_CURBACKUP_FORCE_FULL))) {
+        /*
+         * We don't have this object's incremental information or it's a forced file copy. If this
+         * is a log file, use the full pathname that may include the log path.
+         */
         file = cb->incr_file;
         if (WT_PREFIX_MATCH(file, WT_LOG_FILENAME)) {
             WT_ERR(__wt_scr_alloc(session, 0, &buf));
@@ -128,22 +117,39 @@ __curbackup_incr_next(WT_CURSOR *cursor)
         cb->nbits = 0;
         cb->offset = 0;
         cb->bit_offset = 0;
+        /*
+         * By setting this to true, the next call will detect we're done in the code for the
+         * incremental cursor below and return WT_NOTFOUND.
+         */
         cb->incr_init = true;
         __wt_cursor_set_key(cursor, 0, size, WT_BACKUP_FILE);
     } else {
-        /*
-         * We don't have this object's incremental information, and it's not a full file copy. Get a
-         * list of the block modifications for the file. The block modifications are from the
-         * incremental identifier starting point. Walk the list looking for one with a source of our
-         * id.
-         */
-        WT_ERR(__curbackup_incr_blkmod(session, btree, cb));
-        /*
-         * If there is no block modification information for this file, there is no information to
-         * return to the user.
-         */
-        if (cb->bitstring.mem == NULL)
-            WT_ERR(WT_NOTFOUND);
+        if (cb->incr_init) {
+            /* Look for the next chunk that had modifications.  */
+            while (cb->bit_offset < cb->nbits)
+                if (__bit_test(cb->bitstring.mem, cb->bit_offset))
+                    break;
+                else
+                    ++cb->bit_offset;
+
+            /* We either have this object's incremental information or we're done. */
+            if (cb->bit_offset >= cb->nbits)
+                WT_ERR(WT_NOTFOUND);
+        } else {
+            /*
+             * We don't have this object's incremental information, and it's not a full file copy.
+             * Get a list of the block modifications for the file. The block modifications are from
+             * the incremental identifier starting point. Walk the list looking for one with a
+             * source of our id.
+             */
+            WT_ERR(__curbackup_incr_blkmod(session, btree, cb));
+            /*
+             * If there is no block modification information for this file, there is no information
+             * to return to the user.
+             */
+            if (cb->bitstring.mem == NULL)
+                WT_ERR(WT_NOTFOUND);
+        }
         __wt_cursor_set_key(cursor, cb->offset + cb->granularity * cb->bit_offset++,
           cb->granularity, WT_BACKUP_RANGE);
     }
@@ -197,8 +203,8 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
     /* All WiredTiger owned files are full file copies. */
     if (F_ISSET(other_cb->incr_src, WT_BLKINCR_FULL) ||
       WT_PREFIX_MATCH(cb->incr_file, "WiredTiger")) {
-        __wt_verbose(session, WT_VERB_BACKUP, "Forcing full file copies for id %s",
-          other_cb->incr_src->id_str);
+        __wt_verbose(session, WT_VERB_BACKUP, "Forcing full file copies for %s for id %s",
+          cb->incr_file, other_cb->incr_src->id_str);
         F_SET(cb, WT_CURBACKUP_FORCE_FULL);
     }
     /*

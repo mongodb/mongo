@@ -95,8 +95,6 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTimestampsEqual(self.session.query_timestamp('get=prepare'), '2a')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.checkpoint(), msg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.snapshot("name=test"), msg)
         # WT_SESSION.transaction_pinned_range permitted, not supported in the Python API.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.transaction_sync(), msg)

@@ -22,7 +22,7 @@ type aspell > /dev/null 2>&1 || {
 # catalogs and generating a shorter list on any single system will break other
 # systems.
 replace() {
-	aspell --mode=ccpp --lang=en list < ../$1 |
+	aspell --mode=ccpp --lang=en_US list < ../$1 |
 	sort -u |
 	comm -12 /dev/stdin s_string.ok
 }
@@ -33,7 +33,7 @@ check() {
 	# Strip out git hashes, which are seven character hex strings.
 	# Strip out double quote char literals ('"'), they confuse aspell.
 	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" ../$2 |
-	aspell --lang=en $1 list |
+	aspell --lang=en_US $1 list |
 	sort -u |
 	comm -23 /dev/stdin s_string.ok > $t
 	test -s $t && {

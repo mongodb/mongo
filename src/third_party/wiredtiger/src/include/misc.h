@@ -53,6 +53,10 @@
 #define WT_PETABYTE ((uint64_t)1125899906842624)
 #define WT_EXABYTE ((uint64_t)1152921504606846976)
 
+/* Strings used for indicating failed string buffer construction. */
+#define WT_ERR_STRING "[Error]"
+#define WT_NO_ADDR_STRING "[NoAddr]"
+
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in common structures to save
  * space. To minimize conversions from size_t to uint32_t through the code, we use the following
@@ -290,12 +294,15 @@
  * acquired.
  */
 #ifdef HAVE_DIAGNOSTIC
+#define __wt_hazard_set(session, walk, busyp) \
+    __wt_hazard_set_func(session, walk, busyp, __func__, __LINE__)
 #define __wt_scr_alloc(session, size, scratchp) \
     __wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
 #define __wt_page_in(session, ref, flags) __wt_page_in_func(session, ref, flags, __func__, __LINE__)
 #define __wt_page_swap(session, held, want, flags) \
     __wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
 #else
+#define __wt_hazard_set(session, walk, busyp) __wt_hazard_set_func(session, walk, busyp)
 #define __wt_scr_alloc(session, size, scratchp) __wt_scr_alloc_func(session, size, scratchp)
 #define __wt_page_in(session, ref, flags) __wt_page_in_func(session, ref, flags)
 #define __wt_page_swap(session, held, want, flags) __wt_page_swap_func(session, held, want, flags)
