@@ -18,7 +18,6 @@ executor:
   archive:
     tests:
       - jstests/noPassthrough/backup*.js
-      - jstests/noPassthrough/rollback_wt_cache_full.js
       - jstests/noPassthrough/wt_unclean_shutdown.js
   config:
     shell_options:
