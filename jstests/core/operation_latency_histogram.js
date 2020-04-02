@@ -131,9 +131,12 @@ lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 1, 0, 0);
 testColl.getIndexes();
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
-// Reindex
-assert.commandWorked(testColl.reIndex());
-lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
+// Reindex (Only standalone mode supports the reIndex command.)
+const isStandalone = !db.runCommand({isMaster: 1}).hasOwnProperty('setName');
+if (isStandalone) {
+    assert.commandWorked(testColl.reIndex());
+    lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
+}
 
 // DropIndex
 assert.commandWorked(testColl.dropIndex({pt: "2dsphere"}));

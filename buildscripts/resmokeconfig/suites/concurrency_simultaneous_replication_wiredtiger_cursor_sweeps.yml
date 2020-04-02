@@ -42,12 +42,16 @@ selector:
   # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
   # which presently can cause other simultaneous workloads to fail.
   - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
   # These workloads run the compact command, which takes the checkpoint mutex, thus slowing
   # checkpoints. Cursor sweeps block checkpoints, and the combination can result in timeouts.
   - jstests/concurrency/fsm_workloads/compact.js
   - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+
+  # These workloads run the reIndex command, which is only allowed on a standalone node.
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
   exclude_with_any_tags:
   - requires_sharding

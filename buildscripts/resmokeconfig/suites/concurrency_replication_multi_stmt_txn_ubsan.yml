@@ -32,6 +32,11 @@ selector:
   # Induces non-blindly-retriable errors (see SERVER-45767).
   - jstests/concurrency/fsm_workloads/create_database.js
 
+  # These workloads run the reIndex command, which is only allowed on a standalone node.
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_sharding

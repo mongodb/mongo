@@ -166,20 +166,7 @@ const testCases = {
         unblockedCollections: ['other'],
     },
 
-    // Remaining cases are local-only operations.
-    reIndex: {
-        prepare: function(db) {
-            assert.commandWorked(db.other.insert({_id: 1}));
-            assert.commandWorked(db.coll.insert({_id: 1}));
-            assert.commandWorked(db.coll.ensureIndex({x: 1}));
-        },
-        performOp: function(db) {
-            assert.commandWorked(db.coll.reIndex());
-        },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
-        localOnly: true,
-    },
+    // Remaining case is a local-only operation.
     compact: {
         // At least on WiredTiger, compact is fully inplace so it doesn't need to block readers.
         prepare: function(db) {
