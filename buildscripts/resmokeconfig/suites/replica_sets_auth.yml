@@ -15,8 +15,6 @@ selector:
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
-  # TODO SERVER-46534 will make this work with mirrored reads on
-  - jstests/replsets/read_operations_during_step_up.js
 
 executor:
   config:

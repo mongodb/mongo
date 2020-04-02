@@ -1286,6 +1286,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
                             const ServiceEntryPointCommon::Hooks& behaviors) {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
     OpMsgRequest request;
+    Command* c = nullptr;
     [&] {
         try {  // Parse.
             request = rpc::opMsgRequestFromAnyProtocol(message);
@@ -1319,7 +1320,6 @@ DbResponse receivedCommands(OperationContext* opCtx,
         try {  // Execute.
             curOpCommandSetup(opCtx, request);
 
-            Command* c = nullptr;
             // In the absence of a Command object, no redaction is possible. Therefore
             // to avoid displaying potentially sensitive information in the logs,
             // we restrict the log message to the name of the unrecognized command.
@@ -1384,7 +1384,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
-            notMasterUnackWrites.increment();
+            if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
+                notMasterUnackWrites.increment();
             uasserted(ErrorCodes::NotMaster,
                       str::stream()
                           << "Not-master error while processing '" << request.getCommandName()

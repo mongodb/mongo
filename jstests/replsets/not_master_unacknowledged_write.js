@@ -22,6 +22,19 @@ var secondaryDB = secondary.getDB("test");
 var primaryColl = primaryDB[collName];
 var secondaryColl = secondaryDB[collName];
 
+// Verify that reading from secondaries does not impact `notMasterUnacknowledgedWrites`.
+const preReadingCounter = getNotMasterUnackWritesCounter();
+jsTestLog("Reading from secondary ...");
+[{name: "findOne", fn: () => secondaryColl.findOne()},
+ {name: "distinct", fn: () => secondaryColl.distinct("item")},
+ {name: "count", fn: () => secondaryColl.find().count()},
+].map(({name, fn}) => {
+    assert.doesNotThrow(fn);
+    assert.eq(assert.commandWorked(secondary.getDB("admin").isMaster()).ismaster, false);
+});
+const postReadingCounter = getNotMasterUnackWritesCounter();
+assert.eq(preReadingCounter, postReadingCounter);
+
 jsTestLog("Primary on port " + primary.port + " hangs up on unacknowledged writes");
 // Do each write method with unacknowledged write concern, "wc".
 [{name: "insertOne", fn: (wc) => secondaryColl.insertOne({}, wc)},
