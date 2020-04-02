@@ -136,7 +136,7 @@ Value Variables::getValue(Id id, const Document& root) const {
                 return Value();
             case Variables::kNowId:
             case Variables::kClusterTimeId:
-                if (auto it = _runtimeConstants.find(id); it != _runtimeConstants.end()) {
+                if (auto it = _runtimeConstantsMap.find(id); it != _runtimeConstantsMap.end()) {
                     return it->second;
                 }
 
@@ -169,40 +169,28 @@ Document Variables::getDocument(Id id, const Document& root) const {
     return Document();
 }
 
-RuntimeConstants Variables::getRuntimeConstants() const {
-    RuntimeConstants constants;
-
-    if (auto it = _runtimeConstants.find(kNowId); it != _runtimeConstants.end()) {
-        constants.setLocalNow(it->second.getDate());
-    }
-    if (auto it = _runtimeConstants.find(kClusterTimeId); it != _runtimeConstants.end()) {
-        constants.setClusterTime(it->second.getTimestamp());
-    }
-    if (auto it = _runtimeConstants.find(kJsScopeId); it != _runtimeConstants.end()) {
-        constants.setJsScope(it->second.getDocument().toBson());
-    }
-    if (auto it = _runtimeConstants.find(kIsMapReduceId); it != _runtimeConstants.end()) {
-        constants.setIsMapReduce(it->second.getBool());
-    }
-
-    return constants;
+const RuntimeConstants& Variables::getRuntimeConstants() const {
+    invariant(_runtimeConstants);
+    return *_runtimeConstants;
 }
 
 void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
-    _runtimeConstants[kNowId] = Value(constants.getLocalNow());
+    invariant(!_runtimeConstants);
+    _runtimeConstantsMap[kNowId] = Value(constants.getLocalNow());
     // We use a null Timestamp to indicate that the clusterTime is not available; this can happen if
     // the logical clock is not running. We do not use boost::optional because this would allow the
     // IDL to serialize a RuntimConstants without clusterTime, which should always be an error.
     if (!constants.getClusterTime().isNull()) {
-        _runtimeConstants[kClusterTimeId] = Value(constants.getClusterTime());
+        _runtimeConstantsMap[kClusterTimeId] = Value(constants.getClusterTime());
     }
 
     if (constants.getJsScope()) {
-        _runtimeConstants[kJsScopeId] = Value(constants.getJsScope().get());
+        _runtimeConstantsMap[kJsScopeId] = Value(constants.getJsScope().get());
     }
     if (constants.getIsMapReduce()) {
-        _runtimeConstants[kIsMapReduceId] = Value(constants.getIsMapReduce().get());
+        _runtimeConstantsMap[kIsMapReduceId] = Value(constants.getIsMapReduce().get());
     }
+    _runtimeConstants = constants;
 }
 
 void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {

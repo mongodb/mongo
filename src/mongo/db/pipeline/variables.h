@@ -136,12 +136,14 @@ public:
     }
 
     /**
-     * Serializes runtime constants. This is used to send the constants to shards.
+     * Return a reference to an object which represents the variables which are considered "runtime
+     * constants." It is a programming error to call this function without having called
+     * setRuntimeConstants().
      */
-    RuntimeConstants getRuntimeConstants() const;
+    const RuntimeConstants& getRuntimeConstants() const;
 
     /**
-     * Deserialize runtime constants.
+     * Set the runtime constants. It is a programming error to call this more than once.
      */
     void setRuntimeConstants(const RuntimeConstants& constants);
 
@@ -184,7 +186,10 @@ private:
 
     IdGenerator _idGenerator;
     stdx::unordered_map<Id, ValueAndState> _values;
-    stdx::unordered_map<Id, Value> _runtimeConstants;
+    stdx::unordered_map<Id, Value> _runtimeConstantsMap;
+
+    // Populated after construction. Should not be set more than once.
+    boost::optional<RuntimeConstants> _runtimeConstants;
 };
 
 /**
