@@ -71,7 +71,7 @@ public:
 private:
     static std::string parseReduceFunction(BSONElement func);
 
-    StringData _funcSource;
+    std::string _funcSource;
     std::vector<Value> _values;
     Value _key;
 };
