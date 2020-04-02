@@ -1294,6 +1294,7 @@ var ShardingTest = function(params) {
         }
 
         var rs = this._rs[i].test;
+        rs.awaitNodesAgreeOnPrimary();
         rs.getPrimary().getDB("admin").foo.save({x: 1});
 
         if (keyFile) {
@@ -1362,6 +1363,7 @@ var ShardingTest = function(params) {
     this.configRS.initiateWithAnyNodeAsPrimary(config);
 
     // Wait for master to be elected before starting mongos
+    this.configRS.awaitNodesAgreeOnPrimary();
     var csrsPrimary = this.configRS.getPrimary();
 
     // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up constructing a
