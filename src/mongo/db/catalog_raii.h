@@ -61,15 +61,23 @@ public:
               Date_t deadline = Date_t::max());
 
     /**
-     * Returns nullptr if the database didn't exist.
+     * Returns the database, or nullptr if it didn't exist.
      */
     Database* getDb() const {
         return _db;
     }
 
+    /**
+     * Returns the database, creating it if it does not exist.
+     */
+    Database* ensureDbExists();
+
 private:
+    OperationContext* _opCtx;
+    const std::string _dbName;
+
     const Lock::DBLock _dbLock;
-    Database* const _db;
+    Database* _db;
 };
 
 /**
@@ -102,10 +110,17 @@ public:
                       Date_t deadline = Date_t::max());
 
     /**
-     * Returns nullptr if the database didn't exist.
+     * Returns the database, or nullptr if it didn't exist.
      */
     Database* getDb() const {
         return _autoDb.getDb();
+    }
+
+    /**
+     * Returns the database, creating it if it does not exist.
+     */
+    Database* ensureDbExists() {
+        return _autoDb.ensureDbExists();
     }
 
     /**
@@ -170,15 +185,10 @@ public:
         return _db;
     }
 
-    bool justCreated() const {
-        return _justCreated;
-    }
-
 private:
     AutoGetDb _autoDb;
 
     Database* _db;
-    bool _justCreated{false};
 };
 
 /**
