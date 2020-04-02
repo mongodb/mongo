@@ -8,8 +8,6 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
-  # TODO SERVER-46534 will make this work with mirrored reads on
-  - jstests/replsets/read_operations_during_step_up.js
 
 executor:
   config:
