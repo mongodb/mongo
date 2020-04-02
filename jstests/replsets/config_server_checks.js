@@ -32,11 +32,15 @@ function expectState(rst, state) {
         rst.startSet();
         var conf = rst.getReplSetConfig();
         conf.configsvr = true;
+
         try {
-            rst.nodes[0].adminCommand({replSetInitiate: conf});
+            assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
         } catch (e) {
-            // expected since we close all connections after going into REMOVED
+            if (!isNetworkError(e)) {
+                throw e;
+            }
         }
+
         expectState(rst, ReplSetTest.State.REMOVED);
         rst.stopSet();
     })();
