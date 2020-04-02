@@ -473,7 +473,7 @@ private:
 class FailPointEnableBlock {
 public:
     explicit FailPointEnableBlock(std::string failPointName);
-    FailPointEnableBlock(std::string failPointName, BSONObj cmdObj);
+    FailPointEnableBlock(std::string failPointName, BSONObj data);
     ~FailPointEnableBlock();
 
     // Const access to the underlying FailPoint

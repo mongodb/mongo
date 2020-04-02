@@ -380,6 +380,22 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
         // Kill operations for requests that we didn't use to fulfill the promise.
         requestManager->killOperationsForPendingRequests();
     }
+
+    networkInterfaceCommandsFailedWithErrorCode.shouldFail([&](const BSONObj& data) {
+        const auto errorCode = data.getIntField("errorCode");
+        if (errorCode != status.code()) {
+            return false;
+        }
+
+        const std::string requestCmdName = requestOnAny.cmdObj.firstElement().fieldName();
+        for (auto&& cmdName : data.getObjectField("cmdNames")) {
+            if (cmdName.type() == String && cmdName.valueStringData() == requestCmdName) {
+                return true;
+            }
+        }
+
+        return false;
+    });
 }
 
 void NetworkInterfaceTL::RequestState::cancel() noexcept {
@@ -772,12 +788,11 @@ void NetworkInterfaceTL::RequestState::send(StatusWith<ConnectionPool::Connectio
 
     networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
 
-    if (networkInterfaceAfterAcquireConn.shouldFail()) {
-        LOGV2(4630601,
-              "Request acquired a connection",
-              "requestId"_attr = request->id,
-              "target"_attr = request->target);
-    }
+    LOGV2_DEBUG(4630601,
+                2,
+                "Request acquired a connection",
+                "requestId"_attr = request->id,
+                "target"_attr = request->target);
 
     if (auto counters = interface()->_counters) {
         counters->recordSent();

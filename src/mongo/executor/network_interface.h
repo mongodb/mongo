@@ -45,7 +45,7 @@ namespace executor {
 extern FailPoint networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder;
 extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
 extern FailPoint networkInterfaceHangCommandsAfterAcquireConn;
-extern FailPoint networkInterfaceAfterAcquireConn;
+extern FailPoint networkInterfaceCommandsFailedWithErrorCode;
 
 /**
  * Interface to networking for use by TaskExecutor implementations.
