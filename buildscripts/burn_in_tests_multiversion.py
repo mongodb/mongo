@@ -8,8 +8,7 @@ from typing import Dict
 import click
 from evergreen.api import EvergreenApi
 from git import Repo
-from shrub.config import Configuration
-from shrub.variant import DisplayTaskDefinition
+from shrub.v2 import BuildVariant, ExistingTask, ShrubProject
 import structlog
 from structlog.stdlib import LoggerFactory
 
@@ -17,9 +16,11 @@ import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
 import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke
 from buildscripts.burn_in_tests import GenerateConfig, DEFAULT_PROJECT, CONFIG_FILE, _configure_logging, RepeatConfig, \
     _get_evg_api, EVERGREEN_FILE, DEFAULT_REPO_LOCATIONS, _set_resmoke_cmd, create_tests_by_task, \
-    _write_json_file, run_tests, MAX_TASKS_TO_CREATE
+    run_tests
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.patch_builds.task_generation import validate_task_generation_limit
 from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key
+from buildscripts.util.fileops import write_file
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
@@ -31,21 +32,18 @@ BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
 TASK_PATH_SUFFIX = "/data/multiversion"
 
 
-def create_multiversion_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
-                                              evg_api: EvergreenApi,
-                                              generate_config: GenerateConfig) -> Configuration:
+def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: EvergreenApi,
+                                              generate_config: GenerateConfig) -> BuildVariant:
     """
     Create the multiversion config for the Evergreen generate.tasks file.
 
-    :param evg_config: Shrub configuration to add to.
     :param tests_by_task: Dictionary of tests to generate tasks for.
     :param evg_api: Evergreen API.
     :param generate_config: Configuration of what to generate.
     :return: Shrub configuration with added tasks.
     """
-
-    dt = DisplayTaskDefinition(BURN_IN_MULTIVERSION_TASK)
-
+    build_variant = BuildVariant(generate_config.build_variant)
+    tasks = set()
     if tests_by_task:
         # Get the multiversion suites that will run in as part of burn_in_multiversion.
         multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
@@ -72,8 +70,8 @@ def create_multiversion_generate_tasks_config(evg_config: Configuration, tests_b
             }
             config_options.update(gen_resmoke.DEFAULT_CONFIG_VALUES)
 
-            config_generator = gen_multiversion.EvergreenConfigGenerator(
-                evg_api, evg_config, gen_resmoke.ConfigOptions(config_options))
+            config_generator = gen_multiversion.EvergreenMultiversionConfigGenerator(
+                evg_api, gen_resmoke.ConfigOptions(config_options))
             test_list = tests_by_task[suite["origin"]]["tests"]
             for test in test_list:
                 # Exclude files that should be blacklisted from multiversion testing.
@@ -83,14 +81,14 @@ def create_multiversion_generate_tasks_config(evg_config: Configuration, tests_b
                              suite=suite["multiversion_name"])
                 if test not in files_to_exclude:
                     # Generate the multiversion tasks for each test.
-                    config_generator.generate_evg_tasks(test, idx)
+                    sub_tasks = config_generator.get_burn_in_tasks(test, idx)
+                    tasks = tasks.union(sub_tasks)
                     idx += 1
-            dt.execution_tasks(config_generator.task_names)
-            evg_config.variant(generate_config.build_variant).tasks(config_generator.task_specs)
 
-    dt.execution_task(f"{BURN_IN_MULTIVERSION_TASK}_gen")
-    evg_config.variant(generate_config.build_variant).display_task(dt)
-    return evg_config
+    existing_tasks = {ExistingTask(f"{BURN_IN_MULTIVERSION_TASK}_gen")}
+    build_variant.display_task(BURN_IN_MULTIVERSION_TASK, tasks,
+                               execution_existing_tasks=existing_tasks)
+    return build_variant
 
 
 @click.command()
@@ -180,17 +178,16 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
         # MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
         multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
         assert len(multiversion_tasks) == len(multiversion_suites)
-        evg_config = Configuration()
-        evg_config = create_multiversion_generate_tasks_config(evg_config, tests_by_task, evg_api,
-                                                               generate_config)
 
-        json_config = evg_config.to_map()
-        tasks_to_create = len(json_config.get('tasks', []))
-        if tasks_to_create > MAX_TASKS_TO_CREATE:
-            LOGGER.warning("Attempting to create more tasks than max, aborting",
-                           tasks=tasks_to_create, max=MAX_TASKS_TO_CREATE)
+        build_variant = create_multiversion_generate_tasks_config(tests_by_task, evg_api,
+                                                                  generate_config)
+        shrub_project = ShrubProject.empty()
+        shrub_project.add_build_variant(build_variant)
+
+        if not validate_task_generation_limit(shrub_project):
             sys.exit(1)
-        _write_json_file(json_config, generate_tasks_file)
+
+        write_file(generate_tasks_file, shrub_project.json())
     elif not no_exec:
         run_tests(tests_by_task, resmoke_cmd)
     else:

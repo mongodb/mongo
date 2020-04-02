@@ -1,22 +1,28 @@
 """Unit tests for the burn_in_tags.py script."""
-import sys
 from collections import defaultdict
+import json
 import os
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-from shrub.config import Configuration
+from shrub.v2 import ShrubProject
+
+import buildscripts.ciconfig.evergreen as _evergreen
+from buildscripts.tests.test_burn_in_tests import ns as burn_in_tests_ns
+from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 
 import buildscripts.burn_in_tags as under_test
 
-import buildscripts.ciconfig.evergreen as _evergreen
-
-from buildscripts.tests.test_burn_in_tests import ns as burn_in_tests_ns
-
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
-NS = "buildscripts.burn_in_tags"
+EMPTY_PROJECT = {
+    "buildvariants": [],
+    "tasks": [],
+}
 TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "test_burn_in_tags_evergreen.yml")
+
+NS = "buildscripts.burn_in_tags"
 
 
 def ns(relative_name):  # pylint: disable-invalid-name
@@ -40,7 +46,7 @@ def get_expansions_data():
     }  # yapf: disable
 
 
-def get_evergreen_config():
+def get_evergreen_config() -> EvergreenProjectConfig:
     return _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
 
 
@@ -77,21 +83,18 @@ class TestGenerateEvgBuildVariants(unittest.TestCase):
         base_variant = "enterprise-rhel-62-64-bit-inmem"
         generated_variant = "enterprise-rhel-62-64-bit-inmem-required"
         burn_in_tags_gen_variant = "enterprise-rhel-62-64-bit"
-        shrub_config = Configuration()
+        variant = evg_conf_mock.get_variant(base_variant)
 
-        under_test._generate_evg_build_variant(shrub_config, base_variant, generated_variant,
-                                               burn_in_tags_gen_variant, evg_conf_mock)
+        build_variant = under_test._generate_evg_build_variant(variant, generated_variant,
+                                                               burn_in_tags_gen_variant)
 
-        expected_variant_data = get_evergreen_config().get_variant(base_variant)
-        generated_buildvariants = shrub_config.to_map()["buildvariants"]
-        self.assertEqual(len(generated_buildvariants), 1)
-        generated_build_variant = generated_buildvariants[0]
+        generated_build_variant = build_variant.as_dict()
         self.assertEqual(generated_build_variant["name"], generated_variant)
-        self.assertEqual(generated_build_variant["modules"], expected_variant_data.modules)
+        self.assertEqual(generated_build_variant["modules"], variant.modules)
         generated_expansions = generated_build_variant["expansions"]
         burn_in_bypass_expansion_value = generated_expansions.pop("burn_in_bypass")
         self.assertEqual(burn_in_bypass_expansion_value, burn_in_tags_gen_variant)
-        self.assertEqual(generated_expansions, expected_variant_data.expansions)
+        self.assertEqual(generated_expansions, variant.expansions)
 
 
 class TestGenerateEvgTasks(unittest.TestCase):
@@ -105,13 +108,13 @@ class TestGenerateEvgTasks(unittest.TestCase):
             "enterprise-rhel-62-64-bit-majority-read-concern-off":
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
-        shrub_config = Configuration()
+        shrub_config = ShrubProject()
         evergreen_api = MagicMock()
         repo = MagicMock()
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
                                        buildvariant_map, [repo], evg_conf_mock)
 
-        self.assertEqual(shrub_config.to_map(), {})
+        self.assertEqual(shrub_config.as_dict(), EMPTY_PROJECT)
 
     @patch(ns("create_tests_by_task"))
     def test_generate_evg_tasks_one_test_changed(self, create_tests_by_task_mock):
@@ -131,7 +134,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
             "enterprise-rhel-62-64-bit-majority-read-concern-off":
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
-        shrub_config = Configuration()
+        shrub_config = ShrubProject.empty()
         evergreen_api = MagicMock()
         repo = MagicMock()
         evergreen_api.test_stats_by_project.return_value = [
@@ -140,13 +143,14 @@ class TestGenerateEvgTasks(unittest.TestCase):
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
                                        buildvariant_map, [repo], evg_conf_mock)
 
-        generated_config = shrub_config.to_map()
+        generated_config = shrub_config.as_dict()
         self.assertEqual(len(generated_config["buildvariants"]), 2)
         first_generated_build_variant = generated_config["buildvariants"][0]
+        self.assertIn(first_generated_build_variant["name"], buildvariant_map.values())
         self.assertEqual(first_generated_build_variant["display_tasks"][0]["name"], "burn_in_tests")
         self.assertEqual(
             first_generated_build_variant["display_tasks"][0]["execution_tasks"][0],
-            "burn_in:aggregation_mongos_passthrough_0_enterprise-rhel-62-64-bit-inmem-required")
+            f"burn_in:aggregation_mongos_passthrough_0_{first_generated_build_variant['name']}")
 
 
 EXPANSIONS_FILE_DATA = {
@@ -196,7 +200,7 @@ CREATE_TEST_MEMBERSHIP_MAP = {
 
 
 class TestAcceptance(unittest.TestCase):
-    @patch(ns("_write_to_file"))
+    @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
     @patch(burn_in_tests_ns("find_changed_tests"))
     def test_no_tests_run_if_none_changed(self, find_changed_tests_mock,
@@ -215,11 +219,11 @@ class TestAcceptance(unittest.TestCase):
         under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, None, repos)
 
         write_to_file_mock.assert_called_once()
-        shrub_config = write_to_file_mock.call_args[0][0]
-        self.assertEqual('{}', shrub_config.to_json())
+        shrub_config = write_to_file_mock.call_args[0][2]
+        self.assertEqual(EMPTY_PROJECT, json.loads(shrub_config))
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch(ns("_write_to_file"))
+    @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
     @patch(burn_in_tests_ns("find_changed_tests"))
     @patch(burn_in_tests_ns("create_test_membership_map"))
@@ -244,8 +248,8 @@ class TestAcceptance(unittest.TestCase):
         under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, None, repos)
 
         write_to_file_mock.assert_called_once()
-        written_config = write_to_file_mock.call_args[0][0]
-        written_config_map = written_config.to_map()
+        written_config = write_to_file_mock.call_args[0][2]
+        written_config_map = json.loads(written_config)
 
         n_tasks = len(written_config_map["tasks"])
         # Ensure we are generating at least one task for the test.
