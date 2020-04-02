@@ -80,6 +80,10 @@ MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCreateIndexesCollectionCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
 
+// This failpoint hangs between logging the index build UUID and starting the index build
+// through the IndexBuildsCoordinator.
+MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
+
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
@@ -573,9 +577,17 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                          dbProfilingLevel);
 
     auto buildUUID = UUID::gen();
-    LOGV2(20438, "Registering index build: {buildUUID}", "buildUUID"_attr = buildUUID);
     ReplIndexBuildState::IndexCatalogStats stats;
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
+
+    LOGV2(20438,
+          "Registering index build",
+          "buildUUID"_attr = buildUUID,
+          "ns"_attr = ns,
+          "collectionUUID"_attr = *collectionUUID,
+          "indexes"_attr = specs.size(),
+          "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName]);
+    hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx);
 
     try {
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
@@ -676,9 +688,11 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // considered an error and the command should return success.
         if (ErrorCodes::NamespaceNotFound == ex.code()) {
             LOGV2(20448,
-                  "Index build failed: {buildUUID}: collection dropped: {ns}",
+                  "Index build failed: collection dropped: ",
                   "buildUUID"_attr = buildUUID,
-                  "ns"_attr = ns);
+                  "ns"_attr = ns,
+                  "collectionUUID"_attr = *collectionUUID,
+                  "ex"_attr = ex);
             return true;
         }
 
