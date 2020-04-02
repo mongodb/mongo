@@ -25,8 +25,6 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
-  # Transactions not supported on sharded cluster.
-  - uses_transactions
   # Not relevant for whole-cluster change streams.
   - do_not_run_in_whole_cluster_passthrough
   # Exclude any that assume sharding is disabled

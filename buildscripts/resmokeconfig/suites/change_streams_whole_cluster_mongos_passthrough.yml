@@ -12,8 +12,6 @@ selector:
   ##
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
-  # Transactions not supported on sharded clusters.
-  - uses_transactions
   # Not relevant for whole-cluster change streams.
   - do_not_run_in_whole_cluster_passthrough
   # Exclude any that assume sharding is disabled
