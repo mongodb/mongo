@@ -355,10 +355,10 @@ function test(st, description, testBody) {
              hangDonorAtEndOfMigration.off();
 
              // TODO (SERVER-47003): There will be a left-over entry in config.migrations after the
-             // previous moveChunk fails with MaxTimeMSExpired, so we drop the collection. Otherwise
-             // future migrations would receive a DuplicateKeyError when trying to update
+             // previous moveChunk fails with MaxTimeMSExpired, so we clear the collection.
+             // Otherwise future migrations would receive a DuplicateKeyError when trying to update
              // config.migrations.
-             st.config.getSiblingDB('config').migrations.drop();
+             st.config.getSiblingDB('config').migrations.remove({}, false /* justOne */);
          });
 
     test(st,

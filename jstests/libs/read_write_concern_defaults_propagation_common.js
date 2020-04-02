@@ -165,13 +165,6 @@ var ReadWriteConcernDefaultsPropagation = (function() {
         assert.commandWorked(
             mainConn.getDB("config").settings.remove({_id: "ReadWriteConcernDefaults"}));
         verifyPropgationOfNoDefaults(checkConns);
-
-        // Repeat with a drop of config.settings.
-        setDefaultsAndVerifyPropagation(mainConn, checkConns);
-        assert(mainConn.getDB("config").settings.drop());
-        verifyPropgationOfNoDefaults(checkConns);
-
-        assert.commandWorked(mainConn.getDB("config").createCollection("settings"));
     };
 
     return {runTests, runDropAndDeleteTests};

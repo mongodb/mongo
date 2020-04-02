@@ -169,7 +169,15 @@ checkCommandConfigSvr(
     {_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
 
 // dropCollection
-checkCommandMongos({drop: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
+// We can't use the checkCommandMongos wrapper because it calls adminCommand and dropping admin
+// collections are not allowed in mongos.
+checkCommand(st.s.getDB(dbName),
+             {drop: collName},
+             unacceptableWCsForMongos,
+             acceptableWCsForMongos,
+             false,
+             setupFuncs.createDatabase,
+             cleanupFuncs.dropDatabase);
 checkCommandConfigSvr(
     {_configsvrDropCollection: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 

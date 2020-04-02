@@ -84,7 +84,9 @@ var testListConfigCollections = function(st) {
     var cursor;
     var cursorArray;
 
-    dropCollectionIfExists(userAddedColl);
+    // Dropping collections under config is not allowed via mongos.
+    let configPrimary = st.configRS.getPrimary();
+    dropCollectionIfExists(configPrimary.getDB("config").userAddedColl);
     configDB.createCollection(userAddedColl.getName());
     configCollList.push(userAddedColl.getName());
 
@@ -103,8 +105,6 @@ var testListConfigCollections = function(st) {
     assert(cursor.hasNext());
     assert.eq(cursor.objsLeftInBatch(), 1);
     assert(cursorArray.indexOf(cursor.next().name) > -1);
-
-    assert(userAddedColl.drop());
 };
 
 /**
@@ -256,8 +256,9 @@ var queryUserCreated = function(database) {
     var cursorArray;
     var result;
 
-    // Setup.
-    dropCollectionIfExists(userColl);
+    // Dropping collections under config is not allowed via mongos.
+    let configPrimary = st.configRS.getPrimary();
+    dropCollectionIfExists(configPrimary.getDB(database.getName()).userColl);
     for (var i = 0; i < userCollData.length; i++) {
         assert.commandWorked(userColl.insert(userCollData[i]));
     }
@@ -328,8 +329,6 @@ var queryUserCreated = function(database) {
     assert.eq(
         sortArrayById(result.results),
         [{_id: 1, value: {count: 2}}, {_id: 2, value: {count: 3}}, {_id: 3, value: {count: 2}}]);
-
-    assert(userColl.drop());
 };
 
 var st = new ShardingTest({shards: 2, mongos: 1});

@@ -17,6 +17,11 @@ assert.neq(null, testDB.bar.findOne({x: 1}));
 assert.commandWorked(testDB.runCommand({drop: 'bar'}));
 assert.eq(null, testDB.bar.findOne({x: 1}));
 
+assert.commandFailedWithCode(st.s.getDB('admin').runCommand({drop: 'secrets'}),
+                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(st.s.getDB('config').runCommand({drop: 'settings'}),
+                             ErrorCodes.IllegalOperation);
+
 // Test dropping a sharded collection.
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));

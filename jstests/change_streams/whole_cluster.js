@@ -114,9 +114,8 @@ filteredDBs.forEach(dbName => {
         },
     ];
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
-    // Drop the test collection to avoid duplicate key errors if this test is run multiple
-    // times.
-    assertDropCollection(db.getSiblingDB(dbName), "test");
+    // Clear the test collection to avoid duplicate key errors if this test is run multiple times.
+    assert.commandWorked(db.getSiblingDB(dbName).test.remove({}, false /* justOne */));
 });
 
 // Dropping a database should generate drop entries for each collection followed by a database

@@ -74,6 +74,10 @@ public:
                 "Cannot drop the config database",
                 dbname != NamespaceString::kConfigDb);
 
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot drop the admin database",
+                dbname != NamespaceString::kAdminDb);
+
         uassert(ErrorCodes::BadValue,
                 "have to pass 1 as db parameter",
                 cmdObj.firstElement().isNumber() && cmdObj.firstElement().number() == 1);

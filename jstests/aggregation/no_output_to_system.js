@@ -24,12 +24,7 @@ const outputToAdmin = admin.users;
 assertErrorCode(input, {$merge: {into: {db: 'admin', coll: outputToAdmin.getName()}}}, 31320);
 assert(!collectionExists(outputToAdmin));
 
-// We specify a separate input since $out must reference a collection in the same database.
-const adminInput = admin.sample;
-adminInput.drop();
-assert.commandWorked(adminInput.insert({_id: 0}));
-
-assertErrorCode(adminInput, {$out: outputToAdmin.getName()}, 31321);
+assertErrorCode(input, {$out: {db: 'admin', coll: outputToAdmin.getName()}}, 31321);
 assert(!collectionExists(outputToAdmin));
 
 // Ensure that aggregation can't output to the 'config' database.
@@ -39,12 +34,7 @@ const outputToConfig = config.output;
 assertErrorCode(input, {$merge: {into: {db: 'config', coll: outputToConfig.getName()}}}, 31320);
 assert(!collectionExists(outputToConfig));
 
-// We specify a separate input since $out must reference a collection in the same database.
-const configInput = config.sample;
-configInput.drop();
-assert.commandWorked(configInput.insert({_id: 0}));
-
-assertErrorCode(configInput, {$out: outputToConfig.getName()}, 31321);
+assertErrorCode(input, {$out: {db: 'config', coll: outputToConfig.getName()}}, 31321);
 assert(!collectionExists(outputToConfig));
 
 // Ensure that aggregation can't output to the 'local' database.

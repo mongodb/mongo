@@ -146,18 +146,6 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(shard, true, false);
 }
 
-// Test that if we drop the collection, it will be recreated only by the config server.
-{
-    assertDropCollection(mongosConfig, "system.sessions");
-    validateSessionsCollection(shard, false, false);
-
-    assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-    validateSessionsCollection(shard, false, false);
-
-    assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-    validateSessionsCollection(shard, true, true);
-}
-
 st.stop();
 rs.stopSet();
 })();
