@@ -53,6 +53,9 @@ const splitPoint = {
     y: "A".repeat(512)
 };
 
+// Run splitChunk on the shards directly since the split command for mongos doesn't have an option
+// to specify multiple split points or number of splits.
+
 let splitPoints = [];
 for (let i = 0; i < 10000; i++) {
     splitPoints.push({x: i, y: splitPoint.y});
@@ -81,6 +84,10 @@ assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
     splitKeys: splitPoints,
     epoch: res.versionEpoch,
 }));
+
+// Perform a read on the config primary to have the mongos get the latest config optime since the
+// last two splits were performed directly on the shards.
+assert.neq(null, st.s.getDB('config').databases.findOne());
 
 // Verify that moving a chunk won't trigger mongos's routing entry to get marked as stale until
 // a request comes in to target that chunk.
