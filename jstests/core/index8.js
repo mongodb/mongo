@@ -12,10 +12,10 @@ t.ensureIndex({b: 1}, true);
 t.ensureIndex({c: 1}, [false, "cIndex"]);
 
 checkIndexes = function(num) {
-    var indexes = t.getIndexes();
+    const indexes = t.getIndexes();
     assert.eq(4, indexes.length);
 
-    var start = 0;
+    let start = 0;
     if (indexes[0].name == "_id_")
         start = 1;
     assert(!indexes[start].unique, "A" + num);
@@ -25,8 +25,14 @@ checkIndexes = function(num) {
 };
 
 checkIndexes(1);
-t.reIndex();
-checkIndexes(2);
+
+// The reIndex command is only supported in standalone mode.
+const isMaster = db.runCommand({isMaster: 1});
+const isStandalone = isMaster.msg !== "isdbgrid" && !isMaster.hasOwnProperty('setName');
+if (isStandalone) {
+    assert.commandWorked(t.reIndex());
+    checkIndexes(2);
+}
 
 t.save({a: 2, b: 1});
 t.save({a: 2});

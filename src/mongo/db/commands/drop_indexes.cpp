@@ -100,13 +100,16 @@ public:
 class CmdReIndex : public ErrmsgCommandDeprecated {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;  // can reindex on a secondary
+        // Even though reIndex is a standalone-only command, this will return that the command is
+        // allowed on secondaries so that it will fail with a more useful error message to the user
+        // rather than with a NotMaster error.
+        return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
     std::string help() const override {
-        return "re-index a collection";
+        return "re-index a collection (can only be run on a standalone mongod)";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -127,6 +130,15 @@ public:
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
 
         LOGV2(20457, "CMD: reIndex {toReIndexNss}", "toReIndexNss"_attr = toReIndexNss);
+
+        if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeNone) {
+            uasserted(
+                ErrorCodes::IllegalOperation,
+                str::stream()
+                    << "reIndex is only allowed on a standalone mongod instance. Cannot reIndex '"
+                    << toReIndexNss << "' while replication is active");
+        }
 
         AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
         Collection* collection = autoColl.getCollection();

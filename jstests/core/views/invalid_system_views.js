@@ -14,6 +14,7 @@
 (function() {
 "use strict";
 const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+const isStandalone = !isMongos && !db.runCommand({isMaster: 1}).hasOwnProperty("setName");
 
 function runTest(badViewDefinition) {
     let viewsDB = db.getSiblingDB("invalid_system_views");
@@ -89,7 +90,8 @@ function runTest(badViewDefinition) {
 
     assert.commandWorked(viewsDB.collection.createIndex({x: 1}), makeErrorMessage("createIndexes"));
 
-    if (!isMongos) {
+    // Only standalone mode supports the reIndex command.
+    if (isStandalone) {
         assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
     }
 

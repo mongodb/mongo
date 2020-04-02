@@ -32,6 +32,7 @@ var planStage;
 var isMaster = db.runCommand("ismaster");
 assert.commandWorked(isMaster);
 var isMongos = (isMaster.msg === "isdbgrid");
+var isStandalone = !isMongos && !isMaster.hasOwnProperty('setName');
 
 var assertIndexHasCollation = function(keyPattern, collation) {
     var indexSpecs = coll.getIndexes();
@@ -139,8 +140,9 @@ assertIndexHasCollation({d: 1}, {locale: "simple"});
 assert.commandWorked(coll.ensureIndex({c: 1}, {v: 1}));
 assertIndexHasCollation({c: 1}, {locale: "simple"});
 
-// Test that all indexes retain their current collation when the collection is re-indexed.
-if (!isMongos) {
+// Test that all indexes retain their current collation when the collection is re-indexed. (Only
+// standalone mode supports the reIndex command.)
+if (isStandalone) {
     assert.commandWorked(coll.reIndex());
     assertIndexHasCollation({a: 1}, {
         locale: "fr_CA",

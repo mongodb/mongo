@@ -15,6 +15,11 @@ selector:
   # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
+  # These workloads run the reIndex command, which is only allowed on a standalone node.
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
   exclude_with_any_tags:
   # The ability to shut down a node while its in the middle of applying ops is required for
   # backup_restore. The workloads which perform certain operations which can cause the test to fail

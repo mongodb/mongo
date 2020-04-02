@@ -5,7 +5,7 @@
  *  - A user should not be able to do any committed reads before a snapshot has been blessed.
  *  - Inserts and catalog changes should not be visible in a snapshot before they occurred.
  *  - A getMore should see the new blessed snapshot.
- *  - Dropping an index, repairing, and reIndexing should bump the min snapshot version.
+ *  - Dropping an index should bump the min snapshot version.
  *  - Dropping a collection is visible in committed snapshot, since metadata changes are special.
  *  - 'local'-only commands should error on majority-committed levels, and accept 'local' level.
  *
@@ -165,15 +165,6 @@ function testReadConcernLevel(level) {
 
     // To use the collection again, a snapshot created after the dropIndex must be marked
     // committed.
-    newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-    assertNoSnapshotAvailableForReadConcernLevel();
-    assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
-    assert.eq(getCursorForReadConcernLevel().itcount(), 10);
-
-    // Reindex bumps the min snapshot.
-    assert.commandWorked(t.bump.insert({a: 1}));  // Bump timestamp.
-    t.reIndex();
-    assertNoSnapshotAvailableForReadConcernLevel();
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
     assertNoSnapshotAvailableForReadConcernLevel();
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
