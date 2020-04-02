@@ -1,6 +1,8 @@
 /**
  * Tests that insert oplog entries created by applyOps commands do not contain the 'fromMigrate'
  * field. Additionally tests that non-atomic applyOps inserts should be returned by changeStreams.
+ *
+ * @tags: [uses_change_streams]
  */
 (function() {
 'use strict';
