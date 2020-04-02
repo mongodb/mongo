@@ -1490,6 +1490,7 @@ var ShardingTest = function(params) {
         }
 
         var rs = this._rs[i].test;
+        rs.awaitNodesAgreeOnPrimary();
         rs.getPrimary().getDB("admin").foo.save({x: 1});
 
         if (this.keyFile) {
@@ -1512,6 +1513,7 @@ var ShardingTest = function(params) {
     this.configRS.initiateWithAnyNodeAsPrimary(config);
 
     // Wait for master to be elected before starting mongos
+    this.configRS.awaitNodesAgreeOnPrimary();
     var csrsPrimary = this.configRS.getPrimary();
 
     print("ShardingTest startup and initiation for all nodes took " + (new Date() - startTime) +
