@@ -21,7 +21,6 @@ selector:
   - jstests/sharding/addshard2.js
   - jstests/sharding/autosplit.js
   - jstests/sharding/auto_rebalance_parallel.js
-  - jstests/sharding/auto_rebalance_parallel_replica_sets.js
   - jstests/sharding/basic_drop_coll.js
   - jstests/sharding/basic_merge.js
   - jstests/sharding/count1.js
