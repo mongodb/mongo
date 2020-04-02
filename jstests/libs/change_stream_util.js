@@ -234,8 +234,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      *
      * Returns a list of the changes seen.
      */
-    self.assertNextChangesEqual = function(
-        {cursor, expectedChanges, expectedNumChanges, expectInvalidate, skipFirstBatch}) {
+    self.assertNextChangesEqual = function({
+        cursor,
+        expectedChanges,
+        expectedNumChanges,
+        expectInvalidate,
+        skipFirstBatch,
+        ignoreOrder
+    }) {
         expectInvalidate = expectInvalidate || false;
         skipFirstBatch = skipFirstBatch || false;
 
@@ -260,8 +266,22 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
         }
 
         let changes = self.getNextChanges(cursor, expectedNumChanges, skipFirstBatch);
-        for (let i = 0; i < changes.length; i++) {
-            assertChangeIsExpected(expectedChanges, i, changes, expectInvalidate);
+        if (ignoreOrder) {
+            const errMsgFunc = () => `${tojson(changes)} != ${tojson(expectedChanges)}`;
+            assert.eq(changes.length, expectedNumChanges, errMsgFunc);
+            for (let i = 0; i < changes.length; i++) {
+                assert(expectedChanges.some(expectedChange => {
+                    return _convertExceptionToReturnStatus(() => {
+                        assertChangeStreamEventEq(changes[i], expectedChange);
+                        return true;
+                    })();
+                }),
+                       errMsgFunc);
+            }
+        } else {
+            for (let i = 0; i < changes.length; i++) {
+                assertChangeIsExpected(expectedChanges, i, changes, expectInvalidate);
+            }
         }
 
         // If we expect invalidation, the final change should have operation type "invalidate".
@@ -278,16 +298,22 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     };
 
     /**
-     * Iterates through the change stream and asserts that the next 'expected.length' changes are
-     * among the expected ones. The order of the change events from the cursor relative to their
-     * order in the list of expected changes is ignored, however.
+     * Iterates through the change stream and asserts that the next changes are the expected ones.
+     * The order of the change events from the cursor relative to their order in the list of
+     * expected changes is ignored, however.
+     *
+     * Returns a list of the changes seen.
      */
-    self.assertNextChangesEqualUnordered = function(cursor, expected) {
-        const changes = self.getNextChanges(cursor, expected.length).map(event => {
-            return pruneOptionalFields(event, expected[0]);
+    self.assertNextChangesEqualUnordered = function(
+        {cursor, expectedChanges, expectedNumChanges, expectInvalidate, skipFirstBatch}) {
+        return self.assertNextChangesEqual({
+            cursor: cursor,
+            expectedChanges: expectedChanges,
+            expectedNumChanges: expectedNumChanges,
+            expectInvalidate: expectInvalidate,
+            skipFirstBatch: skipFirstBatch,
+            ignoreOrder: true
         });
-
-        assert.sameMembers(changes, expected);
     };
 
     /**

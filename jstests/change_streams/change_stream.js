@@ -180,7 +180,7 @@ expected = [
         operationType: "delete",
     }
 ];
-cst.assertNextChangesEqualUnordered(cursor, expected);
+cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected});
 
 jsTestLog("Testing intervening write on another collection");
 cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
