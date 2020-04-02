@@ -1,0 +1,32 @@
+Splunk Custom Build Windows
+===========================
+
+NOTE: We use 3 separate branches to build and test builds for Splunk:  Linux, Windows, and MacOS.
+
+This is because signficant changes have to be made to build the tools on RHEL 5.5 Linux.  We also need to make some code changes to account for features
+that are not available in the older OS.
+
+Finally, Splunk requires different versions of openssl (and a specific location requirement on macOS requiring its own distro in Evergreen) 
+This would be hard to generalize in a single evergreen.yml in one branch.
+
+Current branches:
+
+splunk-linux-v3.6.17-BACKPORT-6439
+splunk-macos-v3.6.17-BACKPORT-6439
+splunk-windows-v3.6.17-BACKPORT-6439
+
+Windows
+-------
+
+Splunk has been using the community releases of Windows and there isn't really anything we need to change for custom builds.
+
+In this case we changed the version number and made sure that the version we gave them included SERVER-42525
+
+When running a patch build, use this variant: `windows-64-2k8-ssl`
+
+ie. 
+
+```
+evergreen patch -p "mongodb-mongo-v3.6" -t "compile" -d "BUILD-10833 Splunk custom build of 3.6.17 with BACKPORT-6439 WINDOWS" -v "windows-64-2k8-ssl" -u -f
+```
+

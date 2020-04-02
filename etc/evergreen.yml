@@ -80,12 +80,15 @@ variables:
       set -o verbose
 
       # We get the raw version string (r1.2.3-45-gabcdef) from git
-      MONGO_VERSION=$(git describe)
+      ### SPLUNK
+      ### MONGO_VERSION=$(git describe)
+      MONGO_VERSION=3.6.17-SERVER-42525-splunk
       # If this is a patch build, we add the patch version id to the version string so we know
       # this build was a patch, and which evergreen task it came from
-      if [ "${is_patch|}" = "true" ]; then
-        MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-      fi
+      ### SPLUNK
+      ### if [ "${is_patch|}" = "true" ]; then
+      ###  MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+      ### fi
 
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
@@ -809,12 +812,15 @@ functions:
         set -o verbose
 
         # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe)
+        ### SPLUNK
+        ### MONGO_VERSION=$(git describe)
+        MONGO_VERSION=3.6.17-SERVER-42525-splunk
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch|}" = "true" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-        fi
+        ### SPLUNK
+        ### if [ "${is_patch|}" = "true" ]; then
+        ###  MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+        ### fi
 
         # This script converts the generated version string into a sanitized version string for
         # use by scons and uploading artifacts as well as information about for the scons cache.
@@ -7056,8 +7062,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
 
+### SPLUNK
 - name: windows-64-2k8-ssl
-  display_name: SSL Windows 2008R2
+  display_name: SSL Windows 2008R2 SPLUNK
   run_on:
   - windows-64-vs2015-small
   batchtime: 1440 # 1 day
