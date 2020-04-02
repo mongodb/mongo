@@ -216,10 +216,27 @@ public:
 
     /**
      * Repeatedly runs currentOp to check if the given command is running, and blocks until
-     * the command finishes running or the wait timeout is reached, and returns the number
-     * times of currentOp is run.
+     * the command starts running or the wait timeout is reached. Asserts that the command
+     * is running after the wait and returns the number times of currentOp is run.
      */
-    uint64_t waitForCommand(const std::string command, Milliseconds timeout) {
+    uint64_t waitForCommandToStart(const std::string command, Milliseconds timeout) {
+        ClockSource::StopWatch stopwatch;
+        uint64_t numCurrentOpRan = 0;
+        do {
+            sleepmillis(100);
+            numCurrentOpRan++;
+        } while (!isCommandRunning(command) && stopwatch.elapsed() < timeout);
+
+        ASSERT_TRUE(isCommandRunning(command));
+        return ++numCurrentOpRan;
+    }
+
+    /**
+     * Repeatedly runs currentOp to check if the given command is running, and blocks until
+     * the command finishes running or the wait timeout is reached. Asserts that the command
+     * is no longer running after the wait and returns the number times of currentOp is run.
+     */
+    uint64_t waitForCommandToStop(const std::string command, Milliseconds timeout) {
         ClockSource::StopWatch stopwatch;
         uint64_t numCurrentOpRan = 0;
         do {
@@ -227,7 +244,8 @@ public:
             numCurrentOpRan++;
         } while (isCommandRunning(command) && stopwatch.elapsed() < timeout);
 
-        return numCurrentOpRan;
+        ASSERT_FALSE(isCommandRunning(command));
+        return ++numCurrentOpRan;
     }
 
     struct IsMasterData {
@@ -283,7 +301,7 @@ TEST_F(NetworkInterfaceTest, CancelMissingOperation) {
     assertNumOps(0u, 0u, 0u, 0u);
 }
 
-TEST_F(NetworkInterfaceTest, CancelOperation) {
+TEST_F(NetworkInterfaceTest, CancelLocally) {
     auto cbh = makeCallbackHandle();
 
     auto deferred = [&] {
@@ -331,19 +349,20 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
                         kNoTimeout);
     });
 
+    int numCurrentOpRan = 0;
+
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
-        FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
-
         auto deferred = runCommand(cbh,
                                    makeTestCommand(kNoTimeout,
                                                    makeEchoCmdObj(),
                                                    nullptr /* opCtx */,
                                                    RemoteCommandRequest::HedgeOptions()));
 
-        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+        // Wait for the "echo" operation to start.
+        numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
 
         // Run cancelCommand to kill the above operation.
         net().cancelCommand(cbh);
@@ -357,7 +376,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
     ASSERT(result.elapsedMillis);
 
     // Wait for the operation to be killed on the remote host.
-    auto numCurrentOpRan = waitForCommand("echo", kMaxWait);
+    numCurrentOpRan += waitForCommandToStop("echo", kMaxWait);
 
     // We have one canceled operation (echo), and two other succeeded operations
     // on top of the currentOp operations (configureFailPoint and _killOperations).
@@ -388,22 +407,31 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                         kNoTimeout);
     });
 
+    int numCurrentOpRan = 0;
+
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         // Kick off a blocking "echo" operation.
-        FailPointEnableBlock fpb("networkInterfaceAfterAcquireConn");
-
         auto deferred = runCommand(cbh,
                                    makeTestCommand(kNoTimeout,
                                                    makeEchoCmdObj(),
                                                    nullptr /* opCtx */,
                                                    RemoteCommandRequest::HedgeOptions()));
 
-        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+        // Wait for the "echo" operation to start.
+        numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
 
         // Run cancelCommand to kill the above operation. _killOperations is expected to block and
-        // time out, and the cancel timer is expected to cancel the operations.
+        // time out, and to be canceled by the command timer.
+        FailPointEnableBlock cmdFailedFpb("networkInterfaceCommandsFailedWithErrorCode",
+                                          BSON("cmdNames"
+                                               << BSON_ARRAY("_killOperations") << "errorCode"
+                                               << ErrorCodes::NetworkInterfaceExceededTimeLimit));
+
         net().cancelCommand(cbh);
+
+        // Wait for _killOperations for 'echo' to time out.
+        cmdFailedFpb->waitForTimesEntered(cmdFailedFpb.initialTimesEntered() + 1);
 
         return deferred;
     }();
@@ -413,11 +441,8 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
 
-    // Wait for _killOperations for 'echo' to time out.
-    auto numCurrentOpRan = waitForCommand("_killOperations", kMaxWait);
-
     // We have one canceled operation (echo), one timedout operation (_killOperations),
-    // and one other succeeded operation on top of the currentOp operations (configureFailPoint)
+    // and one succeeded operation on top of the currentOp operations (configureFailPoint).
     assertNumOps(1u, 1u, 0u, 1u + numCurrentOpRan);
 }
 
