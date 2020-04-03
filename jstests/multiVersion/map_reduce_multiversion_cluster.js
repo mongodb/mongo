@@ -17,7 +17,7 @@ const dbName = "test_" + testName;
 const collName = testName;
 
 // Start a sharded cluster in which all mongod and mongos processes are "last-stable" binVersion.
-var st = new ShardingTest({
+const st = new ShardingTest({
     shards: 2,
     rs: {nodes: 2, binVersion: "last-stable"},
     other: {mongosOptions: {binVersion: "last-stable"}}
@@ -165,38 +165,39 @@ function runValidMrTests(coll) {
 //
 // Test against an all 'last-stable' cluster.
 //
-runValidMrTests(sourceColl);
+runValidMrTests(st.s.getDB(dbName)[collName]);
 
 //
 // Upgrade the config servers and the shards to the "latest" binVersion.
 //
-st.upgradeCluster("latest", {upgradeShards: true, upgradeConfigs: true, upgradeMongos: false});
+st.upgradeCluster(
+    "latest",
+    {upgradeShards: true, upgradeConfigs: true, upgradeMongos: false, waitUntilStable: true});
 
 //
 // Test against a mixed version cluster where the shards are upgraded to the latest binary but still
 // in FCV 'last-stable'. Mongos is still on the 'last-stable' binary version.
 //
-runValidMrTests(sourceColl);
+runValidMrTests(st.s.getDB(dbName)[collName]);
 
 //
 // Upgrade mongos to the "latest" binVersion but keep the old FCV.
 //
-st.upgradeCluster("latest", {upgradeShards: false, upgradeConfigs: false, upgradeMongos: true});
-mongosConn = st.s;
-sourceColl = mongosConn.getDB(dbName)[collName];
+st.upgradeCluster(
+    "latest",
+    {upgradeShards: false, upgradeConfigs: false, upgradeMongos: true, waitUntilStable: true});
 
 //
 // Test against a cluster where both mongos and the shards are upgraded to the latest binary
 // version, but remain in the old FCV.
 //
-runValidMrTests(sourceColl);
+runValidMrTests(st.s.getDB(dbName)[collName]);
 
 //
 // Fully upgraded to 'latest'.
 //
-assert.commandWorked(
-    mongosConn.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-runValidMrTests(sourceColl);
+assert.commandWorked(st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+runValidMrTests(st.s.getDB(dbName)[collName]);
 
 st.stop();
 }());
