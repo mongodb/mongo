@@ -1,9 +1,9 @@
 # Sharding Internals
 
-# Recommended prerequisite reading
+## Recommended prerequisite reading
 
 A reader should be familiar with the
-[**general concept**](https://docs.mongodb.com/manual/sharding/#sharding),
+[**general concept**](https://docs.mongodb.com/manual/sharding/#sharding)
 of horizontal scaling or "sharding", the
 [**architecture of a MongoDB sharded cluster**](https://docs.mongodb.com/manual/sharding/#sharded-cluster),
 and the concept of a
