@@ -4,8 +4,6 @@
 // Inserts orphan documents to the donor and recipient shards during the moveChunk and
 // verifies that cleanupOrphaned removes orphans.
 //
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 load('./jstests/libs/cleanup_orphaned_util.js');

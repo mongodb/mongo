@@ -1,8 +1,6 @@
 /**
  * Basic test to demonstrate that the range deleter section in shardingStatistics is displayed
  * correctly.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

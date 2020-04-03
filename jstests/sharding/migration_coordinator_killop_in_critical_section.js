@@ -4,10 +4,6 @@
  *
  * Depends on the checkOrphansAreDeleted hook at the end of ShardingTest to verify that the orphans,
  * range deletion tasks, and migration coordinator state are deleted despite the killOps.
- *
- * Marked as multiversion_incompatible because the failpoints used in this test were introduced
- * on v4.4 mongod.
- * @tags: [multiversion_incompatible]
  */
 
 (function() {

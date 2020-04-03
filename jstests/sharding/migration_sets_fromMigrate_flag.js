@@ -12,7 +12,6 @@
 //         migration and is sent to the recipient via the transfer logs.
 //      #5 fromMigrate is NOT set on donor shard and IS set on the recipient shard when real
 //         delete op is done during chunk migration within the chunk range.
-//  @tags: [requires_fcv_44]
 //
 
 load('./jstests/libs/chunk_manipulation_util.js');

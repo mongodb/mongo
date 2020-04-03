@@ -1,8 +1,6 @@
 /**
  * Tests that a donor resumes coordinating a migration if it fails over after creating the
  * migration coordinator document but before deleting it.
- *
- * @tags: [requires_fcv_44]
  */
 
 // This test induces failovers on shards.

@@ -1,7 +1,5 @@
 /**
  * Tests the interaction of the refineCollectionShardKey command with the range deleter.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 

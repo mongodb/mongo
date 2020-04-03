@@ -1,7 +1,7 @@
 /**
  * Tests that WriteConflictException is handled when applying transfer mods during migrations.
- * @tags: [requires_fcv_44]
  */
+
 (function() {
 'use strict';
 

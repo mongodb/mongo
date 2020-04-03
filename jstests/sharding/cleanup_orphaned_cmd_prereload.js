@@ -1,8 +1,6 @@
 //
 // Tests failed cleanup of orphaned data when we have pending chunks
 //
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 var st = new ShardingTest(
     {shards: 2, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});

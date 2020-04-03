@@ -2,8 +2,6 @@
  * Tests that if maxTimeMS is sent with a moveChunk command, the client thread that issued moveChunk
  * will be interrupted when maxTimeMS is exceeded, but moveChunk will eventually succeed in the
  * background.
- *
- * @tags: [multiversion_incompatible]
  */
 (function() {
 

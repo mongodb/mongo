@@ -6,9 +6,6 @@
  * 2) Waits for all possibly orphaned ranges to be deleted before returning
  * 3) Does not return 'stoppedAtKey', to preserve the former API of not returning 'stoppedAtKey'
  *    once all orphans have been deleted.
- *
- * requires_fcv_44 because it's explicitly testing the FCV 4.4 behavior of cleanupOrphaned.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

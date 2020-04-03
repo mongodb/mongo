@@ -1,8 +1,6 @@
 //
 // Tests cleanup of orphaned data in hashed sharded coll via the orphaned data cleanup command
 //
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 (function() {
 "use strict";

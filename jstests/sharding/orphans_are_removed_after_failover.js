@@ -7,8 +7,6 @@
  * 4. Cause a step down on Shard A
  * 5. Connect directly to the new primary of Shard A and verify that eventually no documents remain
  *    from the chunk that was migrated away
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

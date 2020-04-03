@@ -4,9 +4,6 @@
 //
 // Note: don't use coll1 in this test after a coll1 migration is interrupted -- the distlock isn't
 // released promptly when interrupted.
-//
-// Uses the disableResumableRangeDeleter parameter, which was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 

@@ -2,9 +2,8 @@
 // Basic tests of cleanupOrphaned. Validates that non allowed uses of the cleanupOrphaned
 // command fail.
 //
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
 // requires_persistence because it restarts a shard.
-// @tags: [requires_fcv_44, requires_persistence]
+// @tags: [requires_persistence]
 
 (function() {
 "use strict";

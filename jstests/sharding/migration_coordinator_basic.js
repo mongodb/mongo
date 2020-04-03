@@ -3,9 +3,6 @@
  * own and the recipient's config.rangeDeletions, and informs itself and the recipient of the
  * migration's outcome by updating or deleting its own and the recipient's config.rangeDeletions
  * entries for the migration.
- *
- * This test expects migrations to use the FCV 4.4 protocol.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

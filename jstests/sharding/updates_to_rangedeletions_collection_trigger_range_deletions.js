@@ -1,7 +1,6 @@
 /**
  * Ensure that orphaned documents are deleted when the pending = true field is removed from the
  * config.rangeDeletions collection.
- * @tags: [multiversion_incompatible]
  */
 
 (function() {

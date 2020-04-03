@@ -2,10 +2,6 @@
  * Shuts down the donor primary at two points in the critical section: while the node is executing
  * _configsvrEnsureChunkVersionIsGreaterThan and while the node is forcing a filtering metadata
  * refresh.
- *
- * Marked as multiversion_incompatible because the failpoints used in this test were introduced
- * on v4.4 mongod.
- * @tags: [multiversion_incompatible]
  */
 
 (function() {
