@@ -234,6 +234,7 @@ functions:
               workloads: ../src/workloads/workloads
               ycsb: ../src/YCSB/YCSB
               linkbench: ../src/linkbench/linkbench
+              linkbench2: ../src/linkbench2/linkbench2
               tpcc: ../src/tpcc/tpcc
               genny: ../src/genny/genny
           mongodb_setup:
@@ -435,6 +436,18 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "linkbench"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench2
+  priority: 5
+  exec_timeout_secs: 43200 # 12 hours
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench2"
+        additional_tfvars: "tags: {expire-on-delta: 12}"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -1041,6 +1054,7 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads
     - name: linkbench
+    - name: linkbench2
     - name: tpcc
     - name: genny_patch_tasks
     - name: genny_auto_tasks
@@ -1376,6 +1390,7 @@ buildvariants:
     - name: secondary_reads
     - name: tpcc
     - name: linkbench
+    - name: linkbench2
     - name: genny_patch_tasks
     - name: genny_auto_tasks
     - name: sb_large_scale
@@ -1411,6 +1426,7 @@ buildvariants:
     - name: change_streams_latency
     - name: tpcc
     - name: linkbench
+    - name: linkbench2
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
