@@ -61,9 +61,17 @@ assert.soon(() => {
     return outColl.find().itcount() == 9;
 });
 
+// Note that a $sort comes before the $merge to guarantee that {_id: 1, a: 1} will always be
+// seen before {_id: 2, a: 2}. If {_id: 1, a: 1} is seen first, it gets inserted and will
+// trigger a DuplicateKeyError since a's value is duplicated by {_id: 2, a: 1}. If {_id: 2, a:
+// 2} is seen first, then it will make the replacement {_id: 2, a: 1} => {_id: 2, a: 2},
+// preventing a duplicate key error from arising later on.
 assertErrorCode(
     coll,
-    [{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
+    [
+        {$sort: {a: 1}},
+        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
+    ],
     ErrorCodes.DuplicateKey);
 assert.soon(() => {
     return outColl.find().itcount() == 9;
