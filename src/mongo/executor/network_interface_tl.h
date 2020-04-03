@@ -56,6 +56,7 @@ public:
                        ServiceContext* ctx,
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
+    ~NetworkInterfaceTL();
 
     constexpr static Milliseconds kCancelCommandTimeout{1000};
 
@@ -336,7 +337,7 @@ private:
 
     void _run();
 
-    void _killOperation(std::shared_ptr<RequestState> requestStateToKill);
+    Status _killOperation(std::shared_ptr<RequestState> requestStateToKill);
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;

@@ -134,6 +134,17 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
     }
 }
 
+NetworkInterfaceTL::~NetworkInterfaceTL() {
+    if (!inShutdown()) {
+        shutdown();
+    }
+
+    // Because we quick exit on shutdown, these invariants are usually checked only in ASAN builds
+    // and integration/unit tests.
+    invariant(_inProgress.empty());
+    invariant(_inProgressAlarms.empty());
+}
+
 std::string NetworkInterfaceTL::getDiagnosticString() {
     return "DEPRECATED: getDiagnosticString is deprecated in NetworkInterfaceTL";
 }
@@ -271,6 +282,11 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
 
     {
         stdx::lock_guard lk(interface->_inProgressMutex);
+        if (interface->inShutdown()) {
+            // If we're in shutdown, we can't add a new command.
+            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
+        }
+
         interface->_inProgress.insert({cbHandle, state});
     }
 
@@ -381,7 +397,7 @@ NetworkInterfaceTL::RequestState::~RequestState() {
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         RemoteCommandRequestOnAny& request,
                                         RemoteCommandCompletionFn&& onFinish,
-                                        const BatonHandle& baton) {
+                                        const BatonHandle& baton) try {
     if (inShutdown()) {
         return kNetworkInterfaceShutdownInProgress;
     }
@@ -501,6 +517,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
@@ -637,14 +655,20 @@ void NetworkInterfaceTL::RequestManager::killOperationsForPendingRequests() {
         // If the request was sent, send a remote command request to the target host
         // to kill the operation started by the request.
         bool hasAcquiredConn = getConnStatus(requestState->reqId) == ConnStatus::OK;
-        if (hasAcquiredConn && requestState->request) {
-            LOGV2_DEBUG(4664801,
-                        2,
-                        "Sending remote _killOperations request to cancel command",
-                        "operationKey"_attr = cmdState.lock()->operationKey,
-                        "target"_attr = requestState->request->target,
-                        "request_id"_attr = requestState->request->id);
-            requestState->interface()->_killOperation(requestState);
+        if (!hasAcquiredConn || !requestState->request) {
+            continue;
+        }
+
+        LOGV2_DEBUG(4664801,
+                    2,
+                    "Sending remote _killOperations request to cancel command",
+                    "operationKey"_attr = cmdState.lock()->operationKey,
+                    "target"_attr = requestState->request->target,
+                    "request_id"_attr = requestState->request->id);
+
+        auto status = requestState->interface()->_killOperation(requestState);
+        if (!status.isOK()) {
+            LOGV2_DEBUG(4664810, 2, "Failed to send remote _killOperations", "error"_attr = status);
         }
     }
 }
@@ -839,6 +863,10 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
 
     {
         stdx::lock_guard lk(interface->_inProgressMutex);
+        if (interface->inShutdown()) {
+            // If we're in shutdown, we can't add a new command.
+            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
+        }
         interface->_inProgress.insert({cbHandle, state});
     }
 
@@ -900,7 +928,7 @@ void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
 Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                                RemoteCommandRequestOnAny& request,
                                                RemoteCommandOnReplyFn&& onReply,
-                                               const BatonHandle& baton) {
+                                               const BatonHandle& baton) try {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
@@ -947,6 +975,8 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
     }
 
     return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
@@ -979,7 +1009,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                        << redact(cmdStateToCancel->requestOnAny.toString())});
 }
 
-void NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill) {
+Status NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill) try {
     auto [target, sslMode] = [&] {
         invariant(requestStateToKill->request);
         auto request = requestStateToKill->request.get();
@@ -1020,7 +1050,7 @@ void NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestSta
     auto connFuture = _pool->get(target, sslMode, killOpRequest.kNoTimeout);
     if (connFuture.isReady()) {
         killOpRequestState->trySend(std::move(connFuture).getNoThrow(), 0);
-        return;
+        return Status::OK();
     }
 
     std::move(connFuture)
@@ -1028,6 +1058,9 @@ void NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestSta
         .getAsync([this, killOpRequestState, killOpRequest](auto swConn) {
             killOpRequestState->trySend(std::move(swConn), 0);
         });
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
