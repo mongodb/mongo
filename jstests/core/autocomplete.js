@@ -10,8 +10,6 @@
         return __autocomplete__;
     }
 
-    db = db.getSiblingDB('test_autocomplete');
-
     // Create a collection.
     db.auto_complete_coll.insert({});
 
