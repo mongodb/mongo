@@ -34,6 +34,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -58,6 +59,20 @@ bool waitForCondition(F&& f) {
         i++;
     }
     return false;
+}
+
+// Returns the connection name by filtering on the appName of a $currentOp command. If no result is
+// found, return an empty string.
+std::string getThreadNameByAppName(DBClientBase* conn, StringData appName) {
+    auto curOpCmd =
+        BSON("aggregate" << 1 << "cursor" << BSONObj() << "pipeline"
+                         << BSON_ARRAY(BSON("$currentOp" << BSON("localOps" << true))
+                                       << BSON("$match" << BSON("appName" << appName))));
+    const auto curOpReply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", curOpCmd));
+    const auto cursorResponse = CursorResponse::parseFromBSON(curOpReply->getCommandReply());
+    ASSERT_OK(cursorResponse.getStatus());
+    const auto batch = cursorResponse.getValue().getBatch();
+    return batch.empty() ? "" : batch[0].getStringField("desc");
 }
 
 TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
@@ -755,8 +770,9 @@ TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
 
 TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream) {
     std::string errMsg;
+    const auto conn1AppName = "integration_test";
     auto fixtureConn = std::unique_ptr<DBClientBase>(
-        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+        unittest::getFixtureConnectionString().connect(conn1AppName, errMsg));
     uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
     DBClientBase* conn1 = fixtureConn.get();
 
@@ -802,8 +818,14 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
     // Start a new connection to the server to check the serverStatus metrics.
     std::string newErrMsg;
     auto conn2 = std::unique_ptr<DBClientBase>(
-        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+        unittest::getFixtureConnectionString().connect("integration_test2", newErrMsg));
     uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    std::string threadName;
+    ASSERT(waitForCondition([&] {
+        threadName = getThreadNameByAppName(conn2.get(), conn1AppName);
+        return !threadName.empty();
+    }));
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
@@ -813,8 +835,9 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
     const auto failPointObj = BSON("configureFailPoint"
                                    << "failCommand"
                                    << "mode" << BSON("times" << 1) << "data"
-                                   << BSON("errorCode" << ErrorCodes::NotMaster << "failCommands"
-                                                       << BSON_ARRAY("isMaster")));
+                                   << BSON("threadName" << threadName << "errorCode"
+                                                        << ErrorCodes::NotMaster << "failCommands"
+                                                        << BSON_ARRAY("isMaster")));
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
@@ -838,8 +861,9 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
 
 TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStream) {
     std::string errMsg;
+    const auto conn1AppName = "integration_test";
     auto fixtureConn = std::unique_ptr<DBClientBase>(
-        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+        unittest::getFixtureConnectionString().connect(conn1AppName, errMsg));
     uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
     DBClientBase* conn1 = fixtureConn.get();
 
@@ -885,8 +909,14 @@ TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStre
     // Start a new connection to the server to check the serverStatus metrics.
     std::string newErrMsg;
     auto conn2 = std::unique_ptr<DBClientBase>(
-        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+        unittest::getFixtureConnectionString().connect("integration_test2", newErrMsg));
     uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    std::string threadName;
+    ASSERT(waitForCondition([&] {
+        threadName = getThreadNameByAppName(conn2.get(), conn1AppName);
+        return !threadName.empty();
+    }));
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
@@ -896,8 +926,9 @@ TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStre
     const auto failPointObj = BSON("configureFailPoint"
                                    << "failCommand"
                                    << "mode" << BSON("times" << 1) << "data"
-                                   << BSON("errorCode" << ErrorCodes::NotMaster << "failCommands"
-                                                       << BSON_ARRAY("isMaster")));
+                                   << BSON("threadName" << threadName << "errorCode"
+                                                        << ErrorCodes::NotMaster << "failCommands"
+                                                        << BSON_ARRAY("isMaster")));
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
