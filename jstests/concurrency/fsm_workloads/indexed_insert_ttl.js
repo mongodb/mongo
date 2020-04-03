@@ -40,7 +40,8 @@ var $config = (function() {
         // right after the TTL thread has started to sleep, which requires us to wait at least ~60
         // seconds for it to wake up and delete the expired documents. We wait at least another
         // minute just to avoid race-prone tests on overloaded test hosts.
-        var timeoutMS = 2 * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
+        var timeoutMS =
+            (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
 
         assertWhenOwnColl.soon(function checkTTLCount() {
             // All initial documents should be removed by the end of the workload.
