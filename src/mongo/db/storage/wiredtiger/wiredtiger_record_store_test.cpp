@@ -915,5 +915,85 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op1.get()));
 }
 
+TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
+    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    RecordId rid1;
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        WriteUnitOfWork uow(opCtx.get());
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+        ASSERT_OK(res.getStatus());
+        rid1 = res.getValue();
+
+        res = rs->insertRecord(opCtx.get(), "b", 2, Timestamp());
+        ASSERT_OK(res.getStatus());
+
+        uow.commit();
+    }
+
+    // Cursors should always ensure they are in an active transaction when next() is called.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+
+        auto cursor = rs->getCursor(opCtx.get());
+        ASSERT(cursor->next());
+        ASSERT_TRUE(ru->inActiveTxn());
+
+        // Committing a WriteUnitOfWork will end the current transaction.
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_TRUE(ru->inActiveTxn());
+        wuow.commit();
+        ASSERT_FALSE(ru->inActiveTxn());
+
+        // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
+        ASSERT(cursor->next());
+        ASSERT_TRUE(ru->inActiveTxn());
+    }
+}
+
+TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
+    unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    RecordId rid1;
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        WriteUnitOfWork uow(opCtx.get());
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+        ASSERT_OK(res.getStatus());
+        rid1 = res.getValue();
+
+        res = rs->insertRecord(opCtx.get(), "b", 2, Timestamp());
+        ASSERT_OK(res.getStatus());
+
+        uow.commit();
+    }
+
+    // Cursors should always ensure they are in an active transaction when seekExact() is called.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+
+        auto cursor = rs->getCursor(opCtx.get());
+        ASSERT(cursor->seekExact(rid1));
+        ASSERT_TRUE(ru->inActiveTxn());
+
+        // Committing a WriteUnitOfWork will end the current transaction.
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_TRUE(ru->inActiveTxn());
+        wuow.commit();
+        ASSERT_FALSE(ru->inActiveTxn());
+
+        // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
+        ASSERT(cursor->seekExact(rid1));
+        ASSERT_TRUE(ru->inActiveTxn());
+    }
+}
+
 }  // namespace
 }  // namespace mongo
