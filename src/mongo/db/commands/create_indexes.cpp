@@ -70,7 +70,6 @@ namespace {
 
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
-constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
 constexpr auto kIgnoreUnknownIndexOptionsName = "ignoreUnknownIndexOptions"_sd;
 constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
 constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
@@ -155,7 +154,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             }
 
             hasIndexesField = true;
-        } else if (kCommandName == cmdElemFieldName || kCommitQuorumFieldName == cmdElemFieldName ||
+        } else if (kCommandName == cmdElemFieldName ||
                    kIgnoreUnknownIndexOptionsName == cmdElemFieldName ||
                    isGenericArgument(cmdElemFieldName)) {
             continue;
@@ -237,25 +236,6 @@ Status validateTTLOptions(OperationContext* opCtx, const BSONObj& cmdObj) {
     }
 
     return Status::OK();
-}
-
-/**
- * Retrieves the commit quorum from 'cmdObj' if it is present. If it isn't, we provide a default
- * commit quorum, which consists of all the data-bearing nodes.
- */
-boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* opCtx,
-                                                             const BSONObj& cmdObj) {
-    if (cmdObj.hasField(kCommitQuorumFieldName)) {
-        CommitQuorumOptions commitQuorum;
-        uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
-        return commitQuorum;
-    } else {
-        // Retrieve the default commit quorum if one wasn't passed in, which consists of all
-        // data-bearing nodes.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        int numDataBearingMembers = replCoord->getConfig().getNumDataBearingMembers();
-        return CommitQuorumOptions(numDataBearingMembers);
-    }
 }
 
 /**
@@ -598,7 +578,6 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
-    boost::optional<CommitQuorumOptions> commitQuorum = parseAndGetCommitQuorum(opCtx, cmdObj);
 
     Status validateTTL = validateTTLOptions(opCtx, cmdObj);
     uassertStatusOK(validateTTL);
@@ -646,7 +625,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         (runTwoPhaseBuild) ? IndexBuildProtocol::kTwoPhase : IndexBuildProtocol::kSinglePhase;
     log() << "Registering index build: " << buildUUID;
     ReplIndexBuildState::IndexCatalogStats stats;
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
 
     try {
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
@@ -706,15 +685,12 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         result.append(kNoteFieldName, "index already exists");
     }
 
-    commitQuorum->append("commitQuorum", &result);
-
     return true;
 }
 
 /**
  * { createIndexes : "bar",
- *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
- *   commitQuorum: "majority" }
+ *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
  */
 class CmdCreateIndex : public ErrmsgCommandDeprecated {
 public:

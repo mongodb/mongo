@@ -23,7 +23,7 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
 }
 
 let coll = rst.getPrimary().getDB("indexRebuild")["coll"];
-assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}], {}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 assert.eq(3, coll.getIndexes().length);
 rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
 

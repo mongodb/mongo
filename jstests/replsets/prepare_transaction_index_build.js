@@ -36,7 +36,7 @@ secondary.getDB("admin").runCommand(
     {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'});
 
 jsTestLog("Starting a background index build.");
-assert.commandWorked(testColl.createIndexes([{x: 1}], {}, {writeConcern: {w: 2}}));
+assert.commandWorked(testColl.createIndexes([{x: 1}]));
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
