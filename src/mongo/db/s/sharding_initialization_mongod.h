@@ -119,7 +119,7 @@ private:
     // Function for initializing the sharding environment components (i.e. everything on the Grid)
     ShardingEnvironmentInitFunc _initFunc;
 
-    ReplicaSetChangeListenerHandle _replicaSetChangeListener;
+    std::shared_ptr<ReplicaSetChangeNotifier::Listener> _replicaSetChangeListener;
 };
 
 /**

@@ -49,7 +49,6 @@ class ReplicaSetChangeNotifier {
 public:
     using Key = std::string;
     class Listener;
-    using ListenerHandle = std::unique_ptr<Listener, unique_function<void(Listener*)>>;
     struct State;
 
 public:
@@ -88,24 +87,17 @@ public:
               typename... Args,
               typename = std::enable_if_t<std::is_constructible_v<DerivedT, Args...>>>
     auto makeListener(Args&&... args) {
-        auto deleter = [this](auto listener) {
-            _removeListener(listener);
-            delete listener;
-        };
-        auto ptr = new DerivedT(std::forward<Args>(args)...);
-
+        auto ptr = std::make_shared<DerivedT>(std::forward<Args>(args)...);
         _addListener(ptr);
-
-        return ListenerHandle(ptr, std::move(deleter));
+        return ptr;
     }
 
 private:
-    void _addListener(Listener* listener);
-    void _removeListener(Listener* listener);
+    void _addListener(std::shared_ptr<Listener> listener);
 
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ReplicaSetChangeNotifier::_mutex");
-    std::vector<Listener*> _listeners;
+    std::vector<std::weak_ptr<Listener>> _listeners;
     stdx::unordered_map<Key, State> _replicaSetStates;
 };
 
@@ -167,8 +159,6 @@ public:
 private:
     Notifier* _notifier = nullptr;
 };
-
-using ReplicaSetChangeListenerHandle = ReplicaSetChangeNotifier::ListenerHandle;
 
 struct ReplicaSetChangeNotifier::State {
     ConnectionString connStr;
