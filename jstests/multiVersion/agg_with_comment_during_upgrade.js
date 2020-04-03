@@ -74,21 +74,6 @@ function upgradeSet(rs, options) {
     }
 }
 
-function upgradeCluster(version, components) {
-    st.upgradeCluster(version, components);
-
-    // Wait for the config server and shards to become available.
-    st.configRS.awaitSecondaryNodes();
-    st.rs0.awaitSecondaryNodes();
-    st.rs1.awaitSecondaryNodes();
-
-    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of both shards.
-    for (let client of [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()]) {
-        awaitRSClientHosts(
-            client, [st.rs0.getPrimary(), st.rs1.getPrimary()], {ok: true, ismaster: true});
-    }
-}
-
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the primary shard to "latest", and verify that the agg command still works correctly.
@@ -100,11 +85,15 @@ upgradeSet(st.rs0, {binVersion: "latest"});
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the config servers and repeat the test.
-upgradeCluster("latest", {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false});
+st.upgradeCluster(
+    "latest",
+    {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false, waitUntilStable: true});
 runAggregateWithPrimaryShardMerger();
 
 // Upgrade the mongos and repeat the test.
-upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
+st.upgradeCluster(
+    "latest",
+    {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false, waitUntilStable: true});
 runAggregateWithPrimaryShardMerger();
 
 // Set the FCV to "4.4" to complete the upgrade and repeat the test.

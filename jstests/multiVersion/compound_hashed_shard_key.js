@@ -62,29 +62,6 @@ function assertVersionAndFCV(versions, fcv) {
               fcv);
 }
 
-/**
- * Upgrade the cluster to given version and refresh the connection variables.
- */
-function upgradeCluster(version, components) {
-    const defaultComponents = {upgradeMongos: false, upgradeShards: false, upgradeConfigs: false};
-    components = Object.assign(defaultComponents, components);
-    st.upgradeCluster(version, components);
-
-    // Wait for the config server and shards to become available.
-    st.configRS.awaitSecondaryNodes();
-    st.rs0.awaitSecondaryNodes();
-    st.rs1.awaitSecondaryNodes();
-
-    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of both shards.
-    for (let client of [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()]) {
-        awaitRSClientHosts(
-            client, [st.rs0.getPrimary(), st.rs1.getPrimary()], {ok: true, ismaster: true});
-    }
-
-    mongosDB = st.s.getDB(jsTestName());
-    coll = mongosDB.coll;
-}
-
 // Restarts the given replset node.
 function restartReplSetNode(replSet, node, options) {
     const defaultOpts = {remember: true, appendOptions: true, startClean: false};
@@ -105,8 +82,11 @@ assert.commandFailedWithCode(
     st.s.adminCommand({shardCollection: ns, key: {a: 1, b: "hashed", c: 1}}), ErrorCodes.BadValue);
 
 // Upgrade the cluster to the new binary version, but keep the feature compatibility version at 4.2.
-upgradeCluster(nodeOptions44.binVersion,
-               {upgradeMongos: true, upgradeShards: true, upgradeConfigs: true});
+st.upgradeCluster(
+    nodeOptions44.binVersion,
+    {upgradeMongos: true, upgradeShards: true, upgradeConfigs: true, waitUntilStable: true});
+mongosDB = st.s.getDB(jsTestName());
+coll = mongosDB.coll;
 assertVersionAndFCV(["4.4", "4.3"], lastStableFCV);
 
 // Verify that the shard key cannot be refined to a compound hashed shard key.
@@ -181,7 +161,10 @@ assert.commandWorked(st.s.adminCommand(
 // Starting mongos with 4.2 binary does not fail but read/write operations cannot be performed on
 // the collection. This is because mongos cannot understand compound hashed shard key while trying
 // to target the operation to the respective shard(s).
-upgradeCluster(nodeOptions42.binVersion, {upgradeMongos: true});
+st.upgradeCluster(
+    nodeOptions42.binVersion,
+    {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false, waitUntilStable: true});
+coll = st.s.getDB(jsTestName()).coll;
 assert.commandFailedWithCode(coll.insert({a: 1, b: 1, c: 1}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(coll.update({_id: 0}, {$set: {p: 1}}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(coll.remove({_id: 0}), ErrorCodes.BadValue);
@@ -219,7 +202,8 @@ try {
 // Start that node and mongos with the 4.4 binary for a clean shutdown.
 st.rs0.start(secondaryNodeOfShard, nodeOptions44);
 st.rs0.awaitReplication();
-upgradeCluster(nodeOptions44.binVersion, {upgradeMongos: true});
+st.upgradeCluster(nodeOptions44.binVersion,
+                  {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
 
 st.stop();
 }());
