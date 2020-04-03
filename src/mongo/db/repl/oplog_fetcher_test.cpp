@@ -1417,9 +1417,8 @@ TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) 
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
                                           makeFirstBatch(cursorId, firstBatch, metadataObj));
 
-    validateFindCommand(m,
-                        oplogFetcher->getLastOpTimeFetched_forTest(),
-                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Check that the oplog fetcher has shut down to make sure it has processed the next batch
     // before verifying the batch's contents.
