@@ -568,11 +568,9 @@ Status storeMongodOptions(const moe::Environment& params) {
 
             if (params.count("replication.enableMajorityReadConcern") &&
                 !params["replication.enableMajorityReadConcern"].as<bool>()) {
-                LOGV2_WARNING(
-                    20879,
-                    "Config servers require majority read concern, but it was explicitly "
-                    "disabled. The override is being ignored and the process is continuing "
-                    "with majority read concern enabled.");
+                LOGV2_WARNING(20879,
+                              "Ignoring read concern override as config server requires majority "
+                              "read concern");
             }
             serverGlobalParams.enableMajorityReadConcern = true;
 
@@ -630,7 +628,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         LOGV2(20877, "");
         LOGV2_WARNING(20880,
                       "32-bit servers don't have journaling enabled by default. Please use "
-                      "--journal if you want durability.");
+                      "--journal if you want durability");
         LOGV2(20878, "");
     }
 
