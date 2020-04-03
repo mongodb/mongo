@@ -48,6 +48,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
     const char* getSourceName() const final;
+    boost::intrusive_ptr<DocumentSource> optimize() final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,

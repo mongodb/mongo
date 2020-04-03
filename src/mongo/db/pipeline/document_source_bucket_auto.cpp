@@ -111,6 +111,14 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::getNext() {
     return makeDocument(*(_bucketsIterator++));
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::optimize() {
+    _groupByExpression = _groupByExpression->optimize();
+    for (auto&& accumulatedField : _accumulatedFields) {
+        accumulatedField.expression = accumulatedField.expression->optimize();
+    }
+    return this;
+}
+
 DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) const {
     // Add the 'groupBy' expression.
     _groupByExpression->addDependencies(deps);
