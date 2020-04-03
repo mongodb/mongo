@@ -163,6 +163,110 @@ public:
     }
 
     /**
+     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
+     * the function to the _t member or forwarding the _status. This is the lvalue overload.
+     */
+    template <typename F>
+    StatusWith<std::invoke_result_t<F&&, T&>> transform(F&& f) & {
+        if (_t)
+            return {std::forward<F>(f)(*_t)};
+        else
+            return {_status};
+    }
+
+    /**
+     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
+     * the function to the _t member or forwarding the _status. This is the const overload.
+     */
+    template <typename F>
+    StatusWith<std::invoke_result_t<F&&, const T&>> transform(F&& f) const& {
+        if (_t)
+            return {std::forward<F>(f)(*_t)};
+        else
+            return {_status};
+    }
+
+    /**
+     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
+     * the function to the _t member or forwarding the _status. This is the rvalue overload.
+     */
+    template <typename F>
+    StatusWith<std::invoke_result_t<F&&, T&&>> transform(F&& f) && {
+        if (_t)
+            return {std::forward<F>(f)(*std::move(_t))};
+        else
+            return {std::move(_status)};
+    }
+
+    /**
+     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
+     * the function to the _t member or forwarding the _status. This is the const rvalue overload.
+     */
+    template <typename F>
+    StatusWith<std::invoke_result_t<F&&, const T&&>> transform(F&& f) const&& {
+        if (_t)
+            return {std::forward<F>(f)(*std::move(_t))};
+        else
+            return {std::move(_status)};
+    }
+
+    /**
+     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
+     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
+     * _status. andThen performs the same function as transform but for a function f with a return
+     * type of StatusWith. This is the lvalue overload.
+     */
+    template <typename F>
+    StatusWith<typename std::invoke_result_t<F&&, T&>::value_type> andThen(F&& f) & {
+        if (_t)
+            return {std::forward<F>(f)(*_t)};
+        else
+            return {_status};
+    }
+
+    /**
+     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
+     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
+     * _status. andThen performs the same function as transform but for a function f with a return
+     * type of StatusWith. This is the const overload.
+     */
+    template <typename F>
+    StatusWith<typename std::invoke_result_t<F&&, const T&>::value_type> andThen(F&& f) const& {
+        if (_t)
+            return {std::forward<F>(f)(*_t)};
+        else
+            return {_status};
+    }
+
+    /**
+     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
+     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
+     * _status. andThen performs the same function as transform but for a function f with a return
+     * type of StatusWith. This is the rvalue overload.
+     */
+    template <typename F>
+    StatusWith<typename std::invoke_result_t<F&&, T&&>::value_type> andThen(F&& f) && {
+        if (_t)
+            return {std::forward<F>(f)(*std::move(_t))};
+        else
+            return {std::move(_status)};
+    }
+
+    /**
+     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
+     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
+     * _status. andThen performs the same function as transform but for a function f with a return
+     * type of StatusWith. This is the const rvalue overload.
+     */
+    template <typename F>
+    StatusWith<typename std::invoke_result_t<F&&, const T&&>::value_type> andThen(F&& f) const&& {
+        if (_t)
+            return {std::forward<F>(f)(*std::move(_t))};
+        else
+            return {std::move(_status)};
+    }
+
+    /**
      * This method is a transitional tool, to facilitate transition to compile-time enforced status
      * checking.
      *

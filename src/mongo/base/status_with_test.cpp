@@ -28,8 +28,11 @@
  */
 
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
@@ -87,6 +90,436 @@ TEST(StatusWith, nonDefaultConstructible) {
 TEST(StatusWith, ignoreTest) {
     // A compile-only test
     [] { return StatusWith(false); }().getStatus().ignore();
+}
+
+TEST(StatusWith, MonadicTestLValue) {
+    {
+        auto from = StatusWith<int>{3};
+        auto to = from.transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{3};
+        auto to = from.andThen([](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.andThen([](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{3};
+        auto to = from.andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "lousy value"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+}
+
+TEST(StatusWith, MonadicTestConst) {
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = from.transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = from.andThen([](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.andThen([](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = from.andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "lousy value"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = from.andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+}
+
+TEST(StatusWith, MonadicTestRValue) {
+    {
+        auto from = StatusWith<int>{3};
+        auto to = std::move(from).transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{3};
+        auto to = std::move(from).andThen(
+            [](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).andThen(
+            [](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{3};
+        auto to = std::move(from).andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "lousy value"), to.getStatus());
+    }
+    {
+        auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+}
+
+TEST(StatusWith, MonadicTestConstRValue) {
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = std::move(from).transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).transform([](auto&& i) { return static_cast<double>(i); });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::transform returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = std::move(from).andThen(
+            [](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(3.0, to.getValue());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).andThen(
+            [](auto&& i) { return StatusWith<double>{static_cast<double>(i)}; });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{3};
+        auto to = std::move(from).andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "lousy value"), to.getStatus());
+    }
+    {
+        const auto from = StatusWith<int>{Status{ErrorCodes::IllegalOperation, "broke the law"}};
+        auto to = std::move(from).andThen([](auto&& i) {
+            return StatusWith<double>{Status{ErrorCodes::BadValue, "lousy value"}};
+        });
+        static_assert(std::is_same_v<StatusWith<double>, decltype(to)>,
+                      "StatusWith::andThen returns incorrect type");
+        ASSERT_EQ(Status(ErrorCodes::IllegalOperation, "broke the law"), to.getStatus());
+    }
+}
+
+TEST(StatusWith, Overload) {
+    struct LValue {};
+    struct Const {};
+    struct RValue {};
+    struct ConstRValue {};
+
+    struct {
+        auto operator()(int&) & {
+            return std::pair{LValue{}, LValue{}};
+        }
+        auto operator()(const int&) & {
+            return std::pair{Const{}, LValue{}};
+        }
+        auto operator()(int&&) & {
+            return std::pair{RValue{}, LValue{}};
+        }
+        auto operator()(const int&&) & {
+            return std::pair{ConstRValue{}, LValue{}};
+        }
+
+        auto operator()(int&) const& {
+            return std::pair{LValue{}, Const{}};
+        }
+        auto operator()(const int&) const& {
+            return std::pair{Const{}, Const{}};
+        }
+        auto operator()(int&&) const& {
+            return std::pair{RValue{}, Const{}};
+        }
+        auto operator()(const int&&) const& {
+            return std::pair{ConstRValue{}, Const{}};
+        }
+
+        auto operator()(int&) && {
+            return std::pair{LValue{}, RValue{}};
+        }
+        auto operator()(const int&) && {
+            return std::pair{Const{}, RValue{}};
+        }
+        auto operator()(int&&) && {
+            return std::pair{RValue{}, RValue{}};
+        }
+        auto operator()(const int&&) && {
+            return std::pair{ConstRValue{}, RValue{}};
+        }
+
+        auto operator()(int&) const&& {
+            return std::pair{LValue{}, ConstRValue{}};
+        }
+        auto operator()(const int&) const&& {
+            return std::pair{Const{}, ConstRValue{}};
+        }
+        auto operator()(int&&) const&& {
+            return std::pair{RValue{}, ConstRValue{}};
+        }
+        auto operator()(const int&&) const&& {
+            return std::pair{ConstRValue{}, ConstRValue{}};
+        }
+    } transformFuncs;
+    struct {
+        auto operator()(int&) & {
+            return StatusWith{std::pair{LValue{}, LValue{}}};
+        }
+        auto operator()(const int&) & {
+            return StatusWith{std::pair{Const{}, LValue{}}};
+        }
+        auto operator()(int&&) & {
+            return StatusWith{std::pair{RValue{}, LValue{}}};
+        }
+        auto operator()(const int&&) & {
+            return StatusWith{std::pair{ConstRValue{}, LValue{}}};
+        }
+
+        auto operator()(int&) const& {
+            return StatusWith{std::pair{LValue{}, Const{}}};
+        }
+        auto operator()(const int&) const& {
+            return StatusWith{std::pair{Const{}, Const{}}};
+        }
+        auto operator()(int&&) const& {
+            return StatusWith{std::pair{RValue{}, Const{}}};
+        }
+        auto operator()(const int&&) const& {
+            return StatusWith{std::pair{ConstRValue{}, Const{}}};
+        }
+
+        auto operator()(int&) && {
+            return StatusWith{std::pair{LValue{}, RValue{}}};
+        }
+        auto operator()(const int&) && {
+            return StatusWith{std::pair{Const{}, RValue{}}};
+        }
+        auto operator()(int&&) && {
+            return StatusWith{std::pair{RValue{}, RValue{}}};
+        }
+        auto operator()(const int&&) && {
+            return StatusWith{std::pair{ConstRValue{}, RValue{}}};
+        }
+
+        auto operator()(int&) const&& {
+            return StatusWith{std::pair{LValue{}, ConstRValue{}}};
+        }
+        auto operator()(const int&) const&& {
+            return StatusWith{std::pair{Const{}, ConstRValue{}}};
+        }
+        auto operator()(int&&) const&& {
+            return StatusWith{std::pair{RValue{}, ConstRValue{}}};
+        }
+        auto operator()(const int&&) const&& {
+            return StatusWith{std::pair{ConstRValue{}, ConstRValue{}}};
+        }
+    } andThenFuncs;
+    {
+        auto in = StatusWith<int>{3};
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, LValue>>,
+                                     decltype(in.transform(transformFuncs))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, LValue>>,
+                                     decltype(in.andThen(andThenFuncs))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, Const>>,
+                                     decltype(in.transform(std::as_const(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, Const>>,
+                                     decltype(in.andThen(std::as_const(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, RValue>>,
+                                     decltype(in.transform(std::move(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, RValue>>,
+                                     decltype(in.andThen(std::move(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<LValue, ConstRValue>>,
+                           decltype(in.transform(std::move(std::as_const(transformFuncs))))>,
+            "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<LValue, ConstRValue>>,
+                                     decltype(in.andThen(std::move(std::as_const(andThenFuncs))))>,
+                      "StatusWith::andThen returns incorrect type");
+    }
+    {
+        const auto in = StatusWith<int>{3};
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, LValue>>,
+                                     decltype(in.transform(transformFuncs))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, LValue>>,
+                                     decltype(in.andThen(andThenFuncs))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, Const>>,
+                                     decltype(in.transform(std::as_const(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, Const>>,
+                                     decltype(in.andThen(std::as_const(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, RValue>>,
+                                     decltype(in.transform(std::move(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, RValue>>,
+                                     decltype(in.andThen(std::move(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<Const, ConstRValue>>,
+                           decltype(in.transform(std::move(std::as_const(transformFuncs))))>,
+            "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<Const, ConstRValue>>,
+                                     decltype(in.andThen(std::move(std::as_const(andThenFuncs))))>,
+                      "StatusWith::andThen returns incorrect type");
+    }
+    {
+        auto in = StatusWith<int>{3};
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, LValue>>,
+                                     decltype(std::move(in).transform(transformFuncs))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, LValue>>,
+                                     decltype(std::move(in).andThen(andThenFuncs))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<RValue, Const>>,
+                           decltype(std::move(in).transform(std::as_const(transformFuncs)))>,
+            "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, Const>>,
+                                     decltype(std::move(in).andThen(std::as_const(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, RValue>>,
+                                     decltype(std::move(in).transform(std::move(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, RValue>>,
+                                     decltype(std::move(in).andThen(std::move(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<RValue, ConstRValue>>,
+                                     decltype(std::move(in).transform(
+                                         std::move(std::as_const(transformFuncs))))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<RValue, ConstRValue>>,
+                           decltype(std::move(in).andThen(std::move(std::as_const(andThenFuncs))))>,
+            "StatusWith::andThen returns incorrect type");
+    }
+    {
+        const auto in = StatusWith<int>{3};
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, LValue>>,
+                                     decltype(std::move(in).transform(transformFuncs))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, LValue>>,
+                                     decltype(std::move(in).andThen(andThenFuncs))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<ConstRValue, Const>>,
+                           decltype(std::move(in).transform(std::as_const(transformFuncs)))>,
+            "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, Const>>,
+                                     decltype(std::move(in).andThen(std::as_const(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, RValue>>,
+                                     decltype(std::move(in).transform(std::move(transformFuncs)))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, RValue>>,
+                                     decltype(std::move(in).andThen(std::move(andThenFuncs)))>,
+                      "StatusWith::andThen returns incorrect type");
+        static_assert(std::is_same_v<StatusWith<std::pair<ConstRValue, ConstRValue>>,
+                                     decltype(std::move(in).transform(
+                                         std::move(std::as_const(transformFuncs))))>,
+                      "StatusWith::transform returns incorrect type");
+        static_assert(
+            std::is_same_v<StatusWith<std::pair<ConstRValue, ConstRValue>>,
+                           decltype(std::move(in).andThen(std::move(std::as_const(andThenFuncs))))>,
+            "StatusWith::andThen returns incorrect type");
+    }
 }
 
 }  // namespace
