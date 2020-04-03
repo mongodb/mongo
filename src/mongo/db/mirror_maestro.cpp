@@ -34,6 +34,8 @@
 
 #include "mongo/db/mirror_maestro.h"
 
+#include <cmath>
+#include <cstdlib>
 #include <utility>
 
 #include <fmt/format.h>
@@ -71,6 +73,7 @@ constexpr auto kMirroredReadsName = "mirroredReads"_sd;
 constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
+constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
 
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
 
@@ -182,10 +185,45 @@ public:
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail())) {
             // We only can see if the command resolved if we got a response
             section.append(kMirroredReadsResolvedKey, resolved.loadRelaxed());
+            section.append(kMirroredReadsResolvedBreakdownKey, resolvedBreakdown.toBSON());
         }
 
         return section.obj();
     };
+
+    /**
+     * Maintains a breakdown for resolved requests by host name.
+     * This class may only be used for testing (e.g., as part of a fail-point).
+     */
+    class ResolvedBreakdownByHost {
+    public:
+        void onResponseReceived(const HostAndPort& host) noexcept {
+            const auto hostName = host.toString();
+            stdx::lock_guard<Mutex> lk(_mutex);
+
+            if (_resolved.find(hostName) == _resolved.end()) {
+                _resolved[hostName] = 0;
+            }
+
+            _resolved[hostName]++;
+        }
+
+        BSONObj toBSON() const noexcept {
+            stdx::lock_guard<Mutex> lk(_mutex);
+            BSONObjBuilder bob;
+            for (auto entry : _resolved) {
+                bob.append(entry.first, entry.second);
+            }
+            return bob.obj();
+        }
+
+    private:
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("ResolvedBreakdownByHost"_sd);
+
+        stdx::unordered_map<std::string, CounterT> _resolved;
+    };
+
+    ResolvedBreakdownByHost resolvedBreakdown;
 
     AtomicWord<CounterT> seen;
     AtomicWord<CounterT> sent;
@@ -266,24 +304,20 @@ void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation)
     gMirroredReadsSection.seen.fetchAndAdd(1);
 
     auto params = _params->_data.get();
-    auto samplingParams = MirroringSampler::SamplingParameters(params.getSamplingRate());
-    if (!_sampler.shouldSample(samplingParams)) {
-        // If we wouldn't select a host, then nothing more to do
+    if (params.getSamplingRate() == 0) {
+        // Nothing to do if sampling rate is zero.
         return;
     }
 
     auto imr = _topologyVersionObserver.getCached();
-    if (!imr) {
-        // If we don't have an IsMasterResponse, we can't know where to send our mirrored
-        // request
+    auto samplingParams = MirroringSampler::SamplingParameters(params.getSamplingRate());
+    if (!_sampler.shouldSample(imr, samplingParams)) {
+        // If we wouldn't select a host, then nothing more to do
         return;
     }
 
     auto hosts = _sampler.getRawMirroringTargets(imr);
-    if (hosts.empty()) {
-        // If we had no eligible hosts, nothing more to do
-        return;
-    }
+    invariant(!hosts.empty());
 
     auto clientExecutor = ClientOutOfLineExecutor::get(Client::getCurrent());
     auto clientExecutorHandle = clientExecutor->getHandle();
@@ -333,9 +367,12 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         return bob.obj();
     }();
 
-    // TODO SERVER-46514 When we figure out how to deallocate CommandInvocations effectively, we
-    // should do a normalized sample here.
-    for (auto& host : hosts) {
+    // Mirror to a normalized subset of eligible hosts (i.e., secondaries).
+    const auto startIndex = rand() % hosts.size();
+    const auto mirroringFactor = std::ceil(params.getSamplingRate() * hosts.size());
+
+    for (auto i = 0; i < mirroringFactor; i++) {
+        auto& host = hosts[(startIndex + i) % hosts.size()];
         auto mirrorResponseCallback = [host](auto& args) {
             if (MONGO_likely(!mirrorMaestroExpectsResponse.shouldFail())) {
                 // If we don't expect responses, then there is nothing to do here
@@ -349,6 +386,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
             }
 
             gMirroredReadsSection.resolved.fetchAndAdd(1);
+            gMirroredReadsSection.resolvedBreakdown.onResponseReceived(host);
             LOGV2_DEBUG(
                 31457, 4, "Response received", "host"_attr = host, "response"_attr = args.response);
         };

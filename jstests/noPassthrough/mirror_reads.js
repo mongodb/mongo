@@ -24,14 +24,13 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
 
     jsTestLog(`Sending ${kBurstCount} request burst of ${tojson(cmd)} to primary`);
 
-    // Blast out a set of trivial reads
     for (var i = 0; i < kBurstCount; ++i) {
         rst.getPrimary().getDB(kDbName).runCommand(cmd);
     }
 
     jsTestLog(`Verifying ${tojson(cmd)} was mirrored`);
 
-    // Verify that the reads have been observed on the primary
+    // Verify that the commands have been observed on the primary
     {
         let currentMirroredReads = getMirroredReadsStats(rst);
         assert.lte(startMirroredReads.seen + kBurstCount, currentMirroredReads.seen);
@@ -125,5 +124,82 @@ function verifyMirrorReads(rst, cmd) {
         rst, {update: kCollName, updates: [{q: {_id: 1}, u: {'$inc': {x: 1}}}], ordered: false});
 
     rst.stopSet();
+}
+
+function computeMean(before, after) {
+    let sum = 0;
+    let count = 0;
+
+    Object.keys(after.resolvedBreakdown).forEach(function(host) {
+        sum = sum + after.resolvedBreakdown[host];
+        if (host in before.resolvedBreakdown) {
+            sum = sum - before.resolvedBreakdown[host];
+        }
+        count = count + 1;
+    });
+
+    return sum / count;
+}
+
+function computeSTD(before, after, mean) {
+    let stDev = 0.0;
+    let count = 0;
+
+    Object.keys(after.resolvedBreakdown).forEach(function(host) {
+        let result = after.resolvedBreakdown[host];
+        if (host in before.resolvedBreakdown) {
+            result = result - before.resolvedBreakdown[host];
+        }
+        result = result - mean;
+        result = result * result;
+        stDev = stDev + result;
+
+        count = count + 1;
+    });
+
+    return Math.sqrt(stDev / count);
+}
+
+function verifyMirroringDistribution(rst) {
+    let nodeCount = rst.nodes.length;
+
+    const samplingRate = 0.5;
+    const gaussDeviation = .34;
+    const max = samplingRate + gaussDeviation;
+    const min = samplingRate - gaussDeviation;
+
+    jsTestLog(`Running test with sampling rate = ${samplingRate}`);
+    assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
+
+    let before = getMirroredReadsStats(rst);
+
+    sendAndCheckReads({rst: rst, cmd: {find: kCollName, filter: {}}, minRate: min, maxRate: max});
+
+    let after = getMirroredReadsStats(rst);
+
+    let mean = computeMean(before, after);
+    let std = computeSTD(before, after, mean);
+    jsTestLog(`Mean =  ${mean}; STD = ${std}`);
+
+    // Verify that relative standard deviation is less than 25%.
+    let relativeSTD = std / mean;
+    assert(relativeSTD < 0.25);
+}
+
+{
+    for (var secondaries = 2; secondaries <= 4; secondaries++) {
+        const rst = new ReplSetTest({
+            nodes: secondaries + 1,
+            nodeOptions: {
+                setParameter: {"failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"})}
+            }
+        });
+        rst.startSet();
+        rst.initiateWithHighElectionTimeout();
+
+        jsTestLog(`Verifying mirroring distribution for ${secondaries} secondaries`);
+        verifyMirroringDistribution(rst);
+        rst.stopSet();
+    }
 }
 })();
