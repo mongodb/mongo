@@ -59,6 +59,8 @@ server_parameters:
     cpp_vartype: int
     cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
     default: 2000 # 2secs
+    validator:
+      gte: 0
 
   readHedgingMode:
     description: >-
