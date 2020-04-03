@@ -123,5 +123,147 @@ MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
     mongo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }
+
+TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
+    auto harnessHelper = makeHarnessHelper();
+    bool unique = false;
+    bool partial = false;
+    auto sdi = dynamic_cast<SortedDataInterfaceHarnessHelper*>(harnessHelper.get())
+                   ->newSortedDataInterface(unique, partial);
+
+    // Populate data.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto key = BSON("" << 1);
+        auto res = sdi->insert(opCtx.get(), key, RecordId(1), true);
+        ASSERT_OK(res);
+
+        key = BSON("" << 2);
+        res = sdi->insert(opCtx.get(), key, RecordId(2), true);
+        ASSERT_OK(res);
+
+        uow.commit();
+    }
+
+    // Cursors should always ensure they are in an active transaction when next() is called.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+
+        auto cursor = sdi->newCursor(opCtx.get());
+        auto res = cursor->seek(BSONObj(), true);
+        ASSERT(res);
+
+        ASSERT_TRUE(ru->inActiveTxn());
+
+        // Committing a WriteUnitOfWork will end the current transaction.
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_TRUE(ru->inActiveTxn());
+        wuow.commit();
+        ASSERT_FALSE(ru->inActiveTxn());
+
+        // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
+        ASSERT(cursor->next());
+        ASSERT_TRUE(ru->inActiveTxn());
+    }
+}
+
+TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
+    auto harnessHelper = makeHarnessHelper();
+    bool unique = false;
+    bool partial = false;
+    auto sdi = dynamic_cast<SortedDataInterfaceHarnessHelper*>(harnessHelper.get())
+                   ->newSortedDataInterface(unique, partial);
+
+    // Populate data.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto key = BSON("" << 1);
+        bool inclusive = true;
+        auto res = sdi->insert(opCtx.get(), key, RecordId(1), inclusive);
+        ASSERT_OK(res);
+
+        key = BSON("" << 2);
+        res = sdi->insert(opCtx.get(), key, RecordId(2), inclusive);
+        ASSERT_OK(res);
+
+        uow.commit();
+    }
+
+    // Cursors should always ensure they are in an active transaction when seek() is called.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+
+        auto cursor = sdi->newCursor(opCtx.get());
+
+        bool inclusive = true;
+        ASSERT(cursor->seek(BSON("" << 1), inclusive));
+        ASSERT_TRUE(ru->inActiveTxn());
+
+        // Committing a WriteUnitOfWork will end the current transaction.
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_TRUE(ru->inActiveTxn());
+        wuow.commit();
+        ASSERT_FALSE(ru->inActiveTxn());
+
+        // If a cursor is used after a WUOW commits, it should implicitly start a new
+        // transaction.
+        ASSERT(cursor->seek(BSON("" << 1), inclusive));
+        ASSERT_TRUE(ru->inActiveTxn());
+    }
+}
+
+TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeekExact) {
+    auto harnessHelper = makeHarnessHelper();
+    bool unique = false;
+    bool partial = false;
+    auto sdi = dynamic_cast<SortedDataInterfaceHarnessHelper*>(harnessHelper.get())
+                   ->newSortedDataInterface(unique, partial);
+
+    // Populate data.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto key = BSON("" << 1);
+        auto res = sdi->insert(opCtx.get(), key, RecordId(1), true);
+        ASSERT_OK(res);
+
+        key = BSON("" << 2);
+        res = sdi->insert(opCtx.get(), key, RecordId(2), true);
+        ASSERT_OK(res);
+
+        uow.commit();
+    }
+
+    // Cursors should always ensure they are in an active transaction when seekExact() is
+    // called.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+
+        auto cursor = sdi->newCursor(opCtx.get());
+
+        ASSERT(cursor->seekExact(BSON("" << 1)));
+        ASSERT_TRUE(ru->inActiveTxn());
+
+        // Committing a WriteUnitOfWork will end the current transaction.
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_TRUE(ru->inActiveTxn());
+        wuow.commit();
+        ASSERT_FALSE(ru->inActiveTxn());
+
+        // If a cursor is used after a WUOW commits, it should implicitly start a new
+        // transaction.
+        ASSERT(cursor->seekExact(BSON("" << 1)));
+        ASSERT_TRUE(ru->inActiveTxn());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

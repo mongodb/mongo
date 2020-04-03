@@ -814,6 +814,9 @@ public:
         if (_eof)
             return {};
 
+        // Ensure an active transaction is open.
+        WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+
         if (!_lastMoveSkippedKey)
             advanceWTCursor();
         updatePosition(true);
@@ -1020,6 +1023,9 @@ protected:
 
     // Seeks to query. Returns true on exact match.
     bool seekWTCursor(const KeyString& query) {
+        // Ensure an active transaction is open.
+        WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+
         WT_CURSOR* c = _cursor->get();
 
         int cmp = -1;

@@ -544,20 +544,26 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex.value());
 
-            WriteUnitOfWork wunit(opCtx);
-            Status ret = insert(opCtx, objToIndex.value(), loc);
-            if (_method == IndexBuildMethod::kBackground)
-                exec->saveState();
-            if (!ret.isOK()) {
-                // Fail the index build hard.
-                return ret;
-            }
-            wunit.commit();
             if (_method == IndexBuildMethod::kBackground) {
+                WriteUnitOfWork wunit(opCtx);
+
+                Status ret = insert(opCtx, objToIndex.value(), loc);
+                if (!ret.isOK()) {
+                    return ret;
+                }
+                exec->saveState();
+                wunit.commit();
                 try {
                     exec->restoreState();  // Handles any WCEs internally.
                 } catch (...) {
                     return exceptionToStatus();
+                }
+            } else {
+                // The external sorter is not part of the storage engine and therefore does not need
+                // a WriteUnitOfWork to write keys.
+                Status ret = insert(opCtx, objToIndex.value(), loc);
+                if (!ret.isOK()) {
+                    return ret;
                 }
             }
 
