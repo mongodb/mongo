@@ -2087,6 +2087,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     if (_eof)
         return {};
 
+    // Ensure an active transaction is open. While WiredTiger supports using cursors on a session
+    // without an active transaction (i.e. an implicit transaction), that would bypass configuration
+    // options we pass when we explicitly start transactions in the RecoveryUnit.
+    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+
     WT_CURSOR* c = _cursor->get();
 
     RecordId id;
@@ -2145,6 +2150,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
         _eof = true;
         return {};
     }
+
+    // Ensure an active transaction is open. While WiredTiger supports using cursors on a session
+    // without an active transaction (i.e. an implicit transaction), that would bypass configuration
+    // options we pass when we explicitly start transactions in the RecoveryUnit.
+    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
