@@ -73,7 +73,6 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
             # joining the flush thread here also means that resmoke.py won't hang due a logger from
             # a fixture or a background hook not being closed.
             self._exit_on_incomplete_logging()
-            return
 
         flush_success = logging.flush.stop_thread()
         if not flush_success:
@@ -92,18 +91,18 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
             self._resmoke_logger.info(
                 "We failed to flush all log output to logkeeper but all tests passed, so"
                 " ignoring.")
-            return
+        else:
+            exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
+            self._resmoke_logger.info(
+                "Exiting with code %d rather than requested code %d because we failed to flush all"
+                " log output to logkeeper.", exit_code, self._exit_code)
+            self._exit_code = exit_code
 
-        exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
-        self._resmoke_logger.info(
-            "Exiting with code %d rather than requested code %d because we failed to flush all"
-            " log output to logkeeper.", exit_code, self._exit_code)
-        self._exit_code = exit_code
         # Force exit the process without cleaning up or calling the finally block
         # to avoid threads making system calls from blocking process termination.
         # This must be the last line of code that is run.
         # pylint: disable=protected-access
-        os._exit(exit_code)
+        os._exit(self._exit_code)
 
     def run(self):
         """Run resmoke."""
