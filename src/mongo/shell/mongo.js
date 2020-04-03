@@ -574,9 +574,9 @@ Mongo.prototype.startSession = function startSession(options = {}) {
 
     // Only log this message if we are running a test
     if (typeof TestData === "object" && TestData.testName) {
-        jsTest.log("New session started with sessionID: " +
-                   tojsononeline(newDriverSession.getSessionId()) +
-                   " and options: " + tojsononeline(options));
+        print("New session started with sessionID: " +
+              tojsononeline(newDriverSession.getSessionId()) +
+              " and options: " + tojsononeline(options));
     }
 
     return newDriverSession;
