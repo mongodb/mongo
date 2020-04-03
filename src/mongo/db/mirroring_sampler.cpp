@@ -63,9 +63,28 @@ MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
           return std::move(rnd)();
       }()) {}
 
-bool MirroringSampler::shouldSample(const SamplingParameters& params) const noexcept {
+bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::IsMasterResponse>& imr,
+                                    const SamplingParameters& params) const noexcept {
+    if (!imr) {
+        // If we don't have an IsMasterResponse, we can't know where to send our mirrored request.
+        return false;
+    }
+
+    const auto secondariesCount = imr->getHosts().size() - 1;
+    if (!imr->isMaster() || secondariesCount < 1) {
+        // If this is not the primary, or there are no eligible secondaries, nothing more to do.
+        return false;
+    }
+    invariant(secondariesCount > 0);
+
+    // Adjust ratio to mirror read requests to approximately `samplingRate x secondariesCount`.
+    const auto secondariesRatio = secondariesCount * params.ratio;
+    const auto mirroringFactor = std::ceil(secondariesRatio);
+    invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
+    const double adjustedRatio = secondariesRatio / mirroringFactor;
+
     // If our value is less than our max, then take a sample.
-    return params.value < static_cast<int>(params.max * params.ratio);
+    return params.value < static_cast<int>(params.max * adjustedRatio);
 }
 
 std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
@@ -103,7 +122,7 @@ std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
     auto sampler = MirroringSampler();
 
     auto samplingParams = SamplingParameters(ratio, rndMax, std::move(rnd));
-    if (!sampler.shouldSample(samplingParams)) {
+    if (!sampler.shouldSample(isMaster, samplingParams)) {
         return {};
     }
 

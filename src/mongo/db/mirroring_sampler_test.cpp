@@ -45,8 +45,9 @@ DEATH_TEST(MirroringSamplerTest, ValidateLargeRatio, "invariant") {
     MirroringSampler::getMirroringTargets(dummyIsMaster, 1.1);
 }
 
-DEATH_TEST(MirroringSamplerTest, ValidateMissingIsMaster, "invariant") {
-    MirroringSampler::getMirroringTargets(nullptr, 1);
+TEST(MirroringSamplerTest, ValidateMissingIsMaster) {
+    auto targets = MirroringSampler::getMirroringTargets(nullptr, 1);
+    ASSERT_EQ(targets.size(), 0);
 }
 
 TEST(MirroringSamplerTest, ValidateHostIsPrimary) {

@@ -83,9 +83,10 @@ public:
     };
 
     /**
-     * Use the given params to determine if we should attempt to sample.
+     * Use the given imr and params to determine if we should attempt to sample.
      */
-    bool shouldSample(const SamplingParameters& params) const noexcept;
+    bool shouldSample(const std::shared_ptr<const repl::IsMasterResponse>& imr,
+                      const SamplingParameters& params) const noexcept;
 
     /**
      * Return all eligible hosts from an IsMasterResponse that we should mirror to.
