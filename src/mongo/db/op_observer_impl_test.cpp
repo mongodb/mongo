@@ -257,7 +257,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX, MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, ttlInfo);
         wunit.commit();
@@ -306,7 +306,7 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX, MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCollMod(opCtx.get(), nss, uuid, collModCmd, oldCollOpts, boost::none);
         wunit.commit();

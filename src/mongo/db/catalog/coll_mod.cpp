@@ -246,9 +246,13 @@ Status _collModInternal(OperationContext* opCtx,
                         BSONObjBuilder* result,
                         bool upgradeUniqueIndexes) {
     StringData dbName = nss.db();
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
-    Database* const db = autoDb.getDb();
-    Collection* coll = db ? db->getCollection(opCtx, nss) : nullptr;
+    AutoGetCollection autoColl(
+        opCtx, nss, MODE_IX, MODE_X, AutoGetCollection::ViewMode::kViewsPermitted);
+    Lock::CollectionLock systemViewsLock(
+        opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
+
+    Database* const db = autoColl.getDb();
+    Collection* coll = autoColl.getCollection();
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterDatabaseLock);
 
