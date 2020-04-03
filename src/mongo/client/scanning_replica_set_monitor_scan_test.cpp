@@ -1550,7 +1550,7 @@ public:
     }
 
 protected:
-    decltype(_notifier)::ListenerHandle _listener = _notifier.makeListener<Listener>();
+    std::shared_ptr<decltype(_notifier)::Listener> _listener = _notifier.makeListener<Listener>();
 
     std::shared_ptr<SetState> _state = makeState(basicUri);
 };

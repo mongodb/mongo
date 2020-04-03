@@ -193,7 +193,7 @@ private:
         boost::optional<PoolId> maybeId;
     };
 
-    ReplicaSetChangeListenerHandle _listener;
+    std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingTaskExecutorPoolController::_mutex");
 

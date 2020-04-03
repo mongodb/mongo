@@ -39,18 +39,11 @@
 
 namespace mongo {
 
-void ReplicaSetChangeNotifier::_addListener(Listener* listener) {
+void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) {
     stdx::lock_guard lk(_mutex);
 
     listener->init(this);
     _listeners.push_back(listener);
-}
-
-void ReplicaSetChangeNotifier::_removeListener(Listener* listener) {
-    stdx::lock_guard lk(_mutex);
-
-    auto& listeners = _listeners;
-    listeners.erase(std::remove(listeners.begin(), listeners.end(), listener), listeners.end());
 }
 
 void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
@@ -64,7 +57,9 @@ void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
     lk.unlock();
 
     for (auto listener : listeners) {
-        listener->onFoundSet(name);
+        if (auto l = listener.lock()) {
+            l->onFoundSet(name);
+        }
     };
 }
 
@@ -92,7 +87,9 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
     lk.unlock();
 
     for (auto listener : listeners) {
-        listener->onPossibleSet(state);
+        if (auto l = listener.lock()) {
+            l->onPossibleSet(state);
+        }
     };
 }
 
@@ -123,7 +120,9 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
     lk.unlock();
 
     for (auto listener : listeners) {
-        listener->onConfirmedSet(state);
+        if (auto l = listener.lock()) {
+            l->onConfirmedSet(state);
+        }
     };
 }
 
@@ -144,7 +143,9 @@ void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) noexcept {
     lk.unlock();
 
     for (auto listener : listeners) {
-        listener->onDroppedSet(name);
+        if (auto l = listener.lock()) {
+            l->onDroppedSet(name);
+        }
     };
 }
 
