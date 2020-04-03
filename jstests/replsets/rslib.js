@@ -22,6 +22,7 @@ var waitForConfigReplication;
 var assertSameConfigContent;
 var isMemberNewlyAdded;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
+var assertVoteCount;
 
 (function() {
 "use strict";
@@ -759,5 +760,14 @@ waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force
     assert.soonNoExcept(function() {
         return !isMemberNewlyAdded(node, memberIndex, force) && isConfigCommitted(node);
     }, () => tojson(node.getDB("local").system.replset.findOne()));
+};
+
+assertVoteCount = function(
+    node, {votingMembersCount, majorityVoteCount, writableVotingMembersCount, writeMajorityCount}) {
+    const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+    assert.eq(status["votingMembersCount"], votingMembersCount, tojson(status));
+    assert.eq(status["majorityVoteCount"], majorityVoteCount, tojson(status));
+    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, tojson(status));
+    assert.eq(status["writeMajorityCount"], writeMajorityCount, tojson(status));
 };
 }());

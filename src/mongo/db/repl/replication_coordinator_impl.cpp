@@ -124,6 +124,7 @@ MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
 // Will cause signal drain complete to hang after reconfig
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
+MONGO_FAIL_POINT_DEFINE(doNotRemoveNewlyAddedOnHeartbeats);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -3540,6 +3541,14 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
                     "memberId"_attr = memberId.getData(),
                     "error"_attr = cbData.status);
         // We will retry on the next heartbeat.
+        return;
+    }
+
+    if (MONGO_unlikely(doNotRemoveNewlyAddedOnHeartbeats.shouldFail())) {
+        LOGV2(
+            4709200,
+            "Not removing 'newlyAdded' field due to 'doNotremoveNewlyAddedOnHeartbeats' failpoint",
+            "memberId"_attr = memberId.getData());
         return;
     }
 

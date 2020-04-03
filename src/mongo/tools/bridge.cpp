@@ -93,10 +93,7 @@ public:
             return status.getStatus();
         }
 
-        LOGV2(22916,
-              "Processing bridge command: {cmdName}",
-              "Processing bridge command",
-              "cmdName"_attr = cmdName);
+        LOGV2(22916, "Processing bridge command", "cmdName"_attr = cmdName, "cmdObj"_attr = cmdObj);
 
         BridgeCommand* command = status.getValue();
         return command->run(cmdObj, &_settingsMutex, &_settings);

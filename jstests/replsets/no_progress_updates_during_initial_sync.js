@@ -83,6 +83,7 @@ const writeResW2 = primaryDb.runCommand({
     documents: [{"writeConcernTwo": "shouldfail"}],
     writeConcern: {w: 2, wtimeout: 4000}
 });
+assert.commandWorkedIgnoringWriteConcernErrors(writeResW2);
 checkWriteConcernTimedOut(writeResW2);
 
 // The lastCommitted opTime should not advance on the secondary.
@@ -95,6 +96,7 @@ const writeResWMaj = primaryDb.runCommand({
     documents: [{"writeConcernMajority": "shouldfail"}],
     writeConcern: {w: "majority", wtimeout: 4000}
 });
+assert.commandWorkedIgnoringWriteConcernErrors(writeResWMaj);
 checkWriteConcernTimedOut(writeResWMaj);
 
 // The lastCommitted opTime should not advance on the secondary.
