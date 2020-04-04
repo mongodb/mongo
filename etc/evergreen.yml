@@ -1888,10 +1888,17 @@ functions:
 
         ${activate_virtualenv}
 
+        chmod -R ugo-w ./src
+        ls -la src/mongo/stdx/sigaltstack_location_test.cpp || true
+
         ${compile_env|} $python ./buildscripts/scons.py                                     \
             ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
             ${scons_cache_args|} $extra_args                                                \
             ${targets} MONGO_VERSION=${version} || exit_status=$?
+
+        chmod -R ugo+w ./src
+        ls -la src/mongo/stdx/sigaltstack_location_test.cpp || true
+
         # If compile fails we do not run any tests
         if [[ $exit_status -ne 0 ]]; then
           if [[ "${dump_scons_config_on_failure}" == true ]]; then
