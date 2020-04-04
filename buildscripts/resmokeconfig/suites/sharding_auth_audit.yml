@@ -13,7 +13,11 @@ selector:
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/sharding/*[aA]uth*.js
+  - jstests/sharding/query/*[aA]uth*.js
+  - jstests/sharding/change_streams/*[aA]uth*.js
+
   - jstests/sharding/advance_cluster_time_action_type.js
+  - jstests/sharding/query/aggregation_currentop.js
   - jstests/sharding/kill_sessions.js
   # Skip these additional tests when running with auth enabled.
   - jstests/sharding/parallel.js
