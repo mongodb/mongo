@@ -191,7 +191,7 @@ boost::optional<ChunkVersion> CollectionShardingState::getCurrentShardVersionIfK
     if (!metadata->isSharded())
         return ChunkVersion::UNSHARDED();
 
-    return metadata->getCollVersion();
+    return metadata->getShardVersion();
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
