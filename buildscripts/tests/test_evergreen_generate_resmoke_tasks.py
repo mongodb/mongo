@@ -811,10 +811,10 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
 class GenerateSubSuitesTest(unittest.TestCase):
     @staticmethod
-    def get_mock_options():
+    def get_mock_options(n_fallback=2):
         options = MagicMock()
         options.target_resmoke_time = 10
-        options.fallback_num_sub_suites = 2
+        options.fallback_num_sub_suites = n_fallback
         options.max_tests_per_suite = None
         return options
 
@@ -846,17 +846,35 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
     def test_calculate_suites_fallback(self):
         n_tests = 100
+        n_fallback = 2
         evg = mock_test_stats_unavailable(MagicMock())
-        config_options = self.get_mock_options()
+        config_options = self.get_mock_options(n_fallback=n_fallback)
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
         gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
 
         suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
+        self.assertEqual(n_fallback, len(suites))
         for suite in suites:
-            self.assertEqual(50, len(suite.tests))
+            self.assertEqual(n_tests / n_fallback, len(suite.tests))
+
+        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
+
+    def test_calculate_suites_more_fallback_suites_than_tests(self):
+        n_tests = 5
+        n_fallback = 10
+        evg = mock_test_stats_unavailable(MagicMock())
+        config_options = self.get_mock_options(n_fallback=n_fallback)
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
+
+        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+
+        self.assertEqual(n_tests, len(suites))
+        for suite in suites:
+            self.assertEqual(1, len(suite.tests))
 
         self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
