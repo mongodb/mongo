@@ -830,12 +830,17 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
 {
     static WT_UPDATE tombstone = {.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE};
     WT_VISIBLE_TYPE upd_visible;
+    uint8_t type;
     bool skipped_birthmark;
 
     *updp = NULL;
+
+    type = WT_UPDATE_INVALID; /* [-Wconditional-uninitialized] */
     for (skipped_birthmark = false; upd != NULL; upd = upd->next) {
+        WT_ORDERED_READ(type, upd->type);
+
         /* Skip reserved place-holders, they're never visible. */
-        if (upd->type != WT_UPDATE_RESERVE) {
+        if (type != WT_UPDATE_RESERVE) {
             upd_visible = __wt_txn_upd_visible_type(session, upd);
             if (upd_visible == WT_VISIBLE_TRUE)
                 break;
@@ -843,14 +848,16 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
                 return (WT_PREPARE_CONFLICT);
         }
         /* An invisible birthmark is equivalent to a tombstone. */
-        if (upd->type == WT_UPDATE_BIRTHMARK)
+        if (type == WT_UPDATE_BIRTHMARK)
             skipped_birthmark = true;
     }
 
-    if (upd == NULL && skipped_birthmark)
+    if (upd == NULL && skipped_birthmark) {
         upd = &tombstone;
+        type = upd->type;
+    }
 
-    *updp = upd == NULL || upd->type == WT_UPDATE_BIRTHMARK ? NULL : upd;
+    *updp = upd == NULL || type == WT_UPDATE_BIRTHMARK ? NULL : upd;
     return (0);
 }
 
