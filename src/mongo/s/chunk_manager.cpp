@@ -636,7 +636,6 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     // sequence number to detect batch writes not making progress because of chunks moving across
     // shards too frequently.
     if (collectionVersion == startingCollectionVersion) {
-        setAllShardsRefreshed();
         return shared_from_this();
     }
 
