@@ -8,6 +8,8 @@
  * @tags: [
  *     # The primary is restarted and must retain its data.
  *     requires_persistence,
+ *     # Replica sets using WT require journaling (startup error otherwise).
+ *     requires_journaling,
  * ]
  */
 
