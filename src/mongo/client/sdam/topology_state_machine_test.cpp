@@ -458,4 +458,64 @@ TEST_F(TopologyStateMachineTestFixture, ShouldUpdateToCorrectToplogyType) {
         assertTopologyTypeTestCase(testCase);
     }
 }
+
+TEST_F(TopologyStateMachineTestFixture, ShouldMarkStalePrimaryAsUnknown) {
+    const auto freshPrimary = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
+    const auto stalePrimary = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).back();
+
+    TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
+    auto topologyDescription =
+        std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
+
+    const OID oidOne(std::string("000000000000000000000001"));
+    const OID oidTwo(std::string("000000000000000000000002"));
+
+    auto freshServerDescription = ServerDescriptionBuilder()
+                                      .withType(ServerType::kRSPrimary)
+                                      .withSetName(*topologyDescription->getSetName())
+                                      .withPrimary(freshPrimary)
+                                      .withMe(freshPrimary)
+                                      .withAddress(freshPrimary)
+                                      .withHost(freshPrimary)
+                                      .withHost(stalePrimary)
+                                      .withSetVersion(1)
+                                      .withElectionId(oidTwo)
+                                      .instance();
+
+    auto secondaryServerDescription = ServerDescriptionBuilder()
+                                          .withAddress(stalePrimary)
+                                          .withType(ServerType::kRSSecondary)
+                                          .withSetName(*topologyDescription->getSetName())
+                                          .instance();
+
+    stateMachine.onServerDescription(*topologyDescription, freshServerDescription);
+    stateMachine.onServerDescription(*topologyDescription, secondaryServerDescription);
+
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
+    ASSERT_EQUALS((*topologyDescription->getPrimary())->getAddress(), freshPrimary);
+
+    auto secondaryServer = topologyDescription->findServerByAddress(stalePrimary);
+    ASSERT_EQUALS((*secondaryServer)->getType(), ServerType::kRSSecondary);
+
+    auto staleServerDescription = ServerDescriptionBuilder()
+                                      .withType(ServerType::kRSPrimary)
+                                      .withSetName(*topologyDescription->getSetName())
+                                      .withPrimary(stalePrimary)
+                                      .withMe(stalePrimary)
+                                      .withAddress(stalePrimary)
+                                      .withHost(stalePrimary)
+                                      .withHost(freshPrimary)
+                                      .withSetVersion(1)
+                                      .withElectionId(oidOne)
+                                      .instance();
+
+    stateMachine.onServerDescription(*topologyDescription, staleServerDescription);
+
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
+    ASSERT(topologyDescription->getPrimary());
+    ASSERT_EQUALS((*topologyDescription->getPrimary())->getAddress(), freshPrimary);
+
+    auto staleServer = topologyDescription->findServerByAddress(stalePrimary);
+    ASSERT_EQUALS((*staleServer)->getType(), ServerType::kUnknown);
+}
 }  // namespace mongo::sdam
