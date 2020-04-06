@@ -561,6 +561,14 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
+    if (data.hasField("appName")) {
+        const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+        if (clientMetadata &&
+            clientMetadata.get().getApplicationName() != data.getStringField("appName")) {
+            return false;  // only activate failpoint on connection with a certain appName
+        }
+    }
+
     if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
         if (!data.hasField("failInternalCommands") || !data.getBoolField("failInternalCommands")) {
             return false;
