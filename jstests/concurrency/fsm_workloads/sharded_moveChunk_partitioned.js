@@ -22,9 +22,14 @@ var $config = extendWorkload($config, function($config, $super) {
     // verify that each node in the cluster affected by the moveChunk operation sees
     // the appropriate after-state regardless of whether the operation succeeded or failed.
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        var dbName = db.getName();
+        // Committing a chunk migration requires acquiring the global X lock on the CSRS primary.
+        // This state function is unsafe to automatically run inside a multi-statement transaction
+        // because it'll have left an idle transaction on the CSRS primary before attempting to run
+        // the moveChunk command, which can lead to a hang.
+        fsm.forceRunningOutsideTransaction(this);
+
         var ns = db[collName].getFullName();
-        var config = ChunkHelper.getPrimary(connCache.config);
+        var config = connCache.rsConns.config;
 
         // Verify that more than one shard exists in the cluster. If only one shard existed,
         // there would be no way to move a chunk from one shard to another.
@@ -73,17 +78,22 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Verify that the fromShard and toShard have the correct after-state
         // (see comments below for specifics).
-        var fromShardPrimary = ChunkHelper.getPrimary(connCache.shards[fromShard]);
-        var toShardPrimary = ChunkHelper.getPrimary(connCache.shards[toShard]);
+        var fromShardRSConn = connCache.rsConns.shards[fromShard];
+        var toShardRSConn = connCache.rsConns.shards[toShard];
         var fromShardNumDocsAfter =
-            ChunkHelper.getNumDocs(fromShardPrimary, ns, chunk.min._id, chunk.max._id);
+            ChunkHelper.getNumDocs(fromShardRSConn, ns, chunk.min._id, chunk.max._id);
         var toShardNumDocsAfter =
-            ChunkHelper.getNumDocs(toShardPrimary, ns, chunk.min._id, chunk.max._id);
+            ChunkHelper.getNumDocs(toShardRSConn, ns, chunk.min._id, chunk.max._id);
         // If the moveChunk operation succeeded, verify that the shard the chunk
         // was moved to returns all data for the chunk. If waitForDelete was true,
         // also verify that the shard the chunk was moved from returns no data for the chunk.
         if (moveChunkRes.ok) {
-            if (waitForDelete) {
+            const runningWithStepdowns =
+                TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+
+            // TODO SERVER-46669: The moveChunk command can succeed without waiting for the range
+            // deletion to complete if the replica set shard primary steps down.
+            if (waitForDelete && !runningWithStepdowns) {
                 msg = 'moveChunk succeeded but original shard still had documents.\n' + msgBase +
                     ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
                 assertWhenOwnColl.eq(fromShardNumDocsAfter, 0, msg);
@@ -102,34 +112,26 @@ var $config = extendWorkload($config, function($config, $super) {
         }
 
         // Verify that all config servers have the correct after-state.
-        // (see comments below for specifics).
-        for (var conn of connCache.config) {
-            var res = conn.adminCommand({isMaster: 1});
-            assertAlways.commandWorked(res);
-            if (res.ismaster) {
-                // If the moveChunk operation succeeded, verify that the config updated the chunk's
-                // shard with the toShard. If the operation failed, verify that the config kept
-                // the chunk's shard as the fromShard.
-                var chunkAfter = conn.getDB('config').chunks.findOne({_id: chunk._id});
-                var msg = msgBase + '\nchunkBefore: ' + tojson(chunk) +
-                    '\nchunkAfter: ' + tojson(chunkAfter);
-                if (moveChunkRes.ok) {
-                    msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
-                    assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);
-                } else {
-                    msg = "moveChunk failed but chunk's shard was not original shard.\n" + msg;
-                    assertWhenOwnColl.eq(chunkAfter.shard, fromShard, msg);
-                }
-
-                // Regardless of whether the operation succeeded or failed,
-                // verify that the number of chunks in our partition stayed the same.
-                var numChunksAfter = ChunkHelper.getNumChunks(
-                    conn, ns, this.partition.chunkLower, this.partition.chunkUpper);
-                msg = 'Number of chunks in partition seen by config changed with moveChunk.\n' +
-                    msgBase;
-                assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msg);
-            }
+        // If the moveChunk operation succeeded, verify that the config updated the chunk's shard
+        // with the toShard. If the operation failed, verify that the config kept the chunk's shard
+        // as the fromShard.
+        var chunkAfter = config.getDB('config').chunks.findOne({_id: chunk._id});
+        var msg =
+            msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
+        if (moveChunkRes.ok) {
+            msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
+            assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);
+        } else {
+            msg = "moveChunk failed but chunk's shard was not original shard.\n" + msg;
+            assertWhenOwnColl.eq(chunkAfter.shard, fromShard, msg);
         }
+
+        // Regardless of whether the operation succeeded or failed, verify that the number of chunks
+        // in our partition stayed the same.
+        var numChunksAfter = ChunkHelper.getNumChunks(
+            config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+        msg = 'Number of chunks in partition seen by config changed with moveChunk.\n' + msgBase;
+        assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msg);
 
         // Verify that all mongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
