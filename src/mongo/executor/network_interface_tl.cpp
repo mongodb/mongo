@@ -438,6 +438,11 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
             return RemoteCommandOnAnyResponse(target, std::move(response));
         })
         .getAsync([this, state, baton](StatusWith<RemoteCommandOnAnyResponse> swr) {
+            // Cancel `state->timer` before returning to prevent leaking `state`.
+            if (state->timer) {
+                state->timer->cancel(baton);
+            }
+
             if (!swr.isOK()) {
                 state->conn->indicateFailure(swr.getStatus());
             } else if (!swr.getValue().isOK()) {
@@ -458,10 +463,6 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
                 } else {
                     _counters.failed++;
                 }
-            }
-
-            if (state->timer) {
-                state->timer->cancel(baton);
             }
 
             state->promise.setFromStatusWith(std::move(swr));
