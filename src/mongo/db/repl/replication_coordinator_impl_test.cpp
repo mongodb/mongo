@@ -362,7 +362,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(1);
-    hbArgs.setConfigTerm(OpTime::kUninitializedTerm);
+    hbArgs.setConfigTerm(0);
     hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
@@ -396,7 +396,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(1);
-    hbArgs.setConfigTerm(OpTime::kUninitializedTerm);
+    hbArgs.setConfigTerm(0);
     hbArgs.setCheckEmpty();
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);

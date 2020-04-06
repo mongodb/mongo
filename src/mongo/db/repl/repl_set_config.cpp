@@ -101,7 +101,7 @@ Status ReplSetConfig::initialize(const BSONObj& cfg,
 }
 
 Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg) {
-    return _initialize(cfg, true, OpTime::kUninitializedTerm, OID());
+    return _initialize(cfg, true, OpTime::kInitialTerm, OID());
 }
 
 Status ReplSetConfig::_initialize(const BSONObj& cfg,

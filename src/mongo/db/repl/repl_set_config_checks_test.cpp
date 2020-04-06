@@ -64,19 +64,20 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysUninitializedTerm) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
-    ASSERT_OK(config.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version" << 1 << "term" << 999
-                                                << "protocolVersion" << 1 << "members"
-                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                         << "h1")))));
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "term" << (OpTime::kInitialTerm + 1)
+                                          << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")))));
     ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
-    ASSERT_EQUALS(config.getConfigTerm(), OpTime::kUninitializedTerm);
+    ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
