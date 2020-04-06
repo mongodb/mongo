@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <bcrypt.h>
 #include <memory>
 #include <vector>
 
@@ -206,16 +207,99 @@ protected:
     std::vector<unsigned char> _iv;
 };
 
+/**
+ * Like other symmetric encryptors, this class encrypts block-by-block with update and then only
+ * pads once finalize is called. However, the Windows's BCrypt implementation does not natively
+ * implement this functionality (see SERVER-47733), and will either require block aligned inputs or
+ * will attempt to pad every input. This class bulks together inputs in a local buffer which is
+ * flushed to BCrypt whenever a full block is accumulated via update invocations. Data provided to
+ * update may be encrypted immediately, on a subsequent call to update, or on the call to finalize.
+ */
 class SymmetricEncryptorWindows : public SymmetricImplWindows<SymmetricEncryptor> {
 public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
+    SymmetricEncryptorWindows(const SymmetricKey& key,
+                              aesMode mode,
+                              const uint8_t* iv,
+                              size_t ivLen)
+        : _blockData(_blockBuffer->data(), _blockBuffer->size()),
+          _blockCursor(_blockData),
+          SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv, ivLen) {}
+
     StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ULONG len = 0;
+        ULONG blockBufferEncryptLen = 0;
+        ULONG inputEncryptLen = 0;
+        ConstDataRange inData(in, inLen);
+        ConstDataRangeCursor inCursor(inData);
+
+        // If we have an incomplete block, we need to fill it before encrypting.
+        // If the total amount of input bytes will not fill the blockBuffer, just add it all to
+        // the buffer.
+        if (inLen < _blockCursor.length()) {
+            _blockCursor.writeAndAdvance(inCursor);
+            return 0;
+        } else if (_blockCursor.length() < _blockData.length() && _blockCursor.length() > 0) {
+            // Entering this code path means that we had data left over from the last time update
+            // was called. What we do below is fill the buffer with new input data until it is full.
+            // We then encrypt that buffer. We skip this step when the buffer is empty.
+            uint8_t bytesToFill = _blockCursor.length();
+            ConstDataRange bytesToFillRange(inCursor.data(), bytesToFill);
+            _blockCursor.writeAndAdvance(bytesToFillRange);
+            inCursor.advance(bytesToFill);
+            // We now encrypt the full buffer.
+            NTSTATUS status = BCryptEncrypt(_keyHandle,
+                                            const_cast<PUCHAR>(_blockBuffer->data()),
+                                            _blockBuffer->size(),
+                                            NULL,
+                                            _iv.data(),
+                                            _iv.size(),
+                                            out,
+                                            outLen,
+                                            &blockBufferEncryptLen,
+                                            0);
+            if (status != STATUS_SUCCESS) {
+                return Status{ErrorCodes::OperationFailed,
+                              str::stream() << "Encrypt failed: " << statusWithDescription(status)};
+            }
+            _blockCursor = DataRangeCursor(_blockData);
+        }
+
+        // we will attempt to encrypt as much of the remaining data as we can (i.e. the largest
+        // available size that is a multiple of the block length)
+        size_t remainingBytes = inCursor.length();
+        ULONG bytesToEncrypt = remainingBytes - (remainingBytes % aesBlockSize);
 
         NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                        const_cast<PUCHAR>(in),
-                                        inLen,
+                                        const_cast<PUCHAR>(inCursor.data<UCHAR>()),
+                                        bytesToEncrypt,
+                                        NULL,
+                                        _iv.data(),
+                                        _iv.size(),
+                                        out + blockBufferEncryptLen,
+                                        outLen - blockBufferEncryptLen,
+                                        &inputEncryptLen,
+                                        0);
+
+        if (status != STATUS_SUCCESS) {
+            return Status{ErrorCodes::OperationFailed,
+                          str::stream() << "Encrypt failed: " << statusWithDescription(status)};
+        }
+
+        inCursor.advance(bytesToEncrypt);
+
+        // we now have to store what is left of the input in the block buffer
+        _blockCursor.writeAndAdvance(inCursor);
+
+        return static_cast<size_t>(blockBufferEncryptLen + inputEncryptLen);
+    }
+
+    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+        // if there is any data left over in the block buffer, we will encrypt it with padding
+        ULONG len = 0;
+        NTSTATUS status = BCryptEncrypt(_keyHandle,
+                                        const_cast<PUCHAR>(_blockBuffer->data()),
+                                        _blockBuffer->size() - _blockCursor.length(),
                                         NULL,
                                         _iv.data(),
                                         _iv.size(),
@@ -229,18 +313,23 @@ public:
                           str::stream() << "Encrypt failed: " << statusWithDescription(status)};
         }
 
-        return static_cast<size_t>(len);
-    }
+        // we will now start a new block
+        _blockCursor = DataRangeCursor(_blockData);
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
-        // No finalize needed
-        return 0;
+        return static_cast<size_t>(len);
     }
 
     StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
         // Not a tagged cipher mode, write nothing.
         return 0;
     }
+
+private:
+    // buffer to store a single block of data, to be encrypted by update when filled, or by finalize
+    // with padding. 16 is the block length for AES.
+    SecureAllocatorDefaultDomain::SecureHandle<std::array<uint8_t, aesBlockSize>> _blockBuffer;
+    DataRange _blockData;
+    DataRangeCursor _blockCursor;
 };
 
 class SymmetricDecryptorWindows : public SymmetricImplWindows<SymmetricDecryptor> {
