@@ -195,8 +195,9 @@ struct formatter<mongo::HostAndPort> {
     }
     template <typename FormatContext>
     auto format(const mongo::HostAndPort& hp, FormatContext& ctx) {
-        hp._appendToPolymorphicFunc([&](const auto& v) { fmt::format_to(ctx.out(), "{}", v); });
-        return ctx.out();
+        auto&& it = ctx.out();
+        hp._appendToPolymorphicFunc([&](const auto& v) { it = fmt::format_to(it, "{}", v); });
+        return it;
     }
 };
 }  // namespace fmt
