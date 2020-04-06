@@ -269,21 +269,27 @@ public:
         // TODO(siyuan) Output term of OpTime
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
-        auto earliestOplogTimestampFetch =
-            oplog.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
-        Timestamp earliestOplogTimestamp;
-        if (earliestOplogTimestampFetch.isOK()) {
-            earliestOplogTimestamp = earliestOplogTimestampFetch.getValue();
-        } else {
+        auto earliestOplogTimestampFetch = [&] {
+            AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+            if (!oplog.getCollection()) {
+                return StatusWith<Timestamp>(ErrorCodes::NamespaceNotFound, "oplog doesn't exist");
+            }
+            return oplog.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+        }();
+
+        if (earliestOplogTimestampFetch.getStatus() == ErrorCodes::OplogOperationUnsupported) {
+            // Falling back to use getSingleton if the storage engine does not support
+            // getEarliestOplogTimestamp.
             BSONObj o;
-            uassert(
-                17347,
-                "Problem reading earliest entry from oplog",
-                Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o));
-            earliestOplogTimestamp = o["ts"].timestamp();
+            if (Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o)) {
+                earliestOplogTimestampFetch = o["ts"].timestamp();
+            }
         }
-        result.append("earliestOptime", earliestOplogTimestamp);
+
+        uassert(
+            17347, "Problem reading earliest entry from oplog", earliestOplogTimestampFetch.isOK());
+        result.append("earliestOptime", earliestOplogTimestampFetch.getValue());
+
         return result.obj();
     }
 } oplogInfoServerStatus;

@@ -59,7 +59,11 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
 var replTest = new ReplSetTest(
     {name: "replStatus", nodes: 3, oplogSize: 1, waitForKeys: true, nodeOptions: {syncdelay: 1}});
 
-replTest.startSet();
+const nodes = replTest.startSet();
+
+// Tests that serverStatus oplog returns an error if the oplog collection doesn't exist.
+assert.commandFailedWithCode(nodes[0].getDB('admin').serverStatus({oplog: true}), 17347);
+
 replTest.initiate();
 var master = replTest.getPrimary();
 replTest.awaitReplication();
