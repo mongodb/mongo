@@ -264,13 +264,16 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            const bool isReplSet =
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
             if (failDowngrading.shouldFail())
                 return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");
                 migrationutil::dropRangeDeletionsCollection(opCtx);
-            } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            } else if (isReplSet || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 // The default rwc document should only be deleted on plain replica sets and the
                 // config server replica set, not on shards or standalones.
                 deletePersistedDefaultRWConcernDocument(opCtx);
