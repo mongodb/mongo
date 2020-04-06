@@ -93,10 +93,8 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
-    // TODO(SERVER-47157): require configTerm.
     long long configTerm;
-    status = bsonExtractIntegerFieldWithDefault(
-        replMetadataObj, kConfigTermFieldName, OpTime::kUninitializedTerm, &configTerm);
+    status = bsonExtractIntegerField(replMetadataObj, kConfigTermFieldName, &configTerm);
     if (!status.isOK())
         return status;
 

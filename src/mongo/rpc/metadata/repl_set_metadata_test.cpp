@@ -106,27 +106,6 @@ TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingOplogQueryMeta
     ASSERT_EQ(metadata.getReplicaSetId(), metadata.getReplicaSetId());
     ASSERT_EQ(metadata.getTerm(), 3);
 }
-
-TEST(ReplResponseMetadataTest, MetadataCanBeConstructedFrom42) {
-    // TODO(SERVER-47125): delete this test in 4.6 when we can rely on the isPrimary and configTerm
-    // fields.
-    BSONObj obj(
-        BSON(kReplSetMetadataFieldName
-             << BSON("term" << 3 << "lastOpCommitted"
-                            << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
-                            << "lastCommittedWall" << committedWallTime << "lastOpVisible"
-                            << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
-                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
-
-    auto status = ReplSetMetadata::readFromMetadata(obj);
-    ASSERT_OK(status.getStatus());
-
-    const auto& metadata = status.getValue();
-    ASSERT_FALSE(metadata.getIsPrimary().is_initialized());
-    ASSERT_EQUALS(metadata.getConfigTerm(), -1);
-}
-
 }  // unnamed namespace
 }  // namespace rpc
 }  // namespace mongo

@@ -248,8 +248,8 @@ It includes:
 
 1. The upstream node's last committed OpTime
 2. The current term.
-3. The `ReplicaSetConfig` version (this is used to determine if a reconfig has occurred on the
-   upstream node that hasn't been registered by the downstream node yet).
+3. The `ReplicaSetConfig` version and term (this is used to determine if a reconfig has occurred on
+   the upstream node that hasn't been registered by the downstream node yet).
 4. The replica set ID.
 
 If the metadata has a different config version than the downstream node's config version, then the
