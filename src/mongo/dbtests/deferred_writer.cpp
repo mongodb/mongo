@@ -123,7 +123,7 @@ public:
         std::vector<BSONObj> result;
         BSONObj i;
         while (plan->getNext(&i, nullptr) == PlanExecutor::ExecState::ADVANCED) {
-            result.push_back(i);
+            result.push_back(i.getOwned());
         }
 
         return result;
