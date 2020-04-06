@@ -174,6 +174,11 @@ public:
     Status dumpInsertsFromBulk(OperationContext* opCtx, std::set<RecordId>* const dupRecords);
 
     /**
+     * Check whether all the side writes have been applied from all the side write tables.
+     */
+    bool areAllWritesApplied(OperationContext* opCtx);
+
+    /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
      * drain these writes into the index. If intent locks are held on the collection, more writes
      * may come in after this drain completes. To ensure that all writes are completely drained

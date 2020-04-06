@@ -357,7 +357,6 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
     invariant(_sideWritesTable);
     auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
     auto record = cursor->next();
-
     // The table is empty only when all writes are applied.
     if (!record) {
         auto writesRecorded = _sideWritesCounter->load();
@@ -366,9 +365,8 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
                 << "The number of side writes recorded does not match the number "
                    "applied, despite the table appearing empty. Writes recorded: "
                 << writesRecorded << ", applied: " << _numApplied;
-
-            dassert(writesRecorded == _numApplied, message);
-            warning() << message;
+            log() << message;
+            return false;
         }
         return true;
     }

@@ -727,6 +727,20 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
     return Status::OK();
 }
 
+bool MultiIndexBlock::areAllWritesApplied(OperationContext* opCtx) {
+    for (size_t i = 0; i < _indexes.size(); i++) {
+        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        if (!interceptor)
+            continue;
+
+        if (!interceptor->areAllWritesApplied(opCtx)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 Status MultiIndexBlock::drainBackgroundWrites(OperationContext* opCtx,
                                               RecoveryUnit::ReadSource readSource) {
     if (State::kAborted == _getState()) {

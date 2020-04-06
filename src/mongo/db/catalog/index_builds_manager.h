@@ -124,6 +124,12 @@ public:
                                  RecoveryUnit::ReadSource readSource);
 
     /**
+     * For the given index build, check whether all the side writes have been applied from all the
+     * side write tables.
+     */
+    bool areAllWritesApplied(OperationContext* opCtx, const UUID& buildUUID);
+
+    /**
      * Persists information in the index catalog entry to reflect the successful completion of the
      * scanning/insertion phase.
      *

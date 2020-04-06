@@ -219,6 +219,11 @@ Status IndexBuildsManager::drainBackgroundWrites(OperationContext* opCtx,
     return builder->drainBackgroundWrites(opCtx, readSource);
 }
 
+bool IndexBuildsManager::areAllWritesApplied(OperationContext* opCtx, const UUID& buildUUID) {
+    auto builder = _getBuilder(buildUUID);
+    return builder->areAllWritesApplied(opCtx);
+}
+
 Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
     auto multiIndexBlockPtr = _getBuilder(buildUUID);
     // TODO: verify that the index builder is in the expected state.

@@ -893,32 +893,46 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
     }
 
-    // Need to return the collection lock back to exclusive mode, to complete the index build.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    collLock->emplace(opCtx, nss, MODE_X);
+    // Keep draining until we see everything.
+    while (true) {
+        // Need to return the collection lock back to exclusive mode, to complete the index build.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        collLock->emplace(opCtx, nss, MODE_X);
 
-    // We hold the database MODE_IX lock throughout the index build.
-    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
-    if (db) {
-        auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-        dss.checkDbVersion(opCtx, dssLock);
+        // We hold the database MODE_IX lock throughout the index build.
+        auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
+        if (db) {
+            auto& dss = DatabaseShardingState::get(db);
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
+            dss.checkDbVersion(opCtx, dssLock);
+        }
+
+        invariant(db,
+                  str::stream() << "Database not found after relocking. Index build: "
+                                << replState->buildUUID << ": " << nss << " ("
+                                << replState->collectionUUID << ")");
+
+        invariant(db->getCollection(opCtx, nss),
+                  str::stream() << "Collection not found after relocking. Index build: "
+                                << replState->buildUUID << ": " << nss << " ("
+                                << replState->collectionUUID << ")");
+
+        // Perform the third and final drain after releasing a shared lock and reacquiring an
+        // exclusive lock on the database.
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+
+        // Check that we saw everything in the side writes table that we needed to drain.  If not,
+        // there must still be an outstanding prepared transaction.
+        if (_indexBuildsManager.areAllWritesApplied(opCtx, replState->buildUUID)) {
+            break;
+        }
+
+        // Allow some time for the prepared transaction(s) to commit.
+        collLock->reset();
+        opCtx->sleepFor(Seconds(1));
+        // Try draining again.
     }
-
-    invariant(db,
-              str::stream() << "Database not found after relocking. Index build: "
-                            << replState->buildUUID << ": " << nss << " ("
-                            << replState->collectionUUID << ")");
-
-    invariant(db->getCollection(opCtx, nss),
-              str::stream() << "Collection not found after relocking. Index build: "
-                            << replState->buildUUID << ": " << nss << " ("
-                            << replState->collectionUUID << ")");
-
-    // Perform the third and final drain after releasing a shared lock and reacquiring an
-    // exclusive lock on the database.
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
 
     // Index constraint checking phase.
     uassertStatusOK(
