@@ -33,6 +33,9 @@ var $config = extendWorkload($config, function($config, $super) {
              err.message.indexOf("Documents in target range may still be in use"));
     };
 
+    $config.data.runningWithStepdowns =
+        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+
     // These errors below may arrive due to expected scenarios that occur with concurrent
     // migrations and shard key updates. These include transient transaction errors (targeting
     // issues, lock timeouts, etc) and duplicate key errors that are triggered during normal
@@ -42,7 +45,8 @@ var $config = extendWorkload($config, function($config, $super) {
     // unrecoverable state. If an update fails in one of the above-described scenarios, we assert
     // that the document remains in the pre-updated state. After doing so, we may continue the
     // concurrency test.
-    $config.data.isUpdateShardKeyErrorAcceptable = (errCode, errMsg, errorLabels) => {
+    $config.data.isUpdateShardKeyErrorAcceptable = function isUpdateShardKeyAcceptable(
+        errCode, errMsg, errorLabels) {
         if (!errMsg) {
             return false;
         }
@@ -63,7 +67,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Some return paths will strip out the TransientTransactionError label. We want to still
         // filter out those errors.
-        const transientTransactionErrors = [
+        let skippableErrors = [
             ErrorCodes.StaleConfig,
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
@@ -71,9 +75,20 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.ShardInvalidatedForTargeting
         ];
 
+        // If we're running in a stepdown suite, then attempting to update the shard key may
+        // interact with stepdowns and transactions to cause the following errors. We only expect
+        // these errors in stepdown suites and not in other suites, so we surface them to the test
+        // runner in other scenarios.
+        const stepdownErrors =
+            [ErrorCodes.NoSuchTransaction, ErrorCodes.ConflictingOperationInProgress];
+
+        if (this.runningWithStepdowns) {
+            skippableErrors.push(...stepdownErrors);
+        }
+
         // Failed in the document shard key path, but not with a duplicate key error
         if (errMsg.includes(otherErrorsInChangeShardKeyMsg)) {
-            return transientTransactionErrors.includes(errCode);
+            return skippableErrors.includes(errCode);
         }
 
         return false;
