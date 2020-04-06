@@ -166,7 +166,7 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
  * will be assigned to the index.
  */
 bool canAssignPredToIndex(const RelevantTag* rt,
-                          const std::set<size_t>& multikeyComponents,
+                          const MultikeyComponents& multikeyComponents,
                           StringMap<MatchExpression*>* used) {
     invariant(used);
     const FieldRef path(rt->path);

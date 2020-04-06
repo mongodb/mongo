@@ -30,10 +30,10 @@
 #pragma once
 
 #include <cstddef>
-#include <set>
 
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/index/multikey_paths.h"
 
 namespace mongo {
 namespace dotted_path_support {
@@ -102,13 +102,13 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementSet& elements,
                                  bool expandArrayOnTrailingField = true,
-                                 std::set<std::size_t>* arrayComponents = nullptr);
+                                 MultikeyComponents* arrayComponents = nullptr);
 
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField = true,
-                                 std::set<std::size_t>* arrayComponents = nullptr);
+                                 MultikeyComponents* arrayComponents = nullptr);
 
 /**
  * Returns an owned BSONObj with elements in the same order as they appear in the 'pattern' object

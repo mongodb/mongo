@@ -44,6 +44,8 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 
+#include <boost/container/flat_set.hpp>
+
 namespace mongo {
 
 namespace KeyString {
@@ -905,6 +907,6 @@ int Value::compareWithoutRecordId(const T& other) const {
 
 }  // namespace KeyString
 
-using KeyStringSet = std::set<KeyString::Value>;
+using KeyStringSet = boost::container::flat_set<KeyString::Value>;
 
 }  // namespace mongo

@@ -145,7 +145,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
@@ -199,7 +199,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -234,7 +234,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, std::set<size_t>{}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -259,7 +259,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         }
     }
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
@@ -284,7 +284,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -299,7 +299,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         }
     }
 
-    assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
+    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
@@ -331,8 +331,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPatternAB, {{0U}, std::set<size_t>{}});
-    assertMultikeyPaths(collection, keyPatternAC, {{0U}, std::set<size_t>{}});
+    assertMultikeyPaths(collection, keyPatternAB, {{0U}, MultikeyComponents{}});
+    assertMultikeyPaths(collection, keyPatternAC, {{0U}, MultikeyComponents{}});
 }
 
 }  // namespace

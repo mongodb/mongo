@@ -1097,7 +1097,7 @@ bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
         // Store new path components that cause this index to be multikey in catalog's index
         // metadata.
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            std::set<size_t>& indexMultikeyComponents = md.indexes[offset].multikeyPaths[i];
+            MultikeyComponents& indexMultikeyComponents = md.indexes[offset].multikeyPaths[i];
             for (const auto multikeyComponent : multikeyPaths[i]) {
                 auto result = indexMultikeyComponents.insert(multikeyComponent);
                 newPathIsMultikey = newPathIsMultikey || result.second;

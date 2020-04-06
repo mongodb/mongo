@@ -53,7 +53,7 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                   BSONElementColl& elements,
                                   bool expandArrayOnTrailingField,
                                   size_t depth,
-                                  std::set<size_t>* arrayComponents) {
+                                  MultikeyComponents* arrayComponents) {
     BSONElement e = obj.getField(path);
 
     if (e.eoo()) {
@@ -165,7 +165,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementSet& elements,
                                  bool expandArrayOnTrailingField,
-                                 std::set<size_t>* arrayComponents) {
+                                 MultikeyComponents* arrayComponents) {
     const size_t initialDepth = 0;
     _extractAllElementsAlongPath(
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
@@ -175,7 +175,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField,
-                                 std::set<size_t>* arrayComponents) {
+                                 MultikeyComponents* arrayComponents) {
     const size_t initialDepth = 0;
     _extractAllElementsAlongPath(
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);

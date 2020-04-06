@@ -80,7 +80,7 @@ static const RecordId kMultikeyMetadataKeyId =
 bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
     return std::any_of(multikeyPaths.cbegin(),
                        multikeyPaths.cend(),
-                       [](const std::set<std::size_t>& components) { return !components.empty(); });
+                       [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
 std::vector<KeyString::Value> asVector(const KeyStringSet& keySet) {

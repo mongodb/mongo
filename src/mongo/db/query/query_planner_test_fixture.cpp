@@ -151,7 +151,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     const bool multikey =
         std::any_of(multikeyPaths.cbegin(),
                     multikeyPaths.cend(),
-                    [](const std::set<size_t>& components) { return !components.empty(); });
+                    [](const MultikeyComponents& components) { return !components.empty(); });
     const bool sparse = false;
     const bool unique = false;
     const char name[] = "my_index_with_path_level_multikey_info";

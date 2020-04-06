@@ -162,7 +162,7 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
 void BtreeKeyGenerator::_getKeysArrEltFixed(std::vector<const char*>* fieldNames,
                                             std::vector<BSONElement>* fixed,
                                             const BSONElement& arrEntry,
-                                            KeyStringSet* keys,
+                                            KeyStringSet::sequence_type* keys,
                                             unsigned numNotFound,
                                             const BSONElement& arrObjElt,
                                             const std::set<size_t>& arrIdxs,
@@ -236,10 +236,16 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj,
             invariant(multikeyPaths->empty());
             multikeyPaths->resize(_fieldNames.size());
         }
+        // Extract the underlying sequence and insert elements unsorted to avoid O(N^2) when
+        // inserting element by element if array
+        auto seq = keys->extract_sequence();
         // '_fieldNames' and '_fixed' are passed by value so that their copies can be mutated as
         // part of the _getKeysWithArray method.
         _getKeysWithArray(
-            _fieldNames, _fixed, obj, keys, 0, _emptyPositionalInfo, multikeyPaths, id);
+            _fieldNames, _fixed, obj, &seq, 0, _emptyPositionalInfo, multikeyPaths, id);
+        // Put the sequence back into the set, it will sort and guarantee uniqueness, this is
+        // O(NlogN)
+        keys->adopt_sequence(std::move(seq));
     }
 
     if (keys->empty() && !_isSparse) {
@@ -282,7 +288,7 @@ void BtreeKeyGenerator::_getKeysWithoutArray(const BSONObj& obj,
 void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
                                           std::vector<BSONElement> fixed,
                                           const BSONObj& obj,
-                                          KeyStringSet* keys,
+                                          KeyStringSet::sequence_type* keys,
                                           unsigned numNotFound,
                                           const std::vector<PositionalPathInfo>& positionalInfo,
                                           MultikeyPaths* multikeyPaths,
@@ -368,7 +374,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
         if (id) {
             keyString.appendRecordId(*id);
         }
-        keys->insert(keyString.release());
+        keys->push_back(keyString.release());
     } else if (arrElt.embeddedObject().firstElement().eoo()) {
         // We've encountered an empty array.
         if (multikeyPaths && mayExpandArrayUnembedded) {

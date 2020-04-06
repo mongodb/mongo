@@ -84,7 +84,7 @@ void appendMultikeyPathsAsBytes(BSONObj keyPattern,
 void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multikeyPaths) {
     invariant(multikeyPaths);
     for (auto elem : multikeyPathsObj) {
-        std::set<size_t> multikeyComponents;
+        MultikeyComponents multikeyComponents;
         int len;
         const char* data = elem.binData(len);
         invariant(len > 0);

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <set>
-
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/index_bounds_builder.h"

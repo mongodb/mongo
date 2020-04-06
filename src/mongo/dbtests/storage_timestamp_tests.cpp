@@ -1957,7 +1957,7 @@ public:
             ASSERT(indexMetaData.multikey);
 
             ASSERT_EQ(std::size_t(1), indexMetaData.multikeyPaths.size());
-            const bool match = indexMetaData.multikeyPaths[0] == std::set<std::size_t>({0});
+            const bool match = indexMetaData.multikeyPaths[0] == MultikeyComponents({0});
             if (!match) {
                 FAIL(str::stream() << "Expected: [ [ 0 ] ] Actual: "
                                    << dumpMultikeyPaths(indexMetaData.multikeyPaths));

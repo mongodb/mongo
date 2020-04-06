@@ -555,7 +555,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
         // the value of the field, or they're transformed if the field is geo.
         BSONElementSet fieldElements;
         const bool expandArrayOnTrailingField = false;
-        std::set<size_t>* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
+        MultikeyComponents* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
         dps::extractAllElementsAlongPath(
             obj, keyElem.fieldName(), fieldElements, expandArrayOnTrailingField, arrayComponents);
 

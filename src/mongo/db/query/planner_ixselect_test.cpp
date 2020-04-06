@@ -1392,7 +1392,7 @@ TEST(QueryPlannerIXSelectTest, ExpandedIndexEntriesAreCorrectlyMarkedAsMultikeyO
 
         if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == BSON("a.b" << 1))) {
             ASSERT_TRUE(entry.multikey);
-            ASSERT(entry.multikeyPaths[0] == std::set<std::size_t>{0u});
+            ASSERT(entry.multikeyPaths[0] == MultikeyComponents{0u});
         } else {
             ASSERT_BSONOBJ_EQ(entry.keyPattern, BSON("c.d" << 1));
             ASSERT_FALSE(entry.multikey);

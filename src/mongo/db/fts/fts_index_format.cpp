@@ -88,7 +88,7 @@ const size_t termKeyLengthV3 = termKeyPrefixLengthV3 + termKeySuffixLengthV3;
 BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     BSONElementSet indexedElements;
     const bool expandArrayOnTrailingField = true;
-    std::set<size_t> arrayComponents;
+    MultikeyComponents arrayComponents;
     dps::extractAllElementsAlongPath(
         obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
     uassert(ErrorCodes::CannotBuildIndexKeys,
