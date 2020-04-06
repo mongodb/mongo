@@ -1,0 +1,8 @@
+test_kind: tla_plus_test
+
+selector:
+  roots:
+  - src/mongo/db/repl/tla_plus/**/*.cfg
+
+executor:
+  config: {}

@@ -707,6 +707,7 @@ _SELECTOR_REGISTRY = {
     "genny_test": (_FileBasedSelectorConfig, _Selector),
     "gennylib_test": (_GennylibTestCaseSelectorConfig, _GennylibTestCaseSelector),
     "cpp_libfuzzer_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "tla_plus_test": (_FileBasedSelectorConfig, _Selector),
 }
 
 

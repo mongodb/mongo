@@ -12,6 +12,10 @@ if ! [ -d "$1" ]; then
   echo "$1 not a directory" >&2
   exit 1
 fi
+if ! [ -f "tla2tools.jar" ]; then
+  echo "No tla2tools.jar, run download-tlc.sh first"
+  exit 1
+fi
 
 TLA_FILE="MC$1.tla"
 if ! [ -f "$1/$TLA_FILE" ]; then
@@ -26,7 +30,6 @@ elif ! WORKERS=$(sysctl -n hw.logicalcpu); then
   WORKERS=8 # default
 fi
 
-echo "Downloading tla2tools.jar"
-curl -LO tla.msr-inria.inria.fr/tlatoolbox/dist/tla2tools.jar
 cd "$1"
-java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -workers "$WORKERS" "$TLA_FILE"
+# Defer liveness checks to the end with -lncheck, for speed.
+java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers "$WORKERS" "$TLA_FILE"

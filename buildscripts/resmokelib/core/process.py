@@ -70,8 +70,10 @@ class Process(object):
     """Wrapper around subprocess.Popen class."""
 
     # pylint: disable=protected-access
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, logger, args, env=None, env_vars=None):
+    def __init__(self, logger, args, env=None, env_vars=None, cwd=None):
         """Initialize the process with the specified logger, arguments, and environment."""
 
         # Ensure that executable files that don't already have an
@@ -90,6 +92,7 @@ class Process(object):
         self._process = None
         self._stdout_pipe = None
         self._stderr_pipe = None
+        self._cwd = cwd
 
     def start(self):
         """Start the process and the logger pipes for its stdout and stderr."""
@@ -110,9 +113,9 @@ class Process(object):
         close_fds = (sys.platform != "win32")
 
         with _POPEN_LOCK:
-            self._process = subprocess.Popen(self.args, bufsize=buffer_size, stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE, close_fds=close_fds,
-                                             env=self.env, creationflags=creation_flags)
+            self._process = subprocess.Popen(
+                self.args, bufsize=buffer_size, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                close_fds=close_fds, env=self.env, creationflags=creation_flags, cwd=self._cwd)
             self.pid = self._process.pid
 
         self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)

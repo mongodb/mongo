@@ -1298,6 +1298,15 @@ functions:
   - *monitor_process_threads
   - *collect_system_resource_info
 
+  "do non-compile setup":
+  - command: manifest.load
+  - *git_get_project
+  - *set_task_expansion_macros
+  - *set_up_virtualenv
+  - *upload_pip_requirements
+  - *get_buildnumber
+  - *set_up_credentials
+
   "do benchmark setup":
   - command: manifest.load
   - *git_get_project
@@ -7683,16 +7692,27 @@ tasks:
   - func: "do setup"
   - func: "run idl tests"
 
+- name: tla_plus
+  batchtime: 10080 # 1 week in minutes
+  commands:
+  - func: "do non-compile setup"
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: src/src/mongo/db/repl/tla_plus
+      script: |
+        set -o errexit
+        set -o verbose
+        ./download-tlc.sh
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=tla_plus
+      resmoke_jobs_max: 1
+
 - name: buildscripts_test
   depends_on: []
   commands:
-  - command: manifest.load
-  - func: "git get project"
-  - func: "set task expansion macros"
-  - func: "set up virtualenv"
-  - func: "upload pip requirements"
-  - func: "get buildnumber"
-  - func: "set up credentials"
+  - func: "do non-compile setup"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -8852,6 +8872,16 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-small
+
+- name: tla-plus
+  display_name: TLA+
+  run_on:
+  - ubuntu1804-build
+  stepback: false
+  expansions:
+    timeout_secs: 345600 # 4 days in seconds
+  tasks:
+  - name: tla_plus
 
 - name: ubuntu1604
   display_name: Ubuntu 16.04
