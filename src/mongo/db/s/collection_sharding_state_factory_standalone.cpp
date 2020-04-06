@@ -61,12 +61,6 @@ public:
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
         return {kUnshardedCollection};
     }
-    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() noexcept override {
-        return boost::none;
-    }
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() noexcept override {
-        return boost::none;
-    }
     void checkShardVersionOrThrow(OperationContext*) noexcept override {}
     Status checkShardVersionNoThrow(OperationContext*) noexcept override {
         return Status::OK();
@@ -80,9 +74,8 @@ public:
     }
 
     void toBSONPending(BSONArrayBuilder& bb) const noexcept override {}
+    void report(BSONObjBuilder* builder) override {}
     void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
-
-    void setFilteringMetadata(OperationContext*, CollectionMetadata) noexcept override {}
 };
 
 }  // namespace

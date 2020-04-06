@@ -87,14 +87,11 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        ShardingState* const shardingState = ShardingState::get(opCtx);
-        if (shardingState->enabled()) {
-            result.append(
-                "configServer",
-                Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
-        } else {
-            result.append("configServer", "");
-        }
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+        result.append(
+            "configServer",
+            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
 
         ShardedConnectionInfo* const sci = ShardedConnectionInfo::get(opCtx->getClient(), false);
         result.appendBool("inShardedMode", sci != nullptr);
@@ -107,9 +104,9 @@ public:
 
         AutoGetCollection autoColl(
             opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
-        auto* const css = CollectionShardingState::get(opCtx, nss);
+        auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
-        const auto optMetadata = css->getCurrentMetadataIfKnown();
+        const auto optMetadata = csr->getCurrentMetadataIfKnown();
         if (!optMetadata) {
             result.append("global", "UNKNOWN");
 
@@ -130,7 +127,7 @@ public:
                     chunksArr.doneFast();
 
                     BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
-                    css->toBSONPending(pendingArr);
+                    csr->toBSONPending(pendingArr);
                     pendingArr.doneFast();
                 }
                 metadataBuilder.doneFast();

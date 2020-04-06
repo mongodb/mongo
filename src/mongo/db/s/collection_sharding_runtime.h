@@ -89,10 +89,6 @@ public:
 
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
 
-    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() override;
-
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override;
-
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
 
     Status checkShardVersionNoThrow(OperationContext* opCtx) noexcept override;
@@ -106,9 +102,29 @@ public:
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
         ShardingMigrationCriticalSection::Operation op) const override;
 
-    void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) override;
+    void report(BSONObjBuilder* builder) override;
 
     void appendInfoForServerStatus(BSONArrayBuilder* builder) override;
+
+    /**
+     * Returns boost::none if the description for the collection is not known yet. Otherwise
+     * returns the most recently refreshed from the config server metadata.
+     *
+     * This method do not check for the shard version that the operation requires and should only
+     * be used for cases such as checking whether a particular config server update has taken
+     * effect.
+     */
+    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown();
+
+    /**
+     * Updates the collection's filtering metadata based on changes received from the config server
+     * and also resolves the pending receives map in case some of these pending receives have
+     * committed on the config server or have been abandoned by the donor shard.
+     *
+     * This method must be called with an exclusive collection lock and it does not acquire any
+     * locks itself.
+     */
+    void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata);
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
@@ -175,6 +191,12 @@ private:
      */
     boost::optional<ScopedCollectionDescription> _getCurrentMetadataIfKnown(
         const boost::optional<LogicalTime>& atClusterTime);
+
+    /**
+     * Returns boost::none if the description for the collection is not known yet. Otherwise
+     * returns the most recently refreshed from the config server shard version
+     */
+    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown();
 
     /**
      * Returns the latest version of collection metadata with filtering configured for

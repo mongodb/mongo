@@ -81,20 +81,22 @@ void onShardVersionMismatch(OperationContext* opCtx,
     // retry attempts while the migration is being committed.
     OperationShardingState::get(opCtx).waitForMigrationCriticalSectionSignal(opCtx);
 
-    const auto currentShardVersion = [&] {
+    {
         // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
         // if an invalid view is in the 'system.views' collection.
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCurrentShardVersionIfKnown();
-    }();
-
-    if (currentShardVersion) {
-        if (currentShardVersion->epoch() == shardVersionReceived.epoch() &&
-            currentShardVersion->majorVersion() >= shardVersionReceived.majorVersion()) {
-            // Don't need to remotely reload if we're in the same epoch and the requested version is
-            // smaller than the one we know about. This means that the remote side is behind.
-            return;
+        const auto collDescr =
+            CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        if (collDescr) {
+            const auto currentShardVersion = collDescr->getShardVersion();
+            if (currentShardVersion.epoch() == shardVersionReceived.epoch() &&
+                currentShardVersion.majorVersion() >= shardVersionReceived.majorVersion()) {
+                // Don't need to remotely reload if we're in the same epoch and the requested
+                // version is smaller than the one we know about. This means that the remote side is
+                // behind.
+                return;
+            }
         }
     }
 
@@ -245,7 +247,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // if an invalid view is in the 'system.views' collection.
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        auto optMetadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        auto optMetadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
         // We already have newer version
         if (optMetadata) {
@@ -273,10 +275,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // in the 'system.views' collection.
     AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
     {
-        auto optMetadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        auto optMetadata = csr->getCurrentMetadataIfKnown();
 
         // We already have newer version
         if (optMetadata) {
@@ -302,7 +304,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     CollectionMetadata metadata(std::move(cm), shardingState->shardId());
     const auto newShardVersion = metadata.getShardVersion();
 
-    css->setFilteringMetadata(opCtx, std::move(metadata));
+    csr->setFilteringMetadata(opCtx, std::move(metadata));
     return newShardVersion;
 }
 

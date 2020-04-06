@@ -41,7 +41,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -232,9 +232,9 @@ public:
                 return true;
             }
 
-            auto* const css = CollectionShardingState::get(opCtx, nss);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             const ChunkVersion collectionShardVersion = [&] {
-                auto optMetadata = css->getCurrentMetadataIfKnown();
+                auto optMetadata = csr->getCurrentMetadataIfKnown();
                 return (optMetadata && (*optMetadata)->isSharded())
                     ? (*optMetadata)->getShardVersion()
                     : ChunkVersion::UNSHARDED();
@@ -301,7 +301,7 @@ public:
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
                     auto critSecSignal =
-                        css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                        csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
                     if (critSecSignal) {
                         collLock.reset();
                         autoDb.reset();
@@ -322,7 +322,7 @@ public:
                     // Needed b/c when the last chunk is moved off a shard, the version gets reset
                     // to zero, which should require a reload.
                     auto critSecSignal =
-                        css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                        csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
                     if (critSecSignal) {
                         collLock.reset();
                         autoDb.reset();
@@ -355,8 +355,8 @@ public:
             Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
             const ChunkVersion currVersion = [&] {
-                auto* const css = CollectionShardingState::get(opCtx, nss);
-                auto optMetadata = css->getCurrentMetadataIfKnown();
+                auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+                auto optMetadata = csr->getCurrentMetadataIfKnown();
                 return (optMetadata && (*optMetadata)->isSharded())
                     ? (*optMetadata)->getShardVersion()
                     : ChunkVersion::UNSHARDED();

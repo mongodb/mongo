@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 

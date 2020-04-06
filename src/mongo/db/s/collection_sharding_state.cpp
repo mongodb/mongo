@@ -73,18 +73,13 @@ public:
         return *it->second;
     }
 
-    void report(OperationContext* opCtx, BSONObjBuilder* builder) {
+    void report(BSONObjBuilder* builder) {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
             stdx::lock_guard<Latch> lg(_mutex);
-
-            for (auto& coll : _collections) {
-                const auto optMetadata = coll.second->getCurrentMetadataIfKnown();
-                if (optMetadata) {
-                    const auto& metadata = *optMetadata;
-                    versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
-                }
+            for (const auto& coll : _collections) {
+                coll.second->report(builder);
             }
         }
 
@@ -136,7 +131,7 @@ CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svc
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    collectionsMap->report(opCtx, builder);
+    collectionsMap->report(builder);
 }
 
 void CollectionShardingState::appendInfoForServerStatus(OperationContext* opCtx,

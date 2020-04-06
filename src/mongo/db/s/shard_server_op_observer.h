@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/op_observer.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 
 namespace mongo {
 

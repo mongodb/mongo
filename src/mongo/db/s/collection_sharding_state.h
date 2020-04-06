@@ -128,17 +128,6 @@ public:
     virtual ScopedCollectionDescription getCollectionDescription_DEPRECATED() = 0;
 
     /**
-     * Returns boost::none if the description for the collection is not known yet. Otherwise
-     * returns the most recently refreshed from the config server metadata or shard version.
-     *
-     * These methods do not check for the shard version that the operation requires and should only
-     * be used for cases such as checking whether a particular config server update has taken
-     * effect.
-     */
-    virtual boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() = 0;
-    virtual boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() = 0;
-
-    /**
      * Checks whether the shard version in the operation context is compatible with the shard
      * version of the collection and if not, throws StaleConfigException populated with the received
      * and wanted versions.
@@ -183,14 +172,9 @@ public:
     virtual void toBSONPending(BSONArrayBuilder& bb) const = 0;
 
     /**
-     * Updates the collection's filtering metadata based on changes received from the config server
-     * and also resolves the pending receives map in case some of these pending receives have
-     * committed on the config server or have been abandoned by the donor shard.
-     *
-     * This method must be called with an exclusive collection lock and it does not acquire any
-     * locks itself.
+     * Reports shard version for collection which have filtering information associated.
      */
-    virtual void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) = 0;
+    virtual void report(BSONObjBuilder* builder) = 0;
 
     /**
      * Append info to display in server status.

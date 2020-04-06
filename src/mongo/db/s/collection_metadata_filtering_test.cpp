@@ -101,8 +101,8 @@ protected:
 
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-            auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
-            css->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("0")));
+            CollectionShardingRuntime::get(operationContext(), kNss)
+                ->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("0")));
         }
 
         _manager = std::make_shared<MetadataManager>(

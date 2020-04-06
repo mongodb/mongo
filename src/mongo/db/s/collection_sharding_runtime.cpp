@@ -434,6 +434,13 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     MONGO_UNREACHABLE;
 }
 
+void CollectionShardingRuntime::report(BSONObjBuilder* builder) {
+    auto optCollDescr = getCurrentMetadataIfKnown();
+    if (optCollDescr) {
+        builder->appendTimestamp(_nss.ns(), optCollDescr->getShardVersion().toLong());
+    }
+}
+
 void CollectionShardingRuntime::appendInfoForServerStatus(BSONArrayBuilder* builder) {
     stdx::lock_guard lk(_metadataManagerLock);
     if (_metadataManager) {

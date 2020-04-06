@@ -66,13 +66,6 @@ public:
         return {kUnshardedCollection};
     }
 
-    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown() override {
-        return boost::none;
-    }
-    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown() override {
-        return boost::none;
-    }
-
     void checkShardVersionOrThrow(OperationContext*) override {}
 
     Status checkShardVersionNoThrow(OperationContext*) noexcept override {
@@ -88,9 +81,8 @@ public:
     }
 
     void toBSONPending(BSONArrayBuilder&) const override {}
+    void report(BSONObjBuilder* builder) override {}
     void appendInfoForServerStatus(BSONArrayBuilder* builder) {}
-
-    void setFilteringMetadata(OperationContext*, CollectionMetadata) override {}
 };
 
 class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {

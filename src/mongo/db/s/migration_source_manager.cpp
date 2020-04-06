@@ -171,7 +171,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         collectionUUID = autoColl.getCollection()->uuid();
 
         auto optMetadata =
-            CollectionShardingState::get(_opCtx, getNss())->getCurrentMetadataIfKnown();
+            CollectionShardingRuntime::get(_opCtx, getNss())->getCurrentMetadataIfKnown();
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "The collection's sharding state was cleared by a concurrent operation",
                 optMetadata);

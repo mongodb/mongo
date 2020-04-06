@@ -43,8 +43,8 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    auto* const css = CollectionShardingRuntime::get(opCtx, kTestNss);
-    css->setFilteringMetadata(opCtx, std::move(metadata));
+    CollectionShardingRuntime::get(opCtx, kTestNss)
+        ->setFilteringMetadata(opCtx, std::move(metadata));
 
     auto& oss = OperationShardingState::get(opCtx);
     const auto version = metadata.getShardVersion();
