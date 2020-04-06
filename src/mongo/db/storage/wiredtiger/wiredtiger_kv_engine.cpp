@@ -101,6 +101,12 @@
 #define __has_feature(x) 0
 #endif
 
+#if __has_feature(address_sanitizer)
+const bool kAddressSanitizerEnabled = true;
+#else
+const bool kAddressSanitizerEnabled = false;
+#endif
+
 using namespace fmt::literals;
 
 namespace mongo {
@@ -695,6 +701,22 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
         ss << "),";
     }
+    if (kAddressSanitizerEnabled) {
+        // For applications using WT, advancing a cursor invalidates the data/memory that cursor was
+        // pointing to. WT performs the optimization of managing its own memory. The unit of memory
+        // allocation is a page. Walking a cursor from one key/value to the next often lands on the
+        // same page, which has the effect of keeping the address of the prior key/value valid. For
+        // a bug to occur, the cursor must move across pages, and the prior page must be
+        // evicted. While rare, this can happen, resulting in reading random memory.
+        //
+        // The cursor copy debug mode will instead cause WT to malloc/free memory for each key/value
+        // a cursor is positioned on. Thus, enabling when using with address sanitizer will catch
+        // many cases of dereferencing invalid cursor positions. Note, there is a known caveat: a
+        // free/malloc for roughly the same allocation size can often return the same memory
+        // address. This is a scenario where the address sanitizer is not able to detect a
+        // use-after-free error.
+        ss << "debug_mode=(cursor_copy=true),";
+    }
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig("system");
@@ -943,13 +965,9 @@ void WiredTigerKVEngine::cleanShutdown() {
     _sizeStorer.reset();
     _sessionCache->shuttingDown();
 
-// We want WiredTiger to leak memory for faster shutdown except when we are running tools to look
-// for memory leaks.
-#if !__has_feature(address_sanitizer)
-    bool leak_memory = true;
-#else
-    bool leak_memory = false;
-#endif
+    // We want WiredTiger to leak memory for faster shutdown except when we are running tools to
+    // look for memory leaks.
+    bool leak_memory = !kAddressSanitizerEnabled;
     std::string closeConfig = "";
 
     if (RUNNING_ON_VALGRIND) {
