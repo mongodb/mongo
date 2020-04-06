@@ -404,8 +404,17 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
                 state->conn->indicateSuccess();
             }
 
-            if (state->done.swap(true)) {
-                return;
+            {
+                ON_BLOCK_EXIT([state, baton] {
+                    // Cancel `state->timer` before returning to prevent leaking `state`.
+                    if (state->timer) {
+                        state->timer->cancel(baton);
+                    }
+                });
+
+                if (state->done.swap(true)) {
+                    return;
+                }
             }
 
             if (getTestCommandsEnabled()) {
@@ -415,10 +424,6 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
                 } else {
                     _counters.failed++;
                 }
-            }
-
-            if (state->timer) {
-                state->timer->cancel(baton);
             }
 
             state->promise.setFromStatusWith(std::move(swr));
