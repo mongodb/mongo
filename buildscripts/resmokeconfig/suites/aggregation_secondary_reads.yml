@@ -7,15 +7,11 @@ selector:
   # The files in these directories contain utilities for use in other tests, not tests.
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # TODO SERVER-46544: Investigate whether these tests should remain blacklisted or not.
-  - jstests/aggregation/sources/out/replace_collection.js
-  - jstests/aggregation/group_conversion_to_distinct_scan.js
-  - jstests/aggregation/sources/unionWith/unionWith_collation.js
+  # This test modifies the 'internalDocumentSourceGroupMaxMemoryBytes' parameter on the primary
+  # node and would need to set it on every node in the replica set to run correctly when
+  # performing secondary reads.
   - jstests/aggregation/sources/unionWith/unionWith.js
-  - jstests/aggregation/expressions/collation_expressions.js
-  - jstests/aggregation/bugs/server5932.js
-  - jstests/aggregation/sources/lookup/lookup_subpipeline.js
-  - jstests/aggregation/bugs/server21632.js
+  # This test uses >100MB per node, which can overwhelm test hosts.
   - jstests/aggregation/sources/graphLookup/error.js
 
   exclude_with_any_tags:

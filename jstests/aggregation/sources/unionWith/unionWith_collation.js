@@ -31,16 +31,16 @@ assert.commandWorked(
     testDB.createCollection(caseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}));
 
 assert.commandWorked(noCollationColl.insert([
-    {val: "a"},
-    {val: "b", caseSensitiveColl: true},
-    {val: "B", caseSensitiveColl: true},
-    {val: "c"}
+    {_id: 0, val: "a"},
+    {_id: 1, val: "b", caseSensitiveColl: true},
+    {_id: 2, val: "B", caseSensitiveColl: true},
+    {_id: 3, val: "c"}
 ]));
 assert.commandWorked(caseInsensitiveColl.insert([
-    {val: "a"},
-    {val: "B", caseSensitiveColl: false},
-    {val: "b", caseSensitiveColl: false},
-    {val: "c"}
+    {_id: 0, val: "a"},
+    {_id: 1, val: "B", caseSensitiveColl: false},
+    {_id: 2, val: "b", caseSensitiveColl: false},
+    {_id: 3, val: "c"}
 ]));
 
 const unionWith = (foreignCollName, values) => {
@@ -48,7 +48,7 @@ const unionWith = (foreignCollName, values) => {
         {$match: {val: {$in: values}}},
         {$unionWith: {coll: foreignCollName, pipeline: [{$match: {val: {$in: values}}}]}},
         {
-            $sort: {"val": 1, caseSensitiveColl: 1},
+            $sort: {"val": 1, caseSensitiveColl: 1, _id: 1},
         },
         {$project: {_id: 0}}
     ];
