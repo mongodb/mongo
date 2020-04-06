@@ -740,18 +740,32 @@ TEST_F(KeyStringBuilderTest, ReasonableSize) {
         KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
     ASSERT_LTE(sizeof(heapBuilder), 96);
 
+    // Use large 1KB blocks and verify that we use way less
+    SharedBufferFragmentBuilder fragmentBuilder(1024);
+    KeyString::PooledBuilder pooledBuilder(
+        fragmentBuilder, KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
+    ASSERT_LTE(sizeof(pooledBuilder), 96);
+
     // Test the dynamic memory usage reported to the sorter.
     KeyString::Value value1 = stackBuilder.getValueCopy();
-    ASSERT_LTE(sizeof(value1), 24);
-    ASSERT_LTE(value1.memUsageForSorter(), 26);
+    ASSERT_LTE(sizeof(value1), 32);
+    ASSERT_LTE(value1.memUsageForSorter(), 34);
 
     KeyString::Value value2 = heapBuilder.getValueCopy();
-    ASSERT_LTE(sizeof(value2), 24);
-    ASSERT_LTE(value2.memUsageForSorter(), 26);
+    ASSERT_LTE(sizeof(value2), 32);
+    ASSERT_LTE(value2.memUsageForSorter(), 34);
 
     KeyString::Value value3 = heapBuilder.release();
-    ASSERT_LTE(sizeof(value3), 24);
-    ASSERT_LTE(value3.memUsageForSorter(), 56);
+    ASSERT_LTE(sizeof(value3), 32);
+    ASSERT_LTE(value3.memUsageForSorter(), 64);
+
+    KeyString::Value value4 = pooledBuilder.getValueCopy();
+    ASSERT_LTE(sizeof(value4), 32);
+    ASSERT_LTE(value4.memUsageForSorter(), 34);
+
+    KeyString::Value value5 = pooledBuilder.release();
+    ASSERT_LTE(sizeof(value5), 32);
+    ASSERT_LTE(value5.memUsageForSorter(), 34);
 }
 
 TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {

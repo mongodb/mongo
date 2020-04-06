@@ -197,8 +197,7 @@ std::ostream& operator<<(std::ostream& stream, const CollectionState& state) {
     return stream << state.toString();
 }
 
-StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBufferAllocator>& sb,
-                                                     const CollectionState& state) {
+StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state) {
     return sb << state.toString();
 }
 

@@ -84,8 +84,7 @@ struct CollectionState {
 bool operator==(const CollectionState& lhs, const CollectionState& rhs);
 bool operator!=(const CollectionState& lhs, const CollectionState& rhs);
 std::ostream& operator<<(std::ostream& stream, const CollectionState& state);
-StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBufferAllocator>& sb,
-                                                     const CollectionState& state);
+StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
 class IdempotencyTest : public OplogApplierImplTest {
 public:

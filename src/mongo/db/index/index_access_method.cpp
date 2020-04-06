@@ -138,7 +138,8 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
     auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
     auto multikeyPaths = executionCtx.multikeyPaths();
 
-    getKeys(obj,
+    getKeys(executionCtx.pooledBufferBuilder(),
+            obj,
             options.getKeysMode,
             GetKeysContext::kAddingKeys,
             keys.get(),
@@ -260,7 +261,8 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
 
-            getKeys(requestedKey,
+            getKeys(executionCtx.pooledBufferBuilder(),
+                    requestedKey,
                     GetKeysMode::kEnforceConstraints,
                     GetKeysContext::kAddingKeys,
                     keys.get(),
@@ -365,6 +367,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                                               const RecordId& record,
                                               const InsertDeleteOptions& options,
                                               UpdateTicket* ticket) const {
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
     const MatchExpression* indexFilter = index->getFilterExpression();
     if (!indexFilter || indexFilter->matchesBSON(from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
@@ -376,7 +379,8 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
         // There's no need to compute the prefixes of the indexed fields that possibly caused the
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
-        getKeys(from,
+        getKeys(executionCtx.pooledBufferBuilder(),
+                from,
                 getKeysMode,
                 GetKeysContext::kRemovingKeys,
                 &ticket->oldKeys,
@@ -387,7 +391,8 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
-        getKeys(to,
+        getKeys(executionCtx.pooledBufferBuilder(),
+                to,
                 options.getKeysMode,
                 GetKeysContext::kAddingKeys,
                 &ticket->newKeys,
@@ -528,7 +533,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
 
     try {
         _indexCatalogEntry->accessMethod()->getKeys(
-
+            executionCtx.pooledBufferBuilder(),
             obj,
             options.getKeysMode,
             GetKeysContext::kAddingKeys,
@@ -720,7 +725,8 @@ IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedError
             "obj"_attr = redact(obj));
     };
 
-void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
+void AbstractIndexAccessMethod::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                        const BSONObj& obj,
                                         GetKeysMode mode,
                                         GetKeysContext context,
                                         KeyStringSet* keys,
@@ -754,7 +760,7 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
                                               13026,
                                               13027};
     try {
-        doGetKeys(obj, context, keys, multikeyMetadataKeys, multikeyPaths, id);
+        doGetKeys(pooledBufferBuilder, obj, context, keys, multikeyMetadataKeys, multikeyPaths, id);
     } catch (const AssertionException& ex) {
         // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {

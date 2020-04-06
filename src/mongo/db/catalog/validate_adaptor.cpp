@@ -107,7 +107,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
         auto multikeyPaths = executionCtx.multikeyPaths();
 
-        iam->getKeys(recordBson,
+        iam->getKeys(executionCtx.pooledBufferBuilder(),
+                     recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                      IndexAccessMethod::GetKeysContext::kAddingKeys,
                      documentKeySet.get(),
@@ -220,8 +221,13 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
     const KeyString::Version version =
         index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
-    KeyString::Builder firstKeyString(
-        version, BSONObj(), indexInfo.ord, KeyString::Discriminator::kExclusiveBefore);
+
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
+    KeyString::PooledBuilder firstKeyString(executionCtx.pooledBufferBuilder(),
+                                            version,
+                                            BSONObj(),
+                                            indexInfo.ord,
+                                            KeyString::Discriminator::kExclusiveBefore);
 
     KeyString::Value prevIndexKeyStringValue;
 
@@ -230,7 +236,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     invariant(indexCursorIt != _validateState->getIndexCursors().end());
 
     const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor = indexCursorIt->second;
-    for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.getValueCopy());
+    for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.release());
          indexEntry;
          indexEntry = indexCursor->nextKeyString(opCtx)) {
 

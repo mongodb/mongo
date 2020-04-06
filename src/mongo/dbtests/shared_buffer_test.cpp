@@ -29,9 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/shared_buffer.h"
-
 #include "mongo/base/string_data.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -129,6 +129,62 @@ TEST_F(SharedBufferTest, ReallocOrCopyShrinkShared) {
     ASSERT_EQ('f', buf.get()[0]);
     ASSERT_EQ("foo"_sd, sharer.get());
     ASSERT_NE(buf.get(), sharer.get());
+}
+
+TEST_F(SharedBufferTest, SharedBufferFragmentBuilder) {
+    constexpr size_t kBlockSize = 16;
+    SharedBufferFragmentBuilder builder(kBlockSize);
+
+    auto verifyFragment = [](const SharedBufferFragment& fragment, uint8_t expected) {
+        for (size_t i = 0; i < fragment.size(); ++i)
+            ASSERT(memcmp(fragment.get() + i, &expected, 1) == 0);
+    };
+
+    builder.start(kBlockSize / 2);
+    ASSERT_EQ(builder.capacity(), kBlockSize);
+    uint8_t one = 1;
+    memset(builder.get(), one, kBlockSize / 2);
+    auto fragment1 = builder.finish(kBlockSize / 2);
+    ASSERT_EQ(fragment1.size(), kBlockSize / 2);
+    verifyFragment(fragment1, one);
+
+    builder.start(kBlockSize / 2);
+    ASSERT_EQ(builder.capacity(), kBlockSize / 2);
+    // We can use less than we ask for
+    uint8_t two = 2;
+    memset(builder.get(), two, kBlockSize / 4);
+    auto fragment2 = builder.finish(kBlockSize / 4);
+    ASSERT_EQ(fragment2.size(), kBlockSize / 4);
+    // Buffers should not overlap and be next to each other
+    ASSERT_EQ(fragment1.get() + fragment1.size(), fragment2.get());
+    verifyFragment(fragment2, two);
+
+    // Verify that anything written is transfered when we grow
+    builder.start(builder.capacity());
+    ASSERT_EQ(builder.capacity(), kBlockSize / 4);
+    uint8_t three = 3;
+    size_t written = kBlockSize / 4;
+    // Write current capacity
+    memset(builder.get(), three, written);
+    builder.grow(kBlockSize);
+    // Write the rest
+    memset(builder.get() + written, three, builder.capacity() - written);
+    auto fragment3 = builder.finish(kBlockSize);
+    for (size_t i = 0; i < (kBlockSize / 4); ++i)
+        ASSERT(memcmp(fragment3.get() + i, &three, 1) == 0);
+    ASSERT_GTE(builder.capacity(), kBlockSize);
+    verifyFragment(fragment3, three);
+
+    builder.start(builder.capacity());
+    auto ptr = builder.get();
+    builder.discard();
+    builder.start(builder.capacity());
+    ASSERT_EQ(builder.get(), ptr);
+
+    // No buffers should have been overwritten by others
+    verifyFragment(fragment1, one);
+    verifyFragment(fragment2, two);
+    verifyFragment(fragment3, three);
 }
 
 }  // namespace

@@ -64,7 +64,8 @@ private:
      * and fills each element with the prefixes of the indexed field that would cause this index to
      * be multikey as a result of inserting 'keys'.
      */
-    void doGetKeys(const BSONObj& obj,
+    void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                   const BSONObj& obj,
                    GetKeysContext context,
                    KeyStringSet* keys,
                    KeyStringSet* multikeyMetadataKeys,

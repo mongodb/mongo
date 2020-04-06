@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -835,6 +836,8 @@ public:
             return;
         }
 
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
         OpDebug* const nullOpDebug = nullptr;
@@ -885,7 +888,8 @@ public:
             options.logIfError = true;
 
             KeyStringSet keys;
-            iam->getKeys(actualKey,
+            iam->getKeys(executionCtx.pooledBufferBuilder(),
+                         actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
@@ -1244,6 +1248,8 @@ public:
             return;
         }
 
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
         // Create a new collection.
         lockDb(MODE_X);
         Collection* coll;
@@ -1300,7 +1306,8 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(actualKey,
+            iam->getKeys(executionCtx.pooledBufferBuilder(),
+                         actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
@@ -1465,6 +1472,8 @@ public:
             return;
         }
 
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
         // Create a new collection.
         lockDb(MODE_X);
         Collection* coll;
@@ -1533,7 +1542,8 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(actualKey,
+            iam->getKeys(executionCtx.pooledBufferBuilder(),
+                         actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
@@ -1569,7 +1579,8 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(actualKey,
+            iam->getKeys(executionCtx.pooledBufferBuilder(),
+                         actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
                          &keys,
@@ -1614,6 +1625,8 @@ public:
         if (_background && (!_isInRecordIdOrder || !_engineSupportsCheckpoints)) {
             return;
         }
+
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -1684,7 +1697,8 @@ public:
                 auto iam = const_cast<IndexAccessMethod*>(
                     indexCatalog->getEntry(descriptor)->accessMethod());
                 KeyStringSet keys;
-                iam->getKeys(dupObj,
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
@@ -1716,7 +1730,8 @@ public:
 
                 KeyStringSet keys;
                 InsertResult result;
-                iam->getKeys(dupObj,
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,

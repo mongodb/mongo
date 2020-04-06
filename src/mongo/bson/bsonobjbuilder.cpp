@@ -235,9 +235,7 @@ BSONObjBuilder::~BSONObjBuilder() {
     }
 }
 
-template class BasicBufBuilder<SharedBufferAllocator>;
-template class BasicBufBuilder<StackAllocator<StackSizeDefault>>;
-template class StringBuilderImpl<SharedBufferAllocator>;
-template class StringBuilderImpl<StackAllocator<StackSizeDefault>>;
+template class StringBuilderImpl<BufBuilder>;
+template class StringBuilderImpl<StackBufBuilderBase<StackSizeDefault>>;
 
 }  // namespace mongo

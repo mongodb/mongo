@@ -138,9 +138,10 @@ bool testKeygen(const BSONObj& kp,
         // indexed fields that would cause the index to be multikey as a result of inserting
         // 'actualKeys'.
         //
+        SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
         KeyStringSet actualKeys;
         MultikeyPaths actualMultikeyPaths;
-        keyGen->getKeys(obj, skipMultikey, &actualKeys, &actualMultikeyPaths);
+        keyGen->getKeys(allocator, obj, skipMultikey, &actualKeys, &actualMultikeyPaths);
 
         //
         // Check that the results match the expected result.

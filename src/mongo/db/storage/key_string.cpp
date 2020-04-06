@@ -1197,7 +1197,7 @@ void BuilderBase<BufferT>::_appendPreshiftedIntegerPortion(uint64_t value,
 
 template <class BufferT>
 void BuilderBase<BufferT>::_appendBytes(const void* source, size_t bytes, bool invert) {
-    char* const base = _buffer.skip(bytes);
+    char* const base = _buffer().skip(bytes);
 
     if (invert) {
         memcpy_flipBits(base, source, bytes);
@@ -2564,8 +2564,9 @@ int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t r
     return leftSize < rightSize ? -1 : 1;
 }
 
-template class BuilderBase<BufBuilder>;
-template class BuilderBase<StackBufBuilder>;
+template class BuilderBase<Builder>;
+template class BuilderBase<HeapBuilder>;
+template class BuilderBase<PooledBuilder>;
 
 }  // namespace KeyString
 

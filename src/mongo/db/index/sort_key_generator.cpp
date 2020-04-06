@@ -161,13 +161,14 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
     // corresponding collation keys. Therefore, we use the simple string comparator when comparing
     // the keys themselves.
     KeyStringSet keys;
+    SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     try {
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
         // multikey when getting the index keys for sorting.
         MultikeyPaths* multikeyPaths = nullptr;
         const auto skipMultikey = false;
-        _indexKeyGen->getKeys(obj, skipMultikey, &keys, multikeyPaths);
+        _indexKeyGen->getKeys(allocator, obj, skipMultikey, &keys, multikeyPaths);
     } catch (const AssertionException& e) {
         // Probably a parallel array.
         if (ErrorCodes::CannotIndexParallelArrays == e.code()) {

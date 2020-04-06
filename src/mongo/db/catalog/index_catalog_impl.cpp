@@ -1419,7 +1419,8 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
         auto multikeyPaths = executionCtx.multikeyPaths();
 
-        index->accessMethod()->getKeys(*bsonRecord.docPtr,
+        index->accessMethod()->getKeys(executionCtx.pooledBufferBuilder(),
+                                       *bsonRecord.docPtr,
                                        options.getKeysMode,
                                        IndexAccessMethod::GetKeysContext::kAddingKeys,
                                        keys.get(),
@@ -1582,8 +1583,8 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
     auto keys = executionCtx.keys();
-
-    entry->accessMethod()->getKeys(obj,
+    entry->accessMethod()->getKeys(executionCtx.pooledBufferBuilder(),
+                                   obj,
                                    IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                                    IndexAccessMethod::GetKeysContext::kRemovingKeys,
                                    keys.get(),

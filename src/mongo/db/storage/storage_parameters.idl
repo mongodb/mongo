@@ -62,3 +62,12 @@ server_parameters:
         cpp_varname: gTakeUnstableCheckpointOnShutdown
         set_at: startup
         default: false
+    operationMemoryPoolBlockSizeKB:
+        description: 'Block size in KB for the per operation temporary object memory pool'
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gOperationMemoryPoolBlockSizeKB
+        default: 1
+        validator:
+            gte: 1
+

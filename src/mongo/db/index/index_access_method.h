@@ -303,7 +303,8 @@ public:
      */
     using OnSuppressedErrorFn =
         std::function<void(Status status, const BSONObj& obj, boost::optional<RecordId> loc)>;
-    virtual void getKeys(const BSONObj& obj,
+    virtual void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                         const BSONObj& obj,
                          GetKeysMode mode,
                          GetKeysContext context,
                          KeyStringSet* keys,
@@ -512,7 +513,8 @@ public:
                       std::set<RecordId>* dupRecords,
                       std::vector<BSONObj>* dupKeys) final;
 
-    void getKeys(const BSONObj& obj,
+    void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                 const BSONObj& obj,
                  GetKeysMode mode,
                  GetKeysContext context,
                  KeyStringSet* keys,
@@ -542,7 +544,8 @@ protected:
      * keys are not associated with the document itself, but instead represent multi-key path
      * information that must be stored in a reserved keyspace within the index.
      */
-    virtual void doGetKeys(const BSONObj& obj,
+    virtual void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                           const BSONObj& obj,
                            GetKeysContext context,
                            KeyStringSet* keys,
                            KeyStringSet* multikeyMetadataKeys,
