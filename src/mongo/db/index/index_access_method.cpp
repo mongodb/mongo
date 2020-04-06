@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/progress_meter.h"
@@ -131,23 +132,25 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                          InsertResult* result) {
     invariant(options.fromIndexBuilder || !_indexCatalogEntry->isHybridBuilding());
 
-    KeyStringSet multikeyMetadataKeys;
-    KeyStringSet keys;
-    MultikeyPaths multikeyPaths;
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
+
+    auto keys = executionCtx.keys();
+    auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
+    auto multikeyPaths = executionCtx.multikeyPaths();
 
     getKeys(obj,
             options.getKeysMode,
             GetKeysContext::kAddingKeys,
-            &keys,
-            &multikeyMetadataKeys,
-            &multikeyPaths,
+            keys.get(),
+            multikeyMetadataKeys.get(),
+            multikeyPaths.get(),
             loc,
             kNoopOnSuppressedErrorFn);
 
     return insertKeys(opCtx,
-                      {keys.begin(), keys.end()},
-                      {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
-                      multikeyPaths,
+                      {keys->begin(), keys->end()},
+                      {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
+                      *multikeyPaths,
                       loc,
                       options,
                       result);
@@ -252,19 +255,21 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
     KeyString::Value actualKey = [&]() {
         if (_indexCatalogEntry->getCollator()) {
             // For performance, call get keys only if there is a non-simple collation.
-            KeyStringSet keys;
+            auto& executionCtx = StorageExecutionContext::get(opCtx);
+            auto keys = executionCtx.keys();
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
+
             getKeys(requestedKey,
                     GetKeysMode::kEnforceConstraints,
                     GetKeysContext::kAddingKeys,
-                    &keys,
+                    keys.get(),
                     multikeyMetadataKeys,
                     multikeyPaths,
                     boost::none,  // loc
                     kNoopOnSuppressedErrorFn);
-            invariant(keys.size() == 1);
-            return *keys.begin();
+            invariant(keys->size() == 1);
+            return *keys->begin();
         } else {
             KeyString::HeapBuilder requestedKeyString(
                 getSortedDataInterface()->getKeyStringVersion(),
@@ -516,17 +521,20 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
                                                           const BSONObj& obj,
                                                           const RecordId& loc,
                                                           const InsertDeleteOptions& options) {
-    KeyStringSet keys;
-    MultikeyPaths multikeyPaths;
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
+
+    auto keys = executionCtx.keys();
+    auto multikeyPaths = executionCtx.multikeyPaths();
 
     try {
         _indexCatalogEntry->accessMethod()->getKeys(
+
             obj,
             options.getKeysMode,
             GetKeysContext::kAddingKeys,
-            &keys,
+            keys.get(),
             &_multikeyMetadataKeys,
-            &multikeyPaths,
+            multikeyPaths.get(),
             loc,
             [&](Status status, const BSONObj&, boost::optional<RecordId>) {
                 // If a key generation error was suppressed, record the document as "skipped" so the
@@ -547,27 +555,28 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
         return exceptionToStatus();
     }
 
-    if (!multikeyPaths.empty()) {
+    if (!multikeyPaths->empty()) {
         if (_indexMultikeyPaths.empty()) {
-            _indexMultikeyPaths = multikeyPaths;
+            _indexMultikeyPaths = *multikeyPaths;
         } else {
-            invariant(_indexMultikeyPaths.size() == multikeyPaths.size());
-            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+            invariant(_indexMultikeyPaths.size() == multikeyPaths->size());
+            for (size_t i = 0; i < multikeyPaths->size(); ++i) {
+                _indexMultikeyPaths[i].insert((*multikeyPaths)[i].begin(),
+                                              (*multikeyPaths)[i].end());
             }
         }
     }
 
-    for (const auto& keyString : keys) {
+    for (const auto& keyString : *keys) {
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
 
     _isMultiKey = _isMultiKey ||
         _indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
-            keys.size(),
+            keys->size(),
             {_multikeyMetadataKeys.begin(), _multikeyMetadataKeys.end()},
-            multikeyPaths);
+            *multikeyPaths);
 
     return Status::OK();
 }

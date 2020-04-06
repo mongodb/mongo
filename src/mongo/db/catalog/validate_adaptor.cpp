@@ -44,6 +44,7 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
@@ -89,6 +90,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         return status;
     }
 
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
+
     for (const auto& index : _validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
         const IndexAccessMethod* iam = index->accessMethod();
@@ -100,23 +103,24 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             }
         }
 
-        KeyStringSet documentKeySet;
-        KeyStringSet multikeyMetadataKeys;
-        MultikeyPaths multikeyPaths;
+        auto documentKeySet = executionCtx.keys();
+        auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
+        auto multikeyPaths = executionCtx.multikeyPaths();
+
         iam->getKeys(recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                      IndexAccessMethod::GetKeysContext::kAddingKeys,
-                     &documentKeySet,
-                     &multikeyMetadataKeys,
-                     &multikeyPaths,
+                     documentKeySet.get(),
+                     multikeyMetadataKeys.get(),
+                     multikeyPaths.get(),
                      recordId,
                      IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
         if (!descriptor->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(
-                documentKeySet.size(),
-                {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
-                multikeyPaths)) {
+                documentKeySet->size(),
+                {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
+                *multikeyPaths)) {
             std::string msg = str::stream()
                 << "Index " << descriptor->indexName() << " is not multi-key but has more than one"
                 << " key in document " << recordId;
@@ -126,7 +130,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         }
 
         IndexInfo& indexInfo = _indexConsistency->getIndexInfo(descriptor->indexName());
-        for (const auto& keyString : multikeyMetadataKeys) {
+        for (const auto& keyString : *multikeyMetadataKeys) {
             try {
                 _indexConsistency->addMultikeyMetadataPath(keyString, &indexInfo);
             } catch (...) {
@@ -134,7 +138,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             }
         }
 
-        for (const auto& keyString : documentKeySet) {
+        for (const auto& keyString : *documentKeySet) {
             try {
                 _totalIndexKeys++;
                 _indexConsistency->addDocKey(opCtx, keyString, &indexInfo, recordId);

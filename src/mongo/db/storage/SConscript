@@ -60,6 +60,16 @@ env.Library(
     )
 
 env.Library(
+    target='execution_context',
+    source=[
+        'execution_context.cpp',
+        ],
+    LIBDEPS=[
+        'key_string',
+        ],
+    )
+
+env.Library(
     target='bson_collection_catalog_entry',
     source=[
         'bson_collection_catalog_entry.cpp',

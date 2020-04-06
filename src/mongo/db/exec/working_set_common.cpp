@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -121,6 +122,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     // TODO provide a way for the query planner to opt out of this checking if it is unneeded due to
     // the structure of the plan.
     if (member->getState() == WorkingSetMember::RID_AND_IDX) {
+        auto& executionCtx = StorageExecutionContext::get(opCtx);
         for (size_t i = 0; i < member->keyData.size(); i++) {
             auto&& memberKey = member->keyData[i];
             // If this key was obtained in the current snapshot, then move on to the next key. There
@@ -129,16 +131,16 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 continue;
             }
 
-            KeyStringSet keys;
-            // There's no need to compute the prefixes of the indexed fields that cause the index to
-            // be multikey when ensuring the keyData is still valid.
+            auto keys = executionCtx.keys();
+            // There's no need to compute the prefixes of the indexed fields that cause the
+            // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
             auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId);
             iam->getKeys(member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          IndexAccessMethod::GetKeysContext::kValidatingKeys,
-                         &keys,
+                         keys.get(),
                          multikeyMetadataKeys,
                          multikeyPaths,
                          member->recordId,
@@ -147,7 +149,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                                              memberKey.keyData,
                                              iam->getSortedDataInterface()->getOrdering(),
                                              member->recordId);
-            if (!keys.count(keyString.release())) {
+            if (!keys->count(keyString.release())) {
                 // document would no longer be at this position in the index.
                 return false;
             }
