@@ -71,9 +71,23 @@ public:
 
     /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
+     *
+     * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by
+     * the CollectionMetadata's current chunk manager.
      */
     ChunkVersion getShardVersion() const {
         return (isSharded() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
+    }
+
+    /**
+     * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
+     *
+     * Will not throw an exception if _thisShardId is marked as stale by the CollectionMetadata's
+     * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
+     * caller must execute logic based on the returned ChunkVersion, use getShardVersion() instead.
+     */
+    ChunkVersion getShardVersionForLogging() const {
+        return (isSharded() ? _cm->getVersionForLogging(_thisShardId) : ChunkVersion::UNSHARDED());
     }
 
     /**

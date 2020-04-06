@@ -431,7 +431,8 @@ bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
     return other.getVersion(shardName) == getVersion(shardName);
 }
 
-ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
+ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
+                                              bool throwOnStaleShard) const {
     auto it = _shardVersions.find(shardName);
     if (it == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
@@ -439,13 +440,21 @@ ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
         return ChunkVersion(0, 0, _collectionVersion.epoch());
     }
 
-    if (gEnableFinerGrainedCatalogCacheRefresh) {
+    if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
         uassert(ShardInvalidatedForTargetingInfo(_nss),
                 "shard has been marked stale",
                 !it->second.isStale.load());
     }
 
     return it->second.shardVersion;
+}
+
+ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
+    return _getVersion(shardName, true);
+}
+
+ChunkVersion RoutingTableHistory::getVersionForLogging(const ShardId& shardName) const {
+    return _getVersion(shardName, false);
 }
 
 std::string RoutingTableHistory::toString() const {
