@@ -786,7 +786,13 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
             }
             itDb->second.erase(nss.ns());
             return;
+        } else if (existingRoutingInfo &&
+                   existingRoutingInfo->getSequenceNumber() ==
+                       newRoutingInfo->getSequenceNumber()) {
+            // If the routingInfo hasn't changed, we need to manually reset stale shards.
+            newRoutingInfo->setAllShardsRefreshed();
         }
+
         collEntry->routingInfo = std::move(newRoutingInfo);
     };
 
