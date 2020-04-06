@@ -7,14 +7,20 @@
 const testDB = db.getSiblingDB("test_failcommand");
 const adminDB = db.getSiblingDB("admin");
 
-const getThreadName = function() {
+const getCurOpMetadata = function() {
     let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
     return adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
-        .toArray()[0]
-        .desc;
+        .toArray()[0];
+};
+const getThreadName = function() {
+    return getCurOpMetadata().desc;
+};
+const getAppName = function() {
+    return getCurOpMetadata().appName;
 };
 
 let threadName = getThreadName();
+const appName = getAppName();
 
 // Test idempotent configureFailPoint.
 assert.commandWorked(adminDB.runCommand({
@@ -375,4 +381,29 @@ assert.commandWorked(
 res = assert.commandWorkedIgnoringWriteConcernErrors(testDB.runCommand(
     {insert: "foo", documents: [{x: "doc_for_namespace_case_should_trigger_wce"}]}));
 assert.eq(res.writeConcernError, {code: ErrorCodes.InternalError, errmsg: "foo"});
+
+// Test support for "appName" arg to failCommand
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        failCommands: ["ping"],
+        errorCode: ErrorCodes.NotMaster,
+        threadName: threadName,
+        appName: appName,
+    }
+}));
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+
+assert.commandWorked(adminDB.runCommand({
+    configureFailPoint: "failCommand",
+    mode: "alwaysOn",
+    data: {
+        failCommands: ["ping"],
+        errorCode: ErrorCodes.NotMaster,
+        threadName: threadName,
+        appName: "made up app name",
+    }
+}));
+assert.commandWorked(testDB.runCommand({ping: 1}));
 }());
