@@ -151,11 +151,12 @@ var ChunkHelper = (function() {
     }
 
     function itcount(collection, query) {
-        // We project out all of the fields in order to greatly reduce the likelihood a cursor would
-        // actually be returned. This is acceptable because we're only interested in how many
-        // documents there were and not any of their contents. The network_error_and_txn_override.js
-        // override would throw an exception if we attempted to use the getMore command.
-        return collection.find(query, {_id: 0, nonExistingField: 1}).itcount();
+        // We set a large batch size and project out all of the fields in order to greatly reduce
+        // the likelihood a cursor would actually be returned. This is acceptable because we're only
+        // interested in how many documents there were and not any of their contents. The
+        // network_error_and_txn_override.js override would throw an exception if we attempted to
+        // use the getMore command.
+        return collection.find(query, {_id: 0, nonExistingField: 1}).batchSize(1e6).itcount();
     }
 
     // Return the number of docs in [lower, upper) as seen by conn.
