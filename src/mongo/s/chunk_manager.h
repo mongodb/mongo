@@ -144,7 +144,18 @@ public:
         return _collectionVersion;
     }
 
+    /**
+     * Retrieves the shard version for the given shard. Will throw a ShardInvalidatedForTargeting
+     * exception if the shard is marked as stale.
+     */
     ChunkVersion getVersion(const ShardId& shardId) const;
+
+    /**
+     * Retrieves the shard version for the given shard. Will not throw if the shard is marked as
+     * stale. Only use when logging the given chunk version -- if the caller must execute logic
+     * based on the returned version, use getVersion() instead.
+     */
+    ChunkVersion getVersionForLogging(const ShardId& shardId) const;
 
     const ChunkInfoMap& getChunkMap() const {
         return _chunkMap;
@@ -192,6 +203,8 @@ private:
      * Does a single pass over the chunkMap and constructs the ShardVersionMap object.
      */
     ShardVersionMap _constructShardVersionMap() const;
+
+    ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 
     std::string _extractKeyString(const BSONObj& shardKeyValue) const;
 
@@ -315,6 +328,10 @@ public:
 
     ChunkVersion getVersion(const ShardId& shardId) const {
         return _rt->getVersion(shardId);
+    }
+
+    ChunkVersion getVersionForLogging(const ShardId& shardId) const {
+        return _rt->getVersionForLogging(shardId);
     }
 
     ConstRangeOfChunks chunks() const {
