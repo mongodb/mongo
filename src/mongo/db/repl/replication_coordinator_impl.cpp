@@ -3013,11 +3013,6 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_inlock(
     const rpc::ReplSetMetadata& replMetadata) {
-    if (!enableSafeReplicaSetReconfig) {
-        if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
-            return EventHandle();
-        }
-    }
     return _updateTerm_inlock(replMetadata.getTerm());
 }
 
@@ -3124,10 +3119,9 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                             long long currentTerm) -> StatusWith<ReplSetConfig> {
         ReplSetConfig newConfig;
 
-        // Only explicitly set configTerm for reconfig to this node's term if safe reconfig is
-        // enabled. Otherwise, use -1.
-        auto term = (!args.force && enableSafeReplicaSetReconfig) ? currentTerm
-                                                                  : OpTime::kUninitializedTerm;
+        // Only explicitly set configTerm to this node's term for non-force reconfigs.
+        // Otherwise, use -1.
+        auto term = (!args.force) ? currentTerm : OpTime::kUninitializedTerm;
 
         // When initializing a new config through the replSetReconfig command, ignore the term
         // field passed in through its args. Instead, use this node's term.
@@ -3265,7 +3259,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     // Construct a fake OpTime that can be accepted but isn't used.
     OpTime fakeOpTime(Timestamp(1, 1), topCoordTerm);
 
-    if (!force && enableSafeReplicaSetReconfig) {
+    if (!force) {
         if (!_doneWaitingForReplication_inlock(fakeOpTime, configWriteConcern)) {
             return Status(ErrorCodes::CurrentConfigNotCommittedYet,
                           str::stream()

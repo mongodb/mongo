@@ -56,7 +56,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -424,7 +423,7 @@ public:
         // For safe reconfig, wait for the current config to be committed before running a new one.
         // We will check again after acquiring the repl mutex in processReplSetReconfig(), in case
         // of concurrent reconfigs.
-        if (!parsedArgs.force && enableSafeReplicaSetReconfig) {
+        if (!parsedArgs.force) {
             // Check primary before waiting.
             auto memberState = replCoord->getMemberState();
             uassert(ErrorCodes::NotMaster,
@@ -471,7 +470,7 @@ public:
 
         // Now that the new config has been persisted and installed in memory, wait for the new
         // config to become replicated. For force reconfigs we don't need to do this waiting.
-        if (!parsedArgs.force && enableSafeReplicaSetReconfig) {
+        if (!parsedArgs.force) {
             auto status =
                 replCoord->awaitConfigCommitment(opCtx, false /* waitForOplogCommitment */);
             uassertStatusOK(
