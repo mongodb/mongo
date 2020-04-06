@@ -510,7 +510,7 @@ private:
                 networkingBaton && networkingBaton->canWait()) {
                 return networkingBaton->addSession(*this, NetworkingBaton::Type::In)
                     .onError([](Status error) {
-                        if (ErrorCodes::isCancelationError(error)) {
+                        if (ErrorCodes::isShutdownError(error)) {
                             // If the baton has detached, it will cancel its polling. We catch that
                             // error here and return Status::OK so that we invoke
                             // opportunisticRead() again and switch to asio::async_read() below.
