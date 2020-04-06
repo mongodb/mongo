@@ -139,6 +139,8 @@ public:
                                            TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
 
+    void disableExpeditedChecking();
+
 private:
     /**
      * If the provided executor exists, use that one (for testing). Otherwise create a new one.

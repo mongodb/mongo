@@ -544,6 +544,11 @@ void ServerIsMasterMonitor::requestImmediateCheck() {
     }
 }
 
+void ServerIsMasterMonitor::disableExpeditedChecking() {
+    stdx::lock_guard lock(_mutex);
+    _disableExpeditedChecking(lock);
+}
+
 void ServerIsMasterMonitor::_disableExpeditedChecking(WithLock) {
     for (auto& addressAndMonitor : _singleMonitors) {
         addressAndMonitor.second->disableExpeditedChecking();

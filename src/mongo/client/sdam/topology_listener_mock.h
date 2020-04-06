@@ -40,29 +40,42 @@ public:
     TopologyListenerMock() = default;
     virtual ~TopologyListenerMock() = default;
 
+    void onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
+                                         const BSONObj reply) override;
+
+    void onServerHeartbeatFailureEvent(Status errorStatus,
+                                       const ServerAddress& hostAndPort,
+                                       const BSONObj reply) override;
+
+    /**
+     * Returns true if _serverIsMasterReplies contains an element corresponding to hostAndPort.
+     */
+    bool hasIsMasterResponse(const ServerAddress& hostAndPort);
+    bool _hasIsMasterResponse(WithLock, const ServerAddress& hostAndPort);
+
+    /**
+     * Returns the responses for the most recent onServerHeartbeat events.
+     */
+    std::vector<Status> getIsMasterResponse(const ServerAddress& hostAndPort);
+
     void onServerPingSucceededEvent(IsMasterRTT latency, const ServerAddress& hostAndPort) override;
 
     void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status) override;
 
     /**
-     * Acquires _mutex before calling _hasPingResponse_inlock().
+     * Returns true if _serverPingRTTs contains an element corresponding to hostAndPort.
      */
     bool hasPingResponse(const ServerAddress& hostAndPort);
+    bool _hasPingResponse(WithLock, const ServerAddress& hostAndPort);
 
     /**
-     * Should only be called while holding the _mutex. Returns true if _serverPingRTTs contains an
-     * element corresponding to hostAndPort.
-     */
-    bool _hasPingResponse_inlock(const ServerAddress& hostAndPort);
-
-    /**
-     * Returns the response for the most recent onServerPing event. MUST be called after a ping has
-     * been sent and proccessed in order to remove it from the map and make room for the next.
+     * Returns the responses for the most recent onServerPing events.
      */
     std::vector<StatusWith<IsMasterRTT>> getPingResponse(const ServerAddress& hostAndPort);
 
 private:
     Mutex _mutex;
+    stdx::unordered_map<ServerAddress, std::vector<Status>> _serverIsMasterReplies;
     stdx::unordered_map<ServerAddress, std::vector<StatusWith<IsMasterRTT>>> _serverPingRTTs;
 };
 
