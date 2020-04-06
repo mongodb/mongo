@@ -202,20 +202,24 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1, a: "A"}));
 assert.commandWorked(coll.insert({_id: 2, b: "B"}));
 assert.commandWorked(coll.insert({_id: 3, c: "C"}));
-results = coll.aggregate([{
-                             $project: {
-                                 out: {
-                                     $switch: {
-                                         branches: [
-                                             {case: {$eq: ["$a", "a"]}, then: "foo"},
-                                             {case: {$eq: ["$b", "b"]}, then: "bar"}
-                                         ],
-                                         default: "baz"
-                                     }
-                                 }
-                             }
-                         }],
-                         {collation: caseInsensitive})
+results = coll.aggregate(
+                  [
+                      {$sort: {_id: 1}},
+                      {
+                          $project: {
+                              out: {
+                                  $switch: {
+                                      branches: [
+                                          {case: {$eq: ["$a", "a"]}, then: "foo"},
+                                          {case: {$eq: ["$b", "b"]}, then: "bar"}
+                                      ],
+                                      default: "baz"
+                                  }
+                              }
+                          }
+                      }
+                  ],
+                  {collation: caseInsensitive})
               .toArray();
 assert.eq(3, results.length);
 assert.eq("foo", results[0].out);

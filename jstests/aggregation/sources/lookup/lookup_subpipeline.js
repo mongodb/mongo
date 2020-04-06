@@ -2,7 +2,7 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and anyEq.
 
 const testName = "lookup_subpipeline";
 
@@ -10,17 +10,6 @@ const coll = db.lookUp;
 const from = db.from;
 const thirdColl = db.thirdColl;
 const fourthColl = db.fourthColl;
-
-// Used by testPipeline to sort result documents. All _ids must be primitives.
-function compareId(a, b) {
-    if (a._id < b._id) {
-        return -1;
-    }
-    if (a._id > b._id) {
-        return 1;
-    }
-    return 0;
-}
 
 function generateNestedPipeline(foreignCollName, numLevels) {
     let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];
@@ -34,8 +23,7 @@ function generateNestedPipeline(foreignCollName, numLevels) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    assert.eq(collection.aggregate(pipeline).toArray().sort(compareId),
-              expectedResult.sort(compareId));
+    assert(anyEq(collection.aggregate(pipeline).toArray(), expectedResult));
 }
 
 //

@@ -13,6 +13,8 @@
 (function() {
 "use strict";
 
+load('jstests/libs/fixture_helpers.js');  // For isReplSet() and awaitReplication().
+
 var coll = db.server21632;
 coll.drop();
 
@@ -23,6 +25,13 @@ assert.eq([], coll.aggregate([{$sample: {size: 10}}]).toArray());
 
 db.createCollection(coll.getName());
 
+// If we are performing secondary reads against a replica set, we need to wait for the created
+// collection to replicate to all of the secondaries before we attempt to run coll.stats() on it
+// since coll.stats() is not causally consistent.
+if (FixtureHelpers.isReplSet(db)) {
+    FixtureHelpers.awaitReplication(db);
+}
+
 // Test if we are running WT + LSM and if so, skip the test.
 // WiredTiger LSM random cursor implementation doesn't currently give random enough
 // distribution to pass this test case, so disable the test when checking an LSM
@@ -31,7 +40,7 @@ db.createCollection(coll.getName());
 
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-if (storageEngine == "wiredTiger" && coll.stats().wiredTiger.type == 'lsm') {
+if (storageEngine === "wiredTiger" && coll.stats().wiredTiger.type === 'lsm') {
     return;
 }
 
