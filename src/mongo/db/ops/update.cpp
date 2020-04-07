@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -61,35 +60,31 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     invariant(!request.isExplain());
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nsString, MODE_IX));
+
+    Collection* collection;
 
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
-    if (!collection && request.isUpsert()) {
-        // We have to have an exclusive lock on the db to be allowed to create the collection.
-        // Callers should either get an X or create the collection.
-        const Locker* locker = opCtx->lockState();
-        invariant(locker->isW() ||
-                  locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_IX));
+    writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+        if (collection || !request.isUpsert()) {
+            return;
+        }
 
-        writeConflictRetry(opCtx, "createCollection", nsString.ns(), [&] {
-            Lock::DBLock lk(opCtx, nsString.db(), MODE_X);
+        const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString);
 
-            const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString);
-
-            if (userInitiatedWritesAndNotPrimary) {
-                uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
-                                       str::stream() << "Not primary while creating collection "
-                                                     << nsString << " during upsert"));
-            }
-            WriteUnitOfWork wuow(opCtx);
-            collection = db->createCollection(opCtx, nsString, CollectionOptions());
-            invariant(collection);
-            wuow.commit();
-        });
-    }
+        if (userInitiatedWritesAndNotPrimary) {
+            uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
+                                   str::stream() << "Not primary while creating collection "
+                                                 << nsString << " during upsert"));
+        }
+        WriteUnitOfWork wuow(opCtx);
+        collection = db->createCollection(opCtx, nsString, CollectionOptions());
+        invariant(collection);
+        wuow.commit();
+    });
 
     // Parse the update, get an executor for it, run the executor, get stats out.
     const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
