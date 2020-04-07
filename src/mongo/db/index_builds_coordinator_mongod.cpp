@@ -326,7 +326,10 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     });
 
     // Waits until the index build has either been started or failed to start.
-    auto status = startFuture.getNoThrow(opCtx);
+    // Ignore any interruption state in 'opCtx'.
+    // If 'opCtx' is interrupted, the caller will be notified after startIndexBuild() returns when
+    // it checks the future associated with 'sharedPromise'.
+    auto status = startFuture.getNoThrow(Interruptible::notInterruptible());
     if (!status.isOK()) {
         return status;
     }
