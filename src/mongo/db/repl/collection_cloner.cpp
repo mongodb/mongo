@@ -212,19 +212,18 @@ BaseCloner::AfterStageBehavior CollectionCloner::queryStage() {
 
 void CollectionCloner::runQuery() {
     // Non-resumable query.
-    Query query = QUERY("query" << BSONObj() << "$readOnce" << true);
+    Query query;
 
     if (_resumeSupported) {
         if (_resumeToken) {
             // Resume the query from where we left off.
             LOGV2_DEBUG(21133, 1, "Collection cloner will resume the last successful query");
-            query = QUERY("query" << BSONObj() << "$readOnce" << true << "$_requestResumeToken"
-                                  << true << "$_resumeAfter" << _resumeToken.get());
+            query = QUERY("query" << BSONObj() << "$_requestResumeToken" << true << "$_resumeAfter"
+                                  << _resumeToken.get());
         } else {
             // New attempt at a resumable query.
             LOGV2_DEBUG(21134, 1, "Collection cloner will run a new query");
-            query = QUERY("query" << BSONObj() << "$readOnce" << true << "$_requestResumeToken"
-                                  << true);
+            query = QUERY("query" << BSONObj() << "$_requestResumeToken" << true);
         }
         query.hint(BSON("$natural" << 1));
     }
