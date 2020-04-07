@@ -51,7 +51,7 @@ function runAllTests(launcher) {
     const SIGABRT = 6;
     testShutdownLogging(launcher, function(conn) {
         conn.getDB('admin').shutdownServer();
-    }, makeRegExMatchFn(/shutdown command received/), MongoRunner.EXIT_CLEAN);
+    }, makeRegExMatchFn(/Terminating via shutdown command/), MongoRunner.EXIT_CLEAN);
 
     testShutdownLogging(launcher,
                         makeShutdownByCrashFn('fault'),

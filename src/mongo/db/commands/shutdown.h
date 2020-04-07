@@ -30,15 +30,57 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/commands/shutdown_gen.h"
+
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/ntservice.h"
 
 namespace mongo {
 
-class CmdShutdown : public BasicCommand {
+namespace shutdown_detail {
+void finishShutdown(bool force, long long timeoutSecs);
+}
+
+template <typename Derived>
+class CmdShutdown : public TypedCommand<Derived> {
 public:
-    CmdShutdown() : BasicCommand("shutdown") {}
+    using Request = ShutdownRequest;
+
+    class Invocation final : public TypedCommand<Derived>::InvocationBase {
+    public:
+        using Base = typename TypedCommand<Derived>::InvocationBase;
+        using Base::Base;
+
+        void typedRun(OperationContext* opCtx) {
+            auto force = Base::request().getForce();
+            auto timeoutSecs = Base::request().getTimeoutSecs();
+            // Commands derived from CmdShutdown should define their own
+            // `beginShutdown` methods.
+            Derived::beginShutdown(opCtx, force, timeoutSecs);
+            shutdown_detail::finishShutdown(force, timeoutSecs);
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return NamespaceString(Base::request().getDbName(), "");
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto client = opCtx->getClient();
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::shutdown));
+        }
+    };
 
     bool requiresAuth() const override {
         return true;
@@ -49,18 +91,16 @@ public:
     bool localHostOnlyIfNoAuth() const override {
         return true;
     }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kAlways;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const;
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+                                       std::vector<Privilege>* out) const {
+        ActionSet actions;
+        actions.addAction(ActionType::shutdown);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-
-protected:
-    static void shutdownHelper(const BSONObj& cmdObj);
 };
 
 }  // namespace mongo

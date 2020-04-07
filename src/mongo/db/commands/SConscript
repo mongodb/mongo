@@ -360,6 +360,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='shutdown_idl',
+    source=[
+        'shutdown.cpp',
+        env.Idlc('shutdown.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+)
+
 # Commands that should only be present in mongod
 env.Library(
     target="mongod",
@@ -436,6 +448,7 @@ env.Library(
         'servers',
         'set_index_commit_quorum_idl',
         'shell_protocol',
+        'shutdown_idl',
         'standalone',
         'test_commands_enabled',
     ],

@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-class CmdShutdownMongoD : public CmdShutdown {
+class CmdShutdownMongoD : public CmdShutdown<CmdShutdownMongoD> {
 public:
     std::string help() const override {
         return "shutdown the database.  must be ran against admin db and "
@@ -49,17 +49,7 @@ public:
                "N to wait N seconds for other members to catch up.";
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-
-        long long timeoutSecs = 15;
-        if (cmdObj.hasField("timeoutSecs")) {
-            timeoutSecs = cmdObj["timeoutSecs"].numberLong();
-        }
-
+    static void beginShutdown(OperationContext* opCtx, bool force, long long timeoutSecs) {
         // This code may race with a new index build starting up. We may get 0 active index builds
         // from the IndexBuildsCoordinator shutdown to proceed, but there is nothing to prevent a
         // new index build from starting after that check.
@@ -81,10 +71,6 @@ public:
                 throw;
             }
         }
-
-        // Never returns
-        shutdownHelper(cmdObj);
-        return true;
     }
 
 } cmdShutdownMongoD;
