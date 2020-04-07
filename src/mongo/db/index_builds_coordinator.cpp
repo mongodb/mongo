@@ -1347,7 +1347,7 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
                 auto aborted = false;
                 {
                     // We have to lock the mutex in order to read the committed/aborted state.
-                    stdx::unique_lock<Latch> lk(existingIndexBuild->mutex);
+                    stdx::unique_lock<Latch> lkExisting(existingIndexBuild->mutex);
                     ss << " index build state: " << existingIndexBuild->indexBuildState.toString();
                     if (auto ts = existingIndexBuild->indexBuildState.getTimestamp()) {
                         ss << ", timestamp: " << ts->toString();
