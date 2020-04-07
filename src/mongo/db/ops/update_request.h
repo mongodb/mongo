@@ -33,12 +33,18 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+namespace {
+const std::vector<BSONObj> emptyArrayFilters{};
+const BSONObj emptyCollation{};
+}  // namespace
 
 class FieldRef;
 
@@ -56,80 +62,85 @@ public:
         RETURN_NEW
     };
 
-    inline UpdateRequest(const NamespaceString& nsString) : _nsString(nsString) {}
+    UpdateRequest(const write_ops::UpdateOpEntry& updateOp = write_ops::UpdateOpEntry())
+        : _updateOp(updateOp) {}
+
+    void setNamespaceString(const NamespaceString& nsString) {
+        _nsString = nsString;
+    }
 
     const NamespaceString& getNamespaceString() const {
         return _nsString;
     }
 
-    inline void setQuery(const BSONObj& query) {
-        _query = query;
+    void setQuery(const BSONObj& query) {
+        _updateOp.setQ(query);
     }
 
-    inline const BSONObj& getQuery() const {
-        return _query;
+    const BSONObj& getQuery() const {
+        return _updateOp.getQ();
     }
 
-    inline void setProj(const BSONObj& proj) {
+    void setProj(const BSONObj& proj) {
         _proj = proj;
     }
 
-    inline const BSONObj& getProj() const {
+    const BSONObj& getProj() const {
         return _proj;
     }
 
-    inline void setSort(const BSONObj& sort) {
+    void setSort(const BSONObj& sort) {
         _sort = sort;
     }
 
-    inline const BSONObj& getSort() const {
+    const BSONObj& getSort() const {
         return _sort;
     }
 
-    inline void setCollation(const BSONObj& collation) {
-        _collation = collation;
+    void setCollation(const BSONObj& collation) {
+        _updateOp.setCollation(collation);
     }
 
-    inline const BSONObj& getCollation() const {
-        return _collation;
+    const BSONObj& getCollation() const {
+        return _updateOp.getCollation().get_value_or(emptyCollation);
     }
 
-    inline void setUpdateModification(const write_ops::UpdateModification& updateMod) {
-        _updateMod = updateMod;
+    void setUpdateModification(const write_ops::UpdateModification& updateMod) {
+        _updateOp.setU(updateMod);
     }
 
-    inline const write_ops::UpdateModification& getUpdateModification() const {
-        return _updateMod;
+    const write_ops::UpdateModification& getUpdateModification() const {
+        return _updateOp.getU();
     }
 
-    inline void setUpdateConstants(const boost::optional<BSONObj>& updateConstants) {
-        _updateConstants = updateConstants;
+    void setUpdateConstants(const boost::optional<BSONObj>& updateConstants) {
+        _updateOp.setC(updateConstants);
     }
 
-    inline const boost::optional<BSONObj>& getUpdateConstants() const {
-        return _updateConstants;
+    const boost::optional<BSONObj>& getUpdateConstants() const {
+        return _updateOp.getC();
     }
 
-    inline void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
         _runtimeConstants = std::move(runtimeConstants);
     }
 
-    inline const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
+    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
         return _runtimeConstants;
     }
 
-    inline void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
-        _arrayFilters = arrayFilters;
+    void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
+        _updateOp.setArrayFilters(arrayFilters);
     }
 
-    inline const std::vector<BSONObj>& getArrayFilters() const {
-        return _arrayFilters;
+    const std::vector<BSONObj>& getArrayFilters() const {
+        return _updateOp.getArrayFilters().get_value_or(emptyArrayFilters);
     }
 
     // Please see documentation on the private members matching these names for
     // explanations of the following fields.
 
-    inline void setGod(bool value = true) {
+    void setGod(bool value = true) {
         _god = value;
     }
 
@@ -137,31 +148,31 @@ public:
         return _god;
     }
 
-    inline void setUpsert(bool value = true) {
-        _upsert = value;
+    void setUpsert(bool value = true) {
+        _updateOp.setUpsert(value);
     }
 
     bool isUpsert() const {
-        return _upsert;
+        return _updateOp.getUpsert();
     }
 
-    inline void setUpsertSuppliedDocument(bool value = true) {
-        _upsertSuppliedDocument = value;
+    void setUpsertSuppliedDocument(bool value = true) {
+        _updateOp.setUpsertSupplied(value);
     }
 
     bool shouldUpsertSuppliedDocument() const {
-        return _upsertSuppliedDocument;
+        return _updateOp.getUpsertSupplied();
     }
 
-    inline void setMulti(bool value = true) {
-        _multi = value;
+    void setMulti(bool value = true) {
+        _updateOp.setMulti(value);
     }
 
     bool isMulti() const {
-        return _multi;
+        return _updateOp.getMulti();
     }
 
-    inline void setFromMigration(bool value = true) {
+    void setFromMigration(bool value = true) {
         _fromMigration = value;
     }
 
@@ -169,7 +180,7 @@ public:
         return _fromMigration;
     }
 
-    inline void setFromOplogApplication(bool value = true) {
+    void setFromOplogApplication(bool value = true) {
         _fromOplogApplication = value;
     }
 
@@ -177,66 +188,66 @@ public:
         return _fromOplogApplication;
     }
 
-    inline void setExplain(bool value = true) {
+    void setExplain(bool value = true) {
         _isExplain = value;
     }
 
-    inline bool isExplain() const {
+    bool isExplain() const {
         return _isExplain;
     }
 
-    inline void setReturnDocs(ReturnDocOption value) {
+    void setReturnDocs(ReturnDocOption value) {
         _returnDocs = value;
     }
 
     void setHint(const BSONObj& hint) {
-        _hint = hint;
+        _updateOp.setHint(hint);
     }
 
     BSONObj getHint() const {
-        return _hint;
+        return _updateOp.getHint();
     }
 
-    inline bool shouldReturnOldDocs() const {
+    bool shouldReturnOldDocs() const {
         return _returnDocs == ReturnDocOption::RETURN_OLD;
     }
 
-    inline bool shouldReturnNewDocs() const {
+    bool shouldReturnNewDocs() const {
         return _returnDocs == ReturnDocOption::RETURN_NEW;
     }
 
-    inline bool shouldReturnAnyDocs() const {
+    bool shouldReturnAnyDocs() const {
         return shouldReturnOldDocs() || shouldReturnNewDocs();
     }
 
-    inline void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) {
+    void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) {
         _yieldPolicy = yieldPolicy;
     }
 
-    inline PlanExecutor::YieldPolicy getYieldPolicy() const {
+    PlanExecutor::YieldPolicy getYieldPolicy() const {
         return _yieldPolicy;
     }
 
-    inline void setStmtId(StmtId stmtId) {
+    void setStmtId(StmtId stmtId) {
         _stmtId = std::move(stmtId);
     }
 
-    inline StmtId getStmtId() const {
+    StmtId getStmtId() const {
         return _stmtId;
     }
 
     const std::string toString() const {
         StringBuilder builder;
-        builder << " query: " << _query;
+        builder << " query: " << getQuery();
         builder << " projection: " << _proj;
         builder << " sort: " << _sort;
-        builder << " collation: " << _collation;
-        builder << " updateModification: " << _updateMod.toString();
+        builder << " collation: " << getCollation();
+        builder << " updateModification: " << getUpdateModification().toString();
         builder << " stmtId: " << _stmtId;
 
         builder << " arrayFilters: [";
         bool first = true;
-        for (auto arrayFilter : _arrayFilters) {
+        for (auto arrayFilter : getArrayFilters()) {
             if (!first) {
                 builder << ", ";
             }
@@ -245,8 +256,8 @@ public:
         }
         builder << "]";
 
-        if (_updateConstants) {
-            builder << " updateConstants: " << *_updateConstants;
+        if (getUpdateConstants()) {
+            builder << " updateConstants: " << *getUpdateConstants();
         }
 
         if (_runtimeConstants) {
@@ -254,8 +265,8 @@ public:
         }
 
         builder << " god: " << _god;
-        builder << " upsert: " << _upsert;
-        builder << " multi: " << _multi;
+        builder << " upsert: " << isUpsert();
+        builder << " multi: " << isMulti();
         builder << " fromMigration: " << _fromMigration;
         builder << " fromOplogApplication: " << _fromOplogApplication;
         builder << " isExplain: " << _isExplain;
@@ -263,15 +274,9 @@ public:
     }
 
 private:
-    const NamespaceString& _nsString;
+    NamespaceString _nsString;
 
-    // The hint provided, if any.  If the hint was by index key pattern, the value of '_hint' is
-    // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
-    // {$hint: <String>}, where <String> is the index name hinted.
-    BSONObj _hint;
-
-    // Contains the query that selects documents to update.
-    BSONObj _query;
+    write_ops::UpdateOpEntry _updateOp;
 
     // Contains the projection information.
     BSONObj _proj;
@@ -279,24 +284,9 @@ private:
     // Contains the sort order information.
     BSONObj _sort;
 
-    // Contains the collation information.
-    BSONObj _collation;
-
-    // Contains the modifiers to apply to matched objects, or a replacement document.
-    write_ops::UpdateModification _updateMod;
-
-    // User-defined constant values to be used with a pipeline-style update. Those are different
-    // from the '_runtimeConstants' as they can be specified by the user for each individual
-    // element of the 'updates' array in the 'update' command. The '_runtimeConstants' contains
-    // runtime system constant values which remain unchanged for all update statements in the
-    // 'update' command.
-    boost::optional<BSONObj> _updateConstants;
-
     // System-defined constant values which may be required by the query or update operation.
     boost::optional<RuntimeConstants> _runtimeConstants;
 
-    // Filters to specify which array elements should be updated.
-    std::vector<BSONObj> _arrayFilters;
 
     // The statement id of this request.
     StmtId _stmtId = kUninitializedStmtId;
@@ -306,16 +296,6 @@ private:
     // God bypasses _id checking and index generation. It is only used on behalf of system
     // updates, never user updates.
     bool _god = false;
-
-    // True if this should insert if no matching document is found.
-    bool _upsert = false;
-
-    // True if this upsert operation should insert the document supplied as 'c.new' if the query
-    // does not match any documents.
-    bool _upsertSuppliedDocument = false;
-
-    // True if this update is allowed to affect more than one document.
-    bool _multi = false;
 
     // True if this update is on behalf of a chunk migration.
     bool _fromMigration = false;

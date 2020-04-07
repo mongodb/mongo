@@ -210,7 +210,8 @@ public:
             // Collection should be empty.
             ASSERT_EQUALS(0U, count(BSONObj()));
 
-            UpdateRequest request(nss);
+            auto request = UpdateRequest();
+            request.setNamespaceString(nss);
 
             // Update is the upsert {_id: 0, x: 1}, {$set: {y: 2}}.
             BSONObj query = fromjson("{_id: 0, x: 1}");
@@ -282,7 +283,8 @@ public:
             vector<RecordId> recordIds;
             getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
-            UpdateRequest request(nss);
+            auto request = UpdateRequest();
+            request.setNamespaceString(nss);
 
             // Update is a multi-update that sets 'bar' to 3 in every document
             // where foo is less than 5.
@@ -386,7 +388,8 @@ public:
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
         ASSERT(coll);
-        UpdateRequest request(nss);
+        auto request = UpdateRequest();
+        request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
@@ -477,7 +480,8 @@ public:
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
         ASSERT(coll);
-        UpdateRequest request(nss);
+        auto request = UpdateRequest();
+        request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));

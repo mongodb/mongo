@@ -284,7 +284,8 @@ public:
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         } else {
-            UpdateRequest request(nsString);
+            auto request = UpdateRequest();
+            request.setNamespaceString(nsString);
             const bool isExplain = true;
             makeUpdateRequest(opCtx, args, isExplain, &request);
 
@@ -425,7 +426,8 @@ public:
 
                 appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
             } else {
-                UpdateRequest request(nsString);
+                auto request = UpdateRequest();
+                request.setNamespaceString(nsString);
                 const bool isExplain = false;
                 makeUpdateRequest(opCtx, args, isExplain, &request);
 

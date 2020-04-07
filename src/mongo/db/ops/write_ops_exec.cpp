@@ -729,19 +729,10 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
             "Cannot use (or request) retryable writes with multi=true",
             opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
 
-    UpdateRequest request(ns);
-    request.setQuery(op.getQ());
-    request.setUpdateModification(op.getU());
-    request.setUpdateConstants(op.getC());
+    UpdateRequest request(op);
+    request.setNamespaceString(ns);
     request.setRuntimeConstants(std::move(runtimeConstants));
-    request.setCollation(write_ops::collationOf(op));
     request.setStmtId(stmtId);
-    request.setArrayFilters(write_ops::arrayFiltersOf(op));
-    request.setMulti(op.getMulti());
-    request.setUpsert(op.getUpsert());
-    request.setUpsertSuppliedDocument(op.getUpsertSupplied());
-    request.setHint(op.getHint());
-
     request.setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
                                                                : PlanExecutor::YIELD_AUTO);
 

@@ -413,19 +413,11 @@ private:
                     "explained write batches must be of size 1",
                     _batch.getUpdates().size() == 1);
 
-            UpdateRequest updateRequest(_batch.getNamespace());
-            updateRequest.setQuery(_batch.getUpdates()[0].getQ());
-            updateRequest.setUpdateModification(_batch.getUpdates()[0].getU());
-            updateRequest.setUpdateConstants(_batch.getUpdates()[0].getC());
+            UpdateRequest updateRequest(_batch.getUpdates()[0]);
+            updateRequest.setNamespaceString(_batch.getNamespace());
             updateRequest.setRuntimeConstants(
                 _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
-            updateRequest.setCollation(write_ops::collationOf(_batch.getUpdates()[0]));
-            updateRequest.setArrayFilters(write_ops::arrayFiltersOf(_batch.getUpdates()[0]));
-            updateRequest.setMulti(_batch.getUpdates()[0].getMulti());
-            updateRequest.setUpsert(_batch.getUpdates()[0].getUpsert());
-            updateRequest.setUpsertSuppliedDocument(_batch.getUpdates()[0].getUpsertSupplied());
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-            updateRequest.setHint(_batch.getUpdates()[0].getHint());
             updateRequest.setExplain();
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,

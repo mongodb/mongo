@@ -936,7 +936,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
         // the event it was specified as a UUID.
-        UpdateRequest request(collection->ns());
+        auto request = UpdateRequest();
+        request.setNamespaceString(collection->ns());
         request.setQuery(query);
         request.setUpdateModification(update);
         request.setUpsert(true);
@@ -977,7 +978,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const TimestampedBSONObj& update) {
-    UpdateRequest request(nss);
+    auto request = UpdateRequest();
+    request.setNamespaceString(nss);
     request.setQuery({});
     request.setUpdateModification(update.obj);
     request.setUpsert(true);
@@ -988,7 +990,8 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const BSONObj& query,
                                              const TimestampedBSONObj& update) {
-    UpdateRequest request(nss);
+    auto request = UpdateRequest();
+    request.setNamespaceString(nss);
     request.setQuery(query);
     request.setUpdateModification(update.obj);
     invariant(!request.isUpsert());

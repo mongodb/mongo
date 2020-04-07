@@ -1880,7 +1880,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     // TODO faster...
                     updates++;
 
-                    UpdateRequest request(*nss);
+                    auto request = UpdateRequest();
+                    request.setNamespaceString(*nss);
 
                     request.setQuery(pattern);
                     request.setUpdateModification(idAndDoc.second);

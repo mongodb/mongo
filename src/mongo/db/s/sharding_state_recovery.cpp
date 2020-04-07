@@ -157,7 +157,8 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
                     "Changing sharding recovery document",
                     "update"_attr = redact(updateObj));
 
-        UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
+        auto updateReq = UpdateRequest();
+        updateReq.setNamespaceString(NamespaceString::kServerConfigurationNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
         updateReq.setUpdateModification(updateObj);
         updateReq.setUpsert();

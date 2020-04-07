@@ -385,7 +385,8 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
     BSONObj updateObj(
         ShardIdentityType::createConfigServerUpdateObject(newConnectionString.toString()));
 
-    UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
+    auto updateReq = UpdateRequest();
+    updateReq.setNamespaceString(NamespaceString::kServerConfigurationNamespace);
     updateReq.setQuery(BSON("_id" << ShardIdentityType::IdName));
     updateReq.setUpdateModification(updateObj);
 

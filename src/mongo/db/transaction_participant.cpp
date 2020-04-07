@@ -2320,7 +2320,8 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
 
 UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
     const SessionTxnRecord& sessionTxnRecord) const {
-    UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
+    auto updateRequest = UpdateRequest();
+    updateRequest.setNamespaceString(NamespaceString::kSessionTransactionsTableNamespace);
 
     updateRequest.setUpdateModification(sessionTxnRecord.toBSON());
     updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId().toBSON()));

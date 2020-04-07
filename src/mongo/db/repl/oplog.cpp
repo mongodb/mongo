@@ -1209,7 +1209,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     BSONObjBuilder b;
                     b.append(o.getField("_id"));
 
-                    UpdateRequest request(requestNss);
+                    auto request = UpdateRequest();
+                    request.setNamespaceString(requestNss);
                     request.setQuery(b.done());
                     request.setUpdateModification(o);
                     request.setUpsert();
@@ -1261,7 +1262,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             const bool upsertOplogEntry = op.getUpsert().value_or(false);
             const bool upsert = alwaysUpsert || upsertOplogEntry;
-            UpdateRequest request(requestNss);
+            auto request = UpdateRequest();
+            request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
             request.setUpdateModification(o);
             request.setUpsert(upsert);
