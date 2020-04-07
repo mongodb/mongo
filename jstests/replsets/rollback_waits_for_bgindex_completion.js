@@ -48,12 +48,10 @@ function CommonOps(node) {
     IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "x_1");
 }
 
-// TODO SERVER-46558: Should turn the commit quorum as true.
 const replTest = new ReplSetTest({
     name: jsTestName(),
     nodes: 3,
     useBridge: true,
-    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 replTest.startSet();
 let config = replTest.getReplSetConfig();

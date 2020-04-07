@@ -698,8 +698,8 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                 break;
             case IndexBuildAction::kRollbackAbort:
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-                // TODO SERVER-46558: Should add an invariant check to confirm if the node is in
-                // rollback state.
+                invariant(replCoord->getMemberState().rollback());
+
                 uassertStatusOK(Status(
                     ErrorCodes::IndexBuildAborted,
                     str::stream() << "Aborting index build, index build uuid:"
