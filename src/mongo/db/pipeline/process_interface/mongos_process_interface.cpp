@@ -296,7 +296,8 @@ bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
         opCtx,
         ReadPreferenceSetting::get(opCtx),
         nss.db().toString(),
-        BSON("listIndexes" << nss.coll()),
+        applyReadWriteConcern(
+            opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll())),
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 
     // If the namespace does not exist, then the field paths *must* be _id only.
