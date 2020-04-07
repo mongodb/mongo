@@ -132,8 +132,16 @@ function testShardedKillPinned(
 
         // Eventually the cursors on the mongods should also be cleaned up. They should be
         // killed by mongos when the mongos cursor gets killed.
-        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned == 0);
-        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.pinned == 0);
+        function logActiveOpsAndIdleCursors(shardDB) {
+            return () => "assert.soon failed: " +
+                tojson(shardDB.getSiblingDB("admin")
+                           .aggregate([{$currentOp: {idleCursors: true}}])
+                           .toArray());
+        }
+        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned == 0,
+                    logActiveOpsAndIdleCursors(shard0DB));
+        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.pinned == 0,
+                    logActiveOpsAndIdleCursors(shard1DB));
         assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
         assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
     } finally {
