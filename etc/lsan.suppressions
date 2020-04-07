@@ -6,4 +6,7 @@ leak:mongo::latch_detail::getDiagnosticListenerState
 leak:mongo::latch_detail::installDiagnosticListener
 leak:mongo::Interruptible::installWaitListener
 
+# The singleton must live throughout the lifetime of all SSL threads
+leak::mongo::SSLThreadInfo::ThreadIDManager::idManager
+
 leak:glob64
