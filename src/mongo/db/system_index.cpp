@@ -138,16 +138,11 @@ Status verifySystemIndexes(OperationContext* opCtx) {
     const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
     const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
 
-    // Create indexes for collections on the admin db
+    // Create indexes for the admin.system.users collection.
     {
-        AutoGetDb autoDb(opCtx, systemUsers.db(), MODE_X);
-        if (!autoDb.getDb()) {
-            return Status::OK();
-        }
+        AutoGetCollection autoColl(opCtx, systemUsers, MODE_X);
 
-        Collection* collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemUsers);
-        if (collection) {
+        if (Collection* collection = autoColl.getCollection()) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
@@ -163,7 +158,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
                               "running authSchemaUpgrade on a 2.6 server.");
             }
 
-            // Ensure that system indexes exist for the user collection
+            // Ensure that system indexes exist for the user collection.
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {
@@ -174,10 +169,14 @@ Status verifySystemIndexes(OperationContext* opCtx) {
                 }
             }
         }
+    }
+
+    // Create indexes for the admin.system.roles collection.
+    {
+        AutoGetCollection autoColl(opCtx, systemRoles, MODE_X);
 
         // Ensure that system indexes exist for the roles collection, if it exists.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemRoles);
-        if (collection) {
+        if (Collection* collection = autoColl.getCollection()) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
