@@ -1047,7 +1047,7 @@ TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
 }
 
 TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
@@ -1091,7 +1091,7 @@ TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
@@ -1140,7 +1140,7 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
 
     // Kill the index build we just restarted so the fixture can shut down.
     IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort);
+        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreNotRestartedWhenStartIsRolledBack) {
