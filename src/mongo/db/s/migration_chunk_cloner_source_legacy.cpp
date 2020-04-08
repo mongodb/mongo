@@ -242,7 +242,8 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                                     const UUID& migrationId,
                                                     const LogicalSessionId& lsid,
-                                                    TxnNumber txnNumber) {
+                                                    TxnNumber txnNumber,
+                                                    bool resumableRangeDeleterDisabled) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
@@ -295,89 +296,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                             _args.getMinKey(),
                                             _args.getMaxKey(),
                                             _shardKeyPattern.toBSON(),
-                                            _args.getSecondaryThrottle());
-
-    if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
-        // In 4.4, commands sent to shards that accept writeConcern, must always have writeConcern.
-        // So if the StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then
-        // we add the implicit server default writeConcern.
-        if (!cmdBuilder.hasField(WriteConcernOptions::kWriteConcernField)) {
-            cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              WriteConcernOptions::kImplicitDefault);
-        }
-    }
-
-    auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
-    if (!startChunkCloneResponseStatus.isOK()) {
-        return startChunkCloneResponseStatus.getStatus();
-    }
-
-    // TODO (Kal): Setting the state to kCloning below means that if cancelClone was called we will
-    // send a cancellation command to the recipient. The reason to limit the cases when we send
-    // cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
-    // between cancellations for different migration sessions. It is thus possible that a second
-    // migration from different donor, but the same recipient would certainly abort an already
-    // running migration.
-    stdx::lock_guard<Latch> sl(_mutex);
-    _state = kCloning;
-
-    return Status::OK();
-}
-
-// TODO (SERVER-44787): Remove this overload after 4.4 is released AND
-// disableResumableRangeDeleter has been removed from server parameters.
-Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
-    invariant(_state == kNew);
-    invariant(!opCtx->lockState()->isLocked());
-
-    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
-            opCtx,
-            _args.getNss(),
-            ChunkRange(_args.getMinKey(), _args.getMaxKey()),
-            _shardKeyPattern.getKeyPattern());
-
-        // Prime up the session migration source if there are oplog entries to migrate.
-        _sessionCatalogSource->fetchNextOplog(opCtx);
-    }
-
-    {
-        // Ignore prepare conflicts when we load ids of currently available documents. This is
-        // acceptable because we will track changes made by prepared transactions at transaction
-        // commit time.
-        auto originalPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
-
-        ON_BLOCK_EXIT([&] {
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(originalPrepareConflictBehavior);
-        });
-
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflicts);
-
-        auto storeCurrentLocsStatus = _storeCurrentLocs(opCtx);
-        if (storeCurrentLocsStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
-            stdx::lock_guard<Latch> sl(_mutex);
-            _jumboChunkCloneState.emplace();
-        } else if (!storeCurrentLocsStatus.isOK()) {
-            return storeCurrentLocsStatus;
-        }
-    }
-
-    // Tell the recipient shard to start cloning
-    BSONObjBuilder cmdBuilder;
-
-    StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
-                                            _args.getNss(),
-                                            _sessionId,
-                                            _donorConnStr,
-                                            _args.getFromShardId(),
-                                            _args.getToShardId(),
-                                            _args.getMinKey(),
-                                            _args.getMaxKey(),
-                                            _shardKeyPattern.toBSON(),
-                                            _args.getSecondaryThrottle());
+                                            _args.getSecondaryThrottle(),
+                                            resumableRangeDeleterDisabled);
 
     if (serverGlobalParams.featureCompatibility.isVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {

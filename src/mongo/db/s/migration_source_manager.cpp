@@ -118,10 +118,6 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
 
-BSONObj getMigrationIdBSON(migrationutil::MigrationCoordinator* coordinator) {
-    return coordinator ? coordinator->getMigrationId().toBSON() : BSONObj();
-}
-
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
@@ -262,38 +258,26 @@ Status MigrationSourceManager::startClone() {
         _cloneDriver = std::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
-        boost::optional<AutoGetCollection> autoColl;
-        if (replEnabled) {
-            autoColl.emplace(_opCtx,
-                             getNss(),
-                             MODE_IX,
-                             AutoGetCollection::ViewMode::kViewsForbidden,
-                             _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                 Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
-        } else {
-            autoColl.emplace(_opCtx,
-                             getNss(),
-                             MODE_X,
-                             AutoGetCollection::ViewMode::kViewsForbidden,
-                             _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                 Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
-        }
+        AutoGetCollection autoColl(_opCtx,
+                                   getNss(),
+                                   replEnabled ? MODE_IX : MODE_X,
+                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
         auto csr = CollectionShardingRuntime::get(_opCtx, getNss());
         auto lockedCsr = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
 
-        if (_enableResumableRangeDeleter) {
-            _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
-                _cloneDriver->getSessionId(),
-                _args.getFromShardId(),
-                _args.getToShardId(),
-                getNss(),
-                _collectionUuid.get(),
-                ChunkRange(_args.getMinKey(), _args.getMaxKey()),
-                _chunkVersion,
-                _args.getWaitForDelete());
-        }
+        _coordinator = std::make_unique<migrationutil::MigrationCoordinator>(
+            _cloneDriver->getSessionId(),
+            _args.getFromShardId(),
+            _args.getToShardId(),
+            getNss(),
+            _collectionUuid.get(),
+            ChunkRange(_args.getMinKey(), _args.getMaxKey()),
+            _chunkVersion,
+            _args.getWaitForDelete());
 
         _state = kCloning;
     }
@@ -309,19 +293,15 @@ Status MigrationSourceManager::startClone() {
 
     if (_enableResumableRangeDeleter) {
         _coordinator->startMigration(_opCtx);
+    }
 
-        Status startCloneStatus = _cloneDriver->startClone(_opCtx,
-                                                           _coordinator->getMigrationId(),
-                                                           _coordinator->getLsid(),
-                                                           _coordinator->getTxnNumber());
-        if (!startCloneStatus.isOK()) {
-            return startCloneStatus;
-        }
-    } else {
-        Status startCloneStatus = _cloneDriver->startClone(_opCtx);
-        if (!startCloneStatus.isOK()) {
-            return startCloneStatus;
-        }
+    Status startCloneStatus = _cloneDriver->startClone(_opCtx,
+                                                       _coordinator->getMigrationId(),
+                                                       _coordinator->getLsid(),
+                                                       _coordinator->getTxnNumber(),
+                                                       !_enableResumableRangeDeleter);
+    if (!startCloneStatus.isOK()) {
+        return startCloneStatus;
     }
 
     scopedGuard.dismiss();
@@ -391,7 +371,7 @@ Status MigrationSourceManager::enterCriticalSection() {
 
     LOGV2(22017,
           "Migration successfully entered critical section",
-          "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
+          "migrationId"_attr = _coordinator->getMigrationId());
 
     scopedGuard.dismiss();
     return Status::OK();
@@ -506,7 +486,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
           "Migration succeeded and updated collection version to {updatedCollectionVersion}",
           "Migration succeeded and updated collection version",
           "updatedCollectionVersion"_attr = refreshedMetadata->getCollVersion(),
-          "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
+          "migrationId"_attr = _coordinator->getMigrationId());
 
     if (_enableResumableRangeDeleter) {
         _coordinator->setMigrationDecision(
@@ -631,7 +611,7 @@ void MigrationSourceManager::cleanupOnError() {
                       "Failed to clean up migration",
                       "chunkMigrationRequestParameters"_attr = redact(_args.toString()),
                       "error"_attr = redact(ex),
-                      "migrationId"_attr = getMigrationIdBSON(_coordinator.get()));
+                      "migrationId"_attr = _coordinator->getMigrationId());
     }
 }
 

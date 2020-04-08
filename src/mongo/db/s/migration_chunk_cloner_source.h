@@ -77,10 +77,8 @@ public:
     virtual Status startClone(OperationContext* opCtx,
                               const UUID& migrationId,
                               const LogicalSessionId& lsid,
-                              TxnNumber txnNumber) = 0;
-
-    // TODO (SERVER-44787): Remove this function after 4.4 is released.
-    virtual Status startClone(OperationContext* opCtx) = 0;
+                              TxnNumber txnNumber,
+                              bool resumableRangeDeleterDisabled) = 0;
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate

@@ -1,8 +1,6 @@
 /*
  *  Tests that the deletion task is not written if the donor recovers after the decision is
  * recorded.
- *
- * @tags: [requires_fcv_44]
  */
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
@@ -48,7 +46,8 @@ function sendRecvChunkStart(conn, ns, id, sessionId, lsid, from, to) {
         toShardName: to.shardName,
         min: {x: 50.0},
         max: {x: MaxKey},
-        shardKeyPattern: {x: 1.0}
+        shardKeyPattern: {x: 1.0},
+        resumableRangeDeleterDisabled: false
     };
 
     return conn.getDB("admin").runCommand(cmd);
