@@ -198,6 +198,11 @@ public:
             // We count find command as a query op.
             globalOpCounters.gotQuery();
 
+            ON_BLOCK_EXIT([opCtx] {
+                Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
+                    opCtx, mongo::LogicalOp::opQuery);
+            });
+
             const bool isExplain = false;
             auto qr = parseCmdObjectToQueryRequest(opCtx, ns(), _request.body, isExplain);
 

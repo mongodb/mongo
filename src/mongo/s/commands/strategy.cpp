@@ -237,9 +237,18 @@ void execCommandClient(OperationContext* opCtx,
 
     c->incrementCommandsExecuted();
 
-    if (c->shouldAffectCommandCounter()) {
+    auto shouldAffectCommandCounter = c->shouldAffectCommandCounter();
+
+    if (shouldAffectCommandCounter) {
         globalOpCounters.gotCommand();
     }
+
+    ON_BLOCK_EXIT([opCtx, shouldAffectCommandCounter] {
+        if (shouldAffectCommandCounter) {
+            Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
+                opCtx, mongo::LogicalOp::opCommand);
+        }
+    });
 
     auto wcResult = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
 
@@ -620,6 +629,11 @@ void runCommand(OperationContext* opCtx,
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
+
+    ON_BLOCK_EXIT([opCtx] {
+        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
+            opCtx, mongo::LogicalOp::opQuery);
+    });
 
     const QueryMessage q(*dbm);
 

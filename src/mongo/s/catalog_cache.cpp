@@ -49,6 +49,9 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefresh =
+    OperationContext::declareDecoration<bool>();
+
 namespace {
 
 // How many times to try refreshing the routing info if the set of chunks loaded from the config
@@ -232,6 +235,9 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
         auto& collEntry = itColl->second;
 
         if (collEntry->needsRefresh) {
+
+            operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
+
             auto refreshNotification = collEntry->refreshCompletionNotification;
             if (!refreshNotification) {
                 refreshNotification = (collEntry->refreshCompletionNotification =
@@ -502,6 +508,37 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     _stats.report(&cacheStatsBuilder);
 }
 
+void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx,
+                                                           mongo::LogicalOp opType) {
+    if (!operationBlockedBehindCatalogCacheRefresh(opCtx)) {
+        return;
+    }
+
+    auto& opsBlockedByRefresh = _stats.operationsBlockedByRefresh;
+
+    opsBlockedByRefresh.countAllOperations.fetchAndAddRelaxed(1);
+
+    switch (opType) {
+        case LogicalOp::opInsert:
+            opsBlockedByRefresh.countInserts.fetchAndAddRelaxed(1);
+            break;
+        case LogicalOp::opQuery:
+            opsBlockedByRefresh.countQueries.fetchAndAddRelaxed(1);
+            break;
+        case LogicalOp::opUpdate:
+            opsBlockedByRefresh.countUpdates.fetchAndAddRelaxed(1);
+            break;
+        case LogicalOp::opDelete:
+            opsBlockedByRefresh.countDeletes.fetchAndAddRelaxed(1);
+            break;
+        case LogicalOp::opCommand:
+            opsBlockedByRefresh.countCommands.fetchAndAddRelaxed(1);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
                                             const std::string& dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
@@ -717,6 +754,24 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
     builder->append("countFullRefreshesStarted", countFullRefreshesStarted.load());
 
     builder->append("countFailedRefreshes", countFailedRefreshes.load());
+
+    BSONObjBuilder operationsBlockedByRefreshBuilder(
+        builder->subobjStart("operationsBlockedByRefresh"));
+
+    operationsBlockedByRefreshBuilder.append("countAllOperations",
+                                             operationsBlockedByRefresh.countAllOperations.load());
+    operationsBlockedByRefreshBuilder.append("countInserts",
+                                             operationsBlockedByRefresh.countInserts.load());
+    operationsBlockedByRefreshBuilder.append("countQueries",
+                                             operationsBlockedByRefresh.countQueries.load());
+    operationsBlockedByRefreshBuilder.append("countUpdates",
+                                             operationsBlockedByRefresh.countUpdates.load());
+    operationsBlockedByRefreshBuilder.append("countDeletes",
+                                             operationsBlockedByRefresh.countDeletes.load());
+    operationsBlockedByRefreshBuilder.append("countCommands",
+                                             operationsBlockedByRefresh.countCommands.load());
+
+    operationsBlockedByRefreshBuilder.done();
 }
 
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard)

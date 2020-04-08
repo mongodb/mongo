@@ -255,6 +255,12 @@ public:
      */
     void report(BSONObjBuilder* builder) const;
 
+    /**
+     * Checks if the current operation was ever marked as needing refresh. If the curent operation
+     * was marked as needing refresh, updates the relevant counters inside the Stats struct.
+     */
+    void checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx, mongo::LogicalOp opType);
+
 private:
     // Make the cache entries friends so they can access the private classes below
     friend class CachedDatabaseInfo;
@@ -380,6 +386,18 @@ private:
         // Cumulative, always-increasing counter of how many full or incremental refreshes failed
         // for whatever reason
         AtomicWord<long long> countFailedRefreshes{0};
+
+        // Cumulative, always-increasing counter of how many operations have been blocked by a
+        // catalog cache refresh. Broken down by operation type to match the operations tracked
+        // by the OpCounters class.
+        struct OperationsBlockedByRefresh {
+            AtomicWord<long long> countAllOperations{0};
+            AtomicWord<long long> countInserts{0};
+            AtomicWord<long long> countQueries{0};
+            AtomicWord<long long> countUpdates{0};
+            AtomicWord<long long> countDeletes{0};
+            AtomicWord<long long> countCommands{0};
+        } operationsBlockedByRefresh;
 
         /**
          * Reports the accumulated statistics for serverStatus.
