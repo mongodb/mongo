@@ -72,7 +72,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -1071,35 +1070,6 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     dbResponse.response = reply->done();
 
     return dbResponse;
-}
-
-void Strategy::commandOp(OperationContext* opCtx,
-                         const std::string& db,
-                         const BSONObj& command,
-                         const std::string& versionedNS,
-                         const BSONObj& targetingQuery,
-                         const BSONObj& targetingCollation,
-                         std::vector<CommandResult>* results) {
-    QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, 0);
-
-    ParallelSortClusteredCursor cursor(
-        qSpec, CommandInfo(versionedNS, targetingQuery, targetingCollation));
-
-    // Initialize the cursor
-    cursor.init(opCtx);
-
-    std::set<ShardId> shardIds;
-    cursor.getQueryShardIds(shardIds);
-
-    for (const ShardId& shardId : shardIds) {
-        CommandResult result;
-        result.shardTargetId = shardId;
-
-        result.target =
-            fassert(34417, ConnectionString::parse(cursor.getShardCursor(shardId)->originalHost()));
-        result.result = cursor.getShardCursor(shardId)->peekFirst().getOwned();
-        results->push_back(result);
-    }
 }
 
 DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {

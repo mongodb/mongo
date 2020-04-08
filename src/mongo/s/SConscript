@@ -37,7 +37,6 @@ env.Library(
 env.Library(
     target='sharding_legacy_api',
     source=[
-        'client/parallel.cpp',
         'client/shard_connection.cpp',
         env.Idlc('client/shard_connection.idl')[0],
         'client/version_manager.cpp',
