@@ -1,7 +1,5 @@
 """GDB commands for MongoDB."""
 
-import datetime
-import json
 import os
 import re
 import sys
@@ -17,7 +15,6 @@ try:
     path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
     sys.path.insert(0, path)
     from libstdcxx.v6 import register_libstdcxx_printers
-    from libstdcxx.v6 import printers as stdlib_printers
     register_libstdcxx_printers(gdb.current_objfile())
     print("Loaded libstdc++ pretty printers from '%s'" % printers)
 except Exception as e:
@@ -350,50 +347,6 @@ class DumpMongoDSessionCatalog(gdb.Command):
 
 # Register command
 DumpMongoDSessionCatalog()
-
-
-class DumpMongoDBMutexes(gdb.Command):
-    """Print out the state of mutexes in a mongodb (mongod or mongos) process."""
-
-    def __init__(self):
-        """Initialize DumpMongoDBMutexs."""
-        RegisterMongoCommand.register(self, "mongodb-dump-mutexes", gdb.COMMAND_DATA)
-
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
-        """Invoke DumpMongoDBMutexes."""
-
-        print("Dumping mutex info for all Clients")
-
-        service_context = get_global_service_context()
-        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
-        for client_handle in client_set:
-            client = client_handle.dereference().dereference()
-            diagnostic_info_handle = get_decoration(client, "DiagnosticInfo")[1]
-            diagnostic_info_list = diagnostic_info_handle["list"]
-
-            # Use the STL pretty-printer to iterate over the list
-            printer = stdlib_printers.StdForwardListPrinter(
-                str(diagnostic_info_list.type), diagnostic_info_list)
-
-            # Prepare structured output doc
-            client_name = str(client["_desc"])
-            # Chop off the "\"" from the beginning and end of the string
-            client_name = client_name[1:-1]
-            output_doc = {"client": client_name, "waiting": False}
-
-            # This list will only ever have 0 or 1 element in it
-            for _, diag_info in printer.children():
-                output_doc["waiting"] = True
-                output_doc["mutex"] = str(diag_info["_captureName"])[1:-1]
-
-                millis = int(diag_info["_timestamp"]["millis"])
-                dt = datetime.datetime.fromtimestamp(millis / 1000, tz=datetime.timezone.utc)
-                output_doc["since"] = dt.isoformat()
-            print(json.dumps(output_doc))
-
-
-# Register command
-DumpMongoDBMutexes()
 
 
 class MongoDBDumpLocks(gdb.Command):
