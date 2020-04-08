@@ -539,13 +539,20 @@ void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown(OperationCon
 
     // All index builds should have been signaled to stop via the ServiceContext.
 
-    // Wait for all the index builds to stop.
-    for (auto& dbIt : _databaseIndexBuilds) {
-        // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that
-        // the object does not destruct while we are waiting, causing a use-after-free memory error.
-        auto dbIndexBuildsSharedPtr = dbIt.second;
-        dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    if (_allIndexBuilds.empty()) {
+        return;
     }
+
+    LOGV2(4725201,
+          "Waiting until the following index builds are finished:",
+          "numIndexBuilds"_attr = _allIndexBuilds.size());
+    for (const auto& indexBuild : _allIndexBuilds) {
+        LOGV2(4725202, "    Index build with UUID", "indexBuild_first"_attr = indexBuild.first);
+    }
+
+    // Wait for all the index builds to stop.
+    auto pred = [this]() { return _allIndexBuilds.empty(); };
+    _indexBuildsCondVar.wait(lk, pred);
 }
 
 std::vector<UUID> IndexBuildsCoordinator::_abortCollectionIndexBuilds(stdx::unique_lock<Latch>& lk,
