@@ -31,16 +31,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <memory>
+#include <vector>
+
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
-
-#include <boost/optional.hpp>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <stack>
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -51,8 +54,6 @@ namespace {
  * In order to allow OpenSSL to work in a multithreaded environment, you
  * may need to provide some callbacks for it to use for locking. The following code
  * sets up a vector of mutexes and provides a thread unique ID number.
- * The so-called SSLThreadInfo class encapsulates most of the logic required for
- * OpenSSL multithreaded support.
  *
  * OpenSSL before version 1.1.0 requires applications provide a callback which emits a thread
  * identifier. This ID is used to store thread specific ERR information. When a thread is
@@ -60,92 +61,65 @@ namespace {
  * themselves invoke the application provided callback. These IDs are stored in a hashtable with
  * a questionable hash function. They must be uniformly distributed to prevent collisions.
  */
-class SSLThreadInfo {
+
+class ThreadIDManager {
 public:
-    static unsigned long getID() {
-        struct CallErrRemoveState {
-            explicit CallErrRemoveState(ThreadIDManager& manager, unsigned long id)
-                : _manager(manager), id(id) {}
+    ~ThreadIDManager() = delete;  // Cannot die.
 
-            ~CallErrRemoveState() {
-                ERR_remove_state(0);
-                _manager.releaseID(id);
-            };
-
-            ThreadIDManager& _manager;
-            unsigned long id;
-        };
-
-        // NOTE: This logic is fully intentional. Because ERR_remove_state (called within
-        // the destructor of the kRemoveStateFromThread object) re-enters this function,
-        // we must have a two phase protection, otherwise we would access a thread local
-        // during its destruction.
-        static thread_local boost::optional<CallErrRemoveState> threadLocalState;
-        if (!threadLocalState) {
-            threadLocalState.emplace(_idManager, _idManager.reserveID());
-        }
-
-        return threadLocalState->id;
+    static ThreadIDManager& instance() {
+        static auto& m = *new ThreadIDManager();
+        return m;
     }
 
-    static void lockingCallback(int mode, int type, const char* file, int line) {
-        if (mode & CRYPTO_LOCK) {
-            mutexes()[type]->lock();
-        } else {
-            mutexes()[type]->unlock();
+    unsigned long reserveID() {
+        auto lock = stdx::lock_guard(_idMutex);
+        if (!_idPool.empty()) {
+            unsigned long ret = _idPool.back();
+            _idPool.pop_back();
+            return ret;
         }
+        return ++_idNext;
     }
 
-    static void init() {
-        CRYPTO_set_id_callback(&SSLThreadInfo::getID);
-        CRYPTO_set_locking_callback(&SSLThreadInfo::lockingCallback);
-
-        while ((int)mutexes().size() < CRYPTO_num_locks()) {
-            mutexes().emplace_back(std::make_unique<stdx::recursive_mutex>());
-        }
+    void releaseID(unsigned long id) {
+        auto lock = stdx::lock_guard(_idMutex);
+        _idPool.push_back(id);
     }
 
 private:
-    SSLThreadInfo() = delete;
+    // Machinery for producing IDs that are unique for the life of a thread.
+    Mutex _idMutex = MONGO_MAKE_LATCH("ThreadIDManager::_idMutex");  // Guards _idNext, _idLast.
+    unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
+    std::vector<unsigned long> _idPool;  // Stack of old thread IDs for reuse.
+};
 
+/** A handle for the threadID resource. */
+struct ManagedId {
+    ~ManagedId() {
+        ThreadIDManager::instance().releaseID(id);
+    }
+    const unsigned long id = ThreadIDManager::instance().reserveID();
+};
+
+unsigned long getID() {
+    // The `guard` callback will cause an invocation of `getID`, so it must be destroyed first.
+    thread_local ManagedId managedId{};
+    thread_local auto guard = makeGuard([]{ ERR_remove_state(0); });
+    return managedId.id;
+}
+
+void lockingCallback(int mode, int type, const char* file, int line) {
     // Note: see SERVER-8734 for why we are using a recursive mutex here.
     // Once the deadlock fix in OpenSSL is incorporated into most distros of
     // Linux, this can be changed back to a nonrecursive mutex.
-    static std::vector<std::unique_ptr<stdx::recursive_mutex>>& mutexes() {
-        // Keep the static as a pointer to avoid it ever to be destroyed. It is referenced in the
-        // CallErrRemoveState thread local above.
-        static auto m = new std::vector<std::unique_ptr<stdx::recursive_mutex>>();
-        return *m;
+    static auto& mutexes = *new std::vector<stdx::recursive_mutex>(CRYPTO_num_locks());
+    auto& m = mutexes[type];
+    if (mode & CRYPTO_LOCK) {
+        m.lock();
+    } else {
+        m.unlock();
     }
-
-    class ThreadIDManager {
-    public:
-        unsigned long reserveID() {
-            stdx::unique_lock<Latch> lock(_idMutex);
-            if (!_idLast.empty()) {
-                unsigned long ret = _idLast.top();
-                _idLast.pop();
-                return ret;
-            }
-            return ++_idNext;
-        }
-
-        void releaseID(unsigned long id) {
-            stdx::unique_lock<Latch> lock(_idMutex);
-            _idLast.push(id);
-        }
-
-    private:
-        // Machinery for producing IDs that are unique for the life of a thread.
-        Mutex _idMutex =
-            MONGO_MAKE_LATCH("ThreadIDManager::_idMutex");  // Protects _idNext and _idLast.
-        unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
-        std::stack<unsigned long, std::vector<unsigned long>>
-            _idLast;  // Stores old thread IDs, for reuse.
-    };
-    static ThreadIDManager _idManager;
-};
-SSLThreadInfo::ThreadIDManager SSLThreadInfo::_idManager;
+}
 
 void setupFIPS() {
 // Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
@@ -179,7 +153,8 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     OpenSSL_add_all_algorithms();
 
     // Setup OpenSSL multithreading callbacks and mutexes
-    SSLThreadInfo::init();
+    CRYPTO_set_id_callback(&getID);
+    CRYPTO_set_locking_callback(&lockingCallback);
 
     return Status::OK();
 }
