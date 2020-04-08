@@ -557,6 +557,7 @@ icuEnv.CppUnitTest(
         'future_test_shared_future.cpp',
         'hierarchical_acquisition_test.cpp',
         'icu_test.cpp',
+        'static_immortal_test.cpp',
         'invalidating_lru_cache_test.cpp',
         'itoa_test.cpp',
         'latch_analyzer_test.cpp' if get_option('use-diagnostic-latches') == 'on' else [],
