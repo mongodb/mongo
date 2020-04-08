@@ -251,6 +251,7 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx, const ChunkType& 
         LOGV2_DEBUG(21854,
                     1,
                     "Unable to find more appropriate location for chunk {chunk}",
+                    "Unable to find more appropriate location for chunk",
                     "chunk"_attr = redact(chunk.toString()));
         return Status::OK();
     }
@@ -333,11 +334,11 @@ void Balancer::_mainThread() {
         if (!refreshStatus.isOK()) {
             LOGV2_WARNING(
                 21876,
-                "Balancer settings could not be loaded and will be retried in "
-                "{durationCount_Seconds_kInitBackoffInterval} seconds{causedBy_refreshStatus}",
-                "durationCount_Seconds_kInitBackoffInterval"_attr =
-                    durationCount<Seconds>(kInitBackoffInterval),
-                "causedBy_refreshStatus"_attr = causedBy(refreshStatus));
+                "Balancer settings could not be loaded because of {error} and will be retried in "
+                "{backoffInterval}",
+                "Got error while refreshing balancer settings, will retry with a backoff",
+                "backoffInterval"_attr = Milliseconds(kInitBackoffInterval),
+                "error"_attr = refreshStatus);
 
             _sleepFor(opCtx.get(), kInitBackoffInterval);
             continue;
@@ -368,8 +369,9 @@ void Balancer::_mainThread() {
             Status refreshStatus = balancerConfig->refreshAndCheck(opCtx.get());
             if (!refreshStatus.isOK()) {
                 LOGV2_WARNING(21877,
-                              "Skipping balancing round{causedBy_refreshStatus}",
-                              "causedBy_refreshStatus"_attr = causedBy(refreshStatus));
+                              "Skipping balancing round due to {error}",
+                              "Skipping balancing round",
+                              "error"_attr = refreshStatus);
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
             }
@@ -381,14 +383,14 @@ void Balancer::_mainThread() {
             }
 
             {
-                LOGV2_DEBUG(
-                    21860,
-                    1,
-                    "*** start balancing round. waitForDelete: {balancerConfig_waitForDelete}, "
-                    "secondaryThrottle: {balancerConfig_getSecondaryThrottle}",
-                    "balancerConfig_waitForDelete"_attr = balancerConfig->waitForDelete(),
-                    "balancerConfig_getSecondaryThrottle"_attr =
-                        balancerConfig->getSecondaryThrottle().toBSON());
+                LOGV2_DEBUG(21860,
+                            1,
+                            "Start balancing round. waitForDelete: {waitForDelete}, "
+                            "secondaryThrottle: {secondaryThrottle}",
+                            "Start balancing round",
+                            "waitForDelete"_attr = balancerConfig->waitForDelete(),
+                            "secondaryThrottle"_attr =
+                                balancerConfig->getSecondaryThrottle().toBSON());
 
                 static Occasionally sampler;
                 if (sampler.tick()) {
@@ -398,9 +400,9 @@ void Balancer::_mainThread() {
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
                     LOGV2_WARNING(21878,
-                                  "Failed to split chunks {error}",
+                                  "Failed to split chunks due to {error}",
                                   "Failed to split chunks",
-                                  "error"_attr = causedBy(status));
+                                  "error"_attr = status);
                 } else {
                     LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
                 }
@@ -409,7 +411,7 @@ void Balancer::_mainThread() {
                     uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx.get()));
 
                 if (candidateChunks.empty()) {
-                    LOGV2_DEBUG(21862, 1, "no need to move any chunk");
+                    LOGV2_DEBUG(21862, 1, "No need to move any chunk");
                     _balancedLastTime = 0;
                 } else {
                     _balancedLastTime = _moveChunks(opCtx.get(), candidateChunks);
@@ -422,7 +424,7 @@ void Balancer::_mainThread() {
                         .ignore();
                 }
 
-                LOGV2_DEBUG(21863, 1, "*** End of balancing round");
+                LOGV2_DEBUG(21863, 1, "End balancing round");
             }
 
             Milliseconds balancerInterval =
@@ -433,16 +435,19 @@ void Balancer::_mainThread() {
                 LOGV2(21864,
                       "overrideBalanceRoundInterval: using shorter balancing interval: "
                       "{balancerInterval}",
+                      "overrideBalanceRoundInterval: using shorter balancing interval",
                       "balancerInterval"_attr = balancerInterval);
             });
 
             _endRound(opCtx.get(), balancerInterval);
         } catch (const DBException& e) {
-            LOGV2(
-                21865, "caught exception while doing balance: {e_what}", "e_what"_attr = e.what());
+            LOGV2(21865,
+                  "caught exception while doing balance: {error}",
+                  "Error while doing balance",
+                  "error"_attr = e);
 
             // Just to match the opening statement if in log level 1
-            LOGV2_DEBUG(21866, 1, "*** End of balancing round");
+            LOGV2_DEBUG(21866, 1, "End balancing round");
 
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
@@ -537,10 +542,12 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                 oids[x] = shardId;
             } else {
                 LOGV2(21868,
-                      "error: 2 machines have {x} as oid machine piece: {shardId} and {oids_x}",
-                      "x"_attr = x,
-                      "shardId"_attr = shardId,
-                      "oids_x"_attr = oids[x]);
+                      "error: 2 machines have {oidMachine} as oid machine piece: {firstShardId} "
+                      "and {secondShardId}",
+                      "Two machines have the same oidMachine value",
+                      "oidMachine"_attr = x,
+                      "firstShardId"_attr = shardId,
+                      "secondShardId"_attr = oids[x]);
 
                 result = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
                     opCtx,
@@ -565,7 +572,10 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                 return false;
             }
         } else {
-            LOGV2(21869, "warning: oidMachine not set on: {s}", "s"_attr = s->toString());
+            LOGV2(21869,
+                  "warning: oidMachine not set on: {shard}",
+                  "warning: oidMachine not set on shard",
+                  "shard"_attr = s->toString());
         }
     }
 
@@ -653,19 +663,20 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             numChunksProcessed++;
 
             LOGV2(21871,
-                  "Performing a split because migration {requestIt} failed for size "
-                  "reasons{causedBy_status}",
-                  "requestIt"_attr = redact(requestIt->toString()),
-                  "causedBy_status"_attr = causedBy(redact(status)));
+                  "Migration {migrateInfo} failed with {error}, going to try splitting the chunk",
+                  "Migration failed, going to try splitting the chunk",
+                  "migrateInfo"_attr = redact(requestIt->toString()),
+                  "error"_attr = redact(status));
 
             _splitOrMarkJumbo(opCtx, requestIt->nss, requestIt->minKey);
             continue;
         }
 
         LOGV2(21872,
-              "Balancer move {requestIt} failed{causedBy_status}",
-              "requestIt"_attr = redact(requestIt->toString()),
-              "causedBy_status"_attr = causedBy(redact(status)));
+              "Migration {migrateInfo} failed with {error}",
+              "Migration failed",
+              "migrateInfo"_attr = redact(requestIt->toString()),
+              "error"_attr = redact(status));
     }
 
     return numChunksProcessed;
@@ -691,8 +702,10 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
             boost::none));
 
         if (splitPoints.empty()) {
-            LOGV2(
-                21873, "Marking chunk {chunk} as jumbo.", "chunk"_attr = redact(chunk.toString()));
+            LOGV2(21873,
+                  "Marking chunk {chunk} as jumbo",
+                  "Marking chunk as jumbo",
+                  "chunk"_attr = redact(chunk.toString()));
             chunk.markAsJumbo();
 
             auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
@@ -704,11 +717,12 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                 ShardingCatalogClient::kMajorityWriteConcern);
             if (!status.isOK()) {
                 LOGV2(21874,
-                      "Couldn't set jumbo for chunk with namespace {nss_ns} and min key "
-                      "{chunk_getMin}{causedBy_status_getStatus}",
-                      "nss_ns"_attr = redact(nss.ns()),
-                      "chunk_getMin"_attr = redact(chunk.getMin()),
-                      "causedBy_status_getStatus"_attr = causedBy(redact(status.getStatus())));
+                      "Couldn't mark chunk with namespace {namespace} and min key {minKey} as "
+                      "jumbo due to {error}",
+                      "Couldn't mark chunk as jumbo",
+                      "namespace"_attr = redact(nss.ns()),
+                      "minKey"_attr = redact(chunk.getMin()),
+                      "error"_attr = redact(status.getStatus()));
             }
 
             return;

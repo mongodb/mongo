@@ -249,11 +249,12 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
 
             LOGV2_DEBUG(4615637,
                         1,
-                        "Command to remote {shardId} for hosts {hosts} failed with retriable error "
-                        "and will be retried. Caused by {causedBy}",
+                        "Command to remote {shardId} for hosts {hosts} failed with retryable error "
+                        "{error} and will be retried",
+                        "Command to remote shard failed with retryable error and will be retried",
                         "shardId"_attr = _shardId,
                         "hosts"_attr = failedTargets,
-                        "causedBy"_attr = redact(status));
+                        "error"_attr = redact(status));
 
             ++_retryCount;
             _shardHostAndPort.reset();

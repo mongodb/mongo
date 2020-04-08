@@ -257,10 +257,11 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
             continue;
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
-            LOGV2_WARNING(23834,
-                          "Error initializing sharding state, sleeping for 2 seconds and trying "
-                          "again{causedBy_status}",
-                          "causedBy_status"_attr = causedBy(status));
+            LOGV2_WARNING(
+                23834,
+                "Error {error} initializing sharding state, sleeping for 2 seconds and retrying",
+                "Error initializing sharding state, sleeping for 2 seconds and retrying",
+                "error"_attr = status);
             sleepFor(kRetryInterval);
             continue;
         }
