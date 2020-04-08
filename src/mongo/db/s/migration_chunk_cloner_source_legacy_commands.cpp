@@ -348,11 +348,6 @@ public:
 
         result.appendArray("oplog", arrBuilder.arr());
 
-        // TODO: SERVER-40187 remove after v4.2. This is to indicate the caller that this server
-        // waits for notification on new oplog entries to send over so the caller doesn't need
-        // to throttle.
-        result.append("waitsForNewOplog", true);
-
         return true;
     }
 
