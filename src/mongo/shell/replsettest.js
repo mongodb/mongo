@@ -2470,13 +2470,13 @@ var ReplSetTest = function(opts) {
             };
 
             this.next = function() {
-                this._safelyPerformCursorOperation('next', function(cursor) {
+                return this._safelyPerformCursorOperation('next', function(cursor) {
                     return cursor.next();
                 }, kCappedPositionLostSentinel);
             };
 
             this.hasNext = function() {
-                this._safelyPerformCursorOperation('hasNext', function(cursor) {
+                return this._safelyPerformCursorOperation('hasNext', function(cursor) {
                     return cursor.hasNext();
                 }, false);
             };
@@ -2563,6 +2563,7 @@ var ReplSetTest = function(opts) {
             // Note, we read the oplog backwards from last to first.
             const firstReader = readers[firstReaderIndex];
             let prevOplogEntry;
+            assert(firstReader.hasNext(), "oplog is empty while checkOplogs is called");
             while (firstReader.hasNext()) {
                 const oplogEntry = firstReader.next();
                 if (oplogEntry === kCappedPositionLostSentinel) {
