@@ -345,7 +345,7 @@ Status dropIndexes(OperationContext* opCtx,
         } else if (abortedIndexBuilders.size() > 1) {
             // Only the "*" wildcard can abort multiple index builders.
             invariant(isWildcard);
-            indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(collectionUUID);
+            indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
         }
 
         // Take an exclusive lock on the collection now to be able to perform index catalog writes

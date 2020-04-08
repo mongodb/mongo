@@ -104,12 +104,12 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
         });
 }
 
-void IndexBuildsCoordinatorMongod::shutdown() {
+void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
     // Stop new scheduling.
     _threadPool.shutdown();
 
     // Wait for all active builds to stop.
-    waitForAllIndexBuildsToStopForShutdown();
+    waitForAllIndexBuildsToStopForShutdown(opCtx);
 
     // Wait for active threads to finish.
     _threadPool.join();

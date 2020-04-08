@@ -197,7 +197,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                 // to process the abort signal. Holding a lock here will cause the index builders to
                 // block indefinitely.
                 autoDB = boost::none;
-                indexBuildsCoord->awaitNoBgOpInProgForDb(dbName);
+                indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, dbName);
 
                 if (MONGO_unlikely(dropDatabaseHangAfterWaitingForIndexBuilds.shouldFail())) {
                     LOGV2(4612300,

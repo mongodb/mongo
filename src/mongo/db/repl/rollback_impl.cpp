@@ -374,7 +374,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                     (numInProg > numInProgInCoordinator ? numInProg : numInProgInCoordinator),
                 "db"_attr = db);
             BackgroundOperation::awaitNoBgOpInProgForDb(db);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(db);
+            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, db);
         }
     }
 

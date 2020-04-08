@@ -94,7 +94,7 @@ public:
     /**
      * Executes tasks that must be done prior to destruction of the instance.
      */
-    virtual void shutdown() = 0;
+    virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
      * Stores a coordinator on the specified service context. May only be called once for the
@@ -192,7 +192,7 @@ public:
      * i.e. when the server is not accepting user requests and no internal operations are
      * concurrently starting new index builds.
      */
-    void waitForAllIndexBuildsToStopForShutdown();
+    void waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx);
 
     /**
      * Signals all of the index builds on the specified collection to abort and then waits until the
@@ -371,12 +371,13 @@ public:
     void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                   const UUID& collectionUUID,
                                                   IndexBuildProtocol protocol);
-    void awaitNoIndexBuildInProgressForCollection(const UUID& collectionUUID) const;
+    void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                  const UUID& collectionUUID);
 
     /**
      * Waits for all index builds on a specified database to finish.
      */
-    void awaitNoBgOpInProgForDb(StringData db) const;
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db);
 
     /**
      * Called by the replication coordinator when a replica set reconfig occurs, which could affect

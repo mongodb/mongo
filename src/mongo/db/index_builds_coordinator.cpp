@@ -534,7 +534,7 @@ std::string IndexBuildsCoordinator::_indexBuildActionToString(IndexBuildAction a
     MONGO_UNREACHABLE;
 }
 
-void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown() {
+void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     // All index builds should have been signaled to stop via the ServiceContext.
@@ -1171,8 +1171,8 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationC
     opCtx->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, noIndexBuildsPred);
 }
 
-void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
-    const UUID& collectionUUID) const {
+void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                                      const UUID& collectionUUID) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
@@ -1187,7 +1187,7 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
     invariant(collIndexBuildsSharedPtr->getNumberOfIndexBuilds(lk) == 0);
 }
 
-void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
+void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
