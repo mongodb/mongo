@@ -77,6 +77,15 @@ env.Library(
         ],
 )
 
+env.Benchmark(
+    target='key_gen_bm',
+    source='key_gen_bm.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'key_generator',
+    ],
+)
+
 env.Library(
         target='expression_params',
         source=[
