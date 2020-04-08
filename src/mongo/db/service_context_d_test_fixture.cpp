@@ -91,8 +91,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {
-    IndexBuildsCoordinator::get(getServiceContext())->shutdown();
-
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
@@ -116,6 +114,17 @@ void ServiceContextMongoDTest::setUp() {
 }
 
 void ServiceContextMongoDTest::tearDown() {
+    {
+        // Some tests set the current OperationContext but do not release it until destruction.
+        ServiceContext::UniqueOperationContext uniqueOpCtx;
+        auto opCtx = getClient()->getOperationContext();
+        if (!opCtx) {
+            uniqueOpCtx = getClient()->makeOperationContext();
+            opCtx = uniqueOpCtx.get();
+        }
+        IndexBuildsCoordinator::get(opCtx)->shutdown(opCtx);
+    }
+
     CollectionShardingStateFactory::clear(getServiceContext());
 
     ServiceContextTest::tearDown();

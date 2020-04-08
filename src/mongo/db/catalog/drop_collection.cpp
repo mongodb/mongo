@@ -173,7 +173,7 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         collLock = boost::none;
         autoDb = boost::none;
 
-        indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(collectionUUID);
+        indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
 
         // Take an exclusive lock to finish the collection drop.
         autoDb.emplace(opCtx, startingNss.db(), MODE_IX);

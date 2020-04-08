@@ -60,7 +60,7 @@ public:
      * Shuts down the thread pool, signals interrupt to all index builds, then waits for all of the
      * threads to finish.
      */
-    void shutdown() override;
+    void shutdown(OperationContext* opCtx) override;
 
     /**
      * Sets up the in-memory and persisted state of the index build, then passes the build off to an

@@ -1166,7 +1166,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
         // Shuts down the thread pool and waits for index builds to finish.
         // Depends on setKillAllOperations() above to interrupt the index build operations.
-        IndexBuildsCoordinator::get(serviceContext)->shutdown();
+        IndexBuildsCoordinator::get(serviceContext)->shutdown(opCtx);
 
         // No new readers can come in after the releasing the RSTL, as previously before releasing
         // the RSTL, we made sure that all new operations will be immediately interrupted by setting

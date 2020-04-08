@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-void IndexBuildsCoordinatorEmbedded::shutdown() {}
+void IndexBuildsCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,

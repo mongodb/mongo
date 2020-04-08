@@ -86,7 +86,7 @@ void IndexBuildsCoordinatorMongodTest::setUp() {
 
 void IndexBuildsCoordinatorMongodTest::tearDown() {
     _indexBuildsCoord->verifyNoIndexBuilds_forTestOnly();
-    _indexBuildsCoord->shutdown();
+    _indexBuildsCoord->shutdown(operationContext());
     _indexBuildsCoord.reset();
     // All databases are dropped during tear down.
     CatalogTestFixture::tearDown();

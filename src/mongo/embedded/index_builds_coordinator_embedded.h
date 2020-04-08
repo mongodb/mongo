@@ -54,7 +54,7 @@ public:
     /**
      * Does nothing.
      */
-    void shutdown() override;
+    void shutdown(OperationContext* opCtx) override;
 
     StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,

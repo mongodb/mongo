@@ -580,7 +580,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     if (collUUID) {
         // Allow in-progress indexes to complete before validating collection contents.
         IndexBuildsCoordinator::get(_opCtx.get())
-            ->awaitNoIndexBuildInProgressForCollection(collUUID.get());
+            ->awaitNoIndexBuildInProgressForCollection(_opCtx.get(), collUUID.get());
     }
 
     {
