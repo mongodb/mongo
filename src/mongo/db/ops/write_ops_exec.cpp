@@ -59,7 +59,6 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -835,14 +834,6 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
                 handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
-        }
-
-        // If this was a pipeline style update, record which stages were being used.
-        auto updateMod = singleOp.getU();
-        if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
-            auto pipeline =
-                LiteParsedPipeline(wholeOp.getNamespace(), updateMod.getUpdatePipeline());
-            pipeline.tickGlobalStageCounters();
         }
     }
 

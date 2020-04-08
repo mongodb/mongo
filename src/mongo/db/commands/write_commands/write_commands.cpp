@@ -47,6 +47,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -392,6 +393,17 @@ private:
                            _batch.getUpdates().size(),
                            std::move(reply),
                            &result);
+
+            // If this was a pipeline style update, record which stages were being used.
+            for (auto&& update : _batch.getUpdates()) {
+                auto& updateMod = update.getU();
+                if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+                    AggregationRequest request(_batch.getNamespace(),
+                                               updateMod.getUpdatePipeline());
+                    LiteParsedPipeline pipeline(request);
+                    pipeline.tickGlobalStageCounters();
+                }
+            }
         }
 
         void explain(OperationContext* opCtx,

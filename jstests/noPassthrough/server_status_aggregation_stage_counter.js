@@ -48,7 +48,7 @@ function runTests(db, coll) {
     countersWeExpectToIncreaseMap = {};
 
     // Setup for agg stages which have nested pipelines.
-    assert.commandWorked(db[coll].insert([
+    assert.commandWorked(coll.insert([
         {"_id": 1, "item": "almonds", "price": 12, "quantity": 2},
         {"_id": 2, "item": "pecans", "price": 20, "quantity": 1},
         {"_id": 3}
@@ -100,7 +100,8 @@ function runTests(db, coll) {
     checkCounters(() => coll.explain().aggregate([{$match: {a: 5}}]), ["$match"]);
 
     // Verify that a pipeline in an update ticks counters.
-    checkCounters(() => coll.update({_id: 5}, [{$addFields: {a: {$add: ['$a', 1]}}}]),
+    checkCounters(() => coll.update(
+                      {price: {$gte: 0}}, [{$addFields: {a: {$add: ['$a', 1]}}}], {multi: true}),
                   ["$addFields"],
                   ["$set"]);
 
