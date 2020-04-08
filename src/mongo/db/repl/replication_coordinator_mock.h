@@ -70,6 +70,8 @@ public:
 
     virtual void enterTerminalShutdown();
 
+    virtual void enterQuiesceMode();
+
     virtual void shutdown(OperationContext* opCtx);
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;

@@ -49,6 +49,8 @@ public:
 
     void enterTerminalShutdown() override;
 
+    void enterQuiesceMode() override;
+
     void shutdown(OperationContext* opCtx) override;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;

@@ -51,6 +51,8 @@ void ReplicationCoordinatorEmbedded::startup(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorEmbedded::enterTerminalShutdown() {}
 
+void ReplicationCoordinatorEmbedded::enterQuiesceMode() {}
+
 void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorEmbedded::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}

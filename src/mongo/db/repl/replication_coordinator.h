@@ -127,6 +127,14 @@ public:
     virtual void enterTerminalShutdown() = 0;
 
     /**
+     * We enter quiesce mode during the shutdown process if we are in secondary mode. While in
+     * quiesce mode, we allow reads to continue and accept new reads, but we fail isMaster requests
+     * with ShutdownInProgress. This function causes us to increment the topologyVersion and start
+     * failing isMaster requests with ShutdownInProgress.
+     */
+    virtual void enterQuiesceMode() = 0;
+
+    /**
      * Does whatever cleanup is required to stop replication, including instructing the other
      * components of the replication system to shut down and stop any threads they are using,
      * blocking until all replication-related shutdown tasks are complete.

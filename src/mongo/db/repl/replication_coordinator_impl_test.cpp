@@ -3228,6 +3228,97 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
     getIsMasterThread.join();
 }
 
+TEST_F(ReplCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto opCtx = makeOperationContext();
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    stdx::thread getIsMasterThread([&] {
+        auto maxAwaitTime = Milliseconds(5000);
+        auto deadline = getNet()->now() + maxAwaitTime;
+
+        ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                               opCtx.get(), {}, currentTopologyVersion, deadline),
+                           AssertionException,
+                           ErrorCodes::ShutdownInProgress);
+    });
+
+    // Ensure that awaitIsMasterResponse() is called before entering quiesce mode.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    getReplCoord()->enterQuiesceMode();
+    ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
+                  getTopoCoord().getTopologyVersion().getCounter());
+    // Check that the cached topologyVersion counter was updated correctly.
+    ASSERT_EQUALS(getTopoCoord().getTopologyVersion().getCounter(),
+                  getReplCoord()->getTopologyVersion().getCounter());
+    getIsMasterThread.join();
+}
+
+TEST_F(ReplCoordTest, IsMasterReturnsErrorInQuiesceMode) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    getReplCoord()->enterQuiesceMode();
+    ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
+                  getTopoCoord().getTopologyVersion().getCounter());
+    // Check that the cached topologyVersion counter was updated correctly.
+    ASSERT_EQUALS(getTopoCoord().getTopologyVersion().getCounter(),
+                  getReplCoord()->getTopologyVersion().getCounter());
+
+    auto opCtx = makeOperationContext();
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    // Stale topology version
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, currentTopologyVersion, deadline),
+        AssertionException,
+        ErrorCodes::ShutdownInProgress);
+
+    // Current topology version
+    currentTopologyVersion = getTopoCoord().getTopologyVersion();
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, currentTopologyVersion, deadline),
+        AssertionException,
+        ErrorCodes::ShutdownInProgress);
+
+    // Different process ID
+    auto differentPid = OID::gen();
+    ASSERT_NOT_EQUALS(differentPid, currentTopologyVersion.getProcessId());
+    auto topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, currentTopologyVersion.getCounter());
+    ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                           opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline),
+                       AssertionException,
+                       ErrorCodes::ShutdownInProgress);
+
+    // No topology version
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none),
+        AssertionException,
+        ErrorCodes::ShutdownInProgress);
+}
+
 TEST_F(ReplCoordTest, AllIsMasterFieldsRespectHorizon) {
     init();
     const auto primaryHostName = "node1:12345";

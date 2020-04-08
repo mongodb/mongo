@@ -904,6 +904,14 @@ void ReplicationCoordinatorImpl::enterTerminalShutdown() {
     _inTerminalShutdown = true;
 }
 
+void ReplicationCoordinatorImpl::enterQuiesceMode() {
+    stdx::lock_guard lk(_mutex);
+    _inQuiesceMode = true;
+
+    // Increment the topology version and respond to all waiting isMaster requests with an error.
+    _fulfillTopologyChangePromise(lk);
+}
+
 void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication
@@ -2118,6 +2126,10 @@ ReplicationCoordinatorImpl::_getIsMasterResponseFuture(
     WithLock lk,
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion) const {
+
+    uassert(ErrorCodes::ShutdownInProgress,
+            "The server is in quiesce mode and will shut down",
+            !_inQuiesceMode);
 
     const MemberState myState = _topCoord->getMemberState();
     if (!_rsConfig.isInitialized() || myState.removed()) {
@@ -3732,10 +3744,23 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
     _cachedTopologyVersionCounter.store(_topCoord->getTopologyVersion().getCounter());
     // Create an isMaster response for each horizon the server is knowledgeable about.
     for (auto iter = _horizonToPromiseMap.begin(); iter != _horizonToPromiseMap.end(); iter++) {
-        auto response = _makeIsMasterResponse(iter->first, lock);
-        // Fulfill the promise and replace with a new one for future waiters.
-        iter->second->emplaceValue(response);
-        iter->second = std::make_shared<SharedPromise<std::shared_ptr<const IsMasterResponse>>>();
+        if (_inQuiesceMode) {
+            iter->second->setError({ErrorCodes::ShutdownInProgress,
+                                    "The server is in quiesce mode and will shut down"});
+        } else {
+            auto response = _makeIsMasterResponse(iter->first, lock);
+            // Fulfill the promise and replace with a new one for future waiters.
+            iter->second->emplaceValue(response);
+            iter->second =
+                std::make_shared<SharedPromise<std::shared_ptr<const IsMasterResponse>>>();
+        }
+    }
+
+    IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+
+    if (_inQuiesceMode) {
+        // No more isMaster requests will wait for a topology change, so clear _horizonToPromiseMap.
+        _horizonToPromiseMap.clear();
     }
 }
 
@@ -3758,7 +3783,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized()) {
             _fulfillTopologyChangePromise(lk);
-            IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
         }
     });
 

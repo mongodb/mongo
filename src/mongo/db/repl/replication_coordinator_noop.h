@@ -51,6 +51,8 @@ public:
 
     void enterTerminalShutdown() final;
 
+    void enterQuiesceMode() final;
+
     void shutdown(OperationContext* opCtx) final;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) final;

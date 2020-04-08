@@ -106,6 +106,8 @@ public:
 
     virtual void enterTerminalShutdown() override;
 
+    virtual void enterQuiesceMode() override;
+
     virtual void shutdown(OperationContext* opCtx) override;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;
@@ -1614,6 +1616,9 @@ private:
 
     // If we're in terminal shutdown.  If true, we'll refuse to vote in elections.
     bool _inTerminalShutdown = false;  // (M)
+
+    // If we're in quiesce mode.  If true, we'll respond to isMaster requests with ok:0.
+    bool _inQuiesceMode = false;  // (M)
 
     // The cached value of the 'counter' field in the server's TopologyVersion.
     AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)

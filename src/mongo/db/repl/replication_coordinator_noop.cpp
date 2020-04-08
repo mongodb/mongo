@@ -41,6 +41,8 @@ void ReplicationCoordinatorNoOp::startup(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorNoOp::enterTerminalShutdown() {}
 
+void ReplicationCoordinatorNoOp::enterQuiesceMode() {}
+
 void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorNoOp::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}
