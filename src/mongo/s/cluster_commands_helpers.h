@@ -228,4 +228,15 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
 StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     OperationContext* opCtx, const NamespaceString& nss);
 
+/**
+ * Utility for dispatching a command on a namespace that is sent to all shards. If all shards return
+ * CannotImplicitlyCreateCollection, will throw. If at least one shard succeeds, will ignore
+ * CannotImplicitlyCreateCollection errors.
+ */
+std::vector<AsyncRequestsSender::Response> dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ReadPreference readPreference,
+    const BSONObj& cmdObj);
+
 }  // namespace mongo
