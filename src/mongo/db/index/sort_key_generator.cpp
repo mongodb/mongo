@@ -213,7 +213,7 @@ Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {
     return Value(output.obj().firstElement());
 }
 
-StatusWith<Value> SortKeyGenerator::extractKeyPart(
+boost::optional<Value> SortKeyGenerator::extractKeyPart(
     const Document& doc,
     const DocumentMetadataFields& metadata,
     const SortPattern::SortPatternPart& patternPart) const {
@@ -222,38 +222,35 @@ StatusWith<Value> SortKeyGenerator::extractKeyPart(
         invariant(!patternPart.expression);
         auto keyVariant = doc.getNestedFieldNonCaching(*patternPart.fieldPath);
 
-        const Status arrayError{ErrorCodes::InternalError, "array along path"};
         auto key = stdx::visit(
             visit_helper::Overloaded{
                 // In this case, the document has an array along the path given. This means the
                 // document is ineligible for taking the fast path for index key generation.
-                [&arrayError](Document::TraversesArrayTag) -> StatusWith<Value> {
-                    return arrayError;
-                },
+                [](Document::TraversesArrayTag) -> boost::optional<Value> { return boost::none; },
                 // In this case the field was already in the cache (or may not have existed).
-                [&arrayError](const Value& val) -> StatusWith<Value> {
+                [](const Value& val) -> boost::optional<Value> {
                     // The document may have an array at the given path.
                     if (val.getType() == BSONType::Array) {
-                        return arrayError;
+                        return boost::none;
                     }
                     return val;
                 },
                 // In this case the field was in the backing BSON, and not in the cache.
-                [&arrayError](BSONElement elt) -> StatusWith<Value> {
+                [](BSONElement elt) -> boost::optional<Value> {
                     // The document may have an array at the given path.
                     if (elt.type() == BSONType::Array) {
-                        return arrayError;
+                        return boost::none;
                     }
                     return Value(elt);
                 },
-                [](stdx::monostate none) -> StatusWith<Value> { return Value(); },
+                [](stdx::monostate none) -> boost::optional<Value> { return Value(); },
             },
             keyVariant);
 
-        if (!key.isOK()) {
-            return key;
+        if (!key) {
+            return boost::none;
         }
-        plainKey = key.getValue();
+        plainKey = std::move(*key);
     } else {
         invariant(patternPart.expression);
         // ExpressionMeta expects metadata to be attached to the document.
@@ -268,8 +265,8 @@ StatusWith<Value> SortKeyGenerator::extractKeyPart(
     return plainKey.missing() ? Value{BSONNULL} : getCollationComparisonKey(plainKey);
 }
 
-StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc,
-                                                   const DocumentMetadataFields& metadata) const {
+boost::optional<Value> SortKeyGenerator::extractKeyFast(
+    const Document& doc, const DocumentMetadataFields& metadata) const {
     if (_sortPattern.isSingleElementKey()) {
         return extractKeyPart(doc, metadata, _sortPattern[0]);
     }
@@ -278,12 +275,12 @@ StatusWith<Value> SortKeyGenerator::extractKeyFast(const Document& doc,
     keys.reserve(_sortPattern.size());
     for (auto&& keyPart : _sortPattern) {
         auto extractedKey = extractKeyPart(doc, metadata, keyPart);
-        if (!extractedKey.isOK()) {
+        if (!extractedKey) {
             // We can't use the fast path, so bail out.
             return extractedKey;
         }
 
-        keys.push_back(std::move(extractedKey.getValue()));
+        keys.push_back(std::move(*extractedKey));
     }
     return Value{std::move(keys)};
 }
@@ -306,8 +303,8 @@ Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc,
                                                    const DocumentMetadataFields& metadata) const {
     // This fast pass directly generates a Value.
     auto fastKey = extractKeyFast(doc, metadata);
-    if (fastKey.isOK()) {
-        return std::move(fastKey.getValue());
+    if (fastKey) {
+        return std::move(*fastKey);
     }
 
     // Compute the key through the slow path, which generates a serialized BSON sort key (taking a

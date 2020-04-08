@@ -103,22 +103,22 @@ private:
     // the appropriate metadata if '_sortHasMeta' is true.
     StatusWith<BSONObj> computeSortKeyFromDocumentWithoutMetadata(const BSONObj& obj) const;
 
-    // Returns the sort key for 'doc' based on the SortPattern, or ErrorCodes::InternalError if an
-    // array is encountered during sort key generation.
+    // Returns the sort key for 'doc' based on the SortPattern, or boost::none if an array is
+    // encountered during sort key generation.
     //
     // Note that this function will ignore any metadata (e.g., textScore, randVal), in 'doc' but
     // will instead read from the 'metadata' variable.
-    StatusWith<Value> extractKeyFast(const Document& doc,
-                                     const DocumentMetadataFields& metadata) const;
+    boost::optional<Value> extractKeyFast(const Document& doc,
+                                          const DocumentMetadataFields& metadata) const;
 
     // Extracts the sort key component described by 'keyPart' from 'doc' and returns it. Returns
-    // ErrorCodes::InternalError if the path for 'keyPart' contains an array in 'doc'.
+    // boost::none if the path for 'keyPart' contains an array in 'doc'.
     //
     // Note that this function will ignore any metadata (e.g., textScore, randVal), in 'doc' but
     // will instead read from the 'metadata' variable.
-    StatusWith<Value> extractKeyPart(const Document& doc,
-                                     const DocumentMetadataFields& metadata,
-                                     const SortPattern::SortPatternPart& keyPart) const;
+    boost::optional<Value> extractKeyPart(const Document& doc,
+                                          const DocumentMetadataFields& metadata,
+                                          const SortPattern::SortPatternPart& keyPart) const;
 
     // Returns the sort key for 'doc' based on the SortPattern. Note this is in the BSONObj format -
     // with empty field names.
