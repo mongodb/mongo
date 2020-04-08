@@ -797,6 +797,15 @@ public:
         });
     }
 
+    /**
+     * Same as setFrom(Future) above, but takes a SemiFuture instead of a Future.
+     */
+    void setFrom(SemiFuture<T>&& future) noexcept {
+        setImpl([&](boost::intrusive_ptr<future_details::SharedState<T>>&& sharedState) {
+            std::move(future).propagateResultTo(sharedState.get());
+        });
+    }
+
     TEMPLATE(typename... Args)
     REQUIRES(std::is_constructible_v<T, Args...> || (std::is_void_v<T> && sizeof...(Args) == 0))
     void emplaceValue(Args&&... args) noexcept {

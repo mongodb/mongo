@@ -42,7 +42,11 @@ ExecutorFuture<void> sleepUntil(std::shared_ptr<executor::TaskExecutor> executor
 
     auto scheduledWorkHandle = executor->scheduleWorkAt(
         date, [taskCompletionPromise](const executor::TaskExecutor::CallbackArgs& args) mutable {
-            taskCompletionPromise->setFrom(args.status);
+            if (args.status.isOK()) {
+                taskCompletionPromise->emplaceValue();
+            } else {
+                taskCompletionPromise->setError(args.status);
+            }
         });
 
     if (!scheduledWorkHandle.isOK()) {
