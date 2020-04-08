@@ -93,60 +93,37 @@ assert.throws(function() {
 // SERVER-17387: Find and modify should throw in the case of invalid projection.
 //
 
-t.drop();
+function runFindAndModify(shouldMatch, upsert, newParam) {
+    t.drop();
+    if (shouldMatch) {
+        assert.commandWorked(t.insert({_id: "found"}));
+    }
+    const query = shouldMatch ? "found" : "miss";
+    const res = db.runCommand({
+        findAndModify: t.getName(),
+        query: {_id: query},
+        update: {$inc: {y: 1}},
+        fields: {foo: {$pop: ["bar"]}},
+        upsert: upsert,
+        new: newParam
+    });
+    assert.commandFailedWithCode(res, 31325);
+}
 
 // Insert case.
-var cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "miss"},
-    update: {$inc: {y: 1}},
-    fields: {foo: {$pop: ["bar"]}},
-    upsert: true,
-    new: true
-});
-assert.commandFailed(cmdRes);
-
-t.insert({_id: "found"});
+runFindAndModify(false /* shouldMatch */, true /* upsert */, true /* new */);
 
 // Update with upsert + new.
-cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "found"},
-    update: {$inc: {y: 1}},
-    fields: {foo: {$pop: ["bar"]}},
-    upsert: true,
-    new: true
-});
-assert.commandFailed(cmdRes);
+runFindAndModify(true /* shouldMatch */, true /* upsert */, true /* new */);
 
 // Update with just new: true.
-cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "found"},
-    update: {$inc: {y: 1}},
-    fields: {foo: {$pop: ["bar"]}},
-    new: true
-});
-assert.commandFailed(cmdRes);
+runFindAndModify(true /* shouldMatch */, false /* upsert */, true /* new */);
 
 // Update with just upsert: true.
-cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "found"},
-    update: {$inc: {y: 1}},
-    fields: {foo: {$pop: ["bar"]}},
-    upsert: true
-});
-assert.commandFailed(cmdRes);
+runFindAndModify(true /* shouldMatch */, true /* upsert */, false /* new */);
 
 // Update with neither upsert nor new flags.
-cmdRes = db.runCommand({
-    findAndModify: t.getName(),
-    query: {_id: "found"},
-    update: {$inc: {y: 1}},
-    fields: {foo: {$pop: ["bar"]}},
-});
-assert.commandFailed(cmdRes);
+runFindAndModify(true /* shouldMatch */, false /* upsert */, false /* new */);
 
 //
 // SERVER-17372

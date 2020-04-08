@@ -1,6 +1,14 @@
-// Test that a transaction cannot write to a collection that has been dropped or created since the
-// transaction started.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+/**
+ * Test that a transaction cannot write to a collection that has been dropped or created since the
+ * transaction started.
+ *
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   uses_transactions,
+ *   uses_snapshot_read_concern,
+ *   requires_fcv_44
+ * ]
+ */
 (function() {
 "use strict";
 
@@ -55,11 +63,16 @@ assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "maj
 
 // Ensure the collection drop is visible to the transaction, since our implementation of the in-
 // memory collection catalog always has the most recent collection metadata. We can detect the
-// drop by attempting a findandmodify with upsert=true on the dropped collection, since findand-
-// -modify on a nonexisting collection is not supported inside multi-document transactions.
-// TODO(SERVER-45956) remove or rethink this test case.
-assert.throws(() => (sessionCollB.findAndModify(({update: {a: 1}, upsert: true}))));
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+// drop by attempting a findAndModify on the dropped collection. Since the collection drop is
+// visible, the findAndModify will not match any existing documents.
+// TODO (SERVER-39704): Remove use of retryOnceOnTransientAndRestartTxnOnMongos.
+retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    const res = sessionDB2.runCommand(
+        {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true});
+    assert.commandWorked(res);
+    assert.eq(res.value, null);
+}, txnOptions);
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // A transaction with snapshot read concern cannot write to a collection that has been created
