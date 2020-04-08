@@ -56,7 +56,7 @@ const readThreadFunc = function(readFunc, _collName, timesEntered) {
     assert.commandWorked(
         db.adminCommand({configureFailPoint: 'hangAfterReservingPrepareTimestamp', mode: 'off'}));
 
-    if (isJsonLogNoConn()) {
+    if (isJsonLog(db.getMongo())) {
         checkLog.containsJson(db.getMongo(), 51803, {
             'command': function(obj) {
                 return obj.hasOwnProperty('prepareTransaction');
