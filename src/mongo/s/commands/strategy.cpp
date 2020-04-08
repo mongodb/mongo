@@ -622,9 +622,18 @@ void runCommand(OperationContext* opCtx,
 
         command->incrementCommandsExecuted();
 
-        if (command->shouldAffectCommandCounter()) {
+        auto shouldAffectCommandCounter = command->shouldAffectCommandCounter();
+
+        if (shouldAffectCommandCounter) {
             globalOpCounters.gotCommand();
         }
+
+        ON_BLOCK_EXIT([opCtx, shouldAffectCommandCounter] {
+            if (shouldAffectCommandCounter) {
+                Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
+                    opCtx, mongo::LogicalOp::opCommand);
+            }
+        });
 
 
         for (int tries = 0;; ++tries) {
@@ -870,6 +879,11 @@ void runCommand(OperationContext* opCtx,
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
+
+    ON_BLOCK_EXIT([opCtx] {
+        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
+            opCtx, mongo::LogicalOp::opQuery);
+    });
 
     const QueryMessage q(*dbm);
 
