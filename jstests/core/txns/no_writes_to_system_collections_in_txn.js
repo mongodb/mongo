@@ -3,13 +3,30 @@
 (function() {
 "use strict";
 
-const session = db.getMongo().startSession({causalConsistency: false});
+const session = db.getMongo().startSession();
 
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
 const testDB = session.getDatabase("no_writes_system_collections_in_txn");
 assert.commandWorked(testDB.dropDatabase());
-const systemColl = testDB.getCollection("system.js");
+const systemCollName = "system.js";
+const systemColl = testDB.getCollection(systemCollName);
 const systemDotViews = testDB.getCollection("system.views");
+
+// createCollection is not presently allowed to run in transactions that have a non-local
+// readConcern.
+// TODO(SERVER-46971) Replace "local" with "snapshot".
+session.startTransaction({readConcern: {level: "local"}});
+assert.commandFailedWithCode(testDB.createCollection(systemCollName),
+                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
+// createIndexes is not presently allowed to run in transactions that have a non-local
+// readConcern.
+// TODO(SERVER-46971) Replace "local" with "snapshot".
+session.startTransaction({readConcern: {level: "local"}});
+assert.commandFailedWithCode(systemColl.createIndex({name: 1}),
+                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // Ensure that a collection exists with at least one document.
 assert.commandWorked(systemColl.insert({name: 0}, {writeConcern: {w: "majority"}}));
