@@ -863,9 +863,6 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                                 "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                         }
 
-                        // TODO (SERVER-45707): Test that range deletion tasks are eventually
-                        // deleted even if the collection is dropped before migration coordination
-                        // is resumed.
                         deleteRangeDeletionTaskOnRecipient(
                             opCtx, doc.getRecipientShardId(), doc.getId());
                         deleteRangeDeletionTaskLocally(opCtx, doc.getId());
