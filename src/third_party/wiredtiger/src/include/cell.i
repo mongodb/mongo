@@ -15,7 +15,7 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, wt_timestamp_t durable_sta
   wt_timestamp_t start_ts, uint64_t start_txn, wt_timestamp_t durable_stop_ts,
   wt_timestamp_t stop_ts, uint64_t stop_txn)
 {
-#ifdef HAVE_DIAGNOSTIC
+#if defined(MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE) && defined(HAVE_DIAGNOSTIC)
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     if (start_ts > durable_start_ts)
@@ -92,10 +92,12 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_
         LF_SET(WT_CELL_TXN_START);
     }
     if (durable_start_ts != WT_TS_NONE) {
-        /* Store differences, not absolutes. */
         WT_ASSERT(session, start_ts != WT_TS_NONE && start_ts <= durable_start_ts);
-        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, durable_start_ts - start_ts));
-        LF_SET(WT_CELL_TS_DURABLE_START);
+        /* Store differences if any, not absolutes. */
+        if (durable_start_ts - start_ts > 0) {
+            WT_IGNORE_RET(__wt_vpack_uint(pp, 0, durable_start_ts - start_ts));
+            LF_SET(WT_CELL_TS_DURABLE_START);
+        }
     }
     if (stop_ts != WT_TS_MAX) {
         /* Store differences, not absolutes. */
@@ -108,10 +110,12 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_
         LF_SET(WT_CELL_TXN_STOP);
     }
     if (durable_stop_ts != WT_TS_NONE) {
-        /* Store differences, not absolutes. */
         WT_ASSERT(session, stop_ts != WT_TS_MAX && stop_ts <= durable_stop_ts);
-        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, durable_stop_ts - stop_ts));
-        LF_SET(WT_CELL_TS_DURABLE_STOP);
+        /* Store differences if any, not absolutes. */
+        if (durable_stop_ts - stop_ts > 0) {
+            WT_IGNORE_RET(__wt_vpack_uint(pp, 0, durable_stop_ts - stop_ts));
+            LF_SET(WT_CELL_TS_DURABLE_STOP);
+        }
     }
     if (prepare)
         LF_SET(WT_CELL_PREPARE);
@@ -127,7 +131,7 @@ __wt_check_addr_validity(WT_SESSION_IMPL *session, wt_timestamp_t start_durable_
   wt_timestamp_t oldest_start_ts, uint64_t oldest_start_txn, wt_timestamp_t stop_durable_ts,
   wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn)
 {
-#ifdef HAVE_DIAGNOSTIC
+#if defined(MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE) && defined(HAVE_DIAGNOSTIC)
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     if (oldest_start_ts != WT_TS_NONE && newest_stop_ts == WT_TS_NONE)
@@ -211,6 +215,13 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t
          * WT_ASSERT(
          *  session, oldest_start_ts != WT_TS_NONE && oldest_start_ts <= start_durable_ts);
          */
+        /*
+         * Unlike value cell, we store the durable start timestamp even the difference is zero
+         * compared to oldest commit timestamp. The difference can only be zero when the page
+         * contains all the key/value pairs with the same timestamp. But this scenario is rare and
+         * having that check to find out whether it is zero or not will unnecessarily add overhead
+         * than benefit.
+         */
         WT_IGNORE_RET(__wt_vpack_uint(pp, 0, start_durable_ts - oldest_start_ts));
         LF_SET(WT_CELL_TS_DURABLE_START);
     }
@@ -230,7 +241,14 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t
          * FIXME-prepare-support:
          * WT_ASSERT(session,
          *   newest_stop_ts != WT_TS_MAX && newest_stop_ts <= stop_durable__ts);
-        */
+         */
+        /*
+         * Unlike value cell, we store the durable stop timestamp even the difference is zero
+         * compared to newest commit timestamp. The difference can only be zero when the page
+         * contains all the key/value pairs with the same timestamp. But this scenario is rare and
+         * having that check to find out whether it is zero or not will unnecessarily add overhead
+         * than benefit.
+         */
         WT_IGNORE_RET(__wt_vpack_uint(pp, 0, stop_durable_ts - newest_stop_ts));
         LF_SET(WT_CELL_TS_DURABLE_STOP);
     }
@@ -894,7 +912,9 @@ restart:
             WT_RET(__wt_vunpack_uint(
               &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->durable_start_ts));
             unpack->durable_start_ts += unpack->start_ts;
-        }
+        } else
+            unpack->durable_start_ts = unpack->start_ts;
+
         if (LF_ISSET(WT_CELL_TS_STOP)) {
             WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->stop_ts));
             unpack->stop_ts += unpack->start_ts;
@@ -907,7 +927,11 @@ restart:
             WT_RET(__wt_vunpack_uint(
               &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->durable_stop_ts));
             unpack->durable_stop_ts += unpack->stop_ts;
-        }
+        } else if (unpack->stop_ts != WT_TS_MAX)
+            unpack->durable_stop_ts = unpack->stop_ts;
+        else
+            unpack->durable_stop_ts = WT_TS_NONE;
+
         __cell_check_value_validity(session, unpack->durable_start_ts, unpack->start_ts,
           unpack->start_txn, unpack->durable_stop_ts, unpack->stop_ts, unpack->stop_txn);
         break;

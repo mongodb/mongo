@@ -188,6 +188,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *tag, WT_ITEM *buf)
     return (__wt_verify_dsk_image(session, tag, buf->data, buf->size, NULL, false));
 }
 
+#ifdef MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE
 /*
  * __verify_dsk_ts_addr_cmp --
  *     Do a cell timestamp check against the parent.
@@ -362,6 +363,7 @@ __verify_dsk_validity(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, uint32_t
 
     return (0);
 }
+#endif
 
 /*
  * __verify_dsk_row --
@@ -470,8 +472,12 @@ __verify_dsk_row(
             break;
         }
 
+#ifdef MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE
         /* Check the validity window. */
         WT_ERR(__verify_dsk_validity(session, unpack, cell_num, addr, tag));
+#else
+        WT_UNUSED(addr);
+#endif
 
         /* Check if any referenced item has an invalid address. */
         switch (cell_type) {
@@ -665,8 +671,12 @@ __verify_dsk_col_int(
         WT_RET(__err_cell_type(session, cell_num, tag, unpack->raw, dsk->type));
         WT_RET(__err_cell_type(session, cell_num, tag, unpack->type, dsk->type));
 
+#ifdef MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE
         /* Check the validity window. */
         WT_RET(__verify_dsk_validity(session, unpack, cell_num, addr, tag));
+#else
+        WT_UNUSED(addr);
+#endif
 
         /* Check if any referenced item is entirely in the file. */
         ret = bm->addr_invalid(bm, session, unpack->data, unpack->size);
@@ -747,8 +757,12 @@ __verify_dsk_col_var(
         WT_RET(__err_cell_type(session, cell_num, tag, unpack->type, dsk->type));
         cell_type = unpack->type;
 
+#ifdef MONGODB42_WITH_TIMESTAMP_AND_TXN_VALIDATE
         /* Check the validity window. */
         WT_RET(__verify_dsk_validity(session, unpack, cell_num, addr, tag));
+#else
+        WT_UNUSED(addr);
+#endif
 
         /* Check if any referenced item is entirely in the file. */
         if (cell_type == WT_CELL_VALUE_OVFL) {
