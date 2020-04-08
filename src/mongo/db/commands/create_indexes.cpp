@@ -501,6 +501,11 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             str::stream() << "not allowed to create index on " << ns.ns(),
             ns != NamespaceString::kSessionTransactionsTableNamespace);
 
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot write to system collection " << ns.toString()
+                          << " within a transaction.",
+            !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
