@@ -169,7 +169,9 @@ public:
      * Apply a 'startIndexBuild' oplog entry. Returns when the index build thread has started and
      * performed the initial ready:false write. Throws if there were any errors building the index.
      */
-    void applyStartIndexBuild(OperationContext* opCtx, const IndexBuildOplogEntry& entry);
+    void applyStartIndexBuild(OperationContext* opCtx,
+                              bool isInitialSync,
+                              const IndexBuildOplogEntry& entry);
 
     /**
      * Apply a 'commitIndexBuild' oplog entry. If no index build is found, starts an index build

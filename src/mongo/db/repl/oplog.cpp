@@ -762,7 +762,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   "Error parsing 'startIndexBuild' oplog entry");
           }
 
-          IndexBuildsCoordinator::get(opCtx)->applyStartIndexBuild(opCtx, swOplogEntry.getValue());
+          const bool isInitialSync = mode == OplogApplication::Mode::kInitialSync;
+          IndexBuildsCoordinator::get(opCtx)->applyStartIndexBuild(
+              opCtx, isInitialSync, swOplogEntry.getValue());
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
