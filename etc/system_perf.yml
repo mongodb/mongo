@@ -79,7 +79,6 @@ functions:
         linkbench: ${linkbench_rev}
         genny: ${genny_rev}
         workloads: ${workloads_rev}
-        wtdevelop: ${wtdevelop_rev}
         mongo-tools: ${mongo-tools_rev}
 
   "compile mongodb":
@@ -110,12 +109,6 @@ functions:
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
 
-          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
-          # that githash to version string.
-          if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
-            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
-          fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|false}" = "true" ]; then
@@ -191,21 +184,6 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
-
-  "use WiredTiger develop":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${compile-variant|}" = "-wtdevelop" ]; then
-          cd src/third_party
-          for wtdir in dist examples ext lang src test tools ; do
-            rm -rf wiredtiger/$wtdir
-            mv wtdevelop/$wtdir wiredtiger/
-          done
-        fi
 
   "write yml config": &write_yml_config
     command: shell.exec
@@ -426,7 +404,6 @@ tasks:
   commands:
     - command: manifest.load
     - func: "git get project"
-    - func: "use WiredTiger develop" # noop if ${compile-variant|} is not "-wtdevelop"
     - func: "compile mongodb"
 
 - name: linkbench
@@ -910,11 +887,6 @@ modules:
   prefix: workloads
   branch: master
 
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
-
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: linkbench
@@ -962,20 +934,6 @@ buildvariants:
   tasks:
     - name: compile
     - name: genny_generate_all_tasks
-
-- <<: *compile-amazon2
-  name: wtdevelop-compile-amazon2
-  display_name: WT Develop Compile
-  modules:
-  - mongo-tools
-  - wtdevelop
-  - enterprise
-  - genny # needed for genny_generate_all_tasks
-  expansions:
-    <<: *compile-expansions
-    compile-variant: -wtdevelop
-  tasks:
-    - name: compile
 
 - name: compile-rhel70
   display_name: Compile for Atlas-like
@@ -1534,90 +1492,3 @@ buildvariants:
     - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
-
-
-#######################################
-#  WT Develop Linux Buildvariants     #
-#######################################
-- name: wtdevelop-1-node-replSet
-  display_name: WT Develop 1-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    setup: single-replica
-    cluster: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on:
-      - name: compile
-        variant: wtdevelop-compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
-  tasks: *1nodetasks
-
-- name: wtdevelop-standalone
-  display_name: WT Develop Standalone
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    setup: standalone
-    cluster: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on:
-      - name: compile
-        variant: wtdevelop-compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
-  tasks: *standalonetasks
-
-- name: wtdevelop-3-node-replSet
-  display_name: WT Develop 3-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    setup: replica
-    cluster: replica
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-replset"
-  depends_on:
-      - name: compile
-        variant: wtdevelop-compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
-  tasks: *3nodetasks
-
-# Disabled: SERVER-35586
-#- name: wtdevelop-shard-lite
-#  display_name: WT Develop Shard Lite Cluster
-#  batchtime: 10080 # 7 days
-#  modules: *modules
-#  expansions:
-#    setup: shard-lite
-#    cluster: shard-lite
-#    platform: linux
-#    project_dir: *project_dir
-#    compile-variant: -wtdevelop
-#    authentication: enabled
-#    storageEngine: wiredTiger
-#  run_on:
-#      - "rhel70-perf-shard-lite"
-#  depends_on:
-#      - name: compile
-#        variant: wtdevelop-compile-amazon2
-#  tasks: *shardlitetasks
