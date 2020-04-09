@@ -2582,8 +2582,12 @@ var ReplSetTest = function(opts) {
 
                     const otherOplogEntry = readers[i].next();
                     if (otherOplogEntry && otherOplogEntry !== kCappedPositionLostSentinel) {
-                        assertOplogEntriesEq(
-                            oplogEntry, otherOplogEntry, firstReader, readers[i], prevOplogEntry);
+                        assertOplogEntriesEq.call(this,
+                                                  oplogEntry,
+                                                  otherOplogEntry,
+                                                  firstReader,
+                                                  readers[i],
+                                                  prevOplogEntry);
                     }
                 }
                 prevOplogEntry = oplogEntry;
