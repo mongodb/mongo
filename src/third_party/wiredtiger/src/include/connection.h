@@ -19,8 +19,6 @@ struct __wt_process {
     /* Locked: connection queue */
     TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
 
-    bool page_version_ts; /* timestamp version page formats */
-
 /* Checksum functions */
 #define __wt_checksum(chunk, len) __wt_process.checksum(chunk, len)
     uint32_t (*checksum)(const void *, size_t);

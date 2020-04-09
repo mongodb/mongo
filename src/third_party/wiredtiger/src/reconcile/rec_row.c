@@ -531,16 +531,14 @@ static bool
 __rec_row_zero_len(WT_SESSION_IMPL *session, wt_timestamp_t start_ts, uint64_t start_txn,
   wt_timestamp_t stop_ts, uint64_t stop_txn)
 {
-    /* Before timestamps were stored on pages, it was always possible. */
-    if (!__wt_process.page_version_ts)
-        return (true);
+    WT_UNUSED(session);
+    WT_UNUSED(start_ts);
+    WT_UNUSED(start_txn);
+    WT_UNUSED(stop_ts);
+    WT_UNUSED(stop_txn);
 
-    /*
-     * The item must be globally visible because we're not writing anything on the page.
-     */
-    return ((stop_ts == WT_TS_MAX && stop_txn == WT_TXN_MAX) &&
-      ((start_ts == WT_TS_NONE && start_txn == WT_TXN_NONE) ||
-              __wt_txn_visible_all(session, start_txn, start_ts)));
+    /* Before timestamps were stored on pages, it was always possible. */
+    return (true);
 }
 
 /*

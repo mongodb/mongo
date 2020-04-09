@@ -188,6 +188,7 @@ struct __wt_cell_unpack {
 #define WT_CELL_UNPACK_OVERFLOW 0x1u           /* cell is an overflow */
 #define WT_CELL_UNPACK_PREPARE 0x2u            /* cell is part of a prepared transaction */
 #define WT_CELL_UNPACK_TIME_PAIRS_CLEARED 0x4u /* time pairs are cleared because of restart */
+#define WT_CELL_UNPACK_TOMBSTONE 0x8u          /* cell is never visible */
                                                /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 

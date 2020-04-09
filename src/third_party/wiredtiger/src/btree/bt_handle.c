@@ -15,30 +15,6 @@ static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, bool);
 
 /*
- * __wt_btree_page_version_config --
- *     Select a Btree page format.
- */
-void
-__wt_btree_page_version_config(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-
-    conn = S2C(session);
-
-/*
- * Write timestamp format pages if at the right version or if configured at build-time.
- *
- * The timestamp page format is written starting with WiredTiger version 10.0.0. We need only
- * compare the major version as the minor version is zero.
- */
-#define WT_VERSION_TS_MAJOR 10
-    __wt_process.page_version_ts = conn->compat_major >= WT_VERSION_TS_MAJOR;
-#if defined(HAVE_PAGE_VERSION_TS)
-    __wt_process.page_version_ts = true;
-#endif
-}
-
-/*
  * __btree_clear --
  *     Clear a Btree, either on handle discard or re-open.
  */

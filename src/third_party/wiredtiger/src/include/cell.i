@@ -64,12 +64,12 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_
   wt_timestamp_t start_ts, uint64_t start_txn, wt_timestamp_t durable_stop_ts,
   wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare)
 {
+#ifdef MONGODB44_WITH_TIMESTAMP_PAGE_FORMAT
     uint8_t flags, *flagsp;
 
-    /* Historic page versions and globally visible values have no associated validity window. */
-    if (!__wt_process.page_version_ts ||
-      (durable_start_ts == WT_TS_NONE && start_ts == WT_TS_NONE && start_txn == WT_TXN_NONE &&
-        durable_stop_ts == WT_TS_NONE && stop_ts == WT_TS_MAX && stop_txn == WT_TXN_MAX)) {
+    /* Globally visible values have no associated validity window. */
+    if (durable_start_ts == WT_TS_NONE && start_ts == WT_TS_NONE && start_txn == WT_TXN_NONE &&
+      durable_stop_ts == WT_TS_NONE && stop_ts == WT_TS_MAX && stop_txn == WT_TXN_MAX) {
         ++*pp;
         return;
     }
@@ -120,6 +120,18 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_
     if (prepare)
         LF_SET(WT_CELL_PREPARE);
     *flagsp = flags;
+#else
+    WT_UNUSED(session);
+    WT_UNUSED(durable_start_ts);
+    WT_UNUSED(start_ts);
+    WT_UNUSED(start_txn);
+    WT_UNUSED(durable_stop_ts);
+    WT_UNUSED(stop_ts);
+    WT_UNUSED(stop_txn);
+    WT_UNUSED(prepare);
+
+    ++*pp;
+#endif
 }
 
 /*
@@ -180,13 +192,13 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t
   wt_timestamp_t oldest_start_ts, uint64_t oldest_start_txn, wt_timestamp_t stop_durable_ts,
   wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn)
 {
+#ifdef MONGODB44_WITH_TIMESTAMP_PAGE_FORMAT
     uint8_t flags, *flagsp;
 
-    /* Historic page versions and globally visible values have no associated validity window. */
-    if (!__wt_process.page_version_ts ||
-      (start_durable_ts == WT_TS_NONE && stop_durable_ts == WT_TS_NONE &&
-        oldest_start_ts == WT_TS_NONE && oldest_start_txn == WT_TXN_NONE &&
-        newest_stop_ts == WT_TS_MAX && newest_stop_txn == WT_TXN_MAX)) {
+    /* Globally visible values have no associated validity window. */
+    if (start_durable_ts == WT_TS_NONE && stop_durable_ts == WT_TS_NONE &&
+      oldest_start_ts == WT_TS_NONE && oldest_start_txn == WT_TXN_NONE &&
+      newest_stop_ts == WT_TS_MAX && newest_stop_txn == WT_TXN_MAX) {
         ++*pp;
         return;
     }
@@ -253,6 +265,17 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t
         LF_SET(WT_CELL_TS_DURABLE_STOP);
     }
     *flagsp = flags;
+#else
+    WT_UNUSED(session);
+    WT_UNUSED(start_durable_ts);
+    WT_UNUSED(oldest_start_ts);
+    WT_UNUSED(oldest_start_txn);
+    WT_UNUSED(stop_durable_ts);
+    WT_UNUSED(newest_stop_ts);
+    WT_UNUSED(newest_stop_txn);
+
+    ++*pp;
+#endif
 }
 
 /*
@@ -734,6 +757,29 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 }
 
 /*
+ * __unstable_skip --
+ *     Optionally skip unstable entries in the MongoDB 4.2 release.
+ */
+static inline bool
+__unstable_skip(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack)
+{
+    /*
+     * We should never see a prepared cell, it implies an unclean shutdown followed by a downgrade
+     * (clean shutdown rolls back any prepared cells). Complain and ignore the row.
+     */
+    if (F_ISSET(unpack, WT_CELL_UNPACK_PREPARE)) {
+        __wt_err(session, EINVAL, "unexpected prepared cell found, ignored");
+        return (true);
+    }
+
+    /*
+     * Skip unstable entries after downgrade to releases without validity windows and from previous
+     * wiredtiger_open connections.
+     */
+    return (unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX);
+}
+
+/*
  * __wt_cell_unpack_safe --
  *     Unpack a WT_CELL into a structure, with optional boundary checks.
  */
@@ -1010,6 +1056,9 @@ restart:
     default:
         return (WT_ERROR); /* Unknown cell type. */
     }
+
+    if (__unstable_skip(session, unpack))
+        F_SET(unpack, WT_CELL_UNPACK_TOMBSTONE);
 
 /*
  * Check the original cell against the full cell length (this is a diagnostic as well, we may be

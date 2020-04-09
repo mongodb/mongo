@@ -47,6 +47,8 @@ __wt_rec_addr_ts_init(WT_RECONCILE *r, wt_timestamp_t *newest_durable_ts,
   wt_timestamp_t *oldest_start_tsp, uint64_t *oldest_start_txnp, wt_timestamp_t *newest_stop_tsp,
   uint64_t *newest_stop_txnp)
 {
+    WT_UNUSED(r);
+
     /*
      * If the page format supports address timestamps (and not fixed-length column-store, where we
      * don't maintain timestamps at all), set the oldest/newest timestamps to values at the end of
@@ -58,13 +60,11 @@ __wt_rec_addr_ts_init(WT_RECONCILE *r, wt_timestamp_t *newest_durable_ts,
     *oldest_start_txnp = WT_TXN_MAX;
     *newest_stop_tsp = WT_TS_NONE;
     *newest_stop_txnp = WT_TXN_NONE;
-    if (!__wt_process.page_version_ts || r->page->type == WT_PAGE_COL_FIX) {
-        *newest_durable_ts = WT_TS_NONE;
-        *oldest_start_tsp = WT_TS_NONE;
-        *oldest_start_txnp = WT_TXN_NONE;
-        *newest_stop_tsp = WT_TS_MAX;
-        *newest_stop_txnp = WT_TXN_MAX;
-    }
+    *newest_durable_ts = WT_TS_NONE;
+    *oldest_start_tsp = WT_TS_NONE;
+    *oldest_start_txnp = WT_TXN_NONE;
+    *newest_stop_tsp = WT_TS_MAX;
+    *newest_stop_txnp = WT_TXN_MAX;
 }
 
 /*

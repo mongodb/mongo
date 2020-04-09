@@ -10,9 +10,9 @@
 
 static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, size_t *, bool);
+static int __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, size_t *);
 static int __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
-static int __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, bool);
+static int __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *, bool);
 static int __inmem_row_leaf_entries(WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
 
 /*
@@ -206,13 +206,13 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
         __inmem_col_int(session, page);
         break;
     case WT_PAGE_COL_VAR:
-        WT_ERR(__inmem_col_var(session, page, dsk->recno, &size, check_unstable));
+        WT_ERR(__inmem_col_var(session, page, dsk->recno, &size));
         break;
     case WT_PAGE_ROW_INT:
         WT_ERR(__inmem_row_int(session, page, &size));
         break;
     case WT_PAGE_ROW_LEAF:
-        WT_ERR(__inmem_row_leaf(session, page, check_unstable));
+        WT_ERR(__inmem_row_leaf(session, page, &size, check_unstable));
         break;
     default:
         WT_ERR(__wt_illegal_value(session, page->type));
@@ -313,36 +313,11 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 }
 
 /*
- * __unstable_skip --
- *     Optionally skip unstable entries
- */
-static inline bool
-__unstable_skip(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
-{
-    /*
-     * We should never see a prepared cell, it implies an unclean shutdown followed by a downgrade
-     * (clean shutdown rolls back any prepared cells). Complain and ignore the row.
-     */
-    if (F_ISSET(unpack, WT_CELL_UNPACK_PREPARE)) {
-        __wt_err(session, EINVAL, "unexpected prepared cell found, ignored");
-        return (true);
-    }
-
-    /*
-     * Skip unstable entries after downgrade to releases without validity windows and from previous
-     * wiredtiger_open connections.
-     */
-    return ((unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX) &&
-      (S2C(session)->base_write_gen > dsk->write_gen || !__wt_process.page_version_ts));
-}
-
-/*
  * __inmem_col_var --
  *     Build in-memory index for variable-length, data-only leaf pages in column-store trees.
  */
 static int
-__inmem_col_var(
-  WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, size_t *sizep, bool check_unstable)
+__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, size_t *sizep)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK unpack;
@@ -366,12 +341,6 @@ __inmem_col_var(
     indx = 0;
     cip = page->pg_var;
     WT_CELL_FOREACH_BEGIN (session, btree, page->dsk, unpack) {
-        /* Optionally skip unstable values */
-        if (check_unstable && __unstable_skip(session, page->dsk, &unpack)) {
-            --page->entries;
-            continue;
-        }
-
         WT_COL_PTR_SET(cip, WT_PAGE_DISK_OFFSET(page, unpack.cell));
         cip++;
 
@@ -554,11 +523,47 @@ __inmem_row_leaf_entries(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, ui
 }
 
 /*
+ * __inmem_row_leaf_tombstone --
+ *     Add row-store tombstones required by 4.4 downgrade. (Similar code is not included for
+ *     column-store, MongoDB does not use the column-store functionality.)
+ */
+static int
+__inmem_row_leaf_tombstone(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, size_t *sizep)
+{
+    WT_BTREE *btree;
+    WT_UPDATE **upd_array, *upd;
+
+    btree = S2BT(session);
+
+    /*
+     * Give the page a modify structure and allocate the per-page update array if this is the first
+     * tombstone seen.
+     *
+     * Mark tree dirty, unless the handle is read-only. We'd like to discard the tombstones, but if
+     * the handle is read-only, we're not able to do so.)
+     */
+    if (page->modify == NULL) {
+        WT_RET(__wt_page_modify_init(session, page));
+        if (!F_ISSET(btree, WT_BTREE_READONLY))
+            __wt_page_modify_set(session, page);
+        WT_RET(__wt_calloc_def(session, page->entries, &page->modify->mod_row_update));
+    }
+
+    /* Cleared memory matches the lowest possible transaction ID and timestamp, do nothing. */
+    WT_RET(__wt_update_alloc(session, NULL, &upd, sizep, WT_UPDATE_TOMBSTONE));
+    upd_array = page->modify->mod_row_update;
+    upd->next = upd_array[WT_ROW_SLOT(page, rip)];
+    upd_array[WT_ROW_SLOT(page, rip)] = upd;
+
+    return (0);
+}
+
+/*
  * __inmem_row_leaf --
  *     Build in-memory index for row-store leaf pages.
  */
 static int
-__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool check_unstable)
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep, bool check_unstable)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK unpack;
@@ -586,25 +591,18 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool check_unstable)
             ++rip;
             break;
         case WT_CELL_VALUE:
-            /* Optionally skip unstable values */
-            if (check_unstable && __unstable_skip(session, page->dsk, &unpack)) {
-                --rip;
-                --page->entries;
-            }
-
             /*
              * Simple values without compression can be directly referenced on the page to avoid
              * repeatedly unpacking their cells.
              */
             if (!btree->huffman_value)
                 __wt_row_leaf_value_set(page, rip - 1, &unpack);
-            break;
+
+        /* FALLTHROUGH */
         case WT_CELL_VALUE_OVFL:
             /* Optionally skip unstable values */
-            if (check_unstable && __unstable_skip(session, page->dsk, &unpack)) {
-                --rip;
-                --page->entries;
-            }
+            if (F_ISSET(&unpack, WT_CELL_UNPACK_TOMBSTONE) && check_unstable)
+                WT_RET(__inmem_row_leaf_tombstone(session, page, rip - 1, sizep));
             break;
         default:
             return (__wt_illegal_value(session, unpack.type));
