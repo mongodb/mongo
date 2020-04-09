@@ -180,7 +180,6 @@ class TestLocalCommandLine(unittest.TestCase):
     def test_removes_archival_options(self):
         cmdline = _parser.to_local_args([
             "--suites=my_suite",
-            "--archiveFile=archive.json",
             "--archiveLimitMb=100",
             "--archiveLimitTests=10",
             "--storageEngine=my_storage_engine",

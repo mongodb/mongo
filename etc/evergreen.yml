@@ -1511,7 +1511,6 @@ functions:
                 --taskName=${task_name}                   \
                 --variantName=${build_variant}            \
                 --versionId=${version_id}                 \
-                --archiveFile=archive.json                \
                 --reportFile=report.json                  \
                 --perfReportFile=perf.json
         resmoke_exit_code=$?

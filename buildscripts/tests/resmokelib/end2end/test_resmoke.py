@@ -57,7 +57,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
     def test_archival_on_task_failure(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure.yml",
-            "--archiveFile=archive.json",
+            "--taskId=123",
             "--internalParam=test_archival",
             "--repeatTests=2",
             "--jobs=2",
@@ -72,7 +72,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
     def test_archival_on_task_failure_no_passthrough(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
-            "--archiveFile=archive.json",
+            "--taskId=123",
             "--internalParam=test_archival",
             "--repeatTests=2",
             "--jobs=2",
@@ -83,6 +83,20 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         # test archival
         archival_dirs_to_expect = 4  # 2 tests * 2 nodes
         self.assert_dir_file_count(self.archival_file, archival_dirs_to_expect)
+
+    def test_no_archival_locally(self):
+        # archival should not happen if --taskId is not set.
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
+            "--internalParam=test_archival",
+            "--repeatTests=2",
+            "--jobs=2",
+        ]
+        resmoke_process = self.execute_resmoke(resmoke_args)
+        resmoke_process.wait()
+
+        # test that archival file wasn't created.
+        self.assertFalse(os.path.exists(self.archival_file))
 
 
 class TestTimeout(_ResmokeSelftest):
@@ -119,7 +133,7 @@ class TestTimeout(_ResmokeSelftest):
     def test_task_timeout(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_timeout.yml",
-            "--archiveFile=archive.json",
+            "--taskId=123",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
             "--repeatTests=2",
@@ -137,7 +151,7 @@ class TestTimeout(_ResmokeSelftest):
     def test_task_timeout_no_passthrough(self):
         resmoke_args = [
             "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml",
-            "--archiveFile=archive.json",
+            "--taskId=123",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
             "--repeatTests=2",
