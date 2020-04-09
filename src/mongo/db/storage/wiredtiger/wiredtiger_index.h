@@ -187,6 +187,7 @@ protected:
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
+    const BSONObj _collation;
     KVPrefix _prefix;
     bool _isIdIndex;
 };

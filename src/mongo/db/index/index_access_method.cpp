@@ -698,7 +698,8 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                 return buildDupKeyErrorStatus(data.first,
                                               _descriptor->parentNS(),
                                               _descriptor->indexName(),
-                                              _descriptor->keyPattern());
+                                              _descriptor->keyPattern(),
+                                              _descriptor->collation());
             }
         }
 

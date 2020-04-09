@@ -141,6 +141,7 @@ protected:
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
+    const BSONObj _collation;
 };
 
 class MobileIndexStandard final : public MobileIndex {

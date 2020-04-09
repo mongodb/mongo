@@ -103,6 +103,7 @@ SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationCon
                                         desc->parentNS(),
                                         desc->indexName(),
                                         desc->keyPattern(),
+                                        desc->collation(),
                                         &_dataMap[ident]);
 }
 

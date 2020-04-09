@@ -212,6 +212,7 @@ private:
 Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
-                              const BSONObj& keyPattern);
+                              const BSONObj& keyPattern,
+                              const BSONObj& indexCollation);
 
 }  // namespace mongo
