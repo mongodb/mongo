@@ -452,9 +452,31 @@ public:
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         bool estimate = jsobj["estimate"].trueValue();
 
-        AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
-
+        const NamespaceString nss(ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
+
+        const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+
+        if (collDesc.isSharded()) {
+            const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+            uassert(ErrorCodes::BadValue,
+                    "keyPattern must be empty or must be an object that equals the shard key",
+                    keyPattern.isEmpty() ||
+                        (SimpleBSONObjComparator::kInstance.evaluate(shardKeyPattern.toBSON() ==
+                                                                     keyPattern)));
+
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "min value " << min << " does not have shard key",
+                    min.isEmpty() || shardKeyPattern.isShardKey(min));
+            min = shardKeyPattern.normalizeShardKey(min);
+
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "max value " << max << " does not have shard key",
+                    max.isEmpty() || shardKeyPattern.isShardKey(max));
+            max = shardKeyPattern.normalizeShardKey(max);
+        }
+
         long long numRecords = 0;
         if (collection) {
             numRecords = collection->numRecords(opCtx);
