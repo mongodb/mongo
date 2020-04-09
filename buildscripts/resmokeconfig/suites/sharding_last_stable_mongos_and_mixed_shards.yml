@@ -82,6 +82,8 @@ selector:
   - jstests/sharding/clear_jumbo.js
   # Requires count command to be accurate on sharded clusters, introduced in v4.0.
   - jstests/sharding/accurate_count_with_predicate.js
+  # Requires that dataSize command uses shard versioning, introduced in v4.0.
+  - jstests/sharding/mongos_dataSize.js
   # The 3.6 mongos does not support using localOps to find failpoints.
   - jstests/sharding/verify_sessions_expiration_sharded.js
   # Enable when SERVER-33538 is backported.
