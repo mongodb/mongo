@@ -28,6 +28,7 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -317,6 +318,11 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
         // Do not exit with an incomplete future.
         invariant(replState->sharedPromise.getFuture().isReady());
+
+        // Logs the index build statistics if it took longer than the server parameter `slowMs` to
+        // complete.
+        CurOp::get(opCtx.get())
+            ->completeAndLogOperation(opCtx.get(), MONGO_LOGV2_DEFAULT_COMPONENT);
     });
 
     // Waits until the index build has either been started or failed to start.
