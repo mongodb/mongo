@@ -2626,6 +2626,7 @@ def doConfigure(myenv):
 
     conf.Finish()
 
+    # C11 memset_s - a secure memset
     def CheckMemset_s(context):
         test_body = """
         #define __STDC_WANT_LIB_EXT1__ 1
@@ -2649,6 +2650,10 @@ def doConfigure(myenv):
 
     if conf.CheckFunc('strnlen'):
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
+
+    # Gblic 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero, a secure way to zero memory
+    if conf.CheckFunc('explicit_bzero'):
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXPLICIT_BZERO")
 
     conf.Finish()
 

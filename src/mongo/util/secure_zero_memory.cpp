@@ -50,6 +50,9 @@ void secureZeroMemory(void* mem, size_t size) {
 #if defined(_WIN32)
     // Windows provides a simple function for zeroing memory
     SecureZeroMemory(mem, size);
+#elif defined(MONGO_CONFIG_HAVE_EXPLICIT_BZERO)
+    // Gblic 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero
+    explicit_bzero(mem, size);
 #elif defined(MONGO_CONFIG_HAVE_MEMSET_S)
     // Some C11 libraries provide a variant of memset which is guaranteed to not be optimized away
     fassert(28752, memset_s(mem, size, 0, size) == 0);

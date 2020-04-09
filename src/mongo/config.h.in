@@ -41,14 +41,11 @@
 // Define if building a debug build
 @mongo_config_debug_build@
 
-// Defined if OpenSSL has `SSL_CTX_set_ecdh_auto` and `SSL_set_ecdh_auto`
-@mongo_config_have_ssl_set_ecdh_auto@
-
-// Defined if OpenSSL has `EC_KEY_new_by_curve_name` and the `NID_X9_62_prime256v1` curve defined
-@mongo_config_have_ssl_ec_key_new@
-
 // Defined if execinfo.h and backtrace are available
 @mongo_config_have_execinfo_backtrace@
+
+// Defined if explicit_bzero is available
+@mongo_config_have_explicit_bzero@
 
 // Defined if OpenSSL has the FIPS_mode_set function
 @mongo_config_have_fips_mode_set@
@@ -65,6 +62,12 @@
 // Defined if pthread.h and pthread_setname_np are available
 @mongo_config_have_pthread_setname_np@
 
+// Defined if OpenSSL has `EC_KEY_new_by_curve_name` and the `NID_X9_62_prime256v1` curve defined
+@mongo_config_have_ssl_ec_key_new@
+
+// Defined if OpenSSL has `SSL_CTX_set_ecdh_auto` and `SSL_set_ecdh_auto`
+@mongo_config_have_ssl_set_ecdh_auto@
+
 // Defined if strnlen is available
 @mongo_config_have_strnlen@
 
@@ -74,14 +77,14 @@
 // Defined if building an optimized build
 @mongo_config_optimized_build@
 
-// Defined if SSL support is enabled
-@mongo_config_ssl@
-
 // Defined if OpenSSL has SEQUENCE_ANY
 @mongo_config_ssl_has_asn1_any_definitions@
 
 // Defined if SSL support is enabled with chosen ssl provider
 @mongo_config_ssl_provider@
+
+// Defined if SSL support is enabled
+@mongo_config_ssl@
 
 // Defined if USDT probes are enabled
 @mongo_config_usdt_enabled@
