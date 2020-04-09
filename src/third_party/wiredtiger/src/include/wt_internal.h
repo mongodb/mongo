@@ -255,8 +255,6 @@ struct __wt_named_encryptor;
 typedef struct __wt_named_encryptor WT_NAMED_ENCRYPTOR;
 struct __wt_named_extractor;
 typedef struct __wt_named_extractor WT_NAMED_EXTRACTOR;
-struct __wt_named_snapshot;
-typedef struct __wt_named_snapshot WT_NAMED_SNAPSHOT;
 struct __wt_optrack_header;
 typedef struct __wt_optrack_header WT_OPTRACK_HEADER;
 struct __wt_optrack_record;

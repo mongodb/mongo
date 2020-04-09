@@ -53,6 +53,7 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
  */
 struct __wt_session_impl {
     WT_SESSION iface;
+    WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     void *lang_private; /* Language specific private storage */
 
@@ -62,13 +63,9 @@ struct __wt_session_impl {
     const char *lastop; /* Last operation */
     uint32_t id;        /* UID, offset in session array */
 
+    uint64_t cache_wait_us;        /* Wait time for cache for current operation */
     uint64_t operation_start_us;   /* Operation start */
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
-#ifdef HAVE_DIAGNOSTIC
-    uint32_t op_5043_seconds; /* Temporary debugging to catch WT-5043, discard after 01/2020. */
-#endif
-
-    WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     WT_DATA_HANDLE *dhandle; /* Current data handle */
 
@@ -84,6 +81,7 @@ struct __wt_session_impl {
     struct timespec last_epoch; /* Last epoch time returned */
 
     WT_CURSOR_LIST cursors;          /* Cursors closed with the session */
+    u_int ncursors;                  /* Count of active file cursors. */
     uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
     uint32_t cursor_sweep_countdown; /* Countdown to cursor sweep */
     uint64_t last_cursor_sweep;      /* Last sweep for dead cursors */
@@ -136,9 +134,9 @@ struct __wt_session_impl {
 
     WT_TXN_ISOLATION isolation;
     WT_TXN txn; /* Transaction state */
+
 #define WT_SESSION_BG_SYNC_MSEC 1200000
     WT_LSN bg_sync_lsn; /* Background sync operation LSN. */
-    u_int ncursors;     /* Count of active file cursors. */
 
     void *block_manager; /* Block-manager support */
     int (*block_manager_cleanup)(WT_SESSION_IMPL *);
@@ -147,8 +145,6 @@ struct __wt_session_impl {
     WT_DATA_HANDLE **ckpt_handle; /* Handle list */
     u_int ckpt_handle_next;       /* Next empty slot */
     size_t ckpt_handle_allocated; /* Bytes allocated */
-
-    uint64_t cache_wait_us; /* Wait time for cache for current operation */
 
     /*
      * Operations acting on handles.

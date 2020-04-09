@@ -118,12 +118,11 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         self.assertEqual(calls, 1)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
+        self.assertGreaterEqual(keys_removed, 0)
         if self.in_memory or self.prepare:
-            self.assertEqual(keys_removed, 0)
             self.assertEqual(upd_aborted, nrows * 4)
             self.assertEqual(hs_removed, 0)
         else:
-            self.assertGreaterEqual(keys_removed, 0)
             self.assertGreaterEqual(upd_aborted, 0)
             self.assertGreaterEqual(hs_removed, nrows * 3)
 

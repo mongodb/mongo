@@ -2240,13 +2240,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
      */
     __wt_cache_read_gen_bump(session, ref->page);
 
-#ifdef HAVE_DIAGNOSTIC
-    __wt_seconds32(session, &session->op_5043_seconds);
-#endif
     WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, previous_state, 0));
-#ifdef HAVE_DIAGNOSTIC
-    session->op_5043_seconds = 0;
-#endif
 
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);
 

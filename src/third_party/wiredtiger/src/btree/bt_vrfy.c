@@ -13,11 +13,12 @@
  * prettier.
  */
 typedef struct {
-    uint64_t record_total; /* Total record count */
+    uint64_t records_so_far; /* Records seen so far */
 
     WT_ITEM *max_key;  /* Largest key */
     WT_ITEM *max_addr; /* Largest key page */
 
+#define WT_VERIFY_PROGRESS_INTERVAL 100
     uint64_t fcnt; /* Progress counter */
 
     /* Configuration options passed in. */
@@ -29,7 +30,6 @@ typedef struct {
     bool dump_history;
     bool dump_layout;
     bool dump_pages;
-    bool hs_verify;
 
     /* Page layout information. */
     uint64_t depth, depth_internal[100], depth_leaf[100];
@@ -38,14 +38,10 @@ typedef struct {
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
-static int __verify_col_var_page_hs(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
-static int __verify_key_hs(WT_SESSION_IMPL *, WT_ITEM *, WT_CELL_UNPACK *, WT_VSTUFF *);
-static int __verify_page_cell(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK *, WT_VSTUFF *);
+static int __verify_page_content(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK *, WT_VSTUFF *);
 static int __verify_row_int_key_order(
   WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int __verify_row_leaf_key_order(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
-static int __verify_row_leaf_page_hs(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
-static const char *__verify_timestamp_to_pretty_string(wt_timestamp_t, char *ts_string);
 static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK *, WT_VSTUFF *);
 static int __verify_ts_stable_cmp(
   WT_SESSION_IMPL *, WT_ITEM *, WT_REF *, uint32_t, wt_timestamp_t, wt_timestamp_t, WT_VSTUFF *);
@@ -160,188 +156,6 @@ __dump_layout(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 }
 
 /*
- * __verify_col_var_page_hs --
- *     Verify a page against the history store.
- */
-static int
-__verify_col_var_page_hs(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
-{
-    WT_CELL *cell;
-    WT_CELL_UNPACK *unpack, _unpack;
-    WT_COL *cip;
-    WT_DECL_ITEM(key);
-    WT_DECL_RET;
-    WT_PAGE *page;
-    uint64_t recno, rle;
-    uint32_t i;
-    uint8_t *p;
-
-    page = ref->page;
-    recno = ref->ref_recno;
-    unpack = &_unpack;
-
-    /* Ensure enough room for a column-store key without checking. */
-    WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
-
-    WT_COL_FOREACH (page, cip, i) {
-        p = key->mem;
-        WT_ERR(__wt_vpack_uint(&p, 0, recno));
-        key->size = WT_PTRDIFF(p, key->data);
-
-        cell = WT_COL_PTR(page, cip);
-        __wt_cell_unpack(session, page, cell, unpack);
-        rle = __wt_cell_rle(unpack);
-
-#ifdef HAVE_DIAGNOSTIC
-        /* Optionally dump historical time pairs and values in debug mode. */
-        if (vs->dump_history) {
-            WT_ERR(__wt_msg(session, "\tK {%" PRIu64 " %" PRIu64 "}", recno, rle));
-            WT_ERR(__wt_debug_key_value(session, NULL, unpack));
-        }
-#endif
-
-        WT_ERR(__verify_key_hs(session, key, unpack, vs));
-        recno += rle;
-    }
-
-err:
-    __wt_scr_free(session, &key);
-
-    return (ret);
-}
-
-/*
- * __verify_row_leaf_page_hs --
- *     Verify a page against the history store.
- */
-static int
-__verify_row_leaf_page_hs(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
-{
-    WT_CELL_UNPACK *unpack, _unpack;
-    WT_DECL_ITEM(key);
-    WT_DECL_RET;
-    WT_PAGE *page;
-    WT_ROW *rip;
-    uint32_t i;
-
-    page = ref->page;
-    unpack = &_unpack;
-
-    WT_RET(__wt_scr_alloc(session, 256, &key));
-
-    WT_ROW_FOREACH (page, rip, i) {
-        WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
-        __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
-
-#ifdef HAVE_DIAGNOSTIC
-        /* Optionally dump historical time pairs and values in debug mode. */
-        if (vs->dump_history)
-            WT_ERR(__wt_debug_key_value(session, key, unpack));
-#endif
-
-        WT_ERR(__verify_key_hs(session, key, unpack, vs));
-    }
-
-err:
-    __wt_scr_free(session, &key);
-    return (ret);
-}
-
-/*
- * __verify_key_hs --
- *     Verify a key against the history store. The unpack denotes the data store's timestamp range
- *     information and is used for verifying timestamp range overlaps.
- */
-static int
-__verify_key_hs(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *unpack, WT_VSTUFF *vs)
-{
-    WT_BTREE *btree;
-    WT_CURSOR *hs_cursor;
-    WT_DECL_RET;
-    wt_timestamp_t newer_start_ts, older_start_ts, older_stop_ts;
-    uint64_t hs_counter;
-    uint32_t hs_btree_id, session_flags;
-    int cmp, exact;
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool is_owner;
-
-    btree = S2BT(session);
-    hs_cursor = NULL;
-    hs_btree_id = btree->id;
-    /*
-     * Set the data store timestamp and transactions to initiate timestamp range verification. Since
-     * transaction-ids are wiped out on start, we could possibly have a start txn-id of WT_TXN_NONE,
-     * in which case we initialize our newest with the max txn-id.
-     */
-    newer_start_ts = unpack->start_ts;
-    session_flags = 0;
-    older_stop_ts = 0;
-    is_owner = false;
-
-    /*
-     * Open a history store cursor positioned at the end of the data store key (the newest record)
-     * and iterate backwards until we reach a different key or btree.
-     */
-    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
-    hs_cursor = session->hs_cursor;
-    hs_cursor->set_key(hs_cursor, hs_btree_id, key, WT_TS_MAX, UINT64_MAX);
-    WT_ERR(hs_cursor->search_near(hs_cursor, &exact));
-
-    /* If we jumped to the next key, go back to the previous key. */
-    if (exact > 0)
-        WT_ERR(hs_cursor->prev(hs_cursor));
-
-    for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, vs->tmp1, &older_start_ts, &hs_counter));
-
-        if (hs_btree_id != btree->id)
-            break;
-
-        WT_ERR(__wt_compare(session, NULL, vs->tmp1, key, &cmp));
-        if (cmp != 0)
-            break;
-
-#ifdef HAVE_DIAGNOSTIC
-        /* Optionally dump historical time pairs and values in debug mode. */
-        if (vs->dump_history)
-            WT_ERR(__wt_debug_cursor_hs(session, hs_cursor));
-#else
-        WT_UNUSED(vs);
-#endif
-
-        /* Verify that the newer record's start is later than the older record's stop. */
-        if (newer_start_ts < older_stop_ts) {
-            WT_ERR_MSG(session, WT_ERROR,
-              "In the Btree %" PRIu32
-              ", Key %s has a overlap of "
-              "timestamp ranges between history store stop timestamp %s being "
-              "newer than a more recent timestamp range having start timestamp %s",
-              hs_btree_id,
-              __wt_buf_set_printable(session, vs->tmp1->data, vs->tmp1->size, vs->tmp1),
-              __verify_timestamp_to_pretty_string(older_stop_ts, ts_string[0]),
-              __verify_timestamp_to_pretty_string(newer_start_ts, ts_string[1]));
-        }
-        /*
-         * Since we are iterating from newer to older, the current older record becomes the newer
-         * for the next round of verification.
-         */
-        newer_start_ts = older_start_ts;
-
-        WT_ERR(__verify_ts_stable_cmp(session, key, NULL, 0, older_start_ts, older_stop_ts, vs));
-    }
-    WT_ERR_NOTFOUND_OK(ret);
-
-err:
-    /* It is okay to have not found the key. */
-    if (ret == WT_NOTFOUND)
-        ret = 0;
-
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
-
-    return (ret);
-}
-
-/*
  * __wt_verify --
  *     Verify a file.
  */
@@ -355,21 +169,24 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     WT_DECL_RET;
     WT_VSTUFF *vs, _vstuff;
     size_t root_addr_size;
+    uint32_t session_flags;
     uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
     const char *name;
-    bool bm_start, quit;
+    bool bm_start, is_owner, quit;
 
     btree = S2BT(session);
     bm = btree->bm;
     ckptbase = NULL;
+    session_flags = 0; /* -Wuninitialized */
     name = session->dhandle->name;
     bm_start = false;
+    is_owner = false; /* -Wuninitialized */
 
     WT_CLEAR(_vstuff);
     vs = &_vstuff;
     WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
     WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
-    WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
+    WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &vs->tmp1));
     WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
     WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp3));
     WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp4));
@@ -392,6 +209,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         goto done;
     }
     WT_ERR(ret);
+
+    /* Open a history store cursor. */
+    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
 
     /* Inform the underlying block manager we're verifying. */
     WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
@@ -433,11 +253,16 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
              */
             memset(&addr_unpack, 0, sizeof(addr_unpack));
             addr_unpack.newest_start_durable_ts = ckpt->start_durable_ts;
-            addr_unpack.oldest_start_ts = ckpt->oldest_start_ts;
-            addr_unpack.oldest_start_txn = ckpt->oldest_start_txn;
             addr_unpack.newest_stop_durable_ts = ckpt->stop_durable_ts;
+            addr_unpack.oldest_start_ts = ckpt->oldest_start_ts;
             addr_unpack.newest_stop_ts = ckpt->newest_stop_ts;
-            addr_unpack.newest_stop_txn = ckpt->newest_stop_txn;
+            if (ckpt->write_gen > S2C(session)->base_write_gen) {
+                addr_unpack.oldest_start_txn = ckpt->oldest_start_txn;
+                addr_unpack.newest_stop_txn = ckpt->newest_stop_txn;
+            } else {
+                addr_unpack.oldest_start_txn = WT_TXN_NONE;
+                addr_unpack.newest_stop_txn = WT_TXN_MAX;
+            }
             addr_unpack.raw = WT_CELL_ADDR_INT;
 
             /* Verify the tree. */
@@ -478,6 +303,8 @@ err:
     if (bm_start)
         WT_TRET(bm->verify_end(bm, session));
 
+    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+
     /* Discard the list of checkpoints. */
     if (ckptbase != NULL)
         __wt_meta_ckptlist_free(session, &ckptbase);
@@ -506,7 +333,7 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
     vs->max_addr->size = 0;
 
     /* Record total is per checkpoint, reset the record count. */
-    vs->record_total = 0;
+    vs->records_so_far = 0;
 
     /* Tree depth. */
     vs->depth = 1;
@@ -573,132 +400,6 @@ __verify_addr_ts(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK *unpack, 
 }
 
 /*
- * __wt_verify_history_store_tree --
- *     Verify the history store. There can't be an entry in the history store without having the
- *     latest value for the respective key in the data store. If given a uri, limit the verification
- *     to the corresponding btree.
- */
-int
-__wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
-{
-    WT_CURSOR *cursor, *data_cursor;
-    WT_DECL_ITEM(hs_key);
-    WT_DECL_ITEM(prev_hs_key);
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    wt_timestamp_t hs_start_ts;
-    uint64_t hs_counter;
-    uint32_t btree_id, btree_id_given_uri, session_flags, prev_btree_id;
-    int exact, cmp;
-    char *uri_itr;
-    bool is_owner;
-
-    cursor = data_cursor = NULL;
-    session_flags = 0;
-    btree_id_given_uri = 0; /* [-Wconditional-uninitialized] */
-    prev_btree_id = 0;      /* [-Wconditional-uninitialized] */
-    is_owner = false;       /* [-Wconditional-uninitialized] */
-    uri_itr = NULL;
-
-    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
-    WT_ERR(__wt_scr_alloc(session, 0, &prev_hs_key));
-
-    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
-    cursor = session->hs_cursor;
-
-    /*
-     * If a uri has been provided, limit verification to the corresponding btree by jumping to the
-     * first record for that btree in the history store. Otherwise scan the whole history store.
-     */
-    if (uri != NULL) {
-        ret = __wt_metadata_uri_to_btree_id(session, uri, &btree_id_given_uri);
-        if (ret != 0)
-            WT_ERR_MSG(session, ret, "Unable to locate the URI %s in the metadata file", uri);
-
-        /*
-         * Position the cursor at the first record of the specified btree, or one after. It is
-         * possible there are no records in the history store for this btree.
-         */
-        cursor->set_key(cursor, btree_id_given_uri, hs_key, 0, 0, 0, 0);
-        ret = cursor->search_near(cursor, &exact);
-        if (ret == 0 && exact < 0)
-            ret = cursor->next(cursor);
-    } else
-        ret = cursor->next(cursor);
-
-    /* We have the history store cursor positioned at the first record that we want to verify. */
-    for (; ret == 0; ret = cursor->next(cursor)) {
-        WT_ERR(cursor->get_key(cursor, &btree_id, hs_key, &hs_start_ts, &hs_counter));
-
-        /* When limiting our verification to a uri, bail out if the btree-id doesn't match. */
-        if (uri != NULL && btree_id != btree_id_given_uri)
-            break;
-
-        /*
-         *  Keep track of the previous comparison. The history store is stored in order, so we can
-         *  avoid redundant comparisons. Previous btree ID isn't set, until data cursor is open.
-         */
-        if (data_cursor == NULL || (prev_btree_id != btree_id)) {
-            /*
-             * Check whether this btree-id exists in the metadata. We do that by finding what uri
-             * this btree belongs to. Using this URI, verify the history store key with the data
-             * store.
-             */
-            if (data_cursor != NULL) {
-                WT_ERR(data_cursor->close(data_cursor));
-                /* Setting data_cursor to null, to avoid double free */
-                data_cursor = NULL;
-            }
-            /*
-             * Using the btree-id find the metadata entry and extract the URI for this btree. Don't
-             * forget to free the copy of the URI returned.
-             */
-            __wt_free(session, uri_itr);
-            ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_itr);
-            if (ret != 0) {
-                WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-                WT_ERR_MSG(session, ret, "Unable to find btree-id %" PRIu32
-                                         " in the metadata file for the associated "
-                                         "history store key %s",
-                  btree_id, __wt_buf_set_printable(session, hs_key->data, hs_key->size, tmp));
-            }
-
-            WT_ERR(__wt_open_cursor(session, uri_itr, NULL, NULL, &data_cursor));
-            F_SET(data_cursor, WT_CURSOR_RAW_OK);
-        } else {
-            WT_ERR(__wt_compare(session, NULL, hs_key, prev_hs_key, &cmp));
-            if (cmp == 0)
-                continue;
-        }
-        WT_ERR(__wt_buf_set(session, prev_hs_key, hs_key->data, hs_key->size));
-        prev_btree_id = btree_id;
-
-        data_cursor->set_key(data_cursor, hs_key);
-        ret = data_cursor->search(data_cursor);
-        if (ret == WT_NOTFOUND) {
-            WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-            WT_ERR_MSG(session, WT_NOTFOUND,
-              "In the URI %s, the associated history store key %s cannot be found in the data "
-              "store",
-              uri_itr, __wt_buf_set_printable(session, hs_key->data, hs_key->size, tmp));
-        }
-        WT_ERR(ret);
-    }
-    WT_ERR_NOTFOUND_OK(ret);
-err:
-    if (data_cursor != NULL)
-        WT_TRET(data_cursor->close(data_cursor));
-    if (cursor != NULL)
-        WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
-
-    __wt_scr_free(session, &hs_key);
-    __wt_scr_free(session, &prev_hs_key);
-    __wt_scr_free(session, &tmp);
-    __wt_free(session, uri_itr);
-    return (ret);
-}
-
-/*
  * __verify_tree --
  *     Verify a tree, recursively descending through it in depth-first fashion. The page argument
  *     was physically verified (so we know it's correctly formed), and the in-memory version built.
@@ -708,23 +409,15 @@ static int
 __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK *addr_unpack, WT_VSTUFF *vs)
 {
     WT_BM *bm;
-    WT_CELL *cell;
     WT_CELL_UNPACK *unpack, _unpack;
-    WT_COL *cip;
     WT_DECL_RET;
     WT_PAGE *page;
     WT_REF *child_ref;
-    uint64_t recno;
-    uint32_t entry, i;
-    bool enable_hs_verify;
+    uint32_t entry;
 
     bm = S2BT(session)->bm;
-    page = ref->page;
-
-    /* Temporarily disable as MongoDB tests are timing out. Re-enable with WT-5796. */
-    enable_hs_verify = false;
-
     unpack = &_unpack;
+    page = ref->page;
 
     __wt_verbose(session, WT_VERB_VERIFY, "%s %s", __verify_addr_string(session, ref, vs->tmp1),
       __wt_page_type_string(page->type));
@@ -740,30 +433,24 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK *addr_unpack
     else
         ++vs->depth_leaf[WT_MIN(vs->depth, WT_ELEMENTS(vs->depth_internal) - 1)];
 
-/*
- * The page's physical structure was verified when it was read into
- * memory by the read server thread, and then the in-memory version
- * of the page was built. Now we make sure the page and tree are
- * logically consistent.
- *
- * !!!
- * The problem: (1) the read server has to build the in-memory version
- * of the page because the read server is the thread that flags when
- * any thread can access the page in the tree; (2) we can't build the
- * in-memory version of the page until the physical structure is known
- * to be OK, so the read server has to verify at least the physical
- * structure of the page; (3) doing complete page verification requires
- * reading additional pages (for example, overflow keys imply reading
- * overflow pages in order to test the key's order in the page); (4)
- * the read server cannot read additional pages because it will hang
- * waiting on itself.  For this reason, we split page verification
- * into a physical verification, which allows the in-memory version
- * of the page to be built, and then a subsequent logical verification
- * which happens here.
- *
- * Report progress occasionally.
- */
-#define WT_VERIFY_PROGRESS_INTERVAL 100
+    /*
+     * The page's physical structure was verified when it was read into memory by the read server
+     * thread, and then the in-memory version of the page was built. Now we make sure the page and
+     * tree are logically consistent.
+     *
+     * !!!
+     * The problem: (1) the read server has to build the in-memory version of the page because the
+     * read server is the thread that flags when any thread can access the page in the tree; (2) we
+     * can't build the in-memory version of the page until the physical structure is known to be OK,
+     * so the read server has to verify at least the physical structure of the page; (3) doing
+     * complete page verification requires reading additional pages (for example, overflow keys
+     * imply reading overflow pages in order to test the key's order in the page); (4) the read
+     * server cannot read additional pages because it will hang waiting on itself. For this reason,
+     * we split page verification into a physical verification, which allows the in-memory version
+     * of the page to be built, and then a subsequent logical verification which happens here.
+     *
+     * Report progress occasionally.
+     */
     if (++vs->fcnt % WT_VERIFY_PROGRESS_INTERVAL == 0)
         WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
@@ -775,36 +462,15 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK *addr_unpack
         WT_RET(__wt_debug_page(session, NULL, ref, NULL));
 #endif
 
-    /*
-     * Column-store key order checks: check the page's record number and then update the total
-     * record count.
-     */
+    /* Column-store key order checks: check the page's record number. */
     switch (page->type) {
     case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_INT:
-        recno = ref->ref_recno;
-        goto recno_chk;
     case WT_PAGE_COL_VAR:
-        recno = ref->ref_recno;
-recno_chk:
-        if (recno != vs->record_total + 1)
+        if (ref->ref_recno != vs->records_so_far + 1)
             WT_RET_MSG(session, WT_ERROR, "page at %s has a starting record of %" PRIu64
                                           " when the expected starting record is %" PRIu64,
-              __verify_addr_string(session, ref, vs->tmp1), recno, vs->record_total + 1);
-        break;
-    }
-    switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        vs->record_total += page->entries;
-        break;
-    case WT_PAGE_COL_VAR:
-        recno = 0;
-        WT_COL_FOREACH (page, cip, i) {
-            cell = WT_COL_PTR(page, cip);
-            __wt_cell_unpack(session, page, cell, unpack);
-            recno += __wt_cell_rle(unpack);
-        }
-        vs->record_total += recno;
+              __verify_addr_string(session, ref, vs->tmp1), ref->ref_recno, vs->records_so_far + 1);
         break;
     }
 
@@ -818,21 +484,17 @@ recno_chk:
         break;
     }
 
-    /*
-     * History store checks. Ensure continuity between the data store and history store based on
-     * keys in leaf/var pages.
-     *
-     * Temporarily disable as MongoDB tests are timing out. Re-enable with WT-5796.
-     */
-    if (enable_hs_verify) {
-        switch (page->type) {
-        case WT_PAGE_ROW_LEAF:
-            WT_RET(__verify_row_leaf_page_hs(session, ref, vs));
-            break;
-        case WT_PAGE_COL_VAR:
-            WT_RET(__verify_col_var_page_hs(session, ref, vs));
-            break;
-        }
+    /* Check page content, additionally updating the variable-length column-store record count. */
+    switch (page->type) {
+    case WT_PAGE_COL_FIX:
+        vs->records_so_far += page->entries;
+        break;
+    case WT_PAGE_COL_INT:
+    case WT_PAGE_COL_VAR:
+    case WT_PAGE_ROW_INT:
+    case WT_PAGE_ROW_LEAF:
+        WT_RET(__verify_page_content(session, ref, addr_unpack, vs));
+        break;
     }
 
     /* Compare the address type against the page type. */
@@ -862,19 +524,6 @@ celltype_err:
         break;
     }
 
-    /*
-     * Check overflow pages and timestamps. Done in one function as both checks require walking the
-     * page cells and we don't want to do it twice.
-     */
-    switch (page->type) {
-    case WT_PAGE_COL_INT:
-    case WT_PAGE_COL_VAR:
-    case WT_PAGE_ROW_INT:
-    case WT_PAGE_ROW_LEAF:
-        WT_RET(__verify_page_cell(session, ref, addr_unpack, vs));
-        break;
-    }
-
     /* Check tree connections and recursively descend the tree. */
     switch (page->type) {
     case WT_PAGE_COL_INT:
@@ -886,14 +535,14 @@ celltype_err:
              * than the total records reviewed to this point.
              */
             ++entry;
-            if (child_ref->ref_recno != vs->record_total + 1) {
+            if (child_ref->ref_recno != vs->records_so_far + 1) {
                 WT_RET_MSG(session, WT_ERROR, "the starting record number in entry %" PRIu32
                                               " of the column internal page at "
                                               "%s is %" PRIu64
                                               " and the expected "
                                               "starting record number is %" PRIu64,
                   entry, __verify_addr_string(session, child_ref, vs->tmp1), child_ref->ref_recno,
-                  vs->record_total + 1);
+                  vs->records_so_far + 1);
             }
 
             /* Unpack the address block and check timestamps */
@@ -1068,6 +717,20 @@ __verify_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
 }
 
 /*
+ * __verify_timestamp_to_pretty_string --
+ *     Convert a timestamp to a pretty string, utilizes existing timestamp to string function.
+ */
+static const char *
+__verify_timestamp_to_pretty_string(wt_timestamp_t ts, char *ts_string)
+{
+    if (ts == WT_TS_MAX)
+        return ("WT_TS_MAX");
+    if (ts == WT_TS_NONE)
+        return ("WT_TS_NONE");
+    return (__wt_timestamp_to_string(ts, ts_string));
+}
+
+/*
  * __verify_ts_addr_cmp --
  *     Do a cell timestamp check against the parent.
  */
@@ -1168,53 +831,122 @@ __verify_txn_addr_cmp(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t cell_num,
 }
 
 /*
- * __verify_timestamp_to_pretty_string --
- *     Convert a timestamp to a pretty string, utilizes existing timestamp to string function.
+ * __verify_key_hs --
+ *     Verify a key against the history store. The unpack denotes the data store's timestamp range
+ *     information and is used for verifying timestamp range overlaps.
  */
-static const char *
-__verify_timestamp_to_pretty_string(wt_timestamp_t ts, char *ts_string)
+static int
+__verify_key_hs(
+  WT_SESSION_IMPL *session, WT_ITEM *tmp1, wt_timestamp_t newer_start_ts, WT_VSTUFF *vs)
 {
-    const char *ts_bp;
+#ifdef WT_VERIFY_VALIDATE_HISTORY_STORE
+    WT_BTREE *btree;
+    WT_CURSOR *hs_cursor;
+    WT_DECL_RET;
+    wt_timestamp_t older_start_ts, older_stop_ts;
+    uint64_t hs_counter;
+    uint32_t hs_btree_id;
+    int cmp, exact;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
 
-    switch (ts) {
-    case WT_TS_MAX:
-        ts_bp = "WT_TS_MAX";
-        break;
-    case WT_TS_NONE:
-        ts_bp = "WT_TS_NONE";
-        break;
-    default:
-        ts_bp = __wt_timestamp_to_string(ts, ts_string);
-        break;
+    btree = S2BT(session);
+    hs_btree_id = btree->id;
+
+    /*
+     * Set the data store timestamp and transactions to initiate timestamp range verification. Since
+     * transaction-ids are wiped out on start, we could possibly have a start txn-id of WT_TXN_NONE,
+     * in which case we initialize our newest with the max txn-id.
+     */
+    older_stop_ts = 0;
+
+    /*
+     * Open a history store cursor positioned at the end of the data store key (the newest record)
+     * and iterate backwards until we reach a different key or btree.
+     */
+    hs_cursor = session->hs_cursor;
+    hs_cursor->set_key(hs_cursor, hs_btree_id, tmp1, WT_TS_MAX, WT_TXN_MAX);
+    ret = hs_cursor->search_near(hs_cursor, &exact);
+
+    /* If we jumped to the next key, go back to the previous key. */
+    if (ret == 0 && exact > 0)
+        ret = hs_cursor->prev(hs_cursor);
+
+    for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
+        WT_RET(hs_cursor->get_key(hs_cursor, &hs_btree_id, vs->tmp2, &older_start_ts, &hs_counter));
+
+        if (hs_btree_id != btree->id)
+            break;
+
+        WT_RET(__wt_compare(session, NULL, tmp1, vs->tmp2, &cmp));
+        if (cmp != 0)
+            break;
+
+#ifdef HAVE_DIAGNOSTIC
+        /* Optionally dump historical time pairs and values in debug mode. */
+        if (vs->dump_history)
+            WT_RET(__wt_debug_cursor_hs(session, hs_cursor));
+#endif
+
+        /* Verify the newer record's start is later than the older record's stop. */
+        if (newer_start_ts < older_stop_ts) {
+            WT_RET_MSG(session, WT_ERROR,
+              "key %s has a overlap of timestamp ranges between history store stop timestamp %s "
+              "being newer than a more recent timestamp range having start timestamp %s",
+              __wt_buf_set_printable(session, tmp1->data, tmp1->size, vs->tmp2),
+              __verify_timestamp_to_pretty_string(older_stop_ts, ts_string[0]),
+              __verify_timestamp_to_pretty_string(newer_start_ts, ts_string[1]));
+        }
+        WT_RET(__verify_ts_stable_cmp(session, tmp1, NULL, 0, older_start_ts, older_stop_ts, vs));
+
+        /*
+         * Since we are iterating from newer to older, the current older record becomes the newer
+         * for the next round of verification.
+         */
+        newer_start_ts = older_start_ts;
     }
-    return ts_bp;
+
+    return (ret == WT_NOTFOUND ? 0 : ret);
+#else
+    WT_UNUSED(session);
+    WT_UNUSED(tmp1);
+    WT_UNUSED(newer_start_ts);
+    WT_UNUSED(vs);
+    return (0);
+#endif
 }
 
 /*
- * __verify_page_cell --
- *     Verify the cells on the page.
+ * __verify_page_content --
+ *     Verify the page's content.
  */
 static int
-__verify_page_cell(
+__verify_page_content(
   WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK *addr_unpack, WT_VSTUFF *vs)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK unpack;
     WT_DECL_RET;
+    WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
+    WT_ROW *rip;
+    uint64_t recno, rle;
     uint32_t cell_num;
+    uint8_t *p;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool found_ovfl;
+
+    btree = S2BT(session);
+    page = ref->page;
+    rip = page->pg_row;
+    recno = ref->ref_recno;
+    found_ovfl = false;
 
     /*
      * If a tree is empty (just created), it won't have a disk image; if there is no disk image,
      * we're done.
      */
-    if ((dsk = ref->page->dsk) == NULL)
+    if ((dsk = page->dsk) == NULL)
         return (0);
-
-    btree = S2BT(session);
-    found_ovfl = false;
 
     /* Walk the page, tracking timestamps and verifying overflow pages. */
     cell_num = 0;
@@ -1346,6 +1078,36 @@ __verify_page_cell(
             WT_RET(__verify_ts_stable_cmp(
               session, NULL, ref, cell_num - 1, unpack.start_ts, unpack.stop_ts, vs));
             break;
+        }
+
+        /*
+         * Verify key-associated history-store entries, optionally dump historical time pairs and
+         * values in debug mode.
+         */
+        if (page->type == WT_PAGE_ROW_LEAF) {
+            if (unpack.type != WT_CELL_KEY && unpack.type != WT_CELL_KEY_OVFL)
+                continue;
+
+            WT_RET(__wt_row_leaf_key(session, page, rip++, vs->tmp1, false));
+            WT_RET(__verify_key_hs(session, vs->tmp1, unpack.start_ts, vs));
+
+#ifdef HAVE_DIAGNOSTIC
+            if (vs->dump_history)
+                WT_RET(__wt_debug_key_value(session, vs->tmp1, WT_RECNO_OOB, 0, &unpack));
+#endif
+        } else if (page->type == WT_PAGE_COL_VAR) {
+            rle = __wt_cell_rle(&unpack);
+            p = vs->tmp1->mem;
+            WT_RET(__wt_vpack_uint(&p, 0, recno));
+            vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
+            WT_RET(__verify_key_hs(session, vs->tmp1, unpack.start_ts, vs));
+
+#ifdef HAVE_DIAGNOSTIC
+            if (vs->dump_history)
+                WT_RET(__wt_debug_key_value(session, NULL, recno, rle, &unpack));
+#endif
+            recno += rle;
+            vs->records_so_far += rle;
         }
     }
     WT_CELL_FOREACH_END;

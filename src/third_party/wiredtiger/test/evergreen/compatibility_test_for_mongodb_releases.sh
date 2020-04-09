@@ -30,6 +30,7 @@ build_release()
 # run_format:
 #       arg1: release
 #       arg2: access methods list
+#       arg3: -B for compatibility testing
 #############################################################
 run_format()
 {
@@ -46,6 +47,7 @@ run_format()
         args+="data_source=table "
         args+="in_memory=0 "                    # Interested in the on-disk format
         args+="leak_memory=1 "                  # Faster runs
+        args+="logging=1 "                      # Test log compatibility
         args+="logging_compression=snappy "     # We only built with snappy, force the choice
         args+="rebalance=0 "                    # Faster runs
         args+="rows=1000000 "
@@ -56,7 +58,13 @@ run_format()
         for am in $2; do
             dir="RUNDIR.$am"
             echo "./t running $am access method..."
-            ./t -1q -h $dir "file_type=$am" $args
+            ./t -1q $3 -h $dir "file_type=$am" $args
+
+            # Remove the version string from the base configuration file. (MongoDB does not create
+            # a base configuration file, but format does, so we need to remove its version string
+            # to allow backward compatibility testing.)
+            (echo '/^version=/d'
+             echo w) | ed -s $dir/WiredTiger.basecfg > /dev/null
         done
 }
 
@@ -67,12 +75,12 @@ EXT+="ext/encryptors/rotn/.libs/libwiredtiger_rotn.so, "
 EXT+="]"
 
 #############################################################
-# verify_backward:
+# verify_release:
 #       arg1: release #1
 #       arg2: release #2
 #       arg3: access methods list
 #############################################################
-verify_backward()
+verify_release()
 {
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
         echo "Release \"$1\" verifying \"$2\""
@@ -106,14 +114,17 @@ cd "$top"
 (run_format mongodb-4.0 "fix row var")
 (run_format mongodb-4.2 "fix row var")
 #(run_format mongodb-4.4 "row")
-(run_format "develop" "row")
+(run_format "develop" "row" "-B")
 
 # Verify backward compatibility for supported access methods.
-(verify_backward mongodb-3.6 mongodb-3.4 "fix row var")
-(verify_backward mongodb-4.0 mongodb-3.6 "fix row var")
-(verify_backward mongodb-4.2 mongodb-4.0 "fix row var")
-#(verify_backward mongodb-4.4 mongodb-4.2 "fix row var")
-#(verify_backward develop mongodb-4.4 "row")
- (verify_backward develop mongodb-4.2 "fix row var")
+(verify_release mongodb-3.6 mongodb-3.4 "fix row var")
+(verify_release mongodb-4.0 mongodb-3.6 "fix row var")
+(verify_release mongodb-4.2 mongodb-4.0 "fix row var")
+(verify_release mongodb-4.4 mongodb-4.2 "fix row var")
+(verify_release develop mongodb-4.4 "row")
+(verify_release develop mongodb-4.2 "fix row var")
+
+# Verify forward compatibility for supported access methods.
+(verify_release mongodb-4.2 develop "row")
 
 exit 0

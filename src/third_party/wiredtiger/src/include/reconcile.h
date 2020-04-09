@@ -37,6 +37,12 @@ struct __wt_reconcile {
     wt_timestamp_t max_ondisk_ts;
     wt_timestamp_t min_skipped_ts;
 
+    /*
+     * FIXME: temporarily track the stable timestamp when reconciliation starts. Remove it when
+     * PM-1524 completes.
+     */
+    wt_timestamp_t stable_ts;
+
     u_int updates_seen;     /* Count of updates seen. */
     u_int updates_unstable; /* Count of updates not visible_all. */
 

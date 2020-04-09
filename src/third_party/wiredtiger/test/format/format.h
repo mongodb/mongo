@@ -86,8 +86,9 @@ typedef struct {
     bool logging; /* log operations  */
     FILE *logfp;  /* log file */
 
-    bool replay;           /* Replaying a run. */
-    bool workers_finished; /* Operations completed */
+    bool backward_compatible; /* Backward compatibility testing */
+    bool replay;              /* Replaying a run. */
+    bool workers_finished;    /* Operations completed */
 
     pthread_rwlock_t backup_lock; /* Backup running */
     uint32_t backup_id;           /* Block incremental id */
@@ -238,6 +239,7 @@ typedef struct {
 #define ENCRYPT_ROTN_7 2
     u_int c_encryption_flag; /* Encryption flag value */
 
+#define ISOLATION_NOT_SET 0
 #define ISOLATION_RANDOM 1
 #define ISOLATION_READ_UNCOMMITTED 2
 #define ISOLATION_READ_COMMITTED 3

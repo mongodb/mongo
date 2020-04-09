@@ -217,7 +217,9 @@ take_incr_backup(WT_SESSION *session, int i)
      * With an incremental cursor, we want to truncate on the backup cursor to archive the logs.
      * Only do this if the copy process was entirely successful.
      */
+    /*! [Truncate a backup cursor] */
     error_check(session->truncate(session, "log:", cursor, NULL, NULL));
+    /*! [Truncate a backup cursor] */
     error_check(cursor->close(cursor));
 }
 

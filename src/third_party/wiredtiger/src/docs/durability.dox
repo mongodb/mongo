@@ -76,10 +76,13 @@ instead must disable log file removal using the \c log=(archive=false)
 configuration to ::wiredtiger_open.
 
 Log files may be removed or archived after a checkpoint has completed,
-as long as there's not a backup in progress.  Immediately after the checkpoint
-has completed, only the most recent log file is needed for recovery, and all
-other log files can be removed or archived.  Note that there must always
-be at least one log file for the database.
+as long as there's not a backup in progress.  When performing @ref
+backup_incremental, WT_SESSION::truncate can be used to remove log files
+after completing each incremental backup.
+
+Immediately after the checkpoint has completed, only the most recent log file
+is needed for recovery, and all other log files can be removed or archived.
+Note that there must always be at least one log file for the database.
 
 Open log cursors prevents WiredTiger from automatically removing log files.
 Therefore, we recommend proactively closing log cursors when done with them.
