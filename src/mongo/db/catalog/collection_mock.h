@@ -178,7 +178,7 @@ public:
         std::abort();
     }
 
-    Status setValidator(OperationContext* opCtx, BSONObj validator) {
+    void setValidator(OperationContext* opCtx, Validator validator) {
         std::abort();
     }
 

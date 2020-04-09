@@ -93,7 +93,8 @@ public:
     static constexpr MatchExpressionParser::AllowedFeatureSet kAllowedMatcherFeatures =
         MatchExpressionParser::AllowedFeatures::kText |
         MatchExpressionParser::AllowedFeatures::kExpr |
-        MatchExpressionParser::AllowedFeatures::kJSONSchema;
+        MatchExpressionParser::AllowedFeatures::kJSONSchema |
+        MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     /**
      * The match expression features allowed when running a pipeline with $geoNear.
@@ -102,6 +103,7 @@ public:
         MatchExpressionParser::AllowedFeatures::kText |
         MatchExpressionParser::AllowedFeatures::kExpr |
         MatchExpressionParser::AllowedFeatures::kJSONSchema |
+        MatchExpressionParser::AllowedFeatures::kEncryptKeywords |
         MatchExpressionParser::AllowedFeatures::kGeoNear;
 
     /**

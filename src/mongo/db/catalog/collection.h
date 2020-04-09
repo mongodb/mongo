@@ -417,7 +417,7 @@ public:
      * An empty validator removes all validation.
      * Requires an exclusive lock on the collection.
      */
-    virtual Status setValidator(OperationContext* const opCtx, const BSONObj validator) = 0;
+    virtual void setValidator(OperationContext* const opCtx, Validator validator) = 0;
 
     virtual Status setValidationLevel(OperationContext* const opCtx, const StringData newLevel) = 0;
     virtual Status setValidationAction(OperationContext* const opCtx,
