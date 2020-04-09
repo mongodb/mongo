@@ -241,7 +241,6 @@ public:
              BSONObjBuilder& result) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        // TODO Unwind after SERVER-41070
         MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, waitInIsMaster);
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
