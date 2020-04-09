@@ -341,7 +341,7 @@ Status dropIndexes(OperationContext* opCtx,
         // will cause the index builders to block indefinitely.
         autoColl = boost::none;
         if (abortedIndexBuilders.size() == 1) {
-            indexBuildsCoord->awaitIndexBuildFinished(collectionUUID, abortedIndexBuilders.front());
+            indexBuildsCoord->awaitIndexBuildFinished(opCtx, abortedIndexBuilders.front());
         } else if (abortedIndexBuilders.size() > 1) {
             // Only the "*" wildcard can abort multiple index builders.
             invariant(isWildcard);

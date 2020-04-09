@@ -363,7 +363,7 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
 }
 
 IndexBuildsCoordinator::~IndexBuildsCoordinator() {
-    invariant(_collectionIndexBuilds.empty());
+    invariant(_allIndexBuilds.empty());
 }
 
 bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() {
@@ -559,8 +559,11 @@ std::vector<UUID> IndexBuildsCoordinator::_abortCollectionIndexBuilds(stdx::uniq
                                                                       const UUID& collectionUUID,
                                                                       const std::string& reason,
                                                                       bool shouldWait) {
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
-    if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
+    auto indexBuildFilter = [=](const auto& replState) {
+        return collectionUUID == replState.collectionUUID;
+    };
+    auto collIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+    if (collIndexBuilds.empty()) {
         return {};
     }
 
@@ -568,19 +571,32 @@ std::vector<UUID> IndexBuildsCoordinator::_abortCollectionIndexBuilds(stdx::uniq
           "About to abort all index builders on collection with UUID: {collectionUUID}",
           "collectionUUID"_attr = collectionUUID);
 
-    std::vector<UUID> buildUUIDs = collIndexBuildsIt->second->getIndexBuildUUIDs(lk);
-    collIndexBuildsIt->second->runOperationOnAllBuilds(
-        lk, opCtx, &_indexBuildsManager, abortIndexBuild, reason);
+    std::vector<UUID> buildUUIDs;
+    for (auto replState : collIndexBuilds) {
+        abortIndexBuild(lk, opCtx, &_indexBuildsManager, replState, reason);
+        buildUUIDs.push_back(replState->buildUUID);
+    }
 
     if (!shouldWait) {
         return buildUUIDs;
     }
 
-    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
-    // object does not destruct while we are waiting, causing a use-after-free memory error.
-    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
-    collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    _awaitNoIndexBuildInProgressForCollection(lk, opCtx, collectionUUID);
+
     return buildUUIDs;
+}
+
+void IndexBuildsCoordinator::_awaitNoIndexBuildInProgressForCollection(stdx::unique_lock<Latch>& lk,
+                                                                       OperationContext* opCtx,
+                                                                       const UUID& collectionUUID) {
+    auto indexBuildFilter = [=](const auto& replState) {
+        return collectionUUID == replState.collectionUUID;
+    };
+    auto pred = [&, this]() {
+        auto collIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+        return collIndexBuilds.empty();
+    };
+    _indexBuildsCondVar.wait(lk, pred);
 }
 
 void IndexBuildsCoordinator::abortCollectionIndexBuilds(OperationContext* opCtx,
@@ -1094,19 +1110,6 @@ int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
     return int(dbIndexBuilds.size());
 }
 
-void IndexBuildsCoordinator::dump(std::ostream& ss) const {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    if (_collectionIndexBuilds.size()) {
-        ss << "\n<b>Background Jobs in Progress</b>\n";
-        // TODO: We should improve this to print index names per collection, not just collection
-        // names.
-        for (auto it = _collectionIndexBuilds.begin(); it != _collectionIndexBuilds.end(); ++it) {
-            ss << "  " << it->first << '\n';
-        }
-    }
-}
-
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID,
                                                  IndexBuildProtocol protocol) const {
     stdx::unique_lock<Latch> lk(_mutex);
@@ -1119,7 +1122,9 @@ bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID,
 
 bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID) const {
     stdx::unique_lock<Latch> lk(_mutex);
-    return _collectionIndexBuilds.find(collectionUUID) != _collectionIndexBuilds.end();
+    auto indexBuilds = _filterIndexBuilds_inlock(
+        lk, [=](const auto& replState) { return collectionUUID == replState.collectionUUID; });
+    return !indexBuilds.empty();
 }
 
 bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
@@ -1151,19 +1156,11 @@ void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
             !inProgForDb(db));
 }
 
-void IndexBuildsCoordinator::awaitIndexBuildFinished(const UUID& collectionUUID,
-                                                     const UUID& buildUUID) const {
+void IndexBuildsCoordinator::awaitIndexBuildFinished(OperationContext* opCtx,
+                                                     const UUID& buildUUID) {
     stdx::unique_lock<Latch> lk(_mutex);
-
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
-    if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
-        return;
-    }
-
-    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
-    // object does not destruct while we are waiting, causing a use-after-free memory error.
-    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
-    collIndexBuildsSharedPtr->waitUntilIndexBuildFinished(lk, buildUUID);
+    auto pred = [&, this]() { return _allIndexBuilds.end() == _allIndexBuilds.find(buildUUID); };
+    _indexBuildsCondVar.wait(lk, pred);
 }
 
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
@@ -1182,17 +1179,12 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationC
 void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                                       const UUID& collectionUUID) {
     stdx::unique_lock<Latch> lk(_mutex);
-
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
-    if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
-        return;
-    }
-
-    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
-    // object does not destruct while we are waiting, causing a use-after-free memory error.
-    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
-    collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
-    invariant(collIndexBuildsSharedPtr->getNumberOfIndexBuilds(lk) == 0);
+    auto pred = [&, this]() {
+        auto indexBuilds = _filterIndexBuilds_inlock(
+            lk, [&](const auto& replState) { return collectionUUID == replState.collectionUUID; });
+        return indexBuilds.empty();
+    };
+    _indexBuildsCondVar.wait(lk, pred);
 }
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db) {
@@ -1294,7 +1286,8 @@ void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
 }
 
 void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() {
-    invariant(_collectionIndexBuilds.empty());
+    stdx::unique_lock<Latch> lk(_mutex);
+    invariant(_allIndexBuilds.empty());
 }
 
 // static
@@ -1332,11 +1325,16 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
     WithLock lk, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
     // Check whether any indexes are already being built with the same index name(s). (Duplicate
     // specs will be discovered by the index builder.)
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(replIndexBuildState->collectionUUID);
-    if (collIndexBuildsIt != _collectionIndexBuilds.end()) {
+    auto pred = [&](const auto& replState) {
+        return replIndexBuildState->collectionUUID == replState.collectionUUID;
+    };
+    auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
+    for (auto existingIndexBuild : collIndexBuilds) {
         for (const auto& name : replIndexBuildState->indexNames) {
-            if (collIndexBuildsIt->second->hasIndexBuildState(lk, name)) {
-                auto existingIndexBuild = collIndexBuildsIt->second->getIndexBuildState(lk, name);
+            if (existingIndexBuild->indexNames.end() !=
+                std::find(existingIndexBuild->indexNames.begin(),
+                          existingIndexBuild->indexNames.end(),
+                          name)) {
                 str::stream ss;
                 ss << "Index build conflict: " << replIndexBuildState->buildUUID
                    << ": There's already an index with name '" << name
@@ -1372,10 +1370,6 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
 
     // Register the index build.
 
-    auto collIndexBuildsItAndRes = _collectionIndexBuilds.insert(
-        {replIndexBuildState->collectionUUID, std::make_shared<CollectionIndexBuildsTracker>()});
-    collIndexBuildsItAndRes.first->second->addIndexBuild(lk, replIndexBuildState);
-
     invariant(_allIndexBuilds.emplace(replIndexBuildState->buildUUID, replIndexBuildState).second);
 
     _indexBuildsCondVar.notify_all();
@@ -1385,12 +1379,6 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
 
 void IndexBuildsCoordinator::_unregisterIndexBuild(
     WithLock lk, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(replIndexBuildState->collectionUUID);
-    invariant(collIndexBuildsIt != _collectionIndexBuilds.end());
-    collIndexBuildsIt->second->removeIndexBuild(lk, replIndexBuildState);
-    if (collIndexBuildsIt->second->getNumberOfIndexBuilds(lk) == 0) {
-        _collectionIndexBuilds.erase(collIndexBuildsIt);
-    }
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
