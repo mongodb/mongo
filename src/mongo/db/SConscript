@@ -848,8 +848,6 @@ env.Library(
 env.Library(
     target="index_builds_coordinator_interface",
     source=[
-        "collection_index_builds_tracker.cpp",
-        "database_index_builds_tracker.cpp",
         "index_builds_coordinator.cpp",
     ],
     LIBDEPS=[
