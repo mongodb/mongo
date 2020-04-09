@@ -3253,11 +3253,12 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
 
     invariant(_rsConfig.isInitialized());
 
-    if (!force && !_getMemberState_inlock().primary()) {
-        return Status(ErrorCodes::NotMaster,
-                      str::stream()
-                          << "replSetReconfig should only be run on PRIMARY, but my state is "
-                          << _getMemberState_inlock().toString());
+    if (!force && !_readWriteAbility->canAcceptNonLocalWrites(lk)) {
+        return Status(
+            ErrorCodes::NotMaster,
+            str::stream()
+                << "replSetReconfig should only be run on a writable PRIMARY. Current state is "
+                << _getMemberState_inlock().toString());
     }
     auto topCoordTerm = _topCoord->getTerm();
 
