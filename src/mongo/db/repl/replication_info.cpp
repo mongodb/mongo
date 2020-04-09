@@ -325,7 +325,6 @@ public:
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        // TODO Unwind after SERVER-41070
         waitInIsMaster.pauseWhileSet(opCtx);
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
