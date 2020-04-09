@@ -163,10 +163,10 @@ public:
      * Returns NamespaceExists if we are unable to generate a collection name that does not conflict
      * with an existing collection in this database.
      *
-     * The database must be locked in MODE_X when calling this function.
+     * The database must be locked in MODE_IX when calling this function.
      */
     virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
-        OperationContext* opCtx, StringData collectionNameModel) = 0;
+        OperationContext* opCtx, StringData collectionNameModel) const = 0;
 
     /**
      * If we are in a replset, every replicated collection must have an _id index.  As we scan each

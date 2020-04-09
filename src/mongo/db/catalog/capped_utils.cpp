@@ -237,38 +237,51 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void convertToCapped(OperationContext* opCtx,
-                     const NamespaceString& collectionName,
-                     long long size) {
-    StringData dbname = collectionName.db();
-    StringData shortSource = collectionName.coll();
+void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long long size) {
+    StringData dbname = ns.db();
+    StringData shortSource = ns.coll();
 
-    AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
+    AutoGetCollection autoColl(opCtx, ns, MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
 
     uassert(ErrorCodes::NotMaster,
-            str::stream() << "Not primary while converting " << collectionName
-                          << " to a capped collection",
+            str::stream() << "Not primary while converting " << ns << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);
 
-    Database* const db = autoDb.getDb();
+    Database* const db = autoColl.getDb();
     uassert(
         ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
-    BackgroundOperation::assertNoBgOpInProgForDb(dbname);
-    IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbname);
+    BackgroundOperation::assertNoBgOpInProgForNs(ns);
+    if (Collection* coll = autoColl.getCollection()) {
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
+    }
 
     // Generate a temporary collection name that will not collide with any existing collections.
-    auto tmpNameResult =
-        db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
-    uassertStatusOKWithContext(tmpNameResult,
-                               str::stream()
-                                   << "Cannot generate temporary collection namespace to convert "
-                                   << collectionName << " to a capped collection");
+    boost::optional<Lock::CollectionLock> collLock;
+    const auto longTmpName = [&] {
+        while (true) {
+            auto tmpNameResult =
+                db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
+            uassertStatusOKWithContext(
+                tmpNameResult,
+                str::stream() << "Cannot generate temporary collection namespace to convert " << ns
+                              << " to a capped collection");
 
-    const auto& longTmpName = tmpNameResult.getValue();
+            collLock.emplace(opCtx, tmpNameResult.getValue(), MODE_X);
+            if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                    opCtx, tmpNameResult.getValue())) {
+                return std::move(tmpNameResult.getValue());
+            }
+
+            // The temporary collection was created by someone else between the name being
+            // generated and acquiring the lock on the collection, so try again with a new
+            // temporary collection name.
+            collLock.reset();
+        }
+    }();
     const auto shortTmpName = longTmpName.coll().toString();
 
     cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
@@ -276,7 +289,7 @@ void convertToCapped(OperationContext* opCtx,
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
-    uassertStatusOK(renameCollection(opCtx, longTmpName, collectionName, options));
+    uassertStatusOK(renameCollection(opCtx, longTmpName, ns, options));
 }
 
 }  // namespace mongo
