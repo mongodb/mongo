@@ -592,12 +592,43 @@ NamespaceString getNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
 }  // namespace
 
 void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
+                                                  bool isInitialSync,
                                                   const IndexBuildOplogEntry& oplogEntry) {
     const auto collUUID = oplogEntry.collUUID;
     const auto nss = getNsFromUUID(opCtx, collUUID);
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.replSetAndNotPrimaryAtStart = true;
+
+    // If this is an initial syncing node, drop any conflicting ready index specs prior to
+    // proceeding with building them.
+    if (isInitialSync) {
+        auto dbAndUUID = NamespaceStringOrUUID(nss.db().toString(), collUUID);
+        writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss.ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
+
+            AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_X);
+            auto coll = autoColl.getCollection();
+            invariant(coll,
+                      str::stream() << "Collection with UUID " << collUUID << " was dropped.");
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+
+            const bool includeUnfinished = false;
+            for (const auto& spec : oplogEntry.indexSpecs) {
+                std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "Index spec is missing the 'name' field " << spec,
+                        !name.empty());
+
+                if (auto desc = indexCatalog->findIndexByName(opCtx, name, includeUnfinished)) {
+                    uassertStatusOK(indexCatalog->dropIndex(opCtx, desc));
+                }
+            }
+
+            wuow.commit();
+        });
+    }
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     uassertStatusOK(
