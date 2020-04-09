@@ -2390,8 +2390,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     /*
      * Set compatibility versions early so that any subsystem sees it. Call after we own the
-     * database so that we can know if the database is new or not.
+     * database so that we can know if the database is new or not. Compatibility testing needs to
+     * know if salvage has been set, so parse that early.
      */
+    WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
+    if (cval.val) {
+        if (F_ISSET(conn, WT_CONN_READONLY))
+            WT_ERR_MSG(session, EINVAL, "Readonly configuration incompatible with salvage");
+        F_SET(conn, WT_CONN_SALVAGE);
+    }
+
     WT_ERR(__wt_conn_compat_config(session, cfg, false));
 
     /*
@@ -2578,13 +2586,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
     conn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
-
-    WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
-    if (cval.val) {
-        if (F_ISSET(conn, WT_CONN_READONLY))
-            WT_ERR_MSG(session, EINVAL, "Readonly configuration incompatible with salvage");
-        F_SET(conn, WT_CONN_SALVAGE);
-    }
 
     WT_ERR(__wt_conn_statistics_config(session, cfg));
     WT_ERR(__wt_lsm_manager_config(session, cfg));

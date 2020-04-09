@@ -794,7 +794,8 @@ err:
  *     Dump information about a key and/or value.
  */
 int
-__wt_debug_key_value(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *value)
+__wt_debug_key_value(
+  WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, uint64_t rle, WT_CELL_UNPACK *value)
 {
     WT_DBG *ds, _ds;
     WT_DECL_RET;
@@ -803,17 +804,16 @@ __wt_debug_key_value(WT_SESSION_IMPL *session, WT_ITEM *key, WT_CELL_UNPACK *val
 
     WT_ERR(__debug_config(session, ds, NULL));
 
-    if (key != NULL)
+    if (key == NULL)
+        WT_ERR(ds->f(ds, "\tK {%" PRIu64 " %" PRIu64 "}", recno, rle));
+    else
         WT_ERR(__debug_item_key(ds, "K", key->data, key->size));
-    if (value != NULL) {
-        WT_ERR(__debug_time_pairs(
-          ds, "T", value->start_ts, value->start_txn, value->stop_ts, value->stop_txn));
-        WT_ERR(__debug_cell_data(ds, NULL, value != NULL ? value->type : 0, "V", value));
-    }
+    WT_ERR(__debug_time_pairs(
+      ds, "T", value->start_ts, value->start_txn, value->stop_ts, value->stop_txn));
+    WT_ERR(__debug_cell_data(ds, NULL, value != NULL ? value->type : 0, "V", value));
 
 err:
-    WT_RET(__debug_wrapup(ds));
-    return (ret);
+    return (__debug_wrapup(ds));
 }
 
 /*

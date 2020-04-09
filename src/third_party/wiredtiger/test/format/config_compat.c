@@ -50,7 +50,7 @@ static const char *list[] = {
   "logging.compression", "logging_file_max=", "logging.file_max", "logging_prealloc=",
   "logging.prealloc", "lsm_worker_threads=", "lsm.worker_threads", "major_timeout=",
   "format.major_timeout", "memory_page_max=", "btree.memory_page_max", "merge_max=",
-  "lsm.merge_max", "mmap=", "disk.mmap", "mmap_all=", "runs.mmap_all", "modify_pct=",
+  "lsm.merge_max", "mmap=", "disk.mmap", "mmap_all=", "disk.mmap_all", "modify_pct=",
   "ops.pct.modify", "ops=", "runs.ops", "prefix_compression=", "btree.prefix_compression",
   "prefix_compression_min=", "btree.prefix_compression_min", "prepare=", "ops.prepare",
   "random_cursor=", "ops.random_cursor", "read_pct=", "ops.pct.read", "rebalance=", "ops.rebalance",

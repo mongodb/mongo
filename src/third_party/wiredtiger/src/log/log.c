@@ -1574,6 +1574,33 @@ err:
 }
 
 /*
+ * __wt_log_compat_verify --
+ *     Verify the last log when opening for the compatibility settings. This is separate because we
+ *     need to do it very early in the startup process.
+ */
+int
+__wt_log_compat_verify(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    uint32_t lastlog, lognum;
+    u_int i, logcount;
+    char **logfiles;
+
+    lastlog = 0;
+
+    WT_ERR(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
+    for (i = 0; i < logcount; i++) {
+        WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+        lastlog = WT_MAX(lastlog, lognum);
+    }
+    if (lastlog != 0)
+        WT_ERR(__log_open_verify(session, lastlog, NULL, NULL, NULL, NULL));
+err:
+    WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
+    return (ret);
+}
+
+/*
  * __wt_log_open --
  *     Open the appropriate log file for the connection. The purpose is to find the last log file
  *     that exists, open it and set our initial LSNs to the end of that file. If none exist, call

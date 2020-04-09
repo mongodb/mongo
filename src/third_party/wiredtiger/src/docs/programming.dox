@@ -40,6 +40,7 @@ each of which is ordered by one or more columns.
 - @subpage backup
 - @subpage compact
 - @subpage checkpoint
+- @subpage eviction
 - @subpage durability
 - @subpage in_memory
 - @subpage cursor_join

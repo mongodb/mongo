@@ -344,7 +344,7 @@ backup(void *arg)
      * Perform a full backup at somewhere under 10 seconds (that way there's at least one), then at
      * larger intervals, optionally do incremental backups between full backups.
      */
-    full = incr_full = true;
+    incr_full = true;
     incremental = 0;
     active_files_init(&active[0]);
     active_files_init(&active[1]);

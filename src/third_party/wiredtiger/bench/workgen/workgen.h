@@ -292,7 +292,7 @@ struct Operation {
     Key _key;
     Value _value;
     std::string _config;
-    Transaction *_transaction;
+    Transaction *transaction;
     std::vector<Operation> *_group;
     int _repeatgroup;
     double _timed;
@@ -386,11 +386,15 @@ struct Thread {
 
 struct Transaction {
     bool _rollback;
+    bool use_commit_timestamp;
+    bool use_prepare_timestamp;
     std::string _begin_config;
     std::string _commit_config;
+    double read_timestamp_lag;
 
-    Transaction(const char *_config = NULL) : _rollback(false),
-       _begin_config(_config == NULL ? "" : _config), _commit_config() {}
+    Transaction(const char *_config = NULL) : _rollback(false), use_commit_timestamp(false), use_prepare_timestamp(false), _begin_config(_config == NULL ? "" : _config), _commit_config(),
+    read_timestamp_lag(0.0)
+        {}
 
     void describe(std::ostream &os) const {
 	os << "Transaction: ";
@@ -399,6 +403,12 @@ struct Transaction {
 	os << "begin_config: " << _begin_config;
 	if (!_commit_config.empty())
 	    os << ", commit_config: " << _commit_config;
+    if (use_commit_timestamp)
+	    os << "(use_commit_timestamp) ";
+    if (use_prepare_timestamp)
+	    os << "(use_prepare_timestamp) ";
+    if (read_timestamp_lag)
+        os << "(read_timestamp_lag)";
     }
 };
 
@@ -414,6 +424,9 @@ struct WorkloadOptions {
     int sample_rate;
     std::string sample_file;
     int warmup;
+    double oldest_timestamp_lag;
+    double stable_timestamp_lag;
+    double timestamp_advance;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);

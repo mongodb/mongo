@@ -462,7 +462,7 @@ __posix_file_read_mmap(
     (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
 
     /*
-     * If the I/O falls inside the mapped buffer, and the buffer is not being resized, we will use
+     * If the I/O falls inside the mapped buffer, and the buffer is not being re-sized, we will use
      * the mapped buffer.
      */
     mmap_success = false;
@@ -653,7 +653,7 @@ __posix_file_write_mmap(
     (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
 
     /*
-     * If the I/O falls inside the mapped buffer, and the buffer is not being resized, we will use
+     * If the I/O falls inside the mapped buffer, and the buffer is not being re-sized, we will use
      * the mapped buffer.
      */
     mmap_success = false;

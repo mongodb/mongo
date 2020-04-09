@@ -152,10 +152,13 @@ main(int argc, char *argv[])
     /* Set values from the command line. */
     home = NULL;
     one_flag = quiet_flag = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "1C:c:h:lqrt:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "1BC:c:h:lqrt:")) != EOF)
         switch (ch) {
         case '1': /* One run */
             one_flag = true;
+            break;
+        case 'B': /* Backward compatibility */
+            g.backward_compatible = true;
             break;
         case 'C': /* wiredtiger_open config */
             g.config_open = __wt_optarg;
@@ -394,11 +397,12 @@ static void
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-1lqr] [-C wiredtiger-config]\n    "
+      "usage: %s [-1Blqr] [-C wiredtiger-config]\n    "
       "[-c config-file] [-h home] [name=value ...]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-1 run once\n"
+      "\t-B create backward compatible configurations\n"
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c read test program configuration from a file\n"
       "\t-h home (default 'RUNDIR')\n"

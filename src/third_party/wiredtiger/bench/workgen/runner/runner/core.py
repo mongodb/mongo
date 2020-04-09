@@ -35,7 +35,7 @@ from workgen import Key, Operation, OpList, Table, Transaction, Value
 #   Put the operation (and any suboperations) within a transaction.
 def txn(op, config=None):
     t = Transaction(config)
-    op._transaction = t
+    op.transaction = t
     return op
 
 # sleep --
@@ -301,7 +301,7 @@ def _op_transaction_list(oplist, txn_config):
 def op_group_transaction(ops_arg, ops_per_txn, txn_config):
     if ops_arg != Operation.OP_NONE:
         return txn(ops_arg, txn_config)
-    if ops_arg._transaction != None:
+    if ops_arg.transaction != None:
         raise Exception('nested transactions not supported')
     if ops_arg._repeatgroup != None:
         raise Exception('grouping transactions with multipliers not supported')

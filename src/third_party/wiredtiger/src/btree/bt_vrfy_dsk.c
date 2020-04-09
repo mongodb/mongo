@@ -119,6 +119,15 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_H
     if (dsk->unused != 0)
         WT_RET_VRFY(session, "page at %s has non-zero unused page header bytes", tag);
 
+    /* Check the page version. */
+    switch (dsk->version) {
+    case WT_PAGE_VERSION_ORIG:
+    case WT_PAGE_VERSION_TS:
+        break;
+    default:
+        WT_RET_VRFY(session, "page at %s has an invalid version of %" PRIu8, tag, dsk->version);
+    }
+
     /*
      * Any bytes after the data chunk should be nul bytes; ignore if the size is 0, that allows easy
      * checking of disk images where we don't have the size.

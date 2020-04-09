@@ -99,16 +99,6 @@ typedef enum {
         txn_state->pinned_id = saved_state.pinned_id;                     \
     } while (0)
 
-struct __wt_named_snapshot {
-    const char *name;
-
-    TAILQ_ENTRY(__wt_named_snapshot) q;
-
-    uint64_t id, pinned_id, snap_min, snap_max;
-    uint64_t *snapshot;
-    uint32_t snapshot_count;
-};
-
 struct __wt_txn_state {
     WT_CACHE_LINE_PAD_BEGIN
     volatile uint64_t id;

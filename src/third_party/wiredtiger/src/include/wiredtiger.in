@@ -1627,7 +1627,7 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Truncate a file, table or cursor range.
+	 * Truncate a file, table, cursor range, or backup cursor
 	 *
 	 * Truncate a table or file.
 	 * @snippet ex_all.c Truncate a table
@@ -1649,14 +1649,20 @@ struct __wt_session {
 	 * they do commit, and if there is a crash and recovery runs, the result
 	 * may be different than what was in cache before the crash.
 	 *
+	 * Truncate a backup cursor.  This operation removes all log files that
+	 * have been returned by the backup cursor.  It can be used to remove log
+	 * files after copying them during @ref backup_incremental.
+	 * @snippet ex_backup.c Truncate a backup cursor
+	 *
 	 * @param session the session handle
-	 * @param name the URI of the table or file to truncate
+	 * @param name the URI of the table or file to truncate, or \c "log:"
+	 * for a backup cursor
 	 * @param start optional cursor marking the first record discarded;
 	 * if <code>NULL</code>, the truncate starts from the beginning of
-	 * the object
+	 * the object; must be provided when truncating a backup cursor
 	 * @param stop optional cursor marking the last record discarded;
 	 * if <code>NULL</code>, the truncate continues to the end of the
-	 * object
+	 * object; ignored when truncating a backup cursor
 	 * @configempty{WT_SESSION.truncate, see dist/api_data.py}
 	 * @errors
 	 */

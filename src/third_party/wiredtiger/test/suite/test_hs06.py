@@ -401,7 +401,7 @@ class test_hs06(wttest.WiredTigerTestCase):
             self.assertEqual(cursor[self.create_key(i)], expected)
         self.session.rollback_transaction()
 
-    def test_hs_modify_birthmark_is_base_update(self):
+    def test_hs_modify_stable_is_base_update(self):
         # Create a small table.
         uri = "table:test_hs06"
         create_params = 'key_format={},value_format=S'.format(self.key_format)
@@ -415,8 +415,8 @@ class test_hs06(wttest.WiredTigerTestCase):
             'oldest_timestamp=' + timestamp_str(1) + ',stable_timestamp=' + timestamp_str(1))
 
         # The base update is at timestamp 1.
-        # When we history store evict these pages, the base update will be used as the birthmark since
-        # it's the only thing behind the stable timestamp.
+        # When we history store evict these pages, the base update is the only thing behind
+        # the stable timestamp.
         cursor = self.session.open_cursor(uri)
         for i in range(1, 10000):
             self.session.begin_transaction()
@@ -457,8 +457,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         expected[300] = 'D'
         expected = str().join(expected)
 
-        # Go back and read. We should get the initial value with the 3 modifies applied on top.
-        # Ensure that we're aware that the birthmark update could be the base update.
+        # Go back and read.
         self.session.begin_transaction('read_timestamp=' + timestamp_str(4))
         for i in range(1, 11):
             self.assertEqual(cursor[self.create_key(i)], expected)

@@ -136,9 +136,6 @@ __wt_row_leaf_key_work(
     WT_IKEY *ikey;
     WT_ROW *rip, *jump_rip;
     size_t size;
-#ifdef HAVE_DIAGNOSTIC
-    uint32_t current, start;
-#endif
     u_int last_prefix;
     int jump_slot_offset, slot_offset;
     void *copy;
@@ -163,9 +160,6 @@ __wt_row_leaf_key_work(
     size = 0; /* -Werror=maybe-uninitialized */
 
     direction = BACKWARD;
-#ifdef HAVE_DIAGNOSTIC
-    __wt_seconds32(session, &start);
-#endif
     for (slot_offset = 0;;) {
         if (0) {
 switch_and_jump:
@@ -178,18 +172,6 @@ switch_and_jump:
             slot_offset = jump_slot_offset;
         }
         copy = WT_ROW_KEY_COPY(rip);
-#ifdef HAVE_DIAGNOSTIC
-        /*
-         * Debugging added to detect and gather information for rare hang, WT-5043. Detect and abort
-         * if the current function call or operation takes too long (and 5 minutes is an eternity).
-         */
-        __wt_seconds32(session, &current);
-        WT_ERR_ASSERT(session, (current - start) < WT_MINUTE * 5, EINVAL,
-          "call tracking for WT-5043: %s took longer than 5 minutes", __func__);
-        WT_ERR_ASSERT(session,
-          (session->op_5043_seconds == 0 || (current - session->op_5043_seconds) < WT_MINUTE * 5),
-          EINVAL, "operation tracking for WT-5043: %s took longer than 5 minutes", session->name);
-#endif
 
         /*
          * Figure out what the key looks like.

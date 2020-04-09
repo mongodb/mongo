@@ -198,7 +198,10 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     CONFIG_APPEND(p, ",buffer_alignment=512");
 #endif
 
-    CONFIG_APPEND(p, ",mmap=%d,mmap_all=%d", g.c_mmap ? 1 : 0, g.c_mmap_all ? 1 : 0);
+    if (g.c_mmap)
+        CONFIG_APPEND(p, ",mmap=1");
+    if (g.c_mmap_all)
+        CONFIG_APPEND(p, ",mmap_all=1");
 
     if (g.c_direct_io)
         CONFIG_APPEND(p, ",direct_io=(data)");
@@ -448,13 +451,14 @@ void
 wts_close(void)
 {
     WT_CONNECTION *conn;
-    const char *config;
 
     conn = g.wts_conn;
 
-    config = g.c_leak_memory ? "leak_memory" : NULL;
+    if (g.backward_compatible)
+        testutil_check(conn->reconfigure(conn, "compatibility=(release=3.3)"));
 
-    testutil_check(conn->close(conn, config));
+    testutil_check(conn->close(conn, g.c_leak_memory ? "leak_memory" : NULL));
+
     g.wts_conn = NULL;
     g.wt_api = NULL;
 }
