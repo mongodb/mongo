@@ -57,6 +57,7 @@ public:
                                          NamespaceString("test.EphemeralForTest"),
                                          "indexName",
                                          spec,
+                                         BSONObj{},
                                          &_data));
     }
 
@@ -66,7 +67,8 @@ public:
                                          unique,
                                          NamespaceString("test.EphemeralForTest"),
                                          "indexName",
-                                         BSONObj(),
+                                         BSONObj{},
+                                         BSONObj{},
                                          &_data));
     }
 

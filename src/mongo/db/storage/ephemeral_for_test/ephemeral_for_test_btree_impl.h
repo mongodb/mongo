@@ -46,6 +46,7 @@ std::unique_ptr<SortedDataInterface> getEphemeralForTestBtreeImpl(
     const NamespaceString& collectionNamespace,
     const std::string& indexName,
     const BSONObj& keyPattern,
+    const BSONObj& collation,
     std::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo

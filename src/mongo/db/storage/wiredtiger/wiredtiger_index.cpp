@@ -245,6 +245,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _collectionNamespace(desc->parentNS()),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
+      _collation(desc->collation()),
       _prefix(prefix),
       _isIdIndex(desc->isIdIndex()) {}
 
@@ -380,7 +381,7 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Va
 
     if (isDup(opCtx, c, key))
         return buildDupKeyErrorStatus(
-            key, _collectionNamespace, _indexName, _keyPattern, _ordering);
+            key, _collectionNamespace, _indexName, _keyPattern, _collation, _ordering);
     return Status::OK();
 }
 
@@ -695,8 +696,11 @@ private:
             if (cmp == 0) {
                 // Duplicate found!
                 auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
-                return buildDupKeyErrorStatus(
-                    newKey, _idx->collectionNamespace(), _idx->indexName(), _idx->keyPattern());
+                return buildDupKeyErrorStatus(newKey,
+                                              _idx->collectionNamespace(),
+                                              _idx->indexName(),
+                                              _idx->keyPattern(),
+                                              _idx->_collation);
             } else {
                 /*
                  * _previousKeyString.isEmpty() is only true on the first call to addKey().
@@ -740,8 +744,11 @@ private:
             // Dup found!
             if (!_dupsAllowed) {
                 auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
-                return buildDupKeyErrorStatus(
-                    newKey, _idx->collectionNamespace(), _idx->indexName(), _idx->keyPattern());
+                return buildDupKeyErrorStatus(newKey,
+                                              _idx->collectionNamespace(),
+                                              _idx->indexName(),
+                                              _idx->keyPattern(),
+                                              _idx->_collation);
             }
 
             // If we get here, we are in the weird mode where dups are allowed on a unique
@@ -1522,7 +1529,8 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
 
     if (!dupsAllowed) {
         auto key = KeyString::toBson(keyString, _ordering);
-        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+        return buildDupKeyErrorStatus(
+            key, _collectionNamespace, _indexName, _keyPattern, _collation);
     }
 
     if (!insertedId) {
@@ -1568,7 +1576,8 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         if (ret == WT_DUPLICATE_KEY) {
             auto key = KeyString::toBson(
                 keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
-            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+            return buildDupKeyErrorStatus(
+                key, _collectionNamespace, _indexName, _keyPattern, _collation);
         }
         invariantWTOK(ret);
 
@@ -1583,7 +1592,8 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         if (_keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId)) {
             auto key = KeyString::toBson(
                 keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
-            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+            return buildDupKeyErrorStatus(
+                key, _collectionNamespace, _indexName, _keyPattern, _collation);
         }
     }
 

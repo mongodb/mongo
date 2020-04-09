@@ -195,7 +195,8 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
                                                        const std::string& identEnd,
                                                        const NamespaceString& collectionNamespace,
                                                        const std::string& indexName,
-                                                       const BSONObj& keyPattern)
+                                                       const BSONObj& keyPattern,
+                                                       const BSONObj& collation)
     : _opCtx(opCtx),
       _unique(unique),
       _dupsAllowed(dupsAllowed),
@@ -205,6 +206,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
       _collectionNamespace(collectionNamespace),
       _indexName(indexName),
       _keyPattern(keyPattern),
+      _collation(collation),
       _hasLast(false),
       _lastKeyToString(""),
       _lastRID(-1) {}
@@ -242,7 +244,8 @@ Status SortedDataBuilderInterface::addKey(const KeyString::Value& keyString) {
     if (twoKeyCmp == 0 && twoRIDCmp != 0) {
         if (!_dupsAllowed) {
             auto key = KeyString::toBson(keyString, _order);
-            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+            return buildDupKeyErrorStatus(
+                key, _collectionNamespace, _indexName, _keyPattern, _collation);
         }
         // Duplicate index entries are allowed on this unique index, so we put the RecordId in the
         // KeyString until the unique constraint is resolved.
@@ -279,7 +282,8 @@ SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext
                                           _identEnd,
                                           _collectionNamespace,
                                           _indexName,
-                                          _keyPattern);
+                                          _keyPattern,
+                                          _collation);
 }
 
 // We append \1 to all idents we get, and therefore the KeyString with ident + \0 will only be
@@ -296,6 +300,7 @@ SortedDataInterface::SortedDataInterface(OperationContext* opCtx,
       _collectionNamespace(desc->getCollection()->ns()),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
+      _collation(desc->collation()),
       _isUnique(desc->unique()),
       _isPartial(desc->isPartial()) {
     // This is the string representation of the KeyString before elements in this ident, which is
@@ -355,7 +360,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
                     // dups were not allowed.
                     auto key = KeyString::toBson(keyString, _ordering);
                     return buildDupKeyErrorStatus(
-                        key, _collectionNamespace, _indexName, _keyPattern);
+                        key, _collectionNamespace, _indexName, _keyPattern, _collation);
                 }
             } else {
                 return Status::OK();
@@ -492,7 +497,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const KeyString
                                                                next->keyString.getSize()),
                            key.getSize()) == 0) {
         return buildDupKeyErrorStatus(
-            key, _collectionNamespace, _indexName, _keyPattern, _ordering);
+            key, _collectionNamespace, _indexName, _keyPattern, _collation, _ordering);
     }
 
     return Status::OK();

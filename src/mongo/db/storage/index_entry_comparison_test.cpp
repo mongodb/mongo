@@ -32,6 +32,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 
@@ -42,7 +43,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     auto keyValue = BSON("" << 10 << ""
                             << "abc");
 
-    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern);
+    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
     ASSERT_NOT_OK(dupKeyStatus);
     ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
@@ -59,6 +60,61 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     extraInfo->serialize(&objBuilder);
     ASSERT_BSONOBJ_EQ(objBuilder.obj(),
                       BSON("keyPattern" << keyPattern << "keyValue" << keyValueWithFieldName));
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncodedCollationKey) {
+    StringData mockCollationKey("bar");
+
+    NamespaceString collNss("test.foo");
+    std::string indexName("a_1");
+    auto keyPattern = BSON("a" << 1);
+    auto keyValue = BSON("" << mockCollationKey);
+    auto collation = BSON("locale"
+                          << "en_US");
+
+    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
+    ASSERT_NOT_OK(dupKeyStatus);
+    ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
+
+    ASSERT(dupKeyStatus.reason().find("collation:") != std::string::npos);
+
+    // Verify that the collation key is hex encoded in the error message.
+    std::string expectedHexEncoding =
+        "0x" + toHexLower(mockCollationKey.rawData(), mockCollationKey.size());
+    ASSERT(dupKeyStatus.reason().find(expectedHexEncoding) != std::string::npos);
+
+    // But no hex encoding should have taken place inside the key attached to the extra error info.
+    auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
+    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), BSON("a" << mockCollationKey));
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexWithoutCollation) {
+    NamespaceString collNss("test.foo");
+    std::string indexName("a_1");
+    auto keyPattern = BSON("a" << 1);
+
+    // The byte sequence c0 16 is invalid UTF-8 since this is an overlong encoding of the letter
+    // "a", which should be represented as simply 0x16. The byte 0xc0 is always illegal in UTF-8
+    // since it would only ever be used for an overload two-byte encoding of an ASCII character.
+    auto keyValue = BSON(""
+                         << "\xc0\x16");
+    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
+    ASSERT_NOT_OK(dupKeyStatus);
+    ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
+
+    // We expect to find a hex-encoded version of the illegal UTF-8 byte sequence inside the error
+    // string.
+    ASSERT(dupKeyStatus.reason().find("0xc016") != std::string::npos);
+
+    // In the extra error info, we expect that no hex encoding has taken place.
+    auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
+    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(),
+                      BSON("a"
+                           << "\xc0\x16"));
 }
 
 }  // namespace mongo
