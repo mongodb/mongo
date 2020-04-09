@@ -271,14 +271,11 @@ variables:
   modules:
   - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
-    msi_target: msi
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -599,25 +596,6 @@ functions:
     params:
         path: src/corpus.tgz
         destination: src/corpus
-
-  "fetch mongohouse binaries": &fetch_mongohouse_binaries
-    command: s3.get
-    params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: ${mh_archive}
-        bucket: mciuploads
-        local_file: src/mh.tgz
-        build_variants: *mh_variants
-
-  "extract mongohouse binaries": &extract_mongohouse_binaries
-    command: shell.exec
-    params:
-      working_dir: src
-      build_variants: *mh_variants
-      script: |
-        set -o errexit
-        ${decompress} mh.tgz
 
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
@@ -1796,12 +1774,19 @@ functions:
         fi
         rm -rf ${install_directory|/data/mongo-install-directory}
 
-        # Only allow hygienic builds in Evergreen
-        extra_args="--install-mode=hygienic"
-        if [ -n "${num_scons_link_jobs_available|}" ]; then
-          echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available|}"
-          extra_args="$extra_args --jlink=${num_scons_link_jobs_available|}"
-        fi
+        # Only allow hygienic builds in Evergreen, and use hardlinks to
+        # reduce the disk space impact of installing all of the binaries and
+        # associated debug info.
+        extra_args="--install-mode=hygienic --install-action=hardlink"
+
+        # By default, limit link jobs to one quarter of our overall -j
+        # concurrency unless locally overridden. We do this because in
+        # static link environments, the memory consumption of each
+        # link job is so high that without constraining the number of
+        # links we are likely to OOM or thrash the machine. Dynamic
+        # builds, where htis is not a concern, override this value.
+        echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available|0.25}"
+        extra_args="$extra_args --jlink=${num_scons_link_jobs_available|0.25}"
 
         if [ "${scons_cache_scope|}" = "shared" ]; then
           extra_args="$extra_args --cache-debug=scons_cache.log"
@@ -3394,6 +3379,9 @@ functions:
     params:
       working_dir: "src"
       script: |
+
+        set -eou pipefail
+
         mkdir unittest_binaries || true
         # Find all core files
         core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
@@ -3420,15 +3408,30 @@ functions:
           for binary_file_location in $binary_file_locations
           do
             new_binary_file=unittest_binaries/$(echo $binary_file_location | sed "s/.*\///")
-            if [ ! -f $new_binary_file ]; then
-              mv $binary_file_location $new_binary_file
+            if [ -f $binary_file_location ] && [ ! -f $new_binary_file ]; then
+              cp $binary_file_location $new_binary_file
             fi
+
             # On Windows if a .pdb symbol file exists, include it in the archive.
             pdb_file=$(echo $binary_file_location | sed "s/\.exe/.pdb/")
             if [ -f $pdb_file ]; then
               new_pdb_file=unittest_binaries/$(echo $pdb_file | sed "s/.*\///")
-              mv $pdb_file $new_pdb_file
+              cp $pdb_file $new_pdb_file
             fi
+
+            # On binutils platforms, if a .debug symbol file exists, include it
+            # in the archive
+            debug_file=$binary_file_location.debug
+            if [ -f $debug_file ]; then
+              cp $debug_file unittest_binaries
+            fi
+
+            # On macOS, these are called .dSYM and they are directories
+            dsym_dir=$binary_file_location.dSYM
+            if [ -d $dsym_dir ]; then
+              cp -r $dsym_dir unittest_binaries
+            fi
+
           done
         done
 
@@ -3438,7 +3441,7 @@ functions:
       target: "mongo-unittests.tgz"
       source_dir: "src/unittest_binaries"
       include:
-        - "./*_test${exe}"
+        - "*"
 
   "archive failed unittests": &archive_failed_unittests
     command: s3.put
@@ -3734,33 +3737,11 @@ tasks:
         targets: >-
           archive-dist-test
           archive-dist-test-debug
-          distsrc-${ext|tgz}
-          ${additional_targets|}
-          ${mh_target|}
+          ${additional_compile_targets|}
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
           PREFIX=dist-test
-
-    # Tar unstripped dbtest, to be archived in case of failure
-    - command: archive.targz_pack
-      params:
-        target: "dbtest_unstripped.tgz"
-        source_dir: "src"
-        include:
-          - "./dbtest*"
-
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ $(find . -name mongocryptd${exe} | wc -l) -eq 1 ] ; then
-            # Validate that this build_variant is listed as a known enterprise task for mongocryptd
-            PATH=$PATH:$HOME $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
-          fi
 
     - command: archive.targz_pack
       params:
@@ -3802,50 +3783,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         display_name: Binaries
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-cryptd.${ext|tgz}
-        remote_file: ${mongo_cryptd}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: CryptD Binaries
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-cryptd.${ext|tgz}
-        remote_file: ${mongo_cryptd_debugsymbols}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: CryptD Debugsymbols
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mh-binaries.${ext|tgz}
-        remote_file: ${mh_archive}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: MH Binaries
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mh-debugsymbols.${ext|tgz}
-        remote_file: ${mh_debugsymbols}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: MH Debuginfo
+
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3856,19 +3794,6 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/distsrc.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: Source tarball
-        # We only need to upload the source tarball from one of the build variants
-        # because it should be the same everywhere, so just use rhel70/windows.
-        build_variants: [rhel70, windows]
     - command: s3.put
       params:
         optional: true
@@ -3895,9 +3820,10 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-core install-tools archive-dist ${mh_target|}
+        # The targets here should be the install analogues of whatever
+        # archive targets the 'compile' task builds, excluding -debug targets.
+        targets: install-dist-test
         compiling_for_test: true
-        additional_targets: ""
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
@@ -3964,7 +3890,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-unittests
+        targets: install-unittests install-unittests-debug
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
@@ -4009,7 +3935,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: "install-sdam-json-test"
+        targets: install-sdam-json-test
         task_compile_flags: >-
           --detect-odr-violations
         compiling_for_test: true
@@ -4175,6 +4101,11 @@ tasks:
         task_compile_flags: *embedded_sdk_compile_flags
         task_compile_flags_extra: >-
           --link-model=dynamic
+        # Unlike static builds, dynamic builds have no need to
+        # constrain the number of link jobs. Unfortunately, --jlink=1
+        # means one link job, not 100%. So this is a bit gross but set
+        # it to .99.
+        num_scons_link_jobs_available: 0.99
 
 - name: embedded_sdk_tests_s3_put
   commands:
@@ -7643,23 +7574,40 @@ tasks:
     - func: "scons compile"
       vars:
         targets: >-
+          distsrc-${ext|tgz}
           archive-dist
           archive-dist-debug
           archive-shell
           archive-shell-debug
-          ${msi_target|}
+          ${additional_package_targets|}
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
           --legacy-tarball
-    - func: "run packager.py"
-    - command: archive.targz_pack
+    - command: shell.exec
       params:
-        target: "packages.tgz"
-        source_dir: "src"
-        include:
-          - "repo/**"
-          - "./**.msi"
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ $(find . -name mongocryptd${exe} | wc -l) -eq 1 ] ; then
+            # Validate that this build_variant is listed as a known enterprise task for mongocryptd
+            PATH=$PATH:$HOME $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
+          fi
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/distsrc.${ext|tgz}
+        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Source tarball
+        # We only need to upload the source tarball from one of the build variants
+        # because it should be the same everywhere, so just use rhel70/windows.
+        build_variants: [rhel70, windows]
     - command: s3.put
       params:
         optional: true
@@ -7687,17 +7635,6 @@ tasks:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: packages.tgz
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/tar
-        display_name: Packages
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
         local_file: src/mongodb-shell.${ext|tgz}
         remote_file: ${mongo_shell}
         bucket: mciuploads
@@ -7709,12 +7646,75 @@ tasks:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-debugsymobls.${ext|tgz}
+        local_file: src/mongodb-shell-debugsymbols.${ext|tgz}
         remote_file: ${mongo_shell_debugsymbols}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
         display_name: Shell Debugsymbols
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-cryptd.${ext|tgz}
+        remote_file: ${mongo_cryptd}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: CryptD Binaries
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-cryptd-debugsymbols.${ext|tgz}
+        remote_file: ${mongo_cryptd_debugsymbols}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: CryptD Debugsymbols
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mh-binaries.${ext|tgz}
+        remote_file: ${mh_archive}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: MH Binaries
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mh-debugsymbols.${ext|tgz}
+        remote_file: ${mh_debugsymbols}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: MH Debugsymbols
+    - func: "run packager.py"
+    - command: archive.targz_pack
+      params:
+        target: "packages.tgz"
+        source_dir: "src"
+        include:
+          - "repo/**"
+          - "./**.msi"
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: packages.tgz
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: Packages
 
 
 - name: publish_packages
@@ -7783,7 +7783,15 @@ tasks:
         bucket: mciuploads
         local_file: src/mongo-cryptd.tgz
         build_variants: *mongocryptd_variants
-    - func: "fetch mongohouse binaries"
+    # Fetch the mongohouse binaries
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${mh_archive}
+        bucket: mciuploads
+        local_file: src/mh.tgz
+        build_variants: *mh_variants
     # Fetch the sources (on relevant variants only)
     - command: s3.get
       params:
@@ -8396,8 +8404,6 @@ tasks:
   name: mqlrun
   commands:
   - func: "do setup"
-  - func: "fetch mongohouse binaries"
-  - func: "extract mongohouse binaries"
   - func: "run tests"
     vars:
       resmoke_args: --suites=mqlrun
@@ -8710,12 +8716,11 @@ buildvariants:
   - ubuntu1804-test
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -8831,7 +8836,7 @@ buildvariants:
   run_on:
   - ubuntu1604-arm64-large
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8872,7 +8877,7 @@ buildvariants:
   run_on:
   - ubuntu1804-arm64-build
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8948,7 +8953,7 @@ buildvariants:
   run_on:
   - ubuntu1804-power8-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8994,7 +8999,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: s390x-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     multiversion_architecture: s390x
@@ -9022,12 +9027,12 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9070,7 +9075,7 @@ buildvariants:
   run_on:
   - amazon1-2018-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -9178,7 +9183,7 @@ buildvariants:
   run_on:
   - amazon2-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286
     push_path: linux
@@ -9188,9 +9193,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: amazon2
     multiversion_edition: enterprise
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -9241,9 +9243,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: amazon
     multiversion_edition: targeted
     has_packages: true
@@ -9309,9 +9308,6 @@ buildvariants:
     exe: ".exe"
     content_type: application/zip
     compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=windows
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -9375,14 +9371,11 @@ buildvariants:
   - windows-64-vs2019-small
   expansions:
     exe: ".exe"
-    msi_target: msi
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     mh_target: archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -9418,14 +9411,11 @@ buildvariants:
     - windows-64-vs2019-small
   expansions:
     exe: ".exe"
-    msi_target: msi
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     mh_target: archive-mh archive-mh-debug
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -9494,14 +9484,11 @@ buildvariants:
   run_on:
   - windows-64-vs2019-small
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
-    msi_target: msi
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
@@ -9540,7 +9527,7 @@ buildvariants:
   run_on:
   - windows-64-vs2019-small
   expansions:
-    msi_target: msi
+    additional_package_targets: msi
     exe: ".exe"
     push_path: windows
     push_bucket: downloads.mongodb.org
@@ -9550,9 +9537,7 @@ buildvariants:
     multiversion_platform_42_or_later: windows_x86_64-2012plus
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -9608,13 +9593,11 @@ buildvariants:
   run_on:
   - windows-64-vs2019-small
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     exe: ".exe"
     content_type: application/zip
     compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -9709,12 +9692,11 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: x86_64-enterprise
-    mh_target: archive-mh archive-mh-debug
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
@@ -9802,12 +9784,11 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -9912,7 +9893,7 @@ buildvariants:
   - rhel62-small
   batchtime: 10080 # 7 days
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel62
@@ -10002,7 +9983,7 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # Ban tests that run prepareTransaction or multi-shard transactions (which use
     # prepareTransaction). prepareTransaction is rejected on nodes with
     # enableMajorityReadConcern:"false" (SERVER-37559).
@@ -10118,7 +10099,7 @@ buildvariants:
   - rhel62-small
   batchtime: 10080 # 7 days
   expansions: &enterprise-rhel-62-64-bit-flow-control-off
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
       --flowControl=off
       --excludeWithAnyTags=requires_flow_control
@@ -10195,7 +10176,7 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-single-phase-index-builds
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
       --mongodSetParameters="{enableTwoPhaseIndexBuild: false}"
     compile_flags: >-
@@ -10232,7 +10213,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -10295,12 +10276,11 @@ buildvariants:
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-expansions-template
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: enterprise
@@ -10354,12 +10334,11 @@ buildvariants:
   run_on:
   - rhel80-build
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -10412,7 +10391,7 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    additional_targets: dagger # If this moves to another variant, update the compile_all task
+    additional_compile_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10427,10 +10406,9 @@ buildvariants:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    additional_targets: ""
+    additional_package_targets: ""
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
-    mh_target: ""
   tasks:
   - name: compile_all_run_unittests_TG
   - name: jsCore
@@ -10446,7 +10424,7 @@ buildvariants:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 --use-libunwind=off --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: false
-    mh_target: ""
+    additional_package_targets: ""
   # Override list of tasks to exclude package testing and publishing
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10695,7 +10673,7 @@ buildvariants:
   - rhel71-power8-test
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
@@ -10746,7 +10724,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
     compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
@@ -10796,7 +10774,7 @@ buildvariants:
   - rhel67-zseries-test
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel67 -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
     has_packages: true
     packager_script: packager_enterprise.py
@@ -10895,13 +10873,12 @@ buildvariants:
   run_on:
   - ubuntu1604-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
@@ -10948,9 +10925,14 @@ buildvariants:
   run_on:
    - ubuntu1604-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    # Unlike static builds, dynamic builds have no need to
+    # constrain the number of link jobs. Unfortunately, --jlink=1
+    # means one link job, not 100%. So this is a bit gross but set
+    # it to .99.
+    num_scons_link_jobs_available: 0.99
     scons_cache_scope: shared
     scons_cache_mode: all
     multiversion_platform: ubuntu1604
@@ -10970,9 +10952,14 @@ buildvariants:
   run_on:
    - ubuntu1604-build
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    # Unlike static builds, dynamic builds have no need to
+    # constrain the number of link jobs. Unfortunately, --jlink=1
+    # means one link job, not 100%. So this is a bit gross but set
+    # it to .99.
+    num_scons_link_jobs_available: 0.99
     scons_cache_scope: shared
     scons_cache_mode: all
   tasks:
@@ -10986,6 +10973,11 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    # Unlike static builds, dynamic builds have no need to
+    # constrain the number of link jobs. Unfortunately, --jlink=1
+    # means one link job, not 100%. So this is a bit gross but set
+    # it to .99.
+    num_scons_link_jobs_available: 0.99
     scons_cache_scope: shared
     scons_cache_mode: all
     multiversion_platform: ubuntu1604
@@ -11007,7 +10999,7 @@ buildvariants:
   run_on:
   - suse12-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11054,7 +11046,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11184,7 +11176,7 @@ buildvariants:
   run_on:
   - suse15-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11275,18 +11267,14 @@ buildvariants:
   run_on:
   - debian92-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian92
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: debian92
     multiversion_edition: enterprise
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11327,9 +11315,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: debian92
     multiversion_edition: targeted
     has_packages: true
@@ -11378,18 +11363,14 @@ buildvariants:
   run_on:
   - debian10-test
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian10
-    mh_target: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: debian10
     multiversion_edition: enterprise
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11430,9 +11411,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: debian10
     multiversion_edition: targeted
     has_packages: true
@@ -11485,7 +11463,6 @@ buildvariants:
   expansions:
     test_flags: --storageEngine=biggie --excludeWithAnyTags=SERVER-38379,requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
     compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
@@ -11516,7 +11493,7 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
@@ -11623,7 +11600,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
@@ -11659,7 +11636,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
@@ -11699,7 +11676,7 @@ buildvariants:
   - ubuntu1804-build
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
@@ -11792,7 +11769,7 @@ buildvariants:
   - ubuntu1804-build
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need llvm-symbolizer in the PATH for UBSAN.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
@@ -11856,7 +11833,7 @@ buildvariants:
   - ubuntu1804-build
   stepback: true
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
@@ -11880,7 +11857,7 @@ buildvariants:
   - ubuntu1804-build
   stepback: false
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
@@ -11900,9 +11877,14 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    additional_targets: archive-mongocryptd archive-mongocryptd-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    # Unlike static builds, dynamic builds have no need to
+    # constrain the number of link jobs. Unfortunately, --jlink=1
+    # means one link job, not 100%. So this is a bit gross but set
+    # it to .99.
+    num_scons_link_jobs_available: 0.99
     scons_cache_scope: shared
     scons_cache_mode: all
   tasks:
@@ -12027,7 +12009,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    mh_target: archive-mh archive-mh-debug
+    additional_package_targets: archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise

@@ -136,7 +136,7 @@ def auto_archive_gen(first_env, make_archive_script, pkg_fmt):
             pkg_suffix = "$AUTO_ARCHIVE_TARBALL_SUFFIX"
 
         archive = env.AutoArchive(
-            target="#{}.{}".format(pkg_name, pkg_suffix),
+            target="$PKGDIR/{}.{}".format(pkg_name, pkg_suffix),
             source=[make_archive_script] + env.Alias(install_alias),
             __AUTO_ARCHIVE_TYPE=pkg_fmt,
             AIB_COMPONENT=component,

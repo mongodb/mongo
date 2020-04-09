@@ -26,6 +26,7 @@ import mongo
 import mongo.platform as mongo_platform
 import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
+import mongo.install_actions as install_actions
 
 EnsurePythonVersion(3, 6)
 EnsureSConsVersion(3, 1, 1)
@@ -134,6 +135,14 @@ add_option('install-mode',
     choices=['legacy', 'hygienic'],
     default='legacy',
     help='select type of installation',
+    nargs=1,
+    type='choice',
+)
+
+add_option('install-action',
+    choices=([*install_actions.available_actions] + ['default']),
+    default='default',
+    help='select mechanism to use to install files (advanced option to reduce disk IO and utilization)',
     nargs=1,
     type='choice',
 )
@@ -894,7 +903,7 @@ env_vars.Add('OBJCOPY',
 
 env_vars.Add('PKGDIR',
     help='Directory in which to build packages and archives',
-    default='$VARIANT_DIR/pkgs')
+    default='$BUILD_DIR/pkgs')
 
 env_vars.Add('PREFIX',
     help='Final installation location of files, will be made into a sub dir of $DESTDIR',
@@ -1152,6 +1161,10 @@ if has_option('variables-help'):
 unknown_vars = env_vars.UnknownVariables()
 if unknown_vars:
     env.FatalError("Unknown variables specified: {0}", ", ".join(list(unknown_vars.keys())))
+
+if get_option('install-action') != 'default' and get_option('ninja') != "disabled":
+    env.FatalError("Cannot use non-default install actions when generating Ninja.")
+install_actions.setup(env, get_option('install-action'))
 
 def set_config_header_define(env, varname, varval = 1):
     env['CONFIG_HEADER_DEFINES'][varname] = varval
@@ -2970,12 +2983,23 @@ def doConfigure(myenv):
         # because it is much faster. Don't use it if the user has already configured another linker
         # selection manually.
         if not any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
-            if AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld') or AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold'):
-                if link_model.startswith("dynamic"):
-                    AddToLINKFLAGSIfSupported(myenv, '-Wl,--gdb-index')
 
-            # Our build is already parallel.
-            AddToLINKFLAGSIfSupported(myenv, '-Wl,--no-threads')
+            # lld has problems with separate debug info on some platforms. See:
+            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
+            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
+            if get_option('separate-debug') == 'off':
+                if not AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld'):
+                    AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+            else:
+                AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+
+        # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
+        # builds it works well.
+        if link_model.startswith("dynamic"):
+            AddToLINKFLAGSIfSupported(myenv, '-Wl,--gdb-index')
+
+        # Our build is already parallel.
+        AddToLINKFLAGSIfSupported(myenv, '-Wl,--no-threads')
 
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
