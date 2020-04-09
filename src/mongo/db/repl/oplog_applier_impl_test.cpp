@@ -2960,6 +2960,26 @@ TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
     ASSERT_FALSE(autoColl.getDb());
 }
 
+TEST_F(IdempotencyTest, IgnoreMultipleTextIndexErrorFromSystemConnection) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+    ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
+    ASSERT_OK(runOpInitialSync(insert(fromjson("{_id: 1, a: '1', b: '2'}"))));
+    // Building multiple non-compound indexes on different field results in an IndexOptionsConflict
+    // error code, which is already explicitly ignored during oplog application. In order to test
+    // ignoring the correct multiple text index error, we use compound indexes.
+    auto addA = buildIndex(fromjson("{a: 'text', b: 1}"), BSONObj(), kUuid);
+    ASSERT_OK(runOpInitialSync(addA));
+    // Building a second text index should succeed as only users are limited to one
+    // text index per collection. Trying to build indexA a second time should fail, but the error
+    // will be ignored.
+    auto indexB = buildIndex(fromjson("{b: 'text', c: 1}"), BSONObj(), kUuid);
+    auto dropB = dropIndex("b_index", kUuid);
+    auto ops = {indexB, dropB, addA};
+    testOpsAreIdempotent(ops);
+    ASSERT_OK(runOpsInitialSync(ops));
+}
+
 class IdempotencyTestTxns : public IdempotencyTest {};
 
 // Document used by transaction idempotency tests.
