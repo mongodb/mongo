@@ -1113,7 +1113,8 @@ DBCollection.autocomplete = function(obj) {
  * @return {boolean}
  */
 DBCollection.prototype._isSharded = function() {
-    return !!this._db.getSiblingDB("config").collections.countDocuments({_id: this._fullName});
+    return !!this._db.getSiblingDB("config").collections.countDocuments(
+        {_id: this._fullName, dropped: false});
 };
 
 /**
