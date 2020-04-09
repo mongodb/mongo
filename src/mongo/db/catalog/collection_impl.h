@@ -247,7 +247,7 @@ public:
      * An empty validator removes all validation.
      * Requires an exclusive lock on the collection.
      */
-    Status setValidator(OperationContext* opCtx, BSONObj validator) final;
+    void setValidator(OperationContext* opCtx, Validator validator) final;
 
     Status setValidationLevel(OperationContext* opCtx, StringData newLevel) final;
     Status setValidationAction(OperationContext* opCtx, StringData newAction) final;

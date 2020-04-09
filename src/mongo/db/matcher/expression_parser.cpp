@@ -394,7 +394,7 @@ StatusWithMatchExpression parseJSONSchema(StringData name,
     }
 
     return JSONSchemaParser::parse(
-        expCtx, elem.Obj(), internalQueryIgnoreUnknownJSONSchemaKeywords.load());
+        expCtx, elem.Obj(), allowedFeatures, internalQueryIgnoreUnknownJSONSchemaKeywords.load());
 }
 
 template <class T>

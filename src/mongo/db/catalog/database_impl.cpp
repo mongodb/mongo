@@ -924,8 +924,17 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         // validator to apply some additional checks.
         expCtx->isParsingCollectionValidator = true;
 
-        auto statusWithMatcher =
-            MatchExpressionParser::parse(collectionOptions.validator, std::move(expCtx));
+        // If the validation action is "warn" or the level is "moderate", then disallow any
+        // encryption keywords. This is to prevent any plaintext data from showing up in the logs.
+        auto allowedFeatures = MatchExpressionParser::kDefaultSpecialFeatures;
+        if (collectionOptions.validationAction == "warn" ||
+            collectionOptions.validationLevel == "moderate")
+            allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
+
+        auto statusWithMatcher = MatchExpressionParser::parse(collectionOptions.validator,
+                                                              std::move(expCtx),
+                                                              ExtensionsCallbackNoop(),
+                                                              allowedFeatures);
 
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.

@@ -99,13 +99,14 @@ public:
         kJavascript = 1 << 2,
         kExpr = 1 << 3,
         kJSONSchema = 1 << 4,
+        kEncryptKeywords = 1 << 5,
     };
     using AllowedFeatureSet = unsigned long long;
     static constexpr AllowedFeatureSet kBanAllSpecialFeatures = 0;
     static constexpr AllowedFeatureSet kAllowAllSpecialFeatures =
         std::numeric_limits<unsigned long long>::max();
     static constexpr AllowedFeatureSet kDefaultSpecialFeatures =
-        AllowedFeatures::kExpr | AllowedFeatures::kJSONSchema;
+        AllowedFeatures::kExpr | AllowedFeatures::kJSONSchema | AllowedFeatures::kEncryptKeywords;
 
     /**
      * Parses PathAcceptingKeyword from 'typeElem'. Returns 'defaultKeyword' if 'typeElem'

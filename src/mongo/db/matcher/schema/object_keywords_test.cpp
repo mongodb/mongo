@@ -870,53 +870,67 @@ TEST(JSONSchemaObjectKeywordTest,
 
 TEST(JSONSchemaObjectKeywordTest, CorrectlyIgnoresUnknownKeywordsParameterIsSet) {
     const auto ignoreUnknownKeywords = true;
+    const auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
 
     auto schema = fromjson("{ignored_keyword: 1}");
-    ASSERT_OK(JSONSchemaParser::parse(new ExpressionContextForTest(), schema, ignoreUnknownKeywords)
+    ASSERT_OK(JSONSchemaParser::parse(
+                  new ExpressionContextForTest(), schema, allowedFeatures, ignoreUnknownKeywords)
                   .getStatus());
 
     schema = fromjson("{properties: {a: {ignored_keyword: 1}}}");
-    ASSERT_OK(JSONSchemaParser::parse(new ExpressionContextForTest(), schema, ignoreUnknownKeywords)
+    ASSERT_OK(JSONSchemaParser::parse(
+                  new ExpressionContextForTest(), schema, allowedFeatures, ignoreUnknownKeywords)
                   .getStatus());
 
     schema = fromjson("{properties: {a: {oneOf: [{ignored_keyword: {}}]}}}");
-    ASSERT_OK(JSONSchemaParser::parse(new ExpressionContextForTest(), schema, ignoreUnknownKeywords)
+    ASSERT_OK(JSONSchemaParser::parse(
+                  new ExpressionContextForTest(), schema, allowedFeatures, ignoreUnknownKeywords)
                   .getStatus());
 }
 
 TEST(JSONSchemaObjectKeywordTest, FailsToParseUnsupportedKeywordsWhenIgnoreUnknownParameterIsSet) {
     const auto ignoreUnknownKeywords = true;
+    const auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
 
-    auto result = JSONSchemaParser::parse(
-        new ExpressionContextForTest(), fromjson("{default: {}}"), ignoreUnknownKeywords);
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(),
+                                          fromjson("{default: {}}"),
+                                          allowedFeatures,
+                                          ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword 'default' is not currently supported");
 
     result = JSONSchemaParser::parse(new ExpressionContextForTest(),
                                      fromjson("{definitions: {numberField: {type: 'number'}}}"),
+                                     allowedFeatures,
                                      ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword 'definitions' is not currently supported");
 
-    result = JSONSchemaParser::parse(
-        new ExpressionContextForTest(), fromjson("{format: 'email'}"), ignoreUnknownKeywords);
+    result = JSONSchemaParser::parse(new ExpressionContextForTest(),
+                                     fromjson("{format: 'email'}"),
+                                     allowedFeatures,
+                                     ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword 'format' is not currently supported");
 
-    result = JSONSchemaParser::parse(
-        new ExpressionContextForTest(), fromjson("{id: 'someschema.json'}"), ignoreUnknownKeywords);
+    result = JSONSchemaParser::parse(new ExpressionContextForTest(),
+                                     fromjson("{id: 'someschema.json'}"),
+                                     allowedFeatures,
+                                     ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword 'id' is not currently supported");
 
     result = JSONSchemaParser::parse(new ExpressionContextForTest(),
                                      BSON("$ref"
                                           << "#/definitions/positiveInt"),
+                                     allowedFeatures,
                                      ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword '$ref' is not currently supported");
 
     result = JSONSchemaParser::parse(new ExpressionContextForTest(),
                                      fromjson("{$schema: 'hyper-schema'}"),
+                                     allowedFeatures,
                                      ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword '$schema' is not currently supported");
@@ -924,6 +938,7 @@ TEST(JSONSchemaObjectKeywordTest, FailsToParseUnsupportedKeywordsWhenIgnoreUnkno
     result =
         JSONSchemaParser::parse(new ExpressionContextForTest(),
                                 fromjson("{$schema: 'http://json-schema.org/draft-04/schema#'}"),
+                                allowedFeatures,
                                 ignoreUnknownKeywords);
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "$jsonSchema keyword '$schema' is not currently supported");

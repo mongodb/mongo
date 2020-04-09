@@ -72,9 +72,9 @@ struct CollModRequest {
     BSONElement indexHidden = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
-    BSONElement collValidator = {};
-    std::string collValidationAction = {};
-    std::string collValidationLevel = {};
+    boost::optional<Collection::Validator> collValidator;
+    boost::optional<std::string> collValidationAction;
+    boost::optional<std::string> collValidationLevel;
     bool recordPreImages = false;
 };
 
@@ -191,15 +191,13 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
                 maxFeatureCompatibilityVersion = currentFCV;
             }
-            auto statusW = coll->parseValidator(opCtx,
-                                                e.Obj(),
-                                                MatchExpressionParser::kDefaultSpecialFeatures,
-                                                maxFeatureCompatibilityVersion);
-            if (!statusW.isOK()) {
-                return statusW.getStatus();
+            cmr.collValidator = coll->parseValidator(opCtx,
+                                                     e.Obj().getOwned(),
+                                                     MatchExpressionParser::kDefaultSpecialFeatures,
+                                                     maxFeatureCompatibilityVersion);
+            if (!cmr.collValidator->isOK()) {
+                return cmr.collValidator->getStatus();
             }
-
-            cmr.collValidator = e;
         } else if (fieldName == "validationLevel" && !isView) {
             auto status = coll->parseValidationLevel(e.String());
             if (!status.isOK())
@@ -345,19 +343,22 @@ Status _collModInternal(OperationContext* opCtx,
     auto oplogEntryObj = oplogEntryBuilder.obj();
 
     // Save both states of the CollModRequest to allow writeConflictRetries.
-    const CollModRequest cmrOld = statusW.getValue();
-    CollModRequest cmrNew = statusW.getValue();
+    CollModRequest cmrNew = std::move(statusW.getValue());
+    auto viewPipeline = cmrNew.viewPipeLine;
+    auto viewOn = cmrNew.viewOn;
+    auto indexExpireAfterSeconds = cmrNew.indexExpireAfterSeconds;
+    auto indexHidden = cmrNew.indexHidden;
+    auto idx = cmrNew.idx;
 
-    if (!cmrOld.indexHidden.eoo()) {
-
+    if (indexHidden) {
         if (serverGlobalParams.featureCompatibility.getVersion() <
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46 &&
-            cmrOld.indexHidden.booleanSafe()) {
+            indexHidden.booleanSafe()) {
             return Status(ErrorCodes::BadValue, "Hidden indexes can only be created with FCV 4.6");
         }
         if (coll->ns().isSystem())
             return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
-        if (cmrOld.idx->isIdIndex())
+        if (idx->isIdIndex())
             return Status(ErrorCodes::BadValue, "can't hide _id index");
     }
 
@@ -367,11 +368,11 @@ Status _collModInternal(OperationContext* opCtx,
         // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
         // entries for modifications on a view.
         if (view) {
-            if (!cmrOld.viewPipeLine.eoo())
-                view->setPipeline(cmrOld.viewPipeLine);
+            if (viewPipeline)
+                view->setPipeline(viewPipeline);
 
-            if (!cmrOld.viewOn.empty())
-                view->setViewOn(NamespaceString(dbName, cmrOld.viewOn));
+            if (!viewOn.empty())
+                view->setViewOn(NamespaceString(dbName, viewOn));
 
             ViewCatalog* catalog = ViewCatalog::get(db);
 
@@ -401,53 +402,51 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Handle collMod operation type appropriately.
 
-        if (!cmrOld.indexExpireAfterSeconds.eoo() || !cmrOld.indexHidden.eoo()) {
+        if (indexExpireAfterSeconds || indexHidden) {
             BSONElement newExpireSecs = {};
             BSONElement oldExpireSecs = {};
             BSONElement newHidden = {};
             BSONElement oldHidden = {};
+
             // TTL Index
-            if (!cmrOld.indexExpireAfterSeconds.eoo()) {
-                newExpireSecs = cmrOld.indexExpireAfterSeconds;
-                oldExpireSecs = cmrOld.idx->infoObj().getField("expireAfterSeconds");
+            if (indexExpireAfterSeconds) {
+                newExpireSecs = indexExpireAfterSeconds;
+                oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
                 if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
                                                                     newExpireSecs)) {
                     // Change the value of "expireAfterSeconds" on disk.
                     DurableCatalog::get(opCtx)->updateTTLSetting(opCtx,
                                                                  coll->getCatalogId(),
-                                                                 cmrOld.idx->indexName(),
+                                                                 idx->indexName(),
                                                                  newExpireSecs.safeNumberLong());
                 }
             }
 
             // User wants to hide or unhide index.
-            if (!cmrOld.indexHidden.eoo()) {
-                newHidden = cmrOld.indexHidden;
-                oldHidden = cmrOld.idx->infoObj().getField("hidden");
+            if (indexHidden) {
+                newHidden = indexHidden;
+                oldHidden = idx->infoObj().getField("hidden");
                 // Make sure when we set 'hidden' to false, we can remove the hidden field from
                 // catalog.
                 if (SimpleBSONElementComparator::kInstance.evaluate(oldHidden != newHidden)) {
-                    DurableCatalog::get(opCtx)->updateHiddenSetting(opCtx,
-                                                                    coll->getCatalogId(),
-                                                                    cmrOld.idx->indexName(),
-                                                                    newHidden.booleanSafe());
+                    DurableCatalog::get(opCtx)->updateHiddenSetting(
+                        opCtx, coll->getCatalogId(), idx->indexName(), newHidden.booleanSafe());
                 }
             }
 
-
-            indexCollModInfo = IndexCollModInfo{
-                cmrOld.indexExpireAfterSeconds.eoo() ? boost::optional<Seconds>()
-                                                     : Seconds(newExpireSecs.safeNumberLong()),
-                cmrOld.indexExpireAfterSeconds.eoo() ? boost::optional<Seconds>()
-                                                     : Seconds(oldExpireSecs.safeNumberLong()),
-                cmrOld.indexHidden.eoo() ? boost::optional<bool>() : newHidden.booleanSafe(),
-                cmrOld.indexHidden.eoo() ? boost::optional<bool>() : oldHidden.booleanSafe(),
-                cmrNew.idx->indexName()};
+            indexCollModInfo =
+                IndexCollModInfo{!indexExpireAfterSeconds ? boost::optional<Seconds>()
+                                                          : Seconds(newExpireSecs.safeNumberLong()),
+                                 !indexExpireAfterSeconds ? boost::optional<Seconds>()
+                                                          : Seconds(oldExpireSecs.safeNumberLong()),
+                                 !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
+                                 !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
+                                 cmrNew.idx->indexName()};
 
             // Notify the index catalog that the definition of this index changed. This will
-            // invalidate the idx pointer in cmrOld. On rollback of this WUOW, the idx pointer
-            // in cmrNew will be invalidated and the idx pointer in cmrOld will be valid again.
-            cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmrOld.idx);
+            // invalidate the local idx pointer. On rollback of this WUOW, the idx pointer in
+            // cmrNew will be invalidated and the local var idx pointer will be valid again.
+            cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, idx);
             opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
                 oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
 
@@ -457,13 +456,17 @@ Status _collModInternal(OperationContext* opCtx,
             }
         }
 
-        // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
-        if (!cmrNew.collValidator.eoo())
-            invariant(coll->setValidator(opCtx, cmrNew.collValidator.Obj()));
-        if (!cmrNew.collValidationAction.empty())
-            invariant(coll->setValidationAction(opCtx, cmrNew.collValidationAction));
-        if (!cmrNew.collValidationLevel.empty())
-            invariant(coll->setValidationLevel(opCtx, cmrNew.collValidationLevel));
+        if (cmrNew.collValidator) {
+            coll->setValidator(opCtx, std::move(*cmrNew.collValidator));
+        }
+        if (cmrNew.collValidationAction)
+            uassertStatusOKWithContext(
+                coll->setValidationAction(opCtx, *cmrNew.collValidationAction),
+                "Failed to set validationAction");
+        if (cmrNew.collValidationLevel) {
+            uassertStatusOKWithContext(coll->setValidationLevel(opCtx, *cmrNew.collValidationLevel),
+                                       "Failed to set validationLevel");
+        }
 
         if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
             coll->setRecordPreImages(opCtx, cmrNew.recordPreImages);
@@ -471,7 +474,6 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
-
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();
         opObserver->onCollMod(
             opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, indexCollModInfo);
