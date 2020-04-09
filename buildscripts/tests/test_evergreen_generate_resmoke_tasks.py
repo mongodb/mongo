@@ -78,6 +78,7 @@ class TestAcceptance(unittest.TestCase):
             "project": "mongodb-mongo-master",
             "task_id": "task314",
             "task_name": "some_task_gen",
+            "max_sub_suites": 100,
         }
 
     @staticmethod
@@ -811,11 +812,12 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
 class GenerateSubSuitesTest(unittest.TestCase):
     @staticmethod
-    def get_mock_options(n_fallback=2):
+    def get_mock_options(n_fallback=2, max_sub_suites=100):
         options = MagicMock()
         options.target_resmoke_time = 10
         options.fallback_num_sub_suites = n_fallback
         options.max_tests_per_suite = None
+        options.max_sub_suites = max_sub_suites
         return options
 
     @staticmethod
@@ -858,6 +860,24 @@ class GenerateSubSuitesTest(unittest.TestCase):
         self.assertEqual(n_fallback, len(suites))
         for suite in suites:
             self.assertEqual(n_tests / n_fallback, len(suite.tests))
+
+        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
+
+    def test_max_sub_suites_overrides_fallback(self):
+        n_tests = 100
+        n_fallback = 5
+        max_sub_suites = 1
+        evg = mock_test_stats_unavailable(MagicMock())
+        config_options = self.get_mock_options(n_fallback=n_fallback, max_sub_suites=max_sub_suites)
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
+
+        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+
+        self.assertEqual(max_sub_suites, len(suites))
+        for suite in suites:
+            self.assertEqual(n_tests, len(suite.tests))
 
         self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 

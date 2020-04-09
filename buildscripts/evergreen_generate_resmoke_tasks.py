@@ -857,7 +857,8 @@ class GenerateSubSuites(object):
         LOGGER.debug("Splitting tasks based on fallback",
                      fallback=self.config_options.fallback_num_sub_suites)
         self.test_list = self.list_tests()
-        num_suites = min(self.config_options.fallback_num_sub_suites, len(self.test_list))
+        num_suites = min(self.config_options.fallback_num_sub_suites, len(self.test_list),
+                         self.config_options.max_sub_suites)
         suites = [Suite(self.config_options.suite) for _ in range(num_suites)]
         for idx, test_file in enumerate(self.test_list):
             suites[idx % num_suites].add_test(test_file, 0)
