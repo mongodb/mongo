@@ -3674,6 +3674,8 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
         iter->second->emplaceValue(response);
         iter->second = std::make_shared<SharedPromise<std::shared_ptr<const IsMasterResponse>>>();
     }
+
+    IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
 }
 
 void ReplicationCoordinatorImpl::incrementTopologyVersion() {
@@ -3695,7 +3697,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized()) {
             _fulfillTopologyChangePromise(lk);
-            IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
         }
     });
 
