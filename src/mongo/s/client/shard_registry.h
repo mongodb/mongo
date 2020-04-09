@@ -64,6 +64,25 @@ public:
 
     void swap(ShardRegistryData& other);
 
+    /*
+     * Swaps _shardIdLookup, _rsLookup, and _configShard with other. Merges _hostLookup and
+     * _connStringLookup without overwriting existing entries in either map.
+     *
+     * Called when reloading the shard registry. It is important to merge _hostLookup because
+     * reloading the shard registry can interleave with updates to the shard registry passed by the
+     * RSM.
+     */
+    void swapAndMerge(ShardRegistryData& other);
+
+    /**
+     * Returns a shared pointer the shard object with the given shard id.
+     *
+     * Callers might pass in the connection string or HostAndPort rather than ShardId, so this
+     * method will first look for the shard by ShardId, then connection string, then HostAndPort
+     * stopping once it finds the shard.
+     */
+    std::shared_ptr<Shard> findShard(ShardId const& shardId) const;
+
     /**
      * Lookup shard by replica set name. Returns nullptr if the name can't be found.
      */
@@ -75,7 +94,7 @@ public:
     std::shared_ptr<Shard> findByShardId(const ShardId&) const;
 
     /**
-     * Finds the Shard that the mongod listening at this HostAndPort is a member of.
+     * Finds the shard that the mongod listening at this HostAndPort is a member of.
      */
     std::shared_ptr<Shard> findByHostAndPort(const HostAndPort&) const;
 
@@ -111,6 +130,11 @@ private:
      */
     void _addShard(WithLock, std::shared_ptr<Shard> const&, bool useOriginalCS);
     auto _findByShardId(WithLock, ShardId const&) const -> std::shared_ptr<Shard>;
+    auto _findByHostAndPort(WithLock, const HostAndPort& hostAndPort) const
+        -> std::shared_ptr<Shard>;
+    auto _findByConnectionString(WithLock, const ConnectionString& connectionString) const
+        -> std::shared_ptr<Shard>;
+    auto _findShard(WithLock lk, ShardId const& shardId) const -> std::shared_ptr<Shard>;
     void _rebuildShard(WithLock, ConnectionString const& newConnString, ShardFactory* factory);
 
     // Protects the lookup maps below.
@@ -118,13 +142,17 @@ private:
 
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 
-    // Map of both shardName -> Shard and hostName -> Shard
-    ShardMap _lookup;
+    // Map of shardName -> Shard
+    ShardMap _shardIdLookup;
 
     // Map from replica set name to shard corresponding to this replica set
     ShardMap _rsLookup;
 
+    // Map of HostAndPort to Shard
     stdx::unordered_map<HostAndPort, std::shared_ptr<Shard>> _hostLookup;
+
+    // Map of connection string to Shard
+    std::map<ConnectionString, std::shared_ptr<Shard>> _connStringLookup;
 
     // store configShard separately to always have a reference
     std::shared_ptr<Shard> _configShard;
