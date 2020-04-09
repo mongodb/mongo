@@ -96,8 +96,6 @@ public:
 
     virtual int getProfilingLevel() const = 0;
 
-    virtual const NamespaceString& getProfilingNS() const = 0;
-
     /**
      * Sets the 'drop-pending' state of this Database.
      * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
