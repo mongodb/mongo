@@ -734,16 +734,12 @@ protected:
                                    const std::string& reason,
                                    bool shouldWait);
 
+    void _awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& lk,
+                                 OperationContext* opCtx,
+                                 StringData db);
+
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
-
-    // Maps database name to database information. Tracks and accesses index builds on a database
-    // level. Can be used to abort and wait upon the completion of all index builds for a database.
-    //
-    // Maps shared_ptrs so that DatabaseIndexBuildsTracker instances can outlive being erased from
-    // this map when there are no longer any builds remaining on the database. This is necessary
-    // when callers must wait for all index builds to cease.
-    StringMap<std::shared_ptr<DatabaseIndexBuildsTracker>> _databaseIndexBuilds;
 
     // Collection UUID to collection level index build information. Enables index build lookup and
     // abort by collection UUID and index name, as well as collection level interruption.
