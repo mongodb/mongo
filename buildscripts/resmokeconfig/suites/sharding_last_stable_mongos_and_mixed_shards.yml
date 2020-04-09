@@ -149,6 +149,8 @@ selector:
   - jstests/sharding/server_status.js
   # Enable after SERVER-31083 is backported and available on 4.2 and 4.0 binaries
   - jstests/sharding/enable_sharding_with_primary.js
+  # SERVER-47534: Unblacklist mongos_dataSize.js from sharding_last_stable_mongos_and_mixed_shards suite.
+  - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable if SERVER-43310 is backported to 4.0
