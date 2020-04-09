@@ -46,7 +46,8 @@ public:
                                const std::string& identEnd,
                                const NamespaceString& collectionNamespace,
                                const std::string& indexName,
-                               const BSONObj& keyPattern);
+                               const BSONObj& keyPattern,
+                               const BSONObj& collation);
     void commit(bool mayInterrupt) override;
     virtual Status addKey(const KeyString::Value& keyString);
 
@@ -63,6 +64,7 @@ private:
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
+    const BSONObj _collation;
     // Whether or not we've already added something before.
     bool _hasLast;
     // This is the KeyString of the last key added.
@@ -195,6 +197,7 @@ private:
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
+    const BSONObj _collation;
     // These are the keystring representations of the _prefix and the _identEnd.
     std::string _KSForIdentStart;
     std::string _KSForIdentEnd;

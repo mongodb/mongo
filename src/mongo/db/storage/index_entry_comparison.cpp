@@ -36,6 +36,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -177,14 +179,29 @@ KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSO
 Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
-                              const BSONObj& keyPattern) {
+                              const BSONObj& keyPattern,
+                              const BSONObj& indexCollation) {
+    const bool hasCollation = !indexCollation.isEmpty();
+
     StringBuilder sb;
     sb << "E11000 duplicate key error";
     sb << " collection: " << collectionNamespace;
     sb << " index: " << indexName;
+    if (hasCollation) {
+        sb << " collation: " << indexCollation;
+    }
     sb << " dup key: ";
 
-    BSONObjBuilder builder;
+    // For the purpose of producing a useful error message, generate a representation of the key
+    // with field names hydrated and with invalid UTF-8 hex-encoded.
+    BSONObjBuilder builderForErrmsg;
+
+    // Used to build a version of the key after hydrating with field names but without hex encoding
+    // invalid UTF-8. This key is attached to the extra error info and consumed by callers who may
+    // wish to retry on duplicate key errors. The field names are rehydrated so that we don't return
+    // BSON with duplicate key names to clients.
+    BSONObjBuilder builderForErrorExtraInfo;
+
     // key is a document with forms like: '{ : 123}', '{ : {num: 123} }', '{ : 123, : "str" }'
     BSONObjIterator keyValueIt(key);
     // keyPattern is a document with only one level. e.g. '{a : 1, b : -1}', '{a.b : 1}'
@@ -197,23 +214,45 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
         if (keyNameElem.eoo())
             break;
 
-        builder.appendAs(keyValueElem, keyNameElem.fieldName());
+        builderForErrorExtraInfo.appendAs(keyValueElem, keyNameElem.fieldName());
+
+        // If the duplicate key value contains a string, then it's possible that the string contains
+        // binary data which is not valid UTF-8. This is true for all indexes with a collation,
+        // since the index stores collation keys rather than raw user strings. But it's also
+        // possible that the application has stored binary data inside a string, which the system
+        // has never rejected.
+        //
+        // If the string in the key is invalid UTF-8, then we hex encode it before adding it to the
+        // error message so that the driver can assume valid UTF-8 when reading the reply.
+        const bool shouldHexEncode = keyValueElem.type() == BSONType::String &&
+            (hasCollation || !isValidUTF8(keyValueElem.valueStringData()));
+
+        if (shouldHexEncode) {
+            auto stringToEncode = keyValueElem.valueStringData();
+            builderForErrmsg.append(
+                keyNameElem.fieldName(),
+                str::stream() << "0x"
+                              << toHexLower(stringToEncode.rawData(), stringToEncode.size()));
+        } else {
+            builderForErrmsg.appendAs(keyValueElem, keyNameElem.fieldName());
+        }
     }
 
-    auto keyValueWithName = builder.obj();
-    sb << keyValueWithName;
-    return Status(DuplicateKeyErrorInfo(keyPattern, keyValueWithName), sb.str());
+    sb << builderForErrmsg.obj();
+
+    return Status(DuplicateKeyErrorInfo(keyPattern, builderForErrorExtraInfo.obj()), sb.str());
 }
 
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
+                              const BSONObj& indexCollation,
                               const Ordering& ordering) {
     const BSONObj key = KeyString::toBson(
         keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
 
-    return buildDupKeyErrorStatus(key, collectionNamespace, indexName, keyPattern);
+    return buildDupKeyErrorStatus(key, collectionNamespace, indexName, keyPattern, indexCollation);
 }
 
 }  // namespace mongo

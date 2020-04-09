@@ -106,6 +106,7 @@ std::unique_ptr<SortedDataInterface> EphemeralForTestEngine::getSortedDataInterf
                                         desc->parentNS(),
                                         desc->indexName(),
                                         desc->keyPattern(),
+                                        desc->collation(),
                                         &_dataMap[ident]);
 }
 
