@@ -34,6 +34,8 @@
 
 #include "mongo/db/index_builds_coordinator_mongod.h"
 
+#include <algorithm>
+
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/concurrency/locker.h"
@@ -800,31 +802,30 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     UUID collectionUUID = collection->uuid();
 
     stdx::unique_lock<Latch> lk(_mutex);
-    auto collectionIt = _collectionIndexBuilds.find(collectionUUID);
-    if (collectionIt == _collectionIndexBuilds.end()) {
-        return Status(ErrorCodes::IndexNotFound,
-                      str::stream() << "No index builds found on collection '" << nss << "'.");
-    }
-
-    if (!collectionIt->second->hasIndexBuildState(lk, indexNames.front())) {
+    auto pred = [&](const auto& replState) {
+        if (collectionUUID != replState.collectionUUID) {
+            return false;
+        }
+        if (indexNames.size() != replState.indexNames.size()) {
+            return false;
+        }
+        // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
+        return std::equal(
+            replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
+    };
+    auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
+    if (collIndexBuilds.empty()) {
         return Status(ErrorCodes::IndexNotFound,
                       str::stream() << "Cannot find an index build on collection '" << nss
                                     << "' with the provided index names");
     }
+    invariant(
+        1U == collIndexBuilds.size(),
+        str::stream() << "Found multiple index builds with the same index names on collection "
+                      << nss << " (" << collectionUUID
+                      << "): first index name: " << indexNames.front());
 
-    // Use the first index to get the ReplIndexBuildState.
-    std::shared_ptr<ReplIndexBuildState> buildState =
-        collectionIt->second->getIndexBuildState(lk, indexNames.front());
-
-    // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
-    bool equal = std::equal(
-        buildState->indexNames.begin(), buildState->indexNames.end(), indexNames.begin());
-    if (buildState->indexNames.size() != indexNames.size() || !equal) {
-        return Status(ErrorCodes::IndexNotFound,
-                      str::stream()
-                          << "Provided indexes are not all being "
-                          << "built by the same index builder in collection '" << nss << "'.");
-    }
+    auto buildState = collIndexBuilds.front();
 
     // See if the new commit quorum is satisfiable.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);

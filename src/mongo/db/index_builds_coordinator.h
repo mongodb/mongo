@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/index_build_oplog_entry.h"
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
-#include "mongo/db/collection_index_builds_tracker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_index_builds_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -330,12 +329,6 @@ public:
     int numInProgForDb(StringData db) const;
 
     /**
-     * Prints out the names of collections on which index builds are running, and the number of
-     * index builds per database.
-     */
-    void dump(std::ostream&) const;
-
-    /**
      * Returns true if an index build is in progress on the specified collection.
      */
     bool inProgForCollection(const UUID& collectionUUID, IndexBuildProtocol protocol) const;
@@ -362,10 +355,10 @@ public:
     void assertNoBgOpInProgForDb(StringData db) const;
 
     /**
-     * Waits for the index build with 'buildUUID' to finish on the specified collection before
-     * returning. Returns immediately if no such index build with 'buildUUID' is found.
+     * Waits for the index build with 'buildUUID' to finish before returning.
+     * Returns immediately if no such index build with 'buildUUID' is found.
      */
-    void awaitIndexBuildFinished(const UUID& collectionUUID, const UUID& buildUUID) const;
+    void awaitIndexBuildFinished(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
      * Waits for all index builds on a specified collection to finish.
@@ -727,6 +720,10 @@ protected:
                                                   const std::string& reason,
                                                   bool shouldWait);
 
+    void _awaitNoIndexBuildInProgressForCollection(stdx::unique_lock<Latch>& lk,
+                                                   OperationContext* opCtx,
+                                                   const UUID& collectionUUID);
+
     /**
      * Helper for 'abortDatabaseIndexBuilds' and 'abortDatabaseIndexBuildsNoWait'.
      */
@@ -742,15 +739,6 @@ protected:
 
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
-
-    // Collection UUID to collection level index build information. Enables index build lookup and
-    // abort by collection UUID and index name, as well as collection level interruption.
-    //
-    // Maps shared_ptrs so that CollectionIndexBuildsTracker instances can outlive being erased from
-    // this map when there are no longer any builds remaining on the collection. This is necessary
-    // when callers must wait for and index build or all index builds to cease.
-    stdx::unordered_map<UUID, std::shared_ptr<CollectionIndexBuildsTracker>, UUID::Hash>
-        _collectionIndexBuilds;
 
     // Build UUID to index build information map.
     stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash> _allIndexBuilds;
