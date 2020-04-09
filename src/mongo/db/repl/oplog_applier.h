@@ -127,7 +127,7 @@ public:
 
     /**
      * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
-     * size.
+     * size.  Must not be called from within a WriteUnitOfWork.
      * Batches are limited to 10% of the oplog.
      */
     static std::size_t calculateBatchLimitBytes(OperationContext* opCtx,
