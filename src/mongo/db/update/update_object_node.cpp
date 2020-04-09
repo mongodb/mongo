@@ -268,7 +268,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 
     // Create UpdateInternalNodes along the path.
     UpdateInternalNode* current = static_cast<UpdateInternalNode*>(root);
-    for (size_t i = 0; i < fieldRef.numParts() - 1; ++i) {
+    for (FieldIndex i = 0; i < fieldRef.numParts() - 1; ++i) {
         auto fieldIsArrayFilterIdentifier =
             fieldchecker::isArrayFilterIdentifier(fieldRef.getPart(i));
 
@@ -424,7 +424,8 @@ UpdateExecutor::ApplyResult UpdateObjectNode::apply(
                     pair.first,
                     UpdateNode::createUpdateNodeByMerging(
                         *_positionalChild, *pair.second, updateNodeApplyParams.pathTaken.get())));
-                for (size_t i = 0; i < updateNodeApplyParams.pathToCreate->numParts() + 1; ++i) {
+                for (FieldIndex i = 0; i < updateNodeApplyParams.pathToCreate->numParts() + 1;
+                     ++i) {
                     updateNodeApplyParams.pathTaken->removeLastPart();
                 }
                 invariant(insertResult.second);

@@ -30,8 +30,11 @@
 #pragma once
 
 #include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
 #include <cstddef>
 #include <vector>
+
+#include "mongo/bson/bson_depth.h"
 
 namespace mongo {
 
@@ -53,8 +56,15 @@ namespace mongo {
 // {a: 1, b: 1}           none                  {{}, {}}
 // {a: 1, b: 1}           no multikey metadata  {}
 //
-using MultikeyComponents = boost::container::flat_set<std::size_t>;
+// Use small_vector as data structure to be able to store a few multikey components and paths
+// without needing to allocate memory. This optimizes for the common case.
+constexpr std::size_t kFewMultikeyComponents = 4;
+using MultikeyComponents = boost::container::flat_set<
+    BSONDepthIndex,
+    std::less<BSONDepthIndex>,
+    boost::container::small_vector<BSONDepthIndex, kFewMultikeyComponents>>;
 // An empty vector is used to represent that the index doesn't support path-level multikey tracking.
-using MultikeyPaths = std::vector<MultikeyComponents>;
+constexpr std::size_t kFewCompoundIndexFields = 4;
+using MultikeyPaths = boost::container::small_vector<MultikeyComponents, kFewCompoundIndexFields>;
 
 }  // namespace mongo

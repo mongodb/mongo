@@ -52,13 +52,14 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                   StringData path,
                                   BSONElementColl& elements,
                                   bool expandArrayOnTrailingField,
-                                  size_t depth,
+                                  BSONDepthIndex depth,
                                   MultikeyComponents* arrayComponents) {
     BSONElement e = obj.getField(path);
 
     if (e.eoo()) {
         size_t idx = path.find('.');
         if (idx != std::string::npos) {
+            invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
             StringData left = path.substr(0, idx);
             StringData next = path.substr(idx + 1, path.size());
 
@@ -166,7 +167,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  BSONElementSet& elements,
                                  bool expandArrayOnTrailingField,
                                  MultikeyComponents* arrayComponents) {
-    const size_t initialDepth = 0;
+    const BSONDepthIndex initialDepth = 0;
     _extractAllElementsAlongPath(
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
@@ -176,7 +177,7 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  BSONElementMultiSet& elements,
                                  bool expandArrayOnTrailingField,
                                  MultikeyComponents* arrayComponents) {
-    const size_t initialDepth = 0;
+    const BSONDepthIndex initialDepth = 0;
     _extractAllElementsAlongPath(
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }

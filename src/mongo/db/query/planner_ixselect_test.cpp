@@ -1193,7 +1193,7 @@ TEST(QueryPlannerIXSelectTest, NotEqualsNullCannotUseDottedMultiKeyIndex) {
 
 TEST(QueryPlannerIXSelectTest, NotEqualsNullCanUseIndexWhichIsMultiKeyOnAnotherPath) {
     auto entry = buildSimpleIndexEntry(BSON("a" << 1 << "mk" << 1));
-    entry.multikeyPaths = {{}, {0}};
+    entry.multikeyPaths = {MultikeyComponents{}, MultikeyComponents{0}};
     std::set<size_t> expectedIndices = {0};
     testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }

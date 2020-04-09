@@ -83,7 +83,7 @@ typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;
  */
 Status findLongestPrefix(const FieldRef& prefix,
                          mutablebson::Element root,
-                         size_t* idxFound,
+                         FieldIndex* idxFound,
                          mutablebson::Element* elemFound);
 
 /**
@@ -96,7 +96,7 @@ Status findLongestPrefix(const FieldRef& prefix,
  * to the element in the doc that is the parent of prefix[idxRoot].
  */
 StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
-                                              size_t idxRoot,
+                                              FieldIndex idxRoot,
                                               mutablebson::Element elemFound,
                                               mutablebson::Element newElem);
 

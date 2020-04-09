@@ -71,10 +71,10 @@ Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
 
 Status findLongestPrefix(const FieldRef& prefix,
                          mutablebson::Element root,
-                         size_t* idxFound,
+                         FieldIndex* idxFound,
                          mutablebson::Element* elemFound) {
     // If root is empty or the prefix is so, there's no point in looking for a prefix.
-    const size_t prefixSize = prefix.numParts();
+    const FieldIndex prefixSize = prefix.numParts();
     if (!root.hasChildren() || prefixSize == 0) {
         return Status(ErrorCodes::NonExistentPath, "either the document or the path are empty");
     }
@@ -83,8 +83,8 @@ Status findLongestPrefix(const FieldRef& prefix,
     // in 'root' and that the type of the previous part ('prev') allows for children.
     mutablebson::Element curr = root;
     mutablebson::Element prev = root;
-    size_t i = 0;
-    boost::optional<size_t> numericPart;
+    FieldIndex i = 0;
+    boost::optional<FieldIndex> numericPart;
     bool viable = true;
     for (; i < prefixSize; i++) {
         // If prefix wants to reach 'curr' by applying a non-numeric index to an array
@@ -142,7 +142,7 @@ Status findLongestPrefix(const FieldRef& prefix,
 }
 
 StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
-                                              size_t idxFound,
+                                              FieldIndex idxFound,
                                               mutablebson::Element elemFound,
                                               mutablebson::Element newElem) {
     Status status = Status::OK();
@@ -155,7 +155,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     }
 
     // Sanity check that 'idxField' is an actual part.
-    const size_t size = prefix.numParts();
+    const FieldIndex size = prefix.numParts();
     if (idxFound >= size) {
         return Status(ErrorCodes::BadValue, "index larger than path size");
     }
@@ -164,7 +164,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
 
     // If we are creating children under an array and a numeric index is next, then perhaps
     // we need padding.
-    size_t i = idxFound;
+    FieldIndex i = idxFound;
     bool inArray = false;
     if (elemFound.getType() == mongo::Array) {
         boost::optional<size_t> newIdx = str::parseUnsignedBase10Integer(prefix.getPart(idxFound));
@@ -265,7 +265,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
 Status setElementAtPath(const FieldRef& path,
                         const BSONElement& value,
                         mutablebson::Document* doc) {
-    size_t deepestElemPathPart;
+    FieldIndex deepestElemPathPart;
     mutablebson::Element deepestElem(doc->end());
 
     // Get the existing parents of this path

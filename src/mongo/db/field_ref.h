@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
 #include <boost/optional.hpp>
 #include <iosfwd>
 #include <set>
@@ -36,6 +37,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
@@ -50,6 +52,7 @@ namespace mongo {
  *
  * The class is not thread safe.
  */
+using FieldIndex = BSONDepthIndex;
 class FieldRef {
 public:
     /**
@@ -102,7 +105,7 @@ public:
      * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is undefined
      * otherwise.
      */
-    void setPart(size_t i, StringData part);
+    void setPart(FieldIndex i, StringData part);
 
     /**
      * Adds a new field to the end of the path, increasing its size by 1.
@@ -124,7 +127,7 @@ public:
     /**
      * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
      */
-    StringData getPart(size_t i) const;
+    StringData getPart(FieldIndex i) const;
 
     /**
      * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
@@ -140,14 +143,14 @@ public:
     /**
      * Returns the number of field parts in the prefix that 'this' and 'other' share.
      */
-    size_t commonPrefixSize(const FieldRef& other) const;
+    FieldIndex commonPrefixSize(const FieldRef& other) const;
 
     /**
      * Returns true if the specified path component is a numeric string which is eligible to act as
      * the key name for an element in a BSON array; in other words, the fieldname matches the regex
      * ^(0|[1-9]+[0-9]*)$.
      */
-    bool isNumericPathComponentStrict(size_t i) const;
+    bool isNumericPathComponentStrict(FieldIndex i) const;
 
     /**
      * Returns true if this FieldRef has any numeric path components.
@@ -157,19 +160,19 @@ public:
     /**
      * Returns the positions of all numeric path components, starting from the given position.
      */
-    std::set<size_t> getNumericPathComponents(size_t startPart = 0) const;
+    std::set<FieldIndex> getNumericPathComponents(FieldIndex startPart = 0) const;
 
     /**
      * Returns a StringData of the full dotted field in its current state (i.e., some parts may have
      * been replaced since the parse() call).
      */
-    StringData dottedField(size_t offsetFromStart = 0) const;
+    StringData dottedField(FieldIndex offsetFromStart = 0) const;
 
     /**
      * Returns a StringData of parts of the dotted field from startPart to endPart in its current
      * state (i.e., some parts may have been replaced since the parse() call).
      */
-    StringData dottedSubstring(size_t startPart, size_t endPart) const;
+    StringData dottedSubstring(FieldIndex startPart, FieldIndex endPart) const;
 
     /**
      * Compares the full dotted path represented by this FieldRef to other
@@ -194,8 +197,8 @@ public:
     /**
      * Returns the number of parts in this FieldRef.
      */
-    size_t numParts() const {
-        return _size;
+    FieldIndex numParts() const {
+        return _parts.size();
     }
 
     bool empty() const {
@@ -210,8 +213,8 @@ public:
         return  // Add size of each element in '_replacements' vector.
             container_size_helper::estimateObjectSizeInBytes(
                 _replacements, [](const std::string& s) { return s.capacity(); }, true) +
-            // Add size of each element in '_variable' vector.
-            container_size_helper::estimateObjectSizeInBytes(_variable) +
+            // Add size of each element in '_parts' vector.
+            container_size_helper::estimateObjectSizeInBytes(_parts) +
             // Add runtime size of '_dotted' string.
             _dotted.capacity() +
             // Add size of the object.
@@ -223,7 +226,7 @@ private:
     // here that will not require any extra memory allocation when that is the case. And
     // handle larger dotted fields if it is. The idea is not to penalize the common case
     // with allocations.
-    static const size_t kReserveAhead = 4;
+    static constexpr size_t kFewDottedFieldParts = 4;
 
     // In order to make FieldRef copyable, we use a StringData-like type that stores an offset and
     // length into the backing string. StringData, in constrast, holds const char* pointers that
@@ -242,11 +245,6 @@ private:
         std::size_t len = 0;
     };
 
-    /** Converts the field part index to the variable part equivalent */
-    size_t getIndex(size_t i) const {
-        return i - kReserveAhead;
-    }
-
     /**
      * Returns the new number of parts after appending 'part' to this field path. This is
      * private, because it is only intended for use by the parse function.
@@ -255,31 +253,25 @@ private:
 
     /**
      * Re-assemble _dotted from components, including any replacements in _replacements,
-     * and update the StringData components in _fixed and _variable to refer to the parts
+     * and update the StringData components in _parts to refer to the parts
      * of the new _dotted. This is used to make the storage for the current value of this
      * FieldRef contiguous so it can be returned as a StringData from the dottedField
      * method above.
      */
     void reserialize() const;
 
-    // number of field parts stored
-    size_t _size = 0u;
-
     // Number of field parts in the cached dotted name (_dotted).
-    mutable size_t _cachedSize = 0u;
+    mutable FieldIndex _cachedSize = 0u;
 
-    // First 'kReservedAhead' field components. Each component is either a StringView backed by the
+    // Field components. Each component is either a StringView backed by the
     // _dotted string or boost::none to indicate that getPart() should read the string from the
     // _replacements list.
-    mutable boost::optional<StringView> _fixed[kReserveAhead];
-
-    // Remaining field components. Each non-none element is a view backed by '_dotted'. (See comment
-    // above _fixed.)
-    mutable std::vector<boost::optional<StringView>> _variable;
+    mutable boost::container::small_vector<boost::optional<StringView>, kFewDottedFieldParts>
+        _parts;
 
     /**
-     * Cached copy of the complete dotted name string. The StringView objects in "_fixed" and
-     * "_variable" reference this string.
+     * Cached copy of the complete dotted name string. The StringView objects in "_parts" reference
+     * this string.
      */
     mutable std::string _dotted;
 

@@ -860,14 +860,14 @@ TEST(NumericPathComponents, CanIdentifyNumericPathComponents) {
 
 TEST(NumericPathComponents, CanObtainAllNumericPathComponents) {
     FieldRef path("a.0.b.1.c.2.d");
-    std::set<size_t> expectedComponents{size_t(1), size_t(3), size_t(5)};
+    std::set<FieldIndex> expectedComponents{FieldIndex(1), FieldIndex(3), FieldIndex(5)};
     auto numericPathComponents = path.getNumericPathComponents();
     ASSERT(numericPathComponents == expectedComponents);
 }
 
 TEST(NumericPathComponents, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
     FieldRef path("a.0.b.01.c.2.d");
-    std::set<size_t> expectedComponents{size_t(1), size_t(5)};
+    std::set<FieldIndex> expectedComponents{FieldIndex(1), FieldIndex(5)};
     auto numericPathComponents = path.getNumericPathComponents();
     ASSERT(numericPathComponents == expectedComponents);
 }

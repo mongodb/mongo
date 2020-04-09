@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -180,6 +181,24 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithScalarValue) {
     MultikeyComponents actualArrayComponents;
     dps::extractAllElementsAlongPath(
         obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+
+    assertBSONElementSetsAreEqual({BSON("" << 1)}, actualElements);
+    assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
+TEST(ExtractAllElementsAlongPath, NestedMaxDepthObjectWithScalarValue) {
+    BSONObj obj = BSON("a" << 1);
+    std::string dotted_path = "a";
+    for (uint32_t i = 0; i < BSONDepth::getMaxAllowableDepth(); ++i) {
+        obj = BSON("a" << obj);
+        dotted_path = "a." + dotted_path;
+    }
+
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, dotted_path, actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1)}, actualElements);
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);

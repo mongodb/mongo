@@ -216,7 +216,8 @@ TEST_F(IndexBoundsBuilderTest,
        TranslateNotEqualToNullShouldBuildExactBoundsIfIndexIsNotMultiKeyOnRelevantPath) {
     BSONObj indexPattern = BSON("a" << 1 << "b" << 1);
     auto testIndex = buildSimpleIndexEntry(indexPattern);
-    testIndex.multikeyPaths = {{}, {0}};  // "a" is not multi-key, but "b" is.
+    testIndex.multikeyPaths = {MultikeyComponents{},
+                               MultikeyComponents{0}};  // "a" is not multi-key, but "b" is.
 
     for (BSONObj obj : kNeNullQueries) {
         // It's necessary to call optimize since the $not will have a singleton $and child, which

@@ -171,7 +171,7 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
 
     mutablebson::Document& document = applyParams.element.getDocument();
 
-    size_t fromIdxFound;
+    FieldIndex fromIdxFound;
     mutablebson::Element fromElement(document.end());
     auto status =
         pathsupport::findLongestPrefix(*fromFieldRef, document.root(), &fromIdxFound, &fromElement);

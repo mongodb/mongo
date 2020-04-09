@@ -43,7 +43,7 @@ struct BSONDepth {
     static constexpr std::int32_t kBSONDepthParameterFloor = 5;
 
     // The maximum allowable value for the BSON depth parameter.
-    static constexpr std::int32_t kBSONDepthParameterCeiling = 1000;
+    static constexpr std::int32_t kBSONDepthParameterCeiling = 250;
 
     // The number of extra levels of nesting above the storage depth limit that the server will
     // tolerate.
@@ -67,4 +67,5 @@ struct BSONDepth {
      */
     static std::uint32_t getMaxDepthForUserStorage();
 };
+using BSONDepthIndex = std::uint8_t;
 }  // namespace mongo
