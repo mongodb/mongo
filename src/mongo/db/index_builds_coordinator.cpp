@@ -367,7 +367,6 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
 }
 
 IndexBuildsCoordinator::~IndexBuildsCoordinator() {
-    invariant(_databaseIndexBuilds.empty());
     invariant(_collectionIndexBuilds.empty());
 }
 
@@ -608,8 +607,9 @@ void IndexBuildsCoordinator::_abortDatabaseIndexBuilds(stdx::unique_lock<Latch>&
                                                        const StringData& db,
                                                        const std::string& reason,
                                                        bool shouldWait) {
-    auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
-    if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
+    auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
+    auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+    if (dbIndexBuilds.empty()) {
         return;
     }
 
@@ -617,17 +617,26 @@ void IndexBuildsCoordinator::_abortDatabaseIndexBuilds(stdx::unique_lock<Latch>&
           "About to abort all index builders running for collections in the given database",
           "database"_attr = db);
 
-    dbIndexBuildsIt->second->runOperationOnAllBuilds(
-        lk, opCtx, &_indexBuildsManager, abortIndexBuild, reason);
+    for (auto replState : dbIndexBuilds) {
+        abortIndexBuild(lk, opCtx, &_indexBuildsManager, replState, reason);
+    }
 
     if (!shouldWait) {
         return;
     }
 
-    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
-    // object does not destruct while we are waiting, causing a use-after-free memory error.
-    auto dbIndexBuildsSharedPtr = dbIndexBuildsIt->second;
-    dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    _awaitNoBgOpInProgForDb(lk, opCtx, db);
+}
+
+void IndexBuildsCoordinator::_awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& lk,
+                                                     OperationContext* opCtx,
+                                                     StringData db) {
+    auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
+    auto pred = [&, this]() {
+        auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+        return dbIndexBuilds.empty();
+    };
+    _indexBuildsCondVar.wait(lk, pred);
 }
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
@@ -1115,12 +1124,9 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opC
 
 int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
     stdx::unique_lock<Latch> lk(_mutex);
-
-    auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
-    if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
-        return 0;
-    }
-    return dbIndexBuildsIt->second->getNumberOfIndexBuilds(lk);
+    auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
+    auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
+    return int(dbIndexBuilds.size());
 }
 
 void IndexBuildsCoordinator::dump(std::ostream& ss) const {
@@ -1133,10 +1139,6 @@ void IndexBuildsCoordinator::dump(std::ostream& ss) const {
         for (auto it = _collectionIndexBuilds.begin(); it != _collectionIndexBuilds.end(); ++it) {
             ss << "  " << it->first << '\n';
         }
-    }
-
-    for (auto it = _databaseIndexBuilds.begin(); it != _databaseIndexBuilds.end(); ++it) {
-        ss << "database " << it->first << ": " << it->second->getNumberOfIndexBuilds(lk) << '\n';
     }
 }
 
@@ -1156,8 +1158,7 @@ bool IndexBuildsCoordinator::inProgForCollection(const UUID& collectionUUID) con
 }
 
 bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
-    stdx::unique_lock<Latch> lk(_mutex);
-    return _databaseIndexBuilds.find(db) != _databaseIndexBuilds.end();
+    return numInProgForDb(db) > 0;
 }
 
 void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
@@ -1231,16 +1232,7 @@ void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(OperationC
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db) {
     stdx::unique_lock<Latch> lk(_mutex);
-
-    auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
-    if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
-        return;
-    }
-
-    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
-    // object does not destruct while we are waiting, causing a use-after-free memory error.
-    auto dbIndexBuildsSharedPtr = dbIndexBuildsIt->second;
-    dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    _awaitNoBgOpInProgForDb(lk, opCtx, db);
 }
 
 void IndexBuildsCoordinator::onReplicaSetReconfig() {
@@ -1337,7 +1329,6 @@ void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
 }
 
 void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() {
-    invariant(_databaseIndexBuilds.empty());
     invariant(_collectionIndexBuilds.empty());
 }
 
@@ -1416,14 +1407,6 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
 
     // Register the index build.
 
-    auto dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
-    if (!dbIndexBuilds) {
-        _databaseIndexBuilds[replIndexBuildState->dbName] =
-            std::make_shared<DatabaseIndexBuildsTracker>();
-        dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
-    }
-    dbIndexBuilds->addIndexBuild(lk, replIndexBuildState);
-
     auto collIndexBuildsItAndRes = _collectionIndexBuilds.insert(
         {replIndexBuildState->collectionUUID, std::make_shared<CollectionIndexBuildsTracker>()});
     collIndexBuildsItAndRes.first->second->addIndexBuild(lk, replIndexBuildState);
@@ -1437,13 +1420,6 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
 
 void IndexBuildsCoordinator::_unregisterIndexBuild(
     WithLock lk, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
-    auto dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
-    invariant(dbIndexBuilds);
-    dbIndexBuilds->removeIndexBuild(lk, replIndexBuildState->buildUUID);
-    if (dbIndexBuilds->getNumberOfIndexBuilds(lk) == 0) {
-        _databaseIndexBuilds.erase(replIndexBuildState->dbName);
-    }
-
     auto collIndexBuildsIt = _collectionIndexBuilds.find(replIndexBuildState->collectionUUID);
     invariant(collIndexBuildsIt != _collectionIndexBuilds.end());
     collIndexBuildsIt->second->removeIndexBuild(lk, replIndexBuildState);
