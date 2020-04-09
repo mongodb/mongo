@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/database_index_builds_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog_entry.h"
