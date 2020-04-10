@@ -513,14 +513,14 @@ std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::aw
     OperationContext* opCtx,
     const repl::SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> previous,
-    boost::optional<Date_t> deadline) const {
+    boost::optional<Date_t> deadline) {
     UASSERT_NOT_IMPLEMENTED;
 };
 
 SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
 ReplicationCoordinatorEmbedded::getIsMasterResponseFuture(
     const SplitHorizon::Parameters& horizonParams,
-    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    boost::optional<TopologyVersion> clientTopologyVersion) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

@@ -486,7 +486,7 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMaste
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion,
-    boost::optional<Date_t> deadline) const {
+    boost::optional<Date_t> deadline) {
     MONGO_UNREACHABLE;
 }
 
@@ -494,7 +494,7 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorNoOp::awaitIsMaste
 SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
 ReplicationCoordinatorNoOp::getIsMasterResponseFuture(
     const SplitHorizon::Parameters& horizonParams,
-    boost::optional<TopologyVersion> clientTopologyVersion) const {
+    boost::optional<TopologyVersion> clientTopologyVersion) {
     MONGO_UNREACHABLE;
 }
 

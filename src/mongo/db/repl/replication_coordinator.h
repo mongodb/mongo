@@ -987,7 +987,7 @@ public:
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
-        boost::optional<Date_t> deadline) const = 0;
+        boost::optional<Date_t> deadline) = 0;
 
     /**
      * The futurized version of `awaitIsMasterResponse()`:
@@ -996,7 +996,7 @@ public:
      */
     virtual SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> getIsMasterResponseFuture(
         const SplitHorizon::Parameters& horizonParams,
-        boost::optional<TopologyVersion> clientTopologyVersion) const = 0;
+        boost::optional<TopologyVersion> clientTopologyVersion) = 0;
 
     /**
      * Returns the OpTime that consists of the timestamp of the latest oplog entry and the current
