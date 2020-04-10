@@ -113,6 +113,15 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
         return false;
     }
 
+    if (_startupVersion == StartupVersion::IS_42_UPGRADED) {
+        // Once a 4.4 binary has touched data files, only 4.2.6+ can make sense of them. Note, even
+        // if the FCV was changed to 4.0, we choose to not make the journal compatible with a 4.0
+        // binary. If a primary continues to accept FCV downgrades to 3.6 and earlier, the 4.4
+        // touched data files will never be able to recover. At that point, a resync is the only
+        // option.
+        return false;
+    }
+
     const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     const auto memberState = replCoord->getMemberState();
     if (memberState.arbiter()) {
@@ -155,7 +164,8 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
 
 std::string WiredTigerFileVersion::getDowngradeString() {
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        invariant(_startupVersion != StartupVersion::IS_42);
+        invariant(_startupVersion != StartupVersion::IS_42_UPGRADED &&
+                  _startupVersion != StartupVersion::IS_42_CLASSIC);
 
         switch (_startupVersion) {
             case StartupVersion::IS_34:
@@ -668,10 +678,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "verbose=[recovery_progress,checkpoint_progress],";
     }
 
-    // MongoDB 4.2.6+ will also understand WT compatibility version 3.3. However it should only
-    // write data in compatibility version 3.2.
-    ss << "compatibility=(release=3.2,require_max=\"3.3.0\"),";
-
     // Enable debug write-ahead logging for all tables under debug build.
     if (kDebugBuild) {
         ss << "debug_mode=(table_logging=true),";
@@ -817,12 +823,55 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     bb.done();
 }
 
+/**
+ * Table of MongoDB<->WiredTiger<->Log version numbers:
+ *
+ * |                MongoDB | WiredTiger | Log |
+ * |------------------------+------------+-----|
+ * |                 3.0.15 |      2.5.3 |   1 |
+ * |                 3.2.20 |      2.9.2 |   1 |
+ * |                 3.4.15 |      2.9.2 |   1 |
+ * |                  3.6.4 |      3.0.1 |   2 |
+ * |                 4.0.16 |      3.1.1 |   3 |
+ * |                  4.2.1 |      3.2.2 |   3 |
+ * |                  4.2.6 |      3.3.0 |   3 |
+ * | 4.2.6 (blessed by 4.4) |      3.3.0 |   4 |
+ * |                  4.4.0 |     10.0.0 |   5 |
+ */
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
-    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"3.1.0\")";
+    // So long as the data files are never touched by 4.4, MongoDB 4.2.6+ will remain compatible
+    // with earlier 4.2 versions by using compatibility version 3.2 (log version 3).
+    //
+    // Additionally, we first try opening with `release=3.2` to allow fresh "dbpaths" to be
+    // backwards compatible with earlier 4.2 versions.
+    std::string configStr =
+        wtOpenConfig + ",compatibility=(release=3.2,require_min=\"3.2\",require_max=\"3.2\")";
 
     auto wtEventHandler = _eventHandler.getWtEventHandler();
-
     int ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_42_CLASSIC};
+        return;
+    }
+
+    // If the data files are in 4.4 -> 4.2 downgraded format (log version 4, compatibility version
+    // 3.3), continue to use compatibility version 3.3. This prevents earlier 4.2 releases from ever
+    // running on these data files.
+    configStr =
+        wtOpenConfig + ",compatibility=(release=3.3,require_min=\"3.3\",require_max=\"3.3\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_42_UPGRADED};
+        return;
+    }
+
+    // This shoud only succeed when the previous datafiles were in compatibility mode
+    // 3.1. `require_max=` is added for improved WT error messages. "3.3" is used because WT
+    // disallows using a release outside of the min/max range. These details also apply to the
+    // remaining `wiredtiger_open` calls.
+    configStr =
+        wtOpenConfig + ",compatibility=(release=3.2,require_min=\"3.1\",require_max=\"3.3\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
         _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_40};
         return;
@@ -831,14 +880,16 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     // Arbiters do not replicate the FCV document. Due to arbiter FCV semantics on 4.0, shutting
     // down a 4.0 arbiter may either downgrade the data files to WT compatibility 2.9 or 3.0. Thus,
     // 4.2 binaries must allow starting up on 2.9 and 3.0 files.
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.0.0\")";
+    configStr =
+        wtOpenConfig + ",compatibility=(release=3.2,require_min=\"3.0\",require_max=\"3.3\")";
     ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
         _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_36};
         return;
     }
 
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"2.9.0\")";
+    configStr =
+        wtOpenConfig + ",compatibility=(release=3.2,require_min=\"2.9\",require_max=\"3.3\")";
     ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
     if (!ret) {
         _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_34};
