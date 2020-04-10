@@ -9,8 +9,6 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
-// TODO SERVER-46560: This test is currently racy due to index build abort logic. So,
-// disabling index build commit quorum.
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -22,7 +20,6 @@ const rst = new ReplSetTest({
             },
         },
     ],
-    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 const nodes = rst.startSet();
 rst.initiate();
@@ -64,7 +61,7 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-checkLog.contains(primary, /IndexBuildAborted:?.*Index build aborted: /);
+checkLog.containsJson(primary, 20443);
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.

@@ -320,7 +320,11 @@ Status CollectionBulkLoaderImpl::commit() {
                     "namespace"_attr = _nss.ns(),
                     "stats"_attr = _stats.toString());
 
-        _releaseResources();
+        // Clean up here so we do not try to abort the index builds when cleaning up in
+        // _releaseResources.
+        _idIndexBlock.reset();
+        _secondaryIndexesBlock.reset();
+        _autoColl.reset();
         return Status::OK();
     });
 }
@@ -328,13 +332,13 @@ Status CollectionBulkLoaderImpl::commit() {
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
-        _secondaryIndexesBlock->cleanUpAfterBuild(
+        _secondaryIndexesBlock->abortIndexBuild(
             _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
-        _idIndexBlock->cleanUpAfterBuild(
+        _idIndexBlock->abortIndexBuild(
             _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
         _idIndexBlock.reset();
     }

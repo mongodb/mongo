@@ -71,7 +71,7 @@ const stepDown = startParallelShell(() => {
 // the index build will continue in the background.
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
-checkLog.contains(primary, 'Index build interrupted: ');
+checkLog.containsJson(primary, 20441);
 
 // Wait for stepdown to complete.
 stepDown();

@@ -61,7 +61,6 @@ using namespace indexbuildentryhelpers;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
-MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
 
@@ -305,10 +304,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         // Signal that the index build started successfully.
         startPromise.setWith([] {});
 
-        while (MONGO_unlikely(hangAfterInitializingIndexBuild.shouldFail())) {
-            sleepmillis(100);
-        }
-
         // Runs the remainder of the index build. Sets the promise result and cleans up the index
         // build.
         _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions);
@@ -316,10 +311,14 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         // Do not exit with an incomplete future.
         invariant(replState->sharedPromise.getFuture().isReady());
 
-        // Logs the index build statistics if it took longer than the server parameter `slowMs` to
-        // complete.
-        CurOp::get(opCtx.get())
-            ->completeAndLogOperation(opCtx.get(), MONGO_LOGV2_DEFAULT_COMPONENT);
+        try {
+            // Logs the index build statistics if it took longer than the server parameter `slowMs`
+            // to complete.
+            CurOp::get(opCtx.get())
+                ->completeAndLogOperation(opCtx.get(), MONGO_LOGV2_DEFAULT_COMPONENT);
+        } catch (const DBException& e) {
+            LOGV2(4656002, "unable to log operation", "reason"_attr = e);
+        }
     });
 
     // Waits until the index build has either been started or failed to start.
@@ -499,14 +498,13 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         return;
     }
 
-    // Yield locks and storage engine resources before blocking.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    Lock::TempRelease release(opCtx->lockState());
-    invariant(!opCtx->lockState()->isRSTLLocked());
+    // No locks should be held.
+    invariant(!opCtx->lockState()->isLocked());
 
     Backoff exponentialBackoff(Seconds(1), Seconds(2));
 
-    auto onRemoteCmdScheduled = [&](executor::TaskExecutor::CallbackHandle handle) {
+    auto onRemoteCmdScheduled = [replState,
+                                 replCoord](executor::TaskExecutor::CallbackHandle handle) {
         stdx::unique_lock<Latch> lk(replState->mutex);
         // We have already received commit or abort signal, So skip voting.
         if (replState->waitForNextAction->getFuture().isReady()) {
@@ -517,12 +515,12 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         }
     };
 
-    auto onRemoteCmdComplete = [&](executor::TaskExecutor::CallbackHandle) {
+    auto onRemoteCmdComplete = [replState](executor::TaskExecutor::CallbackHandle) {
         stdx::unique_lock<Latch> lk(replState->mutex);
         replState->voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
     };
 
-    auto needToVote = [&]() -> bool {
+    auto needToVote = [replState]() -> bool {
         stdx::unique_lock<Latch> lk(replState->mutex);
         return !replState->waitForNextAction->getFuture().isReady() ? true : false;
     };
@@ -597,10 +595,6 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIs
     // Waits until the promise is fulfilled or the deadline expires.
     IndexBuildAction nextAction;
     auto waitUntilNextActionIsReady = [&]() {
-        // Don't perform a blocking wait while holding locks or storage engine resources.
-        opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::TempRelease release(opCtx->lockState());
-
         auto deadline = Date_t::now() + Milliseconds(1000);
         auto timeoutError = opCtx->getTimeoutError();
 
@@ -634,9 +628,13 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
           "buildUUID"_attr = replState->buildUUID);
 
     while (true) {
-        // Future wait can be interrupted. This function will yield locks while waiting for the
-        // future to be fulfilled.
+        // Future wait should hold no locks.
+        invariant(!opCtx->lockState()->isLocked(),
+                  str::stream() << "holding locks while waiting for commit or abort: "
+                                << replState->buildUUID);
+        // Future wait can be interrupted.
         const auto nextAction = _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
+
         LOGV2(3856204,
               "Index build received signal for build uuid: {buildUUID} , action: {action}",
               "buildUUID"_attr = replState->buildUUID,
@@ -644,9 +642,7 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
 
         bool needsToRetryWait = false;
 
-        // Ensure RSTL is acquired before checking replication state. This is only necessary for
-        // single-phase builds on secondaries. Everywhere else, the RSTL is already held and this is
-        // should never block.
+        // Reacquire RSTL lock to check replication state.
         repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
@@ -682,13 +678,15 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
                 // Sanity check
                 // This signal can be received during primary (drain phase), secondary,
                 // startup( startup recovery) and startup2 (initial sync).
-                invariant(!isMaster && replState->indexBuildState.isAbortPrepared(),
+                invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
+                invariant(replState->indexBuildState.isAborted(),
                           str::stream()
                               << "Index build: " << replState->buildUUID
                               << ",  index build state: " << replState->indexBuildState.toString());
                 invariant(replState->indexBuildState.getTimestamp() &&
                               replState->indexBuildState.getAbortReason(),
                           replState->buildUUID.toString());
+                // The calling thread will interrupt our OperationContext and we will exit.
                 LOGV2(3856206,
                       "Aborting index build",
                       "buildUUID"_attr = replState->buildUUID,
@@ -699,33 +697,20 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
             case IndexBuildAction::kRollbackAbort:
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
                 invariant(replCoord->getMemberState().rollback());
-
-                uassertStatusOK(Status(
-                    ErrorCodes::IndexBuildAborted,
-                    str::stream() << "Aborting index build, index build uuid:"
-                                  << replState->buildUUID << " , abort reason:"
-                                  << replState->indexBuildState.getAbortReason().get_value_or("")));
+                // The calling thread will interrupt our OperationContext and we will exit.
                 break;
             case IndexBuildAction::kPrimaryAbort:
-                // There are chances when the index build got aborted, it only existed in the
-                // coordinator, So, we missed marking the index build aborted on manager. So, it's
-                // important, we exit from here if we are still primary. Otherwise, the index build
-                // gets committed, though our index build was marked aborted.
-
-                // Single-phase builds do not replicate abort oplog entries. We do not need to be
-                // primary to abort the index build, and we must continue aborting even in the event
-                // of a state transition because this build will not receive another signal.
-                if (isMaster || IndexBuildProtocol::kSinglePhase == replState->protocol) {
-                    uassertStatusOK(Status(
-                        ErrorCodes::IndexBuildAborted,
-                        str::stream()
-                            << "Index build aborted for index build: " << replState->buildUUID
-                            << " , abort reason:"
-                            << replState->indexBuildState.getAbortReason().get_value_or("")));
-                }
-                // Intentionally continue to next case. If we are no longer primary while processing
-                // kPrimaryAbort, fall back to the kCommitQuorumSatisfied case and reset our
-                // 'waitForNextAction'.
+                // The thread aborting a two-phase index build must hold the RSTL so that the
+                // replication state does not change. They will interrupt our OperationContext and
+                // we will exit. Single-phase builds do not replicate abort oplog entries.  We do
+                // not need to be primary to abort the index build, and we must continue aborting
+                // even in the event of a state transition because this build will not receive
+                // another signal.
+                invariant(isMaster || IndexBuildProtocol::kSinglePhase == replState->protocol,
+                          str::stream()
+                              << "isMaster: " << isMaster << ", singlePhase: "
+                              << (IndexBuildProtocol::kSinglePhase == replState->protocol));
+                break;
             case IndexBuildAction::kCommitQuorumSatisfied:
                 if (!isMaster) {
                     // Reset the promise as the node has stepped down,

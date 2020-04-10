@@ -393,10 +393,6 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // implementations anyway as long as that is supported.
     MultiIndexBlock indexer;
 
-    // The code below throws, so ensure build cleanup occurs.
-    ON_BLOCK_EXIT(
-        [&] { indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
-
     // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto fromMigrate = false;
@@ -438,6 +434,11 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     }
 
     auto indexInfoObjs = uassertStatusOK(indexer.init(opCtx, collection, indexesToBuild, onInitFn));
+
+    // The code below throws, so ensure build cleanup occurs.
+    auto abortOnExit = makeGuard(
+        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
+
     uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     uassertStatusOK(indexer.checkConstraints(opCtx));
 
@@ -465,6 +466,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                            }
                        }));
     wunit.commit();
+    abortOnExit.dismiss();
 }
 
 bool Cloner::copyCollection(OperationContext* opCtx,

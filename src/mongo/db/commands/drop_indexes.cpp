@@ -201,22 +201,20 @@ public:
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
 
-        // The 'indexer' can throw, so ensure build cleanup occurs.
-        ON_BLOCK_EXIT([&] {
-            indexer->cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
+            WriteUnitOfWork wunit(opCtx);
+            collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+
+            swIndexesToRebuild =
+                indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
+            uassertStatusOK(swIndexesToRebuild.getStatus());
+            wunit.commit();
         });
 
-        {
-            writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
-
-                swIndexesToRebuild =
-                    indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
-                uassertStatusOK(swIndexesToRebuild.getStatus());
-                wunit.commit();
-            });
-        }
+        // The 'indexer' can throw, so ensure build cleanup occurs.
+        auto abortOnExit = makeGuard([&] {
+            indexer->abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
 
         if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
             LOGV2(20458, "exiting because 'reIndexCrashAfterDrop' fail point was set");
@@ -229,16 +227,15 @@ public:
 
         uassertStatusOK(indexer->checkConstraints(opCtx));
 
-        {
-            writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                uassertStatusOK(indexer->commit(opCtx,
-                                                collection,
-                                                MultiIndexBlock::kNoopOnCreateEachFn,
-                                                MultiIndexBlock::kNoopOnCommitFn));
-                wunit.commit();
-            });
-        }
+        writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
+            WriteUnitOfWork wunit(opCtx);
+            uassertStatusOK(indexer->commit(opCtx,
+                                            collection,
+                                            MultiIndexBlock::kNoopOnCreateEachFn,
+                                            MultiIndexBlock::kNoopOnCommitFn));
+            wunit.commit();
+        });
+        abortOnExit.dismiss();
 
         // Do not allow majority reads from this collection until all original indexes are visible.
         // This was also done when dropAllIndexes() committed, but we need to ensure that no one

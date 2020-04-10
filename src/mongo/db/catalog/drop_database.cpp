@@ -176,10 +176,6 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
             // We need to keep aborting all the active index builders for this database until there
             // are none left when we retrieve the exclusive database lock again.
             while (indexBuildsCoord->inProgForDb(dbName)) {
-                // Sends the abort signal to all the active index builders for this database.
-                indexBuildsCoord->abortDatabaseIndexBuildsNoWait(
-                    opCtx, dbName, "dropDatabase command");
-
                 // Create a scope guard to reset the drop-pending state on the database to false if
                 // there is a replica state change that kills this operation while the locks were
                 // yielded.
@@ -192,12 +188,12 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                     dropPendingGuard.dismiss();
                 });
 
-                // Now that the abort signals were sent out to the active index builders for this
-                // database, we need to release the lock temporarily to allow those index builders
-                // to process the abort signal. Holding a lock here will cause the index builders to
-                // block indefinitely.
+                // Drop locks. The drop helper will acquire locks on our behalf.
                 autoDB = boost::none;
-                indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, dbName);
+
+                // Sends the abort signal to all the active index builders for this database. Waits
+                // for aborted index builds to complete.
+                indexBuildsCoord->abortDatabaseIndexBuilds(opCtx, dbName, "dropDatabase command");
 
                 if (MONGO_unlikely(dropDatabaseHangAfterWaitingForIndexBuilds.shouldFail())) {
                     LOGV2(4612300,

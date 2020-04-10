@@ -159,21 +159,21 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
     const int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
 
     while (true) {
-        // Send the abort signal to any active index builds on the collection.
-        indexBuildsCoord->abortCollectionIndexBuildsNoWait(
-            opCtx,
-            collectionUUID,
-            str::stream() << "Collection " << coll->ns() << "(" << collectionUUID
-                          << ") is being dropped");
+        // Save a copy of the namespace before yielding our locks.
+        const NamespaceString collectionNs = coll->ns();
 
-        // Now that the abort signals were sent out to the active index builders for this
-        // collection, we need to release the lock temporarily to allow those index builders to
-        // process the abort signal. Holding a lock here will cause the index builders to block
-        // indefinitely.
+        // Release locks before aborting index builds. The helper will acquire locks on our behalf.
         collLock = boost::none;
         autoDb = boost::none;
 
-        indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
+        // Send the abort signal to any active index builds on the collection. This waits until all
+        // aborted index builds complete.
+        indexBuildsCoord->abortCollectionIndexBuilds(opCtx,
+                                                     collectionNs,
+                                                     collectionUUID,
+                                                     str::stream()
+                                                         << "Collection " << collectionNs << "("
+                                                         << collectionUUID << ") is being dropped");
 
         // Take an exclusive lock to finish the collection drop.
         autoDb.emplace(opCtx, startingNss.db(), MODE_IX);
@@ -194,24 +194,6 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         const bool abortAgain = indexBuildsCoord->inProgForCollection(collectionUUID);
         if (!abortAgain) {
             break;
-        }
-
-        // We only need to hold an intent lock to send an abort signal to the active index
-        // builders on this collection.
-        collLock = boost::none;
-        autoDb = boost::none;
-
-        autoDb.emplace(opCtx, startingNss.db(), MODE_IX);
-        collLock.emplace(opCtx, dbAndUUID, MODE_IX);
-
-        // Abandon the snapshot as the index catalog will compare the in-memory state to the
-        // disk state, which may have changed when we released the collection lock temporarily.
-        opCtx->recoveryUnit()->abandonSnapshot();
-
-        coll = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
-        status = _checkNssAndReplState(opCtx, coll);
-        if (!status.isOK()) {
-            return status;
         }
     }
 

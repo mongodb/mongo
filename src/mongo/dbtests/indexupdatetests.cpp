@@ -91,8 +91,8 @@ protected:
         try {
             MultiIndexBlock indexer;
 
-            ON_BLOCK_EXIT([&] {
-                indexer.cleanUpAfterBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+            auto abortOnExit = makeGuard([&] {
+                indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
             uassertStatusOK(
@@ -104,6 +104,7 @@ protected:
                                      MultiIndexBlock::kNoopOnCreateEachFn,
                                      MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
+            abortOnExit.dismiss();
         } catch (const DBException& e) {
             if (ErrorCodes::isInterruption(e.code()))
                 return true;
@@ -156,8 +157,9 @@ public:
                                   << static_cast<int>(kIndexVersion) << "unique" << true
                                   << "background" << background);
 
-        ON_BLOCK_EXIT(
-            [&] { indexer.cleanUpAfterBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+        });
 
         ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll));
@@ -167,6 +169,7 @@ public:
         ASSERT_OK(indexer.commit(
             _opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
+        abortOnExit.dismiss();
     }
 };
 
@@ -205,8 +208,9 @@ public:
                                   << "background" << background);
 
         collLk.emplace(_opCtx, _nss, LockMode::MODE_X);
-        ON_BLOCK_EXIT(
-            [&] { indexer.cleanUpAfterBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+        });
 
         ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
 
@@ -320,9 +324,8 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     Lock::CollectionLock collLk(_opCtx, _nss, MODE_X);
 
     MultiIndexBlock indexer;
-    ON_BLOCK_EXIT([&] {
-        indexer.cleanUpAfterBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
-    });
+    auto abortOnExit = makeGuard(
+        [&] { indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status =
         indexer.init(_opCtx, collection(), indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
@@ -345,6 +348,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
                              MultiIndexBlock::kNoopOnCreateEachFn,
                              MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();
+    abortOnExit.dismiss();
     return Status::OK();
 }
 

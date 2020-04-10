@@ -2331,10 +2331,21 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     uassertStatusOK(scheduleResult.getStatus());
     CallbackHandle cbkHandle = scheduleResult.getValue();
 
-    onRemoteCmdScheduled(cbkHandle);
+    try {
+        onRemoteCmdScheduled(cbkHandle);
 
-    // Wait for the response in an interruptible mode.
-    _replExecutor->wait(cbkHandle, opCtx);
+        // Wait for the response in an interruptible mode.
+        _replExecutor->wait(cbkHandle, opCtx);
+    } catch (const DBException&) {
+        // If waiting for the response is interrupted, then we still have a callback out and
+        // registered with the TaskExecutor to run when the response finally does come back. Since
+        // the callback references local state, cbkResponse, it would be invalid for the callback to
+        // run after leaving the this function. Therefore, we cancel the callback and wait
+        // uninterruptably for the callback to be run.
+        _replExecutor->cancel(cbkHandle);
+        _replExecutor->wait(cbkHandle);
+        throw;
+    }
 
     onRemoteCmdComplete(cbkHandle);
     uassertStatusOK(cbkResponse.status);

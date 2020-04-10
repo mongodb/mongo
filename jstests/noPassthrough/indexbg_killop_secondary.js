@@ -1,5 +1,6 @@
 /**
- * Confirms that background index builds on a secondary cannot be aborted using killop.
+ * Confirms that aborting a background index builds on a secondary does not leave node in an
+ * inconsistent state.
  * @tags: [requires_replication]
  */
 (function() {
@@ -29,14 +30,14 @@ const coll = testDB.getCollection('test');
 
 assert.commandWorked(coll.insert({a: 1}));
 
-const secondary = rst.getSecondary();
+let secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
 
 const createIdx =
     IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true});
 
 // When the index build starts, find its op id.
-const secondaryDB = secondary.getDB(testDB.getName());
+let secondaryDB = secondary.getDB(testDB.getName());
 const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
@@ -46,15 +47,26 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
               'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
 });
 
-// Kill the index build. This should have no effect.
+// Kill the index build. This should crash the secondary.
 assert.commandWorked(secondaryDB.killOp(opId));
 
-// Wait for the index build to stop.
-IndexBuildTest.resumeIndexBuilds(secondary);
-IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
+assert.soon(function() {
+    return rawMongoProgramOutput().search(/Fatal assertion.*(51101|31354)/) >= 0;
+});
 
-// Expect successful createIndex command invocation in parallel shell. A new index should be
-// present on the primary.
+// After restarting the secondary, expect that the index build completes successfully.
+const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+rst.stop(secondary.nodeId, undefined, {forRestart: true, allowedExitCode: fassertProcessExitCode});
+rst.start(secondary.nodeId, undefined, true /* restart */);
+
+secondary = rst.getSecondary();
+secondaryDB = secondary.getDB(testDB.getName());
+
+// Wait for the index build to complete.
+rst.awaitReplication();
+
+// Expect successful createIndex command invocation in parallel shell. A new index should be present
+// on the primary and secondary.
 createIdx();
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 

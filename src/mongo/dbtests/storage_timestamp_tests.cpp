@@ -265,8 +265,8 @@ public:
 
         // Build an index.
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT(
-            [&] { indexer.cleanUpAfterBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+        auto abortOnExit = makeGuard(
+            [&] { indexer.abortIndexBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         BSONObj indexInfoObj;
         {
@@ -297,6 +297,7 @@ public:
             // MultiIndexBlock.
             wuow.commit();
         }
+        abortOnExit.dismiss();
     }
 
     std::int32_t itCount(Collection* coll) {
@@ -1872,8 +1873,8 @@ public:
 
         // Build an index on `{a: 1}`. This index will be multikey.
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT([&] {
-            indexer.cleanUpAfterBuild(
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(
                 _opCtx, autoColl.getCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
@@ -1930,6 +1931,7 @@ public:
                 MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
+        abortOnExit.dismiss();
 
         const Timestamp afterIndexBuild = _clock->reserveTicks(1).asTimestamp();
 
@@ -1984,8 +1986,8 @@ public:
 
         // Build an index on `{a: 1}`.
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT([&] {
-            indexer.cleanUpAfterBuild(
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(
                 _opCtx, autoColl.getCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
@@ -2116,6 +2118,7 @@ public:
                 MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
+        abortOnExit.dismiss();
     }
 };
 
@@ -2653,8 +2656,8 @@ public:
 
         const IndexCatalogEntry* buildingIndex = nullptr;
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT([&] {
-            indexer.cleanUpAfterBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
         // Provide a build UUID, indicating that this is a two-phase index build.
@@ -2767,6 +2770,7 @@ public:
                 MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
+        abortOnExit.dismiss();
     }
 };
 
