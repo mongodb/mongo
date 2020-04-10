@@ -23,7 +23,7 @@ const rst = new ReplSetTest({
     useBridge: true
 });
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 // We will kill the secondary after it installs and acknowledges a config to make sure it has made
 // it durable. Disable journaling on the node so we are sure that the config write is flushed
