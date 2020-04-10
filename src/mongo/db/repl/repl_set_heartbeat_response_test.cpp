@@ -124,7 +124,13 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
     ASSERT_EQUALS("syncTarget:27017", hbResponseObj["syncingTo"].String());
 
-    initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
+    // Verify that we allow an unknown field.
+    BSONObjBuilder hbResponseBob;
+    hbResponseBob.appendElements(hbResponseObj);
+    hbResponseBob.append("unknownField", 1);
+    auto cmdObj = hbResponseBob.obj();
+
+    initializeResult = hbResponseObjRoundTripChecker.initialize(cmdObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
     ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 }

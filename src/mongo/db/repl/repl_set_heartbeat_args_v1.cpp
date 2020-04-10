@@ -49,25 +49,11 @@ const std::string kSenderHostFieldName = "from";
 const std::string kSenderIdFieldName = "fromId";
 const std::string kSetNameFieldName = "replSetHeartbeat";
 const std::string kTermFieldName = "term";
-
-const std::string kLegalHeartbeatFieldNames[] = {kCheckEmptyFieldName,
-                                                 kConfigVersionFieldName,
-                                                 kConfigTermFieldName,
-                                                 kHeartbeatVersionFieldName,
-                                                 kSenderHostFieldName,
-                                                 kSenderIdFieldName,
-                                                 kSetNameFieldName,
-                                                 kTermFieldName};
-
 }  // namespace
 
 Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
-    Status status = bsonCheckOnlyHasFieldsForCommand(
-        "ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
-    if (!status.isOK())
-        return status;
-
-    status = bsonExtractBooleanFieldWithDefault(argsObj, kCheckEmptyFieldName, false, &_checkEmpty);
+    Status status =
+        bsonExtractBooleanFieldWithDefault(argsObj, kCheckEmptyFieldName, false, &_checkEmpty);
     if (!status.isOK())
         return status;
 

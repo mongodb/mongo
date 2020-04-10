@@ -54,6 +54,36 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
 
+TEST(ReplSetRequestVotes, ArgsAcceptsUnknownField) {
+    ReplSetRequestVotesArgs requestVoteArgs;
+    BSONObjBuilder bob;
+    requestVoteArgs.addToBSON(&bob);
+    bob.append("unknownField", 1);  // append an unknown field.
+    BSONObj cmdObj = bob.obj();
+    ASSERT_OK(requestVoteArgs.initialize(cmdObj));
+
+    // The serialized object should be the same as the original except for the unknown field.
+    BSONObjBuilder bob2;
+    requestVoteArgs.addToBSON(&bob2);
+    bob2.append("unknownField", 1);
+    ASSERT_BSONOBJ_EQ(bob2.obj(), cmdObj);
+}
+
+TEST(ReplSetRequestVotes, ResponseAcceptsUnknownField) {
+    ReplSetRequestVotesResponse requestVoteRes;
+    BSONObjBuilder bob;
+    requestVoteRes.addToBSON(&bob);
+    bob.append("unknownField", 1);  // append an unknown field.
+    BSONObj cmdObj = bob.obj();
+    ASSERT_OK(requestVoteRes.initialize(cmdObj));
+
+    // The serialized object should be the same as the original except for the unknown field.
+    BSONObjBuilder bob2;
+    requestVoteRes.addToBSON(&bob2);
+    bob2.append("unknownField", 1);
+    ASSERT_BSONOBJ_EQ(bob2.obj(), cmdObj);
+}
+
 
 class VoteRequesterTest : public mongo::unittest::Test {
 public:
