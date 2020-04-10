@@ -30,13 +30,16 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
         - "mongo/db/repl/repl_set_config_validators.h"
+        - "mongo/db/repl/repl_set_tag.h"
+        - "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
         - "mongo/db/repl/member_id.h"
-
+        - "mongo/util/string_map.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
     - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/write_concern_options.idl"
 
 types:
     memberId:
@@ -45,7 +48,23 @@ types:
         cpp_type: "MemberId"
         serializer: MemberId::serializeToBSON
         deserializer: MemberId::parseFromBSON
+        
+    smallExactInt64:
+        bson_serialization_type: any
+        description: "Accepts any numerical type within int64 range.  Serializes as NumberInt if it
+                      fits in an int32, NumberLong otherwise.  Rejects decimals and doubles that
+                      are not integer values."
+        cpp_type: std::int64_t
+        serializer: ::smallExactInt64Append
+        deserializer: ::parseSmallExactInt64
 
+    replSetWriteConcernModeMap:
+        bson_serialization_type: any
+        description: "A BSON object mapping write concern mode names to tag sets"
+        cpp_type: ReplSetWriteConcernModeDefinitions
+        serializer: ReplSetWriteConcernModeDefinitions::serializeToBSON
+        deserializer: ReplSetWriteConcernModeDefinitions::parseFromBSON
+        
 structs:
     MemberConfigBase:
         description: "The configuration for a given member inside of the replica set config"
@@ -110,3 +129,58 @@ structs:
                 type: object
                 optional: true
                 description: "The hostnames for the provided horizons"
+                
+    ReplSetConfigSettings:
+        description: "The configuration options that apply to the whole replica set"
+        strict: false
+        fields:
+            chainingAllowed:
+                type: safeBool
+                default: true
+                description: "When true, the replica set allows secondary members to replicate
+                              from other secondary members. When false, secondaries can replicate
+                              only from the primary."
+            heartbeatIntervalMillis:
+                type: smallExactInt64
+                default: 2000
+                description: "The frequency in milliseconds of the heartbeats"
+                validator: { gt: 0 }
+            heartbeatTimeoutSecs:
+                type: smallExactInt64
+                default: 10
+                description: "Number of seconds that the replica set members wait for a successful
+                              heartbeat from each other"
+                validator: { gt: 0 }
+            electionTimeoutMillis:
+                type: smallExactInt64
+                default: 10000
+                description: "The time limit in milliseconds for detecting when a replica set’s
+                              primary is unreachable"
+                validator: { gt: 0 }
+            catchUpTimeoutMillis:
+                type: smallExactInt64
+                default: -1
+                description: "Time limit in milliseconds for a newly elected primary to sync
+                              (catch up) with the other replica set members that may have more
+                              recent writes. If timeout is -1, infinite catchup time.  If timeout
+                              is 0, newly elected primaries will not attempt to catch up"
+                validator: { gte: -1 }
+            catchUpTakeoverDelayMillis:
+                type: smallExactInt64
+                default: 30000
+                description: "Time in milliseconds a node waits to initiate a catchup takeover
+                              after determining it is ahead of the current primary. -1 disables
+                              catchup takeover"
+                validator: { gte: -1 }
+            getLastErrorModes:
+                type: replSetWriteConcernModeMap
+                default: ReplSetWriteConcernModeDefinitions()
+            getLastErrorDefaults:
+                cpp_name: defaultWriteConcern
+                type: WriteConcern
+                default: WriteConcernOptions()
+                validator: { callback: "validateDefaultWriteConcernHasMember"}
+            replicaSetId:
+                type: objectid
+                optional: true
+                validator: { callback: "validateReplicaSetIdNotNull"}

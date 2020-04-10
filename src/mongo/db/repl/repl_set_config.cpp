@@ -81,17 +81,6 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  kProtocolVersionFieldName,
                                                  ReplSetConfig::kConfigServerFieldName,
                                                  kWriteConcernMajorityJournalDefaultFieldName};
-
-const std::string kChainingAllowedFieldName = "chainingAllowed";
-const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
-const std::string kGetLastErrorDefaultsFieldName = "getLastErrorDefaults";
-const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
-const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
-const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
-const std::string kCatchUpTimeoutFieldName = "catchUpTimeoutMillis";
-const std::string kReplicaSetIdFieldName = "replicaSetId";
-const std::string kCatchUpTakeoverDelayFieldName = "catchUpTakeoverDelayMillis";
-
 }  // namespace
 
 Status ReplSetConfig::initialize(const BSONObj& cfg,
@@ -222,20 +211,20 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
 
     //
     // Generate replica set ID if called from replSetInitiate.
-    // Otherwise, uses 'defaultReplicatSetId' as default if 'cfg' doesn't have an ID.
+    // Otherwise, uses 'defaultReplicaSetId' as default if 'cfg' doesn't have an ID.
     //
     if (forInitiate) {
-        if (_replicaSetId.isSet()) {
+        if (_settings.getReplicaSetId()) {
             return Status(ErrorCodes::InvalidReplicaSetConfig,
                           str::stream() << "replica set configuration cannot contain '"
-                                        << kReplicaSetIdFieldName
+                                        << ReplSetConfigSettings::kReplicaSetIdFieldName
                                         << "' "
                                            "field when called from replSetInitiate: "
                                         << cfg);
         }
-        _replicaSetId = OID::gen();
-    } else if (!_replicaSetId.isSet()) {
-        _replicaSetId = defaultReplicaSetId;
+        _settings.setReplicaSetId(OID::gen());
+    } else if (!_settings.getReplicaSetId() && defaultReplicaSetId.isSet()) {
+        _settings.setReplicaSetId(defaultReplicaSetId);
     }
 
     _calculateMajorities();
@@ -246,182 +235,21 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
 }
 
 Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
-    //
-    // Parse heartbeatIntervalMillis
-    //
-    long long heartbeatIntervalMillis;
-    Status hbIntervalStatus =
-        bsonExtractIntegerFieldWithDefault(settings,
-                                           kHeartbeatIntervalFieldName,
-                                           durationCount<Milliseconds>(kDefaultHeartbeatInterval),
-                                           &heartbeatIntervalMillis);
-    if (!hbIntervalStatus.isOK()) {
-        return hbIntervalStatus;
-    }
-    _heartbeatInterval = Milliseconds(heartbeatIntervalMillis);
-
-    //
-    // Parse electionTimeoutMillis
-    //
-    long long electionTimeoutMillis;
-    auto greaterThanZero = [](const auto& x) { return x > 0; };
-    auto electionTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
-        settings,
-        kElectionTimeoutFieldName,
-        durationCount<Milliseconds>(kDefaultElectionTimeoutPeriod),
-        greaterThanZero,
-        "election timeout must be greater than 0",
-        &electionTimeoutMillis);
-    if (!electionTimeoutStatus.isOK()) {
-        return electionTimeoutStatus;
-    }
-    _electionTimeoutPeriod = Milliseconds(electionTimeoutMillis);
-
-    //
-    // Parse heartbeatTimeoutSecs
-    //
-    long long heartbeatTimeoutSecs;
-    Status heartbeatTimeoutStatus =
-        bsonExtractIntegerFieldWithDefaultIf(settings,
-                                             kHeartbeatTimeoutFieldName,
-                                             durationCount<Seconds>(kDefaultHeartbeatTimeoutPeriod),
-                                             greaterThanZero,
-                                             "heartbeat timeout must be greater than 0",
-                                             &heartbeatTimeoutSecs);
-    if (!heartbeatTimeoutStatus.isOK()) {
-        return heartbeatTimeoutStatus;
-    }
-    _heartbeatTimeoutPeriod = Seconds(heartbeatTimeoutSecs);
-
-    //
-    // Parse catchUpTimeoutMillis
-    //
-    auto validCatchUpParameter = [](long long timeout) {
-        return timeout >= 0LL || timeout == -1LL;
-    };
-    long long catchUpTimeoutMillis;
-    Status catchUpTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
-        settings,
-        kCatchUpTimeoutFieldName,
-        durationCount<Milliseconds>(kDefaultCatchUpTimeoutPeriod),
-        validCatchUpParameter,
-        "catch-up timeout must be positive, 0 (no catch-up) or -1 (infinite catch-up).",
-        &catchUpTimeoutMillis);
-    if (!catchUpTimeoutStatus.isOK()) {
-        return catchUpTimeoutStatus;
-    }
-    _catchUpTimeoutPeriod = Milliseconds(catchUpTimeoutMillis);
-
-    //
-    // Parse catchUpTakeoverDelayMillis
-    //
-    long long catchUpTakeoverDelayMillis;
-    Status catchUpTakeoverDelayStatus = bsonExtractIntegerFieldWithDefaultIf(
-        settings,
-        kCatchUpTakeoverDelayFieldName,
-        durationCount<Milliseconds>(kDefaultCatchUpTakeoverDelay),
-        validCatchUpParameter,
-        "catch-up takeover delay must be -1 (no catch-up takeover) or greater than or equal to 0.",
-        &catchUpTakeoverDelayMillis);
-    if (!catchUpTakeoverDelayStatus.isOK()) {
-        return catchUpTakeoverDelayStatus;
-    }
-    _catchUpTakeoverDelay = Milliseconds(catchUpTakeoverDelayMillis);
-
-    //
-    // Parse chainingAllowed
-    //
-    Status status = bsonExtractBooleanFieldWithDefault(
-        settings, kChainingAllowedFieldName, kDefaultChainingAllowed, &_chainingAllowed);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Parse getLastErrorDefaults
-    //
-    BSONElement gleDefaultsElement;
-    status = bsonExtractTypedField(
-        settings, kGetLastErrorDefaultsFieldName, Object, &gleDefaultsElement);
-    if (status.isOK()) {
-        auto sw = WriteConcernOptions::parse(gleDefaultsElement.Obj());
-        if (!sw.isOK()) {
-            return sw.getStatus();
-        }
-        _defaultWriteConcern = sw.getValue();
-    } else if (status == ErrorCodes::NoSuchKey) {
-        // Default write concern is w: 1.
-        _defaultWriteConcern = WriteConcernOptions();
-    } else {
-        return status;
+    try {
+        _settings =
+            ReplSetConfigSettings::parse(IDLParserErrorContext("ReplSetConfig.settings"), settings);
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
     //
-    // Parse getLastErrorModes
+    // Put getLastErrorModes into the tag configuration.
     //
-    BSONElement gleModesElement;
-    status = bsonExtractTypedField(settings, kGetLastErrorModesFieldName, Object, &gleModesElement);
-    BSONObj gleModes;
-    if (status.isOK()) {
-        gleModes = gleModesElement.Obj();
-    } else if (status != ErrorCodes::NoSuchKey) {
-        return status;
+    auto modesStatus = _settings.getGetLastErrorModes().convertToTagPatternMap(&_tagConfig);
+    if (!modesStatus.isOK()) {
+        return modesStatus.getStatus();
     }
-
-    for (auto&& modeElement : gleModes) {
-        if (_customWriteConcernModes.find(modeElement.fieldNameStringData()) !=
-            _customWriteConcernModes.end()) {
-            return Status(ErrorCodes::Error(51001),
-                          str::stream()
-                              << kSettingsFieldName << '.' << kGetLastErrorModesFieldName
-                              << " contains multiple fields named " << modeElement.fieldName());
-        }
-        if (modeElement.type() != Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "Expected " << kSettingsFieldName << '.'
-                              << kGetLastErrorModesFieldName << '.' << modeElement.fieldName()
-                              << " to be an Object, not " << typeName(modeElement.type()));
-        }
-        ReplSetTagPattern pattern = _tagConfig.makePattern();
-        for (auto&& constraintElement : modeElement.Obj()) {
-            if (!constraintElement.isNumber()) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream()
-                                  << "Expected " << kSettingsFieldName << '.'
-                                  << kGetLastErrorModesFieldName << '.' << modeElement.fieldName()
-                                  << '.' << constraintElement.fieldName() << " to be a number, not "
-                                  << typeName(constraintElement.type()));
-            }
-            const int minCount = constraintElement.numberInt();
-            if (minCount <= 0) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Value of " << kSettingsFieldName << '.'
-                                  << kGetLastErrorModesFieldName << '.' << modeElement.fieldName()
-                                  << '.' << constraintElement.fieldName()
-                                  << " must be positive, but found " << minCount);
-            }
-            status = _tagConfig.addTagCountConstraintToPattern(
-                &pattern, constraintElement.fieldNameStringData(), minCount);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-        _customWriteConcernModes[modeElement.fieldNameStringData()] = pattern;
-    }
-
-    // Parse replica set ID.
-    OID replicaSetId;
-    status = mongo::bsonExtractOIDField(settings, kReplicaSetIdFieldName, &replicaSetId);
-    if (status.isOK()) {
-        if (!replicaSetId.isSet()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << kReplicaSetIdFieldName << " field value cannot be null");
-        }
-    } else if (status != ErrorCodes::NoSuchKey) {
-        return status;
-    }
-    _replicaSetId = replicaSetId;
+    _customWriteConcernModes = std::move(modesStatus.getValue());
 
     return Status::OK();
 }
@@ -441,13 +269,6 @@ Status ReplSetConfig::validate() const {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Replica set configuration must have non-empty "
                                     << kIdFieldName << " field");
-    }
-    if (_heartbeatInterval < Milliseconds(0)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kSettingsFieldName << '.' << kHeartbeatIntervalFieldName
-                                    << " field value must be non-negative, "
-                                       "but found "
-                                    << durationCount<Milliseconds>(_heartbeatInterval));
     }
     if (_members.size() > kMaxMembers || _members.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -606,20 +427,16 @@ Status ReplSetConfig::validate() const {
                       "one non-arbiter member with priority > 0");
     }
 
-    if (_defaultWriteConcern.wMode.empty()) {
-        if (_defaultWriteConcern.wNumNodes == 0) {
-            return Status(ErrorCodes::BadValue,
-                          "Default write concern mode must wait for at least 1 member");
-        }
-    } else {
-        if (WriteConcernOptions::kMajority != _defaultWriteConcern.wMode &&
-            !findCustomWriteMode(_defaultWriteConcern.wMode).isOK()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Default write concern requires undefined write mode "
-                                        << _defaultWriteConcern.wMode);
-        }
+    // This validation must be done outside the IDL because we need to parse the settings object
+    // completely to get the custom write modes.
+    const auto& defaultWriteConcern = _settings.getDefaultWriteConcern();
+    if (!defaultWriteConcern.wMode.empty() &&
+        WriteConcernOptions::kMajority != defaultWriteConcern.wMode &&
+        !findCustomWriteMode(defaultWriteConcern.wMode).isOK()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Default write concern requires undefined write mode "
+                                    << defaultWriteConcern.wMode);
     }
-
 
     if (_protocolVersion == 0) {
         return Status(
@@ -777,7 +594,7 @@ const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& ha
 }
 
 Milliseconds ReplSetConfig::getHeartbeatInterval() const {
-    auto heartbeatInterval = _heartbeatInterval;
+    auto heartbeatInterval = Milliseconds(_settings.getHeartbeatIntervalMillis());
     forceHeartbeatIntervalMS.execute([&](const BSONObj& data) {
         auto intervalMS = data["intervalMS"].numberInt();
         heartbeatInterval = Milliseconds(intervalMS);
@@ -926,45 +743,9 @@ BSONObj ReplSetConfig::toBSON() const {
     members.done();
 
     BSONObjBuilder settingsBuilder(configBuilder.subobjStart(kSettingsFieldName));
-    settingsBuilder.append(kChainingAllowedFieldName, _chainingAllowed);
-    settingsBuilder.appendIntOrLL(kHeartbeatIntervalFieldName,
-                                  durationCount<Milliseconds>(_heartbeatInterval));
-    settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName,
-                                  durationCount<Seconds>(_heartbeatTimeoutPeriod));
-    settingsBuilder.appendIntOrLL(kElectionTimeoutFieldName,
-                                  durationCount<Milliseconds>(_electionTimeoutPeriod));
-    settingsBuilder.appendIntOrLL(kCatchUpTimeoutFieldName,
-                                  durationCount<Milliseconds>(_catchUpTimeoutPeriod));
-    settingsBuilder.appendIntOrLL(kCatchUpTakeoverDelayFieldName,
-                                  durationCount<Milliseconds>(_catchUpTakeoverDelay));
-
-
-    BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
-    for (StringMap<ReplSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
-         mode != _customWriteConcernModes.end();
-         ++mode) {
-        if (mode->first[0] == '$') {
-            // Filter out internal modes
-            continue;
-        }
-        BSONObjBuilder modeBuilder(gleModes.subobjStart(mode->first));
-        for (ReplSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
-             itr != mode->second.constraintsEnd();
-             itr++) {
-            modeBuilder.append(_tagConfig.getTagKey(ReplSetTag(itr->getKeyIndex(), 0)),
-                               itr->getMinCount());
-        }
-        modeBuilder.done();
-    }
-    gleModes.done();
-
-    settingsBuilder.append(kGetLastErrorDefaultsFieldName, _defaultWriteConcern.toBSON());
-
-    if (_replicaSetId.isSet()) {
-        settingsBuilder.append(kReplicaSetIdFieldName, _replicaSetId);
-    }
-
+    _settings.serialize(&settingsBuilder);
     settingsBuilder.done();
+
     return configBuilder.obj();
 }
 

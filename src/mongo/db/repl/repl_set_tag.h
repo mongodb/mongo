@@ -115,6 +115,9 @@ public:
     public:
         TagCountConstraint() {}
         TagCountConstraint(int32_t keyIndex, int32_t minCount);
+        bool operator==(const TagCountConstraint& other) const {
+            return _keyIndex == other._keyIndex && _minCount == other._minCount;
+        }
         int32_t getKeyIndex() const {
             return _keyIndex;
         }
