@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -111,13 +112,10 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
-                             const std::string& shortFrom,
-                             const std::string& shortTo,
+                             const NamespaceString& fromNss,
+                             const NamespaceString& toNss,
                              long long size,
                              bool temp) {
-    NamespaceString fromNss(db->name(), shortFrom);
-    NamespaceString toNss(db->name(), shortTo);
-
     Collection* fromCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
@@ -261,7 +259,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
 
     // Generate a temporary collection name that will not collide with any existing collections.
     boost::optional<Lock::CollectionLock> collLock;
-    const auto longTmpName = [&] {
+    const auto tempNs = [&] {
         while (true) {
             auto tmpNameResult =
                 db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
@@ -282,14 +280,13 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
             collLock.reset();
         }
     }();
-    const auto shortTmpName = longTmpName.coll().toString();
 
-    cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
+    cloneCollectionAsCapped(opCtx, db, ns, tempNs, size, true);
 
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
-    uassertStatusOK(renameCollection(opCtx, longTmpName, ns, options));
+    uassertStatusOK(renameCollection(opCtx, tempNs, ns, options));
 }
 
 }  // namespace mongo
