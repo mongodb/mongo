@@ -104,8 +104,6 @@ StringData toString(IndexBuildMethod method) {
     switch (method) {
         case IndexBuildMethod::kHybrid:
             return "Hybrid"_sd;
-        case IndexBuildMethod::kBackground:
-            return "Background"_sd;
         case IndexBuildMethod::kForeground:
             return "Foreground"_sd;
     }

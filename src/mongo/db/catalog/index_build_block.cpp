@@ -81,8 +81,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
 
     _indexName = descriptor->indexName();
 
-    bool isBackgroundIndex =
-        _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kBackground;
+    bool isBackgroundIndex = _method == IndexBuildMethod::kHybrid;
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(opCtx)) {
         isBackgroundSecondaryBuild =

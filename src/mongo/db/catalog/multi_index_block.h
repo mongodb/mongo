@@ -98,8 +98,6 @@ public:
      */
     static OnCleanUpFn kNoopOnCleanUpFn;
 
-    static bool areHybridIndexBuildsEnabled();
-
     /**
      * By default we enforce the 'unique' flag in specs when building an index by failing.
      * If this is called before init(), we will ignore unique violations. This has no effect if
@@ -301,7 +299,7 @@ public:
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
-     * true for the kHybrid and kBackground methods.
+     * true for the kHybrid method.
      */
     bool isBackgroundBuilding() const;
 

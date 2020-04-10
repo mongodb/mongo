@@ -152,12 +152,6 @@ bool shouldBuildInForeground(OperationContext* opCtx,
         return true;
     }
 
-    // Without hybrid builds enabled, indexes should build with the behavior of their specs.
-    bool hybrid = MultiIndexBlock::areHybridIndexBuildsEnabled();
-    if (!hybrid) {
-        return !index["background"].trueValue();
-    }
-
     return false;
 }
 

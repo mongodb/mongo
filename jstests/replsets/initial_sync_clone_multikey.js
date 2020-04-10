@@ -1,6 +1,5 @@
 /**
- * Test initial sync cloning of a collection that contains a multikey index when hybrid index builds
- * are disabled.
+ * Test initial sync cloning of a collection that contains a multikey index.
  */
 (function() {
 "use strict";
@@ -23,7 +22,7 @@ assert.commandWorked(primaryDB[collName].createIndex({"x": 1}, {background: true
 primaryDB[collName].insert({x: [1, 2]});
 
 jsTestLog("Adding a secondary node to do the initial sync.");
-replTest.add({setParameter: "enableHybridIndexBuilds=false"});
+replTest.add();
 
 jsTestLog("Re-initiating replica set with the new secondary.");
 replTest.reInitiate();

@@ -168,7 +168,7 @@ public:
 
     /**
      * Returns true if the index build supports background writes while building an index. This is
-     * true for the kHybrid and kBackground methods.
+     * true for the kHybrid method.
      */
     bool isBackgroundBuilding(const UUID& buildUUID);
 

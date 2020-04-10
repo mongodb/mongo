@@ -66,11 +66,6 @@ enum class IndexBuildMethod {
      */
     kHybrid,
     /**
-     * Perform a collection scan by writing each document's generated key directly into the index.
-     * Accept writes in the background into the index as well.
-     */
-    kBackground,
-    /**
      * Perform a collection scan to dump all keys into the exteral sorter, then into the index.
      * During this process, callers guarantee that no writes will be accepted on this collection.
      */
