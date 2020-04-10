@@ -1,10 +1,11 @@
-// Test what happens when the profiler (introspect.cpp) wants to log an operation, but the
-// 'system.profiler' collection does not yet exist and is not safe to create, because the operation
-// context is an interrupted state (SERVER-38481).
-//
-// This test restarts the server and requires that data persists across restarts.
-// @tags: [requires_persistence, requires_profiling]
-
+/**
+ * Tests that when the profiler (introspect.cpp) wants to log an operation but the
+ * 'system.profiler' collection does not yet exist and the operation context is an interrupted
+ * state, the collection can still be successfully created on the fly.
+ *
+ * This test restarts the server and requires that data persists across restarts.
+ * @tags: [requires_persistence, requires_profiling]
+ */
 (function() {
 "use strict";
 
@@ -49,24 +50,10 @@ const err = assert.throws(function() {
 assert.contains(
     err.code, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError], err);
 
-//
-// Profiling is not necessary for the rest of the test. We turn it off to make sure it doesn't
-// interfere with any remaining commands.
-//
-db.setProfilingLevel(0);
-
-//
-// The mongod should print out a warning to indicate the potential need for a manually created
-// 'system.profile' collection.
-//
-checkLog.contains(standalone, "Manually create profile collection");
-
-//
-// The mongod should not create the 'system.profile' collection automatically.
-//
+// The mongod should have created the 'system.profile' collection automatically.
 const res = db.runCommand({listCollections: 1, filter: {name: "system.profile"}});
 assert.commandWorked(res);
-assert.eq(res.cursor.firstBatch, [], res);
+assert.eq(res.cursor.firstBatch.length, 1, res);
 
 MongoRunner.stopMongod(standalone);
 })();

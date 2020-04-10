@@ -131,7 +131,6 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
     : _name(name.toString()),
       _epoch(epoch),
-      _profileName(_name + ".system.profile"),
       _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
     auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));

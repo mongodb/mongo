@@ -113,13 +113,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const BSONObj p = b.done();
 
-    const bool wasLocked = opCtx->lockState()->isLocked();
-
     const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
-
-    // True if we need to acquire an X lock on the database in order to create the system.profile
-    // collection.
-    bool acquireDbXLock = false;
 
     auto origFlowControl = opCtx->shouldParticipateInFlowControl();
 
@@ -142,91 +136,54 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             noInterrupt.emplace(opCtx->lockState());
         }
 
-        while (true) {
-            std::unique_ptr<AutoGetDb> autoGetDb;
-            if (acquireDbXLock) {
-                // We should not attempt to acquire an X lock while in "noInterrupt" scope.
-                noInterrupt.reset();
-
-                autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
-                if (autoGetDb->getDb()) {
-                    createProfileCollection(opCtx, autoGetDb->getDb()).transitional_ignore();
-                }
-            } else {
-                autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_IX));
-            }
-
-            Database* const db = autoGetDb->getDb();
-            if (!db) {
-                // Database disappeared
-                LOGV2(20700,
-                      "note: not profiling because db went away for {CurOp_get_opCtx_getNS}",
-                      "CurOp_get_opCtx_getNS"_attr = CurOp::get(opCtx)->getNS());
-                break;
-            }
-
-            Lock::CollectionLock collLock(opCtx, db->getProfilingNS(), MODE_IX);
-
-            // We are about to enforce prepare conflicts for the OperationContext. But it is illegal
-            // to change the behavior of ignoring prepare conflicts while any storage transaction is
-            // still active. So we need to call abandonSnapshot() to close any open transactions.
-            // This call is also harmless because any previous reads or writes should have already
-            // completed, as profile() is called at the end of an operation.
-            opCtx->recoveryUnit()->abandonSnapshot();
-            // The profiler performs writes even after read commands. Ignoring prepare conflicts is
-            // not allowed while performing writes, so temporarily enforce prepare conflicts.
-            EnforcePrepareConflictsBlock enforcePrepare(opCtx);
-
-            Collection* const coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                opCtx, db->getProfilingNS());
-
-            if (coll) {
-                invariant(!opCtx->shouldParticipateInFlowControl());
-                WriteUnitOfWork wuow(opCtx);
-                OpDebug* const nullOpDebug = nullptr;
-                coll->insertDocument(opCtx, InsertStatement(p), nullOpDebug, false)
-                    .transitional_ignore();
-                wuow.commit();
-
-                break;
-            } else if (!acquireDbXLock &&
-                       (!wasLocked || opCtx->lockState()->isDbLockedForMode(dbName, MODE_X))) {
-                // Try to create the collection only if we are not under lock, in order to
-                // avoid deadlocks due to lock conversion. This would only be hit if someone
-                // deletes the profiler collection after setting profile level.
-                acquireDbXLock = true;
-            } else {
-                // Cannot write the profile information
-                break;
-            }
+        const auto dbProfilingNS = NamespaceString(dbName, "system.profile");
+        AutoGetCollection autoColl(opCtx, dbProfilingNS, MODE_IX);
+        Database* const db = autoColl.getDb();
+        if (!db) {
+            // Database disappeared.
+            LOGV2(20700,
+                  "note: not profiling because db went away for {namespace}",
+                  "note: not profiling because db went away for namespace",
+                  "namespace"_attr = CurOp::get(opCtx)->getNS());
+            return;
         }
+
+        // We are about to enforce prepare conflicts for the OperationContext. But it is illegal
+        // to change the behavior of ignoring prepare conflicts while any storage transaction is
+        // still active. So we need to call abandonSnapshot() to close any open transactions.
+        // This call is also harmless because any previous reads or writes should have already
+        // completed, as profile() is called at the end of an operation.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        // The profiler performs writes even after read commands. Ignoring prepare conflicts is
+        // not allowed while performing writes, so temporarily enforce prepare conflicts.
+        EnforcePrepareConflictsBlock enforcePrepare(opCtx);
+
+        uassertStatusOK(createProfileCollection(opCtx, db));
+        Collection* const coll =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
+
+        invariant(!opCtx->shouldParticipateInFlowControl());
+        WriteUnitOfWork wuow(opCtx);
+        OpDebug* const nullOpDebug = nullptr;
+        uassertStatusOK(coll->insertDocument(opCtx, InsertStatement(p), nullOpDebug, false));
+        wuow.commit();
     } catch (const AssertionException& assertionEx) {
-        if (acquireDbXLock && ErrorCodes::isInterruption(assertionEx)) {
-            LOGV2_WARNING(
-                20702,
-                "Interrupted while attempting to create profile collection in database {dbName} to "
-                "profile operation {networkOpToString_op} against {CurOp_get_opCtx_getNS}. "
-                "Manually create profile collection to ensure future operations are logged.",
-                "dbName"_attr = dbName,
-                "networkOpToString_op"_attr = networkOpToString(op),
-                "CurOp_get_opCtx_getNS"_attr = CurOp::get(opCtx)->getNS());
-        } else {
-            LOGV2_WARNING(20703,
-                          "Caught Assertion while trying to profile {networkOpToString_op} against "
-                          "{CurOp_get_opCtx_getNS}: {assertionEx}",
-                          "networkOpToString_op"_attr = networkOpToString(op),
-                          "CurOp_get_opCtx_getNS"_attr = CurOp::get(opCtx)->getNS(),
-                          "assertionEx"_attr = redact(assertionEx));
-        }
+        LOGV2_WARNING(20703,
+                      "Caught Assertion while trying to profile {operation} against "
+                      "{namespace}: {assertion}",
+                      "Caught Assertion while trying to profile operation",
+                      "operation"_attr = networkOpToString(op),
+                      "namespace"_attr = CurOp::get(opCtx)->getNS(),
+                      "assertion"_attr = redact(assertionEx));
     }
 }
 
 
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
-    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
     invariant(!opCtx->shouldParticipateInFlowControl());
 
-    auto& dbProfilingNS = db->getProfilingNS();
+    const auto dbProfilingNS = NamespaceString(db->name(), "system.profile");
     Collection* const collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
     if (collection) {
