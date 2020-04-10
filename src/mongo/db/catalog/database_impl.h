@@ -31,8 +31,6 @@
 
 #include "mongo/db/catalog/database.h"
 
-#include "mongo/platform/random.h"
-
 namespace mongo {
 
 class DatabaseImpl final : public Database {
@@ -124,8 +122,8 @@ public:
      * Returns a NamespaceExists error status if multiple attempts fail to generate a possible
      * unique name.
      */
-    StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
-                                                              StringData collectionNameModel) final;
+    StatusWith<NamespaceString> makeUniqueCollectionNamespace(
+        OperationContext* opCtx, StringData collectionNameModel) const final;
 
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
@@ -179,10 +177,6 @@ private:
     // collections may be created in this Database.
     // This variable may only be read/written while the database is locked in MODE_X.
     AtomicWord<bool> _dropPending{false};
-
-    // Random number generator used to create unique collection namespaces suitable for temporary
-    // collections.
-    PseudoRandom _uniqueCollectionNamespacePseudoRandom;
 };
 
 }  // namespace mongo

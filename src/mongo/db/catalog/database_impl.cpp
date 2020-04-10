@@ -100,6 +100,12 @@ Status validateDBNameForWindows(StringData dbname) {
                       str::stream() << "db name \"" << dbname << "\" is a reserved name");
     return Status::OK();
 }
+
+// Random number generator used to create unique collection namespaces suitable for temporary
+// collections.
+PseudoRandom uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64());
+
+Mutex uniqueCollectionNamespaceMutex = MONGO_MAKE_LATCH("DatabaseUniqueCollectionNamespaceMutex");
 }  // namespace
 
 Status DatabaseImpl::validateDBName(StringData dbname) {
@@ -126,8 +132,7 @@ DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
     : _name(name.toString()),
       _epoch(epoch),
       _profileName(_name + ".system.profile"),
-      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()),
-      _uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64()) {
+      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
     auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));
 
@@ -763,7 +768,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 }
 
 StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
-    OperationContext* opCtx, StringData collectionNameModel) {
+    OperationContext* opCtx, StringData collectionNameModel) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
     // There must be at least one percent sign in the collection name model.
@@ -782,11 +787,13 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
         "abcdefghijklmnopqrstuvwxyz"_sd;
     invariant((10U + 26U * 2) == charsToChooseFrom.size());
 
+    stdx::lock_guard<Latch> lk(uniqueCollectionNamespaceMutex);
+
     auto replacePercentSign = [&, this](char c) {
         if (c != '%') {
             return c;
         }
-        auto i = _uniqueCollectionNamespacePseudoRandom.nextInt32(charsToChooseFrom.size());
+        auto i = uniqueCollectionNamespacePseudoRandom.nextInt32(charsToChooseFrom.size());
         return charsToChooseFrom[i];
     };
 
