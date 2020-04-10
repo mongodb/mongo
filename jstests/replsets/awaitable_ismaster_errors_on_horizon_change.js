@@ -26,7 +26,7 @@ function runAwaitableIsMasterBeforeHorizonChange(topologyVersionField) {
     }),
                                                 ErrorCodes.SplitHorizonChange);
 
-    assert.eq(result.errmsg, "Received a reconfig that changed the horizon parameters.");
+    assert.eq(result.errmsg, "Received a reconfig that changed the horizon mappings.");
 }
 
 function runAwaitableIsMaster(topologyVersionField) {

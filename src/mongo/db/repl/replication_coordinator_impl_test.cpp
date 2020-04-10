@@ -3183,6 +3183,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -3325,6 +3326,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsErrorOnHorizonChange) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -3372,6 +3374,242 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsErrorOnHorizonChange) {
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
     getIsMasterThread.join();
+}
+
+TEST_F(ReplCoordTest, NonAwaitableIsMasterReturnsNoConfigsOnNodeWithUninitializedConfig) {
+    start();
+    auto opCtx = makeOperationContext();
+
+    const auto response = getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, {}, {});
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+}
+
+TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfig) {
+    init("mySet");
+    start(HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    bool isMasterReturned = false;
+    stdx::thread awaitIsMasterTimeout([&] {
+        const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
+        const auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, expectedTopologyVersion, deadline);
+        isMasterReturned = true;
+        auto responseTopologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(expectedTopologyVersion.getProcessId(),
+                      responseTopologyVersion->getProcessId());
+        ASSERT_EQUALS(expectedTopologyVersion.getCounter(), responseTopologyVersion->getCounter());
+        ASSERT_FALSE(response->isMaster());
+        ASSERT_FALSE(response->isSecondary());
+        ASSERT_FALSE(response->isConfigSet());
+    });
+
+    getNet()->enterNetwork();
+    getNet()->advanceTime(halfwayToDeadline);
+    ASSERT_EQUALS(halfwayToDeadline, getNet()->now());
+    ASSERT_FALSE(isMasterReturned);
+
+    getNet()->advanceTime(deadline);
+    ASSERT_EQUALS(deadline, getNet()->now());
+    awaitIsMasterTimeout.join();
+    ASSERT_TRUE(isMasterReturned);
+    getNet()->exitNetwork();
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
+
+    deadline = getNet()->now() + maxAwaitTime;
+    stdx::thread awaitIsMasterInitiate([&] {
+        const auto topologyVersion = getTopoCoord().getTopologyVersion();
+        const auto response =
+            getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, topologyVersion, deadline);
+        auto responseTopologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion.getProcessId(), responseTopologyVersion->getProcessId());
+        ASSERT_EQUALS(topologyVersion.getCounter() + 1, responseTopologyVersion->getCounter());
+        ASSERT_FALSE(response->isMaster());
+        ASSERT_FALSE(response->isSecondary());
+        ASSERT_TRUE(response->isConfigSet());
+    });
+
+    // Ensure that awaitIsMasterResponse() is called before initiating.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    BSONObjBuilder result;
+    auto status =
+        getReplCoord()->processReplSetInitiate(opCtx.get(),
+                                               BSON("_id"
+                                                    << "mySet"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "node1:12345"))),
+                                               &result);
+    ASSERT_OK(status);
+    awaitIsMasterInitiate.join();
+}
+
+TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfigDifferentTopologyVersion) {
+    start();
+    auto opCtx = makeOperationContext();
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+    const auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    // A request with a future TopologyVersion should error.
+    const auto futureTopologyVersion = TopologyVersion(currentTopologyVersion.getProcessId(),
+                                                       currentTopologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(futureTopologyVersion.getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, futureTopologyVersion, deadline),
+        AssertionException,
+        31382);
+
+    // A request with a stale TopologyVersion should return immediately with the current server
+    // TopologyVersion.
+    const auto staleTopologyVersion = TopologyVersion(currentTopologyVersion.getProcessId(),
+                                                      currentTopologyVersion.getCounter() - 1);
+    ASSERT_LESS_THAN(staleTopologyVersion.getCounter(), currentTopologyVersion.getCounter());
+    auto response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, staleTopologyVersion, deadline);
+    auto responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    // A request with a different processId should return immediately with the server processId.
+    const auto differentPid = OID::gen();
+    ASSERT_NOT_EQUALS(differentPid, currentTopologyVersion.getProcessId());
+    auto topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, currentTopologyVersion.getCounter());
+    response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), currentTopologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    // A request with a future TopologyVersion but different processId should still return
+    // immediately.
+    topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, currentTopologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(topologyVersionWithDifferentProcessId.getCounter(),
+                        currentTopologyVersion.getCounter());
+    response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), currentTopologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+}
+
+TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfigInvalidHorizon) {
+    init("mySet");
+    start(HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    const std::string horizonSniName = "horizon.com";
+    const auto horizonParam = SplitHorizon::Parameters(horizonSniName);
+
+    // Send a non-awaitable isMaster.
+    const auto initialResponse = getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, {}, {});
+    ASSERT_FALSE(initialResponse->isMaster());
+    ASSERT_FALSE(initialResponse->isSecondary());
+    ASSERT_FALSE(initialResponse->isConfigSet());
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
+
+    stdx::thread awaitIsMasterInitiate([&] {
+        const auto topologyVersion = getTopoCoord().getTopologyVersion();
+        ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                               opCtx.get(), horizonParam, topologyVersion, deadline),
+                           AssertionException,
+                           ErrorCodes::SplitHorizonChange);
+    });
+
+    // Ensure that the isMaster request has started waiting before initiating.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    // Call replSetInitiate with no horizon configured. This should return an error to the isMaster
+    // request that is currently waiting on a horizonParam that doesn't exit in the config.
+    BSONObjBuilder result;
+    auto status =
+        getReplCoord()->processReplSetInitiate(opCtx.get(),
+                                               BSON("_id"
+                                                    << "mySet"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "node1:12345"))),
+                                               &result);
+    ASSERT_OK(status);
+    awaitIsMasterInitiate.join();
+}
+
+TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfigSpecifiedHorizon) {
+    init("mySet");
+    start(HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    const std::string horizonSniName = "horizon.com";
+    const auto horizonParam = SplitHorizon::Parameters(horizonSniName);
+
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
+
+    const std::string horizonOneSniName = "horizon1.com";
+    const auto horizonOne = SplitHorizon::Parameters(horizonOneSniName);
+    const auto horizonOneView = HostAndPort("horizon1.com:12345");
+    stdx::thread awaitIsMasterInitiate([&] {
+        const auto topologyVersion = getTopoCoord().getTopologyVersion();
+        const auto response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), horizonOne, topologyVersion, deadline);
+        auto responseTopologyVersion = response->getTopologyVersion();
+        const auto hosts = response->getHosts();
+        ASSERT_EQUALS(hosts[0], horizonOneView);
+        ASSERT_EQUALS(topologyVersion.getProcessId(), responseTopologyVersion->getProcessId());
+        ASSERT_EQUALS(topologyVersion.getCounter() + 1, responseTopologyVersion->getCounter());
+        ASSERT_FALSE(response->isMaster());
+        ASSERT_FALSE(response->isSecondary());
+        ASSERT_TRUE(response->isConfigSet());
+    });
+
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    // Call replSetInitiate with a horizon configured.
+    BSONObjBuilder result;
+    auto status = getReplCoord()->processReplSetInitiate(
+        opCtx.get(),
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "node1:12345"
+                                      << "horizons"
+                                      << BSON("horizon1"
+                                              << "horizon1.com:12345")))),
+        &result);
+    ASSERT_OK(status);
+    awaitIsMasterInitiate.join();
 }
 
 TEST_F(ReplCoordTest, AwaitIsMasterUsesDefaultHorizonWhenRequestedHorizonNotFound) {
@@ -3561,6 +3799,147 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsWithNewHorizon) {
     getNet()->exitNetwork();
 }
 
+TEST_F(ReplCoordTest, IsMasterOnRemovedNode) {
+    init();
+    const auto nodeOneHostName = "node1:12345";
+    const auto nodeTwoHostName = "node2:12345";
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host" << nodeOneHostName << "_id" << 1)
+                                          << BSON("host" << nodeTwoHostName << "_id" << 2))),
+                       HostAndPort(nodeOneHostName));
+
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    auto net = getNet();
+    enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort(nodeTwoHostName), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+    // Receive a config that excludes node1 and with node2 having a configured horizon.
+    ReplSetHeartbeatResponse hbResp;
+    ReplSetConfig removedFromConfig;
+    ASSERT_OK(removedFromConfig.initialize(
+        BSON("_id"
+             << "mySet"
+             << "protocolVersion" << 1 << "version" << 2 << "members"
+             << BSON_ARRAY(BSON("host" << nodeTwoHostName << "_id" << 2 << "horizons"
+                                       << BSON("horizon1"
+                                               << "testhorizon.com:100"))))));
+    hbResp.setConfig(removedFromConfig);
+    hbResp.setConfigVersion(2);
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+    net->runReadyNetworkOperations();
+    exitNetwork();
+
+    // node1 no longer exists in the replica set config.
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
+                  getReplCoord()->getConfig().getConfigVersion());
+
+    const auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = net->now() + maxAwaitTime;
+    auto opCtx = makeOperationContext();
+    const auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
+
+    // Non-awaitable isMaster requests should return immediately.
+    auto response = getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, {}, {});
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    // A request with a future TopologyVersion should error.
+    const auto futureTopologyVersion = TopologyVersion(currentTopologyVersion.getProcessId(),
+                                                       currentTopologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(futureTopologyVersion.getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, futureTopologyVersion, deadline),
+        AssertionException,
+        31382);
+
+    // A request with a stale TopologyVersion should return immediately.
+    const auto staleTopologyVersion = TopologyVersion(currentTopologyVersion.getProcessId(),
+                                                      currentTopologyVersion.getCounter() - 1);
+    ASSERT_LESS_THAN(staleTopologyVersion.getCounter(), currentTopologyVersion.getCounter());
+    response =
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, staleTopologyVersion, deadline);
+    auto responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    // A request with a different processId should return immediately with the server processId.
+    const auto differentPid = OID::gen();
+    ASSERT_NOT_EQUALS(differentPid, currentTopologyVersion.getProcessId());
+    auto topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, currentTopologyVersion.getCounter());
+    response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), currentTopologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    // A request with a future TopologyVersion but different processId should still return
+    // immediately.
+    topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, currentTopologyVersion.getCounter() + 1);
+    ASSERT_GREATER_THAN(topologyVersionWithDifferentProcessId.getCounter(),
+                        currentTopologyVersion.getCounter());
+    response = getReplCoord()->awaitIsMasterResponse(
+        opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline);
+    responseTopologyVersion = response->getTopologyVersion();
+    ASSERT_EQUALS(responseTopologyVersion->getProcessId(), currentTopologyVersion.getProcessId());
+    ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+    ASSERT_FALSE(response->isMaster());
+    ASSERT_FALSE(response->isSecondary());
+    ASSERT_FALSE(response->isConfigSet());
+
+    bool isMasterReturned = false;
+    // A request with an equal TopologyVersion should wait and timeout once the deadline is reached.
+    const auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
+    stdx::thread getIsMasterThread([&] {
+        // Sending an isMaster request on a removed node should wait.
+        response = getReplCoord()->awaitIsMasterResponse(
+            opCtx.get(), {}, currentTopologyVersion, deadline);
+        isMasterReturned = true;
+        responseTopologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(responseTopologyVersion->getCounter(), currentTopologyVersion.getCounter());
+        ASSERT_FALSE(response->isMaster());
+        ASSERT_FALSE(response->isSecondary());
+        ASSERT_FALSE(response->isConfigSet());
+    });
+
+    deadline = net->now() + maxAwaitTime;
+    net->enterNetwork();
+    // Set the network clock to a time before the deadline of the isMaster request. The request
+    // should still be waiting.
+    net->advanceTime(halfwayToDeadline);
+    ASSERT_EQUALS(halfwayToDeadline, net->now());
+    ASSERT_FALSE(isMasterReturned);
+
+    // Set the network clock to the deadline.
+    net->advanceTime(deadline);
+    ASSERT_EQUALS(deadline, net->now());
+    getIsMasterThread.join();
+    ASSERT_TRUE(isMasterReturned);
+    net->exitNetwork();
+}
+
 TEST_F(ReplCoordTest, AwaitIsMasterRespondsCorrectlyWhenNodeRemovedAndReadded) {
     init();
     const auto nodeOneHostName = "node1:12345";
@@ -3584,13 +3963,17 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsCorrectlyWhenNodeRemovedAndReadded) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     stdx::thread getIsMasterWaitingForRemovedNodeThread([&] {
-        const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
+        const auto topologyVersion = getTopoCoord().getTopologyVersion();
         // The isMaster response should indicate that the node does not have a valid replica set
         // config.
-        const auto response = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, expectedTopologyVersion, deadline);
+        const auto response =
+            getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, topologyVersion, deadline);
+        const auto responseTopologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(responseTopologyVersion->getProcessId(), topologyVersion.getProcessId());
+        ASSERT_EQUALS(responseTopologyVersion->getCounter(), topologyVersion.getCounter() + 1);
         ASSERT_FALSE(response->isMaster());
         ASSERT_FALSE(response->isSecondary());
         ASSERT_FALSE(response->isConfigSet());
@@ -3631,32 +4014,19 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsCorrectlyWhenNodeRemovedAndReadded) {
     ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
                   getReplCoord()->getConfig().getConfigVersion());
     getIsMasterWaitingForRemovedNodeThread.join();
+    const std::string newHorizonSniName = "newhorizon.com";
+    auto newHorizon = SplitHorizon::Parameters(newHorizonSniName);
 
-    const std::string testHorizonSniName = "testhorizon.com";
-    auto newHorizon = SplitHorizon::Parameters(testHorizonSniName);
     stdx::thread getIsMasterThread([&] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
-        // Sending an isMaster request on a removed node should still indicate that the node does
-        // not have a valid replica set reconfig.
-        const auto response = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), newHorizon, expectedTopologyVersion, deadline);
-        auto topologyVersion = response->getTopologyVersion();
-        ASSERT_FALSE(response->isMaster());
-        ASSERT_FALSE(response->isSecondary());
-        ASSERT_FALSE(response->isConfigSet());
+        // Wait for the node to be readded to the set. This should return an error.
+        ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                               opCtx.get(), {}, expectedTopologyVersion, deadline),
+                           AssertionException,
+                           ErrorCodes::SplitHorizonChange);
     });
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 2);
 
-    deadline = net->now() + maxAwaitTime;
-    // Set the network clock to the timeout deadline of awaitIsMasterResponse.
-    net->enterNetwork();
-    net->advanceTime(deadline);
-    ASSERT_EQUALS(deadline, net->now());
-    getIsMasterThread.join();
-    ASSERT_FALSE(net->hasReadyRequests());
-    net->exitNetwork();
-
-    const std::string newHorizonSniName = "newhorizon.com";
-    newHorizon = SplitHorizon::Parameters(newHorizonSniName);
     const auto newHorizonNodeOne = "newhorizon.com:100";
     const auto newHorizonNodeTwo = "newhorizon.com:200";
 
@@ -3682,6 +4052,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsCorrectlyWhenNodeRemovedAndReadded) {
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
+    getIsMasterThread.join();
 
     stdx::thread getIsMasterThreadNewHorizon([&] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
@@ -3739,6 +4110,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionTimeout) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -3803,6 +4175,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWin) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -3896,6 +4269,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWinWithReconfig) {
         globalFailPointRegistry().find("hangAfterReconfigOnDrainComplete");
 
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -4384,6 +4758,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfig) {
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
@@ -4534,6 +4909,7 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnReplSetReconfigOnSecondary) 
 
     auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
 
     // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.

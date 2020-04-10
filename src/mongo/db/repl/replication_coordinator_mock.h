@@ -336,11 +336,11 @@ public:
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
-        boost::optional<Date_t> deadline) const override;
+        boost::optional<Date_t> deadline) override;
 
     virtual SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> getIsMasterResponseFuture(
         const SplitHorizon::Parameters& horizonParams,
-        boost::optional<TopologyVersion> clientTopologyVersion) const override;
+        boost::optional<TopologyVersion> clientTopologyVersion) override;
 
     virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
 
