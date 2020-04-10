@@ -71,6 +71,18 @@ assert.commandFailedWithCode(sessionDb.runCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
+jsTestLog("Attempting to find with readConcern:majority within a transaction.");
+assert.commandFailedWithCode(sessionDb.runCommand({
+    find: collName,
+    filter: {_id: 1},
+    limit: 1,
+    readConcern: {level: "majority"},
+    autocommit: false,
+    txnNumber: NumberLong(txnNumber),
+    stmtId: NumberInt(stmtId++)
+}),
+                             ErrorCodes.InvalidOptions);
+
 jsTestLog("Attempting to insert with readConcern:local within a transaction.");
 assert.commandFailedWithCode(sessionDb.runCommand({
     insert: collName,

@@ -230,18 +230,22 @@ assert.commandWorked(sessionDb.adminCommand({
 }));
 
 /***********************************************************************************************
- * Invalid to include autocommit field on an operation not inside a transaction.
+ * Invalid to include autocommit field on an operation run with an invalid transaction number.
  **********************************************************************************************/
 
-jsTestLog("Run an operation with autocommit=false outside of a transaction.");
+jsTestLog("Run an operation with autocommit=false in a nonexistent transaction.");
 txnNumber++;
 
 assert.commandWorked(sessionDb.runCommand({find: collName, filter: {}}));
 
+// TODO(SERVER-47508): Remove ErrorCodes.InvalidOptions from allowable error codes. We must
+// accommodate this error code because certain suites will attach a readConcern to this invocation,
+// which in turn will fail the check that only the first statement in a multi-document transaction
+// can specify a readConcern.
 assert.commandFailedWithCode(
     sessionDb.runCommand(
         {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}),
-    ErrorCodes.NoSuchTransaction);
+    [ErrorCodes.NoSuchTransaction, ErrorCodes.InvalidOptions]);
 
 /***********************************************************************************************
  * The 'autocommit' field must be specified on commit/abort commands.
