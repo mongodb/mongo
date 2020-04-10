@@ -43,8 +43,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -98,14 +97,13 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const OID& epoch,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitKeys) {
-    const auto metadataAfterSplit = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
-    }();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+    const auto metadataAfterSplit =
+        CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " changed since split start",
-            metadataAfterSplit.getCollVersion().epoch() == epoch);
+            metadataAfterSplit && metadataAfterSplit->getShardVersion().epoch() == epoch);
 
     auto newChunkBounds(splitKeys);
     auto startKey = chunkRange.getMin();

@@ -51,6 +51,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
@@ -635,7 +636,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         // Only attempt to drop a collection's indexes if we have valid metadata and the
         // collection is sharded.
         if (optMetadata) {
-            const auto& metadata = optMetadata->get();
+            const auto& metadata = *optMetadata;
             if (metadata.isSharded()) {
                 auto chunks = metadata.getChunks();
                 if (chunks.empty()) {
@@ -1362,8 +1363,8 @@ SharedSemiFuture<void> MigrationDestinationManager::_notePending(OperationContex
     // This can currently happen because drops and shard key refine operations aren't guaranteed to
     // be synchronized with in-migrations. The idea for checking this here is that in the future we
     // shouldn't have this problem.
-    if (!optMetadata || !(*optMetadata)->isSharded() ||
-        (*optMetadata)->getCollVersion().epoch() != _epoch) {
+    if (!optMetadata || !optMetadata->isSharded() ||
+        optMetadata->getCollVersion().epoch() != _epoch) {
         return Status{ErrorCodes::StaleShardVersion,
                       str::stream()
                           << "Not marking chunk " << redact(range.toString())
@@ -1396,8 +1397,8 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
     // _collUuid will always be set if _notePending was called, so if it is not set, there is no
     // need to do anything. If it is set, we use it to ensure that the collection UUID has not
     // changed since the beginning of migration.
-    if (!optMetadata || !(*optMetadata)->isSharded() ||
-        (_collUuid && !(*optMetadata)->uuidMatches(*_collUuid))) {
+    if (!optMetadata || !optMetadata->isSharded() ||
+        (_collUuid && !optMetadata->uuidMatches(*_collUuid))) {
         LOGV2(22009,
               "No need to forget pending chunk {range} because the UUID for {namespace} changed",
               "No need to forget pending chunk for the requested range, because the UUID for the "

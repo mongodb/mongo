@@ -56,7 +56,6 @@ CollectionMetadata makeShardedMetadata(UUID uuid = UUID::gen()) {
     return CollectionMetadata(std::move(cm), ShardId("this"));
 }
 
-
 TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionThrowsStaleConfigBeforeSetFilteringMetadataIsCalled) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
@@ -144,8 +143,7 @@ TEST_F(CollectionShardingRuntimeTest,
     csr.setFilteringMetadata(operationContext(), newMetadata);
 
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 2);
-    ASSERT_EQ(*csr.getCollectionDescription()->getChunkManager()->getUUID(),
-              *newMetadata.getChunkManager()->getUUID());
+    ASSERT(csr.getCollectionDescription().uuidMatches(*newMetadata.getChunkManager()->getUUID()));
 }
 
 /**

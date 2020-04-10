@@ -36,6 +36,7 @@
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 

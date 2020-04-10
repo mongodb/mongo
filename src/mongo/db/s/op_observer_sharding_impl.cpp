@@ -52,18 +52,22 @@ const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
                                         CollectionShardingRuntime* csr,
                                         const BSONObj& doc) {
-    if (!repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())
+    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    if (!atClusterTime)
         return;
 
-    const auto collectionFilter = csr->getOwnershipFilter(
-        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-    if (!collectionFilter.isSharded())
+    // TODO (SERVER-47472): The execution leading to here will guarantee that the metadata is always
+    // known, so the !metadata check can be removed
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded())
         return;
 
-    auto shardKey = collectionFilter.extractShardKeyFromDoc(doc);
+    auto shardKey = metadata->getShardKeyPattern().extractShardKeyFromDoc(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    auto chunk = collectionFilter.findIntersectingChunkWithSimpleCollation(shardKey);
+    ChunkManager chunkManagerAtClusterTime(metadata->getChunkManager()->getRoutingHistory(),
+                                           atClusterTime->asTimestamp());
+    auto chunk = chunkManagerAtClusterTime.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
     // read concern parameter.

@@ -112,7 +112,7 @@ public:
      * be used for cases such as checking whether a particular config server update has taken
      * effect.
      */
-    boost::optional<ScopedCollectionDescription> getCurrentMetadataIfKnown();
+    boost::optional<CollectionMetadata> getCurrentMetadataIfKnown();
 
     /**
      * Updates the collection's filtering metadata based on changes received from the config server
@@ -187,7 +187,7 @@ private:
      * Returns the latest version of collection metadata with filtering configured for
      * atClusterTime if specified.
      */
-    boost::optional<ScopedCollectionDescription> _getCurrentMetadataIfKnown(
+    std::shared_ptr<ScopedCollectionDescription::Impl> _getCurrentMetadataIfKnown(
         const boost::optional<LogicalTime>& atClusterTime);
 
     /**
@@ -196,7 +196,7 @@ private:
      * operation context does not match the shard version on the active metadata object.
      */
     enum class TreatUnknownAsUnsharded { kYes, kNo };
-    ScopedCollectionDescription _getMetadataWithVersionCheckAt(
+    std::shared_ptr<ScopedCollectionDescription::Impl> _getMetadataWithVersionCheckAt(
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
         TreatUnknownAsUnsharded treatUnknownAsUnsharded);

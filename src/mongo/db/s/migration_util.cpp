@@ -369,22 +369,30 @@ template <typename Callable>
 void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
-    const auto css = CollectionShardingRuntime::get(opCtx, nss);
-    const auto collDesc = css->getCollectionDescription();
+    const auto csr = CollectionShardingRuntime::get(opCtx, nss);
+    const auto metadata = csr->getCurrentMetadataIfKnown();
     const auto emptyChunkMap =
         RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
 
-    if (!collDesc.isSharded()) {
+    if (!metadata) {
+        LOGV2(474680,
+              "Upgrade: Skipping orphaned range enumeration because the collection's sharding "
+              "state is not known",
+              "namespace"_attr = nss);
+        return;
+    }
+
+    if (!metadata->isSharded()) {
         LOGV2(22029,
               "Upgrade: Skipping orphaned range enumeration because the collection is not sharded",
               "namespace"_attr = nss);
         return;
     }
 
-    auto startingKey = collDesc.getMinKey();
+    auto startingKey = metadata->getMinKey();
 
     while (true) {
-        auto range = collDesc->getNextOrphanRange(emptyChunkMap, startingKey);
+        auto range = metadata->getNextOrphanRange(emptyChunkMap, startingKey);
         if (!range) {
             LOGV2_DEBUG(22030,
                         2,
@@ -837,9 +845,9 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                         return css->getCurrentMetadataIfKnown();
                     }();
 
-                    if (!refreshedMetadata || !(*refreshedMetadata)->isSharded() ||
-                        !(*refreshedMetadata)->uuidMatches(doc.getCollectionUuid())) {
-                        if (!refreshedMetadata || !(*refreshedMetadata)->isSharded()) {
+                    if (!refreshedMetadata || !refreshedMetadata->isSharded() ||
+                        !refreshedMetadata->uuidMatches(doc.getCollectionUuid())) {
+                        if (!refreshedMetadata || !refreshedMetadata->isSharded()) {
                             LOGV2(
                                 22040,
                                 "Even after forced refresh, filtering metadata for this namespace "
@@ -857,7 +865,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                                 "node",
                                 "migrationCoordinatorDocument"_attr = redact(doc.toBSON()),
                                 "refreshedMetadataUUID"_attr =
-                                    (*refreshedMetadata)->getChunkManager()->getUUID(),
+                                    refreshedMetadata->getChunkManager()->getUUID(),
                                 "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                         }
 
@@ -868,7 +876,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                         return true;
                     }
 
-                    if ((*refreshedMetadata)->keyBelongsToMe(doc.getRange().getMin())) {
+                    if (refreshedMetadata->keyBelongsToMe(doc.getRange().getMin())) {
                         coordinator.setMigrationDecision(MigrationCoordinator::Decision::kAborted);
                     } else {
                         coordinator.setMigrationDecision(

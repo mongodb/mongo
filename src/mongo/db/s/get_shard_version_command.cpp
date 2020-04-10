@@ -115,15 +115,15 @@ public:
             }
         } else {
             const auto& metadata = *optMetadata;
-            result.appendTimestamp("global", metadata->getShardVersion().toLong());
+            result.appendTimestamp("global", metadata.getShardVersion().toLong());
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
-                if (metadata->isSharded()) {
-                    metadata->toBSONBasic(metadataBuilder);
+                if (metadata.isSharded()) {
+                    metadata.toBSONBasic(metadataBuilder);
 
                     BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
-                    metadata->toBSONChunks(&chunksArr);
+                    metadata.toBSONChunks(&chunksArr);
                     chunksArr.doneFast();
 
                     BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));

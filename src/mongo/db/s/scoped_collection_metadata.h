@@ -53,28 +53,8 @@ public:
 
     ScopedCollectionDescription(std::shared_ptr<Impl> impl) : _impl(std::move(impl)) {}
 
-    const auto& get() const {
-        return _impl->get();
-    }
-
-    const auto* operator-> () const {
-        return &get();
-    }
-
-    const auto& operator*() const {
-        return get();
-    }
-
     bool isSharded() const {
         return _impl->get().isSharded();
-    }
-
-    ChunkVersion getShardVersion() const {
-        return _impl->get().getShardVersion();
-    }
-
-    ChunkVersion getCollVersion() const {
-        return _impl->get().getCollVersion();
     }
 
     bool isValidKey(const BSONObj& key) const {
@@ -105,10 +85,6 @@ public:
         return _impl->get().uuidMatches(uuid);
     }
 
-    const BSONObj extractShardKeyFromDoc(const BSONObj& doc) const {
-        return _impl->get().getChunkManager()->getShardKeyPattern().extractShardKeyFromDoc(doc);
-    }
-
 protected:
     std::shared_ptr<Impl> _impl;
 };
@@ -125,15 +101,8 @@ public:
     ScopedCollectionFilter(std::shared_ptr<Impl> impl)
         : ScopedCollectionDescription(std::move(impl)) {}
 
-    ScopedCollectionFilter(ScopedCollectionDescription&& scopedMetadata)
-        : ScopedCollectionDescription(std::move(scopedMetadata)) {}
-
     bool keyBelongsToMe(const BSONObj& key) const {
         return _impl->get().keyBelongsToMe(key);
-    }
-
-    Chunk findIntersectingChunkWithSimpleCollation(const BSONObj& shardKey) const {
-        return _impl->get().getChunkManager()->findIntersectingChunkWithSimpleCollation(shardKey);
     }
 };
 

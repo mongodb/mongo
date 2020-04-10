@@ -69,7 +69,7 @@ public:
      * ScopedCollectionDescription goes out of scope, the reference counter on the metadata will be
      * decremented and if it reaches to zero, orphan cleanup may proceed.
      */
-    ScopedCollectionDescription getActiveMetadata(
+    std::shared_ptr<ScopedCollectionDescription::Impl> getActiveMetadata(
         const boost::optional<LogicalTime>& atClusterTime);
 
     /**

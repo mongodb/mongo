@@ -179,15 +179,15 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto& metadata = *optMetadata;
         uassert(ErrorCodes::IncompatibleShardingMetadata,
                 "Cannot move chunks for an unsharded collection",
-                metadata->isSharded());
+                metadata.isSharded());
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();
 
     const auto& collectionMetadata = std::get<0>(collectionMetadataAndUUID);
 
-    const auto collectionVersion = collectionMetadata->getCollVersion();
-    const auto shardVersion = collectionMetadata->getShardVersion();
+    const auto collectionVersion = collectionMetadata.getCollVersion();
+    const auto shardVersion = collectionMetadata.getShardVersion();
 
     // If the shard major version is zero, this means we do not have any chunks locally to migrate
     uassert(ErrorCodes::IncompatibleShardingMetadata,
@@ -206,11 +206,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     chunkToMove.setMin(_args.getMinKey());
     chunkToMove.setMax(_args.getMaxKey());
 
-    uassertStatusOKWithContext(collectionMetadata->checkChunkIsValid(chunkToMove),
+    uassertStatusOKWithContext(collectionMetadata.checkChunkIsValid(chunkToMove),
                                str::stream() << "Unable to move chunk with arguments '"
                                              << redact(_args.toString()));
 
-    _chunkVersion = collectionMetadata->getChunkManager()
+    _chunkVersion = collectionMetadata.getChunkManager()
                         ->findIntersectingChunkWithSimpleCollation(_args.getMinKey())
                         .getLastmod();
     _collectionEpoch = collectionVersion.epoch();
@@ -256,7 +256,7 @@ Status MigrationSourceManager::startClone() {
         // operations require the cloner to be present in order to track changes to the chunk which
         // needs to be transmitted to the recipient.
         _cloneDriver = std::make_unique<MigrationChunkClonerSourceLegacy>(
-            _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
+            _args, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
 
         AutoGetCollection autoColl(_opCtx,
                                    getNss(),
@@ -425,7 +425,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             _args.getFromShardId(),
             _args.getToShardId(),
             migratedChunkType,
-            metadata->getCollVersion(),
+            metadata.getCollVersion(),
             LogicalClock::get(_opCtx)->getClusterTime().asTimestamp());
 
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
@@ -463,7 +463,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
 
-    if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+    if (refreshedMetadata.keyBelongsToMe(_args.getMinKey())) {
         // This condition may only happen if the migration commit has failed for any reason
         if (migrationCommitStatus.isOK()) {
             return {ErrorCodes::ConflictingOperationInProgress,
@@ -485,7 +485,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     LOGV2(22018,
           "Migration succeeded and updated collection version to {updatedCollectionVersion}",
           "Migration succeeded and updated collection version",
-          "updatedCollectionVersion"_attr = refreshedMetadata->getCollVersion(),
+          "updatedCollectionVersion"_attr = refreshedMetadata.getCollVersion(),
           "migrationId"_attr = _coordinator->getMigrationId());
 
     if (_enableResumableRangeDeleter) {
@@ -521,7 +521,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                                      getNss(),
                                      _args.getToShardId(),
                                      _recipientHost,
-                                     refreshedMetadata->getCollVersion());
+                                     refreshedMetadata.getCollVersion());
     }
 
     std::string orphanedRangeCleanUpErrMsg = str::stream()
@@ -624,7 +624,7 @@ void MigrationSourceManager::abortDueToConflictingIndexOperation() {
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
 }
 
-ScopedCollectionDescription MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
+CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
     auto metadata = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
@@ -641,17 +641,17 @@ ScopedCollectionDescription MigrationSourceManager::_getCurrentMetadataAndCheckE
             str::stream() << "The collection's epoch has changed since the migration began. "
                              "Expected collection epoch: "
                           << _collectionEpoch.toString() << ", but found: "
-                          << (metadata->isSharded() ? metadata->getCollVersion().epoch().toString()
-                                                    : "unsharded collection."),
-            metadata->isSharded() && metadata->getCollVersion().epoch() == _collectionEpoch);
+                          << (metadata.isSharded() ? metadata.getCollVersion().epoch().toString()
+                                                   : "unsharded collection"),
+            metadata.isSharded() && metadata.getCollVersion().epoch() == _collectionEpoch);
 
     return metadata;
 }
 
 void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
-    const ScopedCollectionDescription& metadata) {
+    const CollectionMetadata& metadata) {
     // If this is not the first donation, there is nothing to be done
-    if (metadata->getChunkManager()->getVersion(_args.getToShardId()).isSet())
+    if (metadata.getChunkManager()->getVersion(_args.getToShardId()).isSet())
         return;
 
     const std::string dbgMessage = str::stream()

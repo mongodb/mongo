@@ -235,9 +235,8 @@ public:
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             const ChunkVersion collectionShardVersion = [&] {
                 auto optMetadata = csr->getCurrentMetadataIfKnown();
-                return (optMetadata && (*optMetadata)->isSharded())
-                    ? (*optMetadata)->getShardVersion()
-                    : ChunkVersion::UNSHARDED();
+                return (optMetadata && optMetadata->isSharded()) ? optMetadata->getShardVersion()
+                                                                 : ChunkVersion::UNSHARDED();
             }();
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
@@ -357,9 +356,8 @@ public:
             const ChunkVersion currVersion = [&] {
                 auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
                 auto optMetadata = csr->getCurrentMetadataIfKnown();
-                return (optMetadata && (*optMetadata)->isSharded())
-                    ? (*optMetadata)->getShardVersion()
-                    : ChunkVersion::UNSHARDED();
+                return (optMetadata && optMetadata->isSharded()) ? optMetadata->getShardVersion()
+                                                                 : ChunkVersion::UNSHARDED();
             }();
 
             if (!status.isOK()) {

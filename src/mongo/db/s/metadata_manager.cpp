@@ -33,8 +33,6 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
@@ -161,7 +159,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
 }
 
-ScopedCollectionDescription MetadataManager::getActiveMetadata(
+std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMetadata(
     const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<Latch> lg(_managerLock);
 
@@ -171,8 +169,8 @@ ScopedCollectionDescription MetadataManager::getActiveMetadata(
     // We don't keep routing history for unsharded collections, so if the collection is unsharded
     // just return the active metadata
     if (!atClusterTime || !activeMetadata->isSharded()) {
-        return ScopedCollectionDescription(std::make_shared<RangePreserver>(
-            lg, shared_from_this(), std::move(activeMetadataTracker)));
+        return std::make_shared<RangePreserver>(
+            lg, shared_from_this(), std::move(activeMetadataTracker));
     }
 
     auto chunkManager = activeMetadata->getChunkManager();
@@ -191,8 +189,8 @@ ScopedCollectionDescription MetadataManager::getActiveMetadata(
         CollectionMetadata _metadata;
     };
 
-    return ScopedCollectionDescription(std::make_shared<MetadataAtTimestamp>(
-        CollectionMetadata(chunkManagerAtClusterTime, activeMetadata->shardId())));
+    return std::make_shared<MetadataAtTimestamp>(
+        CollectionMetadata(chunkManagerAtClusterTime, activeMetadata->shardId()));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {

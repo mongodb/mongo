@@ -105,32 +105,32 @@ public:
         return _thisShardId;
     }
 
+    const ShardKeyPattern& getShardKeyPattern() const {
+        invariant(isSharded());
+        return _cm->getShardKeyPattern();
+    }
+
     /**
      * Returns true if 'key' contains exactly the same fields as the shard key pattern.
      */
     bool isValidKey(const BSONObj& key) const {
-        invariant(isSharded());
-        return _cm->getShardKeyPattern().isShardKey(key);
+        return getShardKeyPattern().isShardKey(key);
     }
 
     const BSONObj& getKeyPattern() const {
-        invariant(isSharded());
-        return _cm->getShardKeyPattern().toBSON();
+        return getShardKeyPattern().toBSON();
     }
 
     const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
-        invariant(isSharded());
-        return _cm->getShardKeyPattern().getKeyPatternFields();
+        return getShardKeyPattern().getKeyPatternFields();
     }
 
     BSONObj getMinKey() const {
-        invariant(isSharded());
-        return _cm->getShardKeyPattern().getKeyPattern().globalMin();
+        return getShardKeyPattern().getKeyPattern().globalMin();
     }
 
     BSONObj getMaxKey() const {
-        invariant(isSharded());
-        return _cm->getShardKeyPattern().getKeyPattern().globalMax();
+        return getShardKeyPattern().getKeyPattern().globalMax();
     }
 
     bool uuidMatches(UUID uuid) const {

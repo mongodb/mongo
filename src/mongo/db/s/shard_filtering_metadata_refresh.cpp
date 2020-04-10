@@ -155,7 +155,6 @@ CatalogCache& getCatalogCacheForFiltering(OperationContext* opCtx) {
 
 }  // namespace
 
-
 bool hasAdditionalCatalogCacheForFiltering() {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
     return getTestCommandsEnabled() && !storageGlobalParams.readOnly;
@@ -252,9 +251,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // We already have newer version
         if (optMetadata) {
             const auto& metadata = *optMetadata;
-            if (metadata->isSharded() &&
-                metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata->getCollVersion() >= cm->getVersion()) {
+            if (metadata.isSharded() &&
+                metadata.getCollVersion().epoch() == cm->getVersion().epoch() &&
+                metadata.getCollVersion() >= cm->getVersion()) {
                 LOGV2_DEBUG(
                     22063,
                     1,
@@ -263,9 +262,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                     "Skipping metadata refresh because collection already has at least as recent "
                     "metadata",
                     "namespace"_attr = nss,
-                    "latestCollectionVersion"_attr = metadata->getCollVersion(),
+                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
                     "refreshedCollectionVersion"_attr = cm->getVersion());
-                return metadata->getShardVersion();
+                return metadata.getShardVersion();
             }
         }
     }
@@ -283,9 +282,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // We already have newer version
         if (optMetadata) {
             const auto& metadata = *optMetadata;
-            if (metadata->isSharded() &&
-                metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata->getCollVersion() >= cm->getVersion()) {
+            if (metadata.isSharded() &&
+                metadata.getCollVersion().epoch() == cm->getVersion().epoch() &&
+                metadata.getCollVersion() >= cm->getVersion()) {
                 LOGV2_DEBUG(
                     22064,
                     1,
@@ -294,9 +293,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                     "Skipping metadata refresh because collection already has at least as recent "
                     "metadata",
                     "namespace"_attr = nss,
-                    "latestCollectionVersion"_attr = metadata->getCollVersion(),
+                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
                     "refreshedCollectionVersion"_attr = cm->getVersion());
-                return metadata->getShardVersion();
+                return metadata.getShardVersion();
             }
         }
     }

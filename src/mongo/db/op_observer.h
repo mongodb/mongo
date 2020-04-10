@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/rollback.h"
-#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 

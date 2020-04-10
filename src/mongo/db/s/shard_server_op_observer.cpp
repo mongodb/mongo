@@ -41,7 +41,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
@@ -237,8 +236,9 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
-    auto* const css = CollectionShardingState::get(opCtx, nss);
-    const auto collDesc = css->getCollectionDescription_DEPRECATED();
+    // TODO (SERVER-47472): The execution leading to here will guarantee that the metadata is always
+    // known, so the !metadata check can be removed
+    const auto metadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
     for (auto it = begin; it != end; ++it) {
         const auto& insertedDoc = it->doc;
@@ -270,10 +270,10 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
         }
 
-        if (collDesc.isSharded()) {
+        if (metadata && metadata->isSharded()) {
             incrementChunkOnInsertOrUpdate(opCtx,
                                            nss,
-                                           *collDesc->getChunkManager(),
+                                           *metadata->getChunkManager(),
                                            insertedDoc,
                                            insertedDoc.objsize(),
                                            fromMigrate);
@@ -282,9 +282,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    auto* const css = CollectionShardingState::get(opCtx, args.nss);
-    const auto collDesc = css->getCollectionDescription_DEPRECATED();
-
     if (args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
@@ -395,10 +392,14 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (collDesc.isSharded()) {
+    // TODO (SERVER-47472): The execution leading to here will guarantee that the metadata is always
+    // known, so the !metadata check can be removed
+    auto* const csr = CollectionShardingRuntime::get(opCtx, args.nss);
+    const auto metadata = csr->getCurrentMetadataIfKnown();
+    if (metadata && metadata->isSharded()) {
         incrementChunkOnInsertOrUpdate(opCtx,
                                        args.nss,
-                                       *collDesc->getChunkManager(),
+                                       *metadata->getChunkManager(),
                                        args.updateArgs.updatedDoc,
                                        args.updateArgs.updatedDoc.objsize(),
                                        args.updateArgs.fromMigrate);
@@ -422,6 +423,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kShardConfigCollectionsNamespace) {
         onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, documentKey);
     }
+
     if (nss == NamespaceString::kShardConfigDatabasesNamespace) {
         if (isStandaloneOrPrimary(opCtx)) {
             return;
