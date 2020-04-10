@@ -91,7 +91,6 @@ struct Context {
     ::SSLProtocol protoMin = kTLSProtocol1;
     ::SSLProtocol protoMax = kTLSProtocol12;
     CFUniquePtr<::CFArrayRef> certs;
-    bool allowInvalidHostnames = false;
 };
 
 }  // namespace apple

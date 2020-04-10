@@ -1194,6 +1194,23 @@ private:
     CFUniquePtr<::SSLContextRef> _ssl;
 };
 
+CFUniquePtr<::CFArrayRef> CreateSecTrustPolicies(const std::string& remoteHost,
+                                                 bool allowInvalidCertificates) {
+    CFUniquePtr<::CFMutableArrayRef> policiesMutable(
+        ::CFArrayCreateMutable(nullptr, 2, &::kCFTypeArrayCallBacks));
+
+    // Basic X509 policy.
+    CFUniquePtr<::SecPolicyRef> cfX509Policy(::SecPolicyCreateBasicX509());
+    ::CFArrayAppendValue(policiesMutable.get(), cfX509Policy.get());
+
+    // Set Revocation policy.
+    auto policy = ::kSecRevocationNetworkAccessDisabled;
+    CFUniquePtr<::SecPolicyRef> cfRevPolicy(::SecPolicyCreateRevocation(policy));
+    ::CFArrayAppendValue(policiesMutable.get(), cfRevPolicy.get());
+
+    return CFUniquePtr<::CFArrayRef>(policiesMutable.release());
+}
+
 }  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1340,9 +1357,6 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
 Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
                                        const SSLParams& params,
                                        ConnectionDirection direction) {
-    // Options.
-    context->allowInvalidHostnames = _allowInvalidHostnames;
-
     // Protocol Version.
     const auto swProto = parseProtocolRange(params);
     if (!swProto.isOK()) {
@@ -1516,6 +1530,9 @@ StatusWith<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     if (swCIDRRemoteHost.isOK() && remoteHost.find(':') != std::string::npos) {
         ipv6 = true;
     }
+
+    ::SecTrustSetPolicies(cftrust.get(),
+                          CreateSecTrustPolicies(remoteHost, _allowInvalidCertificates).get());
 
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);

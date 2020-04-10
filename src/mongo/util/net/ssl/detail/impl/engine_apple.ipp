@@ -129,9 +129,6 @@ engine::engine(context::native_handle_type context, const std::string& remoteHos
         }
         _protoMin = context->protoMin;
         _protoMax = context->protoMax;
-        if (context->allowInvalidHostnames) {
-            _remoteHostName.clear();
-        }
     } else {
         apple::Context def;
         _protoMin = def.protoMin;
