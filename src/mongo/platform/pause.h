@@ -36,7 +36,7 @@
  *
  * See src/third_party/wiredtiger/src/include/gcc.h
  */
-#ifndef __MSC_VER
+#ifndef _MSC_VER
 
 #if defined(x86_64) || defined(__x86_64__)
 
