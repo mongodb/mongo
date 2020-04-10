@@ -104,8 +104,8 @@ protected:
         auto specObj = builder.obj();
 
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT([&] {
-            indexer.cleanUpAfterBuild(&_opCtx, _collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(&_opCtx, _collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -127,6 +127,7 @@ protected:
                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }
+        abortOnExit.dismiss();
     }
 
     void insert(const char* s) {

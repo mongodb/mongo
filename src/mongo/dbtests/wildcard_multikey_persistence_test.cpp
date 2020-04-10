@@ -200,8 +200,8 @@ protected:
         auto coll = autoColl.getCollection();
 
         MultiIndexBlock indexer;
-        ON_BLOCK_EXIT(
-            [&] { indexer.cleanUpAfterBuild(opCtx(), coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+        auto abortOnExit = makeGuard(
+            [&] { indexer.abortIndexBuild(opCtx(), coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         // Initialize the index builder and add all documents currently in the collection.
         ASSERT_OK(
@@ -212,6 +212,7 @@ protected:
         WriteUnitOfWork wunit(opCtx());
         ASSERT_OK(indexer.commit(
             opCtx(), coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        abortOnExit.dismiss();
         wunit.commit();
     }
 

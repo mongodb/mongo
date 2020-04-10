@@ -78,41 +78,16 @@ MultiIndexBlock::~MultiIndexBlock() {
 
 MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {};
 
-void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx,
-                                        Collection* collection,
-                                        OnCleanUpFn onCleanUp) {
+void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
+                                      Collection* collection,
+                                      OnCleanUpFn onCleanUp) noexcept {
     if (_collectionUUID) {
         // init() was previously called with a collection pointer, so ensure that the same
         // collection is being provided for clean up and the interface in not being abused.
         invariant(_collectionUUID.get() == collection->uuid());
     }
 
-    if (_indexes.empty()) {
-        _buildIsCleanedUp = true;
-        return;
-    }
-
-    if (!_needToCleanup) {
-        CollectionQueryInfo::get(collection).clearQueryCache();
-
-        // The temp tables cannot be dropped in commit() because commit() can be called multiple
-        // times on write conflict errors and the drop does not rollback in WUOWs.
-
-        // Make lock acquisition uninterruptible.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
-        // underneath us.
-        boost::optional<Lock::GlobalLock> lk;
-        if (!opCtx->lockState()->isWriteLocked()) {
-            lk.emplace(opCtx, MODE_IS);
-        }
-
-        for (auto& index : _indexes) {
-            index.block->deleteTemporaryTables(opCtx);
-        }
-
-        _buildIsCleanedUp = true;
+    if (_buildIsCleanedUp) {
         return;
     }
 
@@ -200,15 +175,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
                             << collection->uuid() << " is holding the incorrect lock");
-    if (State::kAborted == _getState()) {
-        return {ErrorCodes::IndexBuildAborted,
-                str::stream() << "Index build aborted: " << _abortReason
-                              << ". Cannot initialize index builder: " << collection->ns() << " ("
-                              << collection->uuid() << "): " << indexSpecs.size()
-                              << " index spec(s) provided. First index spec: "
-                              << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
-    }
-
     _collectionUUID = collection->uuid();
 
     _buildIsCleanedUp = false;
@@ -227,7 +193,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             for (auto& index : _indexes) {
                 index.block->deleteTemporaryTables(opCtx);
             }
-            _indexes.clear();
+            _buildIsCleanedUp = true;
         });
 
         const auto& ns = collection->ns().ns();
@@ -338,9 +304,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         }
 
         wunit.commit();
-
-        _setState(State::kRunning);
-
         return indexInfoObjs;
         // Avoid converting WCE to Status
     } catch (const WriteConflictException&) {
@@ -372,6 +335,7 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                                                        Collection* collection) {
+    invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
@@ -524,11 +488,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 }
 
 Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, const RecordId& loc) {
-    if (State::kAborted == _getState()) {
-        return {ErrorCodes::IndexBuildAborted,
-                str::stream() << "Index build aborted: " << _abortReason};
-    }
-
+    invariant(!_buildIsCleanedUp);
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
             continue;
@@ -557,11 +517,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx) {
 
 Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
                                             std::set<RecordId>* dupRecords) {
-    if (State::kAborted == _getState()) {
-        return {ErrorCodes::IndexBuildAborted,
-                str::stream() << "Index build aborted: " << _abortReason};
-    }
-
+    invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
         // If 'dupRecords' is provided, it will be used to store all records that would result in
@@ -620,15 +576,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     OperationContext* opCtx,
     RecoveryUnit::ReadSource readSource,
     IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
-    if (State::kAborted == _getState()) {
-        return {ErrorCodes::IndexBuildAborted,
-                str::stream() << "Index build aborted: " << _abortReason
-                              << ". Cannot complete drain phase for index build"
-                              << (_collectionUUID ? (" on collection '" +
-                                                     _collectionUUID.get().toString() + "'")
-                                                  : ".")};
-    }
-
+    invariant(!_buildIsCleanedUp);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
@@ -659,6 +607,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
 }
 
 Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, Collection* collection) {
+    invariant(!_buildIsCleanedUp);
     for (auto&& index : _indexes) {
         auto interceptor = index.block->getEntry()->indexBuildInterceptor();
         if (!interceptor)
@@ -673,14 +622,7 @@ Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, Collection*
 }
 
 Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
-    if (State::kAborted == _getState()) {
-        return {ErrorCodes::IndexBuildAborted,
-                str::stream() << "Index build aborted: " << _abortReason
-                              << ". Cannot complete constraint checking for index build"
-                              << (_collectionUUID ? (" on collection '" +
-                                                     _collectionUUID.get().toString() + "'")
-                                                  : ".")};
-    }
+    invariant(!_buildIsCleanedUp);
 
     // For each index that may be unique, check that no recorded duplicates still exist. This can
     // only check what is visible on the index. Callers are responsible for ensuring all writes to
@@ -699,8 +641,7 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
 }
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx) {
-    _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
-
+    invariant(!_buildIsCleanedUp);
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
     // underneath us.
@@ -712,8 +653,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx) {
     for (auto& index : _indexes) {
         index.block->deleteTemporaryTables(opCtx);
     }
-    _indexes.clear();
-    _needToCleanup = false;
+    _buildIsCleanedUp = true;
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
@@ -723,6 +663,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                Collection* collection,
                                OnCreateEachFn onCreateEach,
                                OnCommitFn onCommit) {
+    invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
                             << collection->uuid() << " is holding the incorrect lock");
@@ -730,14 +671,6 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
         invariant(_collectionUUID.get() == collection->uuid());
-    }
-
-    if (State::kAborted == _getState()) {
-        return {
-            ErrorCodes::IndexBuildAborted,
-            str::stream() << "Index build aborted: " << _abortReason
-                          << ". Cannot commit index builder: " << collection->ns()
-                          << (_collectionUUID ? (" (" + _collectionUUID->toString() + ")") : "")};
     }
 
     // Do not interfere with writing multikey information when committing index builds.
@@ -769,6 +702,11 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             _indexes[i].block->getEntry()->setMultikey(opCtx, bulkBuilder->getMultikeyPaths());
         }
 
+        // The commit() function can be called multiple times on write conflict errors. Dropping the
+        // temp tables cannot be rolled back, so do it only after the WUOW commits.
+        opCtx->recoveryUnit()->onCommit(
+            [opCtx, i, this](auto commitTs) { _indexes[i].block->deleteTemporaryTables(opCtx); });
+
         if (opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
             // Add the new index ident to a list so that the validate cmd with {background:true}
             // can ignore the new index until it is regularly checkpoint'ed with the rest of the
@@ -795,79 +733,20 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 
     onCommit();
 
-    // The state of this index build is set to Committed only when the WUOW commits.
-    // It is possible for abort() to be called after the check at the beginning of this function and
-    // before the WUOW is committed. If the WUOW commits, the final state of this index builder will
-    // be Committed. Otherwise, the index builder state will remain as Aborted and further attempts
-    // to commit this index build will fail.
-    opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp> commitTime) { _setState(State::kCommitted); });
-
-    // On rollback sets MultiIndexBlock::_needToCleanup to true.
-    opCtx->recoveryUnit()->onRollback([this]() { _needToCleanup = true; });
-    _needToCleanup = false;
+    opCtx->recoveryUnit()->onCommit([collection, this](boost::optional<Timestamp> commitTime) {
+        CollectionQueryInfo::get(collection).clearQueryCache();
+        _buildIsCleanedUp = true;
+    });
 
     return Status::OK();
 }
-
-bool MultiIndexBlock::isCommitted() const {
-    return State::kCommitted == _getState();
-}
-
-void MultiIndexBlock::abort(StringData reason) {
-    _setStateToAbortedIfNotCommitted(reason);
-}
-
 
 bool MultiIndexBlock::isBackgroundBuilding() const {
     return _method == IndexBuildMethod::kHybrid;
 }
 
 void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
-    invariant(_getState() == State::kUninitialized);
     _method = indexBuildMethod;
-}
-
-MultiIndexBlock::State MultiIndexBlock::getState_forTest() const {
-    return _getState();
-}
-
-MultiIndexBlock::State MultiIndexBlock::_getState() const {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _state;
-}
-
-void MultiIndexBlock::_setState(State newState) {
-    invariant(State::kAborted != newState);
-    stdx::lock_guard<Latch> lock(_mutex);
-    _state = newState;
-}
-
-void MultiIndexBlock::_setStateToAbortedIfNotCommitted(StringData reason) {
-    stdx::lock_guard<Latch> lock(_mutex);
-    if (State::kCommitted == _state) {
-        return;
-    }
-    _state = State::kAborted;
-    _abortReason = reason.toString();
-}
-
-StringData toString(MultiIndexBlock::State state) {
-    switch (state) {
-        case MultiIndexBlock::State::kUninitialized:
-            return "Uninitialized"_sd;
-        case MultiIndexBlock::State::kRunning:
-            return "Running"_sd;
-        case MultiIndexBlock::State::kCommitted:
-            return "Committed"_sd;
-        case MultiIndexBlock::State::kAborted:
-            return "Aborted"_sd;
-    }
-    MONGO_UNREACHABLE;
-}
-
-std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state) {
-    return os << toString(state);
 }
 
 }  // namespace mongo

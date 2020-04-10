@@ -1052,8 +1052,10 @@ TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
     ASSERT_EQUALS(1, numIndexesInProgress(_opCtx.get(), nss, coll));
 
     // Kill the index build we just restarted so the fixture can shut down.
-    IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
+    ASSERT_OK(_coordinator->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT(IndexBuildsCoordinator::get(_opCtx.get())
+               ->abortIndexBuildByBuildUUID(
+                   _opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort, ""));
 }
 
 TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
@@ -1102,8 +1104,10 @@ TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
     ASSERT_EQUALS(1, numIndexesInProgress(_opCtx.get(), nss, coll));
 
     // Kill the index build we just restarted so the fixture can shut down.
-    IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
+    ASSERT_OK(_coordinator->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT(IndexBuildsCoordinator::get(_opCtx.get())
+               ->abortIndexBuildByBuildUUID(
+                   _opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort, ""));
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
@@ -1157,8 +1161,10 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
     ASSERT_EQUALS(1, numIndexesInProgress(_opCtx.get(), nss, coll));
 
     // Kill the index build we just restarted so the fixture can shut down.
-    IndexBuildsCoordinator::get(_opCtx.get())
-        ->abortIndexBuildByBuildUUID(_opCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort);
+    ASSERT_OK(_coordinator->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT(IndexBuildsCoordinator::get(_opCtx.get())
+               ->abortIndexBuildByBuildUUID(
+                   _opCtx.get(), buildUUID, IndexBuildAction::kRollbackAbort, ""));
 }
 
 TEST_F(RSRollbackTest, AbortedIndexBuildsAreNotRestartedWhenStartIsRolledBack) {

@@ -47,7 +47,7 @@ const awaitDropIndex = startParallelShell(() => {
     assert.commandWorked(testDB.runCommand({dropIndexes: TestData.collName, index: "*"}));
 }, conn.port);
 
-checkLog.contains(testDB.getMongo(), "About to abort all index builders on collection with UUID");
+checkLog.contains(testDB.getMongo(), "About to abort all index builders on collection");
 IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();

@@ -162,8 +162,8 @@ bool checkIdIndexExists(OperationContext* opCtx, RecordId catalogId) {
 
 Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     MultiIndexBlock indexer;
-    ON_BLOCK_EXIT(
-        [&] { indexer.cleanUpAfterBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
+    auto abortOnExit = makeGuard(
+        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     const auto indexCatalog = collection->getIndexCatalog();
     const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec();
@@ -187,6 +187,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     status = indexer.commit(
         opCtx, collection, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);
     wuow.commit();
+    abortOnExit.dismiss();
     return status;
 }
 

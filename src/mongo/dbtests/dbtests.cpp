@@ -108,8 +108,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         wunit.commit();
     }
     MultiIndexBlock indexer;
-    ON_BLOCK_EXIT(
-        [&] { indexer.cleanUpAfterBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+    auto abortOnExit =
+        makeGuard([&] { indexer.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status = indexer
                         .init(opCtx,
                               coll,
@@ -140,6 +140,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
     wunit.commit();
+    abortOnExit.dismiss();
     return Status::OK();
 }
 

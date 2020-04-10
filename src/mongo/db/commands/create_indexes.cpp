@@ -79,6 +79,7 @@ MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
 // collection is created.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCreateIndexesCollectionCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildAbort);
 
 // This failpoint hangs between logging the index build UUID and starting the index build
 // through the IndexBuildsCoordinator.
@@ -600,54 +601,31 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             opCtx, dbname, *collectionUUID, specs, buildUUID, protocol, indexBuildOptions));
 
         auto deadline = opCtx->getDeadline();
-        // Date_t::max() means no deadline.
-        if (deadline == Date_t::max()) {
-            LOGV2(20439,
-                  "Waiting for index build to complete: {buildUUID}",
-                  "buildUUID"_attr = buildUUID);
-        } else {
-            LOGV2(20440,
-                  "Waiting for index build to complete: {buildUUID} (deadline: {deadline})",
-                  "buildUUID"_attr = buildUUID,
-                  "deadline"_attr = deadline);
-        }
+        LOGV2(20440,
+              "Waiting for index build to complete",
+              "buildUUID"_attr = buildUUID,
+              "deadline"_attr = deadline);
 
         // Throws on error.
         try {
             stats = buildIndexFuture.get(opCtx);
         } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
             LOGV2(20441,
-                  "Index build interrupted: {buildUUID}: {interruptionEx}",
+                  "Index build received interrupt signal",
                   "buildUUID"_attr = buildUUID,
-                  "interruptionEx"_attr = interruptionEx);
+                  "signal"_attr = interruptionEx);
 
             hangBeforeIndexBuildAbortOnInterrupt.pauseWhileSet();
 
-            boost::optional<Lock::GlobalLock> globalLock;
             if (IndexBuildProtocol::kTwoPhase == protocol) {
                 // If this node is no longer a primary, the index build will continue to run in the
                 // background and will complete when this node receives a commitIndexBuild oplog
                 // entry from the new primary.
                 if (ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
                     LOGV2(20442,
-                          "Index build continuing in background: {buildUUID}",
+                          "Index build ignoring interrupt and continuing in background",
                           "buildUUID"_attr = buildUUID);
                     throw;
-                }
-
-                // If we are using two-phase index builds and are no longer primary after receiving
-                // an interrupt, we cannot replicate an abortIndexBuild oplog entry. Rely on the new
-                // primary to finish the index build. Acquire the global lock to check the
-                // replication state and to prevent any state transitions from happening while
-                // aborting the index build.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                globalLock.emplace(opCtx, MODE_IS);
-                if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-                    uassertStatusOK(
-                        {ErrorCodes::NotMaster,
-                         str::stream()
-                             << "Unable to abort index build because we are no longer primary: "
-                             << buildUUID});
                 }
             }
 
@@ -655,38 +633,48 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // for the createIndexes command or that the IndexBuildsCoordinator task was interrupted
             // independently of this command invocation. We'll defensively abort the index build
             // with the assumption that if the index build was already in the midst of tearing down,
-            // this be a no-op.
-            // Use a null abort timestamp because the index build will generate its own timestamp
-            // on cleanup.
-            indexBuildsCoord->abortIndexBuildOnError(opCtx, buildUUID, interruptionEx.toStatus());
-            LOGV2(20443, "Index build aborted: {buildUUID}", "buildUUID"_attr = buildUUID);
+            // this will be a no-op.
+            {
+                // The current OperationContext may be interrupted, which would prevent us from
+                // taking locks. Use a new OperationContext to abort the index build.
+                auto newClient = opCtx->getServiceContext()->makeClient("abort-index-build");
+                AlternativeClientRegion acr(newClient);
+                const auto abortCtx = cc().makeOperationContext();
 
+                std::string abortReason(str::stream() << "Index build aborted: " << buildUUID
+                                                      << ": " << interruptionEx.toString());
+                indexBuildsCoord->abortIndexBuildByBuildUUID(
+                    abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
+                LOGV2(
+                    20443, "Index build aborted due to interruption", "buildUUID"_attr = buildUUID);
+            }
             throw;
         } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
             LOGV2(20444,
-                  "Index build interrupted due to change in replication state: {buildUUID}: {ex}",
+                  "Index build received interrupt signal due to change in replication state",
                   "buildUUID"_attr = buildUUID,
                   "ex"_attr = ex);
 
-            // The index build will continue to run in the background and will complete when this
-            // node receives a commitIndexBuild oplog entry from the new primary.
-
+            // If this node is no longer a primary, the index build will continue to run in the
+            // background and will complete when this node receives a commitIndexBuild oplog
+            // entry from the new primary.
             if (IndexBuildProtocol::kTwoPhase == protocol) {
                 LOGV2(20445,
-                      "Index build continuing in background: {buildUUID}",
+                      "Index build ignoring interrupt and continuing in background",
                       "buildUUID"_attr = buildUUID);
                 throw;
             }
 
-            indexBuildsCoord->abortIndexBuildOnError(opCtx, buildUUID, ex.toStatus());
-            LOGV2(20446,
-                  "Index build aborted due to NotMaster error: {buildUUID}",
-                  "buildUUID"_attr = buildUUID);
-
+            std::string abortReason(str::stream() << "Index build aborted: " << buildUUID << ": "
+                                                  << ex.toString());
+            indexBuildsCoord->abortIndexBuildByBuildUUID(
+                opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
+            LOGV2(
+                20446, "Index build aborted due to NotMaster error", "buildUUID"_attr = buildUUID);
             throw;
         }
 
-        LOGV2(20447, "Index build completed: {buildUUID}", "buildUUID"_attr = buildUUID);
+        LOGV2(20447, "Index build completed", "buildUUID"_attr = buildUUID);
     } catch (DBException& ex) {
         // If the collection is dropped after the initial checks in this function (before the
         // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
@@ -703,10 +691,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         // All other errors should be forwarded to the caller with index build information included.
-        LOGV2(20449,
-              "Index build failed: {buildUUID}: {ex_toStatus}",
-              "buildUUID"_attr = buildUUID,
-              "ex_toStatus"_attr = ex.toStatus());
+        LOGV2(20449, "Index build failed", "buildUUID"_attr = buildUUID, "ex"_attr = ex.toStatus());
         ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
                                     << " ( " << *collectionUUID << " )");
 
@@ -770,6 +755,7 @@ public:
             try {
                 return runCreateIndexesWithCoordinator(opCtx, dbname, cmdObj, errmsg, result);
             } catch (const DBException& ex) {
+                hangAfterIndexBuildAbort.pauseWhileSet();
                 // We can only wait for an existing index build to finish if we are able to release
                 // our locks, in order to allow the existing index build to proceed. We cannot
                 // release locks in transactions, so we bypass the below logic in transactions.

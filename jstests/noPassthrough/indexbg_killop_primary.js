@@ -51,42 +51,30 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
 // Kill the index builder thread.
 assert.commandWorked(testDB.killOp(opId));
 
-// Two-phase index builds ignore interrupts on the builder thread. Single phase builds to not.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Wait for the index build to stop after completing successfully.
-    IndexBuildTest.resumeIndexBuilds(primary);
+// Wait for the index build to stop from the killop signal.
+try {
     IndexBuildTest.waitForIndexBuildToStop(testDB);
+} finally {
+    IndexBuildTest.resumeIndexBuilds(primary);
+}
 
-    // Expect index build to complete successfully.
-    createIdx();
+const exitCode = createIdx({checkExitSuccess: false});
+assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-    // Check that a new index has been created. This verifies that the index build ignored the
-    // interrupt.
-    IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+// Check that no new index has been created.  This verifies that the index build was aborted
+// rather than successfully completed.
+IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
+// Two-phase index builds replicate different oplog entries.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     const cmdNs = testDB.getCollection('$cmd').getFullName();
     let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
     assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
     ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
-    assert.eq(0, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
+    assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
     ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
-    assert.eq(1, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
+    assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 } else {
-    // Wait for the index build to stop from the killop signal.
-    try {
-        IndexBuildTest.waitForIndexBuildToStop(testDB);
-    } finally {
-        IndexBuildTest.resumeIndexBuilds(primary);
-    }
-
-    const exitCode = createIdx({checkExitSuccess: false});
-    assert.neq(
-        0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
-
-    // Check that no new index has been created.  This verifies that the index build was aborted
-    // rather than successfully completed.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
-
     // The noop oplog entry is the only evidence of the failed single phase index build.
     let ops = rst.dumpOplog(
         primary, {op: 'n', ns: '', 'o.msg': 'Creating indexes. Coll: ' + coll.getFullName()});

@@ -153,13 +153,13 @@ StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
 /**
  * Attempts to abort a single index builder that is responsible for all the index names passed in.
  */
-std::vector<UUID> abortIndexBuildByIndexNamesNoWait(OperationContext* opCtx,
-                                                    Collection* collection,
-                                                    std::vector<std::string> indexNames) {
+std::vector<UUID> abortIndexBuildByIndexNames(OperationContext* opCtx,
+                                              UUID collectionUUID,
+                                              std::vector<std::string> indexNames) {
 
     boost::optional<UUID> buildUUID =
-        IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByIndexNamesNoWait(
-            opCtx, collection->uuid(), indexNames, std::string("dropIndexes command"));
+        IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByIndexNames(
+            opCtx, collectionUUID, indexNames, std::string("dropIndexes command"));
     if (buildUUID) {
         return {*buildUUID};
     }
@@ -210,20 +210,19 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
  * otherwise this attempts to abort a single index builder building the given index names.
  */
 std::vector<UUID> abortActiveIndexBuilders(OperationContext* opCtx,
-                                           Collection* collection,
+                                           const NamespaceString& collectionNs,
+                                           CollectionUUID collectionUUID,
                                            const std::vector<std::string>& indexNames) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
-
     if (indexNames.empty()) {
         return {};
     }
 
     if (indexNames.front() == "*") {
-        return IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuildsNoWait(
-            opCtx, collection->uuid(), "dropIndexes command");
+        return IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuilds(
+            opCtx, collectionNs, collectionUUID, "dropIndexes command");
     }
 
-    return abortIndexBuildByIndexNamesNoWait(opCtx, collection, indexNames);
+    return abortIndexBuildByIndexNames(opCtx, collectionUUID, indexNames);
 }
 
 Status dropReadyIndexes(OperationContext* opCtx,
@@ -333,20 +332,18 @@ Status dropIndexes(OperationContext* opCtx,
 
         indexNames = swIndexNames.getValue();
 
-        // Send the abort signal to any index builders that match the users request.
-        abortedIndexBuilders = abortActiveIndexBuilders(opCtx, collection, indexNames);
+        // Copy the namespace and UUID before dropping locks.
+        auto collUUID = collection->uuid();
+        auto collNs = collection->ns();
 
-        // Now that the abort signals were sent to the intended index builders, release our lock
-        // temporarily to allow the index builders to process the abort signal. Holding a lock here
-        // will cause the index builders to block indefinitely.
+        // Release locks before aborting index builds. The helper will acquire locks on our behalf.
         autoColl = boost::none;
-        if (abortedIndexBuilders.size() == 1) {
-            indexBuildsCoord->awaitIndexBuildFinished(opCtx, abortedIndexBuilders.front());
-        } else if (abortedIndexBuilders.size() > 1) {
-            // Only the "*" wildcard can abort multiple index builders.
-            invariant(isWildcard);
-            indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
-        }
+
+        // Send the abort signal to any index builders that match the users request. Waits until all
+        // aborted builders complete.
+        auto justAborted = abortActiveIndexBuilders(opCtx, collNs, collUUID, indexNames);
+        abortedIndexBuilders.insert(
+            abortedIndexBuilders.end(), justAborted.begin(), justAborted.end());
 
         // Take an exclusive lock on the collection now to be able to perform index catalog writes
         // when removing ready indexes from disk.
@@ -380,35 +377,11 @@ Status dropIndexes(OperationContext* opCtx,
         if (!abortAgain) {
             break;
         }
-
-        // We only need to hold an intent lock to send abort signals to the active index
-        // builder(s) we intend to abort.
-        autoColl = boost::none;
-        autoColl.emplace(opCtx, dbAndUUID, MODE_IX);
-
-        // Abandon the snapshot as the index catalog will compare the in-memory state to the
-        // disk state, which may have changed when we released the lock temporarily.
-        opCtx->recoveryUnit()->abandonSnapshot();
-
-        db = autoColl->getDb();
-        collection = autoColl->getCollection();
-        if (!collection) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "ns not found on database " << dbAndUUID.db()
-                                        << " with collection " << dbAndUUID.uuid());
-        }
-
-        status = checkReplState(opCtx, dbAndUUID);
-        if (!status.isOK()) {
-            return status;
-        }
     }
 
     // If the "*" wildcard was not specified, verify that all the index names belonging to the
     // index builder were aborted.
     if (!isWildcard && !abortedIndexBuilders.empty()) {
-        invariant(abortedIndexBuilders.size() == 1);
-
         // This is necessary to check shard version.
         OldClientContext ctx(opCtx, collection->ns().ns());
 

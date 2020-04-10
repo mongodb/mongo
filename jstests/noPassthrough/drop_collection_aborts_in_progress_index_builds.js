@@ -50,8 +50,7 @@ const awaitDrop = startParallelShell(() => {
 }, conn.port);
 
 try {
-    checkLog.contains(testDB.getMongo(),
-                      "About to abort all index builders on collection with UUID");
+    checkLog.contains(testDB.getMongo(), "About to abort all index builders on collection");
 } finally {
     IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 }
