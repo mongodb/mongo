@@ -4774,24 +4774,26 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
 
         _topCoord->processReplSetRequestVotes(args, response);
 
-        const bool votedForCandidate = response->getVoteGranted();
-        const long long electionTerm = args.getTerm();
-        const Date_t lastVoteDate = _replExecutor->now();
-        const int electionCandidateMemberId =
-            _rsConfig.getMemberAt(candidateIndex).getId().getData();
-        const std::string voteReason = response->getReason();
-        const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
-        const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
-        const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
-        ReplicationMetrics::get(getServiceContext())
-            .setElectionParticipantMetrics(votedForCandidate,
-                                           electionTerm,
-                                           lastVoteDate,
-                                           electionCandidateMemberId,
-                                           voteReason,
-                                           lastAppliedOpTime,
-                                           maxAppliedOpTime,
-                                           priorityAtElection);
+        if (!args.isADryRun()) {
+            const bool votedForCandidate = response->getVoteGranted();
+            const long long electionTerm = args.getTerm();
+            const Date_t lastVoteDate = _replExecutor->now();
+            const int electionCandidateMemberId =
+                _rsConfig.getMemberAt(candidateIndex).getId().getData();
+            const std::string voteReason = response->getReason();
+            const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
+            const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
+            const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
+            ReplicationMetrics::get(getServiceContext())
+                .setElectionParticipantMetrics(votedForCandidate,
+                                               electionTerm,
+                                               lastVoteDate,
+                                               electionCandidateMemberId,
+                                               voteReason,
+                                               lastAppliedOpTime,
+                                               maxAppliedOpTime,
+                                               priorityAtElection);
+        }
     }
 
     // It's safe to store lastVote outside of _mutex. The topology coordinator grants only one

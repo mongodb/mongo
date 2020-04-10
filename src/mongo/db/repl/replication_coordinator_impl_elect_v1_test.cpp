@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/repl/vote_requester.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
@@ -472,6 +473,52 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     ASSERT_EQUALS(1,
                   countTextFormatLogLinesContaining(
                       "Not running for primary, we have been superseded already"));
+}
+
+TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345"))
+                             << "protocolVersion" << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    OperationContextNoop opCtx;
+    OpTime lastOplogEntry = OpTime(Timestamp(999, 0), 1);
+
+    auto metricsAfterVoteRequestWithDryRun = [&](bool dryRun) {
+        repl::VoteRequester::Algorithm requester(getReplCoord()->getConfig(),
+                                                 1 /* candidateIndex */,
+                                                 1 /* term */,
+                                                 dryRun,
+                                                 lastOplogEntry,
+                                                 -1 /* primaryIndex */
+        );
+
+        auto voteRequest = requester.getRequests()[0];
+        ReplSetRequestVotesArgs requestVotesArgs;
+        ASSERT_OK(requestVotesArgs.initialize(voteRequest.cmdObj));
+        ReplSetRequestVotesResponse requestVotesResponse;
+        ASSERT_OK(getReplCoord()->processReplSetRequestVotes(
+            &opCtx, requestVotesArgs, &requestVotesResponse));
+
+        auto electionParticipantMetrics =
+            ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
+
+        LOGV2(4745900,
+              "Got election participant metrics",
+              "metrics"_attr = electionParticipantMetrics,
+              "dryRun"_attr = dryRun);
+        return electionParticipantMetrics;
+    };
+
+    auto metrics = metricsAfterVoteRequestWithDryRun(true);
+    ASSERT_TRUE(metrics.isEmpty());
+
+    metrics = metricsAfterVoteRequestWithDryRun(false);
+    ASSERT_TRUE(metrics["votedForCandidate"].Bool());
 }
 
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
