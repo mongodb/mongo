@@ -932,22 +932,10 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool inclu
 
 }  // namespace
 
-list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid, int options) {
-    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, false), options);
-}
-
-std::list<BSONObj> DBClientBase::getReadyIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                                    int options) {
-    auto specsWithBuildUUIDs =
-        _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, true), options);
-    list<BSONObj> specs;
-    for (const auto& spec : specsWithBuildUUIDs) {
-        if (spec["buildUUID"]) {
-            continue;
-        }
-        specs.push_back(spec);
-    }
-    return specs;
+std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
+                                               bool includeBuildUUIDs,
+                                               int options) {
+    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs), options);
 }
 
 std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,

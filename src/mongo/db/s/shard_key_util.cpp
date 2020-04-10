@@ -189,7 +189,9 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
     const NamespaceString& nss) const {
-    std::list<BSONObj> indexes = _localClient->getIndexSpecs(nss);
+    const bool includeBuildUUIDs = false;
+    const int options = 0;
+    std::list<BSONObj> indexes = _localClient->getIndexSpecs(nss, includeBuildUUIDs, options);
     // Convert std::list to a std::vector.
     return std::vector<BSONObj>{std::make_move_iterator(std::begin(indexes)),
                                 std::make_move_iterator(std::end(indexes))};

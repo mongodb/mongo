@@ -651,7 +651,9 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         // Determine which indexes exist on the local collection that don't exist on the donor's
         // collection.
         DBDirectClient client(opCtx);
-        auto indexes = client.getIndexSpecs(nss);
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        auto indexes = client.getIndexSpecs(nss, includeBuildUUIDs, options);
         for (auto&& recipientIndex : indexes) {
             bool dropIndex = true;
             for (auto&& donorIndex : collectionOptionsAndIndexes.indexSpecs) {

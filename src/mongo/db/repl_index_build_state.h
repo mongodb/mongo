@@ -81,6 +81,10 @@ enum class IndexBuildAction {
      */
     kRollbackAbort,
     /**
+     * Abort signal set on initial sync.
+     */
+    kInitialSyncAbort,
+    /**
      * Abort signal set by createIndexes cmd or by drop databases/collections/indexes cmds
      */
     kPrimaryAbort,

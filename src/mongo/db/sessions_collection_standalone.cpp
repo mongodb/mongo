@@ -72,7 +72,10 @@ void SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opC
 void SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
-    auto indexes = client.getIndexSpecs(NamespaceString::kLogicalSessionsNamespace);
+    const bool includeBuildUUIDs = false;
+    const int options = 0;
+    auto indexes = client.getIndexSpecs(
+        NamespaceString::kLogicalSessionsNamespace, includeBuildUUIDs, options);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << NamespaceString::kLogicalSessionsNamespace << " does not exist",

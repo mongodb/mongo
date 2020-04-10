@@ -56,6 +56,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -525,13 +526,17 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
-    invariant(!collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
-              str::stream() << "cannot perform operation: an index build is currently running for "
-                               "collection "
-                            << fromNss);
 
-    Collection* toColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
-    if (toColl) {
+    // Renaming a collection under the same database name is permitted for two-phase index builds.
+    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+        invariant(
+            !collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "collection "
+                          << fromNss);
+
+        Collection* toColl =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
         invariant(
             !toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
             str::stream() << "cannot perform operation: an index build is currently running for "

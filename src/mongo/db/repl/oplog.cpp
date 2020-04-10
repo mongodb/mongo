@@ -155,6 +155,23 @@ bool shouldBuildInForeground(OperationContext* opCtx,
     return false;
 }
 
+void abortIndexBuilds(OperationContext* opCtx,
+                      const OplogEntry::CommandType& commandType,
+                      const NamespaceString& nss,
+                      const std::string& reason) {
+    auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+    if (commandType == OplogEntry::CommandType::kDropDatabase) {
+        indexBuildsCoordinator->abortDatabaseIndexBuilds(opCtx, nss.db(), reason);
+    } else if (commandType == OplogEntry::CommandType::kDrop ||
+               commandType == OplogEntry::CommandType::kDropIndexes ||
+               commandType == OplogEntry::CommandType::kRenameCollection) {
+        const boost::optional<UUID> collUUID =
+            CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, nss);
+        invariant(collUUID);
+
+        indexBuildsCoordinator->abortCollectionIndexBuilds(opCtx, nss, *collUUID, reason);
+    }
+}
 
 }  // namespace
 
@@ -750,9 +767,13 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   "Error parsing 'startIndexBuild' oplog entry");
           }
 
-          const bool isInitialSync = mode == OplogApplication::Mode::kInitialSync;
+          IndexBuildsCoordinator::ApplicationMode applicationMode =
+              IndexBuildsCoordinator::ApplicationMode::kNormal;
+          if (mode == OplogApplication::Mode::kInitialSync) {
+              applicationMode = IndexBuildsCoordinator::ApplicationMode::kInitialSync;
+          }
           IndexBuildsCoordinator::get(opCtx)->applyStartIndexBuild(
-              opCtx, isInitialSync, swOplogEntry.getValue());
+              opCtx, applicationMode, swOplogEntry.getValue());
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
@@ -1550,6 +1571,18 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 throw WriteConflictException();
             }
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
+                if (mode == OplogApplication::Mode::kInitialSync) {
+                    abortIndexBuilds(opCtx,
+                                     entry.getCommandType(),
+                                     nss,
+                                     "Aborting index builds during initial sync");
+                    LOGV2_DEBUG(4665900,
+                                1,
+                                "Conflicting DDL operation encountered during initial sync; "
+                                "aborting index build and retrying",
+                                "db"_attr = nss.db());
+                }
+
                 Lock::TempRelease release(opCtx->lockState());
 
                 BackgroundOperation::awaitNoBgOpInProgForDb(nss.db());
@@ -1568,14 +1601,25 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
-                Lock::TempRelease release(opCtx->lockState());
-
                 Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
 
-                // TODO: This parse could be expensive and not worth it.
-                auto ns =
-                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString();
+                auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
+
+                if (mode == OplogApplication::Mode::kInitialSync) {
+                    abortIndexBuilds(opCtx,
+                                     entry.getCommandType(),
+                                     ns,
+                                     "Aborting index builds during initial sync");
+                    LOGV2_DEBUG(4665901,
+                                1,
+                                "Conflicting DDL operation encountered during initial sync; "
+                                "aborting index build and retrying",
+                                "namespace"_attr = ns);
+                }
+
+                Lock::TempRelease release(opCtx->lockState());
+
                 auto swUUID = entry.getUuid();
                 if (!swUUID) {
                     LOGV2_ERROR(21261,

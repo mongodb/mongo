@@ -197,6 +197,11 @@ private:
     AfterStageBehavior queryStage();
 
     /**
+     * Stage function that sets up index builders for any unfinished two-phase index builds.
+     */
+    AfterStageBehavior setupIndexBuildersForUnfinishedIndexesStage();
+
+    /**
      * Put all results from a query batch into a buffer to be inserted, and schedule
      * it to be inserted.
      */
@@ -236,13 +241,15 @@ private:
     // The size of the batches of documents returned in collection cloning.
     int _collectionClonerBatchSize;  // (R)
 
-    CollectionClonerStage _countStage;             // (R)
-    CollectionClonerStage _listIndexesStage;       // (R)
-    CollectionClonerStage _createCollectionStage;  // (R)
-    CollectionClonerQueryStage _queryStage;        // (R)
+    CollectionClonerStage _countStage;                                   // (R)
+    CollectionClonerStage _listIndexesStage;                             // (R)
+    CollectionClonerStage _createCollectionStage;                        // (R)
+    CollectionClonerQueryStage _queryStage;                              // (R)
+    CollectionClonerStage _setupIndexBuildersForUnfinishedIndexesStage;  // (R)
 
     ProgressMeter _progressMeter;                       // (X) progress meter for this instance.
-    std::vector<BSONObj> _indexSpecs;                   // (X) Except for _id_
+    std::vector<BSONObj> _readyIndexSpecs;              // (X) Except for _id_
+    std::vector<BSONObj> _unfinishedIndexSpecs;         // (X)
     BSONObj _idIndexSpec;                               // (X)
     std::unique_ptr<CollectionBulkLoader> _collLoader;  // (X)
     //  Function for scheduling database work using the executor.

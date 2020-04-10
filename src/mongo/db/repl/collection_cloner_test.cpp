@@ -101,8 +101,12 @@ protected:
         return cloner->_progressMeter;
     }
 
-    std::vector<BSONObj>& getIndexSpecs(CollectionCloner* cloner) {
-        return cloner->_indexSpecs;
+    std::vector<BSONObj> getIndexSpecs(CollectionCloner* cloner) {
+        std::vector<BSONObj> indexSpecs = cloner->_readyIndexSpecs;
+        for (const auto& unfinishedSpec : cloner->_unfinishedIndexSpecs) {
+            indexSpecs.push_back(unfinishedSpec["spec"].Obj());
+        }
+        return indexSpecs;
     }
 
     BSONObj& getIdIndexSpec(CollectionCloner* cloner) {

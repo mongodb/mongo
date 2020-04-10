@@ -514,7 +514,9 @@ Status Cloner::copyDb(OperationContext* opCtx,
         Lock::TempRelease tempRelease(opCtx->lockState());
         for (auto&& params : createCollectionParams) {
             const NamespaceString nss(dBName, params.collectionName);
-            auto indexSpecs = conn->getIndexSpecs(nss);
+            const bool includeBuildUUIDs = false;
+            const int options = 0;
+            auto indexSpecs = conn->getIndexSpecs(nss, includeBuildUUIDs, options);
 
             collectionIndexSpecs[params.collectionName] = indexSpecs;
 

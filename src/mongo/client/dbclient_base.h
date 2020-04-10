@@ -531,15 +531,20 @@ public:
     /**
      * Lists indexes on the collection 'nsOrUuid'.
      * Includes in-progress indexes.
+     *
+     * If 'includeBuildUUIDs' is true, in-progress index specs will have the following format:
+     * {
+     *     spec: <BSONObj>
+     *     buildUUID: <UUID>
+     * }
+     * and ready index specs will only list the spec.
+     *
+     * If 'includeBuildUUIDs' is false, only the index spec will be returned without a way to
+     * distinguish between ready and in-progress index specs.
      */
     virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                             int options = 0);
-
-    /**
-     * Lists completed indexes on the collection 'nsOrUuid'.
-     */
-    virtual std::list<BSONObj> getReadyIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                                  int options = 0);
+                                             bool includeBuildUUIDs,
+                                             int options);
 
     virtual void dropIndex(const std::string& ns,
                            BSONObj keys,

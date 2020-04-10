@@ -55,7 +55,7 @@ var IndexInitialSyncTest = function(options) {
         try {
             if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
                 IndexBuildTest.assertIndexes(
-                    secondaryColl, 1, ['_id_'], [], {includeBuildUUIDs: true});
+                    secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true});
             } else {
                 IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
             }
