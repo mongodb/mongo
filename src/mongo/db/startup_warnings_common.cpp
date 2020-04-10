@@ -46,6 +46,41 @@
 
 namespace mongo {
 
+#ifdef _WIN32
+bool CheckPrivilegeEnabled(const wchar_t* name) {
+    LUID luid;
+    if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
+        warning() << errnoWithPrefix("Failed to LookupPrivilegeValue");
+        return false;
+    }
+
+    // Get the access token for the current process.
+    HANDLE accessToken;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &accessToken)) {
+        warning() << errnoWithPrefix("Failed to OpenProcessToken");
+        return false;
+    }
+
+    const auto accessTokenGuard = makeGuard([&] { CloseHandle(accessToken); });
+
+    BOOL ret;
+    PRIVILEGE_SET privileges;
+    privileges.PrivilegeCount = 1;
+    privileges.Control = PRIVILEGE_SET_ALL_NECESSARY;
+
+    privileges.Privilege[0].Luid = luid;
+    privileges.Privilege[0].Attributes = 0;
+
+    if (!PrivilegeCheck(accessToken, &privileges, &ret)) {
+        warning() << errnoWithPrefix("Failed to PrivilegeCheck");
+        return false;
+    }
+
+    return ret;
+}
+
+#endif
+
 //
 // system warnings
 //
@@ -127,6 +162,17 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         log() << "**      system. Switch to a 64-bit build of MongoDB to" << startupWarningsLog;
         log() << "**      support larger databases." << startupWarningsLog;
         warned = true;
+    }
+#endif
+
+#ifdef _WIN32
+    if (!CheckPrivilegeEnabled(SE_INC_WORKING_SET_NAME)) {
+        log()
+            << "** WARNING: SeIncreaseWorkingSetPrivilege privilege is not granted to the process."
+            << startupWarningsLog;
+        log() << "**          Secure memory allocation for SCRAM and/or Encrypted Storage Engine "
+                 "may fail."
+              << startupWarningsLog;
     }
 #endif
 
