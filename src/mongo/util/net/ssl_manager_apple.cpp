@@ -1192,6 +1192,26 @@ private:
     CFUniquePtr<::SSLContextRef> _ssl;
 };
 
+CFUniquePtr<::CFArrayRef> CreateSecTrustPolicies(const std::string& remoteHost,
+                                                 bool allowInvalidCertificates) {
+    CFUniquePtr<::CFMutableArrayRef> policiesMutable(
+        ::CFArrayCreateMutable(nullptr, 2, &::kCFTypeArrayCallBacks));
+
+    // Basic X509 policy.
+    CFUniquePtr<::SecPolicyRef> cfX509Policy(::SecPolicyCreateBasicX509());
+    ::CFArrayAppendValue(policiesMutable.get(), cfX509Policy.get());
+
+    // Set Revocation policy.
+    auto policy = ::kSecRevocationNetworkAccessDisabled;
+    if (tlsOCSPEnabled && !remoteHost.empty() && !allowInvalidCertificates) {
+        policy = ::kSecRevocationOCSPMethod;
+    }
+    CFUniquePtr<::SecPolicyRef> cfRevPolicy(::SecPolicyCreateRevocation(policy));
+    ::CFArrayAppendValue(policiesMutable.get(), cfRevPolicy.get());
+
+    return CFUniquePtr<::CFArrayRef>(policiesMutable.release());
+}
+
 }  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1341,9 +1361,6 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
 Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
                                        const SSLParams& params,
                                        ConnectionDirection direction) {
-    // Options.
-    context->allowInvalidHostnames = _allowInvalidHostnames;
-
     // Protocol Version.
     const auto swProto = parseProtocolRange(params);
     if (!swProto.isOK()) {
@@ -1530,18 +1547,8 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         ipv6 = true;
     }
 
-    if (tlsOCSPEnabled && !remoteHost.empty() && !_allowInvalidCertificates) {
-        CFArrayRef policies = nullptr;
-        ::SecTrustCopyPolicies(cftrust.get(), &policies);
-        CFUniquePtr<::CFArrayRef> cfpolicies(policies);
-
-        CFUniquePtr<::CFMutableArrayRef> policiesMutable(
-            ::CFArrayCreateMutableCopy(NULL, 0, policies));
-        CFUniquePtr<::SecPolicyRef> cfRevPolicy(
-            ::SecPolicyCreateRevocation(kSecRevocationOCSPMethod));
-        ::CFArrayAppendValue(policiesMutable.get(), cfRevPolicy.get());
-        ::SecTrustSetPolicies(cftrust.get(), policiesMutable.get());
-    }
+    ::SecTrustSetPolicies(cftrust.get(),
+                          CreateSecTrustPolicies(remoteHost, _allowInvalidCertificates).get());
 
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
