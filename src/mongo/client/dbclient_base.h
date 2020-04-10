@@ -531,9 +531,20 @@ public:
     /**
      * Lists indexes on the collection 'nsOrUuid'.
      * Includes in-progress indexes.
+     *
+     * If 'includeBuildUUIDs' is true, in-progress index specs will have the following format:
+     * {
+     *     spec: <BSONObj>
+     *     buildUUID: <UUID>
+     * }
+     * and ready index specs will only list the spec.
+     *
+     * If 'includeBuildUUIDs' is false, only the index spec will be returned without a way to
+     * distinguish between ready and in-progress index specs.
      */
     virtual std::list<BSONObj> getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                             int options = 0);
+                                             bool includeBuildUUIDs,
+                                             int options);
 
     /**
      * Lists completed indexes on the collection 'nsOrUuid'.

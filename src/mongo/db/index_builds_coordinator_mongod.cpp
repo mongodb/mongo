@@ -174,7 +174,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         _indexBuildFinished.notify_one();
     });
 
-    if (indexBuildOptions.twoPhaseRecovery) {
+    if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
         // Two phase index build recovery goes though a different set-up procedure because the
         // original index will be dropped first.
         invariant(protocol == IndexBuildProtocol::kTwoPhase);
@@ -283,9 +283,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
 
-        if (!indexBuildOptions.twoPhaseRecovery) {
-            status = _setUpIndexBuild(
-                opCtx.get(), buildUUID, startTimestamp, indexBuildOptions.commitQuorum);
+        if (indexBuildOptions.applicationMode != ApplicationMode::kStartupRepair) {
+            status = _setUpIndexBuild(opCtx.get(), buildUUID, startTimestamp, indexBuildOptions);
             if (!status.isOK()) {
                 startPromise.setError(status);
                 return;
@@ -679,6 +678,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                 break;
             case IndexBuildAction::kOplogAbort:
             case IndexBuildAction::kRollbackAbort:
+            case IndexBuildAction::kInitialSyncAbort:
             case IndexBuildAction::kPrimaryAbort:
                 // The calling thread should have interrupted us before signaling an abort action.
                 LOGV2_FATAL(4698901, "Index build abort should have interrupted this operation");

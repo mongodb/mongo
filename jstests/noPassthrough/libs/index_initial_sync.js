@@ -33,12 +33,13 @@ var IndexInitialSyncTest = function(options) {
         const testDB = primary.getDB('test');
         const coll = testDB.getCollection('test');
 
-        assert.commandWorked(coll.insert({a: 1}));
+        assert.commandWorked(coll.insert({a: 1, b: 1}));
+        assert.commandWorked(coll.createIndex({a: 1}));
 
         IndexBuildTest.pauseIndexBuilds(primary);
 
-        const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
-        IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+        const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: 1});
+        IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_1');
 
         // Restart the secondary with a clean data directory to start the initial sync process.
         const secondary = rst.restart(1, {
@@ -55,9 +56,9 @@ var IndexInitialSyncTest = function(options) {
         try {
             if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
                 IndexBuildTest.assertIndexes(
-                    secondaryColl, 1, ['_id_'], [], {includeBuildUUIDs: true});
+                    secondaryColl, 3, ['_id_', 'a_1'], ['b_1'], {includeBuildUUIDs: true});
             } else {
-                IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+                IndexBuildTest.assertIndexes(secondaryColl, 3, ['_id_', 'a_1', 'b_1']);
             }
         } finally {
             IndexBuildTest.resumeIndexBuilds(primary);
@@ -67,10 +68,10 @@ var IndexInitialSyncTest = function(options) {
 
         createIdx();
 
-        IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+        IndexBuildTest.assertIndexes(coll, 3, ['_id_', 'a_1', 'b_1']);
 
         rst.awaitReplication();
-        IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+        IndexBuildTest.assertIndexes(secondaryColl, 3, ['_id_', 'a_1', 'b_1']);
 
         rst.stopSet();
     };

@@ -916,10 +916,14 @@ public:
         return NamespaceString(ns());
     }
     void index() {
-        ASSERT_EQUALS(2u, _client.getIndexSpecs(nss()).size());
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        ASSERT_EQUALS(2u, _client.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
     void noIndex() {
-        ASSERT_EQUALS(0u, _client.getIndexSpecs(nss()).size());
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        ASSERT_EQUALS(0u, _client.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
     void checkIndex() {
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1)));
@@ -1815,14 +1819,21 @@ public:
         insert(ns(), BSON("a" << 2));
         insert(ns(), BSON("a" << 3));
 
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+
         auto specsWithIdIndexOnly =
-            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid));
+            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid),
+                                  includeBuildUUIDs,
+                                  options);
         ASSERT_EQUALS(1U, specsWithIdIndexOnly.size());
 
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1), true));
 
         auto specsWithBothIndexes =
-            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid));
+            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid),
+                                  includeBuildUUIDs,
+                                  options);
         ASSERT_EQUALS(2U, specsWithBothIndexes.size());
     }
 };

@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -337,6 +338,14 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    /*dropTargetUUID*/ {},
                                                    /*numRecords*/ 0U,
                                                    stayTemp);
+
+                    // Abort any remaining index builds on the temporary collection.
+                    IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuilds(
+                        opCtx,
+                        tmpName,
+                        futureColl->uuid(),
+                        "Aborting index builds on temporary collection");
+
                     // The existing collection has been successfully moved out of the way.
                     needsRenaming = false;
                 }

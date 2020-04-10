@@ -67,7 +67,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         return statusWithOptionalResult.getValue().get();
     }
 
-    auto status = _setUpIndexBuild(opCtx, buildUUID, Timestamp(), indexBuildOptions.commitQuorum);
+    auto status = _setUpIndexBuild(opCtx, buildUUID, Timestamp(), indexBuildOptions);
     if (!status.isOK()) {
         return status;
     }

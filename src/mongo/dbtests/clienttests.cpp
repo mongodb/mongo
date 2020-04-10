@@ -82,20 +82,23 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+
         db.insert(ns(), BSON("x" << 2));
-        ASSERT_EQUALS(1u, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
-        ASSERT_EQUALS(2u, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         db.dropIndex(ns(), BSON("x" << 1));
-        ASSERT_EQUALS(1u, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
-        ASSERT_EQUALS(2u, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         db.dropIndexes(ns());
-        ASSERT_EQUALS(1u, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
 
@@ -120,20 +123,23 @@ public:
         ASSERT(collection);
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
         // _id index
-        ASSERT_EQUALS(1U, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       dbtests::createIndex(&opCtx, ns(), BSON("y" << 1), true));
 
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
-        ASSERT_EQUALS(1U, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1), true));
 
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&opCtx));
-        ASSERT_EQUALS(2U, db.getIndexSpecs(nss()).size());
+        ASSERT_EQUALS(2U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
 

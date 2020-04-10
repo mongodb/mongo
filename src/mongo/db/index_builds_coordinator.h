@@ -76,12 +76,18 @@ class ServiceContext;
 class IndexBuildsCoordinator {
 public:
     /**
+     * Represents the set of different application modes used around building indexes that differ
+     * from the default behaviour.
+     */
+    enum class ApplicationMode { kNormal, kStartupRepair, kInitialSync };
+
+    /**
      * Contains additional information required by 'startIndexBuild()'.
      */
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
         bool replSetAndNotPrimaryAtStart = false;
-        bool twoPhaseRecovery = false;
+        ApplicationMode applicationMode = ApplicationMode::kNormal;
     };
 
     /**
@@ -173,7 +179,7 @@ public:
      * performed the initial ready:false write. Throws if there were any errors building the index.
      */
     void applyStartIndexBuild(OperationContext* opCtx,
-                              bool isInitialSync,
+                              ApplicationMode applicationMode,
                               const IndexBuildOplogEntry& entry);
 
     /**
@@ -491,7 +497,7 @@ protected:
     Status _setUpIndexBuild(OperationContext* opCtx,
                             const UUID& buildUUID,
                             Timestamp startTimestamp,
-                            boost::optional<CommitQuorumOptions> commitQuorum);
+                            const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Acquires locks and sets up index build. Throws on error.
@@ -502,7 +508,7 @@ protected:
     PostSetupAction _setUpIndexBuildInner(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState,
                                           Timestamp startTimestamp,
-                                          boost::optional<CommitQuorumOptions> commitQuorum);
+                                          const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Sets up the in-memory and durable state of the index build for two-phase recovery.

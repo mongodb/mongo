@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/collection_cloner.h"
@@ -69,6 +70,10 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
       _listIndexesStage("listIndexes", this, &CollectionCloner::listIndexesStage),
       _createCollectionStage("createCollection", this, &CollectionCloner::createCollectionStage),
       _queryStage("query", this, &CollectionCloner::queryStage),
+      _setupIndexBuildersForUnfinishedIndexesStage(
+          "setupIndexBuildersForUnfinishedIndexes",
+          this,
+          &CollectionCloner::setupIndexBuildersForUnfinishedIndexesStage),
       _progressMeter(1U,  // total will be replaced with count command result.
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
@@ -99,7 +104,11 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
 }
 
 BaseCloner::ClonerStages CollectionCloner::getStages() {
-    return {&_countStage, &_listIndexesStage, &_createCollectionStage, &_queryStage};
+    return {&_countStage,
+            &_listIndexesStage,
+            &_createCollectionStage,
+            &_queryStage,
+            &_setupIndexBuildersForUnfinishedIndexesStage};
 }
 
 
@@ -159,9 +168,28 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
-    auto indexSpecs = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()
-        ? getClient()->getReadyIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk)
-        : getClient()->getIndexSpecs(_sourceDbAndUuid, QueryOption_SlaveOk);
+    std::list<BSONObj> indexSpecs;
+    bool includeBuildUUIDs = false;
+
+    if (IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+        // In FCV 4.4, build all the ready indexes to completion and start building the unfinished
+        // indexes without commiting them until the outcome of the index build is determined.
+        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                  serverGlobalParams.featureCompatibility.getVersion() ==
+                      ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+        includeBuildUUIDs = true;
+        indexSpecs =
+            getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SlaveOk);
+    } else {
+        // In FCV 4.2, build all the ready and unfinished indexes from the sync source to
+        // completion. Using 'includeBuildUUIDs = false', the listIndexes commands returns all ready
+        // and unfinished indexes without a way to distinguish between the two states.
+        includeBuildUUIDs = false;
+        indexSpecs =
+            getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SlaveOk);
+    }
+
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
                       "No indexes found for collection {namespace} while cloning from {source}",
@@ -169,16 +197,23 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
                       "namespace"_attr = _sourceNss.ns(),
                       "source"_attr = getSource());
     }
+
+    // Parse the index specs into their respective state, ready or unfinished.
     for (auto&& spec : indexSpecs) {
-        if (spec["name"].str() == "_id_"_sd) {
+        if (spec.hasField("buildUUID")) {
+            invariant(includeBuildUUIDs);
+            _unfinishedIndexSpecs.push_back(spec.getOwned());
+        } else if (spec.hasField("name") && spec.getStringField("name") == "_id_"_sd) {
             _idIndexSpec = spec.getOwned();
         } else {
-            _indexSpecs.push_back(spec.getOwned());
+            _readyIndexSpecs.push_back(spec.getOwned());
         }
     }
+
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        _stats.indexes = _indexSpecs.size() + (_idIndexSpec.isEmpty() ? 0 : 1);
+        _stats.indexes = _readyIndexSpecs.size() + _unfinishedIndexSpecs.size() +
+            (_idIndexSpec.isEmpty() ? 0 : 1);
     };
 
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
@@ -192,8 +227,15 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::createCollectionStage() {
+    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+        // Single phase index builds should have an empty '_unfinishedIndexSpecs' vector because in
+        // the 'listIndexesStage', we only populate '_unfinishedIndexSpecs' if a buildUUID is
+        // present. A buildUUID is only present for two phase index builds.
+        invariant(_unfinishedIndexSpecs.empty());
+    }
+
     auto collectionBulkLoader = getStorageInterface()->createCollectionForBulkLoading(
-        _sourceNss, _collectionOptions, _idIndexSpec, _indexSpecs);
+        _sourceNss, _collectionOptions, _idIndexSpec, _readyIndexSpecs);
     uassertStatusOK(collectionBulkLoader.getStatus());
     _collLoader = std::move(collectionBulkLoader.getValue());
     return kContinueNormally;
@@ -207,6 +249,62 @@ BaseCloner::AfterStageBehavior CollectionCloner::queryStage() {
     // We want to free the _collLoader regardless of whether the commit succeeds.
     std::unique_ptr<CollectionBulkLoader> loader = std::move(_collLoader);
     uassertStatusOK(loader->commit());
+    return kContinueNormally;
+}
+
+BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinishedIndexesStage() {
+    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() || _unfinishedIndexSpecs.empty()) {
+        return kContinueNormally;
+    }
+
+    // Need to group the index specs by 'buildUUID' and start all the index specs with the same
+    // 'buildUUID' on the same index builder thread.
+    stdx::unordered_map<UUID, std::vector<BSONObj>, UUID::Hash> groupedIndexSpecs;
+    for (const auto& unfinishedSpec : _unfinishedIndexSpecs) {
+        UUID buildUUID = uassertStatusOK(UUID::parse(unfinishedSpec["buildUUID"]));
+        groupedIndexSpecs[buildUUID].push_back(unfinishedSpec["spec"].Obj());
+    }
+
+    auto opCtx = cc().makeOperationContext();
+
+    for (const auto& groupedIndexSpec : groupedIndexSpecs) {
+        std::vector<std::string> indexNames;
+        std::vector<BSONObj> indexSpecs;
+        for (const auto& indexSpec : groupedIndexSpec.second) {
+            std::string indexName = indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName);
+            indexNames.push_back(indexName);
+            indexSpecs.push_back(indexSpec.getOwned());
+        }
+
+        UnreplicatedWritesBlock uwb(opCtx.get());
+
+        // This spawns a new thread and returns immediately once the index build has been
+        // registered with the IndexBuildsCoordinator.
+        try {
+            IndexBuildsCoordinator::get(opCtx.get())
+                ->applyStartIndexBuild(opCtx.get(),
+                                       IndexBuildsCoordinator::ApplicationMode::kInitialSync,
+                                       {getSourceUuid(),
+                                        repl::OplogEntry::CommandType::kStartIndexBuild,
+                                        "createIndexes",
+                                        groupedIndexSpec.first,
+                                        std::move(indexNames),
+                                        std::move(indexSpecs),
+                                        boost::none});
+        } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
+            // Suppress the IndexAlreadyExists error code.
+            // It's possible for the DBDirectClient to return duplicate index specs with different
+            // buildUUIDs from the sync source due to getMore() making multiple network calls.
+            // In these cases, we can ignore this error as the oplog replay phase will correctly
+            // abort and start the appropriate indexes.
+            // Example:
+            // - listIndexes on the sync source sees x_1 (ready: false) with buildUUID ‘x’.
+            // - Sync source aborts the index build with buildUUID ‘x’.
+            // - Sync source starts x_1 (ready: false) with buildUUID ‘y’.
+            // - getMore on listIndexes sees x_1 with buildUUID 'y'.
+        }
+    }
+
     return kContinueNormally;
 }
 
