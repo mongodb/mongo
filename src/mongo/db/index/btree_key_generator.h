@@ -147,9 +147,10 @@ private:
 
     /**
      * This recursive method does the heavy-lifting for getKeys().
+     * It will modify 'fieldNames' and 'fixed'.
      */
-    void _getKeysWithArray(std::vector<const char*> fieldNames,
-                           std::vector<BSONElement> fixed,
+    void _getKeysWithArray(std::vector<const char*>* fieldNames,
+                           std::vector<BSONElement>* fixed,
                            SharedBufferFragmentBuilder& pooledBufferBuilder,
                            const BSONObj& obj,
                            KeyStringSet::sequence_type* keys,
@@ -208,10 +209,14 @@ private:
     /**
      * Sets extracted elements in 'fixed' for field paths that we have traversed to the end.
      *
+     * fieldNamesTemp and fixedTemp are temporary vectors that will be modified by this method
+     *
      * Then calls _getKeysWithArray() recursively.
      */
-    void _getKeysArrEltFixed(std::vector<const char*>* fieldNames,
-                             std::vector<BSONElement>* fixed,
+    void _getKeysArrEltFixed(const std::vector<const char*>& fieldNames,
+                             const std::vector<BSONElement>& fixed,
+                             std::vector<const char*>* fieldNamesTemp,
+                             std::vector<BSONElement>* fixedTemp,
                              SharedBufferFragmentBuilder& pooledBufferBuilder,
                              const BSONElement& arrEntry,
                              KeyStringSet::sequence_type* keys,

@@ -328,6 +328,8 @@ public:
     template <class T>
     int compare(const T& other) const;
 
+    int compareWithTypeBits(const Value& other) const;
+
     template <class T>
     int compareWithoutRecordId(const T& other) const;
 

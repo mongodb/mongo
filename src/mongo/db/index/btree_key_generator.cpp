@@ -159,8 +159,10 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
     return BSONElement();
 }
 
-void BtreeKeyGenerator::_getKeysArrEltFixed(std::vector<const char*>* fieldNames,
-                                            std::vector<BSONElement>* fixed,
+void BtreeKeyGenerator::_getKeysArrEltFixed(const std::vector<const char*>& fieldNames,
+                                            const std::vector<BSONElement>& fixed,
+                                            std::vector<const char*>* fieldNamesTemp,
+                                            std::vector<BSONElement>* fixedTemp,
                                             SharedBufferFragmentBuilder& pooledBufferBuilder,
                                             const BSONElement& arrEntry,
                                             KeyStringSet::sequence_type* keys,
@@ -171,16 +173,26 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(std::vector<const char*>* fieldNames
                                             const std::vector<PositionalPathInfo>& positionalInfo,
                                             MultikeyPaths* multikeyPaths,
                                             boost::optional<RecordId> id) const {
+    // fieldNamesTemp and fixedTemp are passed in by the caller to be used as temporary data
+    // structures as we need them to be mutable in the recursion. When they are stored outside we
+    // can reuse their memory.
+    fieldNamesTemp->clear();
+    fixedTemp->clear();
+    fieldNamesTemp->reserve(fieldNames.size());
+    fixedTemp->reserve(fixed.size());
+    std::copy(fieldNames.begin(), fieldNames.end(), std::back_inserter(*fieldNamesTemp));
+    std::copy(fixed.begin(), fixed.end(), std::back_inserter(*fixedTemp));
+
     // Set up any terminal array values.
     for (const auto idx : arrIdxs) {
-        if (*(*fieldNames)[idx] == '\0') {
-            (*fixed)[idx] = mayExpandArrayUnembedded ? arrEntry : arrObjElt;
+        if (*(*fieldNamesTemp)[idx] == '\0') {
+            (*fixedTemp)[idx] = mayExpandArrayUnembedded ? arrEntry : arrObjElt;
         }
     }
 
     // Recurse.
-    _getKeysWithArray(*fieldNames,
-                      *fixed,
+    _getKeysWithArray(fieldNamesTemp,
+                      fixedTemp,
                       pooledBufferBuilder,
                       arrEntry.type() == Object ? arrEntry.embeddedObject() : BSONObj(),
                       keys,
@@ -240,10 +252,11 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
         // Extract the underlying sequence and insert elements unsorted to avoid O(N^2) when
         // inserting element by element if array
         auto seq = keys->extract_sequence();
-        // '_fieldNames' and '_fixed' are passed by value so that their copies can be mutated as
-        // part of the _getKeysWithArray method.
-        _getKeysWithArray(_fieldNames,
-                          _fixed,
+        // '_fieldNames' and '_fixed' are mutated by _getKeysWithArray so pass in copies
+        auto fieldNamesCopy = _fieldNames;
+        auto fixedCopy = _fixed;
+        _getKeysWithArray(&fieldNamesCopy,
+                          &fixedCopy,
                           pooledBufferBuilder,
                           obj,
                           &seq,
@@ -294,8 +307,8 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
     keys->insert(keyString.release());
 }
 
-void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
-                                          std::vector<BSONElement> fixed,
+void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
+                                          std::vector<BSONElement>* fixed,
                                           SharedBufferFragmentBuilder& pooledBufferBuilder,
                                           const BSONObj& obj,
                                           KeyStringSet::sequence_type* keys,
@@ -329,24 +342,24 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
     // path "a.b" causes the index to be multikey, but the key pattern "a.b.0" only indexes the
     // first element of the array, so we'd have a
     // std::vector<boost::optional<size_t>>{{1U}, boost::none}.
-    std::vector<boost::optional<size_t>> arrComponents(fieldNames.size());
+    std::vector<boost::optional<size_t>> arrComponents(fieldNames->size());
 
     bool mayExpandArrayUnembedded = true;
-    for (size_t i = 0; i < fieldNames.size(); ++i) {
-        if (*fieldNames[i] == '\0') {
+    for (size_t i = 0; i < fieldNames->size(); ++i) {
+        if (*(*fieldNames)[i] == '\0') {
             continue;
         }
 
         bool arrayNestedArray;
         // Extract element matching fieldName[ i ] from object xor array.
         BSONElement e =
-            _extractNextElement(obj, positionalInfo[i], &fieldNames[i], &arrayNestedArray);
+            _extractNextElement(obj, positionalInfo[i], &(*fieldNames)[i], &arrayNestedArray);
 
         if (e.eoo()) {
             // if field not present, set to null
-            fixed[i] = nullElt;
+            (*fixed)[i] = nullElt;
             // done expanding this field name
-            fieldNames[i] = "";
+            (*fieldNames)[i] = "";
             numNotFound++;
         } else if (e.type() == Array) {
             arrIdxs.insert(i);
@@ -362,17 +375,17 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
             }
         } else {
             // not an array - no need for further expansion
-            fixed[i] = e;
+            (*fixed)[i] = e;
         }
     }
 
     if (arrElt.eoo()) {
         // No array, so generate a single key.
-        if (_isSparse && numNotFound == fieldNames.size()) {
+        if (_isSparse && numNotFound == fieldNames->size()) {
             return;
         }
         KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
-        for (const auto& elem : fixed) {
+        for (const auto& elem : *fixed) {
             if (_collator) {
                 keyString.appendBSONElement(elem, [&](StringData stringData) {
                     return _collator->getComparisonString(stringData);
@@ -396,15 +409,19 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
                 // multikey and may occur mid-path. For instance, the indexed path "a.b.c" has
                 // multikey components {0, 1} given the document {a: [{b: []}, {b: 1}]}.
                 size_t fullPathLength = _pathLengths[i];
-                size_t suffixPathLength = FieldRef{fieldNames[i]}.numParts();
+                size_t suffixPathLength = FieldRef{(*fieldNames)[i]}.numParts();
                 invariant(suffixPathLength < fullPathLength);
                 arrComponents[i] = fullPathLength - suffixPathLength - 1;
             }
         }
 
         // For an empty array, set matching fields to undefined.
-        _getKeysArrEltFixed(&fieldNames,
-                            &fixed,
+        std::vector<const char*> fieldNamesTemp;
+        std::vector<BSONElement> fixedTemp;
+        _getKeysArrEltFixed(*fieldNames,
+                            *fixed,
+                            &fieldNamesTemp,
+                            &fixedTemp,
                             pooledBufferBuilder,
                             undefinedElt,
                             keys,
@@ -422,11 +439,11 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
         // and then traverse the remainder of the field path up front. This prevents us from
         // having to look up the indexed element again on each recursive call (i.e. once per
         // array element).
-        std::vector<PositionalPathInfo> subPositionalInfo(fixed.size());
-        for (size_t i = 0; i < fieldNames.size(); ++i) {
+        std::vector<PositionalPathInfo> subPositionalInfo(fixed->size());
+        for (size_t i = 0; i < fieldNames->size(); ++i) {
             const bool fieldIsArray = arrIdxs.find(i) != arrIdxs.end();
 
-            if (*fieldNames[i] == '\0') {
+            if (*(*fieldNames)[i] == '\0') {
                 // We've reached the end of the path.
                 if (multikeyPaths && fieldIsArray && mayExpandArrayUnembedded) {
                     // The 'arrElt' array value isn't expanded into multiple elements when the last
@@ -444,7 +461,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
             // we must have traversed through 'arrElt'.
             invariant(fieldIsArray);
 
-            StringData part = fieldNames[i];
+            StringData part = (*fieldNames)[i];
             part = part.substr(0, part.find('.'));
             subPositionalInfo[i].positionallyIndexedElt = arrObj[part];
             if (subPositionalInfo[i].positionallyIndexedElt.eoo()) {
@@ -466,7 +483,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
                     // latter from the former yields the number of components in the prefix "a.b",
                     // i.e. 2.
                     size_t fullPathLength = _pathLengths[i];
-                    size_t suffixPathLength = FieldRef{fieldNames[i]}.numParts();
+                    size_t suffixPathLength = FieldRef{(*fieldNames)[i]}.numParts();
                     invariant(suffixPathLength < fullPathLength);
                     arrComponents[i] = fullPathLength - suffixPathLength - 1;
                 }
@@ -480,15 +497,19 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*> fieldNames,
             // 'arrElt' array value when generating keys. It therefore cannot cause the index to be
             // multikey.
             subPositionalInfo[i].arrayObj = arrObj;
-            subPositionalInfo[i].remainingPath = fieldNames[i];
+            subPositionalInfo[i].remainingPath = (*fieldNames)[i];
             subPositionalInfo[i].dottedElt = dps::extractElementAtPathOrArrayAlongPath(
                 arrObj, subPositionalInfo[i].remainingPath);
         }
 
         // Generate a key for each element of the indexed array.
+        std::vector<const char*> fieldNamesTemp;
+        std::vector<BSONElement> fixedTemp;
         for (const auto arrObjElem : arrObj) {
-            _getKeysArrEltFixed(&fieldNames,
-                                &fixed,
+            _getKeysArrEltFixed(*fieldNames,
+                                *fixed,
+                                &fieldNamesTemp,
+                                &fixedTemp,
                                 pooledBufferBuilder,
                                 arrObjElem,
                                 keys,

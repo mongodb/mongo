@@ -60,10 +60,8 @@
 
 namespace mongo {
 
-using std::endl;
 using std::pair;
 using std::set;
-using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -84,9 +82,6 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-std::vector<KeyString::Value> asVector(const KeyStringSet& keySet) {
-    return {keySet.begin(), keySet.end()};
-}
 }  // namespace
 
 struct BtreeExternalSortComparison {
@@ -148,18 +143,12 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
             loc,
             kNoopOnSuppressedErrorFn);
 
-    return insertKeys(opCtx,
-                      {keys->begin(), keys->end()},
-                      {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
-                      *multikeyPaths,
-                      loc,
-                      options,
-                      result);
+    return insertKeys(opCtx, *keys, *multikeyMetadataKeys, *multikeyPaths, loc, options, result);
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
-                                             const vector<KeyString::Value>& keys,
-                                             const vector<KeyString::Value>& multikeyMetadataKeys,
+                                             const KeyStringSet& keys,
+                                             const KeyStringSet& multikeyMetadataKeys,
                                              const MultikeyPaths& multikeyPaths,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
@@ -233,7 +222,7 @@ std::unique_ptr<SortedDataInterface::Cursor> AbstractIndexAccessMethod::newCurso
 }
 
 Status AbstractIndexAccessMethod::removeKeys(OperationContext* opCtx,
-                                             const std::vector<KeyString::Value>& keys,
+                                             const KeyStringSet& keys,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
                                              int64_t* numDeleted) {
@@ -318,32 +307,21 @@ long long AbstractIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx) 
     return _newInterface->getSpaceUsedBytes(opCtx);
 }
 
-pair<vector<KeyString::Value>, vector<KeyString::Value>> AbstractIndexAccessMethod::setDifference(
-    const KeyStringSet& left, const KeyStringSet& right, Ordering ordering) {
+pair<KeyStringSet, KeyStringSet> AbstractIndexAccessMethod::setDifference(
+    const KeyStringSet& left, const KeyStringSet& right) {
     // Two iterators to traverse the two sets in sorted order.
     auto leftIt = left.begin();
     auto rightIt = right.begin();
-    vector<KeyString::Value> onlyLeft;
-    vector<KeyString::Value> onlyRight;
+    KeyStringSet::sequence_type onlyLeft;
+    KeyStringSet::sequence_type onlyRight;
 
     while (leftIt != left.end() && rightIt != right.end()) {
-        const int cmp = leftIt->compare(*rightIt);
+        // Use compareWithTypeBits instead of the regular compare as we want just a difference in
+        // typeinfo to also result in an index change.
+        const int cmp = leftIt->compareWithTypeBits(*rightIt);
         if (cmp == 0) {
-            /*
-             * 'leftIt' and 'rightIt' compare equal using compare(), but may not be identical, which
-             * should result in an index change.
-             */
-            auto leftKey = KeyString::toBson(
-                leftIt->getBuffer(), leftIt->getSize(), ordering, leftIt->getTypeBits());
-            auto rightKey = KeyString::toBson(
-                rightIt->getBuffer(), rightIt->getSize(), ordering, rightIt->getTypeBits());
-            if (!leftKey.binaryEqual(rightKey)) {
-                onlyLeft.push_back(*leftIt);
-                onlyRight.push_back(*rightIt);
-            }
             ++leftIt;
             ++rightIt;
-            continue;
         } else if (cmp > 0) {
             onlyRight.push_back(*rightIt);
             ++rightIt;
@@ -357,7 +335,15 @@ pair<vector<KeyString::Value>, vector<KeyString::Value>> AbstractIndexAccessMeth
     onlyLeft.insert(onlyLeft.end(), leftIt, left.end());
     onlyRight.insert(onlyRight.end(), rightIt, right.end());
 
-    return {std::move(onlyLeft), std::move(onlyRight)};
+    KeyStringSet outLeft;
+    KeyStringSet outRight;
+
+    // The above algorithm guarantees that the elements are sorted and unique, so we can let the
+    // container know so we get O(1) complexity adopting it.
+    outLeft.adopt_sequence(boost::container::ordered_unique_range_t(), std::move(onlyLeft));
+    outRight.adopt_sequence(boost::container::ordered_unique_range_t(), std::move(onlyRight));
+
+    return {{std::move(outLeft)}, {std::move(outRight)}};
 }
 
 void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
@@ -405,8 +391,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     ticket->loc = record;
     ticket->dupsAllowed = options.dupsAllowed;
 
-    std::tie(ticket->removed, ticket->added) =
-        setDifference(ticket->oldKeys, ticket->newKeys, getSortedDataInterface()->getOrdering());
+    std::tie(ticket->removed, ticket->added) = setDifference(ticket->oldKeys, ticket->newKeys);
 
     ticket->_isValid = true;
 }
@@ -435,8 +420,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
-    const auto newMultikeyMetadataKeys = asVector(ticket.newMultikeyMetadataKeys);
-    for (const auto keySet : {&ticket.added, &newMultikeyMetadataKeys}) {
+    for (const auto keySet : {&ticket.added, &ticket.newMultikeyMetadataKeys}) {
         for (const auto& keyString : *keySet) {
             Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
             if (isFatalError(opCtx, status, keyString)) {
@@ -446,9 +430,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     if (shouldMarkIndexAsMultikey(
-            ticket.newKeys.size(),
-            {ticket.newMultikeyMetadataKeys.begin(), ticket.newMultikeyMetadataKeys.end()},
-            ticket.newMultikeyPaths)) {
+            ticket.newKeys.size(), ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths)) {
         _indexCatalogEntry->setMultikey(opCtx, ticket.newMultikeyPaths);
     }
 
@@ -566,7 +548,8 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
         } else {
             invariant(_indexMultikeyPaths.size() == multikeyPaths->size());
             for (size_t i = 0; i < multikeyPaths->size(); ++i) {
-                _indexMultikeyPaths[i].insert((*multikeyPaths)[i].begin(),
+                _indexMultikeyPaths[i].insert(boost::container::ordered_unique_range_t(),
+                                              (*multikeyPaths)[i].begin(),
                                               (*multikeyPaths)[i].end());
             }
         }
@@ -579,9 +562,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
 
     _isMultiKey = _isMultiKey ||
         _indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
-            keys->size(),
-            {_multikeyMetadataKeys.begin(), _multikeyMetadataKeys.end()},
-            *multikeyPaths);
+            keys->size(), _multikeyMetadataKeys, *multikeyPaths);
 
     return Status::OK();
 }
@@ -790,7 +771,7 @@ void AbstractIndexAccessMethod::getKeys(SharedBufferFragmentBuilder& pooledBuffe
 
 bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
     size_t numberOfKeys,
-    const vector<KeyString::Value>& multikeyMetadataKeys,
+    const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
 }

@@ -383,7 +383,7 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        const std::vector<KeyString::Value>& keys,
+                                        const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
                                         RecordId loc,

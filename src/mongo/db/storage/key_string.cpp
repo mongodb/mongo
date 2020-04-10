@@ -2564,6 +2564,10 @@ int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t r
     return leftSize < rightSize ? -1 : 1;
 }
 
+int Value::compareWithTypeBits(const Value& other) const {
+    return KeyString::compare(getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
+}
+
 template class BuilderBase<Builder>;
 template class BuilderBase<HeapBuilder>;
 template class BuilderBase<PooledBuilder>;
