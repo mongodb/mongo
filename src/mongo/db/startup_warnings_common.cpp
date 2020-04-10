@@ -46,6 +46,44 @@
 
 namespace mongo {
 
+#ifdef _WIN32
+bool CheckPrivilegeEnabled(const wchar_t* name) {
+    LUID luid;
+    if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
+        auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
+        LOGV2_WARNING(47187001, "{str}", "str"_attr = str);
+        return false;
+    }
+
+    // Get the access token for the current process.
+    HANDLE accessToken;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &accessToken)) {
+        auto str = errnoWithPrefix("Failed to OpenProcessToken");
+        LOGV2_WARNING(47187002, "{str}", "str"_attr = str);
+        return false;
+    }
+
+    const auto accessTokenGuard = makeGuard([&] { CloseHandle(accessToken); });
+
+    BOOL ret;
+    PRIVILEGE_SET privileges;
+    privileges.PrivilegeCount = 1;
+    privileges.Control = PRIVILEGE_SET_ALL_NECESSARY;
+
+    privileges.Privilege[0].Luid = luid;
+    privileges.Privilege[0].Attributes = 0;
+
+    if (!PrivilegeCheck(accessToken, &privileges, &ret)) {
+        auto str = errnoWithPrefix("Failed to PrivilegeCheck");
+        LOGV2_WARNING(47187003, "{str}", "str"_attr = str);
+        return false;
+    }
+
+    return ret;
+}
+
+#endif
+
 //
 // system warnings
 //
@@ -124,6 +162,16 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
                       {logv2::LogTag::kStartupWarnings},
                       "This is a 32-bit MongoDB binary running on a 64-bit operating system. "
                       "Switch to a 64-bit build of MongoDB to support larger databases");
+    }
+#endif
+
+#ifdef _WIN32
+    if (!CheckPrivilegeEnabled(SE_INC_WORKING_SET_NAME)) {
+        LOGV2_OPTIONS(
+            47187004,
+            {logv2::LogTag::kStartupWarnings},
+            "SeIncreaseWorkingSetPrivilege privilege is not granted to the process. Secure memory "
+            "allocation for SCRAM and/or Encrypted Storage Engine may fail.");
     }
 #endif
 
