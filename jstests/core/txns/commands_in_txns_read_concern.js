@@ -25,7 +25,7 @@ otherColl.drop({writeConcern: {w: "majority"}});
 
 jsTest.log("Testing createCollection in a transaction with local readConcern");
 session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-createCollAndCRUDInTxn(sessionDB, collName, true /*explicitCreate*/, false /*upsert*/);
+createCollAndCRUDInTxn(sessionDB, collName, "insert", true /*explicitCreate*/);
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 
@@ -47,7 +47,7 @@ jsTest.log("Testing createCollection in a transaction with local readConcern, wi
            "operations preceeding it");
 session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
 assert.eq(otherColl.find({a: 1}).itcount(), 1);
-createCollAndCRUDInTxn(sessionDB, collName, true /*explicitCreate*/, false /*upsert*/);
+createCollAndCRUDInTxn(sessionDB, collName, "insert", true /*explicitCreate*/);
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 

@@ -89,10 +89,6 @@ var $config = (function() {
                             e["errorLabels"] = ["TransientTransactionError"];
                             throw e;
                         }
-                    } else if (e.code === ErrorCodes.OperationNotSupportedInTransaction) {
-                        // TODO (SERVER-45956): Remove this case once fineAndModify with upsert=true
-                        // is allowed in transactions.
-                        throw e;
                     } else {
                         assertAlways.contains(
                             e.code,

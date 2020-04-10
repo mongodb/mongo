@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify_common.h"
+#include "mongo/db/commands_in_multi_doc_txn_params_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
@@ -454,13 +455,22 @@ public:
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
-                    // We do not allow acquisition of exclusive locks inside multi-document
-                    // transactions, so fail early if we are inside of such a transaction.
-                    // TODO(SERVER-45956) remove below assertion.
+                    auto isFullyUpgradedTo44 =
+                        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                         serverGlobalParams.featureCompatibility.getVersion() ==
+                             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
                     uassert(ErrorCodes::OperationNotSupportedInTransaction,
                             str::stream() << "Cannot create namespace " << nsString.ns()
-                                          << " in multi-document transaction.",
-                            !inTransaction);
+                                          << " in multi-document transaction unless "
+                                             "featureCompatibilityVersion is 4.4.",
+                            isFullyUpgradedTo44 || !inTransaction);
+
+                    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                            str::stream() << "Cannot create namespace " << nsString.ns()
+                                          << " because creation of collections and indexes inside "
+                                             "multi-document transactions is disabled.",
+                            !inTransaction || gShouldMultiDocTxnCreateCollectionAndIndexes.load());
 
                     assertCanWrite(opCtx, nsString);
 

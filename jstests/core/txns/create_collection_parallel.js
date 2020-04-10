@@ -10,7 +10,7 @@
 
 load("jstests/libs/create_collection_txn_helpers.js");
 
-function runParallelCollectionCreateTest(explicitCreate, upsert) {
+function runParallelCollectionCreateTest(command, explicitCreate) {
     const dbName = "test";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
@@ -29,7 +29,7 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -49,8 +49,8 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, command, explicitCreate);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -67,7 +67,7 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
     assert.commandWorked(secondSessionDB.runCommand({create: collName}));  // outside txn
     assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
@@ -81,10 +81,10 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
         "Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, command, explicitCreate);
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -99,10 +99,10 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     assert.commandWorked(sessionDB.dropDatabase());
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, command, explicitCreate);
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -116,12 +116,12 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
                "previously committed collection.");
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(secondSession.getDatabase("test"), collName, command, explicitCreate);
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
     createCollAndCRUDInTxn(
-        sessionDB, distinctCollName, explicitCreate, upsert);             // does not conflict
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);  // conflicts
+        sessionDB, distinctCollName, command, explicitCreate);             // does not conflict
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);  // conflicts
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -135,10 +135,10 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
 
     jsTest.log("Testing distinct createCollections in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createCollAndCRUDInTxn(sessionDB, collName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCreate, upsert);
+    createCollAndCRUDInTxn(secondSessionDB, distinctCollName, command, explicitCreate);
 
     session.commitTransaction();
     secondSession.commitTransaction();
@@ -146,8 +146,10 @@ function runParallelCollectionCreateTest(explicitCreate, upsert) {
     secondSession.endSession();
     session.endSession();
 }
-runParallelCollectionCreateTest(true /*explicitCreate*/, true /*upsert*/);
-runParallelCollectionCreateTest(false /*explicitCreate*/, true /*upsert*/);
-runParallelCollectionCreateTest(true /*explicitCreate*/, false /*upsert*/);
-runParallelCollectionCreateTest(false /*explicitCreate*/, false /*upsert*/);
+runParallelCollectionCreateTest("insert", true /*explicitCreate*/);
+runParallelCollectionCreateTest("insert", false /*explicitCreate*/);
+runParallelCollectionCreateTest("update", true /*explicitCreate*/);
+runParallelCollectionCreateTest("update", false /*explicitCreate*/);
+runParallelCollectionCreateTest("findAndModify", true /*explicitCreate*/);
+runParallelCollectionCreateTest("findAndModify", false /*explicitCreate*/);
 }());
