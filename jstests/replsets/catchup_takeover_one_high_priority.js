@@ -92,6 +92,7 @@ replSet.awaitNodesAgreeOnPrimary();
 // Let the nodes catchup.
 restartServerReplication(nodes[1]);
 restartServerReplication(nodes[2]);
+replSet.awaitReplication();
 
 // Confirm that the highest priority node becomes primary
 // after catching up.
