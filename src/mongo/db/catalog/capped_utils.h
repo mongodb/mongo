@@ -44,8 +44,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
  */
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
-                             const std::string& shortFrom,
-                             const std::string& shortTo,
+                             const NamespaceString& fromNss,
+                             const NamespaceString& toNss,
                              long long size,
                              bool temp);
 
