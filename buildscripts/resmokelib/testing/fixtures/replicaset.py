@@ -116,11 +116,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 self.nodes.append(node)
 
         for i in range(self.num_nodes):
-            # TODO(SERVER-46864): Remove version check on "oplogApplicationEnforcesSteadyStateConstraints"
             steady_state_constraint_param = "oplogApplicationEnforcesSteadyStateConstraints"
-            if (steady_state_constraint_param not in self.nodes[i].mongod_options["set_parameters"]
-                    and (self.mixed_bin_versions_config is None
-                         or self.mixed_bin_versions_config[i] == "new")):
+            if steady_state_constraint_param not in self.nodes[i].mongod_options["set_parameters"]:
                 self.nodes[i].mongod_options["set_parameters"][steady_state_constraint_param] = True
             if self.linear_chain and i > 0:
                 self.nodes[i].mongod_options["set_parameters"][
