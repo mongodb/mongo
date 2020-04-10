@@ -254,6 +254,7 @@ private:
 /**
  * Given the specified command, returns an effective read concern which should be used or an error
  * if the read concern is not valid for the command.
+ * Note that the validation performed is not necessarily exhaustive.
  */
 StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                                                       const CommandInvocation* invocation,
@@ -596,11 +597,6 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
                 createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
             }
-        } else if (txnParticipant.transactionIsOpen()) {
-            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            uassert(ErrorCodes::InvalidOptions,
-                    "Only the first command in a transaction may specify a readConcern",
-                    readConcernArgs.isEmpty());
         }
 
         // Release the transaction lock resources and abort storage transaction for unprepared
@@ -1111,6 +1107,11 @@ void execCommandDatabase(OperationContext* opCtx,
                       str::stream() << "unexpected unset provenance on readConcern: "
                                     << newReadConcernArgs.toBSONInner());
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "Only the first command in a transaction may specify a readConcern",
+                    startTransaction || !opCtx->inMultiDocumentTransaction() ||
+                        newReadConcernArgs.isEmpty());
+
             {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
@@ -1238,8 +1239,11 @@ void execCommandDatabase(OperationContext* opCtx,
         // parse it here, so if it is valid it can be used to compute the proper operationTime.
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         if (readConcernArgs.isEmpty()) {
-            auto readConcernArgsStatus =
-                _extractReadConcern(opCtx, invocation.get(), request.body, false, isInternalClient);
+            auto readConcernArgsStatus = _extractReadConcern(opCtx,
+                                                             invocation.get(),
+                                                             request.body,
+                                                             false /*startTransaction*/,
+                                                             isInternalClient);
             if (readConcernArgsStatus.isOK()) {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
