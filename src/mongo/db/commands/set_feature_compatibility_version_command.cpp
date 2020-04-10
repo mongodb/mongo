@@ -206,6 +206,40 @@ public:
 
             FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
 
+            // Force reconfig to add a 'term' field to the config.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            const bool isReplSet =
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+            if (isReplSet) {
+                auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
+                    auto newConfig = oldConfig;
+                    newConfig.setConfigTerm(term);
+                    newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
+                    return newConfig;
+                };
+
+                // "force" reconfig in order to skip safety checks. This is safe since the content
+                // of config is the same.
+                LOGV2(4718900, "Upgrading replica set config.");
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                uassertStatusOKWithContext(status, "Failed to upgrade the replica set config");
+
+                LOGV2(4718901,
+                      "Waiting for the upgraded replica set config to propagate to a majority");
+                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
+                WriteConcernOptions writeConcern(
+                    repl::ReplSetConfig::kConfigMajorityWriteConcernModeName,
+                    WriteConcernOptions::SyncMode::NONE,
+                    opCtx->getWriteConcern().wTimeout);
+                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
+                uassertStatusOKWithContext(
+                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
+                    "Failed to wait for the upgraded replica set config to propagate to a "
+                    "majority");
+                LOGV2(4718902, "The upgraded replica set config has been propagated to a majority");
+            }
+
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
                 // global IX or X locks. This ensures that either

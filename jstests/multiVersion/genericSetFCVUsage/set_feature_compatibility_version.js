@@ -221,7 +221,7 @@ secondaryAdminDB = secondary.getDB("admin");
 // Rig the election so that the first node running latest version remains the primary after the
 // 'lastStable' secondary is added to the replica set.
 replSetConfig = rst.getReplSetConfig();
-replSetConfig.version = 4;
+replSetConfig.version = rst.getReplSetConfigFromNode().version + 1;
 replSetConfig.members[2].priority = 0;
 reconfig(rst, replSetConfig);
 
