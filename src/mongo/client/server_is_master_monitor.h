@@ -56,8 +56,18 @@ public:
     void requestImmediateCheck();
     void disableExpeditedChecking();
 
+    /**
+     * Calculates the timing of the next IsMaster request when moving to expedited mode. Returns
+     * boost::none if the existing schedule should be maintained.
+     */
+    static boost::optional<Milliseconds> calculateExpeditedDelayUntilNextCheck(
+        const boost::optional<Milliseconds>& maybeTimeSinceLastCheck,
+        const Milliseconds& expeditedRefreshPeriod,
+        const Milliseconds& previousRefreshPeriod);
+
 private:
     void _scheduleNextIsMaster(WithLock, Milliseconds delay);
+    void _rescheduleNextIsMaster(WithLock, Milliseconds delay);
     void _doRemoteCommand();
 
     void _onIsMasterSuccess(IsMasterRTT latency, const BSONObj bson);
@@ -66,6 +76,8 @@ private:
     Milliseconds _overrideRefreshPeriod(Milliseconds original);
     Milliseconds _currentRefreshPeriod(WithLock);
     void _cancelOutstandingRequest(WithLock);
+
+    boost::optional<Milliseconds> _timeSinceLastCheck() const;
 
     static constexpr auto kLogLevel = 0;
 
