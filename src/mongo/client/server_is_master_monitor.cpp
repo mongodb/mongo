@@ -76,12 +76,14 @@ void SingleServerIsMasterMonitor::init() {
 }
 
 void SingleServerIsMasterMonitor::requestImmediateCheck() {
-    Milliseconds delayUntilNextCheck;
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
 
-    // remain in expedited mode until the replica set recovers
+    // The previous refresh period may or may not have been expedited.
+    // Saving the value here before we change to expedited mode.
+    const auto previousRefreshPeriod = _currentRefreshPeriod(lock);
+
     if (!_isExpedited) {
         // save some log lines.
         LOGV2_DEBUG(4333227,
@@ -89,10 +91,13 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
                     "RSM {setName} monitoring {host} in expedited mode until we detect a primary.",
                     "host"_attr = _host,
                     "setName"_attr = _setUri.getSetName());
+
+        // This will change the _currentRefreshPeriod to the shorter expedited duration.
         _isExpedited = true;
     }
 
-    // .. but continue with rescheduling the next request.
+    // Get the new expedited refresh period.
+    const auto expeditedRefreshPeriod = _currentRefreshPeriod(lock);
 
     if (_isMasterOutstanding) {
         LOGV2_DEBUG(4333216,
@@ -103,36 +108,53 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
         return;
     }
 
-    const auto currentRefreshPeriod = _currentRefreshPeriod(lock);
-
-    const Milliseconds timeSinceLastCheck =
-        (_lastIsMasterAt) ? _executor->now() - *_lastIsMasterAt : Milliseconds::max();
-
-    delayUntilNextCheck = (_lastIsMasterAt && (timeSinceLastCheck < currentRefreshPeriod))
-        ? currentRefreshPeriod - timeSinceLastCheck
-        : kZeroMs;
-
-    // if our calculated delay is less than the next scheduled call, then run the check sooner.
-    // Otherwise, do nothing. Three cases to cancel existing request:
-    // 1. refresh period has changed to expedited, so (currentRefreshPeriod - timeSinceLastCheck) is
-    // < 0
-    // 2. calculated delay is less then next scheduled isMaster
-    // 3. isMaster was never scheduled.
-    if (((currentRefreshPeriod - timeSinceLastCheck) < kZeroMs) ||
-        (delayUntilNextCheck < (currentRefreshPeriod - timeSinceLastCheck)) ||
-        timeSinceLastCheck == Milliseconds::max()) {
-        _cancelOutstandingRequest(lock);
-    } else {
-        return;
+    if (const auto maybeDelayUntilNextCheck = calculateExpeditedDelayUntilNextCheck(
+            _timeSinceLastCheck(), expeditedRefreshPeriod, previousRefreshPeriod)) {
+        _rescheduleNextIsMaster(lock, *maybeDelayUntilNextCheck);
     }
+}
 
+boost::optional<Milliseconds> SingleServerIsMasterMonitor::calculateExpeditedDelayUntilNextCheck(
+    const boost::optional<Milliseconds>& maybeTimeSinceLastCheck,
+    const Milliseconds& expeditedRefreshPeriod,
+    const Milliseconds& previousRefreshPeriod) {
+    invariant(expeditedRefreshPeriod.count() <= previousRefreshPeriod.count());
+
+    const auto timeSinceLastCheck =
+        (maybeTimeSinceLastCheck) ? *maybeTimeSinceLastCheck : Milliseconds::max();
+    invariant(timeSinceLastCheck.count() >= 0);
+
+    if (timeSinceLastCheck == previousRefreshPeriod)
+        return boost::none;
+
+    if (timeSinceLastCheck > expeditedRefreshPeriod)
+        return Milliseconds(0);
+
+    const auto delayUntilExistingRequest = previousRefreshPeriod - timeSinceLastCheck;
+
+    // Calculate when the next isMaster should be scheduled.
+    const Milliseconds delayUntilNextCheck = expeditedRefreshPeriod - timeSinceLastCheck;
+
+    // Do nothing if the time would be greater-than or equal to the existing request.
+    return (delayUntilNextCheck >= delayUntilExistingRequest)
+        ? boost::none
+        : boost::optional<Milliseconds>(delayUntilNextCheck);
+}
+
+boost::optional<Milliseconds> SingleServerIsMasterMonitor::_timeSinceLastCheck() const {
+    return (_lastIsMasterAt) ? boost::optional<Milliseconds>(_executor->now() - *_lastIsMasterAt)
+                             : boost::none;
+}
+
+void SingleServerIsMasterMonitor::_rescheduleNextIsMaster(WithLock lock, Milliseconds delay) {
     LOGV2_DEBUG(4333218,
                 kLogLevel,
-                "RSM {setName} rescheduling next isMaster check for {host} in {delay}",
+                "Rescheduling the next replica set monitoring request",
+                "setName"_attr = _setUri.getSetName(),
                 "host"_attr = _host,
-                "delay"_attr = delayUntilNextCheck,
-                "setName"_attr = _setUri.getSetName());
-    _scheduleNextIsMaster(lock, delayUntilNextCheck);
+                "duration"_attr = delay);
+    _cancelOutstandingRequest(lock);
+    _scheduleNextIsMaster(lock, delay);
 }
 
 void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds delay) {
