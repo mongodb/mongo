@@ -61,7 +61,7 @@ public:
     StageState doWork(WorkingSetID* out) final;
 
 private:
-    BSONObj _produceNewDocumentForInsert(bool isInternalRequest);
+    BSONObj _produceNewDocumentForInsert();
     void _performInsert(BSONObj newDocument);
 
     void _generateNewDocumentFromSuppliedDoc(const FieldRefSet& immutablePaths);
