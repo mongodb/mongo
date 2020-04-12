@@ -61,7 +61,7 @@ def default_mongos_log_component_verbosity():
     return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
 
 
-def mongod_program(  # pylint: disable=too-many-branches
+def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
         logger, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts mongod arguments constructed from 'kwargs'."""
 
@@ -78,6 +78,14 @@ def mongod_program(  # pylint: disable=too-many-branches
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
         suite_set_parameters["logComponentVerbosity"] = default_mongod_log_component_verbosity()
+
+    # minNumChunksForSessionsCollection controls the minimum number of chunks the balancer will
+    # enforce for the sessions collection. If the actual number of chunks is less, the balancer will
+    # issue split commands to create more chunks. As a result, the balancer will also end up moving
+    # chunks for the sessions collection to balance the chunks across shards. Unless the suite is
+    # explicitly prepared to handle these background migrations, set the parameter to 1.
+    if "configsvr" in kwargs and "minNumChunksForSessionsCollection" not in suite_set_parameters:
+        suite_set_parameters["minNumChunksForSessionsCollection"] = 1
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
