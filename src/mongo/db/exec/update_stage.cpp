@@ -153,7 +153,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 }
 
 BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId) {
-    const UpdateRequest* request = _params.request;
+    const UpdateRequest* const request = _params.request;
     UpdateDriver* driver = _params.driver;
     CanonicalQuery* cq = _params.canonicalQuery;
 
@@ -175,13 +175,17 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     bool docWasModified = false;
 
-    auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-    const auto collDesc = css->getCollectionDescription_DEPRECATED();
     Status status = Status::OK();
-    const bool validateForStorage = opCtx()->writesAreReplicated() && _enforceOkForStorage;
+    // A user-initiated write is one which is not caused by oplog application and
+    // is not part of a chunk migration. The resulting document should be validated for storage.
+    // It is safe to access the CollectionShardingState in this write context and
+    // to throw SSV if the sharding metadata has not been initialized.
+    const bool isUserInitiatedWrite = opCtx()->writesAreReplicated() && _enforceOkForStorage;
     const bool isInsert = false;
     FieldRefSet immutablePaths;
-    if (opCtx()->writesAreReplicated() && !request->isFromMigration()) {
+    if (isUserInitiatedWrite) {
+        const auto collDesc =
+            CollectionShardingState::get(opCtx(), collection()->ns())->getCollectionDescription();
         if (collDesc.isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
         }
@@ -191,7 +195,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // If we don't need match details, avoid doing the rematch
         status = driver->update(StringData(),
                                 &_doc,
-                                validateForStorage,
+                                isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -210,7 +214,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
         status = driver->update(matchedField,
                                 &_doc,
-                                validateForStorage,
+                                isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -252,7 +256,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (!request->isExplain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            args.criteria = collDesc.extractDocumentKey(newObj);
+            if (isUserInitiatedWrite) {
+                args.criteria = CollectionShardingState::get(opCtx(), collection()->ns())
+                                    ->getCollectionDescription()
+                                    .extractDocumentKey(newObj);
+            } else {
+                const auto docId = newObj[idFieldName];
+                args.criteria = docId ? docId.wrap() : newObj;
+            }
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));
@@ -270,12 +281,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (collDesc.isSharded() && _shouldCheckForShardKeyUpdate) {
-                    bool changesShardKeyOnSameNode =
-                        checkUpdateChangesShardKeyFields(collDesc, oldObj);
-                    if (changesShardKeyOnSameNode && !args.preImageDoc) {
-                        args.preImageDoc = oldObj.value().getOwned();
-                    }
+                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+                    !args.preImageDoc) {
+                    args.preImageDoc = oldObj.value().getOwned();
                 }
 
                 WriteUnitOfWork wunit(opCtx());
@@ -298,12 +306,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->isExplain()) {
-                if (collDesc.isSharded() && _shouldCheckForShardKeyUpdate) {
-                    bool changesShardKeyOnSameNode =
-                        checkUpdateChangesShardKeyFields(collDesc, oldObj);
-                    if (changesShardKeyOnSameNode && !args.preImageDoc) {
-                        args.preImageDoc = oldObj.value().getOwned();
-                    }
+                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+                    !args.preImageDoc) {
+                    args.preImageDoc = oldObj.value().getOwned();
                 }
 
                 WriteUnitOfWork wunit(opCtx());
@@ -701,8 +706,13 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription collDesc,
-                                                   const Snapshotted<BSONObj>& oldObj) {
+bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj) {
+    auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
+    const auto collDesc = css->getCollectionDescription();
+    if (!collDesc.isSharded()) {
+        return false;
+    }
+
     auto newObj = _doc.getObject();
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
@@ -750,10 +760,8 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
     // At this point we already asserted that the complete shardKey have been specified in the
     // query, this implies that mongos is not doing a broadcast update and that it attached a
     // shardVersion to the command. Thus it is safe to call getOwnershipFilter
-    const auto collFilter =
-        CollectionShardingState::get(opCtx(), collection()->ns())
-            ->getOwnershipFilter(opCtx(),
-                                 CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
+    const auto collFilter = css->getOwnershipFilter(
+        opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
     // If this document does not belong anymore to this shard
     if (!collFilter.keyBelongsToMe(oldShardKey)) {

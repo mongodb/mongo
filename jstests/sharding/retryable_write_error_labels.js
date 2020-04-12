@@ -10,6 +10,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 const dbName = "test";
 const collName = "retryable_write_error_labels";
 
@@ -22,10 +24,6 @@ const st = new ShardingTest({
 
     shards: 1
 });
-const primary = st.rs0.getPrimary();
-
-assert.commandWorked(primary.getDB(dbName).runCommand(
-    {insert: collName, documents: [{_id: 0}], writeConcern: {w: "majority"}}));
 
 function checkErrorCode(res, errorCode, isWCError) {
     if (isWCError) {
@@ -37,67 +35,55 @@ function checkErrorCode(res, errorCode, isWCError) {
     }
 }
 
-function checkErrorLabels(res, expectLabel) {
-    if (expectLabel) {
-        assert.eq(res.errorLabels, ["RetryableWriteError"], res);
-    } else {
-        assert(!res.hasOwnProperty("errorLabels"), res);
-    }
+function checkErrorLabels(res) {
+    assert(!res.hasOwnProperty("errorLabels"), res);
 }
 
-function runTest(errorCode, expectLabel, isWCError, isMongos) {
-    const testDB = isMongos ? st.s.getDB(dbName) : primary.getDB(dbName);
-    const session = isMongos ? st.s.startSession() : primary.startSession();
+function enableFailCommand(isWCError, errorCode, commands) {
+    jsTestLog("Enabling failCommand fail point for " + commands + " with writeConcern error " +
+              isWCError);
+    // Sharding tests require {failInternalCommands: true},
+    // s appears to mongod to be an internal client.
+    let failCommandData = {failInternalCommands: true, failCommands: commands};
+    if (isWCError) {
+        failCommandData['writeConcernError'] = {code: NumberInt(errorCode), errmsg: "dummy"};
+    } else {
+        failCommandData['errorCode'] = NumberInt(errorCode);
+    }
+    return configureFailPoint(
+        st.rs0.getPrimary(), "failCommand", failCommandData, "alwaysOn" /*failPointMode*/);
+}
+
+function runTest(errorCode, isWCError) {
+    const testDB = st.getDB(dbName);
+    const session = st.s.startSession();
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 
-    jsTestLog(`Testing with errorCode: ${errorCode}, expectLabel: ${expectLabel}, isWCError: ${
-        isWCError}, isMongos: ${isMongos}`);
+    let insertFailPoint = enableFailCommand(isWCError, errorCode, ["insert"]);
 
-    // Sharding tests (i.e. isMongos is true) require {failInternalCommands: true}, since the mongos
-    // appears to mongod to be an internal client.
-    if (isWCError) {
-        assert.commandWorked(primary.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                writeConcernError: {code: NumberInt(errorCode), errmsg: "dummy"},
-                failCommands: ["insert", "commitTransaction"],
-                failInternalCommands: isMongos
-            }
-        }));
-    } else {
-        assert.commandWorked(primary.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: NumberInt(errorCode),
-                failCommands: ["insert", "commitTransaction"],
-                failInternalCommands: isMongos
-            }
-        }));
-    }
-
-    const withOrWithout = expectLabel ? " with" : " without";
+    jsTestLog(`Testing with errorCode: ${errorCode}, isWCError: ${isWCError}`);
 
     // Test retryable writes.
-    jsTestLog("Retryable write should return error " + errorCode + withOrWithout +
-              " RetryableWriteError label");
+    jsTestLog("Retryable write should return error " + errorCode +
+              " without RetryableWriteError label");
     let res = testDB.runCommand(
         {insert: collName, documents: [{a: errorCode, b: "retryable"}], txnNumber: NumberLong(0)});
     checkErrorCode(res, errorCode, isWCError);
-    checkErrorLabels(res, expectLabel);
+    checkErrorLabels(res);
 
     // Test non-retryable writes.
     jsTestLog("Non-retryable write should return error " + errorCode +
               " without RetryableWriteError label");
     res = testDB.runCommand({insert: collName, documents: [{a: errorCode, b: "non-retryable"}]});
     checkErrorCode(res, errorCode, isWCError);
-    checkErrorLabels(res, false /* expectLabel */);
+    checkErrorLabels(res);
 
+    insertFailPoint.off();
+    let commitTxnFailPoint = enableFailCommand(isWCError, errorCode, ["commitTransaction"]);
     // Test commitTransaction command in a transaction.
-    jsTestLog("commitTransaction should return error " + errorCode + withOrWithout +
-              " RetryableWriteError label");
+    jsTestLog("commitTransaction should return error " + errorCode +
+              " without RetryableWriteError label");
     session.startTransaction();
     assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
     res = sessionDb.adminCommand({
@@ -106,35 +92,17 @@ function runTest(errorCode, expectLabel, isWCError, isMongos) {
         autocommit: false
     });
     checkErrorCode(res, errorCode, isWCError);
-    checkErrorLabels(res, expectLabel);
+    checkErrorLabels(res);
     assert.commandWorkedOrFailedWithCode(
         session.abortTransaction_forTesting(),
         [ErrorCodes.TransactionCommitted, ErrorCodes.NoSuchTransaction]);
 
+    commitTxnFailPoint.off();
     // Test abortTransaction command in a transaction.
-    if (isWCError) {
-        assert.commandWorked(primary.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                writeConcernError: {code: NumberInt(errorCode), errmsg: "dummy"},
-                failCommands: ["abortTransaction"],
-                failInternalCommands: isMongos
-            }
-        }));
-    } else {
-        assert.commandWorked(primary.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: NumberInt(errorCode),
-                failCommands: ["abortTransaction"],
-                failInternalCommands: isMongos
-            }
-        }));
-    }
-    jsTestLog("abortTransaction should return error " + errorCode + withOrWithout +
-              " RetryableWriteError label");
+    let abortTransactionFailPoint = enableFailCommand(isWCError, errorCode, ["abortTransaction"]);
+
+    jsTestLog("abortTransaction should return error " + errorCode +
+              " without RetryableWriteError label");
     session.startTransaction();
     assert.commandWorked(sessionColl.update({}, {$inc: {x: 1}}));
     res = sessionDb.adminCommand({
@@ -143,10 +111,9 @@ function runTest(errorCode, expectLabel, isWCError, isMongos) {
         autocommit: false
     });
     checkErrorCode(res, errorCode, isWCError);
-    checkErrorLabels(res, expectLabel);
+    checkErrorLabels(res);
 
-    assert.commandWorked(primary.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
-
+    abortTransactionFailPoint.off();
     assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(),
                                          ErrorCodes.NoSuchTransaction);
     session.endSession();
@@ -164,50 +131,21 @@ const retryableCodes = [
     ErrorCodes.HostUnreachable,
     ErrorCodes.NetworkTimeout,
     ErrorCodes.SocketException,
-    ErrorCodes.ExceededTimeLimit
+    ErrorCodes.ExceededTimeLimit,
+    ErrorCodes.WriteConcernFailed
 ];
 
 // Test retryable error codes.
 retryableCodes.forEach(function(code) {
-    // Mongod should return RetryableWriteError labels on retryable error codes.
-    runTest(code, true /* expectLabel */, false /* isWCError */, false /* isMongos */);
-
     // Mongos should never return RetryableWriteError labels.
-    runTest(code, false /* expectLabel */, false /* isWCError */, true /* isMongos */);
+    runTest(code, false /* isWCError */);
 });
 
 // Test retryable error codes in writeConcern error.
 retryableCodes.forEach(function(code) {
-    // Mongod should return RetryableWriteError labels on retryable error codes.
-    runTest(code, true /* expectLabel */, true /* isWCError */, false /* isMongos */);
-
     // Mongos should never return RetryableWriteError labels.
-    runTest(code, false /* expectLabel */, true /* isWCError */, true /* isMongos */);
+    runTest(code, true /* isWCError */);
 });
-
-// Test non-retryable error code.
-// Test against mongod.
-runTest(ErrorCodes.WriteConcernFailed,
-        false /* expectLabel */,
-        false /* isWCError */,
-        false /* isMongos */);
-// Test against mongos.
-runTest(ErrorCodes.WriteConcernFailed,
-        false /* expectLabel */,
-        false /* isWCError */,
-        true /* isMongos */);
-
-// Test non-retryable error code in writeConcern error.
-// Test against mongod.
-runTest(ErrorCodes.WriteConcernFailed,
-        false /* expectLabel */,
-        true /* isWCError */,
-        false /* isMongos */);
-// Test against mongos.
-runTest(ErrorCodes.WriteConcernFailed,
-        false /* expectLabel */,
-        true /* isWCError */,
-        true /* isMongos */);
 
 st.s.adminCommand({"configureFailPoint": "overrideMaxAwaitTimeMS", "mode": "off"});
 

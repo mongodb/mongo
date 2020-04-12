@@ -26,22 +26,18 @@ sessionColl.drop({writeConcern: {w: "majority"}});
 otherColl.drop({writeConcern: {w: "majority"}});
 
 jsTest.log("Testing createCollection in a transaction with local readConcern");
-session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+withTxnAndAutoRetryOnMongos(session, () => {
     createCollAndCRUDInTxn(sessionDB, collName, "insert", true /*explicitCreate*/);
 }, {readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 
 sessionColl.drop({writeConcern: {w: "majority"}});
 
 jsTest.log("Testing createIndexes in a transaction with local readConcern");
-session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+withTxnAndAutoRetryOnMongos(session, () => {
     createIndexAndCRUDInTxn(
         sessionDB, collName, false /*explicitCollCreate*/, false /*multikeyIndex*/);
 }, {readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 assert.eq(sessionColl.getIndexes().length, 2);
 
@@ -52,12 +48,10 @@ assert.eq(otherColl.find({}).itcount(), 1);
 
 jsTest.log("Testing createCollection in a transaction with local readConcern, with other " +
            "operations preceeding it");
-session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+withTxnAndAutoRetryOnMongos(session, () => {
     assert.eq(otherColl.find({a: 1}).itcount(), 1);
     createCollAndCRUDInTxn(sessionDB, collName, "insert", true /*explicitCreate*/);
 }, {readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 
 sessionColl.drop({writeConcern: {w: "majority"}});
@@ -67,13 +61,11 @@ assert.eq(otherColl.find({}).itcount(), 1);
 
 jsTest.log("Testing createIndexes in a transaction with local readConcern, with other " +
            "operations preceeding it");
-session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+withTxnAndAutoRetryOnMongos(session, () => {
     assert.eq(otherColl.find({a: 1}).itcount(), 1);
     createIndexAndCRUDInTxn(
         sessionDB, collName, false /*explicitCollCreate*/, false /*multikeyIndex*/);
 }, {readConcern: {level: "local"}, writeConcern: {w: "majority"}});
-assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(sessionColl.find({}).itcount(), 1);
 assert.eq(sessionColl.getIndexes().length, 2);
 

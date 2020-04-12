@@ -28,9 +28,6 @@ const sessionColl = sessionDb.getCollection(collName);
 const session2 = testDB.getMongo().startSession(sessionOptions);
 const session2Db = session2.getDatabase(dbName);
 const session2Coll = session2Db.getCollection(collName);
-const txnOptions = {
-    writeConcern: {w: "majority"}
-};
 
 jsTest.log("Prepopulate the collection.");
 assert.commandWorked(
@@ -42,23 +39,18 @@ assert.commandWorked(
 const expectedDocs = [{_id: 0}, {_id: 1}, {_id: 2}];
 
 jsTestLog("Start a read-only transaction on the first session.");
-session.startTransaction(txnOptions);
+session.startTransaction({writeConcern: {w: "majority"}});
 
 assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
 jsTestLog("Start a transaction on the second session that modifies the same collection.");
 session2.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
-// TODO (SERVER-39704): We use the retryOnceOnTransientAndRestartTxnOnMongos
-// function to handle how MongoS will propagate a StaleShardVersion error as a
-// TransientTransactionError. After SERVER-39704 is completed the
-// retryOnceOnTransientAndRestartTxnOnMongos can be removed
 retryOnceOnTransientAndRestartTxnOnMongos(session2, () => {
     assert.commandWorked(session2Coll.insert({_id: 3}));
-}, txnOptions);
-
-assert.commandWorked(session2Coll.update({_id: 1}, {$set: {a: 1}}));
-assert.commandWorked(session2Coll.deleteOne({_id: 2}));
+    assert.commandWorked(session2Coll.update({_id: 1}, {$set: {a: 1}}));
+    assert.commandWorked(session2Coll.deleteOne({_id: 2}));
+}, {readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
 jsTestLog(
     "Continue reading in the first transaction. Changes from the second transaction should not be visible.");

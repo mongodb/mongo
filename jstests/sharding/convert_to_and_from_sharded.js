@@ -62,10 +62,6 @@ for (var x = 0; x < NUM_NODES; x++) {
 replShard.awaitNodesAgreeOnPrimary();
 assert.commandWorked(st.s.adminCommand({addShard: replShard.getURL()}));
 
-priConn = replShard.getPrimary();
-checkBasicCRUD(priConn.getDB('test').unsharded);
-checkBasicCRUD(priConn.getDB('test').sharded);
-
 checkBasicCRUD(st.s.getDB('test').unsharded);
 checkBasicCRUD(st.s.getDB('test').sharded);
 
@@ -111,9 +107,6 @@ checkBasicCRUD(st.s.getDB('test').unsharded);
 checkBasicCRUD(st.s.getDB('test').sharded);
 
 st.stop();
-
-checkBasicCRUD(priConn.getDB('test').unsharded);
-checkBasicCRUD(priConn.getDB('test').sharded);
 
 jsTest.log('About to restart repl w/o shardsvr');
 
