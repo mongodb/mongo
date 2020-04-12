@@ -37,13 +37,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
-
-using std::string;
-using std::unique_ptr;
-
 namespace {
 
 class CheckShardingIndex : public ErrmsgCommandDeprecated {
@@ -54,7 +49,7 @@ public:
         return "Internal command.\n";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -62,15 +57,15 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
@@ -78,7 +73,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& jsobj,
                    std::string& errmsg,
-                   BSONObjBuilder& result) {
+                   BSONObjBuilder& result) override {
         const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
 
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
@@ -93,8 +88,6 @@ public:
         }
 
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow_DEPRECATED(opCtx);
-
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
             errmsg = "ns not found";
