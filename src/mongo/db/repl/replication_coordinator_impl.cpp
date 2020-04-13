@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 #include <functional>
 #include <limits>
 
@@ -145,6 +146,8 @@ ServerStatusMetricField<Counter64> displayUserOpsKilled("repl.stateTransition.us
 Counter64 userOpsRunning;
 ServerStatusMetricField<Counter64> displayUserOpsRunning(
     "repl.stateTransition.userOperationsRunning", &userOpsRunning);
+
+using namespace fmt::literals;
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -3257,7 +3260,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         return Status(
             ErrorCodes::NotMaster,
             str::stream()
-                << "replSetReconfig should only be run on a writable PRIMARY. Current state is "
+                << "Safe reconfig is only allowed on a writable PRIMARY. Current state is "
                 << _getMemberState_inlock().toString());
     }
     auto topCoordTerm = _topCoord->getTerm();
@@ -3481,6 +3484,13 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx,
                                                          bool waitForOplogCommitment) {
     stdx::unique_lock<Latch> lk(_mutex);
+    // Check writable primary before waiting.
+    if (!_readWriteAbility->canAcceptNonLocalWrites(lk)) {
+        return {
+            ErrorCodes::PrimarySteppedDown,
+            "replSetReconfig should only be run on a writable PRIMARY. Current state {};"_format(
+                _memberState.toString())};
+    }
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
     OpTime fakeOpTime(Timestamp(1, 1), _topCoord->getTerm());
@@ -3491,17 +3501,18 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     LOGV2(4508702, "Waiting for the current config to propagate to a majority of nodes.");
     StatusAndDuration configAwaitStatus =
         awaitReplication(opCtx, fakeOpTime, _getConfigReplicationWriteConcern());
-    if (!configAwaitStatus.status.isOK()) {
-        std::stringstream ss;
-        ss << "Current config with " << currConfig.getConfigVersionAndTerm().toString()
-           << " has not yet propagated to a majority of nodes";
-        return configAwaitStatus.status.withContext(ss.str());
-    }
 
     logv2::DynamicAttributes attr;
     attr.add("configVersion", currConfig.getConfigVersion());
     attr.add("configTerm", currConfig.getConfigTerm());
     attr.add("configWaitDuration", configAwaitStatus.duration);
+    if (!configAwaitStatus.status.isOK()) {
+        LOGV2_WARNING(4714200, "Current config hasn't propagated to a majority of nodes", attr);
+        std::stringstream ss;
+        ss << "Current config with " << currConfig.getConfigVersionAndTerm().toString()
+           << " has not yet propagated to a majority of nodes";
+        return configAwaitStatus.status.withContext(ss.str());
+    }
 
     if (!waitForOplogCommitment) {
         LOGV2(4689401, "Propagated current replica set config to a majority of nodes", attr);
@@ -3516,7 +3527,12 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
           "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
     StatusAndDuration oplogAwaitStatus =
         awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);
+    attr.add("oplogWaitDuration", oplogAwaitStatus.duration);
+    attr.add("configOplogCommitmentOpTime", configOplogCommitmentOpTime);
     if (!oplogAwaitStatus.status.isOK()) {
+        LOGV2_WARNING(4714201,
+                      "Last committed optime in previous config isn't committed in current config",
+                      attr);
         std::stringstream ss;
         ss << "Last committed optime in the previous config ("
            << configOplogCommitmentOpTime.toString()
@@ -3524,8 +3540,6 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
            << currConfig.getConfigVersionAndTerm().toString();
         return oplogAwaitStatus.status.withContext(ss.str());
     }
-    attr.add("oplogWaitDuration", oplogAwaitStatus.duration);
-    attr.add("configOplogCommitmentOpTime", configOplogCommitmentOpTime);
     LOGV2(4508701, "The current replica set config is committed", attr);
     return Status::OK();
 }
