@@ -130,6 +130,15 @@ var doTest = function(signal) {
         assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
     });
 
+    t.reIndex();
+
+    replTest.waitForAllIndexBuildsToFinish('foo', 'foo');
+
+    db.getLastError(3, 30000);
+    ts.forEach(function(z) {
+        assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
+    });
+
     // Shut down the set and finish the test.
     replTest.stopSet(signal);
 };

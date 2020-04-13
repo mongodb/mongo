@@ -420,11 +420,7 @@ let viewsCommandTests = {
     refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
     reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
     refreshSessions: {skip: isUnrelated},
-    reIndex: {
-        command: {reIndex: "view"},
-        expectFailure: true,
-        expectedErrorCode: [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
-    },
+    reIndex: {command: {reIndex: "view"}, expectFailure: true},
     removeShard: {skip: isUnrelated},
     removeShardFromZone: {skip: isUnrelated},
     renameCollection: [

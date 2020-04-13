@@ -12,10 +12,10 @@ t.ensureIndex({b: 1}, true);
 t.ensureIndex({c: 1}, [false, "cIndex"]);
 
 checkIndexes = function(num) {
-    const indexes = t.getIndexes();
+    var indexes = t.getIndexes();
     assert.eq(4, indexes.length);
 
-    let start = 0;
+    var start = 0;
     if (indexes[0].name == "_id_")
         start = 1;
     assert(!indexes[start].unique, "A" + num);
@@ -25,24 +25,8 @@ checkIndexes = function(num) {
 };
 
 checkIndexes(1);
-
-// The reIndex command is only supported in standalone mode.
-const isStandalone = !db.runCommand({isMaster: 1}).hasOwnProperty('setName');
-if (isStandalone) {
-    t.reIndex();
-    checkIndexes(2);
-}
-
-const indexes = t.getIndexes();
-assert.eq(4, indexes.length);
-
-let start = 0;
-if (indexes[0].name == "_id_")
-    start = 1;
-assert(!indexes[start].unique, "A");
-assert(indexes[start + 1].unique, "B " + tojson(indexes[start + 1]));
-assert(!indexes[start + 2].unique, "C");
-assert.eq("cIndex", indexes[start + 2].name, "D");
+t.reIndex();
+checkIndexes(2);
 
 t.save({a: 2, b: 1});
 t.save({a: 2});
