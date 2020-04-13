@@ -466,8 +466,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         if (isBackgroundBuilding()) {
             opCtx->lockState()->restoreLockState(opCtx, lockInfo);
             opCtx->recoveryUnit()->abandonSnapshot();
-            return Status(ErrorCodes::OperationFailed,
-                          "background index build aborted due to failpoint");
         } else {
             invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for foreground index builds");
         }

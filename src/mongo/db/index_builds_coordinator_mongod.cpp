@@ -630,12 +630,12 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIs
     return nextAction;
 }
 
-Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    Timestamp commitIndexBuildTimestamp;
-
+void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions) {
     LOGV2(3856203,
-          "Index build waiting for next action before completing final phase: {buildUUID}",
+          "Index build waiting for next action before completing final phase",
           "buildUUID"_attr = replState->buildUUID);
 
     while (true) {
@@ -647,97 +647,75 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
         const auto nextAction = _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
 
         LOGV2(3856204,
-              "Index build received signal for build uuid: {buildUUID} , action: {action}",
+              "Index build received signal",
               "buildUUID"_attr = replState->buildUUID,
               "action"_attr = _indexBuildActionToString(nextAction));
 
+        // If the index build was aborted, this serves as a final interruption point. Since the
+        // index builder thread is interrupted before the action is set, this must fail if the build
+        // was aborted.
+        opCtx->checkForInterrupt();
+
         bool needsToRetryWait = false;
 
-        // Reacquire RSTL lock to check replication state.
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
-
-        stdx::unique_lock<Latch> lk(replState->mutex);
         switch (nextAction) {
-            case IndexBuildAction::kNoAction:
-                break;
-            case IndexBuildAction::kOplogCommit:
+            case IndexBuildAction::kOplogCommit: {
                 invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-
-                // Sanity check
-                // This signal can be received during primary (drain phase), secondary,
-                // startup( startup recovery) and startup2 (initial sync).
-                invariant(!isMaster && replState->indexBuildState.isCommitPrepared(),
-                          str::stream()
-                              << "Index build: " << replState->buildUUID
-                              << ",  index build state: " << replState->indexBuildState.toString());
                 invariant(replState->indexBuildState.getTimestamp(),
                           replState->buildUUID.toString());
-                // set the commit timestamp
-                commitIndexBuildTimestamp = replState->indexBuildState.getTimestamp().get();
                 LOGV2(3856205,
-                      "Committing index build",
+                      "Committing index build from oplog entry",
                       "buildUUID"_attr = replState->buildUUID,
                       "commitTimestamp"_attr = replState->indexBuildState.getTimestamp().get(),
                       "collectionUUID"_attr = replState->collectionUUID);
                 break;
-            case IndexBuildAction::kOplogAbort:
-                invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-                // Sanity check
-                // This signal can be received during primary (drain phase), secondary,
-                // startup( startup recovery) and startup2 (initial sync).
-                invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
-                invariant(replState->indexBuildState.isAborted(),
-                          str::stream()
-                              << "Index build: " << replState->buildUUID
-                              << ",  index build state: " << replState->indexBuildState.toString());
-                invariant(replState->indexBuildState.getTimestamp() &&
-                              replState->indexBuildState.getAbortReason(),
-                          replState->buildUUID.toString());
-                // The calling thread will interrupt our OperationContext and we will exit.
-                LOGV2(3856206,
-                      "Aborting index build",
-                      "buildUUID"_attr = replState->buildUUID,
-                      "abortTimestamp"_attr = replState->indexBuildState.getTimestamp().get(),
-                      "abortReason"_attr = replState->indexBuildState.getAbortReason().get(),
-                      "collectionUUID"_attr = replState->collectionUUID);
+            }
+            case IndexBuildAction::kCommitQuorumSatisfied: {
+                invariant(!replState->indexBuildState.getTimestamp());
                 break;
-            case IndexBuildAction::kRollbackAbort:
-                invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-                invariant(replCoord->getMemberState().rollback());
-                // The calling thread will interrupt our OperationContext and we will exit.
-                break;
-            case IndexBuildAction::kPrimaryAbort:
-                // The thread aborting a two-phase index build must hold the RSTL so that the
-                // replication state does not change. They will interrupt our OperationContext and
-                // we will exit. Single-phase builds do not replicate abort oplog entries.  We do
-                // not need to be primary to abort the index build, and we must continue aborting
-                // even in the event of a state transition because this build will not receive
-                // another signal.
-                invariant(isMaster || IndexBuildProtocol::kSinglePhase == replState->protocol,
-                          str::stream()
-                              << "isMaster: " << isMaster << ", singlePhase: "
-                              << (IndexBuildProtocol::kSinglePhase == replState->protocol));
-                break;
-            case IndexBuildAction::kCommitQuorumSatisfied:
-                if (!isMaster) {
-                    // Reset the promise as the node has stepped down,
-                    // wait for the new primary to coordinate the index build and send the new
-                    // signal/action.
-                    LOGV2(3856207,
-                          "No longer primary, so will be waiting again for next action before "
-                          "completing final phase: {buildUUID}",
-                          "buildUUID"_attr = replState->buildUUID);
-                    replState->waitForNextAction =
-                        std::make_unique<SharedPromise<IndexBuildAction>>();
-                    needsToRetryWait = true;
-                }
-                break;
+            }
             case IndexBuildAction::kSinglePhaseCommit:
                 invariant(replState->protocol == IndexBuildProtocol::kSinglePhase);
+                break;
+            case IndexBuildAction::kOplogAbort:
+            case IndexBuildAction::kRollbackAbort:
+            case IndexBuildAction::kPrimaryAbort:
+                // The calling thread should have interrupted us before signaling an abort action.
+                LOGV2_FATAL(4698901, "Index build abort should have interrupted this operation");
+            case IndexBuildAction::kNoAction:
+                return;
+        }
+
+        Timestamp commitTimestamp = replState->indexBuildState.getTimestamp()
+            ? replState->indexBuildState.getTimestamp().get()
+            : Timestamp();
+
+        auto result = _insertKeysFromSideTablesAndCommit(
+            opCtx, replState, nextAction, indexBuildOptions, commitTimestamp);
+        switch (result) {
+            case CommitResult::kNoLongerPrimary:
+                invariant(nextAction != IndexBuildAction::kOplogCommit);
+                // Reset the promise as the node has stepped down. Wait for the new primary to
+                // coordinate the index build and send the new signal/action.
+                LOGV2(3856207,
+                      "No longer primary while attempting to commit. Waiting again for next action "
+                      "before completing final phase",
+                      "buildUUID"_attr = replState->buildUUID);
+                {
+                    stdx::unique_lock<Latch> lk(replState->mutex);
+                    replState->waitForNextAction =
+                        std::make_unique<SharedPromise<IndexBuildAction>>();
+                }
+                needsToRetryWait = true;
+                break;
+            case CommitResult::kLockTimeout:
+                LOGV2(4698900,
+                      "Unable to acquire RSTL for commit within deadline. Releasing locks and "
+                      "trying again",
+                      "buildUUID"_attr = replState->buildUUID);
+                needsToRetryWait = true;
+                break;
+            case CommitResult::kSuccess:
                 break;
         }
 
@@ -745,7 +723,6 @@ Timestamp IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
             break;
         }
     }
-    return commitIndexBuildTimestamp;
 }
 
 Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,

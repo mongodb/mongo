@@ -81,10 +81,10 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}
 
-Timestamp IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildAction(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    return Timestamp();
-}
+void IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildActionAndCommit(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions) {}
 
 void IndexBuildsCoordinatorEmbedded::setSignalAndCancelVoteRequestCbkIfActive(
     WithLock ReplIndexBuildStateLk,

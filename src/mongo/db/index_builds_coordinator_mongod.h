@@ -155,8 +155,9 @@ private:
     IndexBuildAction _drainSideWritesUntilNextActionIsAvailable(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) override;
 
-    Timestamp _waitForNextIndexBuildAction(OperationContext* opCtx,
-                                           std::shared_ptr<ReplIndexBuildState> replState) override;
+    void _waitForNextIndexBuildActionAndCommit(OperationContext* opCtx,
+                                               std::shared_ptr<ReplIndexBuildState> replState,
+                                               const IndexBuildOptions& indexBuildOptions) override;
 
     // Thread pool on which index builds are run.
     ThreadPool _threadPool;
