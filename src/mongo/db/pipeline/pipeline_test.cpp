@@ -1969,7 +1969,6 @@ TEST(PipelineOptimizationTest, MatchGetsPushedIntoBothChildrenOfUnion) {
 
     // Test that the $match can get pulled forward from after the $unionWith to inside, then to the
     // beginning of a $unionWith subpipeline.
-    // TODO: SERVER-45535 the explained inner pipeline should have the 'sortKey' form for $sort.
     assertPipelineOptimizesAndSerializesTo(
         "["
         " {$unionWith: {"
