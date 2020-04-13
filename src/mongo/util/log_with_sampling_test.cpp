@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
 
@@ -36,137 +36,77 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/log_global_settings.h"
 #include "mongo/util/log_with_sampling.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
 
-
-TEST(LogWithSamplingTest, ShouldLogCorrectlyWhenSampleRateIsSet) {
+/**
+ *  Get the relevant parts of the environment into a specified state, run
+ *  shouldLogSlowOpWithSampling(...) once, then restore the enviroment's state.
+ *
+ * `debugLogEnabled`: Select whether to log debug messages.
+ *     Unless we're logging debug messages, we should only log the op if it's slow.
+ *
+ * `slowOp`: whether to simulate a slow op or a fast op relative to the test's chosen
+ *     threshold of 10 milliseconds.
+ *
+ * `forceSample`: Set the slow op sampleRate to 0% or 100% to force sampled or not sampled op.
+ */
+auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
+    static const logv2::LogComponent component = logv2::LogComponent::kDefault;
     const auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("log_with_sampling_test");
     const auto opCtx = client->makeOperationContext();
 
-    const auto slowOpThresholdMS = Milliseconds(10);
+    auto loggedSeverityGuard = MinimumLoggedSeverityGuard(
+        component, debugLogEnabled ? logv2::LogSeverity::Debug(1) : logv2::LogSeverity::Info());
 
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
-    // Set sample rate to always profile a slow operation.
-    serverGlobalParams.sampleRate = 1;
+    auto sampleRateGuard = makeGuard(
+        [savedRate = serverGlobalParams.sampleRate] { serverGlobalParams.sampleRate = savedRate; });
+    serverGlobalParams.sampleRate = forceSample ? 1.0 : 0.0;
 
-    // Reset sample rate to the original value after the test exits.
-    ON_BLOCK_EXIT([originalSampleRate] { serverGlobalParams.sampleRate = originalSampleRate; });
-
-    // Set the op duration to be greater than slowOpThreshold so that the op is considered slow.
-    const auto slowOpDurationMS = Milliseconds(11);
-    // Set verbosity level of operation component to info so that it doesn't log due to the log
-    // level.
-    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Info());
-
-    bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
-
-    // Verify that shouldLogSlowOp is true when the sampleRate is 1.
-    ASSERT_TRUE(shouldLogSlowOp);
-
-    // Verify that shouldSample is true when the sampleRate is 1.
-    ASSERT_TRUE(shouldSample);
-
-    // Set sample rate to never profile a slow operation.
-    serverGlobalParams.sampleRate = 0;
-
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
-
-    // Verify that shouldLogSlowOp is false when the sampleRate is 0.
-    ASSERT_FALSE(shouldLogSlowOp);
-
-    // Verify that shouldSample is false when the sampleRate is 0.
-    ASSERT_FALSE(shouldSample);
+    return shouldLogSlowOpWithSampling(
+        opCtx.get(), component, Milliseconds{slowOp ? 11 : 9}, Milliseconds{10});
 }
 
-TEST(LogWithSamplingTest, ShouldAlwaysLogsWithVerbosityLevelDebug) {
-    const auto serviceContext = ServiceContext::make();
-    const auto client = serviceContext->makeClient("log_with_sampling_test");
-    const auto opCtx = client->makeOperationContext();
-
-    const auto slowOpThresholdMS = Milliseconds(10);
-
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
-    // Set sample rate to always profile a slow operation.
-    serverGlobalParams.sampleRate = 1;
-
-    // Reset sample rate to the original value after the test exits.
-    ON_BLOCK_EXIT([originalSampleRate] { serverGlobalParams.sampleRate = originalSampleRate; });
-
-    // Set the op duration to be greater than slowMS so that the op is considered slow.
-    const auto slowOpDurationMS = Milliseconds(11);
-    // Set verbosity level of operation component to debug so that it should always log.
-    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Debug(1));
-
-    bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
-
-    // Verify that shouldLogSlowOp is true when the op is slow.
-    ASSERT_TRUE(shouldLogSlowOp);
-
-    // Verify that shouldSample should be true when the sampleRate is 1.
-    ASSERT_TRUE(shouldSample);
-
-    // Set sample rate to never profile a slow operation.
-    serverGlobalParams.sampleRate = 0;
-
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, slowOpDurationMS, slowOpThresholdMS);
-
-    // Verify that we should still log even when the sampleRate is 0.
-    ASSERT_TRUE(shouldLogSlowOp);
-
-    // Verify that shouldSample should be false even if shouldLogSlowOp is true.
-    ASSERT_FALSE(shouldSample);
+TEST(LogWithSamplingTest, SlowOpWithoutDebugLogging) {
+    {
+        auto [logSlow, sample] = scenario(false, true, true);
+        ASSERT_TRUE(logSlow) << "should log when sampled";
+        ASSERT_TRUE(sample) << "should sample when sampled";
+    }
+    {
+        auto [logSlow, sample] = scenario(false, true, false);
+        ASSERT_FALSE(logSlow) << "should not log when not sampled";
+        ASSERT_FALSE(sample) << "should not sample when not sampled";
+    }
 }
 
-TEST(LogWithSamplingTest, ShouldNotLogFastOp) {
-    const auto serviceContext = ServiceContext::make();
-    const auto client = serviceContext->makeClient("log_with_sampling_test");
-    const auto opCtx = client->makeOperationContext();
+TEST(LogWithSamplingTest, SlowOpWithDebugLogging) {
+    {
+        auto [logSlow, sample] = scenario(true, true, true);
+        ASSERT_TRUE(logSlow) << "should log when the op is slow.";
+        ASSERT_TRUE(sample) << "should sample when sampled";
+    }
+    {
+        auto [logSlow, sample] = scenario(true, true, false);
+        ASSERT_TRUE(logSlow) << "should still log even when not sampled";
+        ASSERT_FALSE(sample) << "should not sample even if should log";
+    }
+}
 
-    const auto slowOpThresholdMS = Milliseconds(10);
-
-    const auto originalSampleRate = serverGlobalParams.sampleRate;
-    // Set sample rate to always profile a slow operation.
-    serverGlobalParams.sampleRate = 1;
-
-    // Reset sample rate to the original value after the test exits.
-    ON_BLOCK_EXIT([originalSampleRate] { serverGlobalParams.sampleRate = originalSampleRate; });
-
-    // Set the op duration to be less than than slowOpThreshold so that the op is considered fast.
-    const auto fastOpDurationMS = Milliseconds(9);
-    // Set verbosity level of operation component to info so that it doesn't log due to the log
-    // level.
-    setMinimumLoggedSeverity(MongoLogV2DefaultComponent_component, logv2::LogSeverity::Info());
-
-    bool shouldLogSlowOp, shouldSample;
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, fastOpDurationMS, slowOpThresholdMS);
-
-    // Verify that shouldLogSlowOp is false when the op is fast.
-    ASSERT_FALSE(shouldLogSlowOp);
-
-    // Verify that shouldSample is true when the sampleRate is 1.
-    ASSERT_TRUE(shouldSample);
-
-    // Set sample rate to never profile a slow operation.
-    serverGlobalParams.sampleRate = 0;
-
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx.get(), MongoLogV2DefaultComponent_component, fastOpDurationMS, slowOpThresholdMS);
-
-    // Verify that we should still not log when the sampleRate is 0.
-    ASSERT_FALSE(shouldLogSlowOp);
-
-    // Verify that shouldSample is false when the sampleRate is 0.
-    ASSERT_FALSE(shouldSample);
+TEST(LogWithSamplingTest, FastOpWithoutDebugLogging) {
+    {
+        auto [logSlow, sample] = scenario(false, false, true);
+        ASSERT_FALSE(logSlow) << "should not log when the op is fast.";
+        ASSERT_TRUE(sample) << "should sample when sampled";
+    }
+    {
+        auto [logSlow, sample] = scenario(false, false, false);
+        ASSERT_FALSE(logSlow) << "should not log when not sampled";
+        ASSERT_FALSE(sample) << "should not sample when not sampled";
+    }
 }
 
 }  // namespace
