@@ -302,6 +302,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * be replicated to all nodes and should not be rolled back.
      */
     this.transitionToSteadyStateOperations = function({skipDataConsistencyChecks = false} = {}) {
+        const start = new Date();
         // Ensure rollback completes before reconnecting tiebreaker.
         //
         // 1. Wait for the rollback node to be SECONDARY; this either waits for rollback to finish
@@ -373,7 +374,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Now that awaitReplication and checkDataConsistency are done, stop replication again so
         // tiebreakerNode is never part of w: majority writes, see comment at top.
         stopServerReplication(tiebreakerNode);
-
+        log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return curPrimary;
     };
 
@@ -382,6 +383,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * that subsequent operations on it will eventually be rolled back.
      */
     this.transitionToRollbackOperations = function() {
+        const start = new Date();
+
         // Ensure previous operations are replicated to the secondary that will be used as the sync
         // source later on. It must be up-to-date to prevent any previous operations from being
         // rolled back.
@@ -405,7 +408,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // We go through this phase every time a rollback occurs.
         doneConsistencyChecks = false;
-
+        log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return curPrimary;
     };
 
@@ -416,6 +419,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * rolled back.
      */
     this.transitionToSyncSourceOperationsBeforeRollback = function() {
+        const start = new Date();
+
         transitionIfAllowed(State.kSyncSourceOpsBeforeRollback);
 
         // Insert one document to ensure rollback will not be skipped.
@@ -468,6 +473,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
 
+        log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         // The current primary, which is the old secondary, will later become the sync source.
         return curPrimary;
     };
@@ -482,6 +488,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * provide a way to test this behavior, even if it's non-deterministic.
      */
     this.transitionToSyncSourceOperationsDuringRollback = function() {
+        const start = new Date();
         transitionIfAllowed(State.kSyncSourceOpsDuringRollback);
 
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
@@ -490,16 +497,19 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // node may choose the tiebreaker.
         curSecondary.reconnect([curPrimary]);
 
+        log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return curPrimary;
     };
 
     this.stop = function(checkDataConsistencyOptions) {
+        const start = new Date();
         restartServerReplication(tiebreakerNode);
         rst.awaitReplication();
         if (!doneConsistencyChecks) {
             this.checkDataConsistency(checkDataConsistencyOptions);
         }
         transitionIfAllowed(State.kStopped);
+        log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return rst.stopSet(undefined /* signal */,
                            undefined /* forRestart */,
                            {skipCheckDBHashes: true, skipValidation: true});
