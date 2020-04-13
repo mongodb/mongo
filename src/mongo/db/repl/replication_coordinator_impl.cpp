@@ -3443,15 +3443,19 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     // acquire the mutex to advance the commit point.
     _topCoord->updateLastCommittedInPrevConfig();
 
-    // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
-    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
-    //
-    // If the new config has the same content but different version and term, skip it, since
-    // the quorum condition is still the same.
+    // Safe reconfig guarantees that all committed entries are safe, so we can keep our commit
+    // point. One exception is when we change the meaning of the "committed" snapshot from applied
+    // -> durable. We have to drop all snapshots so we don't mistakenly read from the wrong one.
+    auto defaultDurableChanged = oldConfig.getWriteConcernMajorityShouldJournal() !=
+        newConfig.getWriteConcernMajorityShouldJournal();
+    // If the new config has the same content but different version and term, like on stepup, we
+    // don't need to drop snapshots either, since the quorum condition is still the same.
     auto newConfigCopy = newConfig;
     newConfigCopy.setConfigTerm(oldConfig.getConfigTerm());
     newConfigCopy.setConfigVersion(oldConfig.getConfigVersion());
-    if (SimpleBSONObjComparator::kInstance.evaluate(oldConfig.toBSON() != newConfigCopy.toBSON())) {
+    auto contentChanged =
+        SimpleBSONObjComparator::kInstance.evaluate(oldConfig.toBSON() != newConfigCopy.toBSON());
+    if (defaultDurableChanged || (isForceReconfig && contentChanged)) {
         _dropAllSnapshots_inlock();
     }
 
