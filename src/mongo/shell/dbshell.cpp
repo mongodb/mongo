@@ -119,7 +119,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
                                      ("EndStartupOptionSetup"))
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
     return Status::OK();
 }
 

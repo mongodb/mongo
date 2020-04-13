@@ -91,7 +91,7 @@ void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
 }
 
 /**
- * Sets the minimum allowed version for the cluster. If it is 4.2, then the node should not use 4.4
+ * Sets the minimum allowed version for the cluster. If it is 4.4, then the node should not use 4.6
  * features.
  *
  * Format:
@@ -119,11 +119,11 @@ public:
     std::string help() const override {
         using FCVP = FeatureCompatibilityVersionParser;
         std::stringstream h;
-        h << "Set the API version exposed by this node. If set to '" << FCVP::kVersion42
-          << "', then " << FCVP::kVersion44 << " features are disabled. If set to '"
-          << FCVP::kVersion44 << "', then " << FCVP::kVersion44
+        h << "Set the API version exposed by this node. If set to '" << FCVP::kVersion44
+          << "', then " << FCVP::kVersion46 << " features are disabled. If set to '"
+          << FCVP::kVersion46 << "', then " << FCVP::kVersion46
           << " features are enabled, and all nodes in the cluster must be binary version "
-          << FCVP::kVersion44 << ". See "
+          << FCVP::kVersion46 << ". See "
           << feature_compatibility_version_documentation::kCompatibilityLink << ".";
         return h.str();
     }
@@ -181,16 +181,16 @@ public:
         ServerGlobalParams::FeatureCompatibility::Version actualVersion =
             serverGlobalParams.featureCompatibility.getVersion();
 
-        if (requestedVersion == FeatureCompatibilityVersionParser::kVersion44) {
+        if (requestedVersion == FeatureCompatibilityVersionParser::kVersion46) {
             uassert(ErrorCodes::IllegalOperation,
-                    "cannot initiate featureCompatibilityVersion upgrade to 4.4 while a previous "
-                    "featureCompatibilityVersion downgrade to 4.2 has not completed. Finish "
-                    "downgrade to 4.2, then upgrade to 4.4.",
+                    "cannot initiate featureCompatibilityVersion upgrade to 4.6 while a previous "
+                    "featureCompatibilityVersion downgrade to 4.4 has not completed. Finish "
+                    "downgrade to 4.4, then upgrade to 4.6.",
                     actualVersion !=
-                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo44);
 
             if (actualVersion ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
                 // Set the client's last opTime to the system last opTime so no-ops wait for
                 // writeConcern.
                 repl::ReplClientInfo::forClient(opCtx->getClient())
@@ -204,7 +204,7 @@ public:
                 // Take the global lock in S mode to create a barrier for operations taking the
                 // global IX or X locks. This ensures that either
                 //   - The global IX/X locked operation will start after the FCV change, see the
-                //     upgrading to 4.4 FCV and act accordingly.
+                //     upgrading to 4.6 FCV and act accordingly.
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before upgrade procedures begin right after
                 //     this.
@@ -235,15 +235,15 @@ public:
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
-        } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion42) {
+        } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion44) {
             uassert(ErrorCodes::IllegalOperation,
-                    "cannot initiate setting featureCompatibilityVersion to 4.2 while a previous "
-                    "featureCompatibilityVersion upgrade to 4.4 has not completed.",
+                    "cannot initiate setting featureCompatibilityVersion to 4.4 while a previous "
+                    "featureCompatibilityVersion upgrade to 4.6 has not completed.",
                     actualVersion !=
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44);
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46);
 
             if (actualVersion ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44) {
                 // Set the client's last opTime to the system last opTime so no-ops wait for
                 // writeConcern.
                 repl::ReplClientInfo::forClient(opCtx->getClient())

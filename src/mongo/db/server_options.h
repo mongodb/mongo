@@ -165,40 +165,40 @@ struct ServerGlobalParams {
          *
          * The legal enum (and featureCompatibilityVersion document) states are:
          *
-         * kFullyDowngradedTo42
-         * (4.2, Unset): Only 4.2 features are available, and new and existing storage
-         *               engine entries use the 4.2 format
-         *
-         * kUpgradingTo44
-         * (4.2, 4.4): Only 4.2 features are available, but new storage engine entries
-         *             use the 4.4 format, and existing entries may have either the
-         *             4.2 or 4.4 format
-         *
-         * kFullyUpgradedTo44
-         * (4.4, Unset): 4.4 features are available, and new and existing storage
+         * kFullyDowngradedTo44
+         * (4.4, Unset): Only 4.4 features are available, and new and existing storage
          *               engine entries use the 4.4 format
          *
-         * kDowngradingTo42
-         * (4.2, 4.2): Only 4.2 features are available and new storage engine
-         *             entries use the 4.2 format, but existing entries may have
-         *             either the 4.2 or 4.4 format
+         * kUpgradingTo46
+         * (4.4, 4.6): Only 4.4 features are available, but new storage engine entries
+         *             use the 4.6 format, and existing entries may have either the
+         *             4.4 or 4.6 format
          *
-         * kUnsetDefault42Behavior
+         * kFullyUpgradedTo46
+         * (4.6, Unset): 4.6 features are available, and new and existing storage
+         *               engine entries use the 4.6 format
+         *
+         * kDowngradingTo44
+         * (4.4, 4.4): Only 4.4 features are available and new storage engine
+         *             entries use the 4.4 format, but existing entries may have
+         *             either the 4.4 or 4.6 format
+         *
+         * kUnsetDefault44Behavior
          * (Unset, Unset): This is the case on startup before the fCV document is
          *                 loaded into memory. isVersionInitialized() will return
          *                 false, and getVersion() will return the default
-         *                 (kFullyDowngradedTo42).
+         *                 (kFullyDowngradedTo44).
          *
          */
         enum class Version {
             // The order of these enums matter, higher upgrades having higher values, so that
             // features can be active or inactive if the version is higher than some minimum or
             // lower than some maximum, respectively.
-            kUnsetDefault42Behavior = 0,
-            kFullyDowngradedTo42 = 1,
-            kDowngradingTo42 = 2,
-            kUpgradingTo44 = 3,
-            kFullyUpgradedTo44 = 4,
+            kUnsetDefault44Behavior = 0,
+            kFullyDowngradedTo44 = 1,
+            kDowngradingTo44 = 2,
+            kUpgradingTo46 = 3,
+            kFullyUpgradedTo46 = 4,
         };
 
         /**
@@ -206,7 +206,7 @@ struct ServerGlobalParams {
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnsetDefault42Behavior;
+            return _version.load() != Version::kUnsetDefault44Behavior;
         }
 
         /**
@@ -219,7 +219,7 @@ struct ServerGlobalParams {
         }
 
         void reset() {
-            _version.store(Version::kUnsetDefault42Behavior);
+            _version.store(Version::kUnsetDefault44Behavior);
         }
 
         void setVersion(Version version) {
@@ -231,7 +231,7 @@ struct ServerGlobalParams {
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnsetDefault42Behavior};
+        AtomicWord<Version> _version{Version::kUnsetDefault44Behavior};
 
     } featureCompatibility;
 

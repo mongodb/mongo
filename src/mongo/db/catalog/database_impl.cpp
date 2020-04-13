@@ -897,11 +897,11 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         // Save this to a variable to avoid reading the atomic variable multiple times.
         const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
 
-        // If the feature compatibility version is not 4.4, and we are validating features as
-        // master, ban the use of new agg features introduced in 4.4 to prevent them from being
+        // If the feature compatibility version is not 4.6, and we are validating features as
+        // master, ban the use of new agg features introduced in 4.6 to prevent them from being
         // persisted in the catalog.
         if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-            currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+            currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
             expCtx->maxFeatureCompatibilityVersion = currentFCV;
         }
 

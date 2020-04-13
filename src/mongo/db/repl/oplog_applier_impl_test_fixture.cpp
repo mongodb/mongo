@@ -127,7 +127,7 @@ void OplogApplierImplTest::setUp() {
     // test fixture does not create a featureCompatibilityVersion document from which to initialize
     // the server parameter.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
 
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
     // invalid timestamp.

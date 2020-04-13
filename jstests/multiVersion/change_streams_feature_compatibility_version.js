@@ -36,7 +36,8 @@ assert.eq(change.documentKey._id, "first insert, just for resume token", tojson(
 const resumeTokenFromLastStable = change._id;
 
 assert.commandWorked(coll.insert({_id: "before binary upgrade"}));
-// Upgrade the set to the new binary version, but keep the feature compatibility version at 4.0.
+// Upgrade the set to the new binary version, but keep the feature compatibility version at
+// last-stable.
 rst.upgradeSet({binVersion: "latest"});
 testDB = rst.getPrimary().getDB(jsTestName());
 coll = testDB.change_stream_upgrade;
@@ -65,8 +66,8 @@ let resumeTokenFromNewVersionOldFCV;
     }
 });
 
-// Explicitly set feature compatibility version to 4.2.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
+// Explicitly set feature compatibility version to the latest FCV.
+assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
 const streamStartedOnNewVersion = coll.watch();
 

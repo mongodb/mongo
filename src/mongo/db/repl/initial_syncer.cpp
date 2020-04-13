@@ -1082,8 +1082,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     auto version = fCVParseSW.getValue();
 
     // Changing the featureCompatibilityVersion during initial sync is unsafe.
-    if (version > ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42 &&
-        version < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+    if (version > ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44 &&
+        version < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,

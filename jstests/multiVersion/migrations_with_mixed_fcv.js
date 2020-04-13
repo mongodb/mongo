@@ -39,7 +39,7 @@ function testMigrationFailsWhileUpgradingSource() {
 
     let st = setup();
 
-    // Ensure FCV 4.2 on shard0.
+    // Ensure last-stable FCV on shard0.
     assert.commandWorked(st.shard0.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(st.shard0.getDB("admin"), lastStableFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
@@ -66,7 +66,7 @@ function testMigrationFailsWhileDowngradingSource() {
 
     let st = setup();
 
-    // Ensure FCV 4.4 on both shards.
+    // Ensure latest FCV on both shards.
     checkFCV(st.shard0.getDB("admin"), latestFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
@@ -92,7 +92,7 @@ function testMigrationFailsWhileUpgradingDestination() {
 
     let st = setup();
 
-    // Ensure FCV 4.2 on shard1.
+    // Ensure last-stable FCV on shard1.
     assert.commandWorked(
         st.shard1.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(st.shard0.getDB("admin"), latestFCV);
@@ -120,7 +120,7 @@ function testMigrationFailsWhileDowngradingDestination() {
 
     let st = setup();
 
-    // Ensure FCV 4.4 on both shards.
+    // Ensure latest FCV on both shards.
     checkFCV(st.shard0.getDB("admin"), latestFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
@@ -142,7 +142,7 @@ function testMigrationFailsWhileDowngradingDestination() {
 }
 
 function testMigrateFromLastStableToLastStable() {
-    jsTestLog("Test FCV 4.2 -> FCV 4.2");
+    jsTestLog("Test last-stable FCV -> latest FCV");
     let st = setup();
 
     assert.commandWorked(
@@ -158,7 +158,7 @@ function testMigrateFromLastStableToLastStable() {
 }
 
 function testMigrateFromLatestToLastStable() {
-    jsTestLog("Test FCV 4.4 -> FCV 4.2");
+    jsTestLog("Test latest FCV -> last-stable FCV");
     let st = setup();
 
     assert.commandWorked(
@@ -174,7 +174,7 @@ function testMigrateFromLatestToLastStable() {
 }
 
 function testMigrateFromLastStableToLatest() {
-    jsTestLog("Test FCV 4.2 -> FCV 4.4 fail");
+    jsTestLog("Test last-stable FCV -> latest FCV fail");
     let st = setup();
 
     assert.commandWorked(
@@ -182,11 +182,11 @@ function testMigrateFromLastStableToLatest() {
     checkFCV(st.shard0.getDB("admin"), lastStableFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
-    // Move chunk [50, inf) to shard1 should fail. Since shard1 is running FCV 4.4, it expects
-    // _recvChunkStart to include explicit writeConcern. Since shard0 is running FCV 4.2, it will
-    // not add it automatically. So we pass explicit writeConcern to the mongos moveChunk command
-    // (which also requires secondaryThrottle: true), which causes it to be passed through
-    // explicitly to shard0, which will use it when calling _recvChunkStart on shard1
+    // Move chunk [50, inf) to shard1 should fail. Since shard1 is running the latest FCV, it
+    // expects _recvChunkStart to include explicit writeConcern. Since shard0 is running the last
+    // stable FCV, it will not add it automatically. So we pass explicit writeConcern to the mongos
+    // moveChunk command (which also requires secondaryThrottle: true), which causes it to be passed
+    // through explicitly to shard0, which will use it when calling _recvChunkStart on shard1
     assert.commandFailedWithCode(st.s.adminCommand({
         moveChunk: ns,
         find: {x: 50},
@@ -210,7 +210,7 @@ function testSetFCVBlocksWhileMigratingChunk() {
     jsTestLog("Testing that setFCV blocks while migrating a chunk");
     let st = setup();
 
-    // Set config and shards to FCV 4.2
+    // Set config and shards to last-stable FCV
     assert.commandWorked(
         st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 

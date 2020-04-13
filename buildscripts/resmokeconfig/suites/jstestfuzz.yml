@@ -18,7 +18,7 @@ executor:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
           skipValidationOnNamespaceNotFound: false
-          forceValidationWithFeatureCompatibilityVersion: "4.2"
+          forceValidationWithFeatureCompatibilityVersion: "4.4"
   fixture:
     class: MongoDFixture
     mongod_options:

@@ -76,8 +76,8 @@ MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 namespace {
 
 const std::string mustDowngradeErrorMsg = str::stream()
-    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 4.2 before attempting "
-       "an upgrade to 4.4; see "
+    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 4.4 before attempting "
+       "an upgrade to 4.6; see "
     << feature_compatibility_version_documentation::kUpgradeLink << " for more details.";
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
@@ -116,14 +116,15 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                           BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
                           featureCompatibilityVersion)) {
         LOGV2(21000,
-              "Re-creating featureCompatibilityVersion document that was deleted with version "
-              "{FeatureCompatibilityVersionParser_kVersion42}.",
-              "FeatureCompatibilityVersionParser_kVersion42"_attr =
-                  FeatureCompatibilityVersionParser::kVersion42);
+              "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
+              "document with version "
+              "{FeatureCompatibilityVersionParser_kVersion44}.",
+              "FeatureCompatibilityVersionParser_kVersion44"_attr =
+                  FeatureCompatibilityVersionParser::kVersion44);
 
         BSONObj fcvObj = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
                                     << FeatureCompatibilityVersionParser::kVersionField
-                                    << FeatureCompatibilityVersionParser::kVersion42);
+                                    << FeatureCompatibilityVersionParser::kVersion44);
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -556,7 +557,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     auto swVersion =
                         FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion);
                     // Note this error path captures all cases of an FCV document existing,
-                    // but with any value other than "4.2" or "4.4". This includes unexpected
+                    // but with any value other than "4.4" or "4.6". This includes unexpected
                     // cases with no path forward such as the FCV value not being a string.
                     uassert(ErrorCodes::MustDowngrade,
                             str::stream()
@@ -564,7 +565,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                                    "featureCompatibilityVersion document (ERROR: "
                                 << swVersion.getStatus()
                                 << "). If the current featureCompatibilityVersion is below "
-                                   "4.2, see the documentation on upgrading at "
+                                   "4.4, see the documentation on upgrading at "
                                 << feature_compatibility_version_documentation::kUpgradeLink << ".",
                             swVersion.isOK());
 
@@ -573,10 +574,10 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     serverGlobalParams.featureCompatibility.setVersion(version);
                     FeatureCompatibilityVersion::updateMinWireVersion();
 
-                    // On startup, if the version is in an upgrading or downrading state, print a
+                    // On startup, if the version is in an upgrading or downgrading state, print a
                     // warning.
                     if (version ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44) {
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46) {
                         LOGV2_OPTIONS(
                             21011,
                             {logv2::LogTag::kStartupWarnings},
@@ -591,10 +592,10 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                             21013,
                             {logv2::LogTag::kStartupWarnings},
                             "**          To fix this, use the setFeatureCompatibilityVersion "
-                            "command to resume upgrade to 4.4.");
+                            "command to resume upgrade to 4.6.");
                     } else if (version ==
                                ServerGlobalParams::FeatureCompatibility::Version::
-                                   kDowngradingTo42) {
+                                   kDowngradingTo44) {
                         LOGV2_OPTIONS(21014,
                                       {logv2::LogTag::kStartupWarnings},
                                       "** WARNING: A featureCompatibilityVersion downgrade did not "
@@ -609,7 +610,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                             21016,
                             {logv2::LogTag::kStartupWarnings},
                             "**          To fix this, use the setFeatureCompatibilityVersion "
-                            "command to resume downgrade to 4.2.");
+                            "command to resume downgrade to 4.4.");
                     }
                 }
             }

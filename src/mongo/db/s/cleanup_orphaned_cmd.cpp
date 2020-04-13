@@ -80,17 +80,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   std::string* errMsg) {
     FixedFCVRegion fixedFCVRegion(opCtx);
 
-    auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Cannot run cleanupOrphaned while the FCV is upgrading or downgrading",
-            fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42 ||
-                fcvVersion ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
-
     // Note that 'disableResumableRangeDeleter' is a startup-only parameter, so it cannot change
     // while this process is running.
-    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !disableResumableRangeDeleter.load()) {
+    if (!disableResumableRangeDeleter.load()) {
         boost::optional<ChunkRange> range;
         boost::optional<UUID> collectionUuid;
         {

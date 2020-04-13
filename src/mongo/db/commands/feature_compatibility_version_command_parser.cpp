@@ -77,12 +77,12 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
 
     const std::string version = versionElem.String();
 
-    if (version != FeatureCompatibilityVersionParser::kVersion44 &&
-        version != FeatureCompatibilityVersionParser::kVersion42) {
+    if (version != FeatureCompatibilityVersionParser::kVersion46 &&
+        version != FeatureCompatibilityVersionParser::kVersion44) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid command argument. Expected '"
-                              << FeatureCompatibilityVersionParser::kVersion44 << "' or '"
-                              << FeatureCompatibilityVersionParser::kVersion42 << "', found "
+                              << FeatureCompatibilityVersionParser::kVersion46 << "' or '"
+                              << FeatureCompatibilityVersionParser::kVersion44 << "', found "
                               << version << " in: " << cmdObj << ". See "
                               << feature_compatibility_version_documentation::kCompatibilityLink
                               << "."};

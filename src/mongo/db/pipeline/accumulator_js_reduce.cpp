@@ -35,10 +35,7 @@
 
 namespace mongo {
 
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    _internalJsReduce,
-    AccumulatorInternalJsReduce::parseInternalJsReduce,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseInternalJsReduce);
 
 AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONElement elem, VariablesParseState vps) {

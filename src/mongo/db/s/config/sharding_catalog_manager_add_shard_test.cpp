@@ -141,7 +141,7 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
-                                   << "4.4"
+                                   << "4.6"
                                    << "writeConcern" << writeConcern));
 
             return response;

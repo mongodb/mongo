@@ -145,7 +145,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
     }
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42) {
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44) {
         // Only consider downgrading when FCV is set to kFullyDowngraded.
         // (This FCV gate must remain across binary version releases.)
         return false;

@@ -79,9 +79,12 @@ enum WireVersion {
     // Supports resumable initial sync (4.4+).
     RESUMABLE_INITIAL_SYNC = 9,
 
+    // Supports some upcoming feature (4.6+).
+    PLACEHOLDER_FOR_46 = 10,
+
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = RESUMABLE_INITIAL_SYNC,
+    LATEST_WIRE_VERSION = PLACEHOLDER_FOR_46,
 };
 
 /**
