@@ -118,7 +118,7 @@ private:
 
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 
-    AtomicWord<unsigned long long> _oplogReadTimestamp;
+    AtomicWord<unsigned long long> _oplogReadTimestamp{0};
 
     stdx::thread _oplogVisibilityThread;
 

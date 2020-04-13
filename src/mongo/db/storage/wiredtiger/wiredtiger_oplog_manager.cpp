@@ -135,7 +135,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
 
     // Out of order writes to the oplog always call triggerOplogVisibilityUpdate() on commit to
-    // prompt the OplogVisibiilityThread to run and update the oplog visibility. We simply need to
+    // prompt the OplogVisibilityThread to run and update the oplog visibility. We simply need to
     // wait until all of the writes behind and including 'waitingFor' commit so there are no oplog
     // holes.
     opCtx->waitForConditionOrInterrupt(_oplogEntriesBecameVisibleCV, lk, [&] {

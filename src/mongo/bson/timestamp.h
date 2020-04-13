@@ -63,7 +63,7 @@ public:
     explicit Timestamp(Date_t date) : Timestamp(date.toULL()) {}
 
     /**
-     * DEPRECATED Constructor that builds a Timestamp from a 64-bit unsigned integer by using
+     * Constructor that builds a Timestamp from a 64-bit unsigned integer by using
      * the high-order 4 bytes of "v" for the "secs" field and the low-order 4 bytes for the "i"
      * field.
      */

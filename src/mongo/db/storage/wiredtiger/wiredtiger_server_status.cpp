@@ -82,6 +82,12 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
 
     WiredTigerUtil::appendSnapshotWindowSettings(_engine, session, &bob);
 
+    {
+        BSONObjBuilder subsection(bob.subobjStart("oplog"));
+        subsection.append("visibility timestamp",
+                          Timestamp(_engine->getOplogManager()->getOplogReadTimestamp()));
+    }
+
     return bob.obj();
 }
 
