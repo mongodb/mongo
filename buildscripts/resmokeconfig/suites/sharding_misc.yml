@@ -161,7 +161,7 @@ selector:
   - jstests/sharding/multi_mongos2.js
   - jstests/sharding/query/cursor_timeout.js
   - jstests/sharding/query/geo_near_sharded.js
-  - jstests/sharding/findandmodify2.js
+  - jstests/sharding/findandmodify_autosplit.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/coll_epoch_test2.js
   - jstests/sharding/cursor1.js
