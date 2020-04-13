@@ -46,7 +46,6 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -447,26 +446,21 @@ public:
 
         auto status = replCoord->processReplSetReconfig(opCtx, parsedArgs, &result);
 
-        {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            // Make sure we are primary before doing noop write.
-            if (status.isOK() && !parsedArgs.force &&
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-                const auto service = opCtx->getServiceContext();
-                Lock::GlobalLock globalLock(opCtx, MODE_IX);
-                writeConflictRetry(opCtx, "replSetReconfig", kReplSetReconfigNss, [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    // Users must not be allowed to provide their own contents for the o2 field.
-                    // o2 field of no-ops is supposed to be used internally.
+        if (status.isOK() && !parsedArgs.force) {
+            const auto service = opCtx->getServiceContext();
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+            writeConflictRetry(opCtx, "replSetReconfig", kReplSetReconfigNss, [&] {
+                WriteUnitOfWork wuow(opCtx);
+                // Users must not be allowed to provide their own contents for the o2 field.
+                // o2 field of no-ops is supposed to be used internally.
 
-                    service->getOpObserver()->onOpMessage(
-                        opCtx,
-                        BSON("msg"
-                             << "Reconfig set"
-                             << "version" << parsedArgs.newConfigObj["version"]));
-                    wuow.commit();
-                });
-            }
+                service->getOpObserver()->onOpMessage(opCtx,
+                                                      BSON("msg"
+                                                           << "Reconfig set"
+                                                           << "version"
+                                                           << parsedArgs.newConfigObj["version"]));
+                wuow.commit();
+            });
         }
 
         uassertStatusOK(status);
