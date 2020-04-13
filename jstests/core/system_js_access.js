@@ -4,8 +4,10 @@
 (function() {
 "use strict";
 
-const coll = db.system_js_access;
+const testDB = db.getSiblingDB('system_js_access');
+const coll = testDB.system_js_access;
 coll.drop();
+testDB.system.js.deleteMany({});
 
 assert.commandWorked(coll.insert([
     {"name": "Alice", "age": 68},
@@ -17,7 +19,7 @@ assert.commandWorked(coll.insert([
 ]));
 
 // Store JS function in database.
-assert.commandWorked(db.system.js.insert({
+assert.commandWorked(testDB.system.js.insert({
     _id: "isAdult",
     value: function(age) {
         return age >= 21;
@@ -25,10 +27,11 @@ assert.commandWorked(db.system.js.insert({
 }));
 
 // $where can access stored functions.
-assert.commandWorked(db.runCommand({find: coll.getName(), filter: {$where: "isAdult(this.age)"}}));
+assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$where: "isAdult(this.age)"}}));
 
 // $function cannot access stored functions.
-assert.commandFailedWithCode(db.runCommand({
+assert.commandFailedWithCode(testDB.runCommand({
     aggregate: coll.getName(),
     pipeline:
         [{$addFields: {isAdult: {$function: {body: "isAdult(age)", args: ["$age"], lang: "js"}}}}],
@@ -37,7 +40,7 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.JSInterpreterFailure);
 
 // The same function specified in-line can be executed by $function.
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     aggregate: coll.getName(),
     pipeline: [{
         $match: {
@@ -57,7 +60,7 @@ assert.commandWorked(db.runCommand({
 
 // Mixed queries with both $where and $function should fail, because $where has to provide system.js
 // to user code, and $function has to not provide it.
-assert.commandFailedWithCode(db.runCommand({
+assert.commandFailedWithCode(testDB.runCommand({
     find: coll.getName(),
     filter: {
         $and: [
@@ -80,7 +83,7 @@ assert.commandFailedWithCode(db.runCommand({
 
 // Queries with both $function and $accumulator should succeed, because both of these operators
 // provide system.js to user code.
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     aggregate: coll.getName(),
     pipeline: [
         {
@@ -119,6 +122,4 @@ assert.commandWorked(db.runCommand({
     ],
     cursor: {}
 }));
-
-assert.commandWorked(db.system.js.remove({_id: "isAdult"}));
 }());
