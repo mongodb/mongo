@@ -133,6 +133,33 @@ TEST_F(ReadThroughCacheTest, CacheSizeZero) {
     }
 }
 
+TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
+    int countLookups = 0;
+    CacheWithThreadPool cache(
+        getServiceContext(), 0, [&](OperationContext*, const std::string& key) {
+            ASSERT_EQ("TestKey", key);
+            countLookups++;
+
+            return CachedValue{1000 * countLookups};
+        });
+
+    auto value = cache.acquire(_opCtx, "TestKey");
+    ASSERT(value);
+    ASSERT_EQ(1000, value->counter);
+    ASSERT_EQ(1, countLookups);
+
+    // Because 'value' above is held alive, the cache will not perform lookup until it is destroyed
+    ASSERT_EQ(1000, cache.acquire(_opCtx, "TestKey")->counter);
+    ASSERT_EQ(1, countLookups);
+
+    cache.invalidate("TestKey");
+    auto valueAfterInvalidate = cache.acquire(_opCtx, "TestKey");
+    ASSERT(!value.isValid());
+    ASSERT(valueAfterInvalidate);
+    ASSERT_EQ(2000, valueAfterInvalidate->counter);
+    ASSERT_EQ(2, countLookups);
+}
+
 TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
     CacheWithThreadPool cache(
         getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
