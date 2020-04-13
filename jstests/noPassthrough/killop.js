@@ -11,22 +11,26 @@ const collName = "test";
 // a sharded cluster. 'shardConn' is a connection to the mongod we enable failpoints on.
 function runTest(conn, shardConn) {
     const db = conn.getDB(dbName);
-    assert.commandWorked(db.dropDatabase());
-    assert.commandWorked(db.getCollection(collName).insert({x: 1}));
 
     assert.commandWorked(
         shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     assert.commandWorked(
         shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
 
+    const findComment = "unique_find_comment";
     const queryToKill = "assert.commandWorked(db.getSiblingDB('" + dbName +
-        "').runCommand({find: '" + collName + "', filter: {x: 1}}));";
+        "').runCommand({find: '" + collName + "', filter: {x: 1}, comment: '" + findComment +
+        "'}));";
     const awaitShell = startParallelShell(queryToKill, conn.port);
     let opId;
 
+    const curOpFilter = {
+        "ns": dbName + "." + collName,
+        "command.comment": findComment,
+    };
     assert.soon(
         function() {
-            const result = db.currentOp({"ns": dbName + "." + collName, "command.filter": {x: 1}});
+            const result = db.currentOp(curOpFilter);
             assert.commandWorked(result);
             if (result.inprog.length === 1 && result.inprog[0].numYields > 0) {
                 opId = result.inprog[0].opid;
@@ -42,7 +46,7 @@ function runTest(conn, shardConn) {
 
     assert.commandWorked(db.killOp(opId));
 
-    let result = db.currentOp({"ns": dbName + "." + collName, "command.filter": {x: 1}});
+    let result = db.currentOp(curOpFilter);
     assert.commandWorked(result);
     assert(result.inprog.length === 1, tojson(db.currentOp()));
     assert(result.inprog[0].hasOwnProperty("killPending"));
@@ -54,13 +58,16 @@ function runTest(conn, shardConn) {
     const exitCode = awaitShell({checkExitSuccess: false});
     assert.neq(0, exitCode, "Expected shell to exit with failure due to operation kill");
 
-    result = db.currentOp({"ns": dbName + "." + collName, "query.filter": {x: 1}});
+    result = db.currentOp(curOpFilter);
     assert.commandWorked(result);
     assert(result.inprog.length === 0, tojson(db.currentOp()));
 }
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 const shardConn = st.rs0.getPrimary();
+
+// Create the unsharded collection.
+assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({x: 1}));
 
 // Test killOp against mongod.
 runTest(shardConn, shardConn);
