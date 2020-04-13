@@ -3387,14 +3387,26 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     }
 
     LOGV2(51814, "Persisting new config to disk");
-    status = _externalState->storeLocalConfigDocument(opCtx, newConfig.toBSON());
-    if (!status.isOK()) {
-        LOGV2_ERROR(21422,
-                    "replSetReconfig failed to store config document; {error}",
-                    "replSetReconfig failed to store config document",
-                    "error"_attr = status);
-        return status;
+    {
+        Lock::GlobalLock globalLock(opCtx, LockMode::MODE_IX);
+        if (!force && !_readWriteAbility->canAcceptNonLocalWrites(opCtx)) {
+            return {ErrorCodes::NotMaster, "Stepped down when persisting new config"};
+        }
+
+        // Don't write no-op for internal and external force reconfig.
+        // For non-force reconfig, we are guaranteed the node is a writable primary.
+        status = _externalState->storeLocalConfigDocument(
+            opCtx, newConfig.toBSON(), !force /* writeOplog */);
+        if (!status.isOK()) {
+            LOGV2_ERROR(21422,
+                        "replSetReconfig failed to store config document; {error}",
+                        "replSetReconfig failed to store config document",
+                        "error"_attr = status);
+            return status;
+        }
     }
+    // Wait for durability of the new config document.
+    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
 
     configStateGuard.dismiss();
     _finishReplSetReconfig(opCtx, newConfig, force, myIndex.getValue());

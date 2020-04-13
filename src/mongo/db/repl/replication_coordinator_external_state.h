@@ -164,10 +164,12 @@ public:
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) = 0;
 
     /**
-     * Stores the replica set config document in local storage, or returns an error.
+     * Stores the replica set config document in local storage and writes a no-op in the oplog, or
+     * returns an error.
      */
-    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
-
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx,
+                                            const BSONObj& config,
+                                            bool writeOplog) = 0;
 
     /**
      * Creates the collection for "lastVote" documents and initializes it, or returns an error.

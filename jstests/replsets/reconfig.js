@@ -23,6 +23,14 @@ printjson(config);
 config.version++;
 config.members[nodes.indexOf(primary)].priority = 2;
 assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}));
+// Successful reconfig writes a no-op into the oplog.
+const expectedNoOp = {
+    op: "n",
+    o: {msg: "Reconfig set", version: config.version}
+};
+const primaryOplog = primary.getDB("local")['oplog.rs'];
+const lastOp = primaryOplog.find(expectedNoOp).sort({'$natural': -1}).limit(1).toArray();
+assert(lastOp.length > 0);
 replTest.awaitReplication();
 
 jsTestLog("Invalid reconfig");

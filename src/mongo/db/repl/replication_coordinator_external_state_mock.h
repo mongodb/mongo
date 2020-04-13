@@ -76,7 +76,9 @@ public:
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
-    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx,
+                                            const BSONObj& config,
+                                            bool writeOplog);
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
     virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);

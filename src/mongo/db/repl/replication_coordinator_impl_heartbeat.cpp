@@ -641,7 +641,12 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                              "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
 
         auto opCtx = cc().makeOperationContext();
-        auto status = _externalState->storeLocalConfigDocument(opCtx.get(), newConfig.toBSON());
+        // Don't write the no-op for config learned via heartbeats.
+        auto status = _externalState->storeLocalConfigDocument(
+            opCtx.get(), newConfig.toBSON(), false /* writeOplog */);
+        // Wait for durability of the new config document.
+        opCtx->recoveryUnit()->waitUntilDurable(opCtx.get());
+
         bool isFirstConfig;
         {
             stdx::lock_guard<Latch> lk(_mutex);

@@ -76,7 +76,7 @@ void ReplicationCoordinatorExternalStateMock::stopDataReplication(OperationConte
 
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* opCtx,
                                                                          const BSONObj& config) {
-    return storeLocalConfigDocument(opCtx, config);
+    return storeLocalConfigDocument(opCtx, config, false);
 }
 
 void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
@@ -119,7 +119,8 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocu
 }
 
 Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(OperationContext* opCtx,
-                                                                         const BSONObj& config) {
+                                                                         const BSONObj& config,
+                                                                         bool writeOplog) {
     if (_storeLocalConfigDocumentStatus.isOK()) {
         setLocalConfigDocument(StatusWith<BSONObj>(config));
         return Status::OK();
