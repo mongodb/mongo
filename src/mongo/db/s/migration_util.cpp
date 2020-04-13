@@ -269,9 +269,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                       "namespace"_attr = deletionTask.getNss(),
                       "migrationId"_attr = deletionTask.getId());
 
-                // TODO (SERVER-46075): Add an asynchronous version of
-                // forceShardFilteringMetadataRefresh to avoid blocking on the network in the
-                // thread pool.
                 autoColl.reset();
                 refreshFilteringMetadataUntilSuccess(opCtx, deletionTask.getNss());
             }
