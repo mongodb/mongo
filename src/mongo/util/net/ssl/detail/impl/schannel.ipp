@@ -250,8 +250,15 @@ ssl_want SSLHandshakeManager::startShutdown(asio::error_code& ec) {
             return ssl_want::want_nothing;
         }
 
-        // TODO - I have not found a way to hit this code path
-        ASIO_ASSERT(false);
+        _pOutBuffer->reset();
+        _pOutBuffer->append(outputBuffers[0].pvBuffer, outputBuffers[0].cbBuffer);
+
+        if (SEC_E_OK == ss && outputBuffers[0].cbBuffer != 0) {
+            ec = asio::error::eof;
+            return ssl_want::want_output;
+        } else {
+            return ssl_want::want_nothing;
+        }
     }
 
     return ssl_want::want_nothing;
@@ -638,6 +645,10 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
 
             return ssl_want::want_nothing;
         } else {
+            // Clear the existing TLS packet from the input buffer since it was completely empty
+            // and we have already processed any extra data.
+            _pInBuffer->reset();
+
             // Sigh, this means that the remote side sent us an TLS record with just a encryption
             // header/trailer but no actual data.
             //
