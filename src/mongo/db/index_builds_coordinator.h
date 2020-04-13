@@ -643,17 +643,15 @@ protected:
      *   - Commit signal can be sent only by oplog applier.
      *   - Abort signal on secondaries can be sent by oplog applier, bgSync on rollback.
      *
-     * On completion, this function returns a timestamp, which may be null, that may be used to
-     * update the mdb catalog as we commit the index build. The commit index build timestamp is
-     * obtained from a commitIndexBuild oplog entry during secondary oplog application.
-     * This function returns a null timestamp on receiving a abortIndexBuild oplog entry; or if we
-     * are currently a primary, in which case we do not need to wait any external signal to commit
-     * the index build.
+     * On completion, this function will commit the index build.
      */
-    virtual Timestamp _waitForNextIndexBuildAction(
-        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
+    virtual void _waitForNextIndexBuildActionAndCommit(
+        OperationContext* opCtx,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        const IndexBuildOptions& indexBuildOptions) = 0;
 
     std::string _indexBuildActionToString(IndexBuildAction action);
+
 
     /**
      * Third phase is catching up on all the writes that occurred during the first two phases.
@@ -661,11 +659,29 @@ protected:
      * _waitForNextIndexBuildAction() comments. This timestamp is used only for committing the
      * index, which sets the ready flag to true, to the catalog; it is not used for the catch-up
      * writes during the final drain phase.
+     *
+     * This operation released the RSTL temporarily to acquire the collection X lock to prevent
+     * deadlocks. It must reacquire the RSTL to commit, but it's possible for the node's state to
+     * have changed in that period of time. If the replication state has changed or the lock
+     * acquisition times out, a non-success CommitResult will be returned and the caller must retry.
+     *
+     * Returns a CommitResult that indicates whether or not the commit was successful.
      */
-    void _insertKeysFromSideTablesAndCommit(OperationContext* opCtx,
-                                            std::shared_ptr<ReplIndexBuildState> replState,
-                                            const IndexBuildOptions& indexBuildOptions,
-                                            const Timestamp& commitIndexBuildTimestamp);
+    enum class CommitResult {
+        /** The index build was able to commit successfully. */
+        kSuccess,
+        /** After reacquiring the RSTL to commit, this node was no longer primary. The caller must
+           reset and wait for the next IndexBuildAction again.  */
+        kNoLongerPrimary,
+        /** Reacquiring the RSTL timed out, indicating that conflicting state transition was in
+           progress. The caller must try again. */
+        kLockTimeout
+    };
+    CommitResult _insertKeysFromSideTablesAndCommit(OperationContext* opCtx,
+                                                    std::shared_ptr<ReplIndexBuildState> replState,
+                                                    IndexBuildAction action,
+                                                    const IndexBuildOptions& indexBuildOptions,
+                                                    const Timestamp& commitIndexBuildTimestamp);
 
     /**
      * Runs the index build.

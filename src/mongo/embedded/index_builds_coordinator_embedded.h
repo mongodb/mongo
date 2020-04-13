@@ -96,8 +96,9 @@ private:
         return {};
     };
 
-    Timestamp _waitForNextIndexBuildAction(OperationContext* opCtx,
-                                           std::shared_ptr<ReplIndexBuildState> replState) override;
+    void _waitForNextIndexBuildActionAndCommit(OperationContext* opCtx,
+                                               std::shared_ptr<ReplIndexBuildState> replState,
+                                               const IndexBuildOptions& indexBuildOptions) override;
 };
 
 }  // namespace mongo
