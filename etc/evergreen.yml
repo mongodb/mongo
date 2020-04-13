@@ -10128,8 +10128,10 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel62-large
+    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
+    # mongodSetParameters.
     test_flags: >-
-        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
+        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2, enableIndexBuildCommitQuorum: false}"
         --excludeWithAnyTags=exclude_from_large_txns
   tasks:
   - name: compile_TG
@@ -10213,10 +10215,12 @@ buildvariants:
     # works correctly.
     # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
     # correctly after rollbackViaRefetch.
+    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
+    # mongodSetParameters.
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
-      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
+      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false, enableIndexBuildCommitQuorum: false}"
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
