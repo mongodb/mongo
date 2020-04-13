@@ -245,20 +245,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='non_auth_task_executor',
-    source=[
-        'non_auth_task_executor.cpp',
-    ],
-    LIBDEPS=[
-        'task_executor_interface',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-    ],
-)
-
 env.CppUnitTest(
     target='executor_test',
     source=[
@@ -285,7 +271,6 @@ env.CppIntegrationTest(
     source=[
         'network_interface_integration_test.cpp',
         'task_executor_cursor_integration_test.cpp',
-        'non_auth_task_executor_integration_test.cpp',
         'thread_pool_task_executor_integration_test.cpp',
     ],
     LIBDEPS=[
@@ -299,7 +284,6 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/version_impl',
         'network_interface_fixture',
-        'non_auth_task_executor',
         'task_executor_cursor',
     ],
 )
