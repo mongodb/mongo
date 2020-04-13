@@ -276,7 +276,8 @@ Status dropCollection(OperationContext* opCtx,
                       BSONObjBuilder& result,
                       DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
-        LOGV2(518070, "CMD: drop {collectionName}", "collectionName"_attr = collectionName);
+        LOGV2(
+            518070, "CMD: drop {collectionName}", "CMD: drop", "collection"_attr = collectionName);
     }
 
     if (MONGO_unlikely(hangDropCollectionBeforeLockAcquisition.shouldFail())) {
@@ -324,7 +325,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                                  const repl::OpTime& dropOpTime,
                                  DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
-        LOGV2(20332, "CMD: drop {collectionName}", "collectionName"_attr = collectionName);
+        LOGV2(20332, "CMD: drop {collectionName}", "CMD: drop", "collection"_attr = collectionName);
     }
 
     if (MONGO_unlikely(hangDropCollectionBeforeLockAcquisition.shouldFail())) {

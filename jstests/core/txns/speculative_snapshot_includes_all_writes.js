@@ -62,9 +62,7 @@ const joinHungWrite = startParallelShell(() => {
 });
 
 if (isJsonLogNoConn()) {
-    checkLog.contains(db.getMongo(),
-                      new RegExp("hangAfterCollectionInserts fail point enabled for.*\"ns\":\"" +
-                                 testColl2.getFullName() + "\""));
+    checkLog.containsJson(db.getMongo(), 20289);
 } else {
     checkLog.contains(
         db.getMongo(),

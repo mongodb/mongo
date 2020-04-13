@@ -167,8 +167,9 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 
     LOGV2(20345,
           "index build: done building index {indexName} on ns {nss}",
-          "indexName"_attr = _indexName,
-          "nss"_attr = _nss);
+          "index build: done building",
+          "namespace"_attr = _nss,
+          "index"_attr = _indexName);
 
     collection->indexBuildSuccess(opCtx, _indexCatalogEntry);
     auto svcCtx = opCtx->getClient()->getServiceContext();

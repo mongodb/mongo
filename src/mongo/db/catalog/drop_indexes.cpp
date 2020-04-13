@@ -293,9 +293,9 @@ Status dropIndexes(OperationContext* opCtx,
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(51806,
-              "CMD: dropIndexes {nss}: {cmdObj_kIndexFieldName_false}",
-              "nss"_attr = nss,
-              "cmdObj_kIndexFieldName_false"_attr = cmdObj[kIndexFieldName].toString(false));
+              "CMD: dropIndexes",
+              "namespace"_attr = nss,
+              "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
     }
 
     result->appendNumber("nIndexesWas", collection->getIndexCatalog()->numIndexesTotal(opCtx));
@@ -453,9 +453,9 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20344,
-                  "CMD: dropIndexes {nss}: {cmdObj_kIndexFieldName_false}",
-                  "nss"_attr = nss,
-                  "cmdObj_kIndexFieldName_false"_attr = cmdObj[kIndexFieldName].toString(false));
+                  "CMD: dropIndexes",
+                  "namespace"_attr = nss,
+                  "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
         BackgroundOperation::assertNoBgOpInProgForNs(nss);

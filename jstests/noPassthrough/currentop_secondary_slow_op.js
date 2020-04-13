@@ -40,9 +40,7 @@ assert.commandWorked(secondaryDB.adminCommand({
 
 try {
     assert.commandWorked(coll.insert({_id: 'b'}));
-    checkLog.contains(
-        secondary,
-        new RegExp(`hangAfterCollectionInserts fail point enabled for.*${coll.getFullName()}`));
+    checkLog.containsJson(secondary, 20289);
 
     jsTestLog('Running currentOp() with slow operation logging.');
     // Lower slowms to make currentOp() log slow operation while the secondary is procesing the

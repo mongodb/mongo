@@ -145,7 +145,8 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
         LOGV2(20288,
               "Collection {nss} has a default collation which is incompatible with this version: "
               "{collationSpec}",
-              "nss"_attr = nss,
+              "Collection has a default collation incompatible with this version",
+              "namespace"_attr = nss,
               "collationSpec"_attr = collationSpec);
         fassertFailedNoTrace(40144);
     }
@@ -302,7 +303,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
                               {logv2::LogTag::kStartupWarnings},
                               "Collection {ns} has malformed validator: {validatorStatus}",
                               "Collection has malformed validator",
-                              "ns"_attr = _ns,
+                              "namespace"_attr = _ns,
                               "validatorStatus"_attr = _validator.getStatus());
     }
     _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
@@ -386,7 +387,8 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     if (_validationAction == ValidationAction::WARN) {
         LOGV2_WARNING(20294,
                       "Document would fail validation collection: {ns} doc: {document}",
-                      "ns"_attr = ns(),
+                      "Document would fail validation",
+                      "namespace"_attr = ns(),
                       "document"_attr = redact(document));
         return Status::OK();
     }
@@ -511,7 +513,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                 whenFirst += firstIdElem.str();
             }
             LOGV2(20289,
-                  "hangAfterCollectionInserts fail point enabled for {ns}{whenFirst}. Blocking "
+                  "hangAfterCollectionInserts fail point enabled. Blocking "
                   "until fail point is disabled.",
                   "ns"_attr = _ns,
                   "whenFirst"_attr = whenFirst);
@@ -567,7 +569,7 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
 
     if (MONGO_unlikely(failAfterBulkLoadDocInsert.shouldFail())) {
         LOGV2(20290,
-              "Failpoint failAfterBulkLoadDocInsert enabled for {ns_ns}. Throwing "
+              "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
               "WriteConflictException.",
               "ns_ns"_attr = _ns.ns());
         throw WriteConflictException();
@@ -693,7 +695,10 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     bool noWarn,
                                     Collection::StoreDeletedDoc storeDeletedDoc) {
     if (isCapped()) {
-        LOGV2(20291, "failing remove on a capped ns {ns}", "ns"_attr = _ns);
+        LOGV2(20291,
+              "failing remove on a capped ns {ns}",
+              "failing remove on a capped ns",
+              "namespace"_attr = _ns);
         uasserted(10089, "cannot remove from a capped collection");
         return;
     }

@@ -75,8 +75,7 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
             if (uuid && minVisible) {
                 LOGV2_DEBUG(20269,
                             1,
-                            "closeCatalog: preserving min visible timestamp. Collection: {coll_ns} "
-                            "UUID: {uuid} TS: {minVisible}",
+                            "closeCatalog: preserving min visible timestamp.",
                             "coll_ns"_attr = coll->ns(),
                             "uuid"_attr = uuid,
                             "minVisible"_attr = minVisible);
@@ -157,8 +156,9 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         for (const auto& indexName : entry.second.first) {
             LOGV2(20275,
                   "openCatalog: rebuilding index: collection: {collNss}, index: {indexName}",
-                  "collNss"_attr = collNss.toString(),
-                  "indexName"_attr = indexName);
+                  "openCatalog: rebuilding index",
+                  "namespace"_attr = collNss.toString(),
+                  "index"_attr = indexName);
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
@@ -178,7 +178,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
         LOGV2_FOR_RECOVERY(
-            23992, 1, "openCatalog: dbholder reopening database {dbName}", "dbName"_attr = dbName);
+            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
         for (auto&& collNss :

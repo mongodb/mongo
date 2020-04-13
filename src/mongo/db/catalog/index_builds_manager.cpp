@@ -116,10 +116,11 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     LOGV2(
         20346,
         "Index build initialized: {buildUUID}: {nss} ({collection_uuid} ): indexes: {indexes_size}",
-        "buildUUID"_attr = buildUUID,
-        "nss"_attr = nss,
-        "collection_uuid"_attr = collection->uuid(),
-        "indexes_size"_attr = indexes.size());
+        "Index build initialized",
+        "indexBuildUUID"_attr = buildUUID,
+        "namespace"_attr = nss,
+        "collectionUuid"_attr = collection->uuid(),
+        "numIndexes"_attr = indexes.size());
 
     return Status::OK();
 }
@@ -166,13 +167,15 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                     if (repair == RepairData::kNo) {
                         LOGV2_FATAL(31396,
                                     "Invalid BSON detected at {id}: {validStatus}",
+                                    "Invalid BSON detected",
                                     "id"_attr = id,
-                                    "validStatus"_attr = redact(validStatus));
+                                    "error"_attr = redact(validStatus));
                     }
                     LOGV2_WARNING(20348,
                                   "Invalid BSON detected at {id}: {validStatus}. Deleting.",
+                                  "Invalid BSON detected; deleting.",
                                   "id"_attr = id,
-                                  "validStatus"_attr = redact(validStatus));
+                                  "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, id);
                 } else {
                     numRecords++;
@@ -293,6 +296,7 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
 
     LOGV2(20347,
           "Index build aborted without cleanup: {buildUUID}: {reason}",
+          "Index build aborted without cleanup",
           "buildUUID"_attr = buildUUID,
           "reason"_attr = reason);
 
