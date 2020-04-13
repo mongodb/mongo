@@ -9923,8 +9923,10 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel62-large
+    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
+    # mongodSetParameters.
     test_flags: >-
-        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
+        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2, enableIndexBuildCommitQuorum: false}"
         --excludeWithAnyTags=exclude_from_large_txns
   tasks:
   - name: compile_TG
