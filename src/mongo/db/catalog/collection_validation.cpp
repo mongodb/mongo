@@ -94,10 +94,9 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
 
         LOGV2_OPTIONS(20295,
                       {logComponentV1toV2(LogComponent::kIndex)},
-                      "validating the internal structure of index {descriptor_indexName} on "
-                      "collection {descriptor_parentNS}",
-                      "descriptor_indexName"_attr = descriptor->indexName(),
-                      "descriptor_parentNS"_attr = descriptor->parentNS());
+                      "validating internal structure",
+                      "index"_attr = descriptor->indexName(),
+                      "namespace"_attr = descriptor->parentNS());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
@@ -134,10 +133,9 @@ void _validateIndexes(OperationContext* opCtx,
 
         LOGV2_OPTIONS(20296,
                       {logComponentV1toV2(LogComponent::kIndex)},
-                      "validating index consistency {descriptor_indexName} on collection "
-                      "{descriptor_parentNS}",
-                      "descriptor_indexName"_attr = descriptor->indexName(),
-                      "descriptor_parentNS"_attr = descriptor->parentNS());
+                      "validating index consistency",
+                      "index"_attr = descriptor->indexName(),
+                      "namespace"_attr = descriptor->parentNS());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
@@ -226,8 +224,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
 
         LOGV2_OPTIONS(20300,
                       {logComponentV1toV2(LogComponent::kIndex)},
-                      "Traversing through the index entries for index {descriptor_indexName}.",
-                      "descriptor_indexName"_attr = descriptor->indexName());
+                      "Traversing through the index entries",
+                      "index"_attr = descriptor->indexName());
 
         indexValidator->traverseIndex(opCtx,
                                       index.get(),
@@ -316,12 +314,11 @@ void _reportInvalidResults(OperationContext* opCtx,
                            const string uuidString) {
     _reportValidationResults(
         opCtx, validateState, indexNsResultsMap, keysPerIndex, results, output);
-    LOGV2_OPTIONS(
-        20302,
-        {logComponentV1toV2(LogComponent::kIndex)},
-        "Validation complete for collection {validateState_nss}{uuidString}. Corruption found.",
-        "validateState_nss"_attr = validateState->nss(),
-        "uuidString"_attr = uuidString);
+    LOGV2_OPTIONS(20302,
+                  {logComponentV1toV2(LogComponent::kIndex)},
+                  "Validation complete -- Corruption found.",
+                  "namespace"_attr = validateState->nss(),
+                  "uuid"_attr = uuidString);
 }
 
 template <typename T>
@@ -496,9 +493,9 @@ Status validate(OperationContext* opCtx,
         // Validate the record store.
         LOGV2_OPTIONS(20303,
                       {logComponentV1toV2(LogComponent::kIndex)},
-                      "validating collection {validateState_nss}{uuidString}",
-                      "validateState_nss"_attr = validateState.nss(),
-                      "uuidString"_attr = uuidString);
+                      "validating collection",
+                      "namespace"_attr = validateState.nss(),
+                      "uuid"_attr = uuidString);
 
         IndexConsistency indexConsistency(opCtx, &validateState);
         ValidateAdaptor indexValidator(&indexConsistency, &validateState, &indexNsResultsMap);
@@ -549,9 +546,9 @@ Status validate(OperationContext* opCtx,
         if (indexConsistency.haveEntryMismatch()) {
             LOGV2_OPTIONS(20305,
                           {logComponentV1toV2(LogComponent::kIndex)},
-                          "Index inconsistencies were detected on collection {validateState_nss}. "
+                          "Index inconsistencies were detected. "
                           "Starting the second phase of index validation to gather concise errors.",
-                          "validateState_nss"_attr = validateState.nss());
+                          "namespace"_attr = validateState.nss());
             _gatherIndexEntryErrors(opCtx,
                                     &validateState,
                                     &indexConsistency,
@@ -592,10 +589,10 @@ Status validate(OperationContext* opCtx,
 
         LOGV2_OPTIONS(20306,
                       {logComponentV1toV2(LogComponent::kIndex)},
-                      "Validation complete for collection {validateState_nss}{uuidString}. No "
+                      "Validation complete for collection. No "
                       "corruption found.",
-                      "validateState_nss"_attr = validateState.nss(),
-                      "uuidString"_attr = uuidString);
+                      "namespace"_attr = validateState.nss(),
+                      "uuid"_attr = uuidString);
 
         output->append("ns", validateState.nss().ns());
     } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {

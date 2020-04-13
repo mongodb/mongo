@@ -429,15 +429,17 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<
     if (_collections.find(ns) != _collections.end()) {
         LOGV2(20279,
               "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
-              "coll_ns"_attr = (*coll)->ns(),
-              "coll_uuid"_attr = (*coll)->uuid());
+              "Conflicted creating a collection.",
+              "namespace"_attr = (*coll)->ns(),
+              "uuid"_attr = (*coll)->uuid());
         throw WriteConflictException();
     }
 
     LOGV2_DEBUG(20280,
                 1,
                 "Registering collection {ns} with UUID {uuid}",
-                "ns"_attr = ns,
+                "Registering collection",
+                "namespace"_attr = ns,
                 "uuid"_attr = uuid);
 
     auto dbName = ns.db().toString();
@@ -468,11 +470,7 @@ std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUU
     auto dbName = ns.db().toString();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
-    LOGV2_DEBUG(20281,
-                1,
-                "Deregistering collection {ns} with UUID {uuid}",
-                "ns"_attr = ns,
-                "uuid"_attr = uuid);
+    LOGV2_DEBUG(20281, 1, "Deregistering collection", "namespace"_attr = ns, "uuid"_attr = uuid);
 
     // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
@@ -507,11 +505,8 @@ void CollectionCatalog::deregisterAllCollections() {
         auto dbName = ns.db().toString();
         auto dbIdPair = std::make_pair(dbName, uuid);
 
-        LOGV2_DEBUG(20283,
-                    1,
-                    "Deregistering collection {ns} with UUID {uuid}",
-                    "ns"_attr = ns,
-                    "uuid"_attr = uuid);
+        LOGV2_DEBUG(
+            20283, 1, "Deregistering collection", "namespace"_attr = ns, "uuid"_attr = uuid);
 
         entry.second.reset();
     }

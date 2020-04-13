@@ -274,9 +274,11 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     LOGV2(20308,
                           "CMD: create {newCollName} - existing collection with conflicting UUID "
                           "{uuid} is in a drop-pending state: {currentName}",
-                          "newCollName"_attr = newCollName,
-                          "uuid"_attr = uuid,
-                          "currentName"_attr = *currentName);
+                          "CMD: create -- existing collection with conflicting UUID "
+                          "is in a drop-pending state",
+                          "newCollection"_attr = newCollName,
+                          "conflictingUuid"_attr = uuid,
+                          "existingCollection"_attr = *currentName);
                     return Result(Status(ErrorCodes::NamespaceExists,
                                          str::stream()
                                              << "existing collection " << currentName->toString()
@@ -321,9 +323,11 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     LOGV2(20309,
                           "CMD: create {newCollName} - renaming existing collection with "
                           "conflicting UUID {uuid} to temporary collection {tmpName}",
-                          "newCollName"_attr = newCollName,
-                          "uuid"_attr = uuid,
-                          "tmpName"_attr = tmpName);
+                          "CMD: create -- renaming existing collection with "
+                          "conflicting UUID to temporary collection",
+                          "newCollection"_attr = newCollName,
+                          "conflictingUuid"_attr = uuid,
+                          "tempName"_attr = tmpName);
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
                         return Result(status);

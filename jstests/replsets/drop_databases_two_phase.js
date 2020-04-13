@@ -154,11 +154,9 @@ var exitCode = dropDatabaseProcess();
 let db = primary.getDB(dbNameToDrop);
 if (isJsonLog(db.getMongo())) {
     checkLog.contains(db.getMongo(),
-                      `dropping collection: {nss}","attr":{"dbName":"${dbNameToDrop}","nss":"${
-                          dbNameToDrop}.${collNameToDrop}"`);
-    checkLog.contains(
-        db.getMongo(),
-        'dropped {numCollections} collection(s)","attr":{"dbName":"dbToDrop","numCollections":1}');
+                      `dropDatabase - dropping collection","attr":{"db":"${
+                          dbNameToDrop}","namespace":"${dbNameToDrop}.${collNameToDrop}"`);
+    checkLog.contains(db.getMongo(), 'dropDatabase - finished","attr":{"db":"dbToDrop"');
 } else {
     checkLog.contains(db.getMongo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
     checkLog.contains(db.getMongo(), "dropped 1 collection(s)");
