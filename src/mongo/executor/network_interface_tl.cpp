@@ -201,6 +201,25 @@ void NetworkInterfaceTL::shutdown() {
 
     LOGV2_DEBUG(22594, 2, "Shutting down network interface.");
 
+    // Cancel any remaining commands. Any attempt to register new commands will throw.
+    auto inProgress = [&] {
+        stdx::lock_guard lk(_inProgressMutex);
+        return std::exchange(_inProgress, {});
+    }();
+
+    for (auto& [_, weakCmdState] : inProgress) {
+        auto cmdState = weakCmdState.lock();
+        if (!cmdState) {
+            continue;
+        }
+
+        if (!cmdState->finishLine.arriveStrongly()) {
+            continue;
+        }
+
+        cmdState->fulfillFinalPromise(kNetworkInterfaceShutdownInProgress);
+    }
+
     // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
     _reactor->stop();
 
