@@ -108,13 +108,13 @@ function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
 
 function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
     // Ensure the dbpath ends with an OS appropriate slash.
+    let separator = '/';
+    if (_isWindows()) {
+        separator = '\\';
+    }
     let lastChar = sourceDbPath[sourceDbPath.length - 1];
     if (lastChar !== '/' && lastChar !== '\\') {
-        if (_isWindows()) {
-            sourceDbPath += '\\';
-        } else {
-            sourceDbPath += '/';
-        }
+        sourceDbPath += separator;
     }
 
     // Ensure that the full path starts with the returned dbpath.
@@ -123,7 +123,9 @@ function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
     // Grab the file path relative to the dbpath. Maintain that relation when copying
     // to the `hiddenDbpath`.
     let relativePath = absoluteFilePath.substr(sourceDbPath.length);
-    let destination = destinationDirectory + '/' + relativePath;
+    let destination = destinationDirectory + separator + relativePath;
+    const newFileDirectory = destination.substring(0, destination.lastIndexOf(separator));
+    mkdir(newFileDirectory);
     copyFile(absoluteFilePath, destination);
     return {fileSource: absoluteFilePath, relativePath: relativePath, fileDestination: destination};
 }
