@@ -94,7 +94,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileInDrainMode) {
+TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenRunningSafeReconfigWhileInDrainMode) {
     init();
 
     assertStartSuccess(BSON("_id"
@@ -121,10 +121,42 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileInDrainMode) 
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
     args.force = false;
-    ASSERT_EQUALS(ErrorCodes::NotMaster,
-                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    auto status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Safe reconfig is only allowed on a writable PRIMARY.");
     ASSERT_TRUE(result.obj().isEmpty());
 }
+
+TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigCmdReceivedWhileInDrainMode) {
+    init();
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234"))
+                            << "protocolVersion" << 1),
+                       HostAndPort("test1", 1234));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    const auto opCtx = makeOperationContext();
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(
+        getReplCoord()->getElectionTimeout_forTest(), opCtx.get());
+
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    // Reconfig command first waits for config commitment and will get an error.
+    auto status = getReplCoord()->awaitConfigCommitment(opCtx.get(), true);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "should only be run on a writable PRIMARY");
+}
+
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWithInvalidConfig) {
     // start up, become primary, receive uninitializable config

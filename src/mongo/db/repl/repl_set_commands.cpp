@@ -36,7 +36,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/algorithm/string.hpp>
-#include <fmt/format.h>
 
 #include "mongo/db/repl/repl_set_command.h"
 
@@ -78,7 +77,6 @@ namespace repl {
 
 using std::string;
 using std::stringstream;
-using namespace fmt::literals;
 
 static const std::string kReplSetReconfigNss = "local.replset.reconfig";
 
@@ -426,13 +424,6 @@ public:
         // We will check again after acquiring the repl mutex in processReplSetReconfig(), in case
         // of concurrent reconfigs.
         if (!parsedArgs.force) {
-            // Check primary before waiting.
-            auto memberState = replCoord->getMemberState();
-            uassert(ErrorCodes::NotMaster,
-                    "replSetReconfig should only be run on PRIMARY, but my state is {};"_format(
-                        memberState.toString()),
-                    memberState.primary());
-
             // Skip the waiting if the current config is from a force reconfig.
             auto oplogWait = replCoord->getConfig().getConfigTerm() != OpTime::kUninitializedTerm;
             auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
@@ -440,6 +431,9 @@ public:
             if (status == ErrorCodes::MaxTimeMSExpired) {
                 // Convert the error code to be more specific.
                 uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
+            } else if (status == ErrorCodes::PrimarySteppedDown) {
+                // Return NotMaster since the command has no side effect yet.
+                status = {ErrorCodes::NotMaster, status.reason()};
             }
             uassertStatusOK(status);
         }
