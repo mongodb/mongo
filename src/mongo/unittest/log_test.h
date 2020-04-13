@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
@@ -62,5 +64,41 @@ inline void clearMinimumLoggedSeverity(logv2::LogComponent component) {
 inline bool hasMinimumLogSeverity(logv2::LogComponent component) {
     return logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(component);
 }
+
+/**
+ * Configure a LogComponent`s MinimumLoggedSeverity, saving the old state and restoring it
+ * when this guard object dies. There can be no severity mapping for a LogComponent, so
+ * the logged severity 'state' is read and written as a boost::optional.
+ */
+class MinimumLoggedSeverityGuard {
+public:
+    MinimumLoggedSeverityGuard(logv2::LogComponent component,
+                               boost::optional<logv2::LogSeverity> severity)
+        : _component{component}, _savedSeverity{_get()} {
+        _put(severity);
+    }
+
+    ~MinimumLoggedSeverityGuard() {
+        _put(_savedSeverity);
+    }
+
+private:
+    boost::optional<logv2::LogSeverity> _get() {
+        if (hasMinimumLogSeverity(_component))
+            return getMinimumLogSeverity(_component);
+        return boost::none;
+    }
+
+    void _put(boost::optional<logv2::LogSeverity> severity) {
+        if (severity) {
+            setMinimumLoggedSeverity(_component, *severity);
+        } else {
+            clearMinimumLoggedSeverity(_component);
+        }
+    }
+
+    logv2::LogComponent _component;
+    boost::optional<logv2::LogSeverity> _savedSeverity;
+};
 
 }  // namespace mongo
