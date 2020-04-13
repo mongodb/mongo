@@ -150,6 +150,7 @@ class ExpressionInternalJsEmit;
 class ExpressionFunction;
 class ExpressionDegreesToRadians;
 class ExpressionRadiansToDegrees;
+class ExpressionInternalRemoveFieldTombstones;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -209,6 +210,7 @@ public:
     virtual void visit(ExpressionIndexOfArray*) = 0;
     virtual void visit(ExpressionIndexOfBytes*) = 0;
     virtual void visit(ExpressionIndexOfCP*) = 0;
+    virtual void visit(ExpressionInternalRemoveFieldTombstones*) = 0;
     virtual void visit(ExpressionIsNumber*) = 0;
     virtual void visit(ExpressionLet*) = 0;
     virtual void visit(ExpressionLn*) = 0;
