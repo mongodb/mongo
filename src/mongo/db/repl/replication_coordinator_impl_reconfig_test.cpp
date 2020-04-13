@@ -1227,6 +1227,66 @@ TEST_F(ReplCoordReconfigTest,
     ASSERT_OK(status);
 }
 
+TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
+    // Start out in a non-initial config version.
+    init();
+    auto configVersion = 2;
+    assertStartSuccess(
+        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Get elected primary.
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    // Advance your optime.
+    auto commitPoint = OpTime(Timestamp(2, 1), 1);
+    replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
+    replicateOpTo(2, commitPoint);
+
+    // Respond to heartbeats before reconfig.
+    respondToAllHeartbeats();
+
+    // Do a reconfig that should fail due to stepdown.
+    configVersion = 3;
+    ReplSetReconfigArgs args;
+    args.newConfigObj = configWithMembers(
+        configVersion, 1, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")));
+
+    BSONObjBuilder result;
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread;
+    reconfigThread = stdx::thread(
+        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+
+    getNet()->enterNetwork();
+    // Wait for the next heartbeat of quorum check and blackhole it.
+    // The reconfig is hung during the quorum check.
+    auto request = getNet()->getNextReadyRequest();
+    getNet()->blackHole(request);
+    getNet()->exitNetwork();
+
+    // Step down due to a higher term.
+    TopologyCoordinator::UpdateTermResult termUpdated;
+    auto updateTermEvh = getReplCoord()->updateTerm_forTest(2, &termUpdated);
+    ASSERT(termUpdated == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+    ASSERT(updateTermEvh.isValid());
+    getReplExec()->waitForEvent(updateTermEvh);
+
+    // Respond to quorum check to resume the reconfig.
+    respondToAllHeartbeats();
+
+    reconfigThread.join();
+    ASSERT_EQ(status.code(), ErrorCodes::NotMaster);
+    ASSERT_EQ(status.reason(), "Stepped down when persisting new config");
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo

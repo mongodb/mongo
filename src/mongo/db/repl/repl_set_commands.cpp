@@ -443,24 +443,6 @@ public:
         }
 
         auto status = replCoord->processReplSetReconfig(opCtx, parsedArgs, &result);
-
-        if (status.isOK() && !parsedArgs.force) {
-            const auto service = opCtx->getServiceContext();
-            Lock::GlobalLock globalLock(opCtx, MODE_IX);
-            writeConflictRetry(opCtx, "replSetReconfig", kReplSetReconfigNss, [&] {
-                WriteUnitOfWork wuow(opCtx);
-                // Users must not be allowed to provide their own contents for the o2 field.
-                // o2 field of no-ops is supposed to be used internally.
-
-                service->getOpObserver()->onOpMessage(opCtx,
-                                                      BSON("msg"
-                                                           << "Reconfig set"
-                                                           << "version"
-                                                           << parsedArgs.newConfigObj["version"]));
-                wuow.commit();
-            });
-        }
-
         uassertStatusOK(status);
 
         // Now that the new config has been persisted and installed in memory, wait for the new
