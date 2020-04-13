@@ -31,6 +31,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -41,8 +42,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
-
-const BSONObj IS_MASTER_BSON = BSON("isMaster" << 1);
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
@@ -215,12 +214,18 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
             durationCount<Milliseconds>(Milliseconds(data["maxAwaitTimeMS"].numberInt()));
     });
 
-    auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << maxAwaitTimeMS
-                                       << "topologyVersion" << _topologyVersion->toBSON());
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+    bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
+    bob.append("topologyVersion", _topologyVersion->toBSON());
+
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
 
     _timeoutMS = SdamConfiguration::kDefaultConnectTimeoutMS + kMaxAwaitTimeMs;
-    auto request = executor::RemoteCommandRequest(
-        HostAndPort(_host), "admin", isMasterCmd, nullptr, _timeoutMS);
+    auto request =
+        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, _timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleExhaustRemoteCommand(
@@ -269,8 +274,15 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
 
 StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleSingleIsMaster() {
     _timeoutMS = SdamConfiguration::kDefaultConnectTimeoutMS;
-    auto request = executor::RemoteCommandRequest(
-        HostAndPort(_host), "admin", IS_MASTER_BSON, nullptr, _timeoutMS);
+
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+
+    auto request =
+        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, _timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleRemoteCommand(
