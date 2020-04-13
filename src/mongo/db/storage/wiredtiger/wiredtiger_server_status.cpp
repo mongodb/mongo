@@ -83,6 +83,12 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
 
     WiredTigerKVEngine::appendGlobalStats(bob);
 
+    {
+        BSONObjBuilder subsection(bob.subobjStart("oplog"));
+        subsection.append("visibility timestamp",
+                          Timestamp(_engine->getOplogManager()->getOplogReadTimestamp()));
+    }
+
     return bob.obj();
 }
 
