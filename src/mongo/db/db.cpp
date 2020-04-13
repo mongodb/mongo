@@ -126,6 +126,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/shard_server_op_observer.h"
@@ -1192,6 +1193,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto validator = LogicalTimeValidator::get(serviceContext)) {
         validator->shutDown();
     }
+
+    // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
+    // Otherwise, it may try to schedule work on the CatalogCacheLoader and fail.
+    auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor();
+    migrationUtilExecutor->shutdown();
+    migrationUtilExecutor->join();
 
     if (ShardingState::get(serviceContext)->enabled()) {
         CatalogCacheLoader::get(serviceContext).shutDown();
