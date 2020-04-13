@@ -46,25 +46,12 @@ boost::optional<ChunkVersion> extractOptionalChunkVersion(const BSONObj& obj, St
     return uassertStatusOK(std::move(swChunkVersion));
 }
 
-boost::optional<ShardId> extractOptionalShardId(const BSONObj& obj, StringData field) {
-    const auto shardIdElem = obj[field];
-    if (shardIdElem.eoo()) {
-        return boost::none;
-    }
-
-    const auto shardId = shardIdElem.String();
-    if (shardId == "") {
-        return boost::none;
-    }
-    return ShardId(shardId);
-}
-
 }  // namespace
 
 StaleConfigInfo::StaleConfigInfo(NamespaceString nss,
                                  ChunkVersion received,
                                  boost::optional<ChunkVersion> wanted,
-                                 boost::optional<ShardId> shardId,
+                                 ShardId shardId,
                                  std::shared_ptr<Notification<void>> criticalSectionSignal)
     : _nss(std::move(nss)),
       _received(received),
@@ -78,9 +65,9 @@ void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     if (_wanted) {
         _wanted->appendLegacyWithField(bob, "vWanted");
     }
-    if (_shardId) {
-        bob->append("shardId", _shardId->toString());
-    }
+
+    invariant(_shardId != "");
+    bob->append("shardId", _shardId.toString());
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
@@ -88,10 +75,13 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 }
 
 StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
+    const auto shardId = obj["shardId"].String();
+    invariant(shardId != "");
+
     return StaleConfigInfo(NamespaceString(obj["ns"].String()),
                            uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
                            extractOptionalChunkVersion(obj, "vWanted"),
-                           extractOptionalShardId(obj, "shardId"));
+                           ShardId(shardId));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {

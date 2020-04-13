@@ -224,18 +224,16 @@ public:
                                                                  bool shouldBlock);
 
     /**
-     * Invalidates a single shard for the current collection if:
-     *   1. The shard's id is given, and
-     *   2. The epochs given in the two chunk versions match.
-     * Otherwise, invalidates the entire collection, causing any future targetting requests to
-     * block on an upcoming catalog cache refresh.
+     * Invalidates a single shard for the current collection if the epochs given in the chunk
+     * versions match. Otherwise, invalidates the entire collection, causing any future targetting
+     * requests to block on an upcoming catalog cache refresh.
      */
     void invalidateShardOrEntireCollectionEntryForShardedCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<ChunkVersion> wantedVersion,
         const ChunkVersion& receivedVersion,
-        boost::optional<ShardId> shardId);
+        ShardId shardId);
 
     /**
      * Non-blocking method that marks the current collection entry for the namespace as needing

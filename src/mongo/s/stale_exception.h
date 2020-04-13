@@ -44,7 +44,7 @@ public:
     StaleConfigInfo(NamespaceString nss,
                     ChunkVersion received,
                     boost::optional<ChunkVersion> wanted,
-                    boost::optional<ShardId> shardId,
+                    ShardId shardId,
                     std::shared_ptr<Notification<void>> criticalSectionSignal = nullptr);
 
     const auto& getNss() const {
@@ -75,7 +75,7 @@ private:
     NamespaceString _nss;
     ChunkVersion _received;
     boost::optional<ChunkVersion> _wanted;
-    boost::optional<ShardId> _shardId;
+    ShardId _shardId;
 
     // This signal does not get serialized and therefore does not get propagated
     // to the router.

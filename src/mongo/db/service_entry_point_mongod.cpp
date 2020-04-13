@@ -198,8 +198,6 @@ public:
                 oss.setMigrationCriticalSectionSignal(sce->getCriticalSectionSignal());
             }
 
-            invariant(sce->getShardId());
-
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh

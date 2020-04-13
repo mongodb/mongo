@@ -414,9 +414,9 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     const NamespaceString& nss,
     boost::optional<ChunkVersion> wantedVersion,
     const ChunkVersion& receivedVersion,
-    boost::optional<ShardId> shardId) {
-    if (shardId && shardVersionsHaveMatchingEpoch(wantedVersion, receivedVersion)) {
-        _createOrGetCollectionEntryAndMarkShardStale(nss, *shardId);
+    ShardId shardId) {
+    if (shardVersionsHaveMatchingEpoch(wantedVersion, receivedVersion)) {
+        _createOrGetCollectionEntryAndMarkShardStale(nss, shardId);
     } else {
         _createOrGetCollectionEntryAndMarkEpochStale(nss);
     }

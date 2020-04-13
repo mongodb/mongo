@@ -78,8 +78,6 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             oss.setMigrationCriticalSectionSignal(staleInfo->getCriticalSectionSignal());
         }
 
-        invariant(staleInfo->getShardId());
-
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(
             _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
