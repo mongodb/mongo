@@ -31,6 +31,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -39,8 +40,6 @@
 
 namespace mongo {
 namespace {
-
-const BSONObj IS_MASTER_BSON = BSON("isMaster" << 1);
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
@@ -184,8 +183,14 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
 }
 
 void SingleServerIsMasterMonitor::_doRemoteCommand() {
-    auto request = executor::RemoteCommandRequest(
-        HostAndPort(_host), "admin", IS_MASTER_BSON, nullptr, _timeoutMS);
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+
+    auto request =
+        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, _timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
     stdx::lock_guard lock(_mutex);

@@ -566,9 +566,14 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
         return;
     }
 
-    auto request = executor::RemoteCommandRequest(
-        host, "admin", BSON("isMaster" << 1), nullptr, kCheckTimeout);
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+    if (WireSpec::instance().isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    }
+    auto request = executor::RemoteCommandRequest(host, "admin", bob.obj(), nullptr, kCheckTimeout);
     request.sslMode = _set->setUri.getSSLMode();
+
     auto status =
         _set->executor
             ->scheduleRemoteCommand(
