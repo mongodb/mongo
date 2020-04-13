@@ -116,7 +116,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
         CommandHelpers::appendMajorityWriteConcern(cloneCatalogDataCommandBuilder.obj()),
-        Shard::RetryPolicy::kIdempotent);
+        Shard::RetryPolicy::kNotIdempotent);
 
     auto cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
     uassertStatusOK(cloneCommandStatus);
