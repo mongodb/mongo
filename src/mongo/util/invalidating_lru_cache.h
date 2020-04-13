@@ -85,7 +85,12 @@ public:
     using key_type = typename Cache::key_type;
     using mapped_type = typename Cache::mapped_type;
 
-    explicit InvalidatingLRUCache(size_t maxCacheSize) : _cache(maxCacheSize) {}
+    /**
+     * The 'cacheSize' parameter specifies the maximum size of the cache before the least recently
+     * used entries start getting evicted. It is allowed to be zero, in which case no entries will
+     * actually be cached, which is only meaningful for the behaviour of `insertOrAssignAndGet`.
+     */
+    explicit InvalidatingLRUCache(size_t cacheSize) : _cache(cacheSize) {}
 
     ~InvalidatingLRUCache() {
         invariant(_evictedCheckedOutValues.empty());
@@ -178,6 +183,10 @@ public:
     /**
      * Same as 'insertOrAssign' above, but also immediately checks-out the newly inserted value and
      * returns it. See the 'get' method below for the semantics of checking-out a value.
+     *
+     * For caches of size zero, this method will not cache the passed-in value, but it will be
+     * returned and the `get` method will continue returning it until all returned handles are
+     * destroyed.
      */
     ValueHandle insertOrAssignAndGet(const Key& key, Value&& value) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
@@ -206,7 +215,7 @@ public:
                 }
             }
 
-            // evictedValue must always be handed-off to guard so that the destructor never runs run
+            // evictedValue must always be handed-off to guard so that the destructor never runs
             // while the mutex is held
             guard.releasePtr(std::move(evictedValue));
         }

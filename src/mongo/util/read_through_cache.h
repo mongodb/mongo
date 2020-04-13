@@ -205,44 +205,56 @@ public:
 
         // Join an in-progress lookup if one has already been scheduled
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            return *it->second->future;
+            return it->second->sharedPromise.getFuture();
 
         // Schedule an asynchronous lookup for the key and then loop around and wait for it to
         // complete
+
+        auto [kickOffAsyncLookupPromise, f] = makePromiseFuture<void>();
+
         auto emplaceResult =
             _inProgressLookups.emplace(key, std::make_unique<InProgressLookup>(key));
         invariant(emplaceResult.second /* emplaced */);
         auto& inProgressLookup = *emplaceResult.first->second;
-
-        auto [kickOffAsyncLookupPromise, f] = makePromiseFuture<void>();
+        auto sharedFutureToReturn = inProgressLookup.sharedPromise.getFuture();
+        ul.unlock();
 
         // Construct the future chain before scheduling the async work so it doesn't execute inline
         // if it so happens that the async work completes by the time the future is constructed, or
         // if it executes inline due to the task executor being shut down.
-        auto future = std::move(f)
-                          .then([this, &inProgressLookup] {
-                              stdx::unique_lock ul(_mutex);
-                              return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
-                          })
-                          .onCompletion([this, &inProgressLookup](StatusWith<Value> swValue) {
-                              const auto key = inProgressLookup.key;
-                              stdx::lock_guard lg(_mutex);
-                              invariant(_inProgressLookups.erase(key) == 1);
-                              if (swValue == ErrorCodes::ReadThroughCacheKeyNotFound)
-                                  return ValueHandle();
+        std::move(f)
+            .then([this, &inProgressLookup] {
+                stdx::unique_lock ul(_mutex);
+                return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
+            })
+            .getAsync([this, key](StatusWith<Value> swValue) {
+                stdx::unique_lock ul(_mutex);
+                auto it = _inProgressLookups.find(key);
+                invariant(it != _inProgressLookups.end());
+                auto inProgressLookup = std::move(it->second);
+                _inProgressLookups.erase(it);
 
-                              return ValueHandle(_cache.insertOrAssignAndGet(
-                                  key,
-                                  {uassertStatusOK(std::move(swValue)),
-                                   _serviceContext->getFastClockSource()->now()}));
-                          })
-                          .share();
+                StatusWith<ValueHandle> swValueHandle(ErrorCodes::InternalError,
+                                                      "ReadThroughCache");
+                if (swValue.isOK()) {
+                    swValueHandle = ValueHandle(_cache.insertOrAssignAndGet(
+                        key,
+                        {std::move(swValue.getValue()),
+                         _serviceContext->getFastClockSource()->now()}));
+                } else if (swValue == ErrorCodes::ReadThroughCacheKeyNotFound) {
+                    swValueHandle = ValueHandle();
+                } else {
+                    swValueHandle = swValue.getStatus();
+                }
 
-        inProgressLookup.future = future;
-        ul.unlock();
+                ul.unlock();
+
+                inProgressLookup->sharedPromise.setFromStatusWith(std::move(swValueHandle));
+            });
+
         kickOffAsyncLookupPromise.emplaceValue();
 
-        return future;
+        return sharedFutureToReturn;
     }
 
     /**
@@ -307,15 +319,20 @@ protected:
     /**
      * ReadThroughCache constructor, to be called by sub-classes, which implement 'lookup'.
      *
-     * The passed-in 'mutex' is for the exclusive usage of the ReadThroughCache and must not be used
-     * in any way by the implementing class. Having the Mutex stored by the sub-class allows latch
+     * The 'mutex' is for the exclusive usage of the ReadThroughCache and must not be used in any
+     * way by the implementing class. Having the mutex stored by the sub-class allows latch
      * diagnostics to be correctly associated with the sub-class (not the generic ReadThroughCache
-     * class). The 'threadPool' can be used for other purposes, but it is mandatory that by the time
-     * this object is destructed that it is shut down and joined so that there are no more
-     * asynchronous loading activities going on.
+     * class).
      *
-     * The 'cacheSize' parameter represents the maximum size of the cache before least recently used
-     * entris will be evicted.
+     * The 'threadPool' can be used for other purposes, but it is mandatory that by the time this
+     * object is destructed that it is shut down and joined so that there are no more asynchronous
+     * loading activities going on.
+     *
+     * The 'cacheSize' parameter specifies the maximum size of the cache before the least recently
+     * used entries start getting evicted. It is allowed to be zero, in which case no entries will
+     * actually be cached, but it doesn't guarantee that every `acquire` call will result in an
+     * invocation of `lookup`. Specifically, several concurrent invocations of `acquire` for the
+     * same key may group together for a single `lookup`.
      */
     ReadThroughCache(Mutex& mutex,
                      ServiceContext* service,
@@ -347,7 +364,7 @@ private:
         }
 
         Key key;
-        boost::optional<SharedSemiFuture<ValueHandle>> future;
+        SharedPromise<ValueHandle> sharedPromise;
 
         bool invalidated;
         boost::optional<CancelToken> cancelToken;
