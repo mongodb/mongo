@@ -32,28 +32,6 @@ env.Library(
     ],
 )
 
-# This library contains legacy sharding functionality, which should not be included in any new
-# development.
-env.Library(
-    target='sharding_legacy_api',
-    source=[
-        'client/shard_connection.cpp',
-        env.Idlc('client/shard_connection.idl')[0],
-        'client/version_manager.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/db/lasterror',
-        'cluster_last_error_info',
-        'grid',
-        'sharding_router_api',
-        'sharding_routing_table',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
-)
-
 env.Library(
     target='sharding_router_api',
     source=[
@@ -115,7 +93,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
-        'sharding_legacy_api',
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/server_parameter",
@@ -457,7 +434,6 @@ env.CppUnitTest(
         'chunk_test.cpp',
         'chunk_version_test.cpp',
         'chunk_writes_tracker_test.cpp',
-        'client/shard_connection_test.cpp',
         'cluster_identity_loader_test.cpp',
         'cluster_last_error_info_test.cpp',
         'hedge_options_util_test.cpp',
@@ -501,7 +477,6 @@ env.CppUnitTest(
         'common_s',
         'coreshard',
         'shard_server_test_fixture',
-        'sharding_legacy_api',
         'sharding_router_test_fixture',
         'sharding_task_executor',
         'write_ops/batch_write_types',

@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/util/scopeguard.h"
@@ -62,9 +61,6 @@ BSONObj buildErrReply(const DBException& ex) {
 
 
 DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const Message& message) {
-    // Release any cached egress connections for client back to pool before destroying
-    auto guard = makeGuard(ShardConnection::releaseMyConnections);
-
     const int32_t msgId = message.header().getId();
     const NetworkOp op = message.operation();
 

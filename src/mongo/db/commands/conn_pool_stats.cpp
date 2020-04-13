@@ -41,7 +41,6 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -114,12 +113,13 @@ public:
 
 } poolStatsCmd;
 
+// This command currently returns nothing, since the shard connection pool no longer exists (v4.6).
 class ShardedPoolStats final : public BasicCommand {
 public:
     ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
 
     std::string help() const override {
-        return "stats about the shard connection pool";
+        return "stats about the shard connection pool (DEPRECATED)";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -147,11 +147,10 @@ public:
              mongo::BSONObjBuilder& result) override {
         // Connection information
         executor::ConnectionPoolStats stats{};
-        shardConnectionPool.appendConnectionStats(&stats);
         stats.appendToBSON(result);
 
         // Thread connection information
-        ShardConnection::reportActiveClientConnections(&result);
+        result.append("threads", BSONObj());
         return true;
     }
 

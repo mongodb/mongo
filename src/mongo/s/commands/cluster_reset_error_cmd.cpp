@@ -35,12 +35,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
 
 namespace mongo {
 namespace {
+
+// This commmand is deprecated and is currently a no-op as of v4.6.
 
 class CmdShardingResetError : public BasicCommand {
 public:
@@ -66,25 +67,6 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         LastError::get(cc()).reset();
-
-        const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc())->getPrevShardHosts();
-
-        for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); i++) {
-            const std::string shardName = *i;
-
-            ShardConnection conn(opCtx, ConnectionString(shardName, ConnectionString::SET), "");
-
-            BSONObj res;
-
-            // Don't care about result from shards.
-            conn->runCommand(
-                dbname,
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-                res);
-            conn.done();
-        }
-
         return true;
     }
 

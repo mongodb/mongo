@@ -72,7 +72,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -708,18 +707,6 @@ void runCommand(OperationContext* opCtx,
                     throw;
                 }();
 
-                // Send setShardVersion on this thread's versioned connections to shards (to support
-                // commands that use the legacy (ShardConnection) versioning protocol).
-                //
-                // Versioned connections are a legacy concept, which is never used from code running
-                // under a transaction (see the invariant inside ShardConnection). Because of this,
-                // the retargeting error could not have come from a ShardConnection, so we don't
-                // need to reset the connection's in-memory state.
-                if (!MONGO_unlikely(doNotRefreshShardsOnRetargettingError.shouldFail()) &&
-                    !TransactionRouter::get(opCtx)) {
-                    ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
-                }
-
                 auto catalogCache = Grid::get(opCtx)->catalogCache();
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
@@ -1277,18 +1264,6 @@ void Strategy::explainFind(OperationContext* opCtx,
                 }
                 throw;
             }();
-
-            // Send setShardVersion on this thread's versioned connections to shards (to support
-            // commands that use the legacy (ShardConnection) versioning protocol).
-            //
-            // Versioned connections are a legacy concept, which is never used from code running
-            // under a transaction (see the invariant inside ShardConnection). Because of this, the
-            // retargeting error could not have come from a ShardConnection, so we don't need to
-            // reset the connection's in-memory state.
-            if (!MONGO_unlikely(doNotRefreshShardsOnRetargettingError.shouldFail()) &&
-                !TransactionRouter::get(opCtx)) {
-                ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
-            }
 
             if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                 Grid::get(opCtx)

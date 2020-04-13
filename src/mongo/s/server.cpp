@@ -76,7 +76,6 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
@@ -332,9 +331,6 @@ void cleanupTask(ServiceContext* serviceContext) {
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
         // harder to dry up the server from active connections before going on to really shut down.
 
-        // Shut down the global dbclient pool so callers stop waiting for connections.
-        shardConnectionPool.shutdown();
-
         // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
         if (auto sep = serviceContext->getServiceEntryPoint()) {
             if (!sep->shutdown(Seconds(10))) {
@@ -579,13 +575,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     unshardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
-    // TODO SERVER-33053: readReplyMetadata is not called on hooks added through
-    // ShardingConnectionHook with _shardedConnections=false, so this hook will not run for
-    // connections using globalConnPool.
     unshardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
-    globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+    globalConnPool.addHook(new ShardingConnectionHook(std::move(unshardedHookList)));
 
     auto shardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     shardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
@@ -593,8 +586,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     shardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
     shardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
-
-    shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
 
     // Hook up a Listener for changes from the ReplicaSetMonitor
     // This will last for the scope of this function. i.e. until shutdown finishes

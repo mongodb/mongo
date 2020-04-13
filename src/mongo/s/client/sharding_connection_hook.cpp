@@ -40,15 +40,13 @@
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/version_manager.h"
 
 namespace mongo {
 
 using std::string;
 
-ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections,
-                                               std::unique_ptr<rpc::EgressMetadataHook> egressHook)
-    : _shardedConnections(shardedConnections), _egressHook(std::move(egressHook)) {}
+ShardingConnectionHook::ShardingConnectionHook(std::unique_ptr<rpc::EgressMetadataHook> egressHook)
+    : _egressHook(std::move(egressHook)) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     if (conn->type() == ConnectionString::INVALID) {
@@ -69,14 +67,6 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                                                  << conn->getServerAddress());
     }
 
-    // Delegate the metadata hook logic to the egress hook; use lambdas to pass the arguments in
-    // the order expected by the egress hook.
-    if (_shardedConnections) {
-        conn->setReplyMetadataReader(
-            [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData target) {
-                return _egressHook->readReplyMetadata(opCtx, target, metadataObj);
-            });
-    }
     conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
         return _egressHook->writeRequestMetadata(opCtx, metadataBob);
     });
@@ -109,12 +99,6 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                     configServerModeNumber <= maxKnownConfigServerMode);
 
         uassertStatusOK(status);
-    }
-}
-
-void ShardingConnectionHook::onDestroy(DBClientBase* conn) {
-    if (_shardedConnections && versionManager.isVersionableCB(conn)) {
-        versionManager.resetShardVersionCB(conn);
     }
 }
 

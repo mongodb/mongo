@@ -31,7 +31,6 @@
 
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 namespace {
@@ -64,7 +63,6 @@ public:
              const std::string&,
              const mongo::BSONObj&,
              mongo::BSONObjBuilder& result) override {
-        shardConnectionPool.flush();
         globalConnPool.flush();
         return true;
     }

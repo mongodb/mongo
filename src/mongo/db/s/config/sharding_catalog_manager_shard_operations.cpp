@@ -66,7 +66,6 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version_helpers.h"
@@ -857,7 +856,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // The shard which was just removed must be reflected in the shard registry, before the replica
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-    shardConnectionPool.removeHost(name);
     ReplicaSetMonitor::remove(name);
 
     // Record finish in changelog

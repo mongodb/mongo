@@ -55,10 +55,12 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     // (no chunks).
     ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
 
-    // Assert that the other shards have the latest collection version after the command is run.
+    // Assert that the targeted shards have the latest collection version after the command is run.
     ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
     ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, latestCollectionVersion);
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard3, ns, latestCollectionVersion);
+
+    // Assert that the unaffected shard still has the stale collection version.
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard3, ns, latestCollectionVersion);
 }
 
 /*
