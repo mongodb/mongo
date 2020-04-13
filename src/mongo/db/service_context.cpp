@@ -332,6 +332,7 @@ void ServiceContext::setKillAllOperations() {
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state
     _globalKill.store(true);
+    auto opsKilled = 0;
 
     // Interrupt all active operations
     for (auto&& client : _clients) {
@@ -339,8 +340,12 @@ void ServiceContext::setKillAllOperations() {
         auto opCtxToKill = client->getOperationContext();
         if (opCtxToKill) {
             killOperation(lk, opCtxToKill, ErrorCodes::InterruptedAtShutdown);
+            opsKilled++;
         }
     }
+
+    // Shared by mongos and mongod shutdown code paths
+    LOGV2(4695300, "Interrupted all currently running operations", "opsKilled"_attr = opsKilled);
 
     // Notify any listeners who need to reach to the server shutting down
     for (const auto listener : _killOpListeners) {
