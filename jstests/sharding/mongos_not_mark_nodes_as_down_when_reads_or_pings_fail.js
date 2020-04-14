@@ -1,5 +1,6 @@
 /*
- * Tests that mongos does not mark nodes as down when reads fail.
+ * Tests that mongos does not mark nodes as down when reads or pings fail.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';
@@ -22,6 +23,7 @@ const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
 const kErrorCode = ErrorCodes.HostUnreachable;
+const kPingWaitTimeMS = 12 * 1000;  // streamable ReplicaSetMonitor's ping interval is 10 seconds.
 const testDB = st.s.getDB(kDbName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
@@ -63,6 +65,48 @@ jsTest.log("Test that mongos does not mark the secondary node as down when reads
     // command with readPreference "secondary" works).
     awaitRSClientHosts(st.s, st.rs0.nodes[1], {ok: true, secondary: true});
     assert.commandWorked(testDB.runCommand(cmdObj));
+})();
+
+jsTest.log("Test that mongos does not mark the primary node as down when pings fail");
+(() => {
+    // Make ping commands fail on the primary node with HostUnreachable. Sleep for some
+    // time to allow the ServerPingMonitor to send out pings.
+    const failPoint = configureFailPoint(
+        st.s, "serverPingMonitorFailWithHostUnreachable", {hostAndPort: st.rs0.nodes[0].host});
+    sleep(kPingWaitTimeMS);
+
+    // Verify that the node was not marked as down (i.e. it is still the primary node and
+    // we can run commands with readPreference "primary").
+    awaitRSClientHosts(st.s, st.rs0.nodes[0], {ok: true, ismaster: true});
+    const cmdObj = {
+        count: kCollName,
+        query: {x: {$gte: 0}},
+        $readPreference: {mode: "primary"},
+    };
+    assert.commandWorked(testDB.runCommand(cmdObj));
+
+    failPoint.off();
+})();
+
+jsTest.log("Test that mongos does not mark the secondary node as down when pings fail");
+(() => {
+    // Make ping commands fail on the secondary node with HostUnreachable. Sleep for some
+    // time to allow the ServerPingMonitor to send out pings.
+    const failPoint = configureFailPoint(
+        st.s, "serverPingMonitorFailWithHostUnreachable", {hostAndPort: st.rs0.nodes[1].host});
+    sleep(kPingWaitTimeMS);
+
+    // Verify that the node was not marked as down (i.e. it is still the secondary node and
+    // we can run commands with readPreference "secondary").
+    awaitRSClientHosts(st.s, st.rs0.nodes[1], {ok: true, secondary: true});
+    const cmdObj = {
+        count: kCollName,
+        query: {x: {$gte: 0}},
+        $readPreference: {mode: "secondary"},
+    };
+    assert.commandWorked(testDB.runCommand(cmdObj));
+
+    failPoint.off();
 })();
 
 st.stop();
