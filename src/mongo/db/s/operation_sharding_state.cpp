@@ -32,7 +32,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharded_connection_info.h"
 
 namespace mongo {
 namespace {
@@ -62,11 +61,7 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
 }
 
 bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
-    const auto client = opCtx->getClient();
-
-    // Shard version information received from mongos may either be attached to the Client or
-    // directly to the OperationContext
-    return ShardedConnectionInfo::get(client, false) || get(opCtx).hasShardVersion();
+    return get(opCtx).hasShardVersion();
 }
 
 void OperationShardingState::setAllowImplicitCollectionCreation(

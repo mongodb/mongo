@@ -38,7 +38,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/str.h"
@@ -93,14 +92,9 @@ public:
             "configServer",
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
 
-        ShardedConnectionInfo* const sci = ShardedConnectionInfo::get(opCtx->getClient(), false);
-        result.appendBool("inShardedMode", sci != nullptr);
-
-        if (sci && sci->getVersion(nss.ns())) {
-            result.appendTimestamp("mine", sci->getVersion(nss.ns())->toLong());
-        } else {
-            result.appendTimestamp("mine", 0);
-        }
+        // Legacy boolean related to sharded connections. To remove in 4.8.
+        result.appendBool("inShardedMode", false);
+        result.appendTimestamp("mine", 0);
 
         AutoGetCollection autoColl(
             opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);

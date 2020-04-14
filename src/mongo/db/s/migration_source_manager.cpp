@@ -97,13 +97,12 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
                                   ShardId toShard,
                                   const HostAndPort& toShardHost,
                                   const ChunkVersion& newCollVersion) {
-    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-        Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
-        toShard,
-        ConnectionString(toShardHost),
-        nss,
-        newCollVersion,
-        false);
+    SetShardVersionRequest ssv(Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
+                               toShard,
+                               ConnectionString(toShardHost),
+                               nss,
+                               newCollVersion,
+                               false);
 
     const executor::RemoteCommandRequest request(
         toShardHost,

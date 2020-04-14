@@ -26,7 +26,7 @@ assert.commandWorked(a.runCommand({
 
 printjson(s.config.chunks.findOne());
 
-assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.t, 1);
+assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.t, 0);
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t, 1);
 
 // From a different client
@@ -38,36 +38,6 @@ assert.eq(a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._con
 assert.eq(a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.i,
           0,
           "a2 mine 1");
-
-function simpleFindOne() {
-    return a2.getMongo().getDB("alleyinsider").foo.findOne();
-}
-
-var barEpoch = s.getDB('config').chunks.findOne({ns: 'alleyinsider.bar'}).lastmodEpoch;
-assert.commandWorked(a2.runCommand({
-    setShardVersion: "alleyinsider.bar",
-    configdb: s._configDB,
-    version: new Timestamp(1, 0),
-    versionEpoch: barEpoch,
-    shard: s.shard0.shardName,
-    authoritative: true
-}),
-                     "setShardVersion bar temp");
-
-assert.throws(simpleFindOne, [], "should complain about not in sharded mode 1");
-
-// the only way that setSharVersion passes is if the shard agrees with the version
-// the shard takes its version from config directly
-// TODO bump timestamps in config
-// assert(a2.runCommand({ "setShardVersion": "alleyinsider.foo", configdb: s._configDB, version:
-// 2 }).ok == 1, "setShardVersion a2-1");
-
-// simpleFindOne(); // now should run ok
-
-// assert(a2.runCommand({ "setShardVersion": "alleyinsider.foo", configdb: s._configDB, version:
-// 3 }).ok == 1, "setShardVersion a2-2");
-
-// simpleFindOne(); // newer version is ok
 
 s.stop();
 })();

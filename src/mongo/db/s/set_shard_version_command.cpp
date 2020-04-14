@@ -44,7 +44,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -97,33 +96,20 @@ public:
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         // Steps
-        // 1. As long as the command does not have noConnectionVersioning set, register a
-        //    ShardedConnectionInfo for this client connection (this is for clients using
-        //    ShardConnection). Registering the ShardedConnectionInfo guarantees that we will check
-        //    the shardVersion on all requests from this client connection. The connection's version
-        //    will be updated on each subsequent setShardVersion sent on this connection.
+        // 1. Set the `authoritative` and `forceRefresh` variables from the command object.
         //
-        // 2. If we have received the init form of setShardVersion, vacuously return true.
-        //    The init form of setShardVersion was used to initialize sharding awareness on a shard,
-        //    but was made obsolete in v3.4 by making nodes sharding-aware when they are added to a
-        //    cluster. The init form was kept in v3.4 shards for compatibility with mixed-version
-        //    3.2/3.4 clusters, but was deprecated and made to vacuously return true in v3.6.
-        //
-        // 3. Validate all command parameters against the info in our ShardingState, and return an
+        // 2. Validate all command parameters against the info in our ShardingState, and return an
         //    error if they do not match.
         //
-        // 4. If the sent shardVersion is compatible with our shardVersion, update the shardVersion
-        //    in this client's ShardedConnectionInfo if needed.
+        // 3. If the sent shardVersion is compatible with our shardVersion, return.
         //
-        // 5. If the sent shardVersion indicates a drop, jump to step 7.
+        // 4. If the sent shardVersion indicates a drop, jump to step 6.
         //
-        // 6. If the sent shardVersion is staler than ours, return a stale config error.
+        // 5. If the sent shardVersion is staler than ours, return a stale config error.
         //
-        // 7. If the sent shardVersion is newer than ours (or indicates a drop), reload our metadata
-        //    and compare the sent shardVersion with what we reloaded. If the versions are now
-        //    compatible, update the shardVersion in this client's ShardedConnectionInfo, as in
-        //    step 4. If the sent shardVersion is staler than what we reloaded, return a stale
-        //    config error, as in step 6.
+        // 6. If the sent shardVersion is newer than ours (or indicates a drop), reload our metadata
+        //    and compare the sent shardVersion with what we reloaded. If the sent shardVersion is
+        //    staler than what we reloaded, return a stale config error, as in step 5.
 
         // Step 1
 
@@ -137,27 +123,8 @@ public:
         // refresh or b) wait for a refresh to be started after it has entered the
         // getCollectionRoutingInfoWithRefresh function
         const bool forceRefresh = cmdObj.getBoolField("forceRefresh");
-        const bool noConnectionVersioning = cmdObj.getBoolField("noConnectionVersioning");
-
-        ShardedConnectionInfo dummyInfo;
-        ShardedConnectionInfo* info;
-        if (noConnectionVersioning) {
-            info = &dummyInfo;
-        } else {
-            info = ShardedConnectionInfo::get(client, true);
-        }
 
         // Step 2
-
-        // The init form of setShardVersion was deprecated in v3.6. For backwards compatibility with
-        // pre-v3.6 mongos, return true.
-        const auto isInit = cmdObj["init"].trueValue();
-        if (isInit) {
-            result.append("initialized", true);
-            return true;
-        }
-
-        // Step 3
 
         // Validate shardName parameter.
         const auto shardName = cmdObj["shard"].str();
@@ -196,17 +163,7 @@ public:
         const ChunkVersion requestedVersion = uassertStatusOK(
             ChunkVersion::parseLegacyWithField(cmdObj, SetShardVersionRequest::kVersion));
 
-        // Step 4
-
-        const auto connectionVersionOrNotSet = info->getVersion(nss.ns());
-
-        // For backwards compatibility, calling SSV for a namespace which is sharded, but doesn't
-        // have version set on the connection requires the call to fail and require the
-        // "need_authoritative" flag to be set on the response. Treating unset connection versions
-        // as UNSHARDED is the legacy way to achieve this purpose.
-        const auto connectionVersion =
-            (connectionVersionOrNotSet ? *connectionVersionOrNotSet : ChunkVersion::UNSHARDED());
-        connectionVersion.appendLegacyWithField(&result, "oldVersion");
+        // Step 3
 
         {
             boost::optional<AutoGetDb> autoDb;
@@ -240,32 +197,10 @@ public:
             }();
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
-                // MongoS and MongoD agree on what is the collection's shard version
-                //
-                // Now we should update the connection's version if it's not compatible with the
-                // request's version. This could happen if the shard's metadata has changed, but
-                // the remote client has already refreshed its view of the metadata since the last
-                // time it sent anything over this connection.
-                if (!connectionVersion.isWriteCompatibleWith(requestedVersion)) {
-                    if (connectionVersion < collectionShardVersion &&
-                        connectionVersion.epoch() == collectionShardVersion.epoch()) {
-                        // A migration occurred
-                        info->setVersion(nss.ns(), requestedVersion);
-                    } else if (authoritative) {
-                        // The collection was dropped and recreated or had its shard key refined.
-                        info->setVersion(nss.ns(), requestedVersion);
-                    } else {
-                        result.append("ns", nss.ns());
-                        result.appendBool("need_authoritative", true);
-                        errmsg = str::stream() << "verifying drop on '" << nss.ns() << "'";
-                        return false;
-                    }
-                }
-
                 return true;
             }
 
-            // Step 5
+            // Step 4
 
             const bool isDropRequested =
                 !requestedVersion.isSet() && collectionShardVersion.isSet();
@@ -283,18 +218,7 @@ public:
             } else {
                 // Not Dropping
 
-                // Step 6
-
-                // TODO: Refactor all of this
-                if (requestedVersion < connectionVersion &&
-                    requestedVersion.epoch() == connectionVersion.epoch()) {
-                    errmsg = str::stream() << "this connection already had a newer version "
-                                           << "of collection '" << nss.ns() << "'";
-                    result.append("ns", nss.ns());
-                    requestedVersion.appendLegacyWithField(&result, "newVersion");
-                    collectionShardVersion.appendLegacyWithField(&result, "globalVersion");
-                    return false;
-                }
+                // Step 5
 
                 // TODO: Refactor all of this
                 if (requestedVersion < collectionShardVersion &&
@@ -340,7 +264,7 @@ public:
             }
         }
 
-        // Step 7
+        // Step 6
 
         // Note: The forceRefresh flag controls whether we make sure to do our
         // own refresh or if we're okay with joining another thread
@@ -421,7 +345,6 @@ public:
             }
         }
 
-        info->setVersion(nss.ns(), requestedVersion);
         return true;
     }
 

@@ -1,6 +1,5 @@
 /**
- * Test that setShardVersion should not reject a configdb string with the same
- * replica set name, but with a member list that is not strictly the same.
+ * Test that setShardVersion fails if sent to the config server.
  */
 (function() {
 "use strict";
@@ -17,19 +16,6 @@ var directConn = new Mongo(st.rs0.getPrimary().host);
 var adminDB = directConn.getDB('admin');
 
 var configStr = adminDB.runCommand({getShardVersion: 'test.user'}).configServer;
-var alternateConfigStr = configStr.substring(0, configStr.lastIndexOf(','));
-
-var shardDoc = st.s.getDB('config').shards.findOne();
-
-jsTest.log("Verify that the obsolete init form of setShardVersion succeeds on shards.");
-assert.commandWorked(adminDB.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: alternateConfigStr,
-    shard: shardDoc._id,
-    shardHost: shardDoc.host
-}));
 
 var configAdmin = st.c0.getDB('admin');
 

@@ -37,12 +37,12 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
 
+// No-op command; deprecated as of v4.6.
 class UnsetShardingCommand : public BasicCommand {
 public:
     UnsetShardingCommand() : BasicCommand("unsetSharding") {}
@@ -75,7 +75,6 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        ShardedConnectionInfo::reset(opCtx->getClient());
         return true;
     }
 

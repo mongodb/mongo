@@ -73,7 +73,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/service_entry_point_common.h"
@@ -1732,14 +1731,6 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 currentOp.done();
                 forceLog = true;
             } else {
-                if (!opCtx->getClient()->isInDirectClient()) {
-                    uassert(18663,
-                            str::stream() << "legacy writeOps not longer supported for "
-                                          << "versioned connections, ns: " << nsString.ns()
-                                          << ", op: " << networkOpToString(op),
-                            !ShardedConnectionInfo::get(&c, false));
-                }
-
                 if (!nsString.isValid()) {
                     uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
                 } else if (op == dbInsert) {

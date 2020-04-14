@@ -818,8 +818,6 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
         if (!_lastSlaveOkConn->authenticatedDuringConnect()) {
             _authConnection(_lastSlaveOkConn.get());
         }
-    } else {
-        // Mongos pooled connections are authenticated through ShardingConnectionHook::onCreate()
     }
 
     LOGV2_DEBUG(20140,

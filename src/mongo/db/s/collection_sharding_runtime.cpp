@@ -36,7 +36,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -76,22 +75,14 @@ boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCt
                                                           const NamespaceString& nss) {
     auto& oss = OperationShardingState::get(opCtx);
 
-    // If there is a version attached to the OperationContext, use it as the received version,
-    // otherwise get the received version from the ShardedConnectionInfo
+    // If there is a version attached to the OperationContext, use it as the received version.
     if (oss.hasShardVersion()) {
         return oss.getShardVersion(nss);
-    } else if (auto const info = ShardedConnectionInfo::get(opCtx->getClient(), false)) {
-        auto connectionShardVersion = info->getVersion(nss.ns());
-
-        // For backwards compatibility with map/reduce, which can access up to 2 sharded collections
-        // in a single call, the lack of version for a namespace on the collection must be treated
-        // as UNSHARDED
-        return connectionShardVersion.value_or(ChunkVersion::UNSHARDED());
     }
 
-    // There is no shard version information on either 'opCtx' or 'client'. This means that the
-    // operation represented by 'opCtx' is unversioned, and the shard version is always OK for
-    // unversioned operations
+    // There is no shard version information on the 'opCtx'. This means that the operation
+    // represented by 'opCtx' is unversioned, and the shard version is always OK for unversioned
+    // operations.
     return boost::none;
 }
 

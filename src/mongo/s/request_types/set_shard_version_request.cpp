@@ -46,7 +46,6 @@ const char kCmdName[] = "setShardVersion";
 const char kConfigServer[] = "configdb";
 const char kShardName[] = "shard";
 const char kShardConnectionString[] = "shardHost";
-const char kInit[] = "init";
 const char kForceRefresh[] = "forceRefresh";
 const char kAuthoritative[] = "authoritative";
 const char kNoConnectionVersioning[] = "noConnectionVersioning";
@@ -57,22 +56,12 @@ constexpr StringData SetShardVersionRequest::kVersion;
 
 SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
                                                ShardId shardName,
-                                               ConnectionString shardConnectionString)
-    : _init(true),
-      _isAuthoritative(true),
-      _configServer(std::move(configServer)),
-      _shardName(std::move(shardName)),
-      _shardCS(std::move(shardConnectionString)) {}
-
-SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
-                                               ShardId shardName,
                                                ConnectionString shardConnectionString,
                                                NamespaceString nss,
                                                ChunkVersion version,
                                                bool isAuthoritative,
                                                bool forceRefresh)
-    : _init(false),
-      _isAuthoritative(isAuthoritative),
+    : _isAuthoritative(isAuthoritative),
       _forceRefresh(forceRefresh),
       _configServer(std::move(configServer)),
       _shardName(std::move(shardName)),
@@ -81,46 +70,6 @@ SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
       _version(std::move(version)) {}
 
 SetShardVersionRequest::SetShardVersionRequest() = default;
-
-SetShardVersionRequest SetShardVersionRequest::makeForInit(
-    const ConnectionString& configServer,
-    const ShardId& shardName,
-    const ConnectionString& shardConnectionString) {
-    return SetShardVersionRequest(configServer, shardName, shardConnectionString);
-}
-
-SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
-    const ConnectionString& configServer,
-    const ShardId& shardName,
-    const ConnectionString& shardConnectionString,
-    const NamespaceString& nss,
-    const ChunkVersion& nssVersion,
-    bool isAuthoritative,
-    bool forceRefresh) {
-    invariant(nss.isValid());
-    return SetShardVersionRequest(configServer,
-                                  shardName,
-                                  shardConnectionString,
-                                  nss,
-                                  nssVersion,
-                                  isAuthoritative,
-                                  forceRefresh);
-}
-
-SetShardVersionRequest SetShardVersionRequest::makeForVersioningNoPersist(
-    const ConnectionString& configServer,
-    const ShardId& shardName,
-    const ConnectionString& shard,
-    const NamespaceString& nss,
-    const ChunkVersion& nssVersion,
-    bool isAuthoritative,
-    bool forceRefresh) {
-    auto ssv = makeForVersioning(
-        configServer, shardName, shard, nss, nssVersion, isAuthoritative, forceRefresh);
-    ssv._noConnectionVersioning = true;
-
-    return ssv;
-}
 
 StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const BSONObj& cmdObj) {
     SetShardVersionRequest request;
@@ -148,12 +97,6 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     }
 
     {
-        Status status = bsonExtractBooleanFieldWithDefault(cmdObj, kInit, false, &request._init);
-        if (!status.isOK())
-            return status;
-    }
-
-    {
         Status status = bsonExtractBooleanFieldWithDefault(
             cmdObj, kForceRefresh, false, &request._forceRefresh);
         if (!status.isOK())
@@ -166,19 +109,6 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
         if (!status.isOK())
             return status;
     }
-
-    {
-        Status status = bsonExtractBooleanFieldWithDefault(
-            cmdObj, kNoConnectionVersioning, false, &request._noConnectionVersioning);
-        if (!status.isOK())
-            return status;
-    }
-
-    if (request.isInit()) {
-        return request;
-    }
-
-    // Only initialize the version information if this is not an "init" request
 
     {
         std::string ns;
@@ -210,37 +140,25 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
 BSONObj SetShardVersionRequest::toBSON() const {
     BSONObjBuilder cmdBuilder;
 
-    cmdBuilder.append(kCmdName, _init ? "" : _nss.get().ns());
-    cmdBuilder.append(kInit, _init);
+    cmdBuilder.append(kCmdName, _nss.get().ns());
     cmdBuilder.append(kForceRefresh, _forceRefresh);
     cmdBuilder.append(kAuthoritative, _isAuthoritative);
-    // 'configdb' field is only included for v3.4 backwards compatibility
+    // TODO (SERVER-47440): Remove adding config server to BSON once v4.4 parsing is
+    // removed.
     cmdBuilder.append(kConfigServer, _configServer.toString());
     cmdBuilder.append(kShardName, _shardName.toString());
     cmdBuilder.append(kShardConnectionString, _shardCS.toString());
 
-    if (_init) {
-        // Always include a 30 second timeout on sharding state initialization, to work around
-        // SERVER-21458.
-        cmdBuilder.append(QueryRequest::cmdOptionMaxTimeMS, 30000);
-    } else {
-        _version->appendLegacyWithField(&cmdBuilder, kVersion);
-    }
-
-    if (_noConnectionVersioning) {
-        cmdBuilder.append(kNoConnectionVersioning, true);
-    }
+    _version->appendLegacyWithField(&cmdBuilder, kVersion);
 
     return cmdBuilder.obj();
 }
 
 const NamespaceString& SetShardVersionRequest::getNS() const {
-    invariant(!_init);
     return _nss.get();
 }
 
 const ChunkVersion SetShardVersionRequest::getNSVersion() const {
-    invariant(!_init);
     return _version.get();
 }
 

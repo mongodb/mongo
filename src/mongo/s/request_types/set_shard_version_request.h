@@ -50,50 +50,13 @@ class SetShardVersionRequest {
 public:
     static constexpr StringData kVersion = "version"_sd;
 
-    /**
-     * Constructs a new set shard version request, which is of the "init" type, meaning it has no
-     * namespace or version information associated with it and the init flag is set.
-     * The constructed request will not contain the "noConnectionVersioning" field, which means that
-     * the entire connection will be marked as "versioned" on the mongod side. DO NOT USE when
-     * sending through the TaskExecutor, which pools connections without consideration for which
-     * are marked as sharded.
-     */
-    static SetShardVersionRequest makeForInit(const ConnectionString& configServer,
-                                              const ShardId& shardName,
-                                              const ConnectionString& shardConnectionString);
-
-    /**
-     * Constructs a new set shard version request, which is of the "versioning" type, meaning it has
-     * both initialization data and namespace and version information associated with it.
-     *
-     * The constructed request will not contain the "noConnectionVersioning" field, which means that
-     * the entire connection will be marked as "versioned" on the mongod side. DO NOT USE when
-     * sending through the TaskExecutor, which pools connections without consideration for which
-     * are marked as sharded.
-     */
-    static SetShardVersionRequest makeForVersioning(const ConnectionString& configServer,
-                                                    const ShardId& shardName,
-                                                    const ConnectionString& shard,
-                                                    const NamespaceString& nss,
-                                                    const ChunkVersion& nssVersion,
-                                                    bool isAuthoritative,
-                                                    bool forceRefresh = false);
-
-    /**
-     * Constructs a new set shard version request, which is of the "versioning" type, meaning it has
-     * both initialization data and namespace and version information associated with it. In
-     * addition, the request will contain the "noConnectionVersioning" field, which means that the
-     * connection WILL NOT be marked as "versioned". DO NOT USE except on connections only used
-     * with operations that do per-operation versioning, and do not depend on the connection being
-     * marked as sharded.
-     */
-    static SetShardVersionRequest makeForVersioningNoPersist(const ConnectionString& configServer,
-                                                             const ShardId& shardName,
-                                                             const ConnectionString& shard,
-                                                             const NamespaceString& nss,
-                                                             const ChunkVersion& nssVersion,
-                                                             bool isAuthoritative,
-                                                             bool forceRefresh = false);
+    SetShardVersionRequest(ConnectionString configServer,
+                           ShardId shardName,
+                           ConnectionString shardConnectionString,
+                           NamespaceString nss,
+                           ChunkVersion version,
+                           bool isAuthoritative,
+                           bool forceRefresh = false);
 
     /**
      * Parses an SSV request from a set shard version command.
@@ -104,16 +67,6 @@ public:
      * Produces a BSON representation of the request, which can be used for sending as a command.
      */
     BSONObj toBSON() const;
-
-    /**
-     * Returns whether this is an "init" type of request, where we only have the config server
-     * information and the identity that the targeted shard should assume or it contains namespace
-     * version as well. If this value is true, it is illegal to access anything other than the
-     * config server, shard name and shard connection string fields.
-     */
-    bool isInit() const {
-        return _init;
-    }
 
     /**
      * Returns whether this request should force the version to be set instead of it being reloaded
@@ -154,41 +107,19 @@ public:
      */
     const ChunkVersion getNSVersion() const;
 
-    /**
-     * Returns whether this setShardVersion request should be persisted on the connection or it
-     * should only be used to initialize the namespace in the global sharding state.
-     */
-    bool getNoConnectionVersioning() const {
-        return _noConnectionVersioning;
-    }
-
 private:
-    SetShardVersionRequest(ConnectionString configServer,
-                           ShardId shardName,
-                           ConnectionString shardConnectionString);
-
-    SetShardVersionRequest(ConnectionString configServer,
-                           ShardId shardName,
-                           ConnectionString shardConnectionString,
-                           NamespaceString nss,
-                           ChunkVersion version,
-                           bool isAuthoritative,
-                           bool forceRefresh = false);
-
     SetShardVersionRequest();
 
-    bool _init{false};
     bool _isAuthoritative{false};
     bool _forceRefresh{false};
-    bool _noConnectionVersioning{false};
 
-    // Only required for v3.4 backwards compatibility.
+    // TODO (SERVER-47440): Remove this parameter once the v4.4 SetShardVersion command stops
+    // parsing it.
     ConnectionString _configServer;
 
     ShardId _shardName;
     ConnectionString _shardCS;
 
-    // These values are only set if _init is false
     boost::optional<NamespaceString> _nss;
     boost::optional<ChunkVersion> _version;
 };
