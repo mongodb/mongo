@@ -620,5 +620,9 @@ BSONObj ReplicationCoordinatorMock::runCmdOnPrimaryAndAwaitResponse(
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
     return BSON("ok" << 1);
 }
+void ReplicationCoordinatorMock::restartHeartbeats_forTest() {
+    return;
+}
+
 }  // namespace repl
 }  // namespace mongo

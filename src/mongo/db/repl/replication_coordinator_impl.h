@@ -375,6 +375,8 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
+    virtual void restartHeartbeats_forTest() override;
+
     // ================== Test support API ===================
 
     /**

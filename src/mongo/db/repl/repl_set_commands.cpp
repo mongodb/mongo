@@ -160,6 +160,9 @@ public:
                 result.append("lastStableRecoveryTimestamp", ts.get());
             }
             return true;
+        } else if (cmdObj.hasElement("restartHeartbeats")) {
+            replCoord->restartHeartbeats_forTest();
+            return true;
         }
 
         Status status = replCoord->checkReplEnabledForCommand(&result);

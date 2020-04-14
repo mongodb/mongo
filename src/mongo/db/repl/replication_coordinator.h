@@ -1039,6 +1039,11 @@ public:
                                                     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                                     OnRemoteCmdCompleteFn onRemoteCmdComplete) = 0;
 
+    /**
+     * A testing only function that cancels and reschedules replication heartbeats immediately.
+     */
+    virtual void restartHeartbeats_forTest() = 0;
+
 protected:
     ReplicationCoordinator();
 };

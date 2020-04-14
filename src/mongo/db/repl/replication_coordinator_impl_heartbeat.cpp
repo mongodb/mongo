@@ -41,6 +41,7 @@
 #include <functional>
 
 #include "mongo/base/status.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
@@ -862,6 +863,13 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
         _replExecutor->cancel(_handleLivenessTimeoutCbh);
     }
 }
+
+void ReplicationCoordinatorImpl::restartHeartbeats_forTest() {
+    stdx::unique_lock<Latch> lk(_mutex);
+    invariant(getTestCommandsEnabled());
+    LOGV2_FOR_HEARTBEATS(4406800, 0, "Restarting heartbeats");
+    _restartHeartbeats_inlock();
+};
 
 void ReplicationCoordinatorImpl::_restartHeartbeats_inlock() {
     _cancelHeartbeats_inlock();

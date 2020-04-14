@@ -546,5 +546,9 @@ BSONObj ReplicationCoordinatorEmbedded::runCmdOnPrimaryAndAwaitResponse(
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorEmbedded::restartHeartbeats_forTest() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace embedded
 }  // namespace mongo
