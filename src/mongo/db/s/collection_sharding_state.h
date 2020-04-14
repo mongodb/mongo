@@ -99,7 +99,7 @@ public:
      */
     virtual ScopedCollectionDescription getCollectionDescription() = 0;
 
-    // TODO (SERVER-46703): This method must not be used in any new code because it does not provide
+    // TODO (SERVER-32198): This method must not be used in any new code because it does not provide
     // the necessary guarantees that getCollectionDescription above does. Specifically, it silently
     // treats UNKNOWN metadata as UNSHARDED, which can lead to data loss.
     virtual ScopedCollectionDescription getCollectionDescription_DEPRECATED() = 0;
@@ -138,7 +138,7 @@ public:
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) = 0;
 
-    // TODO (SERVER-46703): This method must not be used in any new code because it does not provide
+    // TODO (SERVER-32198): This method must not be used in any new code because it does not provide
     // the necessary guarantees that checkShardVersionOrThrow above does. Specifically, it silently
     // treats UNKNOWN metadata as UNSHARDED, which can lead to data loss.
     virtual void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) = 0;
