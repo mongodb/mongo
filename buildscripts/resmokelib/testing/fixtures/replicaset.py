@@ -224,12 +224,20 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             # command.
             for node in self.nodes[1:]:
                 node.await_ready()
-            repl_config["version"] = 2
-            repl_config["members"] = members
-            self.logger.info("Issuing replSetReconfig command: %s", repl_config)
-            # Temporarily use 'force: true' to allow multi-node reconfig.
-            self._configure_repl_set(client, {"replSetReconfig": repl_config, "force": True})
-            self._await_secondaries()
+            # Add in the members one at a time, since non force reconfigs can only add/remove a
+            # single voting member at a time.
+            repl_config["version"] = client.admin.command(
+                {"replSetGetConfig": 1})['config']['version']
+            for ind in range(2, len(members) + 1):
+                repl_config["version"] = repl_config["version"] + 1
+                repl_config["members"] = members[:ind]
+                self.logger.info("Issuing replSetReconfig command: %s", repl_config)
+                self._configure_repl_set(
+                    client, {
+                        "replSetReconfig": repl_config,
+                        "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+                    })
+        self._await_secondaries()
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""
