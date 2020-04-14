@@ -286,6 +286,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
+    options.skipSourceCollectionShardedCheck = true;
     uassertStatusOK(renameCollection(opCtx, tempNs, ns, options));
 }
 

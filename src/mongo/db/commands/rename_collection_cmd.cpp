@@ -87,11 +87,11 @@ public:
                            BSONObjBuilder& result) {
         auto renameRequest =
             RenameCollectionCommand::parse(IDLParserErrorContext("renameCollection"), cmdObj);
-        validateAndRunRenameCollection(opCtx,
-                                       renameRequest.getCommandParameter(),
-                                       renameRequest.getTo(),
-                                       renameRequest.getDropTarget(),
-                                       renameRequest.getStayTemp());
+        RenameCollectionOptions options;
+        options.dropTarget = renameRequest.getDropTarget();
+        options.stayTemp = renameRequest.getStayTemp();
+        validateAndRunRenameCollection(
+            opCtx, renameRequest.getCommandParameter(), renameRequest.getTo(), options);
         return true;
     }
 

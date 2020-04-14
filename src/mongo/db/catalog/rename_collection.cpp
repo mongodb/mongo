@@ -72,8 +72,8 @@ boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, c
 }
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    auto* const css = CollectionShardingState::get(opCtx, nss);
-    return css->getCollectionDescription_DEPRECATED().isSharded();
+    return opCtx->writesAreReplicated() &&
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded();
 }
 
 // From a replicated to an unreplicated collection or vice versa.
@@ -98,7 +98,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Not primary while renaming collection " << source << " to "
                                     << target);
 
-    if (isCollectionSharded(opCtx, source))
+    if (!options.skipSourceCollectionShardedCheck && isCollectionSharded(opCtx, source))
         return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
 
     if (isReplicatedChanged(opCtx, source, target))
@@ -498,6 +498,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
+    // The source collection is not temporary, so we should check if is sharded or not.
     if (isCollectionSharded(opCtx, source))
         return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
 
@@ -706,7 +707,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
     invariant(tmpName.db() == target.db());
-    Status status = renameCollectionWithinDB(opCtx, tmpName, target, options);
+    RenameCollectionOptions tempOptions(options);
+    tempOptions.skipSourceCollectionShardedCheck = true;
+    Status status = renameCollectionWithinDB(opCtx, tmpName, target, tempOptions);
     if (!status.isOK())
         return status;
 
@@ -720,8 +723,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
-                                                    bool dropTarget,
-                                                    bool stayTemp,
+                                                    const RenameCollectionOptions& options,
                                                     std::list<BSONObj> originalIndexes,
                                                     BSONObj originalCollectionOptions) {
     AutoGetDb dbLock(opCtx, targetNs.db(), MODE_X);
@@ -758,13 +760,12 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                            currentIndexes.begin(),
                            SimpleBSONObjComparator::kInstance.makeEqualTo()));
 
-    validateAndRunRenameCollection(opCtx, sourceNs, targetNs, dropTarget, stayTemp);
+    validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
 void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,
-                                    bool dropTarget,
-                                    bool stayTemp) {
+                                    const RenameCollectionOptions& options) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid source namespace: " << source.ns(),
             source.isValid());
@@ -802,9 +803,6 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
                   "allowed");
     }
 
-    RenameCollectionOptions options;
-    options.dropTarget = dropTarget;
-    options.stayTemp = stayTemp;
     uassertStatusOK(renameCollection(opCtx, source, target, options));
 }
 

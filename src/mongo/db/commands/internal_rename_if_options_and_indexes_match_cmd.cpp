@@ -54,11 +54,14 @@ public:
             auto thisRequest = request();
             auto originalIndexes = thisRequest.getIndexes();
             auto indexList = std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
+            RenameCollectionOptions options;
+            options.dropTarget = true;
+            options.stayTemp = false;
+            options.skipSourceCollectionShardedCheck = true;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
                                                            thisRequest.getFrom(),
                                                            thisRequest.getTo(),
-                                                           true /* dropTarget */,
-                                                           false /* stayTemp */,
+                                                           options,
                                                            std::move(indexList),
                                                            thisRequest.getCollectionOptions());
         }

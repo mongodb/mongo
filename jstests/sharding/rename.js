@@ -56,12 +56,6 @@ assert.commandWorked(db.adminCommand({renameCollection: 'test.unSharded', to: 's
 const dropTarget = true;
 assert.commandFailed(db.bar.renameCollection('shardedColl', dropTarget));
 
-jsTest.log('Testing renaming sharded collections, directly on the shard');
-var primary = replTest.getPrimary();
-assert.commandFailed(primary.getDB('test').shardedColl.renameCollection('somethingElse'));
-assert.commandFailed(primary.getDB('test').bar.renameCollection('shardedColl'));
-assert.commandFailed(primary.getDB('test').bar.renameCollection('shardedColl', dropTarget));
-
 jsTest.log("Testing write concern (1)");
 
 assert.commandWorked(db.foo.insert({_id: 3}));

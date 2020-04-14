@@ -42,22 +42,24 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
-void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                    const NamespaceString& sourceNs,
-                                                    const NamespaceString& targetNs,
-                                                    bool dropTarget,
-                                                    bool stayTemp,
-                                                    std::list<BSONObj> originalIndexes,
-                                                    BSONObj collectionOptions);
 /**
- * Renames the collection from "source" to "target" and drops the existing collection iff
+ * Renames the collection from "source" to "target" and drops the existing collection if
  * "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
- * temporariness.
+ * temporariness. "skipSourceCollectionShardedCheck" indicates the "source" collection sharding
+ * state shouldn't be checked.
  */
 struct RenameCollectionOptions {
     bool dropTarget = false;
     bool stayTemp = false;
+    bool skipSourceCollectionShardedCheck = false;
 };
+
+void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
+                                                    const NamespaceString& sourceNs,
+                                                    const NamespaceString& targetNs,
+                                                    const RenameCollectionOptions& options,
+                                                    std::list<BSONObj> originalIndexes,
+                                                    BSONObj collectionOptions);
 
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
@@ -93,7 +95,6 @@ Status renameCollectionForRollback(OperationContext* opCtx,
 void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,
-                                    bool dropTarget,
-                                    bool stayTemp);
+                                    const RenameCollectionOptions& options);
 
 }  // namespace mongo
