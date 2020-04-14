@@ -333,6 +333,22 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     }
 
     auto replState = swReplState.getValue();
+
+    {
+        // Secondary nodes will always try to vote regardless of the commit quorum value. If the
+        // commit quorum is disabled, do not record their entry into the commit ready nodes.
+        Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+        auto commitQuorum = invariant(getCommitQuorum(opCtx, buildUUID));
+        if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
+            return Status::OK();
+        }
+    }
+
+    // Our current contract is that commit quorum can't be disabled for an active index build with
+    // commit quorum on (i.e., commit value set as non-zero or a valid tag) and vice-versa. So,
+    // after this point, it's not possible for the index build's commit quorum value to get updated
+    // to CommitQuorumOptions::kDisabled.
+
     Status upsertStatus(ErrorCodes::InternalError, "Uninitialized value");
 
     IndexBuildEntry indexbuildEntry(
@@ -442,6 +458,16 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
     invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
 
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
+    // Secondaries should always try to vote even if the commit quorum is disabled. Secondaries
+    // must not read the on-disk commit quorum value as it may not be present at all times, such as
+    // during initial sync.
+    if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+        return false;
+    }
+
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
     Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
@@ -455,13 +481,7 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
         return false;
     }
 
-    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    if (replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
-        // Node is primary here.
-        _sendCommitQuorumSatisfiedSignal(opCtx, replState);
-    }
-    // No-op for secondaries.
+    _sendCommitQuorumSatisfiedSignal(opCtx, replState);
     return true;
 }
 
