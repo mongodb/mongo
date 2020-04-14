@@ -3,7 +3,10 @@
  *
  * This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
  * A restarted standalone will lose all data when using an ephemeral storage engine.
- * @tags: [requires_persistence]
+ *
+ * MongoD cannot downgrade after a hard crash, or restart from standalone.
+ *
+ * @tags: [multiversion_incompatible,requires_persistence]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
