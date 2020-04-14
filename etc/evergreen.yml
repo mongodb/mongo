@@ -10384,6 +10384,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0 (Dagger)"
+  batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -10397,6 +10398,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
+  batchtime: 1440 # 1 day
   run_on:
   - rhel70
   expansions:
@@ -10413,6 +10415,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
+  batchtime: 10080  # 1 week
   run_on:
   - rhel70
   expansions:
