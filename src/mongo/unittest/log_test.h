@@ -36,34 +36,47 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
 
-namespace mongo {
+namespace mongo::unittest {
 
-inline logv2::LogSeverity getMinimumLogSeverity() {
-    return logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
-        mongo::logv2::LogComponent::kDefault);
+namespace log_test_detail {
+
+using logv2::LogComponent;
+using logv2::LogSeverity;
+
+inline auto& _settings() {
+    return logv2::LogManager::global().getGlobalSettings();
 }
 
-inline logv2::LogSeverity getMinimumLogSeverity(logv2::LogComponent component) {
-    return logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(component);
+inline bool hasMinimumLogSeverity(LogComponent component) {
+    return _settings().hasMinimumLogSeverity(component);
 }
 
-inline void setMinimumLoggedSeverity(logv2::LogSeverity severity) {
-    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
-        mongo::logv2::LogComponent::kDefault, severity);
+inline LogSeverity getMinimumLogSeverity(LogComponent component) {
+    return _settings().getMinimumLogSeverity(component);
 }
 
-inline void setMinimumLoggedSeverity(logv2::LogComponent component, logv2::LogSeverity severity) {
-    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(component,
-                                                                                    severity);
+inline LogSeverity getMinimumLogSeverity() {
+    return getMinimumLogSeverity(LogComponent::kDefault);
 }
 
-inline void clearMinimumLoggedSeverity(logv2::LogComponent component) {
-    return logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(component);
+inline void setMinimumLoggedSeverity(LogComponent component, LogSeverity severity) {
+    return _settings().setMinimumLoggedSeverity(component, severity);
 }
 
-inline bool hasMinimumLogSeverity(logv2::LogComponent component) {
-    return logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(component);
+inline void setMinimumLoggedSeverity(LogSeverity severity) {
+    return setMinimumLoggedSeverity(LogComponent::kDefault, severity);
 }
+
+inline void clearMinimumLoggedSeverity(LogComponent component) {
+    return _settings().clearMinimumLoggedSeverity(component);
+}
+
+}  // namespace log_test_detail
+
+using log_test_detail::clearMinimumLoggedSeverity;
+using log_test_detail::getMinimumLogSeverity;
+using log_test_detail::hasMinimumLogSeverity;
+using log_test_detail::setMinimumLoggedSeverity;
 
 /**
  * Configure a LogComponent`s MinimumLoggedSeverity, saving the old state and restoring it
@@ -72,9 +85,14 @@ inline bool hasMinimumLogSeverity(logv2::LogComponent component) {
  */
 class MinimumLoggedSeverityGuard {
 public:
+    /** Just save and restore: do not change the severity at ctor time. */
+    explicit MinimumLoggedSeverityGuard(logv2::LogComponent component)
+        : _component{component}, _savedSeverity{_get()} {}
+
+    /** Change the `component` to have `severity`. */
     MinimumLoggedSeverityGuard(logv2::LogComponent component,
                                boost::optional<logv2::LogSeverity> severity)
-        : _component{component}, _savedSeverity{_get()} {
+        : MinimumLoggedSeverityGuard{component} {
         _put(severity);
     }
 
@@ -101,4 +119,4 @@ private:
     boost::optional<logv2::LogSeverity> _savedSeverity;
 };
 
-}  // namespace mongo
+}  // namespace mongo::unittest

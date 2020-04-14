@@ -95,7 +95,7 @@ int main(int argc, char** argv, char** envp) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;
     }
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Debug(verbose.length()));
+    mongo::unittest::setMinimumLoggedSeverity(mongo::logv2::LogSeverity::Debug(verbose.size()));
 
     if (list) {
         auto suiteNames = ::mongo::unittest::getAllSuiteNames();

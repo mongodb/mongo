@@ -159,17 +159,8 @@ public:
 
 // Fixture class to raise log verbosity so that invalid messages are printed by the parser.
 class OpMsgParser : public unittest::Test {
-public:
-    void setUp() override {
-        _original = getMinimumLogSeverity(logv2::LogComponent::kNetwork);
-        setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(1));
-    }
-    void tearDown() override {
-        setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, _original);
-    }
-
-private:
-    logv2::LogSeverity _original = logv2::LogSeverity::Debug(0);
+    unittest::MinimumLoggedSeverityGuard _severityGuard{logv2::LogComponent::kNetwork,
+                                                        logv2::LogSeverity::Debug(1)};
 };
 
 // Section bytes

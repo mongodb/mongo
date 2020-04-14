@@ -7175,16 +7175,9 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
 
 class HeartbeatResponseHighVerbosityTestV1 : public HeartbeatResponseTestV1 {
 public:
-    virtual void setUp() {
-        HeartbeatResponseTestV1::setUp();
-        // set verbosity as high as the highest verbosity log message we'd like to check for
-        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
-    }
-
-    virtual void tearDown() {
-        HeartbeatResponseTestV1::tearDown();
-        setMinimumLoggedSeverity(logv2::LogSeverity::Log());
-    }
+    // set verbosity as high as the highest verbosity log message we'd like to check for
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
+                                                       logv2::LogSeverity::Debug(3)};
 };
 
 // TODO(dannenberg) figure out why this test is useful

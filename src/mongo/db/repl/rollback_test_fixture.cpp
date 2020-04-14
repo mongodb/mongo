@@ -110,10 +110,6 @@ void RollbackTest::setUp() {
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 
-    // Increase rollback log component verbosity for unit tests.
-    setMinimumLoggedSeverity(logv2::LogComponent::kReplicationRollback,
-                             logv2::LogSeverity::Debug(2));
-
     auto observerRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
     observerRegistry->addObserver(std::make_unique<RollbackTestOpObserver>());
 
