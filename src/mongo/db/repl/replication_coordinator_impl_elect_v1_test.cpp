@@ -581,7 +581,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
                   getReplCoord()->processReplSetReconfig(&opCtx, args, &result));
 
-    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(2));
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                              logv2::LogSeverity::Debug(2)};
     startCapturingLogMessages();
 
     // receive sufficient heartbeats to allow the node to see a majority.
@@ -1191,7 +1192,8 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
                                                          << "node3:12345"))
                              << "protocolVersion" << 1);
 
-    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(2));
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                              logv2::LogSeverity::Debug(2)};
     startCapturingLogMessages();
 
     assertStartSuccess(configObj, HostAndPort("node1", 12345));

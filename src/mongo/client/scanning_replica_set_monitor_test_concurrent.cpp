@@ -62,8 +62,6 @@ protected:
         ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
         _startTime = getNet()->now();
-
-        { setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(2)); }
         setGlobalServiceContext(std::move(serviceContext));
     }
 
@@ -154,6 +152,9 @@ protected:
     }
 
 private:
+    unittest::MinimumLoggedSeverityGuard _networkSeverityGuard{logv2::LogComponent::kNetwork,
+                                                               logv2::LogSeverity::Debug(2)};
+
     std::map<HostAndPort, int> _numChecks;
     Date_t _startTime;
 

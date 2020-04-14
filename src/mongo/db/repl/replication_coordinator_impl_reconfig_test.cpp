@@ -685,7 +685,8 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     hbResp.addToBSON(&respObj2);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj2.obj()));
 
-    setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                              logv2::LogSeverity::Debug(1)};
     startCapturingLogMessages();
     // execute hb reconfig, which should fail with a log message; confirmed at end of test
     net->runReadyNetworkOperations();
@@ -698,7 +699,6 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
                                           "the midst of a configuration process"));
     shutdown(opCtx.get());
     reconfigThread.join();
-    setMinimumLoggedSeverity(logv2::LogSeverity::Log());
 }
 
 TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary) {
@@ -744,10 +744,8 @@ class ReplCoordReconfigTest : public ReplCoordTest {
 public:
     int counter = 0;
     std::vector<HostAndPort> initialSyncNodes;
-
-    void setUp() {
-        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(3));
-    }
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
+                                                       logv2::LogSeverity::Debug(3)};
 
     BSONObj member(int id, std::string host) {
         return BSON("_id" << id << "host" << host);

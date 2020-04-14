@@ -82,6 +82,9 @@ private:
     void tearDown() override;
 
 protected:
+    // Reset default log level when each test is over in case it was changed.
+    unittest::MinimumLoggedSeverityGuard _verbosityGuard{logv2::LogComponent::kReplication};
+
     OpObserverMock* _opObserver = nullptr;
     std::unique_ptr<StorageInterface> _storage;
 };
@@ -115,9 +118,6 @@ void ApplyOpsTest::setUp() {
 void ApplyOpsTest::tearDown() {
     _storage = {};
     _opObserver = nullptr;
-
-    // Reset default log level in case it was changed.
-    setMinimumLoggedSeverity(logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(0));
 
     ServiceContextMongoDTest::tearDown();
 }
@@ -291,7 +291,8 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     auto opCtx = cc().makeOperationContext();
 
     // Increase log component verbosity to check for op application messages.
-    setMinimumLoggedSeverity(logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3));
+    auto verbosityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kReplication,
+                                                               logv2::LogSeverity::Debug(3)};
 
     // Test that the 'applyOps' function passes the oplog application mode through correctly to the
     // underlying op application functions.

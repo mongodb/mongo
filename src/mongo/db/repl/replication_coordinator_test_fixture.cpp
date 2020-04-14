@@ -86,7 +86,6 @@ ReplCoordTest::ReplCoordTest() {
 }
 
 ReplCoordTest::~ReplCoordTest() {
-    clearMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection);
     globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 
     if (_callShutdown) {

@@ -40,6 +40,10 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/log_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {
@@ -133,6 +137,10 @@ protected:
     DropPendingCollectionReaper* _dropPendingCollectionReaper = nullptr;
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+
+    // Increase rollback log component verbosity for unit tests.
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kReplicationRollback,
+                                                       logv2::LogSeverity::Debug(2)};
 };
 
 class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {

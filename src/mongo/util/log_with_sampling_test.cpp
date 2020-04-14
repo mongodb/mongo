@@ -59,7 +59,7 @@ auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     const auto client = serviceContext->makeClient("log_with_sampling_test");
     const auto opCtx = client->makeOperationContext();
 
-    auto loggedSeverityGuard = MinimumLoggedSeverityGuard(
+    auto loggedSeverityGuard = unittest::MinimumLoggedSeverityGuard(
         component, debugLogEnabled ? logv2::LogSeverity::Debug(1) : logv2::LogSeverity::Info());
 
     auto sampleRateGuard = makeGuard(

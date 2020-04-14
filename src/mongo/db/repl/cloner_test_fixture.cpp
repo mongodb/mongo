@@ -57,8 +57,6 @@ BSONObj ClonerTestFixture::createCursorResponse(const std::string& nss, const BS
 
 void ClonerTestFixture::setUp() {
     unittest::Test::setUp();
-    logger::globalLogDomain()->setMinimumLoggedSeverity(
-        logger::LogComponent::kReplicationInitialSync, logger::LogSeverity::Debug(1));
     Client::initThread("ClonerTest");
     ThreadPool::Options options;
     options.minThreads = 1U;
@@ -85,8 +83,6 @@ void ClonerTestFixture::setUp() {
 void ClonerTestFixture::tearDown() {
     _dbWorkThreadPool.reset();
     Client::releaseCurrent();
-    logger::globalLogDomain()->setMinimumLoggedSeverity(
-        logger::LogComponent::kReplicationInitialSync, logger::LogSeverity::Debug(0));
     unittest::Test::tearDown();
 }
 

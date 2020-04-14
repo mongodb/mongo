@@ -6753,8 +6753,8 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     // Log all the election messages.
-    setMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection,
-                             logv2::LogSeverity::Debug(5));
+    auto replElectionAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplicationElection, logv2::LogSeverity::Debug(5)};
     startCapturingLogMessages();
     // heartbeatTimeoutSecs is made large so we can advance the clock without worrying about
     // additional heartbeats.
@@ -6813,8 +6813,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Rescheduling election timeout callback"));
     ASSERT_EQ(1, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 
-    setMinimumLoggedSeverity(logv2::LogComponent::kReplicationElection,
-                             logv2::LogSeverity::Debug(4));
+    auto replElectionReducedSeverityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplicationElection, logv2::LogSeverity::Debug(4)};
     net->enterNetwork();
     until = electionTimeoutWhen + Milliseconds(500);
     net->runUntil(until);

@@ -67,6 +67,10 @@ namespace {
 
 using mongo::ErrorCodes;
 using mongo::Status;
+
+using mongo::unittest::getMinimumLogSeverity;
+using mongo::unittest::hasMinimumLogSeverity;
+
 namespace moe = mongo::optionenvironment;
 
 MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
@@ -97,13 +101,16 @@ private:
     std::string _config;
 };
 
-TEST(Verbosity, Default) {
+class Verbosity : public mongo::unittest::Test {
+    /** Reset the log level before we test */
+    mongo::unittest::MinimumLoggedSeverityGuard _severityGuard{mongo::logv2::LogComponent::kDefault,
+                                                               mongo::logv2::LogSeverity::Info()};
+};
+
+TEST_F(Verbosity, Default) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -119,16 +126,13 @@ TEST(Verbosity, Default) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     // Make sure the log level didn't change since we didn't specify any verbose options
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Info());
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Info());
 }
 
-TEST(Verbosity, CommandLineImplicit) {
+TEST_F(Verbosity, CommandLineImplicit) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -145,16 +149,13 @@ TEST(Verbosity, CommandLineImplicit) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 1;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, CommandLineString) {
+TEST_F(Verbosity, CommandLineString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -172,16 +173,13 @@ TEST(Verbosity, CommandLineString) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, CommandLineStringDisguisedLongForm) {
+TEST_F(Verbosity, CommandLineStringDisguisedLongForm) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -199,16 +197,13 @@ TEST(Verbosity, CommandLineStringDisguisedLongForm) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, CommandLineEmptyString) {
+TEST_F(Verbosity, CommandLineEmptyString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -221,13 +216,10 @@ TEST(Verbosity, CommandLineEmptyString) {
     ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
 }
 
-TEST(Verbosity, CommandLineBadString) {
+TEST_F(Verbosity, CommandLineBadString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -242,13 +234,10 @@ TEST(Verbosity, CommandLineBadString) {
     ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
 }
 
-TEST(Verbosity, CommandLineBadStringOnlyDash) {
+TEST_F(Verbosity, CommandLineBadStringOnlyDash) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -260,13 +249,10 @@ TEST(Verbosity, CommandLineBadStringOnlyDash) {
     ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
 }
 
-TEST(Verbosity, CommandLineBadStringOnlyTwoDashes) {
+TEST_F(Verbosity, CommandLineBadStringOnlyTwoDashes) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -278,13 +264,10 @@ TEST(Verbosity, CommandLineBadStringOnlyTwoDashes) {
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 }
 
-TEST(Verbosity, INIConfigString) {
+TEST_F(Verbosity, INIConfigString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -304,16 +287,13 @@ TEST(Verbosity, INIConfigString) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, INIConfigBadString) {
+TEST_F(Verbosity, INIConfigBadString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -330,13 +310,10 @@ TEST(Verbosity, INIConfigBadString) {
     ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
 }
 
-TEST(Verbosity, INIConfigEmptyString) {
+TEST_F(Verbosity, INIConfigEmptyString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -356,16 +333,13 @@ TEST(Verbosity, INIConfigEmptyString) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 0;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, JSONConfigString) {
+TEST_F(Verbosity, JSONConfigString) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -385,16 +359,13 @@ TEST(Verbosity, JSONConfigString) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 4;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, MultipleSourcesMultipleOptions) {
+TEST_F(Verbosity, MultipleSourcesMultipleOptions) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
-
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -416,19 +387,17 @@ TEST(Verbosity, MultipleSourcesMultipleOptions) {
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
     int verbosity = 3;
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
 }
 
-TEST(Verbosity, YAMLConfigStringLogComponent) {
+TEST_F(Verbosity, YAMLConfigStringLogComponent) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
-    // Reset the log level before we test
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogSeverity::Info());
     // Log level for Storage will be cleared by config file value.
-    mongo::setMinimumLoggedSeverity(::mongo::logv2::LogComponent::kStorage,
-                                    ::mongo::logv2::LogSeverity::Debug(1));
+    auto storageSeverityGuard = mongo::unittest::MinimumLoggedSeverityGuard{
+        mongo::logv2::LogComponent::kStorage, mongo::logv2::LogSeverity::Debug(1)};
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
@@ -460,28 +429,28 @@ TEST(Verbosity, YAMLConfigStringLogComponent) {
     int verbosity = 4;
 
     // Default
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(::mongo::logv2::LogComponent::kDefault),
+    ASSERT_EQUALS(getMinimumLogSeverity(), ::mongo::logv2::LogSeverity::Debug(verbosity));
+    ASSERT_EQUALS(getMinimumLogSeverity(::mongo::logv2::LogComponent::kDefault),
                   ::mongo::logv2::LogSeverity::Debug(verbosity));
 
     // AccessControl
-    ASSERT_TRUE(mongo::hasMinimumLogSeverity(::mongo::logv2::LogComponent::kAccessControl));
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(::mongo::logv2::LogComponent::kAccessControl),
+    ASSERT_TRUE(hasMinimumLogSeverity(::mongo::logv2::LogComponent::kAccessControl));
+    ASSERT_EQUALS(getMinimumLogSeverity(::mongo::logv2::LogComponent::kAccessControl),
                   ::mongo::logv2::LogSeverity::Log());
 
     // Query - not mentioned in configuration. should match default.
-    ASSERT_FALSE(mongo::hasMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage));
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage),
+    ASSERT_FALSE(hasMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage));
+    ASSERT_EQUALS(getMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage),
                   ::mongo::logv2::LogSeverity::Debug(verbosity));
 
     // Storage - cleared by -1 value in configuration. should match default.
-    ASSERT_FALSE(mongo::hasMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage));
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage),
+    ASSERT_FALSE(hasMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage));
+    ASSERT_EQUALS(getMinimumLogSeverity(::mongo::logv2::LogComponent::kStorage),
                   ::mongo::logv2::LogSeverity::Debug(verbosity));
 
     // Journaling - explicitly set to 2 in configuration.
-    ASSERT_TRUE(mongo::hasMinimumLogSeverity(::mongo::logv2::LogComponent::kJournal));
-    ASSERT_EQUALS(mongo::getMinimumLogSeverity(::mongo::logv2::LogComponent::kJournal),
+    ASSERT_TRUE(hasMinimumLogSeverity(::mongo::logv2::LogComponent::kJournal));
+    ASSERT_EQUALS(getMinimumLogSeverity(::mongo::logv2::LogComponent::kJournal),
                   ::mongo::logv2::LogSeverity::Debug(2));
 }
 
