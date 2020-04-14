@@ -1,5 +1,8 @@
 /*
  * Tests the dataSize command on mongos.
+ * TODO (SERVER-47534): Unblacklist mongos_dataSize.js from
+ * sharding_last_stable_mongos_and_mixed_shards suite.
+ * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

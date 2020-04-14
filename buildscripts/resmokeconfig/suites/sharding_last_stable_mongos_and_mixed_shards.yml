@@ -25,8 +25,6 @@ selector:
   - jstests/sharding/migration_coordinator_killop_in_critical_section.js
   - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
   - jstests/sharding/test_stacked_migration_cleanup.js
-  # SERVER-47534: Unblacklist mongos_dataSize.js from sharding_last_stable_mongos_and_mixed_shards suite.
-  - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   # Enable when SERVER-43310 is backported
