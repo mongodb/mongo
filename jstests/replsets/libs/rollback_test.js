@@ -271,10 +271,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         assert.soonNoExcept(() => {
             const res = conn.adminCommand({replSetStepUp: 1});
             return res.ok;
-        });
+        }, `failed to step up node ${conn.host}`, ReplSetTest.kDefaultTimeoutMS, 25);
 
         // Waits for the primary to accept new writes.
-        return rst.getPrimary();
+        return rst.getPrimary(ReplSetTest.kDefaultTimeoutMS, 25);
     }
 
     function oplogTop(conn) {
@@ -448,6 +448,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
         log(`Reconnecting the secondary ${curSecondary.host} to the tiebreaker node so it can be
             elected`);
         curSecondary.reconnect([tiebreakerNode]);
+        // Send out an immediate round of heartbeats to elect the node more quickly.
+        assert.commandWorked(curSecondary.adminCommand({replSetTest: 1, restartHeartbeats: 1}));
 
         const newPrimary = stepUp(curSecondary);
 
