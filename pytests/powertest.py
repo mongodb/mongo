@@ -1960,7 +1960,7 @@ Examples:
         " SERVER-15109).", action="store_true", default=False)
 
     # Client options
-    mongo_path = distutils.spawn.find_executable("mongo",
+    mongo_path = distutils.spawn.find_executable("dist-test/bin/mongo",
                                                  os.getcwd() + os.pathsep + os.environ["PATH"])
     client_options.add_option(
         "--mongoPath", dest="mongo_path",
