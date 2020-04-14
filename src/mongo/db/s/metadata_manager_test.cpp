@@ -66,6 +66,13 @@ protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
+        _autoColl.emplace(operationContext(), kNss, MODE_IS);
+    }
+
+    void tearDown() override {
+        _autoColl.reset();
+        _manager.reset();
+        ShardServerTestFixture::tearDown();
     }
 
     /**
@@ -154,7 +161,12 @@ protected:
         return CollectionMetadata(std::make_shared<ChunkManager>(rt, boost::none), kThisShard);
     }
 
+    Collection* collection() {
+        return _autoColl->getCollection();
+    }
+
     std::shared_ptr<MetadataManager> _manager;
+    boost::optional<AutoGetCollection> _autoColl;
 };
 
 TEST_F(MetadataManagerTest, InitialMetadataIsUnknown) {
@@ -208,7 +220,7 @@ TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
 
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
 
-    auto notifn1 = _manager->cleanUpRange(cr1, Date_t{});
+    auto notifn1 = _manager->cleanUpRange(operationContext(), collection(), cr1, Date_t{});
     ASSERT_FALSE(notifn1.ready());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
 
@@ -253,7 +265,7 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);
 
-        optNotif = _manager->cleanUpRange(cr1, Date_t{});
+        optNotif = _manager->cleanUpRange(operationContext(), collection(), cr1, Date_t{});
         ASSERT(optNotif);
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
@@ -291,7 +303,7 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledOnDropAndRecreate) {
     _manager->setFilteringMetadata(
         cloneMetadataMinusChunk(*_manager->getActiveMetadata(_manager, boost::none), rangeToClean));
 
-    auto notif = _manager->cleanUpRange(rangeToClean, Date_t{});
+    auto notif = _manager->cleanUpRange(operationContext(), collection(), rangeToClean, Date_t{});
     ASSERT(!notif.ready());
 
     auto optNotif = _manager->trackOrphanedDataCleanup(rangeToClean);
@@ -386,7 +398,7 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
 
     ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
 
-    auto notifn = _manager->cleanUpRange(cr, Date_t{});
+    auto notifn = _manager->cleanUpRange(operationContext(), collection(), cr, Date_t{});
     ASSERT(!notifn.ready());
     ASSERT_EQ(1UL, _manager->numberOfRangesToClean());
 

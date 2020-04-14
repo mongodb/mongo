@@ -122,7 +122,10 @@ public:
      *
      * Call waitStatus(opCtx) on the result to wait for the deletion to complete or fail.
      */
-    CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
+    CleanupNotification cleanUpRange(OperationContext* opCtx,
+                                     const Collection* collection,
+                                     ChunkRange const& range,
+                                     Date_t whenToDelete);
 
     /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might

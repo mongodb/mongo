@@ -108,7 +108,10 @@ public:
      * result.abandon(), instead of waitStatus, to ignore the outcome.
      */
     enum CleanWhen { kNow, kDelayed };
-    CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
+    CleanupNotification cleanUpRange(OperationContext* opCtx,
+                                     const Collection* collection,
+                                     ChunkRange const& range,
+                                     CleanWhen when);
 
     /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.

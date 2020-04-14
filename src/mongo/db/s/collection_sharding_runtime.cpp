@@ -111,11 +111,13 @@ void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
     _metadataManager->forgetReceive(range);
 }
 
-auto CollectionShardingRuntime::cleanUpRange(ChunkRange const& range, CleanWhen when)
-    -> CleanupNotification {
+auto CollectionShardingRuntime::cleanUpRange(OperationContext* opCtx,
+                                             const Collection* collection,
+                                             ChunkRange const& range,
+                                             CleanWhen when) -> CleanupNotification {
     Date_t time =
         (when == kNow) ? Date_t{} : Date_t::now() + Seconds(orphanCleanupDelaySecs.load());
-    return _metadataManager->cleanUpRange(range, time);
+    return _metadataManager->cleanUpRange(opCtx, collection, range, time);
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,

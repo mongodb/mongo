@@ -563,7 +563,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                                           : CollectionShardingRuntime::kDelayed;
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-        return CollectionShardingRuntime::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
+        return CollectionShardingRuntime::get(opCtx, getNss())
+            ->cleanUpRange(opCtx, autoColl.getCollection(), range, whenToClean);
     }();
 
     if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
