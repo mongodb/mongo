@@ -37,7 +37,6 @@
 #include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/log_domain_global.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace logger {
@@ -68,15 +67,9 @@ void LogManager::detachDefaultConsoleAppender() {
 
 void LogManager::reattachDefaultConsoleAppender() {
     invariant(!_defaultAppender);
-    if (logV2Enabled()) {
-        _defaultAppender = _globalDomain.attachAppender(
-            std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
-                &logv2::LogManager::global().getGlobalDomain(), false));
-    } else {
-        _defaultAppender =
-            _globalDomain.attachAppender(std::make_unique<ConsoleAppender<MessageEventEphemeral>>(
-                std::make_unique<MessageEventDetailsEncoder>()));
-    }
+    _defaultAppender =
+        _globalDomain.attachAppender(std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+            &logv2::LogManager::global().getGlobalDomain(), false));
 }
 
 bool LogManager::isDefaultConsoleAppenderAttached() const {

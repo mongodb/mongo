@@ -34,7 +34,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

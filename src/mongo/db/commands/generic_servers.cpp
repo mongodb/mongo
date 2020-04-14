@@ -232,10 +232,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        if (logV2Enabled()) {
-            return errmsgRunImpl<logv2::RamLog>(opCtx, dbname, cmdObj, errmsg, result);
-        }
-        return errmsgRunImpl<RamLog>(opCtx, dbname, cmdObj, errmsg, result);
+        return errmsgRunImpl<logv2::RamLog>(opCtx, dbname, cmdObj, errmsg, result);
     }
 
     template <typename RamLogType>
@@ -321,11 +318,8 @@ public:
             invariant(ramlog);
             ramlog->clear();
         };
-        if (logV2Enabled()) {
-            clearRamlog(logv2::RamLog::getIfExists(logName));
-        } else {
-            clearRamlog(RamLog::getIfExists(logName));
-        }
+        clearRamlog(logv2::RamLog::getIfExists(logName));
+
         return true;
     }
 };

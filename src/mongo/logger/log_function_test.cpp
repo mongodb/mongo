@@ -40,9 +40,9 @@
 #include "mongo/logger/appender.h"
 #include "mongo/logger/encoder.h"
 #include "mongo/logger/log_component.h"
+#include "mongo/logger/log_test_util.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/text_formatter.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 using namespace mongo::logger;

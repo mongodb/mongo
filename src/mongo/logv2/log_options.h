@@ -70,6 +70,9 @@ public:
 
     LogOptions(FatalMode mode) : _fatalMode(mode) {}
 
+    LogOptions(FatalMode mode, LogTruncation truncation)
+        : _truncation(truncation), _fatalMode(mode) {}
+
     LogOptions(LogTag tags, LogTruncation truncation) : _tags(tags), _truncation(truncation) {}
 
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
