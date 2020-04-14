@@ -191,11 +191,11 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         // There is no persisted metadata.
         return ChunkVersion::UNSHARDED();
     }
-    uassert(ErrorCodes::OperationFailed,
-            str::stream() << "Failed to read persisted collections entry for collection '"
-                          << nss.ns() << "' due to '" << statusWithCollection.getStatus().toString()
-                          << "'.",
-            statusWithCollection.isOK());
+
+    uassertStatusOKWithContext(statusWithCollection,
+                               str::stream()
+                                   << "Failed to read persisted collections entry for collection '"
+                                   << nss.ns() << "'.");
 
     auto statusWithChunk =
         shardmetadatautil::readShardChunks(opCtx,
@@ -204,11 +204,10 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
                                            BSON(ChunkType::lastmod() << -1),
                                            1LL,
                                            statusWithCollection.getValue().getEpoch());
-    uassert(ErrorCodes::OperationFailed,
-            str::stream() << "Failed to read highest version persisted chunk for collection '"
-                          << nss.ns() << "' due to '" << statusWithChunk.getStatus().toString()
-                          << "'.",
-            statusWithChunk.isOK());
+    uassertStatusOKWithContext(
+        statusWithChunk,
+        str::stream() << "Failed to read highest version persisted chunk for collection '"
+                      << nss.ns() << "'.");
 
     return statusWithChunk.getValue().empty() ? ChunkVersion::UNSHARDED()
                                               : statusWithChunk.getValue().front().getVersion();
@@ -293,9 +292,7 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
         if (status == ErrorCodes::NamespaceNotFound) {
             return CollectionAndChangedChunks();
         }
-        return Status(ErrorCodes::OperationFailed,
-                      str::stream()
-                          << "Failed to load local metadata due to '" << status.toString() << "'.");
+        return status.withContext(str::stream() << "Failed to load local metadata.");
     }
 }
 
