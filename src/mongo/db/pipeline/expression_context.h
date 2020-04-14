@@ -257,7 +257,7 @@ public:
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
-    auto getRuntimeConstants() const {
+    const RuntimeConstants& getRuntimeConstants() const {
         return variables.getRuntimeConstants();
     }
 
@@ -273,7 +273,7 @@ public:
         uassert(31264,
                 "Cannot run server-side javascript without the javascript engine enabled",
                 getGlobalScriptEngine());
-        RuntimeConstants runtimeConstants = getRuntimeConstants();
+        const auto& runtimeConstants = getRuntimeConstants();
         const boost::optional<bool> isMapReduceCommand = runtimeConstants.getIsMapReduce();
         if (inMongos) {
             invariant(!forceLoadOfStoredProcedures);
