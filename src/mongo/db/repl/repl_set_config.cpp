@@ -719,6 +719,14 @@ void ReplSetConfig::_initializeConnectionString() {
 }
 
 BSONObj ReplSetConfig::toBSON() const {
+    return _toBSON(false /* omitNewlyAddedField */);
+}
+
+BSONObj ReplSetConfig::toBSONWithoutNewlyAdded() const {
+    return _toBSON(true /* omitNewlyAddedField */);
+}
+
+BSONObj ReplSetConfig::_toBSON(bool omitNewlyAddedField) const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
@@ -738,7 +746,7 @@ BSONObj ReplSetConfig::toBSON() const {
 
     BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
-        members.append(mem->toBSON(getTagConfig()));
+        members.append(mem->toBSON(getTagConfig(), omitNewlyAddedField));
     }
     members.done();
 

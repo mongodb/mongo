@@ -117,8 +117,6 @@ jsTestLog("Reconfiguring new node to have 0 votes");
 cfg = rst.getReplSetConfigFromNode(primary.nodeId);
 cfg.version += 1;
 cfg.members[2].votes = 0;
-// TODO(SERVER-46353): Remove the below "delete" line once replSetGetConfig omits 'newlyAdded'.
-delete cfg.members[2].newlyAdded;
 assert.commandWorked(
     primary.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
 

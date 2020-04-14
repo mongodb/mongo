@@ -218,7 +218,7 @@ public:
     /**
      * Returns the member config as a BSONObj, using "tagConfig" to generate the tag subdoc.
      */
-    BSONObj toBSON(const ReplSetTagConfig& tagConfig) const;
+    BSONObj toBSON(const ReplSetTagConfig& tagConfig, bool omitNewlyAddedField) const;
 
 private:
     const HostAndPort& _host() const {

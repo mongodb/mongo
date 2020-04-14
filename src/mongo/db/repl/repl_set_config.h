@@ -414,9 +414,14 @@ public:
     }
 
     /**
-     * Returns the config as a BSONObj.
+     * Returns the config as a BSONObj. Default behavior (no omission of 'newlyAdded' fields).
      */
     BSONObj toBSON() const;
+
+    /**
+     * Returns the config as a BSONObj. Omits 'newlyAdded' fields.
+     */
+    BSONObj toBSONWithoutNewlyAdded() const;
 
     /**
      * Returns a vector of strings which are the names of the WriteConcernModes.
@@ -524,6 +529,11 @@ private:
      * Returns a pointer to a mutable MemberConfig.
      */
     MemberConfig* _findMemberByID(MemberId id);
+
+    /**
+     * Returns the config as a BSONObj. Omits 'newlyAdded' fields on request.
+     */
+    BSONObj _toBSON(bool omitNewlyAddedField) const;
 
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not

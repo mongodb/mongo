@@ -74,7 +74,8 @@ const addNodeThroughForceReconfig = (id, setNewlyAdded) => {
         newNodeObj.newlyAdded = true;
     }
 
-    let config = rst.getReplSetConfigFromNode();
+    // Get the config from disk in case there are any 'newlyAdded' fields we should preserve.
+    let config = primary.getDB("local").system.replset.findOne();
     config.version++;
     config.members.push(newNodeObj);
 

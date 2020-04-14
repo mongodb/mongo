@@ -162,13 +162,13 @@ bool MemberConfig::hasTags(const ReplSetTagConfig& tagConfig) const {
     return false;
 }
 
-BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
+BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig, bool omitNewlyAddedField) const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, getId().getData());
     configBuilder.append(kHostFieldName, _host().toString());
     configBuilder.append(kArbiterOnlyFieldName, getArbiterOnly());
 
-    if (getNewlyAdded()) {
+    if (!omitNewlyAddedField && getNewlyAdded()) {
         // We should never have _newlyAdded if automatic reconfigs aren't enabled.
         invariant(enableAutomaticReconfig);
         invariant(getNewlyAdded().get());

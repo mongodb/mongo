@@ -67,14 +67,19 @@ assert.commandWorked(secondary.adminCommand({
 
 jsTestLog("Checking for 'newlyAdded' field (should be set)");
 assert(isMemberNewlyAdded(primary, 3));
+
+jsTestLog("Making sure the 'newlyAdded' field is not visible in replSetGetConfig");
+let getConfigRes = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+let newNodeRes = getConfigRes.members[3];
+assert.eq(false, newNodeRes.hasOwnProperty("newlyAdded"), getConfigRes);
+
+jsTestLog("Checking behavior with 'newlyAdded' field set, during initial sync");
 assertVoteCount(primary, {
     votingMembersCount: 3,
     majorityVoteCount: 2,
     writableVotingMembersCount: 3,
     writeMajorityCount: 2
 });
-
-jsTestLog("Checking behavior with 'newlyAdded' field set, during initial sync");
 assert.commandWorked(primaryColl.insert({a: 0}, {writeConcern: {w: 3}}));
 assert.commandWorked(primaryColl.insert({a: 1}, {writeConcern: {w: "majority"}}));
 
@@ -88,13 +93,16 @@ checkWriteConcernTimedOut(res);
 rst.nodes[2].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: "majority"}}));
 
-// Only two nodes are needed for an election (0 and 1).
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-
-// Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+// TODO(SERVER-47612): Reinstate these elections in a more robust form.
+/**
+ * // Only two nodes are needed for an election (0 and 1).
+ * assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+ *
+ * // Reset node 0 to be primary.
+ * rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
+ * assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
+ * assert.eq(rst.getPrimary(), rst.nodes[0]);
+ */
 
 // Initial syncing nodes do not acknowledge replication.
 rst.nodes[1].disconnect(rst.nodes);
@@ -116,8 +124,15 @@ assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
 
-jsTestLog("Checking behavior with 'newlyAdded' field set, after initial sync");
+jsTestLog("Checking that the 'newlyAdded' field is still set");
 assert(isMemberNewlyAdded(primary, 3));
+
+jsTestLog("Making sure the 'newlyAdded' field is still not visible in replSetGetConfig");
+getConfigRes = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+newNodeRes = getConfigRes.members[3];
+assert.eq(false, newNodeRes.hasOwnProperty("newlyAdded"), getConfigRes);
+
+jsTestLog("Checking behavior with 'newlyAdded' field set, after initial sync");
 assertVoteCount(primary, {
     votingMembersCount: 3,
     majorityVoteCount: 2,
@@ -133,13 +148,16 @@ rst.nodes[2].disconnect(rst.nodes);
 rst.nodes[3].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 6}, {writeConcern: {w: "majority"}}));
 
-// Only two nodes are needed for an election (0 and 1).
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-
-// Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+// TODO(SERVER-47612): Reinstate these elections in a more robust form.
+/**
+ * // Only two nodes are needed for an election (0 and 1).
+ * assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+ *
+ * // Reset node 0 to be primary.
+ * rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
+ * assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
+ * assert.eq(rst.getPrimary(), rst.nodes[0]);
+ */
 
 // 'newlyAdded' nodes cannot be one of the two nodes to satisfy w:majority.
 rst.nodes[3].reconnect(rst.nodes);
@@ -151,6 +169,7 @@ checkWriteConcernTimedOut(res);
 rst.nodes[1].reconnect(rst.nodes);
 
 // 'newlyAdded' nodes don't vote.
+rst.nodes[2].disconnect(rst.nodes);
 rst.nodes[0].disconnect(rst.nodes);
 assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}),
                              ErrorCodes.CommandFailed);
@@ -178,13 +197,16 @@ rst.nodes[2].disconnect(rst.nodes);
 // TODO (SERVER-47499): Uncomment this line.
 // assert.commandWorked(primaryColl.insert({a: 8}, {writeConcern: {w: "majority"}}));
 
-// Only three nodes are needed for an election (0, 1, and 3).
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-
-// Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+// TODO(SERVER-47612): Reinstate these elections in a more robust form.
+/**
+ * // Only three nodes are needed for an election (0, 1, and 3).
+ * assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+ *
+ * // Reset node 0 to be primary.
+ * rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
+ * assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
+ * assert.eq(rst.getPrimary(), rst.nodes[0]);
+ */
 
 // 3 nodes are needed for a w:majority write.
 rst.nodes[3].disconnect(rst.nodes);

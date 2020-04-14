@@ -273,7 +273,7 @@ TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVoteAfterToBSON) 
     ASSERT_EQ(0, mc.getNumVotes());
 
     // Verify that the member is still a voting node.
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long votes;
     uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
     ASSERT_EQ(1, votes);
@@ -300,7 +300,7 @@ TEST(MemberConfig, NonVotingNodesWithNewlyAddedFieldShouldStillHaveZeroVotesAfte
     ASSERT_FALSE(mc.isVoter());
     ASSERT_EQ(0, mc.getNumVotes());
 
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long votes;
     uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
     ASSERT_EQ(0, votes);
@@ -321,7 +321,7 @@ TEST(MemberConfig, NonVotingNodesShouldStillHaveZeroVotesAfterToBSON) {
     ASSERT_FALSE(mc.isVoter());
     ASSERT_EQ(0, mc.getNumVotes());
 
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long votes;
     uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
     ASSERT_EQ(0, votes);
@@ -341,7 +341,7 @@ TEST(MemberConfig, VotingNodesShouldStillHaveVoteAfterToBSON) {
     ASSERT_TRUE(mc.isVoter());
     ASSERT_EQ(1, mc.getNumVotes());
 
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long votes;
     uassertStatusOK(bsonExtractIntegerField(obj, "votes", &votes));
     ASSERT_EQ(1, votes);
@@ -371,7 +371,7 @@ TEST(MemberConfig, NodeWithNewlyAddedFieldShouldStillHavePriorityAfterToBSON) {
     ASSERT_EQ(0, mc.getPriority());
 
     // Verify that 'toBSON()' returns the underlying priority field.
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long priority;
     uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
     ASSERT_EQ(3, priority);
@@ -400,7 +400,7 @@ TEST(MemberConfig, PriorityZeroNodeWithNewlyAddedFieldShouldStillHaveZeroPriorit
     ASSERT_EQ(0, mc.getPriority());
 
     // Verify that 'toBSON()' returns the underlying priority field.
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long priority;
     uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
     ASSERT_EQ(0, priority);
@@ -426,7 +426,7 @@ TEST(MemberConfig, PriorityZeroNodeShouldStillHaveZeroPriorityAfterToBSON) {
     ASSERT_EQ(0, mc.getPriority());
 
     // Verify that 'toBSON()' returns the underlying priority field.
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long priority;
     uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
     ASSERT_EQ(0, priority);
@@ -452,7 +452,7 @@ TEST(MemberConfig, NodeShouldStillHavePriorityAfterToBSON) {
     ASSERT_EQ(3, mc.getPriority());
 
     // Verify that 'toBSON()' returns the underlying priority field.
-    const auto obj = mc.toBSON(tagConfig);
+    const auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
     long long priority;
     uassertStatusOK(bsonExtractIntegerField(obj, "priority", &priority));
     ASSERT_EQ(3, priority);
@@ -460,6 +460,36 @@ TEST(MemberConfig, NodeShouldStillHavePriorityAfterToBSON) {
     MemberConfig mc2(obj, &tagConfig);
     ASSERT_FALSE(mc2.isNewlyAdded());
     ASSERT_EQ(3, mc2.getPriority());
+}
+
+TEST(MemberConfig, CanOmitNewlyAddedFieldInBSONViaToBSONWithoutNewlyAdded) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    ReplSetTagConfig tagConfig;
+
+    // Create a member with 'newlyAdded: true' and 'priority: 0'.
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "h"
+                               << "newlyAdded" << true << "priority" << 0),
+                    &tagConfig);
+    ASSERT_TRUE(mc.isNewlyAdded());
+
+    // Verify that the normal 'toBSON()' return includes the 'newlyAdded' field.
+    auto obj = mc.toBSON(tagConfig, false /* omitNewlyAddedField */);
+    bool newlyAdded;
+    uassertStatusOK(bsonExtractBooleanField(obj, "newlyAdded", &newlyAdded));
+    ASSERT_EQ(true, newlyAdded);
+
+    // Also verify that 'toBSONWithoutNewlyAdded' omits the 'newlyAdded' field.
+    obj = mc.toBSON(tagConfig, true /* omitNewlyAddedField */);
+    ASSERT_EQ(ErrorCodes::NoSuchKey, bsonExtractBooleanField(obj, "newlyAdded", &newlyAdded));
+
+    MemberConfig mc2(obj, &tagConfig);
+    ASSERT_FALSE(mc2.isNewlyAdded());
+    ASSERT_EQ(0, mc2.getPriority());
 }
 
 TEST(MemberConfig, ArbiterCannotHaveNewlyAddedFieldSet) {
