@@ -220,7 +220,7 @@ void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceStrin
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
-        msm->abortDueToConflictingIndexOperation();
+        msm->abortDueToConflictingIndexOperation(opCtx);
     }
 }
 

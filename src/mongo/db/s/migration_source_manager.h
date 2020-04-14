@@ -168,7 +168,7 @@ public:
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
      */
-    void abortDueToConflictingIndexOperation();
+    void abortDueToConflictingIndexOperation(OperationContext* opCtx);
 
     /**
      * Returns the cloner which is being used for this migration. This value is available only if
