@@ -49,7 +49,6 @@ public:
     repl::OplogEntry::CommandType commandType;
     std::string commandName;
     UUID buildUUID;
-    boost::optional<CommitQuorumOptions> commitQuorum;
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
     boost::optional<Status> cause;

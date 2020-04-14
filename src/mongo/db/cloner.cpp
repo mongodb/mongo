@@ -418,13 +418,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                                             IndexBuildsCoordinator::extractIndexNames(specs));
             uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexbuildEntry));
 
-            opObserver->onStartIndexBuild(opCtx,
-                                          to_collection,
-                                          collection->uuid(),
-                                          *buildUUID,
-                                          specs,
-                                          CommitQuorumOptions(CommitQuorumOptions::kDisabled),
-                                          fromMigrate);
+            opObserver->onStartIndexBuild(
+                opCtx, to_collection, collection->uuid(), *buildUUID, specs, fromMigrate);
             return Status::OK();
         };
     } else {

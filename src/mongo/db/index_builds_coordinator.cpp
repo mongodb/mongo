@@ -1354,13 +1354,7 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
                                         extractIndexNames(specs));
         uassertStatusOK(addIndexBuildEntry(opCtx, indexbuildEntry));
 
-        opObserver->onStartIndexBuild(opCtx,
-                                      nss,
-                                      collectionUUID,
-                                      buildUUID,
-                                      specs,
-                                      CommitQuorumOptions(CommitQuorumOptions::kDisabled),
-                                      fromMigrate);
+        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
         opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
     };
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
@@ -1667,7 +1661,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->indexSpecs,
-                indexBuildEntry.getCommitQuorum(),
                 false /* fromMigrate */);
 
             return Status::OK();

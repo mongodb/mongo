@@ -41,7 +41,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     // {
     //     < "startIndexBuild" | "commitIndexBuild" | "abortIndexBuild" > : "coll",
     //     "indexBuildUUID" : <UUID>,
-    //     "commitQuorum"   : [<int>|<std::string>] // only required for 'startIndexBuild'
     //     "indexes" : [
     //         {
     //             "key" : {
@@ -85,24 +84,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     auto swBuildUUID = UUID::parse(buildUUIDElem);
     if (!swBuildUUID.isOK()) {
         return swBuildUUID.getStatus().withContext("Error parsing 'indexBuildUUID'");
-    }
-
-    boost::optional<CommitQuorumOptions> commitQuorum;
-    if (repl::OplogEntry::CommandType::kStartIndexBuild == commandType) {
-        auto commitQuorumElem = obj.getField(CommitQuorumOptions::kCommitQuorumField);
-        if (commitQuorumElem.eoo()) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Missing required field '"
-                                  << CommitQuorumOptions::kCommitQuorumField << "'"};
-        }
-
-        commitQuorum = CommitQuorumOptions();
-        auto status = commitQuorum->parse(commitQuorumElem);
-        if (!status.isOK()) {
-            return status.withContext(str::stream() << "Error parsing '"
-                                                    << CommitQuorumOptions::kCommitQuorumField
-                                                    << "': " << status.reason());
-        }
     }
 
     auto indexesElem = obj.getField("indexes");
@@ -152,7 +133,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
                                 commandType,
                                 commandName.toString(),
                                 swBuildUUID.getValue(),
-                                commitQuorum,
                                 indexNames,
                                 indexSpecs,
                                 cause};

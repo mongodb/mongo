@@ -271,14 +271,11 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                                        CollectionUUID collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
-                                       const CommitQuorumOptions& commitQuorum,
                                        bool fromMigrate) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
 
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
-
-    commitQuorum.appendToBuilder(CommitQuorumOptions::kCommitQuorumField, &oplogEntryBuilder);
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
     for (auto indexDoc : indexes) {
