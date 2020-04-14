@@ -57,7 +57,6 @@ public:
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           const CommitQuorumOptions& commitQuorum,
                            bool fromMigrate) override;
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) override;

@@ -299,7 +299,6 @@ public:
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           const CommitQuorumOptions& commitQuorum,
                            bool fromMigrate) override;
 
     /**
@@ -355,7 +354,6 @@ void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             CollectionUUID collUUID,
                                             const UUID& indexBuildUUID,
                                             const std::vector<BSONObj>& indexes,
-                                            const CommitQuorumOptions& commitQuorum,
                                             bool fromMigrate) {
     for (auto&& obj : indexes) {
         indexesCreated.push_back(obj.getOwned());

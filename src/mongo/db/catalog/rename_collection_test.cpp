@@ -85,7 +85,6 @@ public:
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           const CommitQuorumOptions& commitQuorum,
                            bool fromMigrate) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
@@ -180,11 +179,9 @@ void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
                                        CollectionUUID collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
-                                       const CommitQuorumOptions& commitQuorum,
                                        bool fromMigrate) {
     _logOp(opCtx, nss, "startIndex");
-    OpObserverNoop::onStartIndexBuild(
-        opCtx, nss, collUUID, indexBuildUUID, indexes, commitQuorum, fromMigrate);
+    OpObserverNoop::onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
 }
 
 void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,

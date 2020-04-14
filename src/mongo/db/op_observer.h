@@ -100,7 +100,6 @@ public:
                                    CollectionUUID collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
-                                   const CommitQuorumOptions& commitQuorum,
                                    bool fromMigrate) = 0;
 
     /**

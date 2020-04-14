@@ -101,7 +101,7 @@ OplogInterfaceMock::Operation makeStartIndexBuildOplogEntry(Collection* collecti
                                                             BSONObj spec,
                                                             int time) {
     auto entry = BSON("startIndexBuild" << collection->ns().coll() << "indexBuildUUID" << buildUUID
-                                        << "indexes" << BSON_ARRAY(spec) << "commitQuorum" << 1);
+                                        << "indexes" << BSON_ARRAY(spec));
 
     return std::make_pair(BSON("ts" << Timestamp(Seconds(time), 0) << "op"
                                     << "c"

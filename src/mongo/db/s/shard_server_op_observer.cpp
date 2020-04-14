@@ -495,7 +495,6 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               CollectionUUID collUUID,
                                               const UUID& indexBuildUUID,
                                               const std::vector<BSONObj>& indexes,
-                                              const CommitQuorumOptions& commitQuorum,
                                               bool fromMigrate) {
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
