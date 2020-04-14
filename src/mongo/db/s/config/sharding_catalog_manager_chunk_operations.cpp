@@ -1106,10 +1106,11 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         // shard key has been refined, the chunk has been split, or the chunk has been merged.
         LOGV2(23884,
               "ensureChunkVersionIsGreaterThan did not find any chunks with minKey {minKey}, "
-              "maxKey {maxKey}, and epoch {version_epoch}. Returning success.",
+              "maxKey {maxKey}, and epoch {epoch}. Returning success.",
+              "ensureChunkVersionIsGreaterThan did not find any matching chunks; returning success",
               "minKey"_attr = minKey,
               "maxKey"_attr = maxKey,
-              "version_epoch"_attr = version.epoch());
+              "epoch"_attr = version.epoch());
         return;
     }
 
@@ -1119,13 +1120,15 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     if (version.isOlderThan(currentChunk.getVersion())) {
         LOGV2(23885,
               "ensureChunkVersionIsGreaterThan found that the chunk with minKey {minKey}, maxKey "
-              "{maxKey}, and epoch {version_epoch} already has a higher version than {version}. "
-              "Current chunk is {currentChunk_toConfigBSON}. Returning success.",
+              "{maxKey}, and epoch {epoch} already has a higher version than {version}. Current "
+              "chunk is {currentChunk}. Returning success.",
+              "ensureChunkVersionIsGreaterThan found that the chunk already has a higher version; "
+              "returning success",
               "minKey"_attr = minKey,
               "maxKey"_attr = maxKey,
-              "version_epoch"_attr = version.epoch(),
+              "epoch"_attr = version.epoch(),
               "version"_attr = version,
-              "currentChunk_toConfigBSON"_attr = currentChunk.toConfigBSON());
+              "currentChunk"_attr = currentChunk.toConfigBSON());
         return;
     }
 
@@ -1142,10 +1145,13 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             .docs;
     if (highestChunksVector.empty()) {
         LOGV2(23886,
-              "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {version_epoch} "
-              "when attempting to find the collectionVersion. The collection must have been "
-              "dropped concurrently or had its shard key refined. Returning success.",
-              "version_epoch"_attr = version.epoch());
+              "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {epoch} when "
+              "attempting to find the collectionVersion. The collection must have been dropped "
+              "concurrently or had its shard key refined. Returning success.",
+              "ensureChunkVersionIsGreaterThan did not find any chunks with a matching epoch when "
+              "attempting to find the collectionVersion. The collection must have been dropped "
+              "concurrently or had its shard key refined. Returning success.",
+              "epoch"_attr = version.epoch());
         return;
     }
     const auto highestChunk =
@@ -1169,20 +1175,23 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         LOGV2(
             23887,
             "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey {minKey}, "
-            "maxKey {maxKey}, and epoch {version_epoch}. Chunk is now {newChunk_toConfigBSON}",
+            "maxKey {maxKey}, and epoch {epoch}. Chunk is now {newChunk}",
             "minKey"_attr = minKey,
             "maxKey"_attr = maxKey,
-            "version_epoch"_attr = version.epoch(),
-            "newChunk_toConfigBSON"_attr = newChunk.toConfigBSON());
+            "epoch"_attr = version.epoch(),
+            "newChunk"_attr = newChunk.toConfigBSON());
     } else {
-        LOGV2(23888,
-              "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
-              "maxKey {maxKey}, and epoch {version_epoch} when trying to bump its version. The "
-              "collection must have been dropped concurrently or had its shard key refined. "
-              "Returning success.",
-              "minKey"_attr = minKey,
-              "maxKey"_attr = maxKey,
-              "version_epoch"_attr = version.epoch());
+        LOGV2(
+            23888,
+            "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
+            "maxKey {maxKey}, and epoch {epoch} when trying to bump its version. The collection "
+            "must have been dropped concurrently or had its shard key refined. Returning success.",
+            "ensureChunkVersionIsGreaterThan did not find a matching chunk when trying to bump its "
+            "version. The collection must have been dropped concurrently or had its shard key "
+            "refined. Returning success.",
+            "minKey"_attr = minKey,
+            "maxKey"_attr = maxKey,
+            "epoch"_attr = version.epoch());
     }
 }
 

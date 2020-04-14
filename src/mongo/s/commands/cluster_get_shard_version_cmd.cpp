@@ -113,8 +113,11 @@ public:
                 BSONArrayBuilder chunksArrBuilder;
                 bool exceedsSizeLimit = false;
 
+                LOGV2(22753,
+                      "Routing info requested by getShardVersion: {routingInfo}",
+                      "Routing info requested by getShardVersion",
+                      "routingInfo"_attr = redact(cm->toString()));
                 for (const auto& chunk : cm->chunks()) {
-                    LOGV2(22753, "{chunk}", "chunk"_attr = redact(chunk.toString()));
                     if (!exceedsSizeLimit) {
                         BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
                         chunkBB.append(chunk.getMin());

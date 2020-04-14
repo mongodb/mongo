@@ -57,8 +57,9 @@ SessionKiller::Result killSessionsLocalKillOps(OperationContext* opCtx,
                     ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
 
                     LOGV2(20706,
-                          "killing op: {opCtxToKill_getOpID} as part of killing session: {lsid}",
-                          "opCtxToKill_getOpID"_attr = opCtxToKill->getOpID(),
+                          "Killing op {opId} as part of killing session {lsid}",
+                          "Killing op as part of killing session",
+                          "opId"_attr = opCtxToKill->getOpID(),
                           "lsid"_attr = lsid->toBSON());
 
                     opCtx->getServiceContext()->killOperation(lk, opCtxToKill);

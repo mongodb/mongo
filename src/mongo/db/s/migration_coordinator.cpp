@@ -129,10 +129,9 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
 void MigrationCoordinator::setMigrationDecision(Decision decision) {
     LOGV2_DEBUG(23891,
                 2,
-                "MigrationCoordinator setting migration decision to "
-                "{decision_Decision_kCommitted_committed_aborted}",
-                "decision_Decision_kCommitted_committed_aborted"_attr =
-                    (decision == Decision::kCommitted ? "committed" : "aborted"),
+                "MigrationCoordinator setting migration decision to {decision}",
+                "MigrationCoordinator setting migration decision",
+                "decision"_attr = (decision == Decision::kCommitted ? "committed" : "aborted"),
                 "migrationId"_attr = _migrationInfo.getId());
     _decision = decision;
 }
@@ -151,10 +150,9 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
     }
 
     LOGV2(23893,
-          "MigrationCoordinator delivering decision "
-          "{decision_Decision_kCommitted_committed_aborted} to self and to recipient",
-          "decision_Decision_kCommitted_committed_aborted"_attr =
-              (_decision == Decision::kCommitted ? "committed" : "aborted"),
+          "MigrationCoordinator delivering decision {decision} to self and to recipient",
+          "MigrationCoordinator delivering decision to self and to recipient",
+          "decision"_attr = (_decision == Decision::kCommitted ? "committed" : "aborted"),
           "migrationId"_attr = _migrationInfo.getId());
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
@@ -185,11 +183,12 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     LOGV2_DEBUG(23895,
                 2,
-                "Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
-                "{migrationInfo_getLsid} txn: {TxnNumber}",
-                "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
-                "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
-                "TxnNumber"_attr = _migrationInfo.getTxnNumber(),
+                "Bumping transaction number with lsid {lsid} and current txnNumber "
+                "{currentTxnNumber} on recipient shard {recipientShardId}",
+                "Bumping transaction number on recipient shard",
+                "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+                "lsid"_attr = _migrationInfo.getLsid().toBSON(),
+                "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
                 "migrationId"_attr = _migrationInfo.getId());
     migrationutil::advanceTransactionOnRecipient(opCtx,
                                                  _migrationInfo.getRecipientShardId(),
@@ -235,11 +234,12 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
 
     LOGV2_DEBUG(23900,
                 2,
-                "Bumping transaction for {migrationInfo_getRecipientShardId} lsid: "
-                "{migrationInfo_getLsid} txn: {TxnNumber}",
-                "migrationInfo_getRecipientShardId"_attr = _migrationInfo.getRecipientShardId(),
-                "migrationInfo_getLsid"_attr = _migrationInfo.getLsid().toBSON(),
-                "TxnNumber"_attr = _migrationInfo.getTxnNumber(),
+                "Bumping transaction number with lsid {lsid} and current txnNumber "
+                "{currentTxnNumber} on recipient shard {recipientShardId}",
+                "Bumping transaction number on recipient shard",
+                "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+                "lsid"_attr = _migrationInfo.getLsid().toBSON(),
+                "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
                 "migrationId"_attr = _migrationInfo.getId());
     migrationutil::advanceTransactionOnRecipient(opCtx,
                                                  _migrationInfo.getRecipientShardId(),
