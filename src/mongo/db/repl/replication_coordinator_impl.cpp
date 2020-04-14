@@ -51,6 +51,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -3566,6 +3567,17 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
                     "replSetInitiate failed",
                     "error"_attr = status);
         return status;
+    }
+
+    // Shard server nodes start up in the last stable FCV by default. In this case we must ensure
+    // that the config does not have a 'term' field in case their binary is downgraded.
+    bool omitConfigTerm = serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        FeatureCompatibilityVersion::isCleanStartUp();
+    if (omitConfigTerm) {
+        newConfig.setConfigTerm(OpTime::kUninitializedTerm);
+        LOGV2(4711900,
+              "Set config term as uninitialized on shard server node",
+              "newConfig"_attr = newConfig.toBSON());
     }
 
     status = _externalState->initializeReplSetStorage(opCtx, newConfig.toBSON());
