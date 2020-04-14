@@ -41,18 +41,13 @@
 
 namespace mongo {
 
-bool logV2Enabled();
-bool logV2IsJson(logv2::LogFormat format);
-
 /**
  * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
  */
-
 inline bool shouldLogV1(logger::LogComponent logComponent1, logger::LogSeverity severity) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().shouldLog(
-            logComponentV1toV2(logComponent1), logSeverityV1toV2(severity));
-    return logger::globalLogDomain()->shouldLog(logComponent1, severity);
+
+    return logv2::LogManager::global().getGlobalSettings().shouldLog(
+        logComponentV1toV2(logComponent1), logSeverityV1toV2(severity));
 }
 
 }  // namespace mongo

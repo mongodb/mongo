@@ -51,49 +51,34 @@
 namespace mongo {
 
 inline logger::LogSeverity getMinimumLogSeverity() {
-    if (logV2Enabled())
-        return logSeverityV2toV1(
-            logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
-                mongo::logv2::LogComponent::kDefault));
-    return logger::globalLogDomain()->getMinimumLogSeverity();
+    return logSeverityV2toV1(logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
+        mongo::logv2::LogComponent::kDefault));
 }
 
 inline logger::LogSeverity getMinimumLogSeverity(logger::LogComponent component) {
-    if (logV2Enabled())
-        return logSeverityV2toV1(
-            logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
-                logComponentV1toV2(component)));
-    return logger::globalLogDomain()->getMinimumLogSeverity(component);
+    return logSeverityV2toV1(logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(
+        logComponentV1toV2(component)));
 }
 
 inline void setMinimumLoggedSeverity(logger::LogSeverity severity) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
-            mongo::logv2::LogComponent::kDefault, mongo::logSeverityV1toV2(severity));
-    logger::globalLogDomain()->setMinimumLoggedSeverity(severity);
+    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        mongo::logv2::LogComponent::kDefault, mongo::logSeverityV1toV2(severity));
 }
 
 inline void setMinimumLoggedSeverity(logger::LogComponent component, logger::LogSeverity severity) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
-            logComponentV1toV2(component), mongo::logSeverityV1toV2(severity));
-    logger::globalLogDomain()->setMinimumLoggedSeverity(component, severity);
+    return logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        logComponentV1toV2(component), mongo::logSeverityV1toV2(severity));
 }
 
 inline void clearMinimumLoggedSeverity(logger::LogComponent component) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(
-            logComponentV1toV2(component));
-    logger::globalLogDomain()->clearMinimumLoggedSeverity(component);
+    return logv2::LogManager::global().getGlobalSettings().clearMinimumLoggedSeverity(
+        logComponentV1toV2(component));
 }
 
 inline bool hasMinimumLogSeverity(logger::LogComponent component) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(
-            logComponentV1toV2(component));
-    return logger::globalLogDomain()->hasMinimumLogSeverity(component);
+    return logv2::LogManager::global().getGlobalSettings().hasMinimumLogSeverity(
+        logComponentV1toV2(component));
 }
-
 
 namespace logger {
 
@@ -108,30 +93,23 @@ class LogTest : public unittest::Test {
 public:
     LogTest() : _severityOld(getMinimumLogSeverity()) {
         globalLogDomain()->clearAppenders();
-        if (logV2Enabled()) {
-            _appenderHandle = globalLogDomain()->attachAppender(
-                std::make_unique<LogV2Appender<MessageEventEphemeral>>(
-                    &logv2::LogManager::global().getGlobalDomain(), true));
+        _appenderHandle = globalLogDomain()->attachAppender(
+            std::make_unique<LogV2Appender<MessageEventEphemeral>>(
+                &logv2::LogManager::global().getGlobalDomain(), true));
 
-            if (!_captureSink) {
-                _captureSink = logv2::LogCaptureBackend::create(_logLines);
-                _captureSink->set_filter(logv2::ComponentSettingsFilter(
-                    logv2::LogManager::global().getGlobalDomain(),
-                    logv2::LogManager::global().getGlobalSettings()));
-                _captureSink->set_formatter(LOGV2Formatter());
-            }
-            boost::log::core::get()->add_sink(_captureSink);
-        } else {
-            _appenderHandle =
-                globalLogDomain()->attachAppender(std::make_unique<LogTestAppender>(this));
+        if (!_captureSink) {
+            _captureSink = logv2::LogCaptureBackend::create(_logLines);
+            _captureSink->set_filter(
+                logv2::ComponentSettingsFilter(logv2::LogManager::global().getGlobalDomain(),
+                                               logv2::LogManager::global().getGlobalSettings()));
+            _captureSink->set_formatter(LOGV2Formatter());
         }
+        boost::log::core::get()->add_sink(_captureSink);
     }
 
     virtual ~LogTest() {
         globalLogDomain()->detachAppender(_appenderHandle);
-        if (logV2Enabled()) {
-            boost::log::core::get()->remove_sink(_captureSink);
-        }
+        boost::log::core::get()->remove_sink(_captureSink);
         setMinimumLoggedSeverity(_severityOld);
     }
 

@@ -58,7 +58,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
-#include "mongo/logger/logv2_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
@@ -75,6 +74,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log_global_settings.h"
@@ -729,19 +729,6 @@ int _main(int argc, char* argv[], char** envp) {
     // Log to stdout for any early logging before we re-configure the logger
     auto& lv2Manager = logv2::LogManager::global();
     logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
-    if (logV2Enabled()) {
-        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
-        logger::globalLogManager()->getGlobalDomain()->attachAppender(
-            std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &lv2Manager.getGlobalDomain(), false));
-    } else {
-        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
-        logger::globalLogManager()->getGlobalDomain()->attachAppender(
-            std::make_unique<ShellConsoleAppender>(
-                std::make_unique<logger::MessageEventDetailsEncoder>()));
-
-        lv2Config.makeDisabled();
-    }
     uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
@@ -771,38 +758,22 @@ int _main(int argc, char* argv[], char** envp) {
     if (!mongo::serverGlobalParams.quiet.load())
         std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
 
-    if (!logV2Enabled()) {
-        logger::globalLogManager()
-            ->getNamedDomain("plainShellOutput")
-            ->attachAppender(std::make_unique<ShellConsoleAppender>(
-                std::make_unique<logger::MessageEventUnadornedEncoder>()));
-    } else {
-        logger::globalLogManager()->getGlobalDomain()->clearAppenders();
-        logger::globalLogManager()->getGlobalDomain()->attachAppender(
-            std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &(lv2Manager.getGlobalDomain()), false));
-        logger::globalLogManager()
-            ->getNamedDomain("plainShellOutput")
-            ->attachAppender(std::make_unique<logger::LogV2Appender<logger::MessageEventEphemeral>>(
-                &lv2Manager.getGlobalDomain(), false, logv2::LogTag::kPlainShell));
+    auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
+    consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
+                                                           lv2Manager.getGlobalSettings()));
+    consoleSink->set_formatter(ShellFormatter());
 
-        auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
-        consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
-                                                               lv2Manager.getGlobalSettings()));
-        consoleSink->set_formatter(ShellFormatter());
+    consoleSink->locked_backend()->add_stream(
+        boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
 
-        consoleSink->locked_backend()->add_stream(
-            boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
+    consoleSink->locked_backend()->auto_flush();
 
-        consoleSink->locked_backend()->auto_flush();
+    // Remove the initial config from above when setting this sink, otherwise we log everything
+    // twice.
+    lv2Config.makeDisabled();
+    uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
-        // Remove the initial config from above when setting this sink, otherwise we log everything
-        // twice.
-        lv2Config.makeDisabled();
-        uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
-
-        boost::log::core::get()->add_sink(std::move(consoleSink));
-    }
+    boost::log::core::get()->add_sink(std::move(consoleSink));
 
     // Get the URL passed to the shell
     std::string& cmdlineURI = shellGlobalParams.url;

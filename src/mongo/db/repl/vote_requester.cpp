@@ -41,7 +41,6 @@
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

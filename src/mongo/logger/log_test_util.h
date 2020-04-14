@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -38,33 +38,20 @@
 
 #if defined(MONGO_UTIL_LOG_H_)
 #error \
-    "This may occur when log.h is included in a header. " \
+    "This may occur when log_test_util.h is included in a header. " \
        "Please check your #include's."
 #else  // MONGO_UTIL_LOG_H_
 #define MONGO_UTIL_LOG_H_
 
-#include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
-#include "mongo/logger/tee.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_component_settings.h"
-#include "mongo/logv2/log_manager.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log_global_settings.h"
 
 namespace mongo {
-
-namespace logger {
-typedef void (*ExtraLogContextFn)(BufBuilder& builder);
-Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
-
-}  // namespace logger
 
 /*
  * Although this is a "header" file, it is only supposed to be included in C++ files.  The
@@ -85,7 +72,6 @@ const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
 
 using logger::LogstreamBuilderDeprecated;
-using logger::Tee;
 
 /**
  * Returns a LogstreamBuilder for logging a message with LogSeverity::Severe().
@@ -172,10 +158,8 @@ inline LogstreamBuilderDeprecated log(logger::LogComponent::Value componentValue
 
 // this can't be in log_global_settings.h because it utilizes MongoLogDefaultComponent_component
 inline bool shouldLogV1(logger::LogSeverity severity) {
-    if (logV2Enabled())
-        return logv2::LogManager::global().getGlobalSettings().shouldLog(
-            logComponentV1toV2(MongoLogDefaultComponent_component), logSeverityV1toV2(severity));
-    return mongo::shouldLogV1(MongoLogDefaultComponent_component, severity);
+    return logv2::LogManager::global().getGlobalSettings().shouldLog(
+        logComponentV1toV2(MongoLogDefaultComponent_component), logSeverityV1toV2(severity));
 }
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
@@ -200,9 +184,6 @@ inline bool shouldLogV1(logger::LogSeverity severity) {
             ::mongo::getThreadName(),                                                       \
             ::mongo::LogstreamBuilderDeprecated::severityCast(DLEVEL),                      \
             (COMPONENT1))
-
-extern Tee* const warnings;            // Things put here go in serverStatus
-extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
 
 }  // namespace mongo
 

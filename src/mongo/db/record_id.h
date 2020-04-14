@@ -202,10 +202,4 @@ inline std::ostream& operator<<(std::ostream& stream, const boost::optional<Reco
     return stream << "RecordId(" << (id ? id.get().repr() : 0) << ')';
 }
 
-inline logger::LogstreamBuilderDeprecated& operator<<(logger::LogstreamBuilderDeprecated& stream,
-                                                      const RecordId& id) {
-    stream.stream() << id;
-    return stream;
-}
-
 }  // namespace mongo

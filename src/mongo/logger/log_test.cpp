@@ -41,6 +41,7 @@
 #include "mongo/logger/encoder.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_component_settings.h"
+#include "mongo/logger/log_test_util.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/logger/rotatable_file_appender.h"
@@ -50,7 +51,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 using namespace mongo::logger;

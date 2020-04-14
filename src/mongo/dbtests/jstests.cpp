@@ -40,12 +40,12 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logger/logger.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/future.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
