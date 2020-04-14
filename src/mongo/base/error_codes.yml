@@ -21,6 +21,10 @@ error_categories:
     - VoteAbortError
     - NonResumableChangeStreamError
     - RetriableError
+    # isCloseConnectionError() includes all codes that indicate that it is no longer safe or
+    # desirable to maintain a connection with the client. The server will close the connection to
+    # get the client to through server selection again.
+    - CloseConnectionError
 
 error_codes:
     - {code: 0,name: OK}
@@ -339,7 +343,7 @@ error_codes:
     - {code: 300,name: RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist}
     - {code: 301,name: DataCorruptionDetected}
     - {code: 302,name: OCSPCertificateStatusUnknown}
-    - {code: 303,name: SplitHorizonChange}
+    - {code: 303,name: SplitHorizonChange,categories: [CloseConnectionError]}
 
     # This code should only be used upon finding that a shard has been marked stale in the sharding
     # catalog cache, and as such does not belong in the StaleShardVersionError or

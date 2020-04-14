@@ -1,12 +1,15 @@
 /**
- * Tests that doing a reconfig that changes the SplitHorizon will return an error to waiting
- * isMaster requests.
+ * Tests that doing a reconfig that changes the SplitHorizon will cause the server to disconnect
+ * from clients with waiting isMaster requests.
  * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
+
+// Never retry on network error, because this test needs to detect the network error.
+TestData.skipRetryOnNetworkError = true;
 
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 replTest.startSet();
@@ -19,14 +22,15 @@ const secondary = replTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
 function runAwaitableIsMasterBeforeHorizonChange(topologyVersionField) {
-    const result = assert.commandFailedWithCode(db.runCommand({
+    let res = assert.throws(() => db.runCommand({
         isMaster: 1,
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: 99999999,
-    }),
-                                                ErrorCodes.SplitHorizonChange);
+    }));
+    assert(isNetworkError(res));
 
-    assert.eq(result.errmsg, "Received a reconfig that changed the horizon mappings.");
+    // We should automatically reconnect after the failed command.
+    assert.commandWorked(db.adminCommand({ping: 1}));
 }
 
 function runAwaitableIsMaster(topologyVersionField) {

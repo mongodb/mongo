@@ -1280,6 +1280,12 @@ void execCommandDatabase(OperationContext* opCtx,
                     "error"_attr = redact(e.toString()));
 
         generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), extraFieldsBuilder.obj());
+
+        if (ErrorCodes::isA<ErrorCategory::CloseConnectionError>(e.code())) {
+            // Rethrow the exception to the top to signal that the client connection should be
+            // closed.
+            throw;
+        }
     }
 }
 
@@ -1398,6 +1404,12 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
             generateErrorResponse(
                 opCtx, replyBuilder.get(), ex, metadataBob.obj(), extraFieldsBuilder.obj());
+
+            if (ErrorCodes::isA<ErrorCategory::CloseConnectionError>(ex.code())) {
+                // Rethrow the exception to the top to signal that the client connection should be
+                // closed.
+                throw;
+            }
         }
     }();
 

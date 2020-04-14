@@ -7,6 +7,9 @@
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
 
+// Never retry on network error, because this test needs to detect the network error.
+TestData.skipRetryOnNetworkError = true;
+
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 // Start the replica set but don't initiate yet.
 replTest.startSet();
@@ -33,13 +36,15 @@ function runAwaitableIsMaster(topologyVersionField) {
 
 // Waiting isMasters should error when a node rejoins a replica set.
 function runAwaitableIsMasterOnRejoiningSet(topologyVersionField) {
-    const result = assert.commandFailedWithCode(db.runCommand({
+    const result = assert.throws(() => db.runCommand({
         isMaster: 1,
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: 99999999,
-    }),
-                                                ErrorCodes.SplitHorizonChange);
-    assert.eq(result.errmsg, "Received a reconfig that changed the horizon mappings.");
+    }));
+    assert(isNetworkError(result));
+
+    // We should automatically reconnect after the failed command.
+    assert.commandWorked(db.adminCommand({ping: 1}));
 }
 
 // A failpoint signalling that the servers have received the isMaster request and are waiting for a
