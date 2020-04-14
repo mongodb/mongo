@@ -112,12 +112,12 @@ assert.commandFailedWithCode(testDb.createCollection('c'.repeat(8192)),
 assert.commandFailedWithCode(
     testDb.adminCommand(
         {renameCollection: dbName + '.' + shortCollName, to: dbName + '.' + longCollNameRename}),
-    ErrorCodes.IllegalOperation);
+    ErrorCodes.IncompatibleServerVersion);
 assert.commandFailedWithCode(testDb.adminCommand({
     renameCollection: dbName + '.' + shortCollName,
     to: renameDbName + '.' + longCollNameRename
 }),
-                             ErrorCodes.IllegalOperation);
+                             ErrorCodes.IncompatibleServerVersion);
 
 MongoRunner.stopMongod(conn);
 })();
