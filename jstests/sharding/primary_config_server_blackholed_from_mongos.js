@@ -36,11 +36,7 @@ for (let i = 0; i < conf.members.length; i++) {
         conf.members[i].priority = 0;
     }
 }
-conf.version++;
-// TODO (SERVER-45575): Update this to be a non-force reconfig.
-const response = admin.runCommand({replSetReconfig: conf, force: true});
-assert.commandWorked(response);
-
+reconfig(st.configRS, conf);
 jsTest.log('Partitioning the config server primary from the mongos');
 configPrimary.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(configPrimary, 1.0);
