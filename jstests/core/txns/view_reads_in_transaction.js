@@ -21,18 +21,14 @@ assert.commandWorked(coll.insert(testDoc, {writeConcern: {w: "majority"}}));
 assert.commandWorked(view.runCommand(
     "create", {viewOn: coll.getName(), pipeline: [], writeConcern: {w: "majority"}}));
 
-const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-if (isMongos) {
-    // Refresh the router's and shard's database versions so the distinct run below can succeed.
-    // This is necessary because shards always abort their local transaction on stale version
-    // errors and mongos is not allowed to retry on these errors in a transaction if the stale
-    // shard has completed at least one earlier statement.
-    assert.eq(view.distinct("_id"), ["kyle"]);
-}
-
 // Run a dummy find to start the transaction.
 jsTestLog("Starting transaction.");
 session.startTransaction({readConcern: {level: "snapshot"}});
+// Refresh the router's and shard's database versions so the distinct run below can succeed.
+// This is necessary because shards always abort their local transaction on stale version
+// errors and mongos is not allowed to retry on these errors in a transaction if the stale
+// shard has completed at least one earlier statement.
+assert.eq(view.distinct("_id"), ["kyle"]);
 let cursor = coll.find();
 cursor.next();
 
