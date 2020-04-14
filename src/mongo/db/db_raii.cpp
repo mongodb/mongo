@@ -345,12 +345,10 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
                                              : kDoNotChangeProfilingLevel,
                     deadline) {
 
-    // Perform the check early so the query planner would be able to extract the correct
-    // shard key. Also make sure that version is compatible if query planner decides to
-    // use an empty plan.
-    invariant(!_autoCollForRead.getView() || !_autoCollForRead.getCollection());
-    auto css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
-    css->checkShardVersionOrThrow_DEPRECATED(opCtx);
+    if (!_autoCollForRead.getView()) {
+        auto* const css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
+        css->checkShardVersionOrThrow(opCtx);
+    }
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)

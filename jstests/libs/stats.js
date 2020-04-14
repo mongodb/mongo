@@ -10,7 +10,7 @@ function getHistogramStats(coll) {
 /**
  * Returns the differences in read, write, and command counts between two histograms.
  */
-function diffHistogram(coll, thisHistogram, lastHistogram) {
+function diffHistogram(thisHistogram, lastHistogram) {
     return {
         reads: thisHistogram.reads.ops - lastHistogram.reads.ops,
         writes: thisHistogram.writes.ops - lastHistogram.writes.ops,
@@ -24,7 +24,7 @@ function diffHistogram(coll, thisHistogram, lastHistogram) {
  */
 function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, commandDiff) {
     let thisHistogram = getHistogramStats(coll);
-    let diff = diffHistogram(coll, thisHistogram, lastHistogram);
+    let diff = diffHistogram(thisHistogram, lastHistogram);
     // Running the $collStats aggregation itself will increment read stats by one.
     assert.eq(diff.reads, readDiff + 1, "miscounted histogram reads");
     assert.eq(diff.writes, writeDiff, "miscounted histogram writes");

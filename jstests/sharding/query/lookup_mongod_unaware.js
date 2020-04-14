@@ -145,19 +145,9 @@ assert.commandWorked(mongos0DB.adminCommand({
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
-// Verify $lookup results through mongos1, which is not aware that the local
-// collection is sharded. The results are expected to be incorrect when both the mongos and
-// primary shard incorrectly believe that a collection is unsharded.
-// TODO: This should be fixed by SERVER-32629, likewise for the other aggregates in this file
-// sent to the stale mongos.
+// Verify $lookup results through the stale mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
-assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), [
-    {_id: 1, a: null, "same": {_id: 1, b: null}},
-    {_id: 1, a: null, "same": {_id: 2}},
-
-    {_id: 2, "same": {_id: 1, b: null}},
-    {_id: 2, "same": {_id: 2}}
-]);
+assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 //
 // Test sharded local and unsharded foreign collections, with the primary shard unaware that
@@ -174,16 +164,9 @@ assert.commandWorked(mongos0ForeignColl.insert({_id: 2}));
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
-// Verify $lookup results through mongos1, which is not aware that the local
-// collection is sharded. The results are expected to be incorrect when both the mongos and
-// primary shard incorrectly believe that a collection is unsharded.
+// Verify $lookup results through the stale mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
-assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), [
-    {_id: 1, a: null, "same": {_id: 1, b: null}},
-    {_id: 1, a: null, "same": {_id: 2}},
-    {_id: 2, "same": {_id: 1, b: null}},
-    {_id: 2, "same": {_id: 2}}
-]);
+assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 st.stop();
 })();

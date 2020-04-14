@@ -14,8 +14,13 @@ const mongosDB = st.s0.getDB(jsTestName());
 assert.commandWorked(st.s0.adminCommand({enableSharding: jsTestName()}));
 st.ensurePrimaryShard(jsTestName(), st.shard0.shardName);
 const mongosColl = mongosDB.test;
+const mongosOtherColl = mongosDB.otherEmptyCollection;
 const primaryShard = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
+
+// Ensure shard0 has the source collection created and is aware of its shard version in order for
+// the profiler entry counts to not get offset due to StaleShardVersion
+assert.commandWorked(mongosColl.insert({val: 'TestValue'}));
 
 assert.commandWorked(primaryShard.setProfilingLevel(2));
 assert.commandWorked(shard1DB.setProfilingLevel(2));
@@ -25,9 +30,8 @@ assert.commandWorked(shard1DB.setProfilingLevel(2));
 let testName = "sub_pipeline_can_be_passed_through";
 assert.commandWorked(mongosDB.runCommand({
     aggregate: mongosColl.getName(),
-    pipeline: [
-        {$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosDB.otherColl.getName(), as: "c"}}
-    ],
+    pipeline:
+        [{$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosOtherColl.getName(), as: "c"}}],
     cursor: {},
     comment: testName
 }));
@@ -50,7 +54,7 @@ const pipelineForLookup = [
         {
           $lookup: {
               pipeline: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
-              from: mongosDB.otherColl.getName(),
+              from: mongosOtherColl.getName(),
               as: "c",
           }
         },
@@ -75,7 +79,7 @@ profilerHasZeroMatchingEntriesOrThrow({
 // Same test as the above with another level of nested $lookup.
 const pipelineForNestedLookup = [{
         $lookup: {
-            from: mongosDB.otherColl.getName(),
+            from: mongosOtherColl.getName(),
             as: "field",
             pipeline: [{
                 $lookup: {
@@ -147,7 +151,7 @@ const pipelineForNestedFacet = [
 testName = "facet_with_merge_cannot_be_passed_through";
 assert.commandFailedWithCode(mongosDB.runCommand({
     aggregate: mongosColl.getName(),
-    pipeline: pipelineForFacet,
+    pipeline: pipelineForNestedFacet,
     cursor: {},
     comment: testName
 }),

@@ -22,6 +22,8 @@ assert.commandWorked(viewsDB.runCommand({create: "view", viewOn: "collection"}))
 let view = viewsDB["view"];
 let coll = viewsDB["collection"];
 
+assert.commandWorked(coll.insert({val: 'TestValue'}));
+
 // Check the histogram counters.
 let lastHistogram = getHistogramStats(view);
 view.aggregate([{$match: {}}]);

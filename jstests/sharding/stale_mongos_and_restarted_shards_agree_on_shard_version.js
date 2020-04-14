@@ -1,16 +1,14 @@
 /**
- * Tests that after a restart on a shard multi write operations, finds and aggregations
- * work as expected on stale routers
+ * Tests that after a restart of a shard, multi write operations, finds and aggregations still work
+ * as expected with a stale router
  *
- * This test requrires persistence because it asumes the shard will still have it's
- * data after restarting
- * TODO: Remove requires_fcv_44 tag if SERVER-32198 is backported or 4.4 becomes last
- * @tags: [requires_persistence, requires_fcv_44]
+ * This test requrires persistence because it asumes the shard will still have it's data after
+ * restarting
+ *
+ * @tags: [requires_persistence]
  */
 (function() {
 'use strict';
-// TODO (SERVER-32198) remove after SERVER-32198 is fixed
-TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 
@@ -103,8 +101,7 @@ const staleMongoS = st.s1;
     setupCollectionForTest('TestFindColl');
 
     var coll = staleMongoS.getDB(kDatabaseName).TestFindColl.find().toArray();
-    // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
-    assert.neq(2, coll.length);
+    assert.eq(2, coll.length);
 }
 {
     jsTest.log('Testing: Aggregate with sharded collection unknown on a stale mongos');
@@ -112,8 +109,7 @@ const staleMongoS = st.s1;
 
     var count =
         staleMongoS.getDB(kDatabaseName).TestAggregateColl.aggregate([{$count: 'total'}]).toArray();
-    // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
-    assert.neq(2, count[0].total);
+    assert.eq(2, count[0].total);
 }
 {
     jsTest.log('Testing: Transactions with unsharded collection, which is unknown on the shard');
