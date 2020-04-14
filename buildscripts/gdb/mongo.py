@@ -368,7 +368,7 @@ class DumpMongoDBMutexes(gdb.Command):
         client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
         for client_handle in client_set:
             client = client_handle.dereference().dereference()
-            decoration_info = get_decoration(client, "DiagnosticInfoHandle")[1]
+            decoration_info = get_decoration(client, "DiagnosticInfoHandle")
             if not decoration_info:
                 continue
             diagnostic_info_handle = decoration_info[1]
