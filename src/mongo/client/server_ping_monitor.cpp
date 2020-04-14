@@ -215,10 +215,9 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT duratio
                                                        const sdam::ServerAddress& address,
                                                        const BSONObj reply) {
     stdx::lock_guard lk(_mutex);
-    uassert(ErrorCodes::ShutdownInProgress,
-            str::stream() << "ServerPingMonitor is unable to start monitoring '" << address
-                          << "' due to shutdown",
-            !_isShutdown);
+    if (_isShutdown) {
+        return;
+    }
 
     if (_serverPingMonitorMap.find(address) != _serverPingMonitorMap.end()) {
         LOGV2_DEBUG(466811,
