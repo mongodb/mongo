@@ -134,6 +134,12 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
+    // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
+    // consider all collections as unsharded.
+    if (!ShardingState::get(_serviceContext)->enabled()) {
+        return {kUnshardedCollection};
+    }
+
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     uassert(
         StaleConfigInfo(_nss,
