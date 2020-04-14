@@ -33,6 +33,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/sharding_migration_critical_section.h"
+#include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
@@ -90,15 +92,6 @@ public:
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
     void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) override;
-
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) override;
-
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx) override;
-
-    void exitCriticalSection(OperationContext* opCtx) override;
-
-    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation op) const override;
 
     void appendShardVersion(BSONObjBuilder* builder) override;
 
@@ -168,6 +161,32 @@ public:
      * startingFrom key value, if any, or boost::none if there is no such range.
      */
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
+
+    /**
+     * Methods to control the collection's critical section. Methods listed below must be called
+     * with both the collection lock and CSRLock held in exclusive mode.
+     *
+     * In these methods, the CSRLock ensures concurrent access to the
+     * critical section.
+     */
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
+
+    /**
+     * Method to control the collection's critical secion. Method listed below must be called with
+     * the collection lock in IX mode and the CSRLock in exclusive mode.
+     *
+     * In this method, the CSRLock ensures concurrent access to the
+     * critical section.
+     */
+    void exitCriticalSection(OperationContext* opCtx);
+
+    /**
+     * If the collection is currently in a critical section, returns the critical section signal to
+     * be waited on. Otherwise, returns nullptr.
+     */
+    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
+        ShardingMigrationCriticalSection::Operation op) const;
 
     /**
      * Appends information about any chunks for which incoming migration has been requested, but the

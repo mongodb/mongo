@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -121,9 +122,9 @@ public:
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                auto const css = CollectionShardingState::get(opCtx, ns());
+                auto const csr = CollectionShardingRuntime::get(opCtx, ns());
                 auto criticalSectionSignal =
-                    css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead);
+                    csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead);
                 if (criticalSectionSignal) {
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
                 }
@@ -145,6 +146,7 @@ public:
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
     };
+
 } _flushRoutingTableCacheUpdatesCmd;
 
 }  // namespace

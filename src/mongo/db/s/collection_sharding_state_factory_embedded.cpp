@@ -66,14 +66,6 @@ public:
     void checkShardVersionOrThrow(OperationContext*) override {}
     void checkShardVersionOrThrow_DEPRECATED(OperationContext*) override {}
 
-    void enterCriticalSectionCatchUpPhase(OperationContext*) override {}
-    void enterCriticalSectionCommitPhase(OperationContext*) override {}
-    void exitCriticalSection(OperationContext*) override {}
-    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation) const override {
-        return nullptr;
-    }
-
     void appendShardVersion(BSONObjBuilder* builder) override {}
     void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
 };

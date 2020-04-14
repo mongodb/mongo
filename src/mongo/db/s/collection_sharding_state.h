@@ -32,8 +32,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state_lock.h"
 
 namespace mongo {
 
@@ -74,12 +72,6 @@ public:
      * returned pointer must not be stored.
      */
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * It is the caller's responsibility to ensure that the collection locks for this namespace are
-     * held when this is called. The returned pointer should never be stored.
-     */
-    static CollectionShardingState* get_UNSAFE(ServiceContext* svcCtx, const NamespaceString& nss);
 
     /**
      * Reports all collections which have filtering information associated.
@@ -144,32 +136,6 @@ public:
     virtual void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) = 0;
 
     /**
-     * Methods to control the collection's critical section. Methods listed below must be called
-     * with both the collection lock and CSRLock held in exclusive mode.
-     *
-     * In these methods, the CSRLock ensures concurrent access to the
-     * critical section.
-     */
-    virtual void enterCriticalSectionCatchUpPhase(OperationContext* opCtx) = 0;
-    virtual void enterCriticalSectionCommitPhase(OperationContext* opCtx) = 0;
-
-    /**
-     * Method to control the collection's critical secion. Method listed below must be called with
-     * the collection lock in IX mode and the CSRLock in exclusive mode.
-     *
-     * In this method, the CSRLock ensures concurrent access to the
-     * critical section.
-     */
-    virtual void exitCriticalSection(OperationContext* opCtx) = 0;
-
-    /**
-     * If the collection is currently in a critical section, returns the critical section signal to
-     * be waited on. Otherwise, returns nullptr.
-     */
-    virtual std::shared_ptr<Notification<void>> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation op) const = 0;
-
-    /**
      * Appends information about the shard version of the collection.
      */
     virtual void appendShardVersion(BSONObjBuilder* builder) = 0;
@@ -178,6 +144,13 @@ public:
      * Append information for the collection to be displayed in server status.
      */
     virtual void appendInfoForServerStatus(BSONArrayBuilder* builder) = 0;
+
+protected:
+    /**
+     * It is the caller's responsibility to ensure that the collection locks for this namespace are
+     * held when this is called. The returned pointer should never be stored.
+     */
+    static CollectionShardingState* get_UNSAFE(ServiceContext* svcCtx, const NamespaceString& nss);
 };
 
 /**
