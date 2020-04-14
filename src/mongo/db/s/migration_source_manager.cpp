@@ -637,7 +637,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingState::kNow
                                                           : CollectionShardingState::kDelayed;
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-        return CollectionShardingState::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
+        return CollectionShardingState::get(opCtx, getNss())
+            ->cleanUpRange(opCtx, autoColl.getCollection(), range, whenToClean);
     }();
 
     if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {

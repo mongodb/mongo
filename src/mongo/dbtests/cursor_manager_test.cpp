@@ -585,5 +585,44 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
     ASSERT(cursors2.find(cursor2) != cursors2.end());
 }
 
+TEST_F(CursorManagerTestCustomOpCtx,
+       GetCursorIdsForNamespaceReturnsSingleEntryForMatchingNamespace) {
+    auto opCtx = _queryServiceContext->makeOperationContext();
+    auto pinned = makeCursor(opCtx.get());
+    auto cursorId = pinned.getCursor()->cursorid();
+    auto cursorsForNamespace = useCursorManager()->getCursorIdsForNamespace(kTestNss);
+    ASSERT_EQUALS(cursorsForNamespace.size(), 1ull);
+    ASSERT_EQUALS(cursorsForNamespace[0], cursorId);
+}
+
+TEST_F(CursorManagerTestCustomOpCtx,
+       GetCursorIdsForNamespaceReturnsMultipleEntriesForMatchingNamespace) {
+    auto opCtx = _queryServiceContext->makeOperationContext();
+    auto pinned1 = makeCursor(opCtx.get());
+    auto pinned2 = makeCursor(opCtx.get());
+    auto cursorId1 = pinned1.getCursor()->cursorid();
+    auto cursorId2 = pinned2.getCursor()->cursorid();
+    auto cursorsForNamespace = useCursorManager()->getCursorIdsForNamespace(kTestNss);
+    ASSERT_EQUALS(cursorsForNamespace.size(), 2ull);
+
+    // The results for cursorsForNamespace won't necessarily be the same as the order of insertion.
+    std::set<CursorId> cursorsForNamespaceSet(cursorsForNamespace.begin(),
+                                              cursorsForNamespace.end());
+
+    ASSERT_EQUALS(cursorsForNamespaceSet.count(cursorId1), 1ull);
+    ASSERT_EQUALS(cursorsForNamespaceSet.count(cursorId2), 1ull);
+}
+
+TEST_F(CursorManagerTestCustomOpCtx,
+       GetCursorIdsForNamespaceDoesNotReturnEntriesForNonMatchingNamespace) {
+    auto opCtx = _queryServiceContext->makeOperationContext();
+    // Add a cursor for kTestNss.
+    auto pinned = makeCursor(opCtx.get());
+    // Get cursors for a different NamespaceString.
+    auto cursorsForNamespace =
+        useCursorManager()->getCursorIdsForNamespace(NamespaceString("somerandom.nss"));
+    ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -118,7 +118,10 @@ public:
      *
      * Call waitStatus(opCtx) on the result to wait for the deletion to complete or fail.
      */
-    CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
+    CleanupNotification cleanUpRange(OperationContext* opCtx,
+                                     const Collection* collection,
+                                     ChunkRange const& range,
+                                     Date_t whenToDelete);
 
     /**
      * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use

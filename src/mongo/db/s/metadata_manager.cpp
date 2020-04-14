@@ -38,6 +38,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -148,6 +150,49 @@ void scheduleCleanup(executor::TaskExecutor* executor,
         log() << "Failed to schedule the orphan data cleanup task"
               << causedBy(redact(swCallbackHandle.getStatus()));
     }
+}
+
+void logRangeDeletionWaitingOnOpenCursors(const OperationContext* opCtx,
+                                          const Collection* collection,
+                                          const NamespaceString& nss,
+                                          const ChunkRange& range) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss.toString(), MODE_IS));
+    std::vector<CursorId> cursorIds;
+    // If the collection exists, gather a list of all cursors related to the collection.
+    if (collection) {
+        auto cursorIdsFromCollectionCursorManager =
+            collection->getCursorManager()->getCursorIdsForNamespace(nss);
+        cursorIds.insert(cursorIds.end(),
+                         cursorIdsFromCollectionCursorManager.begin(),
+                         cursorIdsFromCollectionCursorManager.end());
+
+        // Aggregation cursors are registered on the global cursor manager. A cursor on
+        // the global cursor manager can involve any number of collections, but is registered with
+        // the namespace of the aggregate command. This works well for this purpose since any other
+        // namespaces would come through a $lookup or $graphLookup which cannot read from sharded
+        // collections and so could not be contributing to the delay of a range deletion. The
+        // namespace of the aggregate command can be sharded, so we do want to include those
+        // aggregation cursors in this message.
+        auto cursorIdsFromGlobalCursorManager =
+            CursorManager::getGlobalCursorManager()->getCursorIdsForNamespace(nss);
+        cursorIds.insert(cursorIds.end(),
+                         cursorIdsFromGlobalCursorManager.begin(),
+                         cursorIdsFromGlobalCursorManager.end());
+    }
+
+    // Join cursorIds as a comma-separated list.
+    std::string cursorIdList =
+        cursorIds.empty() ? "" : std::accumulate(std::next(cursorIds.begin()),
+                                                 cursorIds.end(),
+                                                 std::to_string(cursorIds[0]),
+                                                 [](std::string a, CursorId b) {
+                                                     return std::move(a) + ',' + std::to_string(b);
+                                                 });
+
+    log() << "Deletion of " << nss.ns() << " range " << redact(range.toString())
+          << " will be scheduled after all possibly dependent queries finish. "
+             "All open cursors for namespace: ["
+          << cursorIdList << "]";
 }
 
 }  // namespace
@@ -417,8 +462,10 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
     _pushRangeToClean(lg, range, Date_t{}).abandon();
 }
 
-auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
-    -> CleanupNotification {
+auto MetadataManager::cleanUpRange(OperationContext* opCtx,
+                                   const Collection* collection,
+                                   ChunkRange const& range,
+                                   Date_t whenToDelete) -> CleanupNotification {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
 
@@ -444,8 +491,7 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
         return _pushRangeToClean(lg, range, whenToDelete);
     }
 
-    log() << "Deletion of " << _nss.ns() << " range " << redact(range.toString())
-          << " will be scheduled after all possibly dependent queries finish";
+    logRangeDeletionWaitingOnOpenCursors(opCtx, collection, _nss, range);
 
     // Put it on the oldest metadata permissible; the current one might live a long time.
     auto& orphans = overlapMetadata->orphans;

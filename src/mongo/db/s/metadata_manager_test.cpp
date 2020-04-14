@@ -80,6 +80,13 @@ protected:
         configTargeter()->setFindHostReturnValue(dummyHost);
 
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
+        _autoColl.emplace(operationContext(), kNss, MODE_IS);
+    }
+
+    void tearDown() override {
+        _autoColl.reset();
+        _manager.reset();
+        ShardingMongodTestFixture::tearDown();
     }
 
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() const {
@@ -146,7 +153,12 @@ protected:
         return cm2Ptr;
     }
 
+    Collection* collection() {
+        return _autoColl->getCollection();
+    }
+
     std::shared_ptr<MetadataManager> _manager;
+    boost::optional<AutoGetCollection> _autoColl;
 };
 
 // In the following tests, the ranges-to-clean is not drained by the background deleter thread
@@ -172,7 +184,7 @@ TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
     _manager->refreshActiveMetadata(makeEmptyMetadata());
 
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    auto notifn1 = _manager->cleanUpRange(cr1, Date_t{});
+    auto notifn1 = _manager->cleanUpRange(operationContext(), collection(), cr1, Date_t{});
     ASSERT_FALSE(notifn1.ready());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
     auto optNotifn = _manager->trackOrphanedDataCleanup(cr1);
@@ -218,7 +230,7 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);  // not yet...
 
-        optNotif = _manager->cleanUpRange(cr1, Date_t{});
+        optNotif = _manager->cleanUpRange(operationContext(), collection(), cr1, Date_t{});
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
     }  // scm1,2,3 destroyed, refcount of each metadata goes to zero
@@ -316,7 +328,7 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     ASSERT(_manager->numberOfRangesToClean() == 0UL);
 
     ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    auto notifn = _manager->cleanUpRange(cr1, Date_t{});
+    auto notifn = _manager->cleanUpRange(operationContext(), collection(), cr1, Date_t{});
     ASSERT(!notifn.ready());
     ASSERT(_manager->numberOfRangesToClean() == 1UL);
     notifn.abandon();

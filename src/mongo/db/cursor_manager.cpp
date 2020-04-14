@@ -640,6 +640,22 @@ void CursorManager::appendActiveCursors(std::vector<GenericCursor>* cursors) con
     }
 }
 
+std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceString& nss) const {
+    std::vector<CursorId> cursors;
+
+    auto allPartitions = _cursorMap->lockAllPartitions();
+    for (auto&& partition : allPartitions) {
+        for (auto&& entry : partition) {
+            auto cursor = entry.second;
+            if (cursor->nss() == nss) {
+                cursors.emplace_back(cursor->cursorid());
+            }
+        }
+    }
+
+    return cursors;
+}
+
 stdx::unordered_set<CursorId> CursorManager::getCursorsForSession(LogicalSessionId lsid) const {
     stdx::unordered_set<CursorId> cursors;
 

@@ -152,7 +152,11 @@ public:
      * result.abandon(), instead of waitStatus, to ignore the outcome.
      */
     enum CleanWhen { kNow, kDelayed };
-    auto cleanUpRange(ChunkRange const& range, CleanWhen) -> CleanupNotification;
+    auto cleanUpRange(OperationContext* opCtx,
+                      const Collection* collection,
+                      ChunkRange const& range,
+                      CleanWhen) -> CleanupNotification;
+
 
     /**
      * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use

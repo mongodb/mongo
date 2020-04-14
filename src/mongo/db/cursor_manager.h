@@ -196,6 +196,11 @@ public:
      */
     void appendActiveCursors(std::vector<GenericCursor>* cursors) const;
 
+    /**
+     * Returns a vector of all open cursors for the given namespace.
+     */
+    std::vector<CursorId> getCursorIdsForNamespace(const NamespaceString& nss) const;
+
     /*
      * Returns a list of all open cursors for the given session.
      */
