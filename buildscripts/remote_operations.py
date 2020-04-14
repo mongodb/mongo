@@ -279,7 +279,7 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
     shell_options.add_option(
         "--commandDir", dest="command_dir", default=None,
         help=("Working directory on remote to execute commands"
-              " form. Defaults to remote login directory."))
+              " from. Defaults to remote login directory."))
 
     copy_options.add_option(
         "--file", dest="files", default=None, action="append",
