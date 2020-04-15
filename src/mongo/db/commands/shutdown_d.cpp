@@ -35,8 +35,37 @@
 
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+Status stepDownForShutdown(OperationContext* opCtx,
+                           const Milliseconds& waitTime,
+                           bool forceShutdown) noexcept {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // If this is a single node replica set, then we don't have to wait
+    // for any secondaries. Ignore stepdown.
+    if (replCoord->getConfig().getNumMembers() != 1) {
+        try {
+            replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
+        } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
+            // Ignore not master errors.
+        } catch (const DBException& e) {
+            if (!forceShutdown) {
+                return e.toStatus();
+            }
+            // Ignore stepDown errors on force shutdown.
+            log() << "Error stepping down during force shutdown " << e.toStatus();
+        }
+
+        // Even if the ReplicationCoordinator failed to step down, ensure we still shut down the
+        // TransactionCoordinatorService (see SERVER-45009)
+        TransactionCoordinatorService::get(opCtx)->onStepDown();
+    }
+    return Status::OK();
+}
+
 namespace {
 
 class CmdShutdownMongoD : public CmdShutdown {
@@ -61,14 +90,7 @@ public:
             timeoutSecs = cmdObj["timeoutSecs"].numberLong();
         }
 
-        try {
-            repl::ReplicationCoordinator::get(opCtx)->stepDown(
-                opCtx, force, Seconds(timeoutSecs), Seconds(120));
-        } catch (const DBException& e) {
-            if (e.code() != ErrorCodes::NotMaster) {  // ignore not master
-                throw;
-            }
-        }
+        uassertStatusOK(stepDownForShutdown(opCtx, Seconds(timeoutSecs), force));
 
         // Never returns
         shutdownHelper(cmdObj);

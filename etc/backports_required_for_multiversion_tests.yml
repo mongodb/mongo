@@ -55,6 +55,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
 - ticket: SERVER-45143
   test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
+- ticket: SERVER-47190
+  test_file: jstests/replsets/force_shutdown_primary.js
 
 sharding_multiversion:
 - ticket: SERVER-38691

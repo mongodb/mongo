@@ -35,6 +35,9 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+Status stepDownForShutdown(OperationContext* opCtx,
+                           const Milliseconds& waitTime,
+                           bool forceShutdown) noexcept;
 
 class CmdShutdown : public BasicCommand {
 public:
