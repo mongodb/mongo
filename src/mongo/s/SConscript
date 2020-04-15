@@ -387,6 +387,31 @@ env.Library(
 )
 
 env.Library(
+    target='mongos_is_master_response',
+    source=[
+        'mongos_is_master_response.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/rpc/metadata',
+    ]
+)
+
+env.Library(
+    target='mongos_topology_coordinator',
+    source=[
+        'mongos_topology_coordinator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        'mongos_is_master_response',
+    ],
+)
+
+env.Library(
     target='mongos_server_parameters',
     source=[
         'mongos_server_parameters.cpp',

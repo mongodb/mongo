@@ -42,7 +42,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/transport/ismaster_metrics.h"
+#include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -52,16 +52,6 @@ namespace mongo {
 
 // Hangs in the beginning of each isMaster command when set.
 MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
-// Awaitable isMaster requests with the proper topologyVersions are expected to sleep for
-// maxAwaitTimeMS on mongos. This failpoint will hang right before doing this sleep when set.
-MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
-
-TopologyVersion mongosTopologyVersion;
-
-MONGO_INITIALIZER(GenerateMongosTopologyVersion)(InitializerContext*) {
-    mongosTopologyVersion = TopologyVersion(OID::gen(), 0);
-    return Status::OK();
-}
 
 namespace {
 
@@ -133,6 +123,7 @@ public:
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
         boost::optional<TopologyVersion> clientTopologyVersion;
+        boost::optional<long long> maxAwaitTimeMS;
         if (topologyVersionElement && maxAwaitTimeMSField) {
             clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                                            topologyVersionElement.Obj());
@@ -140,32 +131,16 @@ public:
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
 
-            long long maxAwaitTimeMS;
-            uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
-            uassert(51759, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
+            long long parsedMaxAwaitTimeMS;
+            uassertStatusOK(
+                bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &parsedMaxAwaitTimeMS));
+
+            uassert(
+                51759, "maxAwaitTimeMS must be a non-negative integer", parsedMaxAwaitTimeMS >= 0);
+
+            maxAwaitTimeMS = parsedMaxAwaitTimeMS;
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
-
-            if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId()) {
-                uassert(51761,
-                        str::stream()
-                            << "Received a topology version with counter: "
-                            << clientTopologyVersion->getCounter()
-                            << " which is greater than the mongos topology version counter: "
-                            << mongosTopologyVersion.getCounter(),
-                        clientTopologyVersion->getCounter() == mongosTopologyVersion.getCounter());
-
-                // The topologyVersion never changes on a running mongos process, so just sleep for
-                // maxAwaitTimeMS.
-                IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
-                ON_BLOCK_EXIT(
-                    [&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
-                if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
-                    LOGV2(31463, "hangWhileWaitingForIsMasterResponse failpoint enabled.");
-                    hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
-                }
-                opCtx->sleepFor(Milliseconds(maxAwaitTimeMS));
-            }
         } else {
             uassert(51760,
                     (topologyVersionElement
@@ -175,8 +150,15 @@ public:
         }
 
         auto result = replyBuilder->getBodyBuilder();
-        result.appendBool("ismaster", true);
-        result.append("msg", "isdbgrid");
+        const auto* mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
+
+        auto mongosIsMasterResponse =
+            mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, maxAwaitTimeMS);
+
+        mongosIsMasterResponse->appendToBuilder(&result);
+        // The isMaster response always includes a topologyVersion.
+        auto currentMongosTopologyVersion = mongosIsMasterResponse->getTopologyVersion();
+
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
@@ -201,9 +183,6 @@ public:
         auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
         saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
 
-        BSONObjBuilder topologyVersionBuilder(result.subobjStart("topologyVersion"));
-        mongosTopologyVersion.serialize(&topologyVersionBuilder);
-
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster protocol");
 
@@ -215,8 +194,9 @@ public:
             InExhaustIsMaster::get(opCtx->getClient()->session().get())
                 ->setInExhaustIsMaster(true /* inExhaustIsMaster */);
 
-            if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId() &&
-                clientTopologyVersion->getCounter() == mongosTopologyVersion.getCounter()) {
+            if (clientTopologyVersion->getProcessId() ==
+                    currentMongosTopologyVersion.getProcessId() &&
+                clientTopologyVersion->getCounter() == currentMongosTopologyVersion.getCounter()) {
                 // Indicate that an exhaust message should be generated and the previous BSONObj
                 // command parameters should be reused as the next BSONObj command parameters.
                 replyBuilder->setNextInvocation(boost::none);
@@ -226,7 +206,7 @@ public:
                     if (elt.fieldNameStringData() == "topologyVersion"_sd) {
                         BSONObjBuilder topologyVersionBuilder(
                             nextInvocationBuilder.subobjStart("topologyVersion"));
-                        mongosTopologyVersion.serialize(&topologyVersionBuilder);
+                        currentMongosTopologyVersion.serialize(&topologyVersionBuilder);
                     } else {
                         nextInvocationBuilder.append(elt);
                     }
