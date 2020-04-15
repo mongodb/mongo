@@ -66,7 +66,7 @@ replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
 let awaitShell;
 try {
     assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "alwaysOn"}));
+        {configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "alwaysOn"}));
 
     // Starts parallel shell to run the command that will hang.
     awaitShell = startParallelShell(function() {
@@ -102,7 +102,7 @@ try {
     }));
 } finally {
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "off"}));
+        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "off"}));
 }
 
 // Wait for the parallel shell to complete.
