@@ -1388,8 +1388,13 @@ runMongoProgram = function() {
     args = appendSetParameterArgs(args);
     var progName = args[0];
 
-    // The bsondump tool doesn't support these auth related command line flags.
-    if (jsTestOptions().auth && progName != 'mongod') {
+    const separator = _isWindows() ? '\\' : '/';
+    progName = progName.split(separator).pop();
+    const [baseProgramName, programVersion] = progName.split("-");
+
+    // Non-shell binaries (which are in fact instantiated via `runMongoProgram`) may not support
+    // these command line flags.
+    if (jsTestOptions().auth && baseProgramName != 'mongod') {
         args = args.slice(1);
         args.unshift(progName,
                      '-u',
