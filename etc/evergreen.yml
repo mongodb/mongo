@@ -6716,7 +6716,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication
-  tags: ["concurrency", "common", "read_concern_maj"]
+  tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6738,7 +6738,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_with_balancer
-  tags: ["concurrency", "common", "read_concern_maj"]
+  tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6749,7 +6749,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_no_txns
-  tags: ["concurrency", "no_txns"]
+  tags: ["concurrency", "no_txns", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6760,7 +6760,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_no_txns_with_balancer
-  tags: ["concurrency", "no_txns"]
+  tags: ["concurrency", "no_txns", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6771,7 +6771,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_clusterwide_ops_add_remove_shards
-  tags: ["concurrency", "common", "read_concern_maj"]
+  tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6791,7 +6791,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
-  tags: ["concurrency"]
+  tags: ["concurrency", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6802,7 +6802,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
-  tags: ["concurrency", "stepdowns"]
+  tags: ["concurrency", "stepdowns", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6813,7 +6813,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
-  tags: ["concurrency", "stepdowns"]
+  tags: ["concurrency", "stepdowns", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6824,7 +6824,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_terminate_primary_with_balancer
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6835,7 +6835,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_kill_primary_with_balancer
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6846,7 +6846,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn
-  tags: ["concurrency"]
+  tags: ["concurrency", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6856,7 +6856,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_with_balancer
-  tags: ["concurrency"]
+  tags: ["concurrency", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6866,7 +6866,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn
-  tags: ["concurrency"]
+  tags: ["concurrency", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6876,7 +6876,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
-  tags: ["concurrency"]
+  tags: ["concurrency", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6886,7 +6886,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_with_stepdowns
-  tags: ["concurrency", "stepdowns"]
+  tags: ["concurrency", "stepdowns", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6896,7 +6896,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_terminate_primary
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6906,7 +6906,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_kill_primary
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -10144,15 +10144,35 @@ buildvariants:
   - name: concurrency_replication
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication_with_balancer
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_clusterwide_ops_add_remove_shards
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_local_read_write_multi_stmt_txn
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_multi_stmt_txn
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_with_stepdowns
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_with_stepdowns_and_balancer
+    distros:
+    - rhel62-large
   - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_txns
@@ -10224,6 +10244,8 @@ buildvariants:
   - name: .concurrency .no_txns
   - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
+    distros:
+    - rhel62-large
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel62-large
@@ -10793,7 +10815,10 @@ buildvariants:
   - name: .auth !.multiversion !.audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
+  - name: .concurrency .common !.large
+  - name: .concurrency .common .large
+    distros:
+      - rhel62-large
   - name: concurrency_replication_causal_consistency
     distros:
       - rhel62-large
@@ -11486,7 +11511,10 @@ buildvariants:
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
-  - name: .concurrency .common
+  - name: .concurrency .common !.large
+  - name: .concurrency .common .large
+    distros:
+      - suse12-build
   - name: concurrency_replication_causal_consistency
     distros:
       - suse12-build
