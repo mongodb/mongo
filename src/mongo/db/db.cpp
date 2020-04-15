@@ -64,6 +64,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
+#include "mongo/db/commands/shutdown.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -1066,28 +1067,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             opCtx = uniqueOpCtx.get();
         }
 
-        // If this is a single node replica set, then we don't have to wait
-        // for any secondaries. Ignore stepdown.
-        if (repl::ReplicationCoordinator::get(serviceContext)->getConfig().getNumMembers() != 1) {
-            try {
-                // For faster tests, we allow a short wait time with setParameter.
-                auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load()
-                    ? Milliseconds(Seconds(15))
-                    : Milliseconds(100);
-                replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
-            } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
-                // ignore not master errors
-            } catch (const DBException& e) {
-                LOGV2_WARNING(20561,
-                              "Error stepping down in non-command initiated shutdown path: {error}",
-                              "Error stepping down in non-command initiated shutdown path",
-                              "error"_attr = e);
-            }
-
-            // Even if the replCoordinator failed to step down, ensure we still shut down the
-            // TransactionCoordinatorService (see SERVER-45009)
-            TransactionCoordinatorService::get(serviceContext)->onStepDown();
-        }
+        // For faster tests, we allow a short wait time with setParameter.
+        auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load() ? Milliseconds(Seconds(15))
+                                                                         : Milliseconds(100);
+        const auto forceShutdown = true;
+        // stepDown should never return an error during force shutdown.
+        invariantStatusOK(stepDownForShutdown(opCtx, waitTime, forceShutdown));
     }
 
     MirrorMaestro::shutdown(serviceContext);

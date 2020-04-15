@@ -40,6 +40,9 @@
 #include "mongo/util/ntservice.h"
 
 namespace mongo {
+Status stepDownForShutdown(OperationContext* opCtx,
+                           const Milliseconds& waitTime,
+                           bool forceShutdown) noexcept;
 
 namespace shutdown_detail {
 void finishShutdown(bool force, long long timeoutSecs);

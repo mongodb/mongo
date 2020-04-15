@@ -63,6 +63,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/reconfig_waits_for_oplog_commitment_condition.js
 - ticket: SERVER-44500
   test_file: jstests/replsets/apply_ops_inserts_do_not_include_fromMigrate_field.js
+- ticket: SERVER-47190
+  test_file: jstests/replsets/force_shutdown_primary.js
 
 sharding_multiversion:
 
