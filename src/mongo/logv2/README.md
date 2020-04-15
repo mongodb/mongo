@@ -58,7 +58,7 @@ __Importantly__: downstream analysis tools will rely on this convention, as a re
 
 When logging the below information, do so with these specific terms:
 
-* __namespace__ - instead of "ns"
+* __namespace__ - when logging a value of the form "\<db name\>.\<collection name\>". Do not use "collection" or abbreviate to "ns"
 * __db__ - instead of "database"
 * __error__ - when an error occurs, instead of "status". Use this for objects of type Status and DBException
 * __reason__ - to provide rationale for an event/action when "error" isn't appropriate
