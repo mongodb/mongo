@@ -1391,7 +1391,7 @@ functions:
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
-          --useLatest 4.3
+          --useLatest 4.4
 
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
