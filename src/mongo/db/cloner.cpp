@@ -73,7 +73,6 @@
 namespace mongo {
 
 using std::endl;
-using std::list;
 using std::set;
 using std::string;
 using std::unique_ptr;
@@ -467,114 +466,6 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                        }));
     wunit.commit();
     abortOnExit.dismiss();
-}
-
-bool Cloner::copyCollection(OperationContext* opCtx,
-                            const string& ns,
-                            const BSONObj& query,
-                            string& errmsg,
-                            bool shouldCopyIndexes,
-                            CollectionOptions::ParseKind optionsParser) {
-    const NamespaceString nss(ns);
-    const string dbname = nss.db().toString();
-
-    // config
-    BSONObj filter = BSON("name" << nss.coll().toString());
-    list<BSONObj> collList = _conn->getCollectionInfos(dbname, filter);
-    BSONObjBuilder optionsBob;
-    bool shouldCreateCollection = false;
-
-    if (!collList.empty()) {
-        invariant(collList.size() <= 1);
-        shouldCreateCollection = true;
-        BSONObj col = collList.front();
-
-        // Confirm that 'col' is not a view.
-        {
-            std::string namespaceType;
-            auto status = bsonExtractStringField(col, "type", &namespaceType);
-
-            uassert(ErrorCodes::InternalError,
-                    str::stream() << "Collection 'type' expected to be a string: " << col,
-                    ErrorCodes::TypeMismatch != status.code());
-
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "copyCollection not supported for views. ns: "
-                                  << col["name"].valueStringData(),
-                    !(status.isOK() && namespaceType == "view"));
-        }
-
-        if (col["options"].isABSONObj()) {
-            optionsBob.appendElements(col["options"].Obj());
-        }
-        if ((optionsParser == CollectionOptions::parseForStorage) && col["info"].isABSONObj()) {
-            auto info = col["info"].Obj();
-            if (info.hasField("uuid")) {
-                optionsBob.append(info.getField("uuid"));
-            }
-        }
-    }
-    BSONObj options = optionsBob.obj();
-
-    auto sourceIndexes = _conn->getIndexSpecs(nss, QueryOption_SlaveOk);
-    auto idIndexSpec = getIdIndexSpec(sourceIndexes);
-
-    Lock::DBLock dbWrite(opCtx, dbname, MODE_X);
-
-    uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
-            !opCtx->writesAreReplicated() ||
-                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
-
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, dbname);
-
-    if (shouldCreateCollection) {
-        bool result = writeConflictRetry(opCtx, "createCollection", ns, [&] {
-            opCtx->checkForInterrupt();
-
-            WriteUnitOfWork wunit(opCtx);
-            CollectionOptions collectionOptions =
-                uassertStatusOK(CollectionOptions::parse(options, optionsParser));
-            const bool createDefaultIndexes = true;
-            Status status =
-                db->userCreateNS(opCtx, nss, collectionOptions, createDefaultIndexes, idIndexSpec);
-            if (!status.isOK()) {
-                errmsg = status.toString();
-                // abort write unit of work
-                return false;
-            }
-
-            wunit.commit();
-            return true;
-        });
-
-        if (!result) {
-            return result;
-        }
-    } else {
-        LOGV2_DEBUG(20416,
-                    1,
-                    "No collection info found for ns:{nss}, host:{conn_getServerAddress}",
-                    "nss"_attr = nss.toString(),
-                    "conn_getServerAddress"_attr = _conn->getServerAddress());
-    }
-
-    // main data
-    CloneOptions opts;
-    opts.slaveOk = true;
-    copy(opCtx, dbname, nss, options, idIndexSpec, nss, opts, Query(query));
-
-    /* TODO : copyIndexes bool does not seem to be implemented! */
-    if (!shouldCopyIndexes) {
-        LOGV2(
-            20417, "ERROR copy collection shouldCopyIndexes not implemented? {ns}", "ns"_attr = ns);
-    }
-
-    // indexes
-    copyIndexes(opCtx, dbname, NamespaceString(ns), options, sourceIndexes, NamespaceString(ns));
-
-    return true;
 }
 
 StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
