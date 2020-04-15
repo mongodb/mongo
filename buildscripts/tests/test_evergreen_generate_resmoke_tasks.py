@@ -995,7 +995,8 @@ class GenerateSubSuitesTest(unittest.TestCase):
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[1], filtered_list)
 
-    def test_filter_blacklist_files(self):
+    @patch(ns('_parser.set_run_options'))
+    def test_filter_blacklist_files(self, set_run_options_mock):
         tests_runtimes = [
             TestRuntime(test_name="dir1/file1.js", runtime=20.32),
             TestRuntime(test_name="dir2/file2.js", runtime=24.32),
@@ -1019,7 +1020,8 @@ class GenerateSubSuitesTest(unittest.TestCase):
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[0], filtered_list)
 
-    def test_filter_blacklist_files_for_windows(self):
+    @patch(ns('_parser.set_run_options'))
+    def test_filter_blacklist_files_for_windows(self, set_run_options_mock):
         tests_runtimes = [
             TestRuntime(test_name="dir1/file1.js", runtime=20.32),
             TestRuntime(test_name="dir2/file2.js", runtime=24.32),

@@ -1,5 +1,6 @@
 """Unit tests for the buildscripts.resmokelib.selector module."""
 
+import sys
 import fnmatch
 import os.path
 import unittest
@@ -514,7 +515,7 @@ class TestFilterTests(unittest.TestCase):
         self.assertEqual(["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], selected)
 
     def test_filter_temporarily_disabled_tests(self):
-        parser.parse_command_line()
+        parser.parse_command_line(sys.argv[1:])
         test_file_explorer = MockTestFileExplorer()
         test_file_explorer.tags = {
             "dir/subdir1/test11.js": ["tag1", "tag2", "__TEMPORARILY_DISABLED__"],

@@ -760,7 +760,7 @@ class GenerateSubSuites(object):
         self.test_list = []
 
         # Populate config values for methods like list_tests()
-        _parser.set_options()
+        _parser.set_run_options()
 
     def calculate_suites(self, start_date: datetime, end_date: datetime) -> List[Suite]:
         """

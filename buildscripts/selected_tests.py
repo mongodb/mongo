@@ -484,7 +484,7 @@ def main(
     selected_tests_service = SelectedTestsService.from_file(selected_tests_config)
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
 
-    buildscripts.resmokelib.parser.set_options()
+    buildscripts.resmokelib.parser.set_run_options()
 
     task_expansions = read_config.read_config_file(expansion_file)
     origin_build_variants = task_expansions["selected_tests_buildvariants"].split(" ")

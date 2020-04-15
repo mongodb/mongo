@@ -2,7 +2,6 @@
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import core
-from buildscripts.resmokelib import parser
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.testcases import interface
 
@@ -16,11 +15,29 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         """Initialize the BenchmarkTestCase with the executable to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
-        parser.validate_benchmark_options()
+        self.validate_benchmark_options()
 
         self.bm_executable = program_executable
         self.suite_bm_options = program_options
         self.bm_options = {}
+
+    def validate_benchmark_options(self):  # pylint: disable=no-self-use
+        """Error out early if any options are incompatible with benchmark test suites.
+
+        :return: None
+        """
+
+        if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1 or _config.REPEAT_TESTS_SECS:
+            raise ValueError(
+                "--repeatSuites/--repeatTests cannot be used with benchmark tests. "
+                "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
+                "configuration.")
+
+        if _config.JOBS > 1:
+            raise ValueError(
+                "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
+                "patterns and cause additional context switching, which lead to inaccurate benchmark "
+                "results. Please use --jobs=1" % _config.JOBS)
 
     def configure(self, fixture, *args, **kwargs):
         """Configure BenchmarkTestCase."""

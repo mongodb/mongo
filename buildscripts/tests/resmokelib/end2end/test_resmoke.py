@@ -27,7 +27,7 @@ class _ResmokeSelftest(unittest.TestCase):
         cls.logger.addHandler(handler)
 
         cls.test_dir = os.path.normpath("/data/db/selftest")
-        cls.resmoke_const_args = ["--dbpathPrefix={}".format(cls.test_dir)]
+        cls.resmoke_const_args = ["run", "--dbpathPrefix={}".format(cls.test_dir)]
 
     def setUp(self):
         self.logger.info("Cleaning temp directory %s", self.test_dir)
@@ -114,7 +114,7 @@ class TestTimeout(_ResmokeSelftest):
         # TODO: replace above with below after SERVER-46691.
         # signal_resmoke_process = core.programs.make_process(
         #     self.logger,
-        #     [sys.executable, "buildscripts/signal_resmoke.py", "--pid", str(resmoke_process.pid)])
+        #     [sys.executable, "buildscripts/signal_resmoke.py", "run", "--pid", str(resmoke_process.pid)])
         # signal_resmoke_process.start()
 
         # return_code = signal_resmoke_process.wait()

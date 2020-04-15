@@ -1478,7 +1478,7 @@ functions:
             ${san_symbolizer}                             \
             ${snmp_config_path}                           \
             ${resmoke_wrapper}                            \
-            $python buildscripts/evergreen_run_tests.py   \
+            $python buildscripts/resmoke.py run   \
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \

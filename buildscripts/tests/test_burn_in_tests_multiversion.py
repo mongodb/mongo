@@ -16,7 +16,7 @@ from buildscripts.burn_in_tests import _gather_task_info, create_generate_tasks_
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 import buildscripts.resmokelib.parser as _parser
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
-_parser.set_options()
+_parser.set_run_options()
 
 MONGO_4_2_HASH = "d94888c0d0a8065ca57d354ece33b3c2a1a5a6d6"
 

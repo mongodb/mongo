@@ -398,7 +398,7 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
 
 def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     """Build the resmoke command, if a resmoke.py command wasn't passed in."""
-    new_args = [sys.executable, "buildscripts/resmoke.py"]
+    new_args = [sys.executable, "buildscripts/resmoke.py", "run"]
     if resmoke_args:
         new_args = copy.deepcopy(resmoke_args)
 
@@ -645,7 +645,7 @@ def create_tests_by_task(build_variant: str, repos: Iterable[Repo],
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    buildscripts.resmokelib.parser.set_options()
+    buildscripts.resmokelib.parser.set_run_options()
     if changed_tests:
         return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
                                           exclude_tasks)
