@@ -4230,22 +4230,10 @@ var authCommandsLib = {
           command: {insert: "oplog.rs", documents: [{ts: Timestamp()}]},
           skipSharded: true,
           setup: function(db) {
-              load("jstests/libs/storage_engine_utils.js");
-              if (!db.getCollectionNames().includes("oplog.rs")) {
-                  assert.commandWorked(
-                      db.runCommand({create: "oplog.rs", capped: true, size: 10000}));
-              } else {
-                  if (storageEngineIsWiredTigerOrInMemory()) {
-                      assert.commandWorked(db.adminCommand({replSetResizeOplog: 1, size: 10000}));
-                  } else {
-                      assert.commandWorked(db.runCommand({drop: "oplog.rs"}));
-                      assert.commandWorked(
-                          db.runCommand({create: "oplog.rs", capped: true, size: 10000}));
-                  }
-              }
+              db.createCollection("oplog.rs", {capped: true, size: 10000});
           },
           teardown: function(db) {
-              assert.commandWorked(db.oplog.rs.runCommand('emptycapped'));
+              db.oplog.rs.drop();
           },
           testcases: [
               {
