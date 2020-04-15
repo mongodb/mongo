@@ -326,23 +326,6 @@ std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* o
         opCtx, swDefaults.getValue(), false /*removeIndexBuildsToo*/);
 }
 
-void checkUniqueIndexConstraints(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const BSONObj& newIdxKey) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
-
-    const auto collDesc =
-        CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
-    if (!collDesc.isSharded())
-        return;
-
-    const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
-    uassert(ErrorCodes::CannotCreateIndex,
-            str::stream() << "cannot create unique index over " << newIdxKey
-                          << " with shard key pattern " << shardKeyPattern.toBSON(),
-            shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
-}
-
 /**
  * Fills in command result with number of indexes when there are no indexes to add.
  */
