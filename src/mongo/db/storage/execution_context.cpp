@@ -35,6 +35,9 @@ const OperationContext::Decoration<StorageExecutionContext> StorageExecutionCont
     OperationContext::declareDecoration<StorageExecutionContext>();
 
 StorageExecutionContext::StorageExecutionContext()
-    : _pooledBufferBuilder(gOperationMemoryPoolBlockSizeKB.loadRelaxed() * 1024) {}
+    : _pooledBufferBuilder(
+          gOperationMemoryPoolBlockInitialSizeKB.loadRelaxed() * static_cast<size_t>(1024),
+          SharedBufferFragmentBuilder::DoubleGrowStrategy(
+              gOperationMemoryPoolBlockMaxSizeKB.loadRelaxed() * static_cast<size_t>(1024))) {}
 
 }  // namespace mongo

@@ -93,20 +93,26 @@ private:
  */
 class SharedBufferFragmentBuilder {
 public:
+    static constexpr size_t kDefaultMaxBlockSize = 1024 * 1024;  // 1MB
     using GrowStrategy = std::function<size_t(size_t)>;
-    SharedBufferFragmentBuilder(size_t blockSize, GrowStrategy growStrategy = DoubleGrowStrategy())
+    SharedBufferFragmentBuilder(
+        size_t blockSize, GrowStrategy growStrategy = DoubleGrowStrategy(kDefaultMaxBlockSize))
         : _offset(0), _blockSize(blockSize), _growStrategy(growStrategy) {}
 
     struct ConstantGrowStrategy {
-        size_t operator()(size_t current) {
+        size_t operator()(size_t current) const {
             return current;
         }
     };
 
     struct DoubleGrowStrategy {
-        size_t operator()(size_t current) {
-            return current * 2;
+        DoubleGrowStrategy(size_t maxBlockSize) : _maxBlockSize(maxBlockSize) {}
+        size_t operator()(size_t current) const {
+            return std::min(current * 2, _maxBlockSize);
         }
+
+    private:
+        size_t _maxBlockSize;
     };
 
     // Starts building a memory fragment with at least 'initialSize' capacity.
