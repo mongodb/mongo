@@ -53,7 +53,7 @@ void finishShutdown(bool force, long long timeoutSecs) {
     });
 
     // Shared by mongos and mongod shutdown code paths
-    LOGV2(4695300,
+    LOGV2(4695400,
           "Terminating via shutdown command",
           "force"_attr = force,
           "timeoutSecs"_attr = timeoutSecs);
