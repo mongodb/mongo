@@ -1239,62 +1239,6 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
     ASSERT_STRING_CONTAINS(status.reason(), "unable to determine common point");
 }
 
-TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
-    createOplog(_opCtx.get());
-
-    OpTime dropTime = OpTime(Timestamp(2, 0), 5);
-    auto dpns = NamespaceString("test.t").makeDropPendingNamespace(dropTime);
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    auto coll = _createCollection(_opCtx.get(), dpns, options);
-    _dropPendingCollectionReaper->addDropPendingNamespace(_opCtx.get(), dropTime, dpns);
-
-    auto commonOperation = makeOpAndRecordId(1);
-    auto dropCollectionOperation =
-        std::make_pair(BSON("ts" << dropTime.getTimestamp() << "t" << dropTime.getTerm() << "op"
-                                 << "c"
-                                 << "ui" << coll->uuid() << "ns"
-                                 << "test.t"
-                                 << "wall" << Date_t() << "o"
-                                 << BSON("drop"
-                                         << "t")),
-                       RecordId(2));
-    class RollbackSourceLocal : public RollbackSourceMock {
-    public:
-        RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
-            : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* opCtx,
-                                      const NamespaceString& nss) const override {
-            called = true;
-        }
-        mutable bool called;
-    };
-    RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
-        commonOperation,
-    })));
-
-    {
-        AutoGetCollectionForReadCommand autoCollDropPending(_opCtx.get(), dpns);
-        ASSERT_TRUE(autoCollDropPending.getCollection());
-        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString("test.t"));
-        ASSERT_FALSE(autoColl.getCollection());
-    }
-    ASSERT_OK(syncRollback(_opCtx.get(),
-                           OplogInterfaceMock({dropCollectionOperation, commonOperation}),
-                           rollbackSource,
-                           {},
-                           {},
-                           _coordinator,
-                           _replicationProcess.get()));
-    ASSERT_FALSE(rollbackSource.called);
-    {
-        AutoGetCollectionForReadCommand autoCollDropPending(_opCtx.get(), dpns);
-        ASSERT_FALSE(autoCollDropPending.getCollection());
-        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString("test.t"));
-        ASSERT_TRUE(autoColl.getCollection());
-    }
-}
-
 TEST_F(RSRollbackTest, RollbackRenameCollectionInSameDatabaseCommand) {
     createOplog(_opCtx.get());
     CollectionOptions options;

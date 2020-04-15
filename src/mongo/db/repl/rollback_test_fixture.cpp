@@ -289,9 +289,6 @@ std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const std:
     return {BSONObj(), NamespaceString()};
 }
 
-void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
-                                                  const NamespaceString& nss) const {}
-
 StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
     return BSON("name" << nss.ns() << "options" << BSONObj());
 }
