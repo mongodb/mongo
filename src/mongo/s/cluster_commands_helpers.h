@@ -296,14 +296,6 @@ BSONObj extractQuery(const BSONObj& cmdObj);
 BSONObj extractCollation(const BSONObj& cmdObj);
 
 /**
- * Utility function to compute a single error code from a vector of command results.
- *
- * @return If there is an error code common to all of the error results, returns that error
- *          code; otherwise, returns 0.
- */
-int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results);
-
-/**
  * Utility function to return an empty result set from a command.
  */
 bool appendEmptyResultSet(OperationContext* opCtx,

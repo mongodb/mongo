@@ -1305,11 +1305,7 @@ void Strategy::explainFind(OperationContext* opCtx,
     const char* mongosStageName =
         ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
 
-    uassertStatusOK(
-        ClusterExplain::buildExplainResult(opCtx,
-                                           ClusterExplain::downconvert(opCtx, shardResponses),
-                                           mongosStageName,
-                                           millisElapsed,
-                                           out));
+    uassertStatusOK(ClusterExplain::buildExplainResult(
+        opCtx, shardResponses, mongosStageName, millisElapsed, out));
 }
 }  // namespace mongo

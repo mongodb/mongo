@@ -363,7 +363,7 @@ private:
                                 const NamespaceString& nss,
                                 const BSONObj& command,
                                 BatchItemRef targetingBatchItem,
-                                std::vector<Strategy::CommandResult>* results) {
+                                std::vector<AsyncRequestsSender::Response>* results) {
         auto endpoints = [&] {
             // Note that this implementation will not handle targeting retries and does not
             // completely emulate write behavior
@@ -407,16 +407,9 @@ private:
             auto response = ars.next();
             uassertStatusOK(response.swResponse);
 
-            Strategy::CommandResult result;
-
             // If the response status was OK, the response must contain which host was targeted.
             invariant(response.shardHostAndPort);
-            result.target = ConnectionString(std::move(*response.shardHostAndPort));
-
-            result.shardTargetId = std::move(response.shardId);
-            result.result = std::move(response.swResponse.getValue().data);
-
-            results->push_back(result);
+            results->push_back(response);
         }
     }
 };
@@ -583,12 +576,12 @@ private:
 
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&_batchedRequest, 0);
-        std::vector<Strategy::CommandResult> shardResults;
+        std::vector<AsyncRequestsSender::Response> shardResponses;
         _commandOpWrite(
-            opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResults);
+            opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResponses);
         auto bodyBuilder = result->getBodyBuilder();
         uassertStatusOK(ClusterExplain::buildExplainResult(
-            opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));
+            opCtx, shardResponses, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));
     }
 
     NamespaceString ns() const override {

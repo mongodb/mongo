@@ -626,33 +626,6 @@ BSONObj extractCollation(const BSONObj& cmdObj) {
     return collationElem.embeddedObject();
 }
 
-int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
-    int commonErrCode = -1;
-    for (std::vector<Strategy::CommandResult>::const_iterator it = results.begin();
-         it != results.end();
-         ++it) {
-        // Only look at shards with errors.
-        if (!it->result["ok"].trueValue()) {
-            int errCode = it->result["code"].numberInt();
-
-            if (commonErrCode == -1) {
-                commonErrCode = errCode;
-            } else if (commonErrCode != errCode) {
-                // At least two shards with errors disagree on the error code
-                commonErrCode = 0;
-            }
-        }
-    }
-
-    // If no error encountered or shards with errors disagree on the error code, return 0
-    if (commonErrCode == -1 || commonErrCode == 0) {
-        return 0;
-    }
-
-    // Otherwise, shards with errors agree on the error code; return that code
-    return commonErrCode;
-}
-
 bool appendEmptyResultSet(OperationContext* opCtx,
                           BSONObjBuilder& result,
                           Status status,

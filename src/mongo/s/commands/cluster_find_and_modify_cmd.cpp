@@ -225,17 +225,16 @@ public:
 
         const auto millisElapsed = timer.millis();
 
-        Strategy::CommandResult cmdResult;
-        cmdResult.shardTargetId = shard->getId();
-        cmdResult.target = shard->getConnString();
-        cmdResult.result = bob.obj();
+        executor::RemoteCommandResponse response(bob.obj(), Milliseconds(millisElapsed));
 
-        std::vector<Strategy::CommandResult> shardResults;
-        shardResults.push_back(cmdResult);
+        // We fetch an arbitrary host from the ConnectionString, since
+        // ClusterExplain::buildExplainResult() doesn't use the given HostAndPort.
+        AsyncRequestsSender::Response arsResponse{
+            shard->getId(), response, shard->getConnString().getServers().front()};
 
         auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResults, ClusterExplain::kSingleShard, millisElapsed, &bodyBuilder);
+            opCtx, {arsResponse}, ClusterExplain::kSingleShard, millisElapsed, &bodyBuilder);
     }
 
     bool run(OperationContext* opCtx,

@@ -97,35 +97,6 @@ public:
                             ExplainOptions::Verbosity verbosity,
                             const ReadPreferenceSetting& readPref,
                             BSONObjBuilder* out);
-
-    struct CommandResult {
-        CommandResult() = default;
-        CommandResult(ShardId shardId, ConnectionString target, BSONObj result)
-            : shardTargetId(std::move(shardId)),
-              target(std::move(target)),
-              result(std::move(result)) {}
-        ShardId shardTargetId;
-        ConnectionString target;
-        BSONObj result;
-    };
-
-    /**
-     * Executes a command against a particular database, and targets the command based on a
-     * collection in that database, according to 'targetingQuery' and 'targetingCollation'. If
-     * 'targetingCollation' is empty, the collection default collation is used for targeting.
-     *
-     * This version should be used by internal commands when possible.
-     *
-     * TODO: Replace these methods and all other methods of command dispatch with a more general
-     * command op framework.
-     */
-    static void commandOp(OperationContext* opCtx,
-                          const std::string& db,
-                          const BSONObj& command,
-                          const std::string& versionedNS,
-                          const BSONObj& targetingQuery,
-                          const BSONObj& targetingCollation,
-                          std::vector<CommandResult>* results);
 };
 
 }  // namespace mongo

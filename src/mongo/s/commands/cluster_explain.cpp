@@ -101,35 +101,17 @@ bool appendElementsIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend) {
     return false;
 }
 
-}  // namespace
+void throwOnBadARSResponse(const AsyncRequestsSender::Response& arsResponse) {
+    auto status = arsResponse.swResponse.isOK()
+        ? getStatusFromCommandResult(arsResponse.swResponse.getValue().data)
+        : arsResponse.swResponse.getStatus();
+    uassertStatusOKWithContext(
+        status, str::stream() << "Explain command on shard " << arsResponse.shardId << " failed");
 
-// static
-std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
-    OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses) {
-    std::vector<Strategy::CommandResult> results;
-    for (auto& response : responses) {
-        Status status = response.swResponse.getStatus();
-        if (response.swResponse.isOK()) {
-            auto& result = response.swResponse.getValue().data;
-            status = getStatusFromCommandResult(result);
-            if (status.isOK()) {
-                invariant(response.shardHostAndPort);
-                results.emplace_back(
-                    response.shardId, ConnectionString(*response.shardHostAndPort), result);
-                continue;
-            }
-        }
-        // Convert the error status back into the format of a command result.
-        BSONObjBuilder statusObjBob;
-        CommandHelpers::appendCommandStatusNoThrow(statusObjBob, status);
-
-        // Get the Shard object in order to get the ConnectionString.
-        auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, response.shardId));
-        results.emplace_back(response.shardId, shard->getConnString(), statusObjBob.obj());
-    }
-    return results;
+    invariant(arsResponse.shardHostAndPort);
 }
+
+}  // namespace
 
 // static
 BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
@@ -150,37 +132,31 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Ver
 }
 
 // static
-Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult>& shardResults) {
-    // Error we didn't get results from any shards.
-    if (shardResults.empty()) {
-        return Status(ErrorCodes::InternalError, "no shards found for explain");
-    }
+void ClusterExplain::validateShardResponses(
+    const vector<AsyncRequestsSender::Response>& shardResponses) {
+    // Error we didn't get responses from any shards.
+    uassert(ErrorCodes::InternalError, "No shards found for explain", !shardResponses.empty());
 
-    // Count up the number of shards that have execution stats and all plans
-    // execution level information.
+    // Count up the number of shards that have execution stats and all plan execution level
+    // information.
     size_t numShardsExecStats = 0;
     size_t numShardsAllPlansStats = 0;
 
-    // Check that the result from each shard has a true value for "ok" and has
+    // Check that the response from each shard has a true value for "ok" and has
     // the expected "queryPlanner" field.
-    for (size_t i = 0; i < shardResults.size(); i++) {
-        auto status = getStatusFromCommandResult(shardResults[i].result);
-        if (!status.isOK()) {
-            return status.withContext(str::stream()
-                                      << "Explain command on shard "
-                                      << shardResults[i].target.toString() << " failed");
-        }
+    for (auto&& response : shardResponses) {
+        throwOnBadARSResponse(response);
 
-        if (Object != shardResults[i].result["queryPlanner"].type()) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream()
-                              << "Explain command on shard " << shardResults[i].target.toString()
-                              << " failed, caused by: " << shardResults[i].result);
-        }
+        auto responseData = response.swResponse.getValue().data;
 
-        if (shardResults[i].result.hasField("executionStats")) {
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Explain command on shard " << response.shardId
+                              << " failed, caused by: " << responseData,
+                responseData["queryPlanner"].type() == Object);
+
+        if (responseData.hasField("executionStats")) {
             numShardsExecStats++;
-            BSONObj execStats = shardResults[i].result["executionStats"].Obj();
+            BSONObj execStats = responseData["executionStats"].Obj();
             if (execStats.hasField("allPlansExecution")) {
                 numShardsAllPlansStats++;
             }
@@ -188,21 +164,16 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
     }
 
     // Either all shards should have execution stats info, or none should.
-    if (0 != numShardsExecStats && shardResults.size() != numShardsExecStats) {
-        return Status(ErrorCodes::InternalError,
-                      str::stream() << "Only " << numShardsExecStats << "/" << shardResults.size()
-                                    << " had executionStats explain information.");
-    }
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "Only " << numShardsExecStats << "/" << shardResponses.size()
+                          << " had executionStats explain information.",
+            numShardsExecStats == 0 || numShardsExecStats == shardResponses.size());
 
     // Either all shards should have all plans execution stats, or none should.
-    if (0 != numShardsAllPlansStats && shardResults.size() != numShardsAllPlansStats) {
-        return Status(ErrorCodes::InternalError,
-                      str::stream()
-                          << "Only " << numShardsAllPlansStats << "/" << shardResults.size()
-                          << " had allPlansExecution explain information.");
-    }
-
-    return Status::OK();
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "Only " << numShardsAllPlansStats << "/" << shardResponses.size()
+                          << " had allPlansExecution explain information.",
+            numShardsAllPlansStats == 0 || numShardsAllPlansStats == shardResponses.size());
 }
 
 // static
@@ -218,7 +189,7 @@ const char* ClusterExplain::getStageNameForReadOp(size_t numShards, const BSONOb
 
 // static
 void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
-                                      const vector<Strategy::CommandResult>& shardResults,
+                                      const vector<AsyncRequestsSender::Response>& shardResponses,
                                       const char* mongosStageName,
                                       BSONObjBuilder* out) {
     BSONObjBuilder queryPlannerBob(out->subobjStart("queryPlanner"));
@@ -228,16 +199,18 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
 
     winningPlanBob.append("stage", mongosStageName);
     BSONArrayBuilder shardsBuilder(winningPlanBob.subarrayStart("shards"));
-    for (size_t i = 0; i < shardResults.size(); i++) {
+    for (size_t i = 0; i < shardResponses.size(); i++) {
+        auto responseData = shardResponses[i].swResponse.getValue().data;
+
         BSONObjBuilder singleShardBob(shardsBuilder.subobjStart());
 
-        BSONObj queryPlanner = shardResults[i].result["queryPlanner"].Obj();
-        BSONObj serverInfo = shardResults[i].result["serverInfo"].Obj();
+        BSONObj queryPlanner = responseData["queryPlanner"].Obj();
+        BSONObj serverInfo = responseData["serverInfo"].Obj();
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
+        singleShardBob.append("shardName", shardResponses[i].shardId.toString());
         {
             const auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardResults[i].shardTargetId));
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardResponses[i].shardId));
             singleShardBob.append("connectionString", shard->getConnString().toString());
         }
         appendIfRoom(&singleShardBob, serverInfo, "serverInfo");
@@ -251,11 +224,12 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
 }
 
 // static
-void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shardResults,
+void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>& shardResponses,
                                     const char* mongosStageName,
                                     long long millisElapsed,
                                     BSONObjBuilder* out) {
-    if (!shardResults[0].result.hasField("executionStats")) {
+    auto firstShardResponseData = shardResponses[0].swResponse.getValue().data;
+    if (!firstShardResponseData.hasField("executionStats")) {
         // The shards don't have execution stats info. Bail out without adding anything
         // to 'out'.
         return;
@@ -268,8 +242,9 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
     long long keysExamined = 0;
     long long docsExamined = 0;
     long long totalChildMillis = 0;
-    for (size_t i = 0; i < shardResults.size(); i++) {
-        BSONObj execStats = shardResults[i].result["executionStats"].Obj();
+    for (size_t i = 0; i < shardResponses.size(); i++) {
+        auto responseData = shardResponses[i].swResponse.getValue().data;
+        BSONObj execStats = responseData["executionStats"].Obj();
         if (execStats.hasField("nReturned")) {
             nReturned += execStats["nReturned"].numberLong();
         }
@@ -302,11 +277,13 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
     executionStagesBob.append("totalChildMillis", totalChildMillis);
 
     BSONArrayBuilder execShardsBuilder(executionStagesBob.subarrayStart("shards"));
-    for (size_t i = 0; i < shardResults.size(); i++) {
-        BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
-        BSONObj execStats = shardResults[i].result["executionStats"].Obj();
+    for (size_t i = 0; i < shardResponses.size(); i++) {
+        auto responseData = shardResponses[i].swResponse.getValue().data;
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
+        BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
+        BSONObj execStats = responseData["executionStats"].Obj();
+
+        singleShardBob.append("shardName", shardResponses[i].shardId.toString());
         appendElementsIfRoom(&singleShardBob, execStats);
         singleShardBob.doneFast();
     }
@@ -314,7 +291,7 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
 
     executionStagesBob.doneFast();
 
-    if (!shardResults[0].result["executionStats"].Obj().hasField("allPlansExecution")) {
+    if (!firstShardResponseData["executionStats"].Obj().hasField("allPlansExecution")) {
         // The shards don't have execution stats for all plans, so we're done.
         executionStatsBob.doneFast();
         return;
@@ -322,12 +299,13 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
 
     // Add the allPlans stats from each shard.
     BSONArrayBuilder allPlansExecBob(executionStatsBob.subarrayStart("allPlansExecution"));
-    for (size_t i = 0; i < shardResults.size(); i++) {
+    for (size_t i = 0; i < shardResponses.size(); i++) {
+        auto responseData = shardResponses[i].swResponse.getValue().data;
+
         BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
+        singleShardBob.append("shardName", shardResponses[i].shardId.toString());
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
-
-        BSONObj execStats = shardResults[i].result["executionStats"].Obj();
+        BSONObj execStats = responseData["executionStats"].Obj();
         vector<BSONElement> allPlans = execStats["allPlansExecution"].Array();
 
         BSONArrayBuilder innerArrayBob(singleShardBob.subarrayStart("allPlans"));
@@ -344,19 +322,21 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
 }
 
 // static
-Status ClusterExplain::buildExplainResult(OperationContext* opCtx,
-                                          const vector<Strategy::CommandResult>& shardResults,
-                                          const char* mongosStageName,
-                                          long long millisElapsed,
-                                          BSONObjBuilder* out) {
+Status ClusterExplain::buildExplainResult(
+    OperationContext* opCtx,
+    const vector<AsyncRequestsSender::Response>& shardResponses,
+    const char* mongosStageName,
+    long long millisElapsed,
+    BSONObjBuilder* out) {
     // Explain only succeeds if all shards support the explain command.
-    Status validateStatus = ClusterExplain::validateShardResults(shardResults);
-    if (!validateStatus.isOK()) {
-        return validateStatus;
+    try {
+        ClusterExplain::validateShardResponses(shardResponses);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
-    buildPlannerInfo(opCtx, shardResults, mongosStageName, out);
-    buildExecStats(shardResults, mongosStageName, millisElapsed, out);
+    buildPlannerInfo(opCtx, shardResponses, mongosStageName, out);
+    buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
     explain_common::generateServerInfo(out);
 
     return Status::OK();

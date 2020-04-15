@@ -176,11 +176,7 @@ public:
 
                 auto bodyBuilder = result->getBodyBuilder();
                 uassertStatusOK(ClusterExplain::buildExplainResult(
-                    opCtx,
-                    ClusterExplain::downconvert(opCtx, shardResponses),
-                    mongosStageName,
-                    millisElapsed,
-                    &bodyBuilder));
+                    opCtx, shardResponses, mongosStageName, millisElapsed, &bodyBuilder));
 
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 auto bodyBuilder = result->getBodyBuilder();

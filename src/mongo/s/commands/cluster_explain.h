@@ -40,22 +40,11 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Namespace for the collection of static methods used by commands in the implementation of
- * explain on mongos.
+ * Namespace for the collection of static methods used by commands in the implementation of explain
+ * on mongos.
  */
 class ClusterExplain {
 public:
-    /**
-     * Temporary crutch to allow a single implementation of the methods in this file. Since
-     * AsyncRequestsSender::Response is a strict superset of Strategy::CommandResult, we leave the
-     * implementations in terms of Strategy::CommandResult and convert down.
-     *
-     * TODO(esha): remove once Strategy::commandOp is removed, and make these methods take
-     * vector<AsyncRequestsSender::Response>.
-     */
-    static std::vector<Strategy::CommandResult> downconvert(
-        OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses);
-
     /**
      * Returns an explain command request wrapping the passed in command at the given verbosity
      * level, propagating generic top-level command arguments.
@@ -63,23 +52,24 @@ public:
     static BSONObj wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity);
 
     /**
-     * Determines the kind of "execution stage" that mongos would use in order to collect
-     * the results from the shards, assuming that the command being explained is a read
-     * operation such as find or count.
+     * Determines the kind of "execution stage" that mongos would use in order to collect the
+     * responses from the shards, assuming that the command being explained is a read operation
+     * such as find or count.
      */
     static const char* getStageNameForReadOp(size_t numShards, const BSONObj& explainObj);
 
     /**
      * Command implementations on mongos use this method to construct the sharded explain
-     * output format based on the results from the shards in 'shardResults'.
+     * output format based on the responses from the shards in 'shardResponses'.
      *
      * On success, the output is added to the BSONObj builder 'out'.
      */
-    static Status buildExplainResult(OperationContext* opCtx,
-                                     const std::vector<Strategy::CommandResult>& shardResults,
-                                     const char* mongosStageName,
-                                     long long millisElapsed,
-                                     BSONObjBuilder* out);
+    static Status buildExplainResult(
+        OperationContext* opCtx,
+        const std::vector<AsyncRequestsSender::Response>& shardResponses,
+        const char* mongosStageName,
+        long long millisElapsed,
+        BSONObjBuilder* out);
 
 
     //
@@ -94,30 +84,31 @@ public:
 private:
     /**
      * Returns an OK status if all shards support the explain command and returned sensible
-     * results. Otherwise, returns a non-OK status and the entire explain should fail.
+     * responses. Otherwise, returns a non-OK status and the entire explain should fail.
      */
-    static Status validateShardResults(const std::vector<Strategy::CommandResult>& shardResults);
+    static void validateShardResponses(
+        const std::vector<AsyncRequestsSender::Response>& shardResponses);
 
     /**
      * Populates the BSONObj builder 'out' with query planner explain information, based on
-     * the results from the shards contained in 'shardResults'.
+     * the responses from the shards contained in 'shardResponses'.
      *
      * The planner info will display 'mongosStageName' as the name of the execution stage
-     * performed by mongos after gathering results from the shards.
+     * performed by mongos after gathering responses from the shards.
      */
     static void buildPlannerInfo(OperationContext* opCtx,
-                                 const std::vector<Strategy::CommandResult>& shardResults,
+                                 const std::vector<AsyncRequestsSender::Response>& shardResponses,
                                  const char* mongosStageName,
                                  BSONObjBuilder* out);
 
     /**
      * Populates the BSONObj builder 'out' with execution stats explain information,
-     * if the results from the shards in 'shardsResults' contain this info.
+     * if the responses from the shards in 'shardsResponses' contain this info.
      *
      * Will display 'mongosStageName' as the name of the execution stage performed by mongos,
      * and 'millisElapsed' as the execution time of the mongos stage.
      */
-    static void buildExecStats(const std::vector<Strategy::CommandResult>& shardResults,
+    static void buildExecStats(const std::vector<AsyncRequestsSender::Response>& shardResponses,
                                const char* mongosStageName,
                                long long millisElapsed,
                                BSONObjBuilder* out);
