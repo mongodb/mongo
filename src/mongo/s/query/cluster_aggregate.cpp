@@ -125,6 +125,13 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
             : Value(Document{CollationSpec::kSimpleSpec});
     }
 
+    if (mergeCtx->inMongos) {
+        // TODO SERVER-44884: We set this flag to indicate that the shards should always use the new
+        // upsert mechanism when executing relevant $merge modes. After branching for 4.5, supported
+        // upgrade versions will all use the new mechanism, and we can remove this flag.
+        mergeCmd[AggregationRequest::kUseNewUpsert] = Value(true);
+    }
+
     const auto txnRouter = TransactionRouter::get(mergeCtx->opCtx);
     if (txnRouter && mergingShardContributesData) {
         // Don't include a readConcern since we can only include read concerns on the _first_
