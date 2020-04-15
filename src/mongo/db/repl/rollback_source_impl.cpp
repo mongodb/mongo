@@ -31,8 +31,6 @@
 
 #include "mongo/db/repl/rollback_source_impl.h"
 
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/cloner.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -84,23 +82,6 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
     return _getConnection()->findOneByUUID(db, uuid, filter, ReadConcernArgs::kImplicitDefault);
-}
-
-void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
-                                                  const NamespaceString& nss) const {
-    std::string errmsg;
-    auto tmpConn = std::make_unique<DBClientConnection>();
-    uassert(15908, errmsg, tmpConn->connect(_source, StringData(), errmsg));
-    uassertStatusOK(replAuthenticate(tmpConn.get()));
-
-    // cloner owns _conn in unique_ptr
-    Cloner cloner;
-    cloner.setConnection(std::move(tmpConn));
-    uassert(15909,
-            str::stream() << "replSet rollback error resyncing collection " << nss.ns() << ' '
-                          << errmsg,
-            cloner.copyCollection(
-                opCtx, nss.ns(), BSONObj(), errmsg, true, CollectionOptions::parseForStorage));
 }
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::string& db,

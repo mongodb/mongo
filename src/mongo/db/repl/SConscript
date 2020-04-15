@@ -97,7 +97,6 @@ env.Library(
         'repl_coordinator_interface',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
-        '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',

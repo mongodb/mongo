@@ -90,12 +90,6 @@ public:
                                                               const BSONObj& filter) const = 0;
 
     /**
-     * Clones a single collection from the sync source.
-     */
-    virtual void copyCollectionFromRemote(OperationContext* opCtx,
-                                          const NamespaceString& nss) const = 0;
-
-    /**
      * Finds and returns collection info using the UUID.
      */
     virtual StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,

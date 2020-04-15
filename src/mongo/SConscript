@@ -373,7 +373,6 @@ mongod = env.Program(
         'db/catalog/health_log',
         'db/catalog/index_key_validate',
         'db/client_metadata_propagation_egress_hook',
-        'db/cloner',
         'db/collection_index_usage_tracker',
         'db/commands/mongod',
         'db/commands/mongod_fcv',
