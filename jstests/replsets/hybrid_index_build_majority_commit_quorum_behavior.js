@@ -94,15 +94,9 @@ resumeIndexBuild(secondary, "hangAfterIndexBuildDumpsInsertsFromBulk");
 jsTestLog("Waiting for first drain phase to complete");
 checkLog.contains(secondary, "Hanging after index build first drain");
 sanityChecks();
-pauseIndexBuild(secondary, "hangAfterIndexBuildSecondDrain");
-resumeIndexBuild(secondary, "hangAfterIndexBuildFirstDrain");
-
-jsTestLog("Waiting for second drain phase to complete");
-checkLog.contains(secondary, "Hanging after index build second drain");
-sanityChecks();
 // Make secondary to resume index build. This should allow secondary to vote
 // and make primary to commit index build.
-resumeIndexBuild(secondary, "hangAfterIndexBuildSecondDrain");
+resumeIndexBuild(secondary, "hangAfterIndexBuildFirstDrain");
 
 jsTestLog("Wait for create index thread to join");
 joinCreateIndexThread();

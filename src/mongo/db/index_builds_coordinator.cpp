@@ -1973,8 +1973,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          const IndexBuildOptions& indexBuildOptions) {
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
-    _insertKeysFromSideTablesBlockingWrites(opCtx, replState, indexBuildOptions);
     _signalPrimaryForCommitReadiness(opCtx, replState);
+    _insertKeysFromSideTablesBlockingWrites(opCtx, replState, indexBuildOptions);
     auto commitIndexBuildTimestamp = _waitForNextIndexBuildAction(opCtx, replState);
     invariant(commitIndexBuildTimestamp.isNull() ||
                   replState->protocol != IndexBuildProtocol::kSinglePhase,
