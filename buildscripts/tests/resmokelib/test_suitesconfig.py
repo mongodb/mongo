@@ -6,7 +6,7 @@ import mock
 
 from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib import parser
-parser.set_options()
+parser.set_run_options()
 
 # pylint: disable=missing-docstring
 

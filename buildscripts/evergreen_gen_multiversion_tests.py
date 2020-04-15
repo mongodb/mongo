@@ -415,7 +415,7 @@ def generate_exclude_yaml(suite: str, task_path_suffix: str, is_generated_suite:
 
     if not is_generated_suite:
         # Populate the config values to get the resmoke config directory.
-        buildscripts.resmokelib.parser.set_options()
+        buildscripts.resmokelib.parser.set_run_options()
         suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
 
         # Update the static suite config with the excluded files and write to disk.

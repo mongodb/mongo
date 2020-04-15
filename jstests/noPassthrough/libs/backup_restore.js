@@ -122,7 +122,7 @@ var BackupRestoreTest = function(options) {
     function _fsmClient(host) {
         // Launch FSM client
         const suite = 'concurrency_replication_for_backup_restore';
-        const resmokeCmd = 'python buildscripts/resmoke.py --shuffle --continueOnFailure' +
+        const resmokeCmd = 'python buildscripts/resmoke.py run --shuffle --continueOnFailure' +
             ' --repeat=99999 --mongo=' + MongoRunner.mongoShellPath +
             ' --shellConnString=mongodb://' + host + ' --suites=' + suite;
 
