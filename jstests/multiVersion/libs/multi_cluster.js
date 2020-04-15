@@ -95,19 +95,22 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     }
 
     if (options.waitUntilStable) {
-        // Wait for the config server and shards to become available.
-        this.configRS.awaitSecondaryNodes();
-        let shardPrimaries = [];
-        for (let rs of this._rs) {
-            rs.test.awaitSecondaryNodes();
-            shardPrimaries.push(rs.test.getPrimary());
-        }
+        this.waitUntilStable();
+    }
+};
 
-        // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of all
-        // shards.
-        for (let client of [...this._mongos, ...shardPrimaries]) {
-            awaitRSClientHosts(client, shardPrimaries, {ok: true, ismaster: true});
-        }
+ShardingTest.prototype.waitUntilStable = function() {
+    // Wait for the config server and shards to become available.
+    this.configRS.awaitSecondaryNodes();
+    let shardPrimaries = [];
+    for (let rs of this._rs) {
+        rs.test.awaitSecondaryNodes();
+        shardPrimaries.push(rs.test.getPrimary());
+    }
+
+    // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of all shards.
+    for (let client of [...this._mongos, ...shardPrimaries]) {
+        awaitRSClientHosts(client, shardPrimaries, {ok: true, ismaster: true});
     }
 };
 
