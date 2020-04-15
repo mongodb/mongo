@@ -88,9 +88,11 @@ try {
         indexNames: ['a_1'],
         commitQuorum: "someTag"
     }));
-
-    assert.commandWorked(testDB.runCommand(
+    // setIndexCommitQuorum should fail as it is illegal to disable commit quorum for in-progress
+    // index builds with commit quorum enabled.
+    assert.commandFailed(testDB.runCommand(
         {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 0}));
+
     assert.commandWorked(testDB.runCommand(
         {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 2}));
     assert.commandWorked(testDB.runCommand({
