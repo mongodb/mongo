@@ -371,7 +371,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
                 break;
             default:
                 CollectionShardingState::get(_opCtx, NamespaceString(ns))
-                    ->checkShardVersionOrThrow_DEPRECATED(_opCtx);
+                    ->checkShardVersionOrThrow(_opCtx);
                 break;
         }
     }
