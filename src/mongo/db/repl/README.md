@@ -251,6 +251,7 @@ It includes:
 3. The `ReplicaSetConfig` version and term (this is used to determine if a reconfig has occurred on
    the upstream node that hasn't been registered by the downstream node yet).
 4. The replica set ID.
+5. Whether the upstream node is primary.
 
 If the metadata has a different config version than the downstream node's config version, then the
 metadata is ignored until a reconfig command is received that synchronizes the config versions.

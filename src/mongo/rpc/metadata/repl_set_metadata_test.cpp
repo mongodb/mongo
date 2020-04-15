@@ -44,10 +44,10 @@ static const OpTime opTime(Timestamp(1234, 100), 5);
 static const OpTime opTime2(Timestamp(7777, 100), 6);
 static const Date_t committedWallTime = Date_t() + Seconds(opTime.getSecs());
 static const ReplSetMetadata metadata(
-    3, {opTime, committedWallTime}, opTime2, 6, 0, OID("abcdefabcdefabcdefabcdef"), 12, -1, false);
+    3, {opTime, committedWallTime}, opTime2, 6, 0, OID("abcdefabcdefabcdefabcdef"), -1, false);
 
 TEST(ReplResponseMetadataTest, ReplicaSetIdNotSet) {
-    ASSERT_FALSE(ReplSetMetadata(3, OpTimeAndWallTime(), OpTime(), 6, 0, OID(), 12, -1, false)
+    ASSERT_FALSE(ReplSetMetadata(3, OpTimeAndWallTime(), OpTime(), 6, 0, OID(), -1, false)
                      .hasReplicaSetId());
 }
 
@@ -67,8 +67,8 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
                             << "lastCommittedWall" << committedWallTime << "lastOpVisible"
                             << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
                             << "configVersion" << 6 << "configTerm" << 0 << "replicaSetId"
-                            << metadata.getReplicaSetId() << "primaryIndex" << 12
-                            << "syncSourceIndex" << -1 << "isPrimary" << false)));
+                            << metadata.getReplicaSetId() << "syncSourceIndex" << -1 << "isPrimary"
+                            << false)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);

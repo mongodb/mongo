@@ -335,8 +335,8 @@ const Date_t OplogFetcherTest::staleWallTime = Date_t() + Seconds(staleOpTime.ge
 const rpc::OplogQueryMetadata OplogFetcherTest::staleOqMetadata = rpc::OplogQueryMetadata(
     {staleOpTime, staleWallTime}, staleOpTime, rbid, primaryIndex, syncSourceIndex);
 
-const rpc::ReplSetMetadata OplogFetcherTest::replSetMetadata = rpc::ReplSetMetadata(
-    1, OpTimeAndWallTime(), OpTime(), 1, 0, OID(), primaryIndex, syncSourceIndex, false);
+const rpc::ReplSetMetadata OplogFetcherTest::replSetMetadata =
+    rpc::ReplSetMetadata(1, OpTimeAndWallTime(), OpTime(), 1, 0, OID(), syncSourceIndex, false);
 
 void OplogFetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
@@ -848,8 +848,8 @@ TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMe
 
     ASSERT_OK(processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
     ASSERT_TRUE(dataReplicatorExternalState->metadataWasProcessed);
-    ASSERT_EQUALS(replSetMetadata.getPrimaryIndex(),
-                  dataReplicatorExternalState->replMetadataProcessed.getPrimaryIndex());
+    ASSERT_EQUALS(replSetMetadata.getIsPrimary(),
+                  dataReplicatorExternalState->replMetadataProcessed.getIsPrimary());
     ASSERT_EQUALS(oqMetadata.getPrimaryIndex(),
                   dataReplicatorExternalState->oqMetadataProcessed.getPrimaryIndex());
 }

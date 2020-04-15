@@ -807,7 +807,6 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
                                       rsConfig.getConfigVersion(),
                                       0,
                                       unexpectedId,
-                                      1,
                                       -1,
                                       true);
         uassertStatusOK(metadata.writeToMetadata(&responseBuilder));
@@ -894,7 +893,6 @@ TEST_F(ReplCoordHBV1Test,
         config.getConfigVersion(),
         0,
         {},     // replset id
-        1,      // currentPrimaryIndex,
         1,      // currentSyncSourceIndex
         true);  // isPrimary
 
@@ -971,7 +969,6 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
         config.getConfigVersion(),
         0,
         {},     // replset id
-        1,      // currentPrimaryIndex,
         1,      // currentSyncSourceIndex
         true);  // isPrimary
 

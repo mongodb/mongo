@@ -449,7 +449,6 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                           rsConfig.getConfigVersion(),
                                           rsConfig.getConfigTerm(),
                                           unexpectedId,
-                                          rpc::ReplSetMetadata::kNoPrimary,
                                           -1,
                                           false);
             BSONObjBuilder bob;

@@ -86,8 +86,7 @@ void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata
 
     _replicationCoordinator->processReplSetMetadata(replMetadata);
 
-    if ((oqMetadata.getPrimaryIndex() != rpc::OplogQueryMetadata::kNoPrimary) ||
-        (replMetadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary)) {
+    if (oqMetadata.getPrimaryIndex() != rpc::OplogQueryMetadata::kNoPrimary) {
         _replicationCoordinator->cancelAndRescheduleElectionTimeout();
     }
 }

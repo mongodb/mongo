@@ -2906,30 +2906,19 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     fassert(4612000, !currentSourceOpTime.isNull());
 
     int syncSourceIndex = oqMetadata.getSyncSourceIndex();
-    // A 4.2 sync source's primaryIndex is unreliable, because we don't know what config version the
-    // index is valid for. Prefer the new 4.4 field isPrimary.
-    // TODO(SERVER-47125): Require isPrimary and stop using primaryIndex.
-    bool sourceIsPrimary =
-        replMetadata.getIsPrimary().value_or(oqMetadata.getPrimaryIndex() == currentSourceIndex);
 
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
     const OpTime myLastOpTime = getMyLastAppliedOpTime();
-    if (syncSourceIndex == -1 && currentSourceOpTime <= myLastOpTime && !sourceIsPrimary) {
-        logv2::DynamicAttributes attrs;
-        attrs.add("syncSource", currentSource);
-        attrs.add("lastFetchedOpTime", myLastOpTime);
-        attrs.add("syncSourceLatestOplogOpTime", currentSourceOpTime);
-        if (replMetadata.getIsPrimary().is_initialized()) {
-            attrs.add("isPrimary", replMetadata.getIsPrimary().value());
-        } else {
-            attrs.add("isPrimary", "unset");
-        }
-
+    if (syncSourceIndex == -1 && currentSourceOpTime <= myLastOpTime &&
+        !replMetadata.getIsPrimary()) {
         LOGV2(21832,
               "Choosing new sync source. Our current sync source is not primary and does "
               "not have a sync source, so we require that it is ahead of us",
-              attrs);
+              "syncSource"_attr = currentSource,
+              "lastFetchedOpTime"_attr = myLastOpTime,
+              "syncSourceLatestOplogOpTime"_attr = currentSourceOpTime,
+              "isPrimary"_attr = replMetadata.getIsPrimary());
         return true;
     }
 
@@ -2986,7 +2975,6 @@ rpc::ReplSetMetadata TopologyCoordinator::prepareReplSetMetadata(
                                 _rsConfig.getConfigVersion(),
                                 _rsConfig.getConfigTerm(),
                                 _rsConfig.getReplicaSetId(),
-                                _currentPrimaryIndex,
                                 _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
                                 _role == Role::kLeader /* isPrimary */);
 }

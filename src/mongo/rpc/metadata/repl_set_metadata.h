@@ -46,13 +46,6 @@ extern const char kReplSetMetadataFieldName[];
  */
 class ReplSetMetadata {
 public:
-    /**
-     * Default primary index. Also used to indicate in metadata that there is no
-     * primary.
-     */
-    // TODO(SERVER-47125): remove post-4.4.
-    static const int kNoPrimary = -1;
-
     ReplSetMetadata() = default;
     ReplSetMetadata(long long term,
                     repl::OpTimeAndWallTime committedOpTime,
@@ -60,9 +53,8 @@ public:
                     long long configVersion,
                     long long configTerm,
                     OID id,
-                    int currentPrimaryIndex,
                     int currentSyncSourceIndex,
-                    boost::optional<bool> isPrimary);
+                    bool isPrimary);
 
     /**
      * format:
@@ -122,15 +114,6 @@ public:
         return _replicaSetId;
     }
 
-    // TODO(SERVER-47125): remove post-4.4.
-    /**
-     * Returns the index of the current primary from the perspective of the sender.
-     * Returns kNoPrimary if there is no primary.
-     */
-    int getPrimaryIndex() const {
-        return _currentPrimaryIndex;
-    }
-
     /**
      * Returns the index of the sync source of the sender.
      * Returns -1 if it has no sync source.
@@ -140,11 +123,9 @@ public:
     }
 
     /**
-     * Returns true if the sender is primary, false if it isn't, and boost::none if this metadata
-     * is from a pre-4.4 node that doesn't send isPrimary.
+     * Returns true if the sender is primary.
      */
-    // TODO(SERVER-47125): make this a regular bool post-4.4.
-    boost::optional<bool> getIsPrimary() const {
+    bool getIsPrimary() const {
         return _isPrimary;
     }
 
@@ -167,10 +148,8 @@ private:
     long long _configVersion = -1;
     long long _configTerm = repl::OpTime::kUninitializedTerm;
     OID _replicaSetId;
-    // TODO(SERVER-47125): remove this member variable post-4.4.
-    int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;
-    boost::optional<bool> _isPrimary;
+    bool _isPrimary;
 };
 
 }  // namespace rpc
