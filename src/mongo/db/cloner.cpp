@@ -699,12 +699,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
                       const std::string& toDBName,
                       const string& masterHost,
                       const CloneOptions& opts,
-                      set<string>* clonedColls,
-                      std::vector<BSONObj> collectionsToClone) {
-    massert(10289,
-            "useReplAuth is not written to replication log",
-            !opts.useReplAuth || !opCtx->writesAreReplicated());
-
+                      set<string>* clonedColls) {
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
     if (!statusWithMasterHost.isOK()) {
         return statusWithMasterHost.getStatus();
@@ -760,7 +755,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
         clonedColls->clear();
     }
 
-    if (opts.createCollections) {
+    {
         // getCollectionInfos may make a remote call, which may block indefinitely, so release
         // the global lock that we are entering with.
         Lock::TempRelease tempRelease(opCtx->lockState());
@@ -773,8 +768,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
             return status.getStatus();
         }
         toClone = status.getValue();
-    } else {
-        toClone = collectionsToClone;
     }
 
     std::vector<CreateCollectionParams> createCollectionParams;
@@ -816,66 +809,60 @@ Status Cloner::copyDb(OperationContext* opCtx,
         !opCtx->writesAreReplicated() ||
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, toDBName));
 
-    if (opts.syncData) {
-        if (opts.createCollections) {
-            Status status = createCollectionsForDb(opCtx, createCollectionParams, toDBName, opts);
-            if (!status.isOK()) {
-                return status;
-            }
+    auto status = createCollectionsForDb(opCtx, createCollectionParams, toDBName, opts);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    for (auto&& params : createCollectionParams) {
+        if (params.shardedColl) {
+            continue;
         }
 
-        for (auto&& params : createCollectionParams) {
-            if (params.shardedColl) {
-                continue;
-            }
+        LOGV2_DEBUG(20420,
+                    2,
+                    "  really will clone: {params_collectionInfo}",
+                    "params_collectionInfo"_attr = params.collectionInfo);
 
-            LOGV2_DEBUG(20420,
-                        2,
-                        "  really will clone: {params_collectionInfo}",
-                        "params_collectionInfo"_attr = params.collectionInfo);
+        const NamespaceString from_name(opts.fromDB, params.collectionName);
+        const NamespaceString to_name(toDBName, params.collectionName);
 
-            const NamespaceString from_name(opts.fromDB, params.collectionName);
-            const NamespaceString to_name(toDBName, params.collectionName);
-
-            if (clonedColls) {
-                clonedColls->insert(from_name.ns());
-            }
-
-            LOGV2_DEBUG(20421,
-                        1,
-                        "\t\t cloning {from_name} -> {to_name}",
-                        "from_name"_attr = from_name,
-                        "to_name"_attr = to_name);
-
-            copy(opCtx,
-                 toDBName,
-                 from_name,
-                 params.collectionInfo["options"].Obj(),
-                 params.idIndexSpec,
-                 to_name,
-                 opts,
-                 Query());
+        if (clonedColls) {
+            clonedColls->insert(from_name.ns());
         }
+
+        LOGV2_DEBUG(20421,
+                    1,
+                    "\t\t cloning {from_name} -> {to_name}",
+                    "from_name"_attr = from_name,
+                    "to_name"_attr = to_name);
+
+        copy(opCtx,
+             toDBName,
+             from_name,
+             params.collectionInfo["options"].Obj(),
+             params.idIndexSpec,
+             to_name,
+             opts,
+             Query());
     }
 
     // now build the secondary indexes
-    if (opts.syncIndexes) {
-        for (auto&& params : createCollectionParams) {
-            LOGV2(20422,
-                  "copying indexes for: {params_collectionInfo}",
-                  "params_collectionInfo"_attr = params.collectionInfo);
+    for (auto&& params : createCollectionParams) {
+        LOGV2(20422,
+              "copying indexes for: {params_collectionInfo}",
+              "params_collectionInfo"_attr = params.collectionInfo);
 
-            const NamespaceString from_name(opts.fromDB, params.collectionName);
-            const NamespaceString to_name(toDBName, params.collectionName);
+        const NamespaceString from_name(opts.fromDB, params.collectionName);
+        const NamespaceString to_name(toDBName, params.collectionName);
 
 
-            copyIndexes(opCtx,
-                        toDBName,
-                        from_name,
-                        params.collectionInfo["options"].Obj(),
-                        collectionIndexSpecs[params.collectionName],
-                        to_name);
-        }
+        copyIndexes(opCtx,
+                    toDBName,
+                    from_name,
+                    params.collectionInfo["options"].Obj(),
+                    collectionIndexSpecs[params.collectionName],
+                    to_name);
     }
 
     return Status::OK();

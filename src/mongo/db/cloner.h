@@ -70,8 +70,7 @@ public:
                   const std::string& toDBName,
                   const std::string& masterHost,
                   const CloneOptions& opts,
-                  std::set<std::string>* clonedColls,
-                  std::vector<BSONObj> collectionsToClone = std::vector<BSONObj>());
+                  std::set<std::string>* clonedColls);
 
     /**
      * Copies a collection. The optionsParser indicates how to parse the collection options. If
@@ -134,20 +133,12 @@ private:
 
 /**
  *  slaveOk     - if true it is ok if the source of the data is !ismaster.
- *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
- *  createCollections - When 'true', will fetch a list of collections from the remote and create
- *                them.  When 'false', assumes collections have already been created ahead of time.
  */
 struct CloneOptions {
     std::string fromDB;
     std::set<std::string> shardedColls;
 
     bool slaveOk = false;
-    bool useReplAuth = false;
-
-    bool syncData = true;
-    bool syncIndexes = true;
-    bool createCollections = true;
 };
 
 }  // namespace mongo
