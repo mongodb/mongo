@@ -195,7 +195,7 @@ BSONObj UpsertStage::_produceNewDocumentForInsert(bool isInternalRequest) {
     // The collection description must remain in scope since it owns the pointers used by
     // 'shardKeyPaths' and 'immutablePaths'.
     auto* css = CollectionShardingState::get(opCtx(), _params.request->getNamespaceString());
-    auto collDesc = css->getCollectionDescription();
+    auto collDesc = css->getCollectionDescription_DEPRECATED();
 
     // Compute the set of shard key paths and the set of immutable paths. Either may be empty.
     FieldRefSet shardKeyPaths, immutablePaths;
