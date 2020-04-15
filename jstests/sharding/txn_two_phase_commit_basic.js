@@ -236,9 +236,8 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
         jsTest.log("Verify that the transaction was committed on all shards.");
         // Use assert.soon(), because although coordinateCommitTransaction currently blocks
         // until the commit process is fully complete, it will eventually be changed to only
-        // block until the decision is *written*, at which point the test can pass the
-        // operationTime returned by coordinateCommitTransaction as 'afterClusterTime' in the
-        // read to ensure the read sees the transaction's writes (TODO SERVER-37165).
+        // block until the decision is *written*, so the documents may not be visible
+        // immediately.
         assert.soon(function() {
             return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
         });
