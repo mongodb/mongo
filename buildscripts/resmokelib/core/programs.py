@@ -71,6 +71,7 @@ def make_process(*args, **kwargs):
     # If installDir is provided, add it early to the path
     if config.INSTALL_DIR is not None:
         path.append(config.INSTALL_DIR)
+        env_vars["INSTALL_DIR"] = config.INSTALL_DIR
 
     path.append(env_vars.get("PATH", os.environ.get("PATH", "")))
 

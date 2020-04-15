@@ -435,6 +435,28 @@ BSONObj readDumpFile(const BSONObj& a, void*) {
     return builder.obj();
 }
 
+BSONObj shellGetEnv(const BSONObj& a, void*) {
+    uassert(4735501,
+            "_getEnv() takes one argument: the name of the environment variable",
+            a.nFields() == 1 && a.firstElementType() == String);
+    const auto envName = a.firstElement().String();
+    std::string result{};
+#ifndef _WIN32
+    auto envPtr = getenv(envName.c_str());
+    if (envPtr) {
+        result = std::string(envPtr);
+    }
+#else
+    auto envPtr = _wgetenv(toNativeString(envName.c_str()).c_str());
+    if (envPtr) {
+        result = toUtf8String(envPtr);
+    }
+#endif
+
+    return BSON("" << result.c_str());
+}
+
+
 }  // namespace
 
 void installShellUtilsExtended(Scope& scope) {
@@ -454,6 +476,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
     scope.injectNative("_readDumpFile", readDumpFile);
+    scope.injectNative("_getEnv", shellGetEnv);
 }
 
 }  // namespace shell_utils
