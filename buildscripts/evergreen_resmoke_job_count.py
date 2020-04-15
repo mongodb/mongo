@@ -43,6 +43,7 @@ PLATFORM_TASK_FACTOR_OVERRIDES = {"win32": TASKS_FACTORS, "cygwin": TASKS_FACTOR
 
 # Apply factor for a task everywhere it is run.
 GLOBAL_TASK_FACTOR_OVERRIDES = {
+    r"causally_consistent_hedged_reads_jscore_passthrough.*": 0.25,
     r"logical_session_cache.*_refresh_jscore_passthrough.*": 0.25,
     r"multi_shard_.*multi_stmt_txn_.*jscore_passthrough.*": 0.125,
     r"sharded_causally_consistent_jscore_passthrough.*": 0.75,
