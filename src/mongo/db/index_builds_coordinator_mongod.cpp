@@ -813,7 +813,17 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << nss << "'.");
     }
 
-    invariantStatusOK(swOnDiskCommitQuorum);
+    auto currentCommitQuorum = invariantStatusOK(swOnDiskCommitQuorum);
+    if (currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled ||
+        newCommitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Commit quorum value can be changed only for index builds "
+                                    << "with commit quorum enabled, nss: '" << nss
+                                    << "' first index name: '" << indexNames.front()
+                                    << "' currentCommitQuorum: " << currentCommitQuorum.toBSON()
+                                    << " providedCommitQuorum: " << newCommitQuorum.toBSON());
+    }
+
     invariant(opCtx->lockState()->isRSTLLocked());
     // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
     // prevent readers from reading the commit quorum value and making decision on commit quorum
