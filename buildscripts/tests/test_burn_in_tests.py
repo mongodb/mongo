@@ -440,7 +440,7 @@ class TestSetResmokeCmd(unittest.TestCase):
         resmoke_cmds = under_test._set_resmoke_cmd(repeat_config, [])
 
         self.assertListEqual(resmoke_cmds,
-                             [sys.executable, "buildscripts/resmoke.py", '--repeatSuites=2'])
+                             [sys.executable, "buildscripts/resmoke.py", "run", '--repeatSuites=2'])
 
     def test__set_resmoke_cmd_no_opts(self):
         repeat_config = under_test.RepeatConfig()
@@ -627,7 +627,7 @@ class RunTests(unittest.TestCase):
     @patch(ns('subprocess.check_call'))
     def test_run_tests_no_tests(self, check_call_mock):
         tests_by_task = {}
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
 
         under_test.run_tests(tests_by_task, resmoke_cmd)
 
@@ -637,7 +637,7 @@ class RunTests(unittest.TestCase):
     def test_run_tests_some_test(self, check_call_mock):
         n_tasks = 3
         tests_by_task = create_tests_by_task_mock(n_tasks, 5)
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
 
         under_test.run_tests(tests_by_task, resmoke_cmd)
 
@@ -649,7 +649,7 @@ class RunTests(unittest.TestCase):
         error_code = 42
         n_tasks = 3
         tests_by_task = create_tests_by_task_mock(n_tasks, 5)
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
         check_call_mock.side_effect = subprocess.CalledProcessError(error_code, "err1")
         exit_mock.side_effect = ValueError('exiting')
 

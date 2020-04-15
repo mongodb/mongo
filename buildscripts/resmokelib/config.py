@@ -55,6 +55,7 @@ DEFAULTS = {
     "genny_executable": None,
     "include_with_any_tags": None,
     "jobs": 1,
+    "logger_file": None,
     "mongo_executable": None,
     "mongod_executable": None,
     "mongod_set_parameters": None,
@@ -82,7 +83,9 @@ DEFAULTS = {
     "majority_read_concern": None,  # Default is set on the commandline.
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
+    "suite_files": None,
     "tag_file": None,
+    "test_files": None,
     "transport_layer": None,
 
     # Evergreen options.
@@ -287,6 +290,9 @@ INCLUDE_WITH_ANY_TAGS = None
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None
 
+# Yaml file that specified logging configuration.
+LOGGER_FILE = None
+
 # The path to the mongo executable used by resmoke.py.
 MONGO_EXECUTABLE = None
 
@@ -381,8 +387,14 @@ STORAGE_ENGINE = None
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
 
+# Yaml suites that specify how tests should be executed.
+SUITE_FILES = None
+
 # The tag file to use that associates tests with tags.
 TAG_FILE = None
+
+# The test files to execute.
+TEST_FILES = None
 
 # If set, then mongod/mongos's started by resmoke.py will use the specified transport layer.
 TRANSPORT_LAYER = None
@@ -427,3 +439,6 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE)
+
+# Generated logging config for the current invocation.
+LOGGING_CONFIG = None

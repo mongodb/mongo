@@ -350,7 +350,7 @@ functions:
         cd test/qa-tests
         chmod 400 jstests/libs/key*
 
-        python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
+        python buildscripts/resmoke.py run --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
   "build tool":
     command: shell.exec
@@ -1412,7 +1412,7 @@ tasks:
           chmod +x ../../bin/*
           mv ../../bin/* .
           chmod 400 jstests/libs/key*
-          python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
+          python buildscripts/resmoke.py run --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
 - name: qa-dump-restore-with-archiving-current
   depends_on:

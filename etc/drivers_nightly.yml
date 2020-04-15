@@ -188,7 +188,7 @@ functions:
         fi
 
         ${rlp_environment}   \
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py run ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "cleanup environment":
     command: shell.exec

@@ -406,7 +406,7 @@ def _write_json_file(json_data, pathname):
 
 def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     """Build the resmoke command, if a resmoke.py command wasn't passed in."""
-    new_args = [sys.executable, "buildscripts/resmoke.py"]
+    new_args = [sys.executable, "buildscripts/resmoke.py", "run"]
     if resmoke_args:
         new_args = copy.deepcopy(resmoke_args)
 
