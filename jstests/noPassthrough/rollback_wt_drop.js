@@ -31,6 +31,7 @@ let CommonOps = (node) => {
     const collToDrop = mydb.getCollection(replicatedDropCollName);
     assert.commandWorked(mydb.createCollection(collToDrop.getName()));
     assert(collToDrop.drop());
+    TwoPhaseDropCollectionTest.waitForDropToComplete(mydb, replicatedDropCollName);
 
     // This collection will be dropped during a rename.
     const renameTargetColl = node.getCollection(renameTargetCollName);
