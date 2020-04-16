@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/net/cidr.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 
@@ -170,11 +171,13 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
 
         // If any of the bound addresses is the default route (0.0.0.0 on IPv4) it means we are
         // listening on all network interfaces and need to check against any of them.
+        auto defaultRoute = false;
         if (myAddrs.empty() ||
             std::any_of(myAddrs.cbegin(), myAddrs.cend(), [](std::string const& addrStr) {
                 return HostAndPort(addrStr, serverGlobalParams.port).isDefaultRoute();
             })) {
             myAddrs = getBoundAddrs(IPv6Enabled());
+            defaultRoute = true;
         }
 
         const std::vector<std::string> hostAddrs =
@@ -185,6 +188,26 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             for (std::vector<std::string>::const_iterator j = hostAddrs.begin();
                  j != hostAddrs.end();
                  ++j) {
+
+                // If we are listening on the default route and the host address is in the range of
+                // addresses that correspond to the loopback interface, then we consider the host as
+                // ourself.
+                //
+                // Note that this logic is included to account for the fact that Debian systems add
+                // the "127.0.1.1" address for the local host name (as opposed to "127.0.0.1").
+                // Debian does not do this for IPv6 so we don't need to check that here.
+                try {
+                    CIDR loopbackAddrs("127.0.0.1/8");
+                    if (defaultRoute && loopbackAddrs.contains(CIDR(*j))) {
+                        return true;
+                    }
+                } catch (const std::exception& e) {
+                    LOGV2_WARNING(4754500,
+                                  "Error checking host against loopback addresses",
+                                  "host"_attr = *j,
+                                  "error"_attr = e.what());
+                }
+
                 if (*i == *j) {
                     return true;
                 }
