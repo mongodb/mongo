@@ -60,6 +60,7 @@ SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
       _eventListener(eventListener),
       _executor(executor),
       _heartbeatFrequencyMS(_overrideRefreshPeriod(heartbeatFrequencyMS)),
+      _isExpedited(true),
       _isShutdown(true),
       _setUri(setUri) {
     LOGV2_DEBUG(4333217,
