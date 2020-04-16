@@ -65,7 +65,6 @@ void aggregateResults(int scale,
         fileSize += b["fileSize"].numberLong();
     }
 
-    // TODO SERVER-26110: Add aggregated 'collections' and 'views' metrics.
     output.appendNumber("objects", objects);
 
     // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
