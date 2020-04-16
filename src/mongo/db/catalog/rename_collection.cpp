@@ -65,7 +65,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(useRenameCollectionPathThroughConfigsvr);
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
@@ -99,11 +98,8 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Not primary while renaming collection " << source << " to "
                                     << target);
 
-    // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
-    if (!MONGO_unlikely(useRenameCollectionPathThroughConfigsvr.shouldFail())) {
-        if (isCollectionSharded(opCtx, source))
-            return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
-    }
+    if (isCollectionSharded(opCtx, source))
+        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
 
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,
@@ -501,11 +497,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
-    // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
-    if (!MONGO_unlikely(useRenameCollectionPathThroughConfigsvr.shouldFail())) {
-        if (isCollectionSharded(opCtx, source))
-            return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
-    }
+    if (isCollectionSharded(opCtx, source))
+        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
 
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,
