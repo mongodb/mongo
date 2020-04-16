@@ -3,7 +3,8 @@
  * a prepare conflict after yielding. See SERVER-44577.
  *
  * @tags: [
- *   requires_replication
+ *   requires_replication,
+ *   uses_prepare_transaction,
  * ]
  */
 load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.
