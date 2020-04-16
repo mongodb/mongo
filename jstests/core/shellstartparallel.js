@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_fastcount,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 function f() {

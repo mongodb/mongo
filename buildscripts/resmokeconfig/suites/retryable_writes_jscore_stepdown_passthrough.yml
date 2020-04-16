@@ -108,6 +108,11 @@ selector:
   # "Cowardly refusing to run test with overridden write concern when it uses a command that can
   #  only perform w=1 writes: ..."
   - requires_eval_command
+  # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+  # performed earlier in a parallel shell if multiple nodes are electable because the latest
+  # operation and cluster times aren't shared between shells.
+  # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+  - uses_parallel_shell
 
 executor:
   archive:

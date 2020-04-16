@@ -7,7 +7,7 @@
  * - Confirm that the command can be run repeatedly without breaking things
  * - Confirm that the pseudo commands and eval can perform fsyncLock/Unlock
  *
- * @tags: [requires_eval_command, requires_fastcount]
+ * @tags: [requires_eval_command, requires_fastcount, uses_parallel_shell]
  */
 (function() {
     "use strict";

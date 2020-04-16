@@ -71,11 +71,6 @@ selector:
   # explain command to run.
   - jstests/core/explain2.js
 
-  # Starts a parallel shell but won't restart it after unclean shutdown.
-  # TODO SERVER-33229: Remove these exclusions
-  - jstests/core/compact_keeps_indexes.js
-  - jstests/core/find_and_modify_concurrent_update.js
-
   # Inserts enough data that recovery takes more than 8 seconds, so we never get a working primary.
   - jstests/core/geo_s2ordering.js
 
@@ -129,6 +124,11 @@ selector:
   - requires_collstats
   # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
   - requires_datasize
+  # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+  # performed earlier in a parallel shell if multiple nodes are electable because the latest
+  # operation and cluster times aren't shared between shells.
+  # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+  - uses_parallel_shell
 
 executor:
   archive:
@@ -138,7 +138,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      # TODO SERVER-33229: Remove override of startParallelShell
       eval: >-
         testingReplication = true;
         load("jstests/libs/override_methods/auto_retry_on_network_error.js");

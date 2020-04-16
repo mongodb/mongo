@@ -7,6 +7,7 @@
 //   assumes_read_preference_unchanged,
 //   requires_getmore,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 (function() {

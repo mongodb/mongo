@@ -4,6 +4,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent

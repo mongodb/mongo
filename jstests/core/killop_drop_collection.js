@@ -5,6 +5,7 @@
  * successfully.
  * @tags: [
  *   assumes_superuser_permissions,
+ *   uses_parallel_shell,
  * ]
  */
 (function() {
