@@ -148,7 +148,7 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
         $db: "test"
     })"));
 
-    Message request = msgBuilder.finish();
+    Message request = msgBuilder.finishWithoutSizeChecking();
     Message reply;
     ASSERT_TRUE(conn->call(request, reply, false));
 
@@ -184,7 +184,7 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
 
     msgBuilder.setBody(std::move(body));
 
-    Message request = msgBuilder.finish();
+    Message request = msgBuilder.finishWithoutSizeChecking();
     Message reply;
     ASSERT_TRUE(conn->call(request, reply, false));
 
@@ -1064,7 +1064,7 @@ TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
     OpMsgRequest request;
     request.body = bob.obj<BSONObj::LargeSizeTrait>();
     ASSERT_GT(request.body.objsize(), BSONObjMaxInternalSize);
-    auto requestMsg = request.serialize();
+    auto requestMsg = request.serializeWithoutSizeChecking();
 
     Message replyMsg;
     ASSERT(conn->call(requestMsg, replyMsg));

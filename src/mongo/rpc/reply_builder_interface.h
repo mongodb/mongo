@@ -113,6 +113,8 @@ public:
     /**
      * Writes data then transfers ownership of the message to the caller. The behavior of
      * calling any methods on the builder is subsequently undefined.
+     * Can throw BSONObjectTooLarge if the internal buffer has grown too large to be converted
+     * to a Message within the BSON size limit.
      */
     virtual Message done() = 0;
 
