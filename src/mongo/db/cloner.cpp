@@ -633,6 +633,23 @@ Status Cloner::copyDb(OperationContext* opCtx,
         return status;
     }
 
+    // now build the secondary indexes
+    for (auto&& params : createCollectionParams) {
+        LOGV2(20422,
+              "copying indexes for: {params_collectionInfo}",
+              "params_collectionInfo"_attr = params.collectionInfo);
+
+        const NamespaceString nss(dBName, params.collectionName);
+
+
+        _copyIndexes(opCtx,
+                     dBName,
+                     nss,
+                     params.collectionInfo["options"].Obj(),
+                     collectionIndexSpecs[params.collectionName],
+                     conn.get());
+    }
+
     for (auto&& params : createCollectionParams) {
         if (params.shardedColl) {
             continue;
@@ -656,23 +673,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
               params.idIndexSpec,
               Query(),
               conn.get());
-    }
-
-    // now build the secondary indexes
-    for (auto&& params : createCollectionParams) {
-        LOGV2(20422,
-              "copying indexes for: {params_collectionInfo}",
-              "params_collectionInfo"_attr = params.collectionInfo);
-
-        const NamespaceString nss(dBName, params.collectionName);
-
-
-        _copyIndexes(opCtx,
-                     dBName,
-                     nss,
-                     params.collectionInfo["options"].Obj(),
-                     collectionIndexSpecs[params.collectionName],
-                     conn.get());
     }
 
     return Status::OK();
