@@ -8,6 +8,7 @@
  *   assumes_superuser_permissions,
  *   # Uses index building in background
  *   requires_background_index,
+ *   uses_parallel_shell,
  * ]
  */
 (function() {

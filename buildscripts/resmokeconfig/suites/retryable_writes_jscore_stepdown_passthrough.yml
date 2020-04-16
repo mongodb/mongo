@@ -110,6 +110,11 @@ selector:
   ## The next tag corresponds to long running-operations, as they may exhaust their number
   # of retries and result in a network error being thrown.
   - operations_longer_than_stepdown_interval
+  # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+  # performed earlier in a parallel shell if multiple nodes are electable because the latest
+  # operation and cluster times aren't shared between shells.
+  # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+  - uses_parallel_shell
 
 executor:
   archive:

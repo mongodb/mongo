@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_non_retryable_writes,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 // Yield and delete test case for query optimizer cursor.  SERVER-4401

@@ -2,6 +2,7 @@
 //   requires_getmore,
 //   requires_non_retryable_writes,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 // SERVER-2009 Count odd numbered entries while updating and deleting even numbered entries.

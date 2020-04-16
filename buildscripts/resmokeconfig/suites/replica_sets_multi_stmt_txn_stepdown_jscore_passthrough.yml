@@ -284,12 +284,6 @@ selector:
   # Creates new mongo connection but won't retry connecting.
   - jstests/core/shell_connection_strings.js
 
-  # Starts a parallel shell but won't restart it after shutdown.
-  # TODO SERVER-33229: Remove these exclusions
-  - jstests/core/compact_keeps_indexes.js
-  - jstests/core/find_and_modify_concurrent_update.js
-  - jstests/core/shellstartparallel.js
-
   # Does not support tojson of command objects.
   - jstests/core/SERVER-23626.js
 
@@ -341,6 +335,11 @@ selector:
   - requires_capped
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
+  # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+  # performed earlier in a parallel shell if multiple nodes are electable because the latest
+  # operation and cluster times aren't shared between shells.
+  # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+  - uses_parallel_shell
 
 executor:
   archive:

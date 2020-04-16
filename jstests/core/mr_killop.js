@@ -7,6 +7,7 @@
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 // Test killop applied to m/r operations and child ops of m/r operations.
