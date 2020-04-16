@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-struct CloneOptions;
 class DBClientBase;
 class NamespaceString;
 class OperationContext;
@@ -55,8 +54,8 @@ public:
 
     /**
      * Copies an entire database from the specified host.
-     * clonedColls: when not-null, the function will return with this populated with a list of
-     *              the collections that were cloned.
+     * clonedColls: the function will return with this populated with a list of the collections that
+     *              were cloned.
      * collectionsToClone: When opts.createCollections is false, this list reflects the collections
      *              that are cloned.  When opts.createCollections is true, this parameter is
      *              ignored and the collection list is fetched from the remote via _conn.
@@ -64,14 +63,14 @@ public:
     Status copyDb(OperationContext* opCtx,
                   const std::string& toDBName,
                   const std::string& masterHost,
-                  const CloneOptions& opts,
+                  const std::string& fromDBName,
+                  const std::vector<NamespaceString>& shardedColls,
                   std::set<std::string>* clonedColls);
 
+private:
     // Filters a database's collection list and removes collections that should not be cloned.
-    // CloneOptions should be populated with a fromDB and a list of collections to ignore, which
-    // will be filtered out.
-    StatusWith<std::vector<BSONObj>> filterCollectionsForClone(
-        const CloneOptions& opts, const std::list<BSONObj>& initialCollections);
+    StatusWith<std::vector<BSONObj>> _filterCollectionsForClone(
+        const std::string& fromDBName, const std::list<BSONObj>& initialCollections);
 
     struct CreateCollectionParams {
         std::string collectionName;
@@ -82,39 +81,33 @@ public:
 
     // Executes 'createCollection' for each collection described in 'createCollectionParams', in
     // 'dbName'.
-    Status createCollectionsForDb(OperationContext* opCtx,
-                                  const std::vector<CreateCollectionParams>& createCollectionParams,
-                                  const std::string& dbName,
-                                  const CloneOptions& opts);
+    Status _createCollectionsForDb(
+        OperationContext* opCtx,
+        const std::vector<CreateCollectionParams>& createCollectionParams,
+        const std::string& dbName);
 
     /*
      * Returns the _id index spec from 'indexSpecs', or an empty BSONObj if none is found.
      */
-    static BSONObj getIdIndexSpec(const std::list<BSONObj>& indexSpecs);
+    static BSONObj _getIdIndexSpec(const std::list<BSONObj>& indexSpecs);
 
-private:
-    void copy(OperationContext* opCtx,
-              const std::string& toDBName,
-              const NamespaceString& from_ns,
-              const BSONObj& from_opts,
-              const BSONObj& from_id_index,
-              const NamespaceString& to_ns,
-              Query q);
+    void _copy(OperationContext* opCtx,
+               const std::string& toDBName,
+               const NamespaceString& from_ns,
+               const BSONObj& from_opts,
+               const BSONObj& from_id_index,
+               const NamespaceString& to_ns,
+               Query q);
 
-    void copyIndexes(OperationContext* opCtx,
-                     const std::string& toDBName,
-                     const NamespaceString& from_ns,
-                     const BSONObj& from_opts,
-                     const std::list<BSONObj>& from_indexes,
-                     const NamespaceString& to_ns);
+    void _copyIndexes(OperationContext* opCtx,
+                      const std::string& toDBName,
+                      const NamespaceString& from_ns,
+                      const BSONObj& from_opts,
+                      const std::list<BSONObj>& from_indexes,
+                      const NamespaceString& to_ns);
 
     struct Fun;
     std::unique_ptr<DBClientBase> _conn;
-};
-
-struct CloneOptions {
-    std::string fromDB;
-    std::set<std::string> shardedColls;
 };
 
 }  // namespace mongo

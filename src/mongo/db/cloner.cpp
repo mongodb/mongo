@@ -34,6 +34,8 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/cloner_gen.h"
 
+#include <algorithm>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -72,11 +74,8 @@
 
 namespace mongo {
 
-using std::endl;
-using std::set;
 using std::string;
 using std::unique_ptr;
-using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -84,7 +83,7 @@ MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
 
-BSONObj Cloner::getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
+BSONObj Cloner::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
     for (auto&& indexSpec : indexSpecs) {
         BSONElement indexName;
         uassertStatusOK(bsonExtractTypedField(
@@ -278,13 +277,13 @@ struct Cloner::Fun {
 
 /* copy the specified collection
  */
-void Cloner::copy(OperationContext* opCtx,
-                  const string& toDBName,
-                  const NamespaceString& from_collection,
-                  const BSONObj& from_opts,
-                  const BSONObj& from_id_index,
-                  const NamespaceString& to_collection,
-                  Query query) {
+void Cloner::_copy(OperationContext* opCtx,
+                   const string& toDBName,
+                   const NamespaceString& from_collection,
+                   const BSONObj& from_opts,
+                   const BSONObj& from_id_index,
+                   const NamespaceString& to_collection,
+                   Query query) {
     LOGV2_DEBUG(20414,
                 2,
                 "\t\tcloning collection {from_collection} to {to_collection} on "
@@ -321,12 +320,12 @@ void Cloner::copy(OperationContext* opCtx,
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 }
 
-void Cloner::copyIndexes(OperationContext* opCtx,
-                         const string& toDBName,
-                         const NamespaceString& from_collection,
-                         const BSONObj& from_opts,
-                         const std::list<BSONObj>& from_indexes,
-                         const NamespaceString& to_collection) {
+void Cloner::_copyIndexes(OperationContext* opCtx,
+                          const string& toDBName,
+                          const NamespaceString& from_collection,
+                          const BSONObj& from_opts,
+                          const std::list<BSONObj>& from_indexes,
+                          const NamespaceString& to_collection) {
     LOGV2_DEBUG(20415,
                 2,
                 "\t\t copyIndexes {from_collection} to {to_collection} on {conn_getServerAddress}",
@@ -362,7 +361,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                                        to_collection,
                                        collectionOptions,
                                        createDefaultIndexes,
-                                       getIdIndexSpec(from_indexes)),
+                                       _getIdIndexSpec(from_indexes)),
                       str::stream()
                           << "Collection creation failed while copying indexes from "
                           << from_collection.ns() << " to " << to_collection.ns() << " (Cloner)");
@@ -457,8 +456,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     abortOnExit.dismiss();
 }
 
-StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
-    const CloneOptions& opts, const std::list<BSONObj>& initialCollections) {
+StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
+    const std::string& fromDBName, const std::list<BSONObj>& initialCollections) {
     std::vector<BSONObj> finalCollections;
     for (auto&& collection : initialCollections) {
         LOGV2_DEBUG(20418, 2, "\t cloner got {collection}", "collection"_attr = collection);
@@ -478,7 +477,7 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
             return status;
         }
 
-        const NamespaceString ns(opts.fromDB, collectionName.c_str());
+        const NamespaceString ns(fromDBName, collectionName.c_str());
 
         if (ns.isSystem()) {
             if (!ns.isLegalClientSystemNS()) {
@@ -492,11 +491,10 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
     return finalCollections;
 }
 
-Status Cloner::createCollectionsForDb(
+Status Cloner::_createCollectionsForDb(
     OperationContext* opCtx,
     const std::vector<CreateCollectionParams>& createCollectionParams,
-    const std::string& dbName,
-    const CloneOptions& opts) {
+    const std::string& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, dbName);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
@@ -584,9 +582,12 @@ Status Cloner::createCollectionsForDb(
 
 Status Cloner::copyDb(OperationContext* opCtx,
                       const std::string& toDBName,
-                      const string& masterHost,
-                      const CloneOptions& opts,
-                      set<string>* clonedColls) {
+                      const std::string& masterHost,
+                      const std::string& fromDBName,
+                      const std::vector<NamespaceString>& shardedColls,
+                      std::set<std::string>* clonedColls) {
+    invariant(clonedColls, str::stream() << masterHost << ":" << toDBName);
+
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
     if (!statusWithMasterHost.isOK()) {
         return statusWithMasterHost.getStatus();
@@ -606,7 +607,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     if (masterSameProcess) {
-        if (opts.fromDB == toDBName) {
+        if (fromDBName == toDBName) {
             // Guard against re-entrance
             return Status(ErrorCodes::IllegalOperation, "can't clone from self (localhost)");
         }
@@ -638,9 +639,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
 
     // Gather the list of collections to clone
     std::vector<BSONObj> toClone;
-    if (clonedColls) {
-        clonedColls->clear();
-    }
+    clonedColls->clear();
 
     {
         // getCollectionInfos may make a remote call, which may block indefinitely, so release
@@ -648,9 +647,9 @@ Status Cloner::copyDb(OperationContext* opCtx,
         Lock::TempRelease tempRelease(opCtx->lockState());
 
         std::list<BSONObj> initialCollections = _conn->getCollectionInfos(
-            opts.fromDB, ListCollectionsFilter::makeTypeCollectionFilter());
+            fromDBName, ListCollectionsFilter::makeTypeCollectionFilter());
 
-        auto status = filterCollectionsForClone(opts, initialCollections);
+        auto status = _filterCollectionsForClone(fromDBName, initialCollections);
         if (!status.isOK()) {
             return status.getStatus();
         }
@@ -666,8 +665,8 @@ Status Cloner::copyDb(OperationContext* opCtx,
             params.idIndexSpec = idIndex.Obj();
         }
 
-        const NamespaceString ns(opts.fromDB, params.collectionName);
-        if (opts.shardedColls.find(ns.ns()) != opts.shardedColls.end()) {
+        const NamespaceString ns(fromDBName, params.collectionName);
+        if (std::find(shardedColls.begin(), shardedColls.end(), ns) != shardedColls.end()) {
             params.shardedColl = true;
         }
         createCollectionParams.push_back(params);
@@ -678,25 +677,25 @@ Status Cloner::copyDb(OperationContext* opCtx,
     {
         Lock::TempRelease tempRelease(opCtx->lockState());
         for (auto&& params : createCollectionParams) {
-            const NamespaceString nss(opts.fromDB, params.collectionName);
+            const NamespaceString nss(fromDBName, params.collectionName);
             auto indexSpecs = _conn->getIndexSpecs(nss);
 
             collectionIndexSpecs[params.collectionName] = indexSpecs;
 
             if (params.idIndexSpec.isEmpty()) {
-                params.idIndexSpec = getIdIndexSpec(indexSpecs);
+                params.idIndexSpec = _getIdIndexSpec(indexSpecs);
             }
         }
     }
 
     uassert(
         ErrorCodes::NotMaster,
-        str::stream() << "Not primary while cloning database " << opts.fromDB
+        str::stream() << "Not primary while cloning database " << fromDBName
                       << " (after getting list of collections to clone)",
         !opCtx->writesAreReplicated() ||
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, toDBName));
 
-    auto status = createCollectionsForDb(opCtx, createCollectionParams, toDBName, opts);
+    auto status = _createCollectionsForDb(opCtx, createCollectionParams, toDBName);
     if (!status.isOK()) {
         return status;
     }
@@ -711,12 +710,10 @@ Status Cloner::copyDb(OperationContext* opCtx,
                     "  really will clone: {params_collectionInfo}",
                     "params_collectionInfo"_attr = params.collectionInfo);
 
-        const NamespaceString from_name(opts.fromDB, params.collectionName);
+        const NamespaceString from_name(fromDBName, params.collectionName);
         const NamespaceString to_name(toDBName, params.collectionName);
 
-        if (clonedColls) {
-            clonedColls->insert(from_name.ns());
-        }
+        clonedColls->insert(from_name.ns());
 
         LOGV2_DEBUG(20421,
                     1,
@@ -724,13 +721,13 @@ Status Cloner::copyDb(OperationContext* opCtx,
                     "from_name"_attr = from_name,
                     "to_name"_attr = to_name);
 
-        copy(opCtx,
-             toDBName,
-             from_name,
-             params.collectionInfo["options"].Obj(),
-             params.idIndexSpec,
-             to_name,
-             Query());
+        _copy(opCtx,
+              toDBName,
+              from_name,
+              params.collectionInfo["options"].Obj(),
+              params.idIndexSpec,
+              to_name,
+              Query());
     }
 
     // now build the secondary indexes
@@ -739,16 +736,16 @@ Status Cloner::copyDb(OperationContext* opCtx,
               "copying indexes for: {params_collectionInfo}",
               "params_collectionInfo"_attr = params.collectionInfo);
 
-        const NamespaceString from_name(opts.fromDB, params.collectionName);
+        const NamespaceString from_name(fromDBName, params.collectionName);
         const NamespaceString to_name(toDBName, params.collectionName);
 
 
-        copyIndexes(opCtx,
-                    toDBName,
-                    from_name,
-                    params.collectionInfo["options"].Obj(),
-                    collectionIndexSpecs[params.collectionName],
-                    to_name);
+        _copyIndexes(opCtx,
+                     toDBName,
+                     from_name,
+                     params.collectionInfo["options"].Obj(),
+                     collectionIndexSpecs[params.collectionName],
+                     to_name);
     }
 
     return Status::OK();
