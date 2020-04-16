@@ -6388,7 +6388,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_EQ(oqMetadata.getValue().getLastOpApplied(), optime2);
     ASSERT_EQ(oqMetadata.getValue().getRBID(), 100);
     ASSERT_EQ(oqMetadata.getValue().getSyncSourceIndex(), -1);
-    ASSERT_EQ(oqMetadata.getValue().getPrimaryIndex(), -1);
+    ASSERT_EQ(oqMetadata.getValue().hasPrimaryIndex(), false);
 
     auto replMetadata = rpc::ReplSetMetadata::readFromMetadata(metadata);
     ASSERT_OK(replMetadata.getStatus());

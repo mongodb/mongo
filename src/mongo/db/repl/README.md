@@ -346,12 +346,11 @@ It then creates a `ReplSetHeartbeatResponse` object. This includes:
 2. The receiving node's election time
 3. The receiving node's last applied OpTime
 4. The receiving node's last durable OpTime
-5. The node the receiving node thinks is primary
-6. The term of the receiving node
-7. The state of the receiving node
-8. The receiving node's sync source
-9. The receiving node's `ReplicaSetConfig` version
-10. Whether the receiving node is primary
+5. The term of the receiving node
+6. The state of the receiving node
+7. The receiving node's sync source
+8. The receiving node's `ReplicaSetConfig` version
+9. Whether the receiving node is primary
 
 When the sending node receives the response to the heartbeat, it first processes its
 `ReplSetMetadata` like before.

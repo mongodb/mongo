@@ -859,7 +859,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         errMsg << " (config version: " << replSetMetadata.getConfigVersion();
         errMsg << "; last applied optime: " << oqMetadata.getLastOpApplied().toString();
         errMsg << "; sync source index: " << oqMetadata.getSyncSourceIndex();
-        errMsg << "; primary index: " << oqMetadata.getPrimaryIndex();
+        errMsg << "; has primary index: " << oqMetadata.hasPrimaryIndex();
         errMsg << ") is no longer valid";
         errMsg << "last fetched optime: " << lastFetched.toString();
         return Status(ErrorCodes::InvalidSyncSource, errMsg);

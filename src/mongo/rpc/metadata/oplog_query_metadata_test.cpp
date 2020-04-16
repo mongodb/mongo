@@ -48,6 +48,7 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     ASSERT_EQ(opTime1, metadata.getLastOpCommitted().opTime);
     ASSERT_EQ(committedWall, metadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(opTime2, metadata.getLastOpApplied());
+    ASSERT_TRUE(metadata.hasPrimaryIndex());
 
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder).transitional_ignore();
@@ -75,14 +76,22 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     ASSERT_EQ(opTime2, clonedMetadata.getLastOpApplied());
     ASSERT_EQ(committedWall, clonedMetadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(metadata.getRBID(), clonedMetadata.getRBID());
-    ASSERT_EQ(metadata.getPrimaryIndex(), clonedMetadata.getPrimaryIndex());
     ASSERT_EQ(metadata.getSyncSourceIndex(), clonedMetadata.getSyncSourceIndex());
+    ASSERT_TRUE(clonedMetadata.hasPrimaryIndex());
 
     BSONObjBuilder clonedBuilder;
     clonedMetadata.writeToMetadata(&clonedBuilder).transitional_ignore();
 
     BSONObj clonedSerializedObj = clonedBuilder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, clonedSerializedObj);
+}
+
+TEST(ReplResponseMetadataTest, OplogQueryMetadataHasPrimaryIndex) {
+    for (auto [currentPrimaryIndex, hasPrimaryIndex] :
+         std::vector<std::pair<int, bool>>{{-1, false}, {0, true}, {1, true}}) {
+        OplogQueryMetadata oqm({OpTime(), Date_t()}, OpTime(), 1, currentPrimaryIndex, -1);
+        ASSERT_EQUALS(hasPrimaryIndex, oqm.hasPrimaryIndex());
+    }
 }
 
 }  // unnamed namespace

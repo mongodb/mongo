@@ -88,11 +88,13 @@ public:
     }
 
     /**
-     * Returns the index of the current primary from the perspective of the sender.
-     * Returns kNoPrimary if there is no primary.
+     * True if the sender thinks there is a primary.
+     *
+     * Note: the $oplogQueryData's primaryIndex isn't safe to use, we don't know which config
+     * version it's from. All we can safely say is whether the sender thinks there's a primary.
      */
-    int getPrimaryIndex() const {
-        return _currentPrimaryIndex;
+    bool hasPrimaryIndex() const {
+        return _currentPrimaryIndex != kNoPrimary;
     }
 
     /**

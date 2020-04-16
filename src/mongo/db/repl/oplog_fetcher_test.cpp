@@ -853,8 +853,8 @@ TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMe
     ASSERT_TRUE(dataReplicatorExternalState->metadataWasProcessed);
     ASSERT_EQUALS(replSetMetadata.getIsPrimary(),
                   dataReplicatorExternalState->replMetadataProcessed.getIsPrimary());
-    ASSERT_EQUALS(oqMetadata.getPrimaryIndex(),
-                  dataReplicatorExternalState->oqMetadataProcessed.getPrimaryIndex());
+    ASSERT_EQUALS(oqMetadata.hasPrimaryIndex(),
+                  dataReplicatorExternalState->oqMetadataProcessed.hasPrimaryIndex());
 }
 
 TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceRollsBack) {
