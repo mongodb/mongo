@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/logv2/log_attr.h"
 
 namespace mongo {
 
@@ -202,6 +203,10 @@ public:
             return hash;
         }
     };
+
+    friend auto logAttrs(const UUID& uuid) {
+        return "uuid"_attr = uuid;
+    }
 
 private:
     UUID(const UUIDStorage& uuid) : _uuid(uuid) {}

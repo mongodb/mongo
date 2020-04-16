@@ -51,6 +51,7 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/decorable.h"
@@ -536,6 +537,10 @@ public:
 
     virtual bool isInitialized() const {
         return false;
+    }
+
+    friend auto logAttrs(const Collection& col) {
+        return logv2::multipleAttrs(col.ns(), col.uuid());
     }
 };
 
