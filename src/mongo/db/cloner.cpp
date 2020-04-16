@@ -274,7 +274,6 @@ struct Cloner::Fun {
     BSONObj from_id_index;
     NamespaceString to_collection;
     time_t saveLast;
-    CloneOptions _opts;
 };
 
 /* copy the specified collection
@@ -285,7 +284,6 @@ void Cloner::copy(OperationContext* opCtx,
                   const BSONObj& from_opts,
                   const BSONObj& from_id_index,
                   const NamespaceString& to_collection,
-                  const CloneOptions& opts,
                   Query query) {
     LOGV2_DEBUG(20414,
                 2,
@@ -303,10 +301,8 @@ void Cloner::copy(OperationContext* opCtx,
     f.from_id_index = from_id_index;
     f.to_collection = to_collection;
     f.saveLast = time(nullptr);
-    f._opts = opts;
 
-    int options = QueryOption_NoCursorTimeout | (opts.slaveOk ? QueryOption_SlaveOk : 0) |
-        QueryOption_Exhaust;
+    int options = QueryOption_NoCursorTimeout | QueryOption_Exhaust;
     {
         Lock::TempRelease tempRelease(opCtx->lockState());
         _conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
@@ -683,7 +679,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
         Lock::TempRelease tempRelease(opCtx->lockState());
         for (auto&& params : createCollectionParams) {
             const NamespaceString nss(opts.fromDB, params.collectionName);
-            auto indexSpecs = _conn->getIndexSpecs(nss, opts.slaveOk ? QueryOption_SlaveOk : 0);
+            auto indexSpecs = _conn->getIndexSpecs(nss);
 
             collectionIndexSpecs[params.collectionName] = indexSpecs;
 
@@ -734,7 +730,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
              params.collectionInfo["options"].Obj(),
              params.idIndexSpec,
              to_name,
-             opts,
              Query());
     }
 

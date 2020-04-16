@@ -99,7 +99,6 @@ private:
               const BSONObj& from_opts,
               const BSONObj& from_id_index,
               const NamespaceString& to_ns,
-              const CloneOptions& opts,
               Query q);
 
     void copyIndexes(OperationContext* opCtx,
@@ -113,14 +112,9 @@ private:
     std::unique_ptr<DBClientBase> _conn;
 };
 
-/**
- *  slaveOk     - if true it is ok if the source of the data is !ismaster.
- */
 struct CloneOptions {
     std::string fromDB;
     std::set<std::string> shardedColls;
-
-    bool slaveOk = false;
 };
 
 }  // namespace mongo
