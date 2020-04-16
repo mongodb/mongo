@@ -153,9 +153,9 @@ make sure it actually is able to fetch from the sync source candidate’s oplog.
   then the node blacklists that sync source candidate as well because the candidate is too far
   ahead.
 * During initial sync, rollback, or recovery from unclean shutdown, nodes will set a specific
-  OpTime, **`minValid`**, that they must reach before it is safe to read from the node and before
-  the node can transition into `SECONDARY` state. If the secondary has a `minValid`, then the sync
-  source candidate is checked for that `minValid` entry.
+  OpTime, [**`minValid`**](#replication-timestamp-glossary), that they must reach before it is safe
+  to read from the node and before the node can transition into `SECONDARY` state. If the secondary
+  has a `minValid`, then the sync source candidate is checked for that `minValid` entry.
 * The sync source's **RollbackID** is also fetched to be checked after the first batch is returned
   by the `OplogFetcher`.
 
@@ -166,19 +166,49 @@ Otherwise, the secondary found a sync source! At that point `BackgroundSync` sta
 
 ### Oplog Entry Application
 
-A separate thread, `RSDataSync` is used for pulling oplog entries off of the oplog buffer and
-applying them. `RSDataSync` constructs a `SyncTail` in a loop which is used to actually apply the
-operations. The `SyncTail` instance does some oplog application, and terminates when there is a state
-change where we need to pause oplog application. After it terminates, `RSDataSync` loops back and
-decides if it should make a new `SyncTail` and continue.
+A separate thread, `ReplBatcher`, runs the
+[`OplogBatcher`](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/db/repl/oplog_batcher.h) and
+is used for pulling oplog entries off of the oplog buffer and creating the next batch that will be
+applied. These batches are called **oplog applier batches** and are different from **oplog fetcher
+batches**, which are sent by a node's sync source during [oplog fetching](#oplog-fetching). Oplog
+applier batches differ from oplog fetcher batches because they have more restrictions than just size
+limits when creating a new batch. Operations in a batch are applied in parallel when possible, so
+there are certain operation types (like commands) which require being in their own oplog applier
+batch. For example, a dropDatabase operation shouldn't be applied in parallel with other operations,
+so it must be in a batch of size one.
 
-`SyncTail` creates multiple threads that apply buffered oplog entries in parallel. Operations are
-pulled off of the oplog buffer in batches to be applied. Nodes keep track of their “last applied
-OpTime”, which is only moved forward at the end of a batch. Oplog entries within the same batch are
-not necessarily applied in order. Operations on a document must be atomic and ordered, so operations
-on the same document will be put on the same thread to be serialized. Additionally, command
-operations are done serially in batches of size 1. Insert operations are also batched together for
-improved performance.
+The
+[`OplogApplier`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/oplog_applier.h)
+is in charge of applying each batch of oplog entries received from the batcher. It will run in an
+endless loop doing the following:
+
+1. Get the next oplog applier batch from the batcher.
+2. Acquire the [Parallel Batch Writer Mode lock](#parallel-batch-writer-mode).
+3. Set the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's last applied
+   optime (before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down
+   in the middle of writing entries to the oplog.
+4. Write the batch of oplog entries into the oplog.
+5. Clear the `oplogTruncateAfterPoint` and set the [**`minValid`**](#replication-timestamp-glossary)
+   document to be the optime of the last entry in the batch. Until the node applies entries through
+   the optime set in this document, the data will not be consistent with the oplog.
+6. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
+   same batch are not necessarily applied in order. The operations in each batch will be divided
+   among the writer threads. The only restriction for creating the vector of operations that each
+   writer thread will apply serially has to do with the namespace that the operation applies to.
+   Operations on a document must be atomic and ordered, so operations on the same namespace will be
+   put on the same thread to be serialized. When applying operations, each writer thread will try to
+   **group** together insert operations for improved performance and will apply all other operations
+   individually.
+7. Tell the storage engine to flush the journal.
+8. Persist the node's "applied through" optime (the optime of the last oplog entry in this oplog
+   applier batch) to disk. This will update the `minValid` document now that the batch has been
+   applied in its entirety.
+9. Update oplog visibility by notifying the storage engine of the new oplog entries. Since entries
+   in an oplog applier batch are applied in parallel, it is only safe to make these entries visible
+   once all the entries in this batch are applied, otherwise an oplog hole could be made visible.
+   <!-- TODO SERVER-47296: Link to Oplog Visibility Section in Execution Arch Guide -->
+10. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
+   last optime in the batch.
 
 ## Replication and Topology Coordinators
 
@@ -542,9 +572,9 @@ replaces the local version with the remote versions.
 
 The node gets the last applied OpTime from the sync source and the Rollback ID to check if a
 rollback has happened during this rollback, in which case it fails rollback and shuts down. The
-last applied OpTime is set as the `minValid` for the node and the node goes into RECOVERING state.
-The node resumes fetching and applying operations like a normal secondary until it hits that
-`minValid`. Only at that point does the node go into SECONDARY state.
+last applied OpTime is set as the [`minValid`](#replication-timestamp-glossary) for the node and the
+node goes into RECOVERING state. The node resumes fetching and applying operations like a normal
+secondary until it hits that `minValid`. Only at that point does the node go into SECONDARY state.
 
 This process is very similar to initial sync and startup after an unclean shutdown in that
 operations are applied on data that may already reflect those operations and operations in the
@@ -902,8 +932,9 @@ which ensures a snapshot with no oplog holes.
 
 Secondaries begin replicating transaction oplog entries once the primary has either prepared or
 committed the transaction. They use the `OplogApplier` to apply these entries, which then uses the
-writer thread pool to schedule operations to apply.
-<!-- TODO SERVER-43969: Link to oplog application section -->
+writer thread pool to schedule operations to apply. See the
+[oplog entry application](#oplog-entry-application) section for more details on how secondary oplog
+application works.
 
 Before secondaries process and apply transaction oplog entries, they will track operations that
 require changes to `config.transactions`. This results in an update to the transactions table entry
@@ -1022,10 +1053,10 @@ error code), so that the caller knows that they can safely retry the entire tran
 
 The **Parallel Batch Writer Mode** lock (also known as the PBWM or the Peanut Butter Lock) is a
 global resource that helps manage the concurrency of running operations while a secondary is
-applying a batch of oplog entries. Since secondary oplog application applies batches in parallel,
-operations will not necessarily be applied in order, so a node will hold the PBWM while it is
-waiting for the entire batch to be applied. For secondaries, in order to read at a consistent state
-without needing the PBWM lock, a node will try to read at the
+[applying a batch of oplog entries](#oplog-entry-application). Since secondary oplog application
+applies batches in parallel, operations will not necessarily be applied in order, so a node will
+hold the PBWM while it is waiting for the entire batch to be applied. For secondaries, in order to
+read at a consistent state without needing the PBWM lock, a node will try to read at the
 [`lastApplied`](#replication-timestamp-glossary) timestamp. Since `lastApplied` is set after a batch
 is completed, it is guaranteed to be at a batch boundary. However, during initial sync there could
 be changes from a background index build that occur after the `lastApplied` timestamp. Since there
@@ -1483,13 +1514,13 @@ oplog to a point that it can guarantee does not have any oplog holes using the
 and untimestamped so that it will reflect information more recent than the latest stable checkpoint
 even after a shutdown.
 
-The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during oplog batch
-application. Before writing a batch of oplog entries to the oplog, the node will set the
-`oplogTruncateAfterPoint` to the `lastApplied` timestamp. If the node shuts down before it finishes
-writing the batch, then during startup recovery the node will truncate the oplog back to the point
-saved before the batch application began. If the node successfully finishes writing the batch to the
-oplog, it will reset the `oplogTruncateAfterPoint` to null since there are no oplog holes and the
-oplog will not need to be truncated if the node restarts.
+The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during
+[oplog batch application](#oplog-entry-application). Before writing a batch of oplog entries to the
+oplog, the node will set the `oplogTruncateAfterPoint` to the `lastApplied` timestamp. If the node
+shuts down before it finishes writing the batch, then during startup recovery the node will truncate
+the oplog back to the point saved before the batch application began. If the node successfully
+finishes writing the batch to the oplog, it will reset the `oplogTruncateAfterPoint` to null since
+there are no oplog holes and the oplog will not need to be truncated if the node restarts.
 
 The second scenario for setting the `oplogTruncateAfterPoint` is while primary. A primary allows
 secondaries to replicate one of its oplog entries as soon as there are no oplog holes in-memory
@@ -1604,16 +1635,21 @@ is updated and propagated, please see [Commit Point Propagation](#commit-point-p
 holes point (primary) that has been flushed to the journal. It is asynchronously updated by the
 storage engine as new writes become durable. Default journaling frequency is 100ms.
 
+**`minValid`**: Optime that indicates the point a node has to apply through for the data to be
+considered consistent. This optime is set on the `minValid` document in
+[`ReplicationConsistencyMarkers`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_consistency_markers.h),
+which means that it will be persisted between restarts of a node.
+
 **`oldest_timestamp`**: The earliest timestamp that the storage engine is guaranteed to have history
 for. New transactions can never start a timestamp earlier than this timestamp. Since we advance this
 as we advance the `stable_timestamp`, it will be less than or equal to the `stable_timestamp`.
 
 **`oplogTruncateAfterPoint`**: Tracks the latest no oplog holes point. On primaries, it is updated
-by the storage engine prior to flushing the journal to disk. During oplog batch application, it is
-set at the start of the batch and cleared at the end of batch application. Startup recovery will use
-the `oplogTruncateAfterPoint` to truncate the oplog back to an oplog point consistent with the rest
-of the replica set: other nodes may have replicated in-memory data that a crashed node no longer has
-and is unaware that it lacks.
+by the storage engine prior to flushing the journal to disk. During
+[oplog batch application](#oplog-entry-application), it is set at the start of the batch and cleared
+at the end of batch application. Startup recovery will use the `oplogTruncateAfterPoint` to truncate
+the oplog back to an oplog point consistent with the rest of the replica set: other nodes may have
+replicated in-memory data that a crashed node no longer has and is unaware that it lacks.
 
 **`prepareTimestamp`**: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This
 is the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided
