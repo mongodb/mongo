@@ -1309,8 +1309,10 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                 const auto migrationId =
                     _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj();
 
-                LOGV2_WARNING(
-                    22012,
+                // Exception will abort migration cleanly
+                LOGV2_ERROR_OPTIONS(
+                    16977,
+                    {logv2::UserAssertAfterLog()},
                     "Cannot migrate chunk because the local document {localDoc} has the same _id "
                     "as the reloaded remote document {remoteDoc}",
                     "Cannot migrate chunk because the local document has the same _id as the "
@@ -1318,13 +1320,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                     "localDoc"_attr = redact(localDoc),
                     "remoteDoc"_attr = redact(updatedDoc),
                     "migrationId"_attr = migrationId);
-
-                // Exception will abort migration cleanly
-                uasserted(16977,
-                          str::stream() << "Cannot migrate chunk because the local document "
-                                        << redact(localDoc)
-                                        << " has the same _id as the reloaded remote document "
-                                        << redact(updatedDoc) << "; migrationId: " << migrationId);
             }
 
             // We are in write lock here, so sure we aren't killing
