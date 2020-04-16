@@ -181,6 +181,27 @@ Microseconds OperationContext::getRemainingMaxTimeMicros() const {
     return _maxTime - getElapsedTime();
 }
 
+void OperationContext::restoreMaxTimeMS() {
+    if (!_storedMaxTime) {
+        return;
+    }
+
+    auto maxTime = *_storedMaxTime;
+    _storedMaxTime = boost::none;
+
+    if (maxTime <= Microseconds::zero()) {
+        maxTime = Microseconds::max();
+    }
+
+    if (maxTime == Microseconds::max()) {
+        _deadline = Date_t::max();
+    } else {
+        auto clock = getServiceContext()->getFastClockSource();
+        _deadline = clock->now() + clock->getPrecision() + maxTime - _elapsedTime.elapsed();
+    }
+    _maxTime = maxTime;
+}
+
 namespace {
 
 // Helper function for checkForInterrupt fail point.  Decides whether the operation currently

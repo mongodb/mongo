@@ -80,6 +80,7 @@ public:
     static const char kRequestResumeTokenField[];
     static const char kResumeAfterField[];
     static const char kUse44SortKeys[];
+    static const char kMaxTimeMSOpOnlyField[];
 
     static const char kNaturalSortField[];
 
