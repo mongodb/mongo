@@ -53,11 +53,13 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
 namespace {
+MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 /**
  * Creates and returns a legacy exhaust message, if exhaust is allowed. The returned message is to
  * be used as the subsequent 'synthetic' exhaust request. Returns an empty message if exhaust is not
@@ -146,8 +148,11 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
     }
 
     OpMsg::removeChecksum(&dbresponse->response);
-    // Indicate that the response is part of an exhaust stream. Re-checksum if needed.
-    OpMsg::setFlag(&dbresponse->response, OpMsg::kMoreToCome);
+    // Indicate that the response is part of an exhaust stream (unless the 'doNotSetMoreToCome'
+    // failpoint is set). Re-checksum if needed.
+    if (!MONGO_unlikely(doNotSetMoreToCome.shouldFail())) {
+        OpMsg::setFlag(&dbresponse->response, OpMsg::kMoreToCome);
+    }
     if (checksumPresent) {
         OpMsg::appendChecksum(&dbresponse->response);
     }
