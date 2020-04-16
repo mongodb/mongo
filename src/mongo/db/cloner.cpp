@@ -45,9 +45,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/commands/rename_collection.h"
@@ -55,18 +53,15 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -324,82 +319,14 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
         return;
     }
 
-    // TODO pass the MultiIndexBlock when inserting into the collection rather than building the
-    // indexes after the fact. This depends on holding a lock on the collection the whole time
-    // from creation to completion without yielding to ensure the index and the collection
-    // matches. It also wouldn't work on non-empty collections so we would need both
-    // implementations anyway as long as that is supported.
-    MultiIndexBlock indexer;
-
-    // Emit startIndexBuild and commitIndexBuild oplog entries if supported by the current FCV.
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto collUUID = collection->uuid();
     auto fromMigrate = false;
-    auto buildUUID = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44
-        ? boost::make_optional(UUID::gen())
-        : boost::none;
-
-    MultiIndexBlock::OnInitFn onInitFn;
-    if (opCtx->writesAreReplicated() && buildUUID) {
-        onInitFn = [&](std::vector<BSONObj>& specs) {
-            // TODO SERVER-47438: Should remove this onInitFn lambda function as we no longer
-            // need to generate startIndexBuild and commitIndexBuild oplog entries.
-
-            // Currently, primary doesn't wait for any votes from secondaries to commit
-            // the index build. So, it's of no use to set the commit quorum option of any value
-            // greater than 0. Disabling commit quorum is just an optimization to avoid secondaries
-            // from trying to vote before committing index build.
-            //
-            // Persist the commit quorum value in the config.system.indexBuilds collection.
-            IndexBuildEntry indexbuildEntry(*buildUUID,
-                                            collection->uuid(),
-                                            CommitQuorumOptions(CommitQuorumOptions::kDisabled),
-                                            IndexBuildsCoordinator::extractIndexNames(specs));
-            uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexbuildEntry));
-
-            opObserver->onStartIndexBuild(
-                opCtx, nss, collection->uuid(), *buildUUID, specs, fromMigrate);
-            return Status::OK();
-        };
-    } else {
-        onInitFn = MultiIndexBlock::kNoopOnInitFn;
-    }
-
-    auto indexInfoObjs = uassertStatusOK(indexer.init(opCtx, collection, indexesToBuild, onInitFn));
-
-    // The code below throws, so ensure build cleanup occurs.
-    auto abortOnExit = makeGuard(
-        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
-
-    uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
-    uassertStatusOK(indexer.checkConstraints(opCtx));
-
-    WriteUnitOfWork wunit(opCtx);
-    uassertStatusOK(
-        indexer.commit(opCtx,
-                       collection,
-                       [&](const BSONObj& spec) {
-                           // If two phase index builds are enabled, the index build will be
-                           // coordinated using startIndexBuild and commitIndexBuild oplog entries.
-                           if (opCtx->writesAreReplicated() &&
-                               !IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-                               opObserver->onCreateIndex(
-                                   opCtx, collection->ns(), collection->uuid(), spec, fromMigrate);
-                           }
-                       },
-                       [&] {
-                           if (opCtx->writesAreReplicated() && buildUUID) {
-                               opObserver->onCommitIndexBuild(opCtx,
-                                                              collection->ns(),
-                                                              collection->uuid(),
-                                                              *buildUUID,
-                                                              indexInfoObjs,
-                                                              fromMigrate);
-                           }
-                       }));
-    wunit.commit();
-    abortOnExit.dismiss();
+    writeConflictRetry(opCtx, "_copyIndexes", nss.ns(), [&] {
+        WriteUnitOfWork wunit(opCtx);
+        IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+            opCtx, collUUID, indexesToBuild, fromMigrate);
+        wunit.commit();
+    });
 }
 
 StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
