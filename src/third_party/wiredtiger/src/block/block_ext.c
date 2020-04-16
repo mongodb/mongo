@@ -1067,7 +1067,8 @@ __wt_block_extlist_read_avail(
      * Extent blocks are allocated from the available list: if reading the avail list, the extent
      * blocks might be included, remove them.
      */
-    WT_ERR_NOTFOUND_OK(__wt_block_off_remove_overlap(session, block, el, el->offset, el->size));
+    WT_ERR_NOTFOUND_OK(
+      __wt_block_off_remove_overlap(session, block, el, el->offset, el->size), false);
 
 err:
 #ifdef HAVE_DIAGNOSTIC

@@ -164,7 +164,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
     if (cv.len != 0 && !WT_STRING_MATCH("none", cv.str, cv.len)) {
         /* Extract the application-supplied metadata (if any). */
         WT_CLEAR(metadata);
-        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, lsmconf, "app_metadata", &metadata));
+        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, lsmconf, "app_metadata", &metadata), false);
         WT_ERR(__wt_collator_config(
           session, lsm_tree->name, &cv, &metadata, &lsm_tree->collator, &lsm_tree->collator_owned));
         WT_ERR(__wt_strndup(session, cv.str, cv.len, &lsm_tree->collator_name));
@@ -175,7 +175,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
     if ((ret = __wt_config_getones(session, lsmconf, "lsm.merge_custom.start_generation", &cv)) ==
       0)
         lsm_tree->custom_generation = (uint32_t)cv.val;
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     if (lsm_tree->custom_generation != 0) {
         WT_ERR(__wt_config_getones(session, lsmconf, "lsm.merge_custom.prefix", &cv));
         WT_ERR(__wt_strndup(session, cv.str, cv.len, &lsm_tree->custom_prefix));
@@ -267,7 +267,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
               session, lsm_tree, chunk->id, chunk->generation, &chunk->uri));
         }
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     lsm_tree->nchunks = nchunks;
 
     WT_ERR(__wt_config_getones(session, lsmconf, "old_chunks", &cv));
@@ -284,7 +284,7 @@ __lsm_meta_read_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, const char *
         WT_ERR(__wt_strndup(session, lk.str, lk.len, &chunk->uri));
         F_SET(chunk, WT_LSM_CHUNK_ONDISK);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     lsm_tree->nold_chunks = nchunks;
 
     /*

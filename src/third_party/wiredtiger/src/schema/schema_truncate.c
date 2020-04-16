@@ -53,7 +53,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
     WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
     while ((ret = cursor->next(cursor)) == 0)
         WT_ERR(cursor->remove(cursor));
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
 err:

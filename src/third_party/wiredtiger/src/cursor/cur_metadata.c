@@ -278,7 +278,7 @@ __curmetadata_next(WT_CURSOR *cursor)
               session, WT_ISO_READ_UNCOMMITTED, ret = __curmetadata_setkv(mdc, file_cursor));
             if (ret == 0)
                 break;
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         }
     }
 
@@ -326,7 +326,7 @@ __curmetadata_prev(WT_CURSOR *cursor)
           session, WT_ISO_READ_UNCOMMITTED, ret = __curmetadata_setkv(mdc, file_cursor));
         if (ret == 0)
             break;
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
 
 err:

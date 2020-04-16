@@ -592,7 +592,7 @@ __log_file_server(void *arg)
                 if (!conn->hot_backup && conn->log_cursors == 0) {
                     WT_WITH_HOTBACKUP_READ_LOCK(session,
                       WT_ERR_ERROR_OK(__wt_ftruncate(session, close_fh, close_end_lsn.l.offset),
-                                                  ENOTSUP),
+                                                  ENOTSUP, false),
                       NULL);
                 }
                 WT_SET_LSN(&close_end_lsn, close_end_lsn.l.file + 1, 0);
@@ -903,7 +903,7 @@ __log_server(void *arg)
          * buffer may need to wait for the write_lsn to advance in the case of a synchronous buffer.
          * We end up with a hang.
          */
-        WT_ERR_BUSY_OK(__wt_log_force_write(session, 0, &did_work));
+        WT_ERR_ERROR_OK(__wt_log_force_write(session, 0, &did_work), EBUSY, false);
 
         /*
          * We don't want to archive or pre-allocate files as often as we want to force out log

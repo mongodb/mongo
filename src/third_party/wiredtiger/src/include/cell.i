@@ -116,6 +116,11 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_
             LF_SET(WT_CELL_TS_DURABLE_STOP);
         }
     }
+    /*
+     * Currently, no uncommitted prepared updates are written to the data store, so this flag must
+     * be false until we allow writing them in WT-5984. In that ticket this assert must be removed.
+     */
+    WT_ASSERT(session, prepare == false);
     if (prepare)
         LF_SET(WT_CELL_PREPARE);
     *flagsp = flags;
@@ -177,7 +182,7 @@ __wt_check_addr_validity(WT_SESSION_IMPL *session, wt_timestamp_t start_durable_
 static inline void
 __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t start_durable_ts,
   wt_timestamp_t oldest_start_ts, uint64_t oldest_start_txn, wt_timestamp_t stop_durable_ts,
-  wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn)
+  wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn, bool prepare)
 {
     uint8_t flags, *flagsp;
 
@@ -250,6 +255,13 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, wt_timestamp_t
         WT_IGNORE_RET(__wt_vpack_uint(pp, 0, stop_durable_ts - newest_stop_ts));
         LF_SET(WT_CELL_TS_DURABLE_STOP);
     }
+    /*
+     * Currently, no uncommitted prepared updates are written to the data store, so this flag must
+     * be false until we allow writing them in WT-5984. In that ticket this assert must be removed.
+     */
+    WT_ASSERT(session, prepare == false);
+    if (prepare)
+        LF_SET(WT_CELL_PREPARE);
     *flagsp = flags;
 }
 
@@ -261,7 +273,7 @@ static inline size_t
 __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, uint64_t recno,
   wt_timestamp_t start_durable_ts, wt_timestamp_t oldest_start_ts, uint64_t oldest_start_txn,
   wt_timestamp_t stop_durable_ts, wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn,
-  size_t size)
+  bool prepare, size_t size)
 {
     uint8_t *p;
 
@@ -270,7 +282,7 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
     *p = '\0';
 
     __cell_pack_addr_validity(session, &p, start_durable_ts, oldest_start_ts, oldest_start_txn,
-      stop_durable_ts, newest_stop_ts, newest_stop_txn);
+      stop_durable_ts, newest_stop_ts, newest_stop_txn, prepare);
 
     if (recno == WT_RECNO_OOB)
         cell->__chunk[0] |= (uint8_t)cell_type; /* Type */
@@ -291,13 +303,10 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
 static inline size_t
 __wt_cell_pack_value(WT_SESSION_IMPL *session, WT_CELL *cell, wt_timestamp_t durable_start_ts,
   wt_timestamp_t start_ts, uint64_t start_txn, wt_timestamp_t durable_stop_ts,
-  wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle, size_t size)
+  wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare, uint64_t rle, size_t size)
 {
     uint8_t byte, *p;
-    bool prepare, validity;
-
-    /* FIXME-prepare-support: The prepare flag should be passed in. */
-    prepare = false;
+    bool validity;
 
     /* Start building a cell: the descriptor byte starts zero. */
     p = cell->__chunk;
@@ -428,16 +437,9 @@ __wt_cell_pack_value_match(
 static inline size_t
 __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell, wt_timestamp_t start_durable_ts,
   wt_timestamp_t start_ts, uint64_t start_txn, wt_timestamp_t stop_durable_ts,
-  wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle, uint64_t v)
+  wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare, uint64_t rle, uint64_t v)
 {
     uint8_t *p;
-    bool prepare;
-
-    /*
-     * FIXME-prepare-support: These values should be passed in when support for prepared
-     * transactions with durable history is fully implemented.
-     */
-    prepare = false;
 
     /* Start building a cell: the descriptor byte starts zero. */
     p = cell->__chunk;
@@ -564,14 +566,10 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 static inline size_t
 __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type,
   wt_timestamp_t durable_start_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle,
-  size_t size)
+  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle, size_t size)
 {
     uint8_t *p;
-    bool prepare;
-
-    /* FIXME-prepare-support: The prepare flag should be passed in. */
-    prepare = false;
 
     /* Start building a cell: the descriptor byte starts zero. */
     p = cell->__chunk;

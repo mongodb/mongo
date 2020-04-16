@@ -1175,8 +1175,8 @@ extern int __wt_realloc_noclear(WT_SESSION_IMPL *session, size_t *bytes_allocate
   size_t bytes_to_allocate, void *retp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv,
   uint8_t type, wt_timestamp_t start_durable_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_child_modify(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref,
   bool *hazardp, WT_CHILD_STATE *statep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
@@ -1955,11 +1955,11 @@ static inline int __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset
 static inline int __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r,
   const void *data, size_t size, wt_timestamp_t durable_start_ts, wt_timestamp_t start_ts,
   uint64_t start_txn, wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn,
-  uint64_t rle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool prepare, uint64_t rle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_rec_dict_replace(WT_SESSION_IMPL *session, WT_RECONCILE *r,
   wt_timestamp_t start_durable_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle,
-  WT_REC_KV *val) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle, WT_REC_KV *val) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_row_leaf_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip,
@@ -2050,11 +2050,12 @@ static inline int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offse
 static inline size_t __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type,
   uint64_t recno, wt_timestamp_t start_durable_ts, wt_timestamp_t oldest_start_ts,
   uint64_t oldest_start_txn, wt_timestamp_t stop_durable_ts, wt_timestamp_t newest_stop_ts,
-  uint64_t newest_stop_txn, size_t size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  uint64_t newest_stop_txn, bool prepare, size_t size)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
   wt_timestamp_t start_durable_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle,
-  uint64_t v) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle, uint64_t v) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell,
   wt_timestamp_t start_durable_ts, wt_timestamp_t start_ts, uint64_t start_txn,
   wt_timestamp_t stop_durable_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle)
@@ -2065,12 +2066,12 @@ static inline size_t __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type,
   wt_timestamp_t durable_start_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle,
-  size_t size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle, size_t size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_pack_value(WT_SESSION_IMPL *session, WT_CELL *cell,
   wt_timestamp_t durable_start_ts, wt_timestamp_t start_ts, uint64_t start_txn,
-  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, uint64_t rle,
-  size_t size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_timestamp_t durable_stop_ts, wt_timestamp_t stop_ts, uint64_t stop_txn, bool prepare,
+  uint64_t rle, size_t size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_cell_total_len(WT_CELL_UNPACK *unpack)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline size_t __wt_strnlen(const char *s, size_t maxlen)
@@ -2165,12 +2166,12 @@ static inline void __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref);
 static inline void __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 static inline void __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page);
 static inline void __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page);
-static inline void __wt_rec_addr_ts_init(WT_RECONCILE *r, wt_timestamp_t *start_durable_ts,
-  wt_timestamp_t *oldest_start_tsp, uint64_t *oldest_start_txnp, wt_timestamp_t *stop_durable_ts,
-  wt_timestamp_t *newest_stop_tsp, uint64_t *newest_stop_txnp);
+static inline void __wt_rec_addr_ts_init(WT_RECONCILE *r, wt_timestamp_t *start_durable_tsp,
+  wt_timestamp_t *oldest_start_tsp, uint64_t *oldest_start_txnp, wt_timestamp_t *stop_durable_tsp,
+  wt_timestamp_t *newest_stop_tsp, uint64_t *newest_stop_txnp, bool *preparep);
 static inline void __wt_rec_addr_ts_update(WT_RECONCILE *r, wt_timestamp_t start_durable_ts,
   wt_timestamp_t oldest_start_ts, uint64_t oldest_start_txn, wt_timestamp_t stop_durable_ts,
-  wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn);
+  wt_timestamp_t newest_stop_ts, uint64_t newest_stop_txn, bool prepare);
 static inline void __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r,
   WT_ADDR *addr, WT_CELL_UNPACK *vpack, bool proxy_cell, uint64_t recno);
 static inline void __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv);

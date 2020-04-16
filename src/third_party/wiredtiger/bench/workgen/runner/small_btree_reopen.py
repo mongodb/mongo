@@ -32,7 +32,7 @@ from wiredtiger import *
 from workgen import *
 
 context = Context()
-conn = wiredtiger_open("WT_TEST", "create,cache_size=500MB")
+conn = context.wiredtiger_open("create,cache_size=500MB")
 s = conn.open_session()
 tname = "file:test.wt"
 s.create(tname, 'key_format=S,value_format=S')

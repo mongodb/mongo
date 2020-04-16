@@ -178,7 +178,7 @@ __config_merge_scan(
         cp->entries[cp->entries_next].strip = strip;
         ++cp->entries_next;
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     __wt_scr_free(session, &kb);

@@ -873,7 +873,7 @@ __clsm_next(WT_CURSOR *cursor)
               (ret = __clsm_position_chunk(clsm, c, true, &cmp)) == 0 && cmp == 0 &&
               clsm->current == NULL)
                 clsm->current = c;
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         }
         F_SET(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_MULTIPLE);
         F_CLR(clsm, WT_CLSM_ITERATE_PREV);
@@ -894,14 +894,14 @@ retry:
                 if (c != clsm->current) {
                     WT_ERR(WT_LSM_CURCMP(session, clsm->lsm_tree, c, clsm->current, cmp));
                     if (cmp == 0)
-                        WT_ERR_NOTFOUND_OK(c->next(c));
+                        WT_ERR_NOTFOUND_OK(c->next(c), false);
                 }
             }
         }
 
         /* Move the smallest cursor forward. */
         c = clsm->current;
-        WT_ERR_NOTFOUND_OK(c->next(c));
+        WT_ERR_NOTFOUND_OK(c->next(c), false);
     }
 
     /* Find the cursor(s) with the smallest key. */
@@ -975,11 +975,10 @@ __clsm_next_random(WT_CURSOR *cursor)
          * This call to next_random on the chunk can potentially end in WT_NOTFOUND if the chunk we
          * picked is empty. We want to retry in that case.
          */
-        ret = __wt_curfile_next_random(c);
+        WT_ERR_NOTFOUND_OK(__wt_curfile_next_random(c), true);
         if (ret == WT_NOTFOUND)
             continue;
 
-        WT_ERR(ret);
         F_SET(cursor, WT_CURSTD_KEY_INT);
         WT_ERR(c->get_key(c, &cursor->key));
         /*
@@ -1031,7 +1030,7 @@ __clsm_prev(WT_CURSOR *cursor)
               (ret = __clsm_position_chunk(clsm, c, false, &cmp)) == 0 && cmp == 0 &&
               clsm->current == NULL)
                 clsm->current = c;
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         }
         F_SET(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_MULTIPLE);
         F_CLR(clsm, WT_CLSM_ITERATE_NEXT);
@@ -1052,14 +1051,14 @@ retry:
                 if (c != clsm->current) {
                     WT_ERR(WT_LSM_CURCMP(session, clsm->lsm_tree, c, clsm->current, cmp));
                     if (cmp == 0)
-                        WT_ERR_NOTFOUND_OK(c->prev(c));
+                        WT_ERR_NOTFOUND_OK(c->prev(c), false);
                 }
             }
         }
 
         /* Move the largest cursor backwards. */
         c = clsm->current;
-        WT_ERR_NOTFOUND_OK(c->prev(c));
+        WT_ERR_NOTFOUND_OK(c->prev(c), false);
     }
 
     /* Find the cursor(s) with the largest key. */
@@ -1162,14 +1161,13 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
                 have_hash = true;
             }
 
-            ret = __wt_bloom_hash_get(bloom, &bhash);
+            WT_ERR_NOTFOUND_OK(__wt_bloom_hash_get(bloom, &bhash), true);
             if (ret == WT_NOTFOUND) {
                 WT_LSM_TREE_STAT_INCR(session, clsm->lsm_tree->bloom_miss);
                 continue;
             }
             if (ret == 0)
                 WT_LSM_TREE_STAT_INCR(session, clsm->lsm_tree->bloom_hit);
-            WT_ERR(ret);
         }
         c->set_key(c, &cursor->key);
         if ((ret = c->search(c)) == 0) {
@@ -1179,7 +1177,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
                 ret = WT_NOTFOUND;
             goto done;
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
         F_CLR(c, WT_CURSTD_KEY_SET);
         /* Update stats: the active chunk can't have a bloom filter. */
         if (bloom != NULL)
@@ -1347,7 +1345,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
                 deleted = false;
             }
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
     if (deleted) {
         clsm->current = NULL;

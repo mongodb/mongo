@@ -80,6 +80,7 @@ wts_load(void)
     WT_DECL_RET;
     WT_ITEM key, value;
     WT_SESSION *session;
+    uint32_t keyno;
     bool is_bulk;
 
     conn = g.wts_conn;
@@ -111,11 +112,11 @@ wts_load(void)
     if (g.c_txn_timestamps)
         bulk_begin_transaction(session);
 
-    while (++g.key_cnt <= g.c_rows) {
+    for (keyno = 0; ++keyno <= g.c_rows;) {
         /* Do some checking every 10K operations. */
-        if (g.key_cnt % 10000 == 0) {
+        if (keyno % 10000 == 0) {
             /* Report on progress. */
-            track("bulk load", g.key_cnt, NULL);
+            track("bulk load", keyno, NULL);
 
             /* Restart the enclosing transaction so we don't overflow the cache. */
             if (g.c_txn_timestamps) {
@@ -124,28 +125,28 @@ wts_load(void)
             }
         }
 
-        key_gen(&key, g.key_cnt);
-        val_gen(NULL, &value, g.key_cnt);
+        key_gen(&key, keyno);
+        val_gen(NULL, &value, keyno);
 
         switch (g.type) {
         case FIX:
             if (!is_bulk)
-                cursor->set_key(cursor, g.key_cnt);
+                cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, *(uint8_t *)value.data);
-            logop(session, "%-10s %" PRIu64 " {0x%02" PRIx8 "}", "bulk", g.key_cnt,
+            logop(session, "%-10s %" PRIu64 " {0x%02" PRIx8 "}", "bulk", keyno,
               ((uint8_t *)value.data)[0]);
             break;
         case VAR:
             if (!is_bulk)
-                cursor->set_key(cursor, g.key_cnt);
+                cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu64 " {%.*s}", "bulk", g.key_cnt, (int)value.size,
+            logop(session, "%-10s %" PRIu64 " {%.*s}", "bulk", keyno, (int)value.size,
               (char *)value.data);
             break;
         case ROW:
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu64 " {%.*s}, {%.*s}", "bulk", g.key_cnt, (int)key.size,
+            logop(session, "%-10s %" PRIu64 " {%.*s}, {%.*s}", "bulk", keyno, (int)key.size,
               (char *)key.data, (int)value.size, (char *)value.data);
             break;
         }
@@ -155,9 +156,6 @@ wts_load(void)
          * case, guaranteeing the load succeeds probably means future updates are also guaranteed to
          * succeed, which isn't what we want. If we run out of space in the initial load, reset the
          * row counter and continue.
-         *
-         * Decrease inserts, they can't be successful if we're at the cache limit, and increase the
-         * delete percentage to get some extra space once the run starts.
          */
         if ((ret = cursor->insert(cursor)) != 0) {
             testutil_assert(ret == WT_CACHE_FULL || ret == WT_ROLLBACK);
@@ -167,18 +165,38 @@ wts_load(void)
                 bulk_begin_transaction(session);
             }
 
-            if (g.c_insert_pct > 5)
+            /*
+             * Decrease inserts since they won't be successful if we're hitting cache limits, and
+             * increase the delete percentage to get some extra space once the run starts. We can't
+             * simply modify the values because they have to equal 100 when the database is reopened
+             * (we are going to rewrite the CONFIG file, too).
+             */
+            if (g.c_insert_pct > 5) {
+                g.c_delete_pct += g.c_insert_pct - 5;
                 g.c_insert_pct = 5;
-            if (g.c_delete_pct < 20)
-                g.c_delete_pct += 20;
+            }
+            if (g.c_delete_pct < 20) {
+                g.c_delete_pct += g.c_write_pct / 2;
+                g.c_write_pct = g.c_write_pct / 2;
+            }
+            if (g.c_delete_pct < 20) {
+                g.c_delete_pct += g.c_modify_pct / 2;
+                g.c_write_pct = g.c_modify_pct / 2;
+            }
             break;
         }
     }
 
-    /* We may have exited the loop early, reset all of our counters to match our insert count. */
-    --g.key_cnt;
-    g.rows = g.key_cnt;
-    g.c_rows = (uint32_t)g.key_cnt;
+    /*
+     * We may have exited the loop early, reset our counters to match our insert count. If the count
+     * changed, rewrite the CONFIG file so reopens aren't surprised.
+     */
+    --keyno;
+    if (g.rows != keyno) {
+        g.rows = keyno;
+        g.c_rows = (uint32_t)keyno;
+        config_print(false);
+    }
 
     if (g.c_txn_timestamps)
         bulk_commit_transaction(session);

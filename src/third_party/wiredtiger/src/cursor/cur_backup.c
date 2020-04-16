@@ -334,8 +334,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
      */
     ret = __wt_meta_checkpoint_last_name(session, WT_METAFILE_URI, &ckpt);
     __wt_free(session, ckpt);
-    if (ret != 0 && ret != WT_NOTFOUND)
-        WT_ERR(ret);
+    WT_ERR_NOTFOUND_OK(ret, true);
     if (ret == WT_NOTFOUND) {
         /*
          * If we don't find any checkpoint, backup files need to be full copy.
@@ -494,11 +493,9 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
         if (is_dup)
             WT_ERR_MSG(session, EINVAL,
               "Incremental identifier can only be specified on a primary backup cursor");
-        ret = __backup_find_id(session, &cval, NULL);
+        WT_ERR_NOTFOUND_OK(__backup_find_id(session, &cval, NULL), true);
         if (ret == 0)
             WT_ERR_MSG(session, EINVAL, "Incremental identifier already exists");
-        if (ret != WT_NOTFOUND)
-            WT_ERR(ret);
 
         WT_ERR(__backup_add_id(session, &cval));
         incremental_config = true;
@@ -546,7 +543,7 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
             WT_ERR(ret);
         }
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /*
      * Compatibility checking.

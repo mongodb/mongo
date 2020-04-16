@@ -101,11 +101,11 @@ random_failure(void)
 TINFO **tinfo_list;
 
 /*
- * wts_ops --
+ * operations --
  *     Perform a number of operations in a set of threads.
  */
 void
-wts_ops(u_int ops_seconds, bool lastrun)
+operations(u_int ops_seconds, bool lastrun)
 {
     TINFO *tinfo, total;
     WT_CONNECTION *conn;
@@ -195,14 +195,25 @@ wts_ops(u_int ops_seconds, bool lastrun)
         testutil_check(__wt_thread_create(NULL, &alter_tid, alter, NULL));
     if (g.c_backups)
         testutil_check(__wt_thread_create(NULL, &backup_tid, backup, NULL));
-    if (g.c_checkpoint_flag == CHECKPOINT_ON)
-        testutil_check(__wt_thread_create(NULL, &checkpoint_tid, checkpoint, NULL));
     if (g.c_compact)
         testutil_check(__wt_thread_create(NULL, &compact_tid, compact, NULL));
     if (g.c_random_cursor)
         testutil_check(__wt_thread_create(NULL, &random_tid, random_kv, NULL));
     if (g.c_txn_timestamps)
         testutil_check(__wt_thread_create(NULL, &timestamp_tid, timestamp, tinfo_list));
+
+    /*
+     * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
+     * original database open because format tests small caches and you can get into cache stuck
+     * trouble during the initial load (where bulk load isn't configured). There's a single thread
+     * doing lots of inserts and creating huge leaf pages. Those pages can't be evicted if there's a
+     * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
+     * we're not going to fix it in the library, so configure it away by delaying checkpoint start.
+     */
+    if (g.c_checkpoint_flag == CHECKPOINT_WIREDTIGER)
+        wts_checkpoints();
+    if (g.c_checkpoint_flag == CHECKPOINT_ON)
+        testutil_check(__wt_thread_create(NULL, &checkpoint_tid, checkpoint, NULL));
 
     /* Spin on the threads, calculating the totals. */
     for (;;) {
@@ -288,8 +299,16 @@ wts_ops(u_int ops_seconds, bool lastrun)
     if (g.logging)
         testutil_check(session->close(session, NULL));
 
-    for (i = 0; i < g.c_threads; ++i)
-        free(tinfo_list[i]);
+    for (i = 0; i < g.c_threads; ++i) {
+        tinfo = tinfo_list[i];
+
+        /*
+         * Assert records were not removed unless configured to do so, otherwise subsequent runs can
+         * incorrectly report scan errors.
+         */
+        testutil_assert(g.c_delete_pct != 0 || tinfo->remove == 0);
+        free(tinfo);
+    }
     free(tinfo_list);
 }
 
@@ -786,7 +805,6 @@ ops(void *arg)
                 READ_OP_FAILED(true);
             break;
         case REMOVE:
-remove_instead_of_truncate:
             switch (g.type) {
             case ROW:
                 ret = row_remove(tinfo, cursor, positioned);
@@ -813,7 +831,7 @@ remove_instead_of_truncate:
              */
             if (__wt_atomic_addv64(&g.truncate_cnt, 1) > 2) {
                 (void)__wt_atomic_subv64(&g.truncate_cnt, 1);
-                goto remove_instead_of_truncate;
+                goto update_instead_of_chosen_op;
             }
 
             if (!positioned)
@@ -1023,7 +1041,7 @@ wts_read_scan(void)
     testutil_check(ret);
 
     /* Check a random subset of the records using the key. */
-    for (keyno = 0; keyno < g.key_cnt;) {
+    for (keyno = 0; keyno < g.rows;) {
         keyno += mmrand(NULL, 1, 1000);
         if (keyno > g.rows)
             keyno = g.rows;
@@ -1180,9 +1198,12 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
         /*
          * Compare the returned key with the previously returned key, and assert the order is
          * correct. If not deleting keys, and the rows aren't in the column-store insert name space,
-         * also assert we don't skip groups of records (that's a page-split bug symptom).
+         * also assert we don't skip groups of records (that's a page-split bug symptom). Note a
+         * previous run that performed salvage might have corrupted a chunk of space such that
+         * records were removed. If this is a reopen of an existing database, assume salvage might
+         * have happened.
          */
-        record_gaps = g.c_delete_pct != 0;
+        record_gaps = g.c_delete_pct != 0 || g.reopen;
         switch (g.type) {
         case FIX:
         case VAR:
@@ -1212,8 +1233,8 @@ order_error_col:
             if (!record_gaps) {
                 /*
                  * Convert the keys to record numbers and then compare less-than-or-equal. (Not
-                 * less-than, row-store inserts new rows in-between rows by append a new suffix to
-                 * the row's key.)
+                 * less-than, row-store inserts new rows in-between rows by appending a new suffix
+                 * to the row's key.)
                  */
                 testutil_check(__wt_buf_fmt((WT_SESSION_IMPL *)cursor->session, tinfo->tbuf, "%.*s",
                   (int)tinfo->key->size, (char *)tinfo->key->data));

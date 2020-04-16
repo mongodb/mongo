@@ -559,7 +559,7 @@ __lsm_bloom_create(
         WT_ERR(src->get_key(src, &key));
         __wt_bloom_insert(bloom, &key);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     WT_TRET(src->close(src));
 
     WT_TRET(__wt_bloom_finalize(bloom));
@@ -569,7 +569,7 @@ __lsm_bloom_create(
 
     /* Load the new Bloom filter into cache. */
     WT_CLEAR(key);
-    WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
+    WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key), false);
 
     __wt_verbose(session, WT_VERB_LSM,
       "LSM worker created bloom filter %s. "

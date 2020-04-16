@@ -81,7 +81,7 @@ context = Context()
 conn_config="create,cache_size=2GB,session_max=1000,eviction=(threads_min=4,threads_max=8),log=(enabled=false),transaction_sync=(enabled=false),checkpoint_sync=true,checkpoint=(wait=8),statistics=(fast),statistics_log=(json,wait=1)"
 table_config="allocation_size=4k,memory_page_max=10MB,prefix_compression=false,split_pct=90,leaf_page_max=32k,internal_page_max=16k,type=file,block_compressor=snappy"
 conn_config += extensions_config(['compressors/snappy'])
-conn = wiredtiger_open("WT_TEST", conn_config)
+conn = context.wiredtiger_open(conn_config)
 s = conn.open_session()
 
 tables = []

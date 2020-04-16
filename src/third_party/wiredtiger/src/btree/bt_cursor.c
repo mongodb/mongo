@@ -1095,10 +1095,9 @@ retry:
     WT_ERR(__cursor_func_init(cbt, true));
 
     if (btree->type == BTREE_ROW) {
-        ret = __cursor_row_search(cbt, false, NULL, NULL);
+        WT_ERR_NOTFOUND_OK(__cursor_row_search(cbt, false, NULL, NULL), true);
         if (ret == WT_NOTFOUND)
             goto search_notfound;
-        WT_ERR(ret);
 
         /* Check whether an update would conflict. */
         WT_ERR(__curfile_update_check(cbt));
@@ -1111,10 +1110,9 @@ retry:
 
         ret = __cursor_row_modify(cbt, WT_UPDATE_TOMBSTONE);
     } else {
-        ret = __cursor_col_search(cbt, NULL, NULL);
+        WT_ERR_NOTFOUND_OK(__cursor_col_search(cbt, NULL, NULL), true);
         if (ret == WT_NOTFOUND)
             goto search_notfound;
-        WT_ERR(ret);
 
         /*
          * If we find a matching record, check whether an update would conflict. Do this before

@@ -37,7 +37,7 @@ def timestamp_str(t):
     return '%x' % t
 
 # test_rollback_to_stable01.py
-# Shared base class used by gc tests.
+# Shared base class used by rollback to stable tests.
 class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
@@ -128,12 +128,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = ''
-        # Temporarily solution to have good cache size until prepare updates are written to disk.
-        if self.prepare:
-            config += 'cache_size=100MB,statistics=(all)'
-        else:
-            config += 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all)'
         if self.in_memory:
             config += ',in_memory=true'
         else:

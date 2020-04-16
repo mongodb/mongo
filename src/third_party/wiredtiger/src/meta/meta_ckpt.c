@@ -489,7 +489,7 @@ __wt_meta_ckptlist_get(
             WT_ERR(__ckpt_load(session, &k, &v, ckpt));
         }
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     if (!update && slot == 0)
         WT_ERR(WT_NOTFOUND);
 
@@ -872,7 +872,7 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
      * entry.
      */
     if (strcmp(hex_timestamp, "0") == 0)
-        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_CKPT_URI));
+        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_CKPT_URI), false);
     else {
         WT_ERR(__wt_buf_catfmt(session, buf, "checkpoint_timestamp=\"%s\"", hex_timestamp));
         WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_URI, buf->data));

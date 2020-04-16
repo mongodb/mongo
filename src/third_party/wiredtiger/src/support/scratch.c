@@ -171,7 +171,7 @@ __wt_buf_set_printable_format(
             WT_ERR(__wt_illegal_value(session, pv.type));
         }
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     __wt_scr_free(session, &tmp);

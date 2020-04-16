@@ -78,10 +78,15 @@ _wiredtiger.pyd
 
 # Binaries
 **/bench/wtperf/wtperf
+**/csuite/test_incr_backup
+**/csuite/test_wt4699_json
+**/csuite/test_wt4803_history_store_abort
+**/csuite/test_wt4891_meta_ckptlist_get_alloc
 **/examples/c/ex_access
 **/examples/c/ex_all
 **/examples/c/ex_async
 **/examples/c/ex_backup
+**/examples/c/ex_backup_block
 **/examples/c/ex_call_center
 **/examples/c/ex_config_parse
 **/examples/c/ex_cursor

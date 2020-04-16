@@ -29,6 +29,7 @@
 #include "format.h"
 #include "config.h"
 
+static void config(void);
 static void config_backup(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
@@ -61,11 +62,28 @@ static void config_transaction(void);
 #define DISABLE_RANDOM_LSM_TESTING 1
 
 /*
- * config_setup --
- *     Initialize configuration for a run.
+ * config_final --
+ *     Final run initialization.
  */
 void
-config_setup(void)
+config_final(void)
+{
+    config(); /* Finish up configuration and review it. */
+
+    config_print(false);
+
+    g.rows = g.c_rows; /* Set the key count. */
+
+    key_init(); /* Initialize key/value information. */
+    val_init();
+}
+
+/*
+ * config --
+ *     Initialize the configuration itself.
+ */
+static void
+config(void)
 {
     CONFIG *cp;
     char buf[128];
@@ -196,8 +214,7 @@ config_setup(void)
         config_in_memory_reset();
     if (DATASOURCE("lsm"))
         config_lsm_reset();
-    if (g.backward_compatible != 0)
-        config_backward_compatible();
+    config_backward_compatible();
 
     /*
      * Key/value minimum/maximum are related, correct unless specified by the configuration.
@@ -237,9 +254,6 @@ config_setup(void)
         else
             config_single("runs.timer=360", false);
     }
-
-    /* Reset the key count. */
-    g.key_cnt = 0;
 }
 
 /*
@@ -286,12 +300,36 @@ config_backup(void)
 static void
 config_backward_compatible(void)
 {
-    if (!g.backward_compatible)
+    bool backward_compatible;
+
+    /*
+     * If built in a branch that doesn't support all current options, or creating a database for
+     * such an environment, strip out configurations that won't work.
+     */
+    backward_compatible = g.backward_compatible;
+#if WIREDTIGER_VERSION_MAJOR < 10
+    backward_compatible = true;
+#endif
+    if (!backward_compatible)
         return;
 
-    if (config_is_perm("disk.mmap_all"))
-        testutil_die(EINVAL, "-B option incompatible with mmap_all configuration");
-    config_single("disk.mmap_all=off", false);
+    if (g.c_backup_incr_flag != INCREMENTAL_OFF) {
+        if (config_is_perm("backup.incremental"))
+            testutil_die(EINVAL, "incremental backup not supported in backward compatibility mode");
+        config_single("backup.incremental=off", false);
+    }
+
+    if (g.c_mmap_all) {
+        if (config_is_perm("disk.mmap_all"))
+            testutil_die(EINVAL, "disk.mmap_all not supported in backward compatibility mode");
+        config_single("disk.mmap_all=off", false);
+    }
+
+    if (g.c_timing_stress_hs_sweep) {
+        if (config_is_perm("stress.hs_sweep"))
+            testutil_die(EINVAL, "stress.hs_sweep not supported in backward compatibility mode");
+        config_single("stress.hs_sweep=off", false);
+    }
 }
 
 /*
@@ -864,6 +902,7 @@ void
 config_error(void)
 {
     CONFIG *cp;
+    size_t max_name;
 
     /* Display configuration names. */
     fprintf(stderr, "\n");
@@ -880,11 +919,10 @@ config_error(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
     fprintf(stderr, "Configuration names:\n");
+    for (max_name = 0, cp = c; cp->name != NULL; ++cp)
+        max_name = WT_MAX(max_name, strlen(cp->name));
     for (cp = c; cp->name != NULL; ++cp)
-        if (strlen(cp->name) > 25)
-            fprintf(stderr, "%s: %s\n", cp->name, cp->desc);
-        else
-            fprintf(stderr, "%25s: %s\n", cp->name, cp->desc);
+        fprintf(stderr, "%*s: %s\n", (int)max_name, cp->name, cp->desc);
 }
 
 /*
@@ -896,6 +934,10 @@ config_print(bool error_display)
 {
     CONFIG *cp;
     FILE *fp;
+
+    /* Reopening or replaying an existing database should leave the existing CONFIG file. */
+    if (g.reopen || g.replay)
+        return;
 
     if (error_display)
         fp = stdout;

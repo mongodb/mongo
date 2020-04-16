@@ -1174,10 +1174,12 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->start_durable_ts = addr->stop_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+        addr->newest_start_durable_ts = addr->newest_stop_durable_ts = addr->oldest_start_ts =
+          WT_TS_NONE;
         addr->oldest_start_txn = WT_TXN_NONE;
         addr->newest_stop_ts = WT_TS_MAX;
         addr->newest_stop_txn = WT_TXN_MAX;
+        addr->prepare = false;
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1782,10 +1784,12 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->start_durable_ts = addr->stop_durable_ts = addr->oldest_start_ts = WT_TS_NONE;
+        addr->newest_start_durable_ts = addr->newest_stop_durable_ts = addr->oldest_start_ts =
+          WT_TS_NONE;
         addr->oldest_start_txn = WT_TXN_NONE;
         addr->newest_stop_ts = WT_TS_MAX;
         addr->newest_stop_txn = WT_TXN_MAX;
+        addr->prepare = false;
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;

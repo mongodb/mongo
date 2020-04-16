@@ -601,7 +601,6 @@ class Translator:
             s += '        return op_ret\n'
             s += '\n'
         s += 'context = Context()\n'
-        s += 'homedir = "' + self.homedir + '"\n'
         extra_config = ''
         s += 'conn_config = ""\n'
 
@@ -616,7 +615,7 @@ class Translator:
                 s += 'conn_config += extensions_config(["compressors/' + \
                     compression + '"])\n'
             compression = 'block_compressor=' + compression + ','
-        s += 'conn = wiredtiger_open(homedir, "create," + conn_config)\n'
+        s += 'conn = context.wiredtiger_open("create," + conn_config)\n'
         s += 's = conn.open_session("' + sess_config + '")\n'
         s += '\n'
         s += self.translate_table_create()
@@ -634,8 +633,7 @@ class Translator:
                 s += 'conn.close()\n'
                 if readonly:
                     'conn_config += ",readonly=true"\n'
-                s += 'conn = wiredtiger_open(homedir, ' + \
-                    '"create," + conn_config)\n'
+                s += 'conn = context.wiredtiger_open("create," + conn_config)\n'
                 s += '\n'
             s += 'workload = Workload(context, ' + t_var + ')\n'
             s += workloadopts
@@ -643,7 +641,7 @@ class Translator:
             if self.verbose > 0:
                 s += 'print("workload:")\n'
             s += 'workload.run(conn)\n\n'
-            s += 'latency_filename = homedir + "/latency.out"\n'
+            s += 'latency_filename = context.args.home + "/latency.out"\n'
             s += 'latency.workload_latency(workload, latency_filename)\n'
 
         if close_conn:

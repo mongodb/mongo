@@ -29,6 +29,36 @@
 #include "format.h"
 
 /*
+ * Home directory initialize command: create the directory if it doesn't exist, else remove
+ * everything except the RNG log file.
+ *
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
+ */
+#define FORMAT_HOME_INIT_CMD   \
+    "test -e %s || mkdir %s; " \
+    "cd %s > /dev/null && rm -rf `ls | sed /CONFIG.rand/d`"
+
+/*
+ * wts_create --
+ *     Create the database home.
+ */
+void
+wts_create(void)
+{
+    WT_DECL_RET;
+    size_t len;
+    char *cmd;
+
+    len = strlen(g.home) * 3 + strlen(FORMAT_HOME_INIT_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, FORMAT_HOME_INIT_CMD, g.home, g.home, g.home));
+    if ((ret = system(cmd)) != 0)
+        testutil_die(ret, "home initialization (\"%s\") failed", cmd);
+    free(cmd);
+}
+
+/*
  * compressor --
  *     Configure compression.
  */
@@ -297,34 +327,8 @@ wts_reopen(void)
 }
 
 /*
- * wts_checkpoints --
- *     Configure WiredTiger library checkpoints.
- */
-void
-wts_checkpoints(void)
-{
-    char config[1024];
-
-    /*
-     * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
-     * original database open because format tests small caches and you can get into cache stuck
-     * trouble during the initial load (where bulk load isn't configured). There's a single thread
-     * doing lots of inserts and creating huge leaf pages. Those pages can't be evicted if there's a
-     * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
-     * we're not going to fix it in the library, so configure it away here.
-     */
-    if (g.c_checkpoint_flag != CHECKPOINT_WIREDTIGER)
-        return;
-
-    testutil_check(
-      __wt_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
-        g.c_checkpoint_wait, MEGABYTE(g.c_checkpoint_log_size)));
-    testutil_check(g.wts_conn->reconfigure(g.wts_conn, config));
-}
-
-/*
- * wts_create --
- *     Create the underlying store.
+ * wts_init --
+ *     Create the database object.
  */
 void
 wts_init(void)

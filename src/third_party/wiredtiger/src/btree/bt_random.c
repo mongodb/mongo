@@ -526,7 +526,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
          * items we didn't find any valid pages. We can't return WT_NOTFOUND to the application
          * unless a tree is really empty, fallback to skipping through tree pages.
          */
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     /*

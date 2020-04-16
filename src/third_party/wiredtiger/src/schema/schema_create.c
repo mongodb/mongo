@@ -222,7 +222,7 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
             WT_ERR(EEXIST);
         exists = true;
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Find the first NULL entry in the cfg stack. */
     for (cfgp = &cfg[1]; *cfgp; cfgp++)
@@ -334,7 +334,7 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     while ((ret = tcur->next(tcur)) == 0)
         WT_ERR(__wt_apply_single_idx(session, idx, icur, (WT_CURSOR_TABLE *)tcur, icur->insert));
 
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 err:
     if (icur)
         WT_TRET(icur->close(icur));
@@ -413,7 +413,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
             WT_ERR(EEXIST);
         exists = true;
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     if (__wt_config_getones(session, config, "source", &cval) == 0) {
         WT_ERR(__wt_buf_fmt(session, &namebuf, "%.*s", (int)cval.len, cval.str));
@@ -447,12 +447,12 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
         __wt_config_subinit(session, &kcols, &icols);
         while ((ret = __wt_config_next(&kcols, &ckey, &cval)) == 0)
             ++npublic_cols;
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     } else {
         WT_ERR(__pack_initn(session, &pack, kval.str, kval.len));
         while ((ret = __pack_next(&pack, &pv)) == 0)
             ++npublic_cols;
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     /*
@@ -476,7 +476,7 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
         }
         WT_ERR(__wt_buf_catfmt(session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Index values are empty: all columns are packed into the index key. */
     WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
@@ -570,7 +570,7 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
     __wt_config_subinit(session, &conf, &cval);
     for (ncolgroups = 0; (ret = __wt_config_next(&conf, &cgkey, &cgval)) == 0; ncolgroups++)
         ;
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_ERR(__wt_config_collapse(session, cfg, &tableconf));
     WT_ERR(__wt_metadata_insert(session, uri, tableconf));

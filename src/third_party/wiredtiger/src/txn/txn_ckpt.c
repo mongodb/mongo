@@ -69,7 +69,7 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
                 break;
             }
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     } else if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
       !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:"))
         fail = uri;
@@ -152,7 +152,7 @@ __checkpoint_apply_operation(
         if ((ret = __wt_schema_worker(session, tmp->data, op, NULL, cfg, 0)) != 0)
             WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     if (!target_list && named)
         /* Some objects don't support named checkpoints. */
@@ -869,7 +869,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * part of the metadata file (performing recovery on backup folder where no checkpoint
      * occurred), this will return ENOENT which we ignore and continue.
      */
-    WT_ERR_ERROR_OK(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0), ENOENT);
+    WT_ERR_ERROR_OK(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0), ENOENT, false);
     hs_dhandle = session->dhandle;
 
     /*
@@ -1399,7 +1399,7 @@ __checkpoint_lock_dirty_tree(
                       "key: %.*s",
                       (int)k.len, k.str);
             }
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         }
     }
 

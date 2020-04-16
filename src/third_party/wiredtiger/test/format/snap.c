@@ -242,7 +242,9 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
     fprintf(stderr, "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
     testutil_check(__wt_debug_cursor_page(cursor, g.home_pagedump));
     fprintf(stderr, "snapshot-isolation error: Dumping HS to %s\n", g.home_hsdump);
+#if WIREDTIGER_VERSION_MAJOR >= 10
     testutil_check(__wt_debug_cursor_tree_hs(cursor, g.home_hsdump));
+#endif
     if (g.logging)
         testutil_check(cursor->session->log_flush(cursor->session, "sync=off"));
 #endif

@@ -394,7 +394,7 @@ __wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char 
             WT_ERR(__wt_strdup(session, key, uri));
             break;
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
 
 err:

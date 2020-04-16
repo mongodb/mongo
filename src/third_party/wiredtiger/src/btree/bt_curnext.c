@@ -737,7 +737,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
             LF_SET(WT_READ_WONT_NEED);
         WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
-        WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
+        WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND, false);
     }
 
 err:

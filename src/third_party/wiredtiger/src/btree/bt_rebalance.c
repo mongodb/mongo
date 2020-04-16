@@ -76,12 +76,13 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session, const uint8_t *key, size_t key
 
     WT_RET(__wt_calloc_one(session, &copy_addr));
     copy->addr = copy_addr;
-    copy_addr->start_durable_ts = unpack->newest_start_durable_ts;
+    copy_addr->newest_start_durable_ts = unpack->newest_start_durable_ts;
     copy_addr->oldest_start_ts = unpack->oldest_start_ts;
     copy_addr->oldest_start_txn = unpack->oldest_start_txn;
-    copy_addr->stop_durable_ts = unpack->newest_stop_durable_ts;
+    copy_addr->newest_stop_durable_ts = unpack->newest_stop_durable_ts;
     copy_addr->newest_stop_ts = unpack->newest_stop_ts;
     copy_addr->newest_stop_txn = unpack->newest_stop_txn;
+    copy_addr->prepare = F_ISSET(unpack, WT_CELL_UNPACK_PREPARE);
     WT_RET(__wt_memdup(session, unpack->data, unpack->size, &copy_addr->addr));
     copy_addr->size = (uint8_t)unpack->size;
     copy_addr->type = unpack->type == WT_CELL_ADDR_LEAF ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;

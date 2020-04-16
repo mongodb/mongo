@@ -570,7 +570,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
               !tried_eviction && F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;
-                WT_ERR_BUSY_OK(ret);
+                WT_ERR_ERROR_OK(ret, EBUSY, false);
 
                 walk = prev;
                 prev = NULL;
