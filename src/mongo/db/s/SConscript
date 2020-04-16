@@ -100,6 +100,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/db/vector_clock_d',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_initialization',
@@ -359,6 +360,7 @@ env.CppUnitTest(
         'sharding_logging_test.cpp',
         'start_chunk_clone_request_test.cpp',
         'type_shard_identity_test.cpp',
+        'vector_clock_config_server_test.cpp',
         'wait_for_majority_service_test.cpp',
     ],
     LIBDEPS=[
@@ -413,6 +415,7 @@ env.CppUnitTest(
         'sharding_initialization_mongod_test.cpp',
         'sharding_initialization_op_observer_test.cpp',
         'split_vector_test.cpp',
+        'vector_clock_shard_server_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

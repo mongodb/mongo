@@ -182,6 +182,11 @@ public:
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
+
+    // Contains the fields of the document that are in the collection's shard key, and "_id".
+    static BSONObj getDocumentKey(OperationContext* opCtx,
+                                  NamespaceString const& nss,
+                                  BSONObj const& doc);
 };
 
 }  // namespace mongo

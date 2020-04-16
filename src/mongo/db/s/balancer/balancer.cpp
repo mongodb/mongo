@@ -156,9 +156,19 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
                   "shardVersions"_attr = shardVersions.done());
 }
 
-ReplicaSetAwareServiceRegistry::Registerer<Balancer> balancerRegisterer("Balancer");
+const auto _balancerDecoration = ServiceContext::declareDecoration<Balancer>();
+
+const ReplicaSetAwareServiceRegistry::Registerer<Balancer> _balancerRegisterer("Balancer");
 
 }  // namespace
+
+Balancer* Balancer::get(ServiceContext* serviceContext) {
+    return &_balancerDecoration(serviceContext);
+}
+
+Balancer* Balancer::get(OperationContext* operationContext) {
+    return get(operationContext->getServiceContext());
+}
 
 Balancer::Balancer()
     : _balancedLastTime(0),
@@ -166,7 +176,7 @@ Balancer::Balancer()
       _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
-      _migrationManager(getServiceContext()) {}
+      _migrationManager(_balancerDecoration.owner(this)) {}
 
 
 Balancer::~Balancer() {

@@ -62,6 +62,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -103,6 +104,8 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
     ReadPreferenceSetting::get(opCtx) =
         uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdObj));
 
+    VectorClock::get(opCtx)->gossipIn(cmdObj, opCtx->getClient()->getSessionTags());
+
     auto logicalClock = LogicalClock::get(opCtx);
     invariant(logicalClock);
 
@@ -134,6 +137,7 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
+    VectorClock::get(opCtx)->gossipOut(responseBuilder, opCtx->getClient()->getSessionTags());
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator->shouldGossipLogicalTime()) {
         auto now = LogicalClock::get(opCtx)->getClusterTime();

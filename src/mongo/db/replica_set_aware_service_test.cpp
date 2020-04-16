@@ -44,15 +44,15 @@ public:
     int numCallsOnStepDown{0};
 
 protected:
-    virtual void onStepUpBegin(OperationContext* opCtx) {
+    void onStepUpBegin(OperationContext* opCtx) override {
         numCallsOnStepUpBegin++;
     }
 
-    virtual void onStepUpComplete(OperationContext* opCtx) {
+    void onStepUpComplete(OperationContext* opCtx) override {
         numCallsOnStepUpComplete++;
     }
 
-    virtual void onStepDown() {
+    void onStepDown() override {
         numCallsOnStepDown++;
     }
 };
@@ -61,34 +61,57 @@ protected:
  * Service that's never registered.
  */
 class ServiceA : public TestService<ServiceA> {
+public:
+    static ServiceA* get(ServiceContext* serviceContext);
+
 private:
-    virtual bool shouldRegisterReplicaSetAwareService() const final {
+    bool shouldRegisterReplicaSetAwareService() const final {
         return false;
     }
 };
 
+const auto getServiceA = ServiceContext::declareDecoration<ServiceA>();
+
 ReplicaSetAwareServiceRegistry::Registerer<ServiceA> serviceARegisterer("ServiceA");
+
+ServiceA* ServiceA::get(ServiceContext* serviceContext) {
+    return &getServiceA(serviceContext);
+}
 
 
 /**
  * Service that's always registered.
  */
 class ServiceB : public TestService<ServiceB> {
+public:
+    static ServiceB* get(ServiceContext* serviceContext);
+
 private:
-    virtual bool shouldRegisterReplicaSetAwareService() const final {
+    bool shouldRegisterReplicaSetAwareService() const final {
         return true;
     }
 };
 
+const auto getServiceB = ServiceContext::declareDecoration<ServiceB>();
+
 ReplicaSetAwareServiceRegistry::Registerer<ServiceB> serviceBRegisterer("ServiceB");
+
+ServiceB* ServiceB::get(ServiceContext* serviceContext) {
+    return &getServiceB(serviceContext);
+}
 
 
 /**
  * Service that's always registered, depends on ServiceB.
  */
 class ServiceC : public TestService<ServiceC> {
+public:
+    static ServiceC* get(ServiceContext* serviceContext);
+
 private:
-    virtual bool shouldRegisterReplicaSetAwareService() const final {
+    ServiceContext* getServiceContext();
+
+    bool shouldRegisterReplicaSetAwareService() const final {
         return true;
     }
 
@@ -110,7 +133,17 @@ private:
     }
 };
 
+const auto getServiceC = ServiceContext::declareDecoration<ServiceC>();
+
 ReplicaSetAwareServiceRegistry::Registerer<ServiceC> serviceCRegisterer("ServiceC", {"ServiceB"});
+
+ServiceC* ServiceC::get(ServiceContext* serviceContext) {
+    return &getServiceC(serviceContext);
+}
+
+ServiceContext* ServiceC::getServiceContext() {
+    return getServiceC.owner(this);
+}
 
 
 using ReplicaSetAwareServiceTest = ServiceContextTest;
@@ -127,9 +160,11 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+
     ASSERT_EQ(0, b->numCallsOnStepUpBegin);
     ASSERT_EQ(0, b->numCallsOnStepUpComplete);
     ASSERT_EQ(0, b->numCallsOnStepDown);
+
     ASSERT_EQ(0, c->numCallsOnStepUpBegin);
     ASSERT_EQ(0, c->numCallsOnStepUpComplete);
     ASSERT_EQ(0, c->numCallsOnStepDown);
@@ -144,9 +179,11 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+
     ASSERT_EQ(3, b->numCallsOnStepUpBegin);
     ASSERT_EQ(2, b->numCallsOnStepUpComplete);
     ASSERT_EQ(1, b->numCallsOnStepDown);
+
     ASSERT_EQ(3, c->numCallsOnStepUpBegin);
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);

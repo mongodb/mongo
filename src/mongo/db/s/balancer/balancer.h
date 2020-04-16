@@ -59,6 +59,12 @@ class Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
     Balancer& operator=(const Balancer&) = delete;
 
 public:
+    /**
+     * Provide access to the Balancer decoration on ServiceContext.
+     */
+    static Balancer* get(ServiceContext* serviceContext);
+    static Balancer* get(OperationContext* operationContext);
+
     Balancer();
     ~Balancer();
 

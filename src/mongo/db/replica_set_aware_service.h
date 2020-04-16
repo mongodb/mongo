@@ -40,10 +40,14 @@ namespace mongo {
  * Using this interface avoids the need to manually hook the various places in
  * ReplicationCoordinatorExternalStateImpl where these events occur.
  *
- * To define a ReplicaSetAwareService, a class needs to inherit from ReplicaSetAwareService
- * (templated on itself), implement the pure virtual methods in ReplicaSetAwareInterface, and define
- * a static ReplicaSetAwareServiceRegistry::Registerer to declare the name (and optionally
- * pre-requisite services) of the service.
+ * To define a ReplicaSetAwareService, a class needs to:
+ *
+ * 1. Inherit from ReplicaSetAwareService (templated on itself).
+ * 2. Implement the pure virtual methods in ReplicaSetAwareInterface.
+ * 3. Store a singleton object of the class somewhere (ideally as a ServiceContext decoration).
+ * 4. Define a public static `get(ServiceContext*)` function.
+ * 5. Define a static ReplicaSetAwareServiceRegistry::Registerer object to declare the name (and
+ *    optionally pre-requisite services) of the service.
  *
  * If the service should only be active in certain configurations, then the class should override
  * shouldRegisterReplicaSetAwareService.  For the common cases of services that are only active on
@@ -57,6 +61,8 @@ namespace mongo {
  *
  * class FooService : public ReplicaSetAwareService<FooService> {
  * public:
+ *     static FooService* get(ServiceContext* serviceContext);
+ *
  *     // ...
  *
  * private:
@@ -79,9 +85,15 @@ namespace mongo {
  *
  * namespace {
  *
- * ReplicaSetAwareServiceRegistry::Registerer<FooService> fooServiceRegisterer("FooService");
+ * const auto _fooDecoration = ServiceContext::declareDecoration<FooService>();
+ *
+ * const ReplicaSetAwareServiceRegistry::Registerer<FooService> _fooServiceRegisterer("FooService");
  *
  * }  // namespace
+ *
+ * FooService* FooService::get(ServiceContext* serviceContext) {
+ *     return _fooDecoration(serviceContext);
+ * }
  */
 
 /**
@@ -175,27 +187,8 @@ class ReplicaSetAwareService : private ReplicaSetAwareInterface {
 public:
     virtual ~ReplicaSetAwareService() = default;
 
-    /**
-     * Retrieves the per-serviceContext instance of the ActualService.
-     */
-    static ActualService* get(ServiceContext* serviceContext) {
-        return &_decoration(serviceContext);
-    }
-
-    static ActualService* get(OperationContext* operationContext) {
-        return get(operationContext->getServiceContext());
-    }
-
 protected:
     ReplicaSetAwareService() = default;
-
-    /**
-     * Used when services need to get a reference to the serviceContext that they are decorating.
-     */
-    ServiceContext* getServiceContext() {
-        auto* actualService = checked_cast<ActualService*>(this);
-        return &_decoration.owner(*actualService);
-    }
 
 private:
     friend ReplicaSetAwareServiceRegistry::Registerer<ActualService>;
@@ -216,16 +209,7 @@ private:
     virtual bool shouldRegisterReplicaSetAwareService() const {
         return true;
     }
-
-    // The decoration of the actual service on the ServiceContext.
-    // Definition of this static can't be inline, because it isn't constexpr.
-    static Decorable<ServiceContext>::Decoration<ActualService> _decoration;
 };
-
-template <class ActualService>
-Decorable<ServiceContext>::Decoration<ActualService>
-    ReplicaSetAwareService<ActualService>::_decoration =
-        ServiceContext::declareDecoration<ActualService>();
 
 
 /**

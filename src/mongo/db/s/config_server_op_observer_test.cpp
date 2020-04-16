@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -102,10 +103,12 @@ TEST_F(ConfigServerOpObserverTest, ConfigOpTimeAdvancedWhenMajorityCommitPointAd
     repl::OpTime b(Timestamp(1, 2), 1);
 
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), a);
-    // TODO SERVER-46200: Verify that configOpTime is a.
+    const auto aTime = VectorClock::get(getServiceContext())->getTime();
+    ASSERT_EQ(a.getTimestamp(), aTime[VectorClock::Component::ConfigTime].asTimestamp());
 
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), b);
-    // TODO SERVER-46200: Verify that configOpTime is b.
+    const auto bTime = VectorClock::get(getServiceContext())->getTime();
+    ASSERT_EQ(b.getTimestamp(), bTime[VectorClock::Component::ConfigTime].asTimestamp());
 }
 
 }  // namespace

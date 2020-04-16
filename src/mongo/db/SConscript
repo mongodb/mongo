@@ -1562,6 +1562,52 @@ env.Library(
         'global_settings',
         'logical_time',
         'service_context',
+        'vector_clock_mutable',
+    ],
+)
+
+env.Library(
+    target='vector_clock',
+    source=[
+        'vector_clock.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+        'service_context',
+    ],
+)
+
+env.Library(
+    target='vector_clock_mutable',
+    source=[
+        'vector_clock_mutable.cpp',
+    ],
+    LIBDEPS=[
+        'vector_clock',
+    ],
+)
+
+env.Library(
+    target='vector_clock_d',
+    source=[
+        'vector_clock_mongod.cpp',
+    ],
+    LIBDEPS=[
+        'vector_clock_mutable',
+    ],
+    LIBDEPS_PRIVATE=[
+        'replica_set_aware_service',
+        'server_options_core',
+    ],
+)
+
+env.Library(
+    target='vector_clock_trivial',
+    source=[
+        'vector_clock_trivial.cpp',
+    ],
+    LIBDEPS=[
+        'vector_clock_mutable',
     ],
 )
 
@@ -1834,6 +1880,7 @@ envWithAsio.CppUnitTest(
         'transaction_participant_retryable_writes_test.cpp',
         'transaction_participant_test.cpp',
         'update_index_data_test.cpp',
+        'vector_clock_mongod_test.cpp',
         'write_concern_options_test.cpp',
         'error_labels_test.cpp',
         env.Idlc('commands_test_example.idl')[0],

@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -105,6 +106,8 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
 
     TrackingMetadata::get(opCtx) =
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
+
+    VectorClock::get(opCtx)->gossipIn(metadataObj, opCtx->getClient()->getSessionTags());
 
     auto logicalClock = LogicalClock::get(opCtx);
     if (logicalClock && logicalClock->isEnabled()) {

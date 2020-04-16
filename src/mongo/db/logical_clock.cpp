@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -100,6 +101,7 @@ Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
 }
 
 LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
+    (void)VectorClockMutable::get(_service)->tick(VectorClock::Component::ClusterTime, nTicks);
 
     invariant(nTicks > 0 && nTicks <= kMaxSignedInt);
 

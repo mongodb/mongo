@@ -34,9 +34,9 @@
 #include "mongo/db/s/config_server_op_observer.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -94,8 +94,8 @@ void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
 
 void ConfigServerOpObserver::onMajorityCommitPointUpdate(ServiceContext* service,
                                                          const repl::OpTime& newCommitPoint) {
-    // TODO SERVER-46200: tick the VectorClock's ConfigTime.
-    Grid::get(service)->advanceConfigOpTimeAuthoritative(newCommitPoint);
+    VectorClockMutable::get(service)->tickTo(VectorClock::Component::ConfigTime,
+                                             LogicalTime(newCommitPoint.getTimestamp()));
 }
 
 }  // namespace mongo

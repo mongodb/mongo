@@ -82,6 +82,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -442,6 +443,8 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
         !LogicalClock::get(opCtx)->isEnabled()) {
         return;
     }
+
+    VectorClock::get(opCtx)->gossipOut(metadataBob, opCtx->getClient()->getSessionTags());
 
     // Authorized clients always receive operationTime and dummy signed $clusterTime.
     if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
