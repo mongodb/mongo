@@ -203,12 +203,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
      * Get a list of the checkpoints for this file. Empty objects have no checkpoints, in which case
      * there's no work to do.
      */
-    ret = __wt_meta_ckptlist_get(session, name, false, &ckptbase);
+    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get(session, name, false, &ckptbase), true);
     if (ret == WT_NOTFOUND) {
         ret = 0;
         goto done;
     }
-    WT_ERR(ret);
 
     /* Open a history store cursor. */
     WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));

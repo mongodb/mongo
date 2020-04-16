@@ -120,8 +120,8 @@ cd "$top"
 (verify_release mongodb-3.6 mongodb-3.4 "fix row var")
 (verify_release mongodb-4.0 mongodb-3.6 "fix row var")
 (verify_release mongodb-4.2 mongodb-4.0 "fix row var")
-(verify_release mongodb-4.4 mongodb-4.2 "fix row var")
-(verify_release develop mongodb-4.4 "row")
+#(verify_release mongodb-4.4 mongodb-4.2 "fix row var")
+#(verify_release develop mongodb-4.4 "row")
 (verify_release develop mongodb-4.2 "fix row var")
 
 # Verify forward compatibility for supported access methods.

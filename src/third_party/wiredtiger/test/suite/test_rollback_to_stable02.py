@@ -55,12 +55,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = ''
-        # Temporarily solution to have good cache size until prepare updates are written to disk.
-        if self.prepare:
-            config += 'cache_size=250MB,statistics=(all)'
-        else:
-            config += 'cache_size=100MB,statistics=(all)'
+        config = 'cache_size=100MB,statistics=(all)'
         if self.in_memory:
             config += ',in_memory=true'
         else:

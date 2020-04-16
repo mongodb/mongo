@@ -44,7 +44,7 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename, uint32
         if ((ret = __wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA,
                WT_FS_OPEN_CREATE | WT_FS_OPEN_DURABLE | WT_FS_OPEN_EXCLUSIVE, &fh)) == 0)
             break;
-        WT_ERR_TEST(ret != EEXIST, ret);
+        WT_ERR_TEST(ret != EEXIST, ret, false);
 
         if (tmp == NULL)
             WT_ERR(__wt_scr_alloc(session, 0, &tmp));

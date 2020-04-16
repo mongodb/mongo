@@ -56,12 +56,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = ''
-        # Temporarily solution to have good cache size until prepare updates are written to disk.
-        if self.prepare:
-            config += 'cache_size=2GB,statistics=(all)'
-        else:
-            config += 'cache_size=500MB,statistics=(all)'
+        config = 'cache_size=500MB,statistics=(all)'
         if self.in_memory:
             config += ',in_memory=true'
         else:
@@ -154,7 +149,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-        if self.in_memory or self.prepare:
+        if self.in_memory:
             self.assertGreaterEqual(upd_aborted, nrows * 11)
             self.assertGreaterEqual(hs_removed, 0)
         else:

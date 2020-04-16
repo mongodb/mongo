@@ -182,7 +182,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     WT_DECL_RET;
     WT_PAGE *page;
     WT_UPDATE *first_txn_upd, *first_upd, *upd, *last_upd;
-    wt_timestamp_t max_ts, tombstone_durable_ts;
+    wt_timestamp_t max_ts;
     size_t size, upd_memsize;
     uint64_t max_txn, txnid;
     bool has_newer_updates, is_hs_page, supd_restore, upd_saved;
@@ -198,12 +198,12 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     upd_select->stop_durable_ts = WT_TS_NONE;
     upd_select->stop_ts = WT_TS_MAX;
     upd_select->stop_txn = WT_TXN_MAX;
+    upd_select->prepare = false;
 
     page = r->page;
     first_txn_upd = upd = last_upd = NULL;
     upd_memsize = 0;
     max_ts = WT_TS_NONE;
-    tombstone_durable_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
     has_newer_updates = upd_saved = false;
     is_hs_page = F_ISSET(S2BT(session), WT_BTREE_HS);
@@ -263,17 +263,6 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         /* Track the first update with non-zero timestamp. */
         if (upd->start_ts > max_ts)
             max_ts = upd->start_ts;
-
-        /*
-         * FIXME-prepare-support: A temporary solution for not storing durable timestamp in the
-         * cell. Properly fix this problem in PM-1524. Currently pin all the prepared updates with
-         * durable timestamp larger than stable timestamp in cache.
-         */
-        if (upd->durable_ts != upd->start_ts && upd->durable_ts > r->stable_ts) {
-            has_newer_updates = true;
-            upd_select->upd = NULL;
-            continue;
-        }
 
         /* Always select the newest committed update to write to disk */
         if (upd_select->upd == NULL)
@@ -350,10 +339,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
          */
         if (upd->type == WT_UPDATE_TOMBSTONE) {
             upd_select->stop_ts = upd->start_ts;
-            if (upd->txnid != WT_TXN_NONE)
-                upd_select->stop_txn = upd->txnid;
-            if (upd->durable_ts != WT_TS_NONE)
-                tombstone_durable_ts = upd->durable_ts;
+            upd_select->stop_txn = upd->txnid;
+            upd_select->stop_durable_ts = upd->durable_ts;
 
             /* Find the update this tombstone applies to. */
             if (!__wt_txn_visible_all(session, upd->txnid, upd->start_ts)) {
@@ -367,15 +354,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         }
         if (upd != NULL) {
             /* The beginning of the validity window is the selected update's time pair. */
-            upd_select->start_durable_ts = upd_select->start_ts = upd->start_ts;
-            /* If durable timestamp is provided, use it. */
-            if (upd->durable_ts != WT_TS_NONE)
-                upd_select->start_durable_ts = upd->durable_ts;
+            upd_select->start_ts = upd->start_ts;
+            upd_select->start_durable_ts = upd->durable_ts;
             upd_select->start_txn = upd->txnid;
-
-            /* Use the tombstone durable timestamp as the overall durable timestamp if it exists. */
-            if (tombstone_durable_ts != WT_TS_NONE)
-                upd_select->stop_durable_ts = tombstone_durable_ts;
         } else if (upd_select->stop_ts != WT_TS_NONE || upd_select->stop_txn != WT_TXN_NONE) {
             /* If we only have a tombstone in the update list, we must have an ondisk value. */
             WT_ASSERT(session, vpack != NULL);
@@ -389,12 +370,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
              * keep the same on-disk value but set the stop time pair to indicate that the validity
              * window ends when this tombstone started.
              */
-            upd_select->start_durable_ts = upd_select->start_ts = vpack->start_ts;
+            upd_select->start_ts = vpack->start_ts;
+            upd_select->start_durable_ts = vpack->durable_start_ts;
             upd_select->start_txn = vpack->start_txn;
-
-            /* Use the tombstone durable timestamp as the overall durable timestamp if it exists. */
-            if (tombstone_durable_ts != WT_TS_NONE)
-                upd_select->stop_durable_ts = tombstone_durable_ts;
 
             /*
              * Leaving the update unset means that we can skip reconciling. If we've set the stop
@@ -413,14 +391,6 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             upd_select->upd = upd;
         }
     }
-    /*
-     * If we've set the stop to a zeroed pair, we intend to remove the key. Instead of selecting the
-     * onpage value and setting the stop a zeroed time pair which would trigger a rewrite of the
-     * cell with the new stop time pair, we should unset the selected update so the key itself gets
-     * omitted from the new page image.
-     */
-    if (upd_select->stop_ts == WT_TS_NONE && upd_select->stop_txn == WT_TXN_NONE)
-        upd_select->upd = NULL;
 
     /*
      * If we found a tombstone with a time pair earlier than the update it applies to, which can

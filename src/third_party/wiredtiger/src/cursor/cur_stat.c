@@ -638,7 +638,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
             F_SET(cst, WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK | WT_STAT_TYPE_FAST |
                 WT_STAT_TYPE_TREE_WALK);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
         if ((ret = __wt_config_subgets(session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
             if (F_ISSET(cst, WT_STAT_TYPE_ALL))
                 WT_ERR_MSG(session, EINVAL,
@@ -646,7 +646,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
                   "configuration values should be specified");
             F_SET(cst, WT_STAT_TYPE_FAST);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
         if ((ret = __wt_config_subgets(session, &cval, "cache_walk", &sval)) == 0 &&
           sval.val != 0) {
@@ -656,7 +656,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
              */
             F_SET(cst, WT_STAT_TYPE_CACHE_WALK | WT_STAT_TYPE_FAST);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
         if ((ret = __wt_config_subgets(session, &cval, "tree_walk", &sval)) == 0 && sval.val != 0) {
             /*
@@ -665,7 +665,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
              */
             F_SET(cst, WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
         if ((ret = __wt_config_subgets(session, &cval, "size", &sval)) == 0 && sval.val != 0) {
             if (F_ISSET(cst, WT_STAT_TYPE_FAST | WT_STAT_TYPE_ALL))
@@ -674,7 +674,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
                   "configuration values should be specified");
             F_SET(cst, WT_STAT_TYPE_SIZE);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
         if ((ret = __wt_config_subgets(session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
             if (F_ISSET(cst, WT_STAT_TYPE_SIZE))
                 WT_ERR_MSG(session, EINVAL,
@@ -682,7 +682,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
                   "statistics");
             F_SET(cst, WT_STAT_CLEAR);
         }
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
         /* If no configuration, use the connection's configuration. */
         if (cst->flags == 0) {

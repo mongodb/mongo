@@ -1227,6 +1227,13 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             /* Set prepare timestamp. */
             upd->start_ts = txn->prepare_timestamp;
 
+            /*
+             * By default durable timestamp is assigned with 0 which is same as WT_TS_NONE. Assign
+             * it with WT_TS_NONE to make sure in case if we change the macro value it shouldn't be
+             * a problem.
+             */
+            upd->durable_ts = WT_TS_NONE;
+
             WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
             op->u.op_upd = NULL;
 

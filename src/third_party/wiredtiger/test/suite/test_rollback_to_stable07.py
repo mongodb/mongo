@@ -52,12 +52,7 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
     scenarios = make_scenarios(prepare_values)
 
     def conn_config(self):
-        config = ''
-        # Temporarily solution to have good cache size until prepare updates are written to disk.
-        if self.prepare:
-            config += 'cache_size=250MB,statistics=(all),log=(enabled=true)'
-        else:
-            config += 'cache_size=50MB,statistics=(all),log=(enabled=true)'
+        config = 'cache_size=50MB,statistics=(all),log=(enabled=true)'
         return config
 
     def simulate_crash_restart(self, uri, olddir, newdir):
@@ -154,13 +149,8 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreaterEqual(upd_aborted, 0)
-        if self.prepare:
-            # pages_visisted needs a fix once we started writing prepared updates to disk.
-            self.assertEqual(pages_visited, 0)
-            self.assertGreaterEqual(hs_removed, 0)
-        else:
-            self.assertGreater(pages_visited, 0)
-            self.assertGreaterEqual(hs_removed, nrows * 4)
+        self.assertGreater(pages_visited, 0)
+        self.assertGreaterEqual(hs_removed, nrows * 4)
 
         # Simulate another server crash and restart.
         self.simulate_crash_restart(uri, "RESTART", "RESTART2")

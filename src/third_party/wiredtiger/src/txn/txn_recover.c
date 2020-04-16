@@ -138,7 +138,7 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
         GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
         cursor->set_key(cursor, recno);
         if ((ret = cursor->search(cursor)) != 0)
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         else {
             /*
              * Build/insert a complete value during recovery rather
@@ -200,7 +200,7 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
         GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
         __wt_cursor_set_raw_key(cursor, &key);
         if ((ret = cursor->search(cursor)) != 0)
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
         else {
             /*
              * Build/insert a complete value during recovery rather
@@ -374,10 +374,11 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
     ckpt_timestamp = 0;
 
     /* Search in the metadata for the system information. */
-    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, WT_SYSTEM_CKPT_URI, &sys_config));
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, WT_SYSTEM_CKPT_URI, &sys_config), false);
     if (sys_config != NULL) {
         WT_CLEAR(cval);
-        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, sys_config, "checkpoint_timestamp", &cval));
+        WT_ERR_NOTFOUND_OK(
+          __wt_config_getones(session, sys_config, "checkpoint_timestamp", &cval), false);
         if (cval.len != 0) {
             __wt_verbose(
               session, WT_VERB_RECOVERY, "Recovery timestamp %.*s", (int)cval.len, cval.str);
@@ -554,10 +555,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
      * an older version.
      */
     metac->set_key(metac, WT_HS_URI);
-    ret = metac->search(metac);
+    WT_ERR_NOTFOUND_OK(metac->search(metac), true);
     if (ret == WT_NOTFOUND)
         hs_exists = false;
-    WT_ERR_NOTFOUND_OK(ret);
     /* Unpin the page from cache. */
     WT_ERR(metac->reset(metac));
 

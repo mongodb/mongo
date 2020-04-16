@@ -131,7 +131,7 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
         WT_ERR(__wt_direct_io_size_check(session, filecfg, "allocation_size", &allocsize));
         WT_ERR(__wt_block_manager_create(session, key, allocsize));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));

@@ -133,10 +133,11 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
      * isn't found.
      */
     WT_CLEAR(cval);
-    WT_ERR_NOTFOUND_OK(__wt_config_getones(session, idx->config, "collator", &cval));
+    WT_ERR_NOTFOUND_OK(__wt_config_getones(session, idx->config, "collator", &cval), false);
     if (cval.len != 0) {
         WT_CLEAR(metadata);
-        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, idx->config, "app_metadata", &metadata));
+        WT_ERR_NOTFOUND_OK(
+          __wt_config_getones(session, idx->config, "app_metadata", &metadata), false);
         WT_ERR(__wt_collator_config(
           session, idx->name, &cval, &metadata, &idx->collator, &idx->collator_owned));
     }
@@ -190,7 +191,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
             continue;
         WT_ERR(__wt_buf_catfmt(session, buf, "%.*s,", (int)ckey.len, ckey.str));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /*
      * If the table doesn't yet have its column groups, don't try to calculate a plan: we are just
@@ -343,7 +344,7 @@ __schema_open_index(
         if (idxname != NULL)
             break;
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
     if (idxname != NULL && !match)
         ret = WT_NOTFOUND;
 

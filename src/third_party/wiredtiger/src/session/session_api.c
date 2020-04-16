@@ -385,7 +385,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
         else
             F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     ret = __wt_config_getones(session, config, "cache_cursors", &cval);
     if (ret == 0) {
@@ -396,7 +396,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
             WT_ERR(__session_close_cached_cursors(session));
         }
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     API_END_RET_NOTFOUND_MAP(session, ret);
@@ -562,7 +562,7 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
          */
         if (to_dup != NULL && strcmp(to_dup->uri, "backup:") == 0)
             dup_backup = true;
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
         if (to_dup != NULL) {
             uri = to_dup->uri;
@@ -709,7 +709,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
           !WT_STRING_MATCH("file", cval.str, cval.len) &&
           (strncmp(uri, cval.str, cval.len) != 0 || uri[cval.len] != ':'))
             WT_ERR_MSG(session, EINVAL, "%s: unsupported type configuration", uri);
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     ret = __wt_session_create(session, uri, config);
@@ -1087,7 +1087,7 @@ __session_import(WT_SESSION *wt_session, const char *uri, const char *config)
 
     if ((ret = __wt_metadata_search(session, uri, &value)) == 0)
         WT_ERR_MSG(session, EINVAL, "an object named \"%s\" already exists in the database", uri);
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_ERR(__wt_import(session, uri));
 
@@ -1321,7 +1321,7 @@ __wt_session_range_truncate(
          */
         WT_ERR(__session_open_cursor((WT_SESSION *)session, uri, NULL, NULL, &start));
         local_start = true;
-        ret = start->next(start);
+        WT_ERR_NOTFOUND_OK(start->next(start), true);
         if (ret == WT_NOTFOUND) {
             /*
              * If there are no elements, there is nothing to do.
@@ -1329,7 +1329,6 @@ __wt_session_range_truncate(
             ret = 0;
             goto done;
         }
-        WT_ERR(ret);
     }
 
     /*
@@ -1370,13 +1369,13 @@ __wt_session_range_truncate(
     if (start != NULL)
         if ((ret = start->search_near(start, &cmp)) != 0 ||
           (cmp < 0 && (ret = start->next(start)) != 0)) {
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
             goto done;
         }
     if (stop != NULL)
         if ((ret = stop->search_near(stop, &cmp)) != 0 ||
           (cmp > 0 && (ret = stop->prev(stop)) != 0)) {
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
             goto done;
         }
 

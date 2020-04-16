@@ -995,7 +995,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
             else
                 F_CLR(cursor, WT_CURSTD_APPEND);
         } else
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     /*
@@ -1007,7 +1007,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
         else
             F_CLR(cursor, WT_CURSTD_OVERWRITE);
     } else
-        WT_ERR_NOTFOUND_OK(ret);
+        WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     API_END_RET(session, ret);

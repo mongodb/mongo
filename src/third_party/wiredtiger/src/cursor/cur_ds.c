@@ -530,11 +530,12 @@ __wt_curds_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, con
     ret = __wt_config_getones(session, metaconf, "collator", &cval);
     if (ret == 0 && cval.len != 0) {
         WT_CLEAR(metadata);
-        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, metaconf, "app_metadata", &metadata));
+        WT_ERR_NOTFOUND_OK(
+          __wt_config_getones(session, metaconf, "app_metadata", &metadata), false);
         WT_ERR(__wt_collator_config(
           session, uri, &cval, &metadata, &data_source->collator, &data_source->collator_owned));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_ERR(
       dsrc->open_cursor(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));

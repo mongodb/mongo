@@ -2146,7 +2146,7 @@ tasks:
           # No of times to run the loop
           times: 1
           # No of processes to run in the background
-          no_of_procs: 10
+          no_of_procs: 8
 
   # The task name is ppc-zseries because this task will be used in both buildVariants
   - name: format-stress-ppc-zseries-test

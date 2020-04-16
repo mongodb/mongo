@@ -876,7 +876,7 @@ __conn_load_extension_int(
     WT_ERR(__wt_dlsym(session, dlh, terminate_name, false, &dlh->terminate));
 
     WT_CLEAR(cval);
-    WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "config", &cval));
+    WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "config", &cval), false);
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &ext_config));
     ext_cfg[0] = ext_config;
     ext_cfg[1] = NULL;
@@ -947,7 +947,7 @@ __conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[], bool early_l
         sub_cfg[1] = sval.len > 0 ? exconfig->data : NULL;
         WT_ERR(__conn_load_extension_int(session, expath->data, sub_cfg, early_load));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     __wt_scr_free(session, &expath);
@@ -2098,7 +2098,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
         }
         WT_ERR(__wt_fprintf(session, fs, "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str));
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Flush the stream and rename the file into place. */
     ret = __wt_sync_and_rename(session, &fs, WT_BASECONFIG_SET, WT_BASECONFIG);
@@ -2514,7 +2514,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
             if (sval.val)
                 FLD_SET(conn->direct_io, ft->flag);
         } else
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     WT_ERR(__wt_config_gets(session, cfg, "write_through", &cval));
@@ -2524,7 +2524,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
             if (sval.val)
                 FLD_SET(conn->write_through, ft->flag);
         } else
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
@@ -2575,7 +2575,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
                 break;
             }
         } else
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));

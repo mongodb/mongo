@@ -37,7 +37,7 @@ from workgen import *
 context = Context()
 conn_config = ""
 conn_config += ",cache_size=2GB,eviction=(threads_max=8),log=(enabled=true),session_max=250,statistics=(fast),statistics_log=(wait=1,json),io_capacity=(total=30M)"   # explicitly added
-conn = wiredtiger_open("WT_TEST", "create," + conn_config)
+conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
 wtperf_table_config = "key_format=S,value_format=S," +\
@@ -140,5 +140,5 @@ workload.options.warmup=0
 workload.options.sample_interval_ms = 1000
 workload.run(conn)
 
-latency_filename = "WT_TEST/latency.out"
+latency_filename = context.args.home + "/latency.out"
 latency.workload_latency(workload, latency_filename)

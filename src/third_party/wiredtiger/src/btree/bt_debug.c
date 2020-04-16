@@ -1367,11 +1367,13 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
         WT_RET(ds->f(ds, ", %s", "reading"));
 
     if (__wt_ref_addr_copy(session, ref, &addr))
-        WT_RET(ds->f(ds, ", start/stop durable ts %s,%s, start/stop ts/txn %s,%s, %s",
-          __wt_timestamp_to_string(addr.start_durable_ts, ts_string[0]),
-          __wt_timestamp_to_string(addr.stop_durable_ts, ts_string[1]),
+        WT_RET(ds->f(ds,
+          ", start/stop durable ts %s,%s, start/stop ts/txn %s,%s, prepared updates: %s, %s",
+          __wt_timestamp_to_string(addr.newest_start_durable_ts, ts_string[0]),
+          __wt_timestamp_to_string(addr.newest_stop_durable_ts, ts_string[1]),
           __wt_time_pair_to_string(addr.oldest_start_ts, addr.oldest_start_txn, tp_string[0]),
           __wt_time_pair_to_string(addr.newest_stop_ts, addr.newest_stop_txn, tp_string[1]),
+          addr.prepare ? "true" : "false",
           __wt_addr_string(session, addr.addr, addr.size, ds->t1)));
     return (ds->f(ds, "\n"));
 }

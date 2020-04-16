@@ -38,19 +38,27 @@ check_copy(void)
     WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
+    size_t len;
+    char *path;
 
-    wts_open(g.home_backup, false, &conn);
+    len = strlen(g.home) + strlen("BACKUP") + 2;
+    path = dmalloc(len);
+    testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
 
-    testutil_checkfmt(conn->open_session(conn, NULL, NULL, &session), "%s", g.home_backup);
+    wts_open(path, false, &conn);
+
+    testutil_checkfmt(conn->open_session(conn, NULL, NULL, &session), "%s", path);
 
     /*
      * Verify can return EBUSY if the handle isn't available. Don't yield and retry, in the case of
      * LSM, the handle may not be available for a long time.
      */
     ret = session->verify(session, g.uri, NULL);
-    testutil_assertfmt(ret == 0 || ret == EBUSY, "WT_SESSION.verify: %s: %s", g.home_backup, g.uri);
+    testutil_assertfmt(ret == 0 || ret == EBUSY, "WT_SESSION.verify: %s: %s", path, g.uri);
 
-    testutil_checkfmt(conn->close(conn, NULL), "%s", g.home_backup);
+    testutil_checkfmt(conn->close(conn, NULL), "%s", path);
+
+    free(path);
 }
 
 /*
@@ -171,7 +179,7 @@ again:
 #endif
             error_sys_check(unlink(filename));
             testutil_check(__wt_snprintf(
-              filename, sizeof(filename), "%s/BACKUP_COPY/%s", g.home, prev->names[prevpos]));
+              filename, sizeof(filename), "%s/BACKUP.copy/%s", g.home, prev->names[prevpos]));
             error_sys_check(unlink(filename));
         } else {
             /*
@@ -227,7 +235,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     /*
      * Save another copy of the original file to make debugging recovery errors easier.
      */
-    len = strlen(g.home) + strlen("BACKUP_COPY") + strlen(name) + 10;
+    len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
     second = dmalloc(len);
     testutil_check(__wt_snprintf(config, sizeof(config), "incremental=(file=%s)", name));
 
@@ -245,7 +253,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              * prepend the home directory to the file names ourselves.
              */
             testutil_check(__wt_snprintf(first, len, "%s/BACKUP/%s", g.home, name));
-            testutil_check(__wt_snprintf(second, len, "%s/BACKUP_COPY/%s", g.home, name));
+            testutil_check(__wt_snprintf(second, len, "%s/BACKUP.copy/%s", g.home, name));
             if (tmp_sz < size) {
                 tmp = drealloc(tmp, size);
                 tmp_sz = size;
@@ -270,7 +278,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              * directory to the name for us.
              */
             testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
-            testutil_check(__wt_snprintf(second, len, "BACKUP_COPY/%s", name));
+            testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
             testutil_assert(type == WT_BACKUP_FILE);
             testutil_assert(rfd == -1);
             testutil_assert(first_pass == true);
@@ -306,14 +314,20 @@ copy_file(WT_SESSION *session, const char *name)
     /*
      * Save another copy of the original file to make debugging recovery errors easier.
      */
-    len = strlen("BACKUP_COPY") + strlen(name) + 10;
+    len = strlen("BACKUP.copy") + strlen(name) + 10;
     second = dmalloc(len);
-    testutil_check(__wt_snprintf(second, len, "BACKUP_COPY/%s", name));
+    testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
     testutil_check(__wt_copy_and_sync(session, first, second));
 
     free(first);
     free(second);
 }
+
+/*
+ * Backup directory initialize command, remove and re-create the primary backup directory, plus a
+ * copy we maintain for recovery testing.
+ */
+#define HOME_BACKUP_INIT_CMD "rm -rf %s/BACKUP %s/BACKUP.copy && mkdir %s/BACKUP %s/BACKUP.copy"
 
 /*
  * backup --
@@ -327,15 +341,19 @@ backup(void *arg)
     WT_CURSOR *backup_cursor;
     WT_DECL_RET;
     WT_SESSION *session;
+    size_t len;
     u_int incremental, period;
-    uint32_t src_id;
+    uint64_t src_id;
     const char *config, *key;
-    char cfg[512];
+    char cfg[512], *cmd;
     bool full, incr_full;
 
     (void)(arg);
 
     conn = g.wts_conn;
+
+    /* Guarantee backup ID uniqueness, we might be reopening an existing database. */
+    __wt_seconds(NULL, &g.backup_id);
 
     /* Open a session. */
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -378,7 +396,7 @@ backup(void *arg)
                 active_now = &active[g.backup_id % 2];
                 active_prev = NULL;
                 testutil_check(__wt_snprintf(
-                  cfg, sizeof(cfg), "incremental=(enabled,this_id=ID%" PRIu32 ")", g.backup_id++));
+                  cfg, sizeof(cfg), "incremental=(enabled,this_id=ID%" PRIu64 ")", g.backup_id++));
                 full = true;
                 incr_full = false;
             } else {
@@ -388,7 +406,7 @@ backup(void *arg)
                     active_now = &active[0];
                 src_id = g.backup_id - 1;
                 testutil_check(__wt_snprintf(cfg, sizeof(cfg),
-                  "incremental=(enabled,src_id=ID%u,this_id=ID%" PRIu32 ")", src_id,
+                  "incremental=(enabled,src_id=ID%" PRIu64 ",this_id=ID%" PRIu64 ")", src_id,
                   g.backup_id++));
                 /* Restart a full incremental every once in a while. */
                 full = false;
@@ -415,8 +433,14 @@ backup(void *arg)
         }
 
         /* If we're taking a full backup, create the backup directories. */
-        if (full || incremental == 0)
-            testutil_checkfmt(system(g.home_backup_init), "%s", "backup directory creation failed");
+        if (full || incremental == 0) {
+            len = strlen(g.home) * 4 + strlen(HOME_BACKUP_INIT_CMD) + 1;
+            cmd = dmalloc(len);
+            testutil_check(
+              __wt_snprintf(cmd, len, HOME_BACKUP_INIT_CMD, g.home, g.home, g.home, g.home));
+            testutil_checkfmt(system(cmd), "%s", "backup directory creation failed");
+            free(cmd);
+        }
 
         /*
          * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.

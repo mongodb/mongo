@@ -31,7 +31,9 @@ from runner import *
 from wiredtiger import *
 from workgen import *
 
-def show(tname):
+def show(tname, s, args):
+    if not args.verbose:
+        return
     print('')
     print('<><><><> ' + tname + ' <><><><>')
     c = s.open_cursor(tname, None)
@@ -42,7 +44,16 @@ def show(tname):
     c.close()
 
 context = Context()
-conn = wiredtiger_open("WT_TEST", "create,cache_size=1G")
+
+# Using the context's wiredtiger_open() method has benefits:
+#   * there is a default home directory (WT_TEST), which is automatically cleared before the open.
+#   * the args on the python command line are parsed, allowing for:
+#     --home homedir
+#     --keep   (don't remove homedir before starting)
+#     --verbose
+#     and the ability to add additional command line arguments.
+
+conn = context.wiredtiger_open("create,cache_size=1G")
 s = conn.open_session()
 tname = 'table:simple'
 s.create(tname, 'key_format=S,value_format=S')
@@ -51,9 +62,9 @@ ops = Operation(Operation.OP_INSERT, Table(tname), Key(Key.KEYGEN_APPEND, 10), V
 thread = Thread(ops)
 workload = Workload(context, thread)
 workload.run(conn)
-show(tname)
+show(tname, s, context.args)
 
 thread = Thread(ops * 5)
 workload = Workload(context, thread)
 workload.run(conn)
-show(tname)
+show(tname, s, context.args)

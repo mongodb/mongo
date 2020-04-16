@@ -1182,7 +1182,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
      */
     if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY)
         ret = 0;
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Sort the list into LRU order and restart. */
     __wt_spin_lock(session, &queue->evict_lock);

@@ -28,12 +28,16 @@
 
 #include "format.h"
 
+#define REBALANCE_COPY_CMD "../../wt -h %s dump -f %s/REBALANCE.%s %s"
+#define REBALANCE_CMP_CMD "cmp %s/REBALANCE.orig %s/REBALANCE.new > /dev/null"
+
 void
 wts_rebalance(void)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    char cmd[1024];
+    size_t len;
+    char *cmd;
 
     if (g.c_rebalance == 0)
         return;
@@ -41,9 +45,9 @@ wts_rebalance(void)
     track("rebalance", 0ULL, NULL);
 
     /* Dump the current object */
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
-                                                   " -h %s dump -f %s/rebalance.orig %s",
-      g.home, g.home, g.uri));
+    len = strlen(g.home) * 2 + strlen(g.uri) + strlen(REBALANCE_COPY_CMD) + 100;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, REBALANCE_COPY_CMD, g.home, g.home, "orig", g.uri));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
     /* Rebalance, then verify the object. */
@@ -59,18 +63,12 @@ wts_rebalance(void)
 
     wts_verify("post-rebalance verify");
     wts_close();
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
-                                                   " -h %s dump -f %s/rebalance.new %s",
-      g.home, g.home, g.uri));
+    testutil_check(__wt_snprintf(cmd, len, REBALANCE_COPY_CMD, g.home, g.home, "new", g.uri));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
-/* Compare the old/new versions of the object. */
-#ifdef _WIN32
-    testutil_check(__wt_snprintf(
-      cmd, sizeof(cmd), "fc /b %s\\rebalance.orig %s\\rebalance.new > NUL", g.home, g.home));
-#else
-    testutil_check(__wt_snprintf(
-      cmd, sizeof(cmd), "cmp %s/rebalance.orig %s/rebalance.new > /dev/null", g.home, g.home));
-#endif
+    /* Compare the old/new versions of the object. */
+    testutil_check(__wt_snprintf(cmd, len, REBALANCE_CMP_CMD, g.home, g.home));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
+
+    free(cmd);
 }

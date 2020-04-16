@@ -18,8 +18,7 @@ static int __curtable_update(WT_CURSOR *cursor);
         for (__i = 0, __cp = (ctable)->cg_cursors; __i < WT_COLGROUPS((ctable)->table); \
              __i++, __cp++) {                                                           \
             WT_TRET((*__cp)->f(*__cp));                                                 \
-            if (ret != 0 && ret != WT_NOTFOUND)                                         \
-                goto err;                                                               \
+            WT_ERR_NOTFOUND_OK(ret, true);                                              \
         }                                                                               \
     } while (0)
 
@@ -599,7 +598,7 @@ __curtable_update(WT_CURSOR *cursor)
             WT_ERR(__wt_schema_project_slice(
               session, ctable->cg_cursors, ctable->plan, 0, cursor->value_format, value_copy));
         } else
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
     }
 
     APPLY_CG(ctable, update);
@@ -758,7 +757,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
                 WT_ERR(ret);
                 WT_ERR(__apply_idx(stop, offsetof(WT_CURSOR, remove), false));
             } while ((ret = wt_stop->prev(wt_stop)) == 0);
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
 
             __wt_cursor_set_raw_key(wt_stop, key);
             APPLY_CG(stop, search);
@@ -774,7 +773,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
                 if (stop != NULL)
                     WT_ERR(wt_start->compare(wt_start, wt_stop, &cmp));
             } while (cmp < 0 && (ret = wt_start->next(wt_start)) == 0);
-            WT_ERR_NOTFOUND_OK(ret);
+            WT_ERR_NOTFOUND_OK(ret, false);
 
             __wt_cursor_set_raw_key(wt_start, key);
             APPLY_CG(start, search);

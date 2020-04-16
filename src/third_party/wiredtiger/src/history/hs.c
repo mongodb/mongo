@@ -391,6 +391,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
      */
     WT_ERR(__wt_update_alloc(session, &cursor->value, &hs_upd->next, &notused, WT_UPDATE_STANDARD));
     hs_upd->next->start_ts = upd->start_ts;
+    hs_upd->next->durable_ts = upd->durable_ts;
     hs_upd->next->txnid = upd->txnid;
 
     /*
@@ -933,12 +934,12 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
      * las) to the oldest (earlier in the las) for a given key.
      */
     read_timestamp = allow_prepare ? txn->prepare_timestamp : txn->read_timestamp;
-    ret = __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, read_timestamp);
+    WT_ERR_NOTFOUND_OK(
+      __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, read_timestamp), true);
     if (ret == WT_NOTFOUND) {
         ret = 0;
         goto done;
     }
-    WT_ERR(ret);
     WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
     /* Stop before crossing over to the next btree */
@@ -1107,11 +1108,10 @@ __hs_delete_key_int(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *
 
     hs_cursor->set_key(hs_cursor, btree_id, key, WT_TS_NONE, (uint64_t)0);
     WT_ERR(__wt_buf_set(session, srch_key, hs_cursor->key.data, hs_cursor->key.size));
-    ret = hs_cursor->search_near(hs_cursor, &exact);
+    WT_ERR_NOTFOUND_OK(hs_cursor->search_near(hs_cursor, &exact), true);
     /* Empty history store is fine. */
     if (ret == WT_NOTFOUND)
         goto done;
-    WT_ERR(ret);
     /*
      * If we raced with a history store insert, we may be two or more records away from our target.
      * Keep iterating forwards until we are on or past our target key.
@@ -1127,9 +1127,9 @@ __hs_delete_key_int(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *
                 break;
         }
         /* No entries greater than or equal to the key we searched for. */
+        WT_ERR_NOTFOUND_OK(ret, true);
         if (ret == WT_NOTFOUND)
             goto done;
-        WT_ERR(ret);
     }
     /* Bailing out here also means we have no history store records for our key. */
     WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
@@ -1348,7 +1348,7 @@ __wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
               __wt_buf_set_printable(session, hs_key->data, hs_key->size, prev_hs_key));
         WT_ERR(ret);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 err:
     if (data_cursor != NULL)
         WT_TRET(data_cursor->close(data_cursor));

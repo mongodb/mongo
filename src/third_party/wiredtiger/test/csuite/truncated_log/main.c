@@ -68,7 +68,6 @@ write_and_read_new(WT_SESSION *session)
     testutil_check(session->log_printf(session, "Test Log Record"));
     testutil_check(session->log_flush(session, "sync=on"));
     testutil_check(session->open_cursor(session, "log:", NULL, NULL, &logc));
-    testutil_check(session->open_cursor(session, "log:", NULL, NULL, &logc));
     saw_msg = false;
     while (logc->next(logc) == 0) {
         /*

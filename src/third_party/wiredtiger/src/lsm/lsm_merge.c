@@ -450,7 +450,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
         if (create_bloom)
             __wt_bloom_insert(bloom, &key);
     }
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_STAT_CONN_INCRV(session, lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
     ++lsm_tree->merge_progressing;
@@ -510,7 +510,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
     ++lsm_tree->merge_progressing;
     (void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
     in_sync = false;
-    WT_ERR_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_ERR(__wt_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
     __wt_lsm_tree_writelock(session, lsm_tree);

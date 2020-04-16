@@ -174,7 +174,8 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
      * from an earlier run.
      */
     rel_major = rel_minor = WT_CONN_COMPAT_NONE;
-    if ((ret = __wt_metadata_search(session, WT_METADATA_COMPAT, &value)) == 0) {
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, WT_METADATA_COMPAT, &value), true);
+    if (ret == 0) {
         WT_ERR(__wt_config_getones(session, value, "major", &cval));
         rel_major = (uint16_t)cval.val;
         WT_ERR(__wt_config_getones(session, value, "minor", &cval));
@@ -193,8 +194,6 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
               min_major, min_minor, rel_major, rel_minor);
     } else if (ret == WT_NOTFOUND)
         ret = 0;
-    else
-        WT_ERR(ret);
 
 done:
     conn->req_max_major = max_major;
