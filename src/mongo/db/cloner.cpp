@@ -285,32 +285,8 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
     if (from_indexes.empty())
         return;
 
-    // We are under lock here again, so reload the database in case it may have disappeared
-    // during the temp release
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, toDBName);
-
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    if (!collection) {
-        writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-            opCtx->checkForInterrupt();
-
-            WriteUnitOfWork wunit(opCtx);
-            CollectionOptions collectionOptions = uassertStatusOK(
-                CollectionOptions::parse(from_opts, CollectionOptions::ParseKind::parseForCommand));
-            const bool createDefaultIndexes = true;
-            invariant(db->userCreateNS(opCtx,
-                                       nss,
-                                       collectionOptions,
-                                       createDefaultIndexes,
-                                       _getIdIndexSpec(from_indexes)),
-                      str::stream() << "Collection creation failed while copying indexes from "
-                                    << nss << " (Cloner)");
-            wunit.commit();
-            collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-            invariant(collection, str::stream() << "Missing collection " << nss << " (Cloner)");
-        });
-    }
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    invariant(collection, str::stream() << "Missing collection " << nss << " (Cloner)");
 
     auto indexCatalog = collection->getIndexCatalog();
     auto indexesToBuild = indexCatalog->removeExistingIndexesNoChecks(
