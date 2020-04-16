@@ -27,12 +27,8 @@ function runCommandWithLsidCheck(conn, dbName, cmdName, cmdObj, func, makeFuncAr
     }
 
     if (!cmdObjUnwrapped.hasOwnProperty("lsid")) {
-        // TODO: SERVER-30848 fixes getMore requests to use a session in the mongo shell.
-        // Until that happens, we bypass throwing an error for getMore and only throw an error
-        // for other requests not using sessions.
-        if (cmdName !== "getMore") {
-            throw new Error("command object does not have session id: " + tojson(cmdObj));
-        }
+        // Throw an error for requests not using sessions.
+        throw new Error("command object does not have session id: " + tojson(cmdObj));
     }
     return func.apply(conn, makeFuncArgs(cmdObj));
 }
