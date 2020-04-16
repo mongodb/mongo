@@ -72,12 +72,6 @@ selector:
   # Creates new mongo connection but won't retry connecting.
   - jstests/core/shell_connection_strings.js
 
-  # Starts a parallel shell but won't restart it after shutdown.
-  # TODO SERVER-33229: Remove these exclusions
-  - jstests/core/compact_keeps_indexes.js
-  - jstests/core/find_and_modify_concurrent_update.js
-  - jstests/core/shellstartparallel.js
-
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
@@ -115,6 +109,11 @@ selector:
   # "Cowardly refusing to run test with overridden write concern when it uses a command that can
   #  only perform w=1 writes: ..."
   - requires_eval_command
+  # Operations in the main test shell aren't guaranteed to be causally consistent with operations
+  # performed earlier in a parallel shell if multiple nodes are electable because the latest
+  # operation and cluster times aren't shared between shells.
+  # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
+  - uses_parallel_shell
 
 executor:
   archive:
@@ -124,7 +123,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      # TODO SERVER-33229: Remove override of startParallelShell
       eval: >-
         testingReplication = true;
         load("jstests/libs/override_methods/auto_retry_on_network_error.js");

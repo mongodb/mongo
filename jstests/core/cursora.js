@@ -5,6 +5,7 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 (function() {
