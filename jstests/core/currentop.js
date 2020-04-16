@@ -5,6 +5,7 @@
  *   assumes_superuser_permissions,
  *   # fsync command is not available on embedded
  *   incompatible_with_embedded,
+ *   uses_parallel_shell,
  * ]
  */
 

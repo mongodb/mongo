@@ -6,10 +6,6 @@
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
  *
  * @tags: [
- *   # Background validation is only supported by WT.
- *   requires_wiredtiger,
- *   # inMemory does not have checkpoints; background validation only runs on a checkpoint.
- *   requires_persistence,
  *   # A failpoint is set that only exists on the mongod.
  *   assumes_against_mongod_not_mongos,
  *   # A failpoint is set against the primary only.
@@ -17,7 +13,12 @@
  *   # Checkpoint cursors cannot be open in lsm.
  *   does_not_support_wiredtiger_lsm,
  *   # Background validation will be first available in v4.4.
- *   requires_fcv_44
+ *   requires_fcv_44,
+ *   # inMemory does not have checkpoints; background validation only runs on a checkpoint.
+ *   requires_persistence,
+ *   # Background validation is only supported by WT.
+ *   requires_wiredtiger,
+ *   uses_parallel_shell,
  * ]
  */
 

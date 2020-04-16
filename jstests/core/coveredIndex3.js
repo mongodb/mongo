@@ -1,5 +1,8 @@
 // Check proper covered index handling when query and processGetMore yield.
 // SERVER-4975
+// @tags: [
+//   uses_parallel_shell,
+// ]
 
 if (0) {  // SERVER-4975
 
