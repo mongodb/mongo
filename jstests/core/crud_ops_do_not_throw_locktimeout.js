@@ -1,11 +1,14 @@
 /**
  * Tests that CRUD operations do not throw lock timeouts outside of transactions.
  *
- * @tags: [assumes_against_mongod_not_mongos,
- *         assumes_read_concern_unchanged,
- *         assumes_write_concern_unchanged,
- *         # This test requires failpoint behavior not available in v4.2.
- *         requires_fcv_44]
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_read_concern_unchanged,
+ *   assumes_write_concern_unchanged,
+ *   # This test requires failpoint behavior not available in v4.2.
+ *   requires_fcv_44,
+ *   uses_parallel_shell,
+ * ]
  */
 (function() {
 "use strict";

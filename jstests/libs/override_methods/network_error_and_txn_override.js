@@ -1109,9 +1109,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 }
 
 if (configuredForNetworkRetry()) {
-    OverrideHelpers.prependOverrideInParallelShell(
-        "jstests/libs/override_methods/network_error_and_txn_override.js");
-
     const connectOriginal = connect;
 
     connect = function(url, user, pass) {
@@ -1140,13 +1137,18 @@ if (configuredForNetworkRetry()) {
         throw new Error(
             "logout() isn't resilient to network errors. Please add requires_non_retryable_commands to your test");
     };
+
+    startParallelShell = function() {
+        throw new Error("Cowardly refusing to run test with network retries enabled when it uses " +
+                        "startParallelShell()");
+    };
 }
 
 if (configuredForTxnOverride()) {
     startParallelShell = function() {
         throw new Error(
-            "Cowardly refusing to run test with transaction override enabled when it uses" +
-            "startParalleShell()");
+            "Cowardly refusing to run test with transaction override enabled when it uses " +
+            "startParallelShell()");
     };
 }
 

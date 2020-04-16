@@ -1,9 +1,16 @@
 /**
  * Test to verify that the 'comment' field set while running a command gets populated in $currentOp
  * and profiler.
- *  @tags: [assumes_against_mongod_not_mongos, assumes_unsharded_collection,
- * does_not_support_stepdowns, requires_profiling, assumes_read_concern_unchanged,
- * assumes_write_concern_unchanged, requires_fcv_44]
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_read_concern_unchanged,
+ *   assumes_unsharded_collection,
+ *   assumes_write_concern_unchanged,
+ *   does_not_support_stepdowns,
+ *   requires_fcv_44,
+ *   requires_profiling,
+ *   uses_parallel_shell,
+ * ]
  */
 
 (function() {

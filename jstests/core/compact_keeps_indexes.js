@@ -5,6 +5,7 @@
 //   # compact command is not available on embedded
 //   incompatible_with_embedded,
 //   uses_multiple_connections,
+//   uses_parallel_shell,
 // ]
 
 (function() {
