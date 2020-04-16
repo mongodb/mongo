@@ -47,7 +47,7 @@ namespace mongo {
 namespace executor {
 
 namespace {
-static inline const std::string kMaxTimeMSOptionName = "maxTimeMS";
+static inline const std::string kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 }  // unnamed namespace
 
 /**
@@ -759,26 +759,19 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
     if (requestState->isHedge) {
         invariant(cmdStatePtr->requestOnAny.hedgeOptions);
-
-        // Attach a maxTimeMS to the request.
         auto maxTimeMS = request.hedgeOptions->maxTimeMSForHedgedReads;
-        if (request.timeout == request.kNoTimeout || request.timeout > Milliseconds(maxTimeMS)) {
-            BSONObjBuilder updatedCmdBuilder;
-            for (const auto& elem : request.cmdObj) {
-                if (elem.fieldNameStringData() != kMaxTimeMSOptionName) {
-                    updatedCmdBuilder.append(elem);
-                }
-            }
-            updatedCmdBuilder.append(kMaxTimeMSOptionName, maxTimeMS);
-            request.cmdObj = updatedCmdBuilder.obj();
 
-            LOGV2_DEBUG(4647200,
-                        2,
-                        "Set maxTimeMS for request",
-                        "maxTimeMS"_attr = maxTimeMS,
-                        "request_id"_attr = cmdStatePtr->requestOnAny.id,
-                        "target"_attr = cmdStatePtr->requestOnAny.target[idx]);
-        }
+        BSONObjBuilder updatedCmdBuilder;
+        updatedCmdBuilder.appendElements(request.cmdObj);
+        updatedCmdBuilder.append(kMaxTimeMSOpOnlyField, maxTimeMS);
+        request.cmdObj = updatedCmdBuilder.obj();
+
+        LOGV2_DEBUG(4647200,
+                    2,
+                    "Setup hedge request",
+                    "request_id"_attr = cmdStatePtr->requestOnAny.id,
+                    "request"_attr = redact(request.toString()),
+                    "target"_attr = cmdStatePtr->requestOnAny.target[idx]);
 
         if (cmdStatePtr->interface->_svcCtx) {
             auto hm = HedgingMetrics::get(cmdStatePtr->interface->_svcCtx);

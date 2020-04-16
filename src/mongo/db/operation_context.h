@@ -423,6 +423,15 @@ public:
         return _exhaust;
     }
 
+    void storeMaxTimeMS(Microseconds maxTime) {
+        _storedMaxTime = maxTime;
+    }
+
+    /**
+     * Restore deadline to match the value stored in _storedMaxTime.
+     */
+    void restoreMaxTimeMS();
+
 private:
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
@@ -540,11 +549,14 @@ private:
     bool _isExecutingShutdown = false;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
-    // user-specified maxTime. This is tracked with microsecond granularity for the purpose of
+    // user-specified maxTimeMS. This is tracked with microsecond granularity for the purpose of
     // assigning unused execution time back to a cursor at the end of an operation, only. The
     // _deadline and the service context's fast clock are the only values consulted for determining
     // if the operation's timelimit has been exceeded.
     Microseconds _maxTime = Microseconds::max();
+
+    // The value of the maxTimeMS requested by user in the case it was overwritten.
+    boost::optional<Microseconds> _storedMaxTime;
 
     // Timer counting the elapsed time since the construction of this OperationContext.
     Timer _elapsedTime;

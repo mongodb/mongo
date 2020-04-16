@@ -367,6 +367,11 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
         _opKeyMap.emplace(*opKey, cursorId);
     }
 
+    // Restores the maxTimeMS provided in the cursor generating command in the case it used
+    // maxTimeMSOpOnly. This way the pinned cursor will have the leftover time consistent with the
+    // maxTimeMS.
+    opCtx->restoreMaxTimeMS();
+
     return ClientCursorPin(opCtx, unownedCursor, this);
 }
 

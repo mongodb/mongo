@@ -110,6 +110,7 @@ const char QueryRequest::kInternalReadAtClusterTimeField[] = "$_internalReadAtCl
 const char QueryRequest::kRequestResumeTokenField[] = "$_requestResumeToken";
 const char QueryRequest::kResumeAfterField[] = "$_resumeAfter";
 const char QueryRequest::kUse44SortKeys[] = "_use44SortKeys";
+const char QueryRequest::kMaxTimeMSOpOnlyField[] = "maxTimeMSOpOnly";
 
 // Field names for sorting options.
 const char QueryRequest::kNaturalSortField[] = "$natural";

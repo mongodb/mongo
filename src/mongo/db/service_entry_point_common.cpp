@@ -972,6 +972,7 @@ void execCommandDatabase(OperationContext* opCtx,
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
+        BSONElement maxTimeMSOpOnlyField;
         BSONElement allowImplicitCollectionCreationField;
         BSONElement helpField;
 
@@ -980,6 +981,11 @@ void execCommandDatabase(OperationContext* opCtx,
             StringData fieldName = element.fieldNameStringData();
             if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
                 cmdOptionMaxTimeMSField = element;
+            } else if (fieldName == QueryRequest::kMaxTimeMSOpOnlyField) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Can not specify maxTimeMSOpOnly for non internal clients",
+                        isInternalClient);
+                maxTimeMSOpOnlyField = element;
             } else if (fieldName == "allowImplicitCollectionCreation") {
                 allowImplicitCollectionCreationField = element;
             } else if (fieldName == CommandHelpers::kHelpFieldName) {
@@ -999,9 +1005,9 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (CommandHelpers::isHelpRequest(helpField)) {
             CurOp::get(opCtx)->ensureStarted();
-            // We disable last-error for help requests due to SERVER-11492, because config servers
-            // use help requests to determine which commands are database writes, and so must be
-            // forwarded to all config servers.
+            // We disable last-error for help requests due to SERVER-11492, because config
+            // servers use help requests to determine which commands are database writes, and so
+            // must be forwarded to all config servers.
             LastError::get(opCtx->getClient()).disable();
             Command::generateHelpResponse(opCtx, replyBuilder, *command);
             return;
@@ -1067,20 +1073,28 @@ void execCommandDatabase(OperationContext* opCtx,
             opCounters->gotCommand();
         }
 
-        // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
-        // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
-        // getMore command, where it is used to communicate the maximum time to wait for new inserts
-        // on tailable cursors, not as a deadline for the operation.
+        // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation
+        // on the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning
+        // for a getMore command, where it is used to communicate the maximum time to wait for
+        // new inserts on tailable cursors, not as a deadline for the operation.
         // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
-        // require introducing a new 'max await time' parameter for getMore, and eventually banning
-        // maxTimeMS altogether on a getMore command.
-        const int maxTimeMS =
-            uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
-        if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
+        // require introducing a new 'max await time' parameter for getMore, and eventually
+        // banning maxTimeMS altogether on a getMore command.
+        int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
+        int maxTimeMSOpOnly = uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField));
+
+        if ((maxTimeMS > 0 || maxTimeMSOpOnly > 0) &&
+            command->getLogicalOp() != LogicalOp::opGetMore) {
             uassert(40119,
                     "Illegal attempt to set operation deadline within DBDirectClient",
                     !opCtx->getClient()->isInDirectClient());
-            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+            if (maxTimeMSOpOnly > 0 && (maxTimeMS == 0 || maxTimeMSOpOnly < maxTimeMS)) {
+                opCtx->storeMaxTimeMS(Milliseconds{maxTimeMS});
+                opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMSOpOnly},
+                                             ErrorCodes::MaxTimeMSExpired);
+            } else if (maxTimeMS > 0) {
+                opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+            }
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -1121,8 +1135,8 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         }
 
-        // Remember whether or not this operation is starting a transaction, in case something later
-        // in the execution needs to adjust its behavior based on this.
+        // Remember whether or not this operation is starting a transaction, in case something
+        // later in the execution needs to adjust its behavior based on this.
         opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
 
         auto& oss = OperationShardingState::get(opCtx);
@@ -1147,9 +1161,10 @@ void execCommandDatabase(OperationContext* opCtx,
         // This may trigger the maxTimeAlwaysTimeOut failpoint.
         auto status = opCtx->checkForInterruptNoAssert();
 
-        // We still proceed if the primary stepped down, but accept other kinds of interruptions.
-        // We defer to individual commands to allow themselves to be interruptible by stepdowns,
-        // since commands like 'voteRequest' should conversely continue executing.
+        // We still proceed if the primary stepped down, but accept other kinds of
+        // interruptions. We defer to individual commands to allow themselves to be
+        // interruptible by stepdowns, since commands like 'voteRequest' should conversely
+        // continue executing.
         if (status != ErrorCodes::PrimarySteppedDown &&
             status != ErrorCodes::InterruptedDueToReplStateChange) {
             uassertStatusOK(status);
@@ -1199,10 +1214,10 @@ void execCommandDatabase(OperationContext* opCtx,
             auto engine = opCtx->getServiceContext()->getStorageEngine();
             invariant(engine && engine->supportsReadConcernSnapshot());
 
-            // SnapshotTooOld errors indicate that PIT ops are failing to find an available snapshot
-            // at their specified atClusterTime. Therefore, we'll try to increase the snapshot
-            // history window that the storage engine maintains in order to increase the likelihood
-            // of successful future PIT atClusterTime requests.
+            // SnapshotTooOld errors indicate that PIT ops are failing to find an available
+            // snapshot at their specified atClusterTime. Therefore, we'll try to increase the
+            // snapshot history window that the storage engine maintains in order to increase
+            // the likelihood of successful future PIT atClusterTime requests.
             SnapshotWindowUtil::incrementSnapshotTooOldErrorCount();
             SnapshotWindowUtil::increaseTargetSnapshotWindowSize(opCtx);
         } else {
@@ -1340,7 +1355,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
                             ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
 
             {
-                // Try to set this as early as possible, as soon as we have figured out the command.
+                // Try to set this as early as possible, as soon as we have figured out the
+                // command.
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
             }
@@ -1579,12 +1595,12 @@ DbResponse receivedGetMore(OperationContext* opCtx,
             // Make sure that killCursorGlobal does not throw an exception if it is interrupted.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-            // If an error was thrown prior to auth checks, then the cursor should remain alive in
-            // order to prevent an unauthorized user from resulting in the death of a cursor. In
-            // other error cases, the cursor is dead and should be cleaned up.
+            // If an error was thrown prior to auth checks, then the cursor should remain alive
+            // in order to prevent an unauthorized user from resulting in the death of a cursor.
+            // In other error cases, the cursor is dead and should be cleaned up.
             //
-            // If killing the cursor fails, ignore the error and don't try again. The cursor should
-            // be reaped by the client cursor timeout thread.
+            // If killing the cursor fails, ignore the error and don't try again. The cursor
+            // should be reaped by the client cursor timeout thread.
             CursorManager::get(opCtx)
                 ->killCursor(opCtx, cursorid, false /* shouldAudit */)
                 .ignore();
