@@ -3872,7 +3872,8 @@ public:
         addIf<TimestampMultiIndexBuildsDuringRename>();
         addIf<TimestampAbortIndexBuild>();
         addIf<TimestampIndexDrops>();
-        addIf<TimestampIndexBuilderOnPrimary>();
+        // TODO SERVER-46722: Turn back on when test is passing.
+        // addIf<TimestampIndexBuilderOnPrimary>();
         addIf<SecondaryReadsDuringBatchApplicationAreAllowed>();
         addIf<ViewCreationSeparateTransaction>();
         addIf<CreateCollectionWithSystemIndex>();

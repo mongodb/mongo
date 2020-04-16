@@ -1156,6 +1156,23 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig = "leak_memory=true,";
     }
 
+    std::uint64_t stableTimestamp = _stableTimestamp.load();
+    if (gTakeUnstableCheckpointOnShutdown) {
+        closeConfig += "use_timestamp=false,";
+    } else if (stableTimestamp > 0 && stableTimestamp < _initialDataTimestamp.load()) {
+        // After a rollback via refetch, WT update chains for _id index keys can be logically
+        // corrupt for read timestamps earlier than the `_initialDataTimestamp`. Because the stable
+        // timestamp is really a read timestamp, we must avoid taking a stable checkpoint.
+        //
+        // If a stable timestamp is not set, there's no risk of reading corrupt history.
+        LOGV2(22326,
+              "Skipping checkpoint during clean shutdown because stableTimestamp < "
+              "initialDataTimestamp.",
+              "stableTimestamp"_attr = stableTimestamp,
+              "initialDataTimestamp"_attr = _initialDataTimestamp.load());
+        quickExit(EXIT_SUCCESS);
+    }
+
     if (_fileVersion.shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
         LOGV2(22324, "Downgrading WiredTiger datafiles.");
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
@@ -1169,22 +1186,7 @@ void WiredTigerKVEngine::cleanShutdown() {
         invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()));
     }
 
-    if (gTakeUnstableCheckpointOnShutdown) {
-        closeConfig += "use_timestamp=false,";
-    }
-
-    const Timestamp stableTimestamp = getStableTimestamp();
-    const Timestamp initialDataTimestamp = getInitialDataTimestamp();
-    if (stableTimestamp >= initialDataTimestamp) {
-        invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
-    } else {
-        LOGV2(22326,
-              "Skipping checkpoint during clean shutdown because stableTimestamp "
-              "({stableTimestamp}) is less than the initialDataTimestamp ({initialDataTimestamp})",
-              "stableTimestamp"_attr = stableTimestamp,
-              "initialDataTimestamp"_attr = initialDataTimestamp);
-        quickExit(EXIT_SUCCESS);
-    }
+    invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
     _conn = nullptr;
 }
 

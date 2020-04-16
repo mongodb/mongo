@@ -17,8 +17,15 @@ function testDowngrade(enableMajorityReadConcern) {
     jsTest.log("Test downgrade with enableMajorityReadConcern=" + enableMajorityReadConcern);
 
     // Set up Rollback Test.
-    let replTest = new ReplSetTest(
-        {name, nodes: 3, useBridge: true, nodeOptions: {enableMajorityReadConcern: "false"}});
+    let replTest = new ReplSetTest({
+        name,
+        nodes: 3,
+        useBridge: true,
+        nodeOptions: {
+            enableMajorityReadConcern: "false",
+            setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})},
+        }
+    });
     replTest.startSet();
     let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;
@@ -49,9 +56,27 @@ function testDowngrade(enableMajorityReadConcern) {
         {_id: 0}, {writeConcern: {w: "majority"}}));
     assert.eq(rollbackNode.getDB(dbName)[sourceCollName].find({_id: 0}).itcount(), 1);
 
-    // Kill the rollback node and restart it on the last-stable version.
+    // However, due to the stable timestamp being behind the initial data timestamp, clean shutdown
+    // does not downgrade the datafiles.
+    rollbackTest.getTestFixture().stop(0, 15, {}, {forRestart: true});
+    // Demonstrate there was no downgrade. The "last-stable" binary will not start up.
+    const fakeUnusedPortToSatisfyUnnecessaryValidation = allocatePort();
+    assert.eq(MongoRunner.EXIT_ABRUPT,
+              runMongoProgram("mongod-" + MongoRunner.getBinVersionFor("last-stable"),
+                              "--port",
+                              fakeUnusedPortToSatisfyUnnecessaryValidation,
+                              "--dbpath",
+                              rollbackTest.getTestFixture().getDbPath(0)));
+    // Start the latest binary on the datafiles.
+    rollbackTest.getTestFixture().start(0,
+                                        {
+                                            binVersion: "latest",
+                                            enableMajorityReadConcern: enableMajorityReadConcern,
+                                        },
+                                        true /* restart */);
+    // Performing a clean restart to last-stable should now succeed.
     rollbackTest.restartNode(
-        0, 9, {binVersion: "last-stable", enableMajorityReadConcern: enableMajorityReadConcern});
+        0, 15, {binVersion: "last-stable", enableMajorityReadConcern: enableMajorityReadConcern});
     replTest.awaitSecondaryNodes();
 
     // The rollback node should replay the new operation.
