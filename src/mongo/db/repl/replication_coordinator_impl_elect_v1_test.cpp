@@ -61,6 +61,14 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using ApplierState = ReplicationCoordinator::ApplierState;
 
+TEST(LastVote, LastVoteAcceptsUnknownField) {
+    auto lastVoteBSON =
+        BSON("candidateIndex" << 1 << "term" << 2 << "_id" << 3 << "unknownField" << 1);
+    auto lastVoteSW = LastVote::readFromLastVote(lastVoteBSON);
+    ASSERT_OK(lastVoteSW.getStatus());
+    ASSERT_BSONOBJ_EQ(lastVoteSW.getValue().toBSON(), BSON("term" << 2 << "candidateIndex" << 1));
+}
+
 TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
