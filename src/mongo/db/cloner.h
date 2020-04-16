@@ -61,9 +61,8 @@ public:
      *              ignored and the collection list is fetched from the remote via _conn.
      */
     Status copyDb(OperationContext* opCtx,
-                  const std::string& toDBName,
+                  const std::string& dBName,
                   const std::string& masterHost,
-                  const std::string& fromDBName,
                   const std::vector<NamespaceString>& shardedColls,
                   std::set<std::string>* clonedColls);
 
@@ -93,21 +92,20 @@ private:
 
     void _copy(OperationContext* opCtx,
                const std::string& toDBName,
-               const NamespaceString& from_ns,
+               const NamespaceString& nss,
                const BSONObj& from_opts,
                const BSONObj& from_id_index,
-               const NamespaceString& to_ns,
-               Query q);
+               Query q,
+               DBClientBase* conn);
 
     void _copyIndexes(OperationContext* opCtx,
                       const std::string& toDBName,
-                      const NamespaceString& from_ns,
+                      const NamespaceString& nss,
                       const BSONObj& from_opts,
                       const std::list<BSONObj>& from_indexes,
-                      const NamespaceString& to_ns);
+                      DBClientBase* conn);
 
     struct Fun;
-    std::unique_ptr<DBClientBase> _conn;
 };
 
 }  // namespace mongo

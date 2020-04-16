@@ -127,8 +127,7 @@ public:
         Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         Cloner cloner;
-        uassertStatusOK(
-            cloner.copyDb(opCtx, dbname, from.toString(), dbname, shardedColls, &clonedColls));
+        uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), shardedColls, &clonedColls));
         {
             BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
             cloneBarr.append(clonedColls);
