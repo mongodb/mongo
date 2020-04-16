@@ -91,7 +91,7 @@ private:
 
     boost::optional<Date_t> _lastIsMasterAt;
     bool _isMasterOutstanding = false;
-    bool _isExpedited = false;
+    bool _isExpedited;
     executor::TaskExecutor::CallbackHandle _nextIsMasterHandle;
     executor::TaskExecutor::CallbackHandle _remoteCommandHandle;
 
