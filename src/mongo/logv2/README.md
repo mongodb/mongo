@@ -393,6 +393,90 @@ JSON format:
 "samples": [{"durationNanos": 200}, {"durationNanos": 400}]
 ``` 
 
+# Attribute naming abstraction
+
+The style guide contains recommendations for attribute naming in certain cases. To make abstraction of attribute naming possible a `logAttrs` function can be implemented as a friend function in a class with the following signature:
+
+```
+class AnyUserType {
+public:
+  friend auto logAttrs(const AnyUserType& instance) {
+    return "name"_attr=instance;
+  }
+
+  BSONObj toBSON() const; // Type needs to be loggable
+};
+```
+
+##### Examples
+```
+const AnyUserType& t = ...;
+LOGV2(2000, "log of user type", logAttr(t));
+```
+
+## Multiple attributes
+
+In some cases a loggable type might be composed as a hierarchy in the C++ type system which would lead to a very verbose structured log output as every level in the hierarcy needs a name when outputted as JSON. The attribute naming abstraction system can also be used to collapse such hierarchies. Instead of making a type loggable it can instead return one or more attributes from its members by using `multipleAttrs` in `logAttrs` functions.
+
+`multipleAttrs(...)` accepts attributes or instances of types with `logAttrs` functions implemented.
+
+##### Examples
+
+```
+class NotALoggableType {
+  std::string name;
+  BSONObj data;
+
+  friend auto logAttrs(const NotALoggableType& instance) {
+    return logv2::multipleAttrs("name"_attr=instance.name, "data"_attr=instance.data);
+  }
+};
+
+NotALoggableType t = ...;
+
+// These two log statements would produce the same output (apart from different id)
+
+LOGV2(2001, "Log of non-loggable type's members", logAttrs(t));
+
+LOGV2(2001, "Log of non-loggable type's members", "name"_attr=t.name, "data"_attr=t.data);
+
+```
+
+## Handling temporary lifetime with multiple attributes
+
+To avoid lifetime issues (log attributes bind their values by reference) it is recommended to **not** create attributes when using `multipleAttrs` unless attributes are created for members directly. If `logAttrs` or `""_attr=` is used inside a `logAttrs` function on the return of a function returning by value it will result in a dangling reference. The following example illustrates the problem
+
+```
+class SomeSubType {
+public:
+  BSONObj toBSON() const {...};
+
+  friend auto logAttrs(const SomeSubType& sub) {
+    return "subAttr"_attr=sub;
+  }
+};
+
+class SomeType {
+public:
+  const std::string& name() const { return name_; }
+  SomeSubType sub() const { return sub_; } // Returning by value!
+
+  friend auto logAttrs(const SomeType& type) {
+    // logAttrs(type.sub()) below will contain a danling reference!
+    return logv2::multipleAttrs("name"_attr=type.name(), logAttrs(type.sub()));
+  }
+private:
+  SomeSubType sub_;
+  std::string name_;
+};
+``` 
+The better implementation would be to let the log system control the lifetime by passing the instance to `multipleAttrs` without creating the attribute. The log system will detect that it is not an attribute and will attempt to create attributes by calling `logAttrs`:
+```
+friend auto logAttrs(const SomeType& type) {
+  return logv2::multipleAttrs("name"_attr=type.name(), type.sub());
+}
+```
+
 # Additional features
 
 ## Combining uassert with log statement

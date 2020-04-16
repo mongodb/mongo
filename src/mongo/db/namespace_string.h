@@ -38,6 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -405,6 +406,10 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const NamespaceString& nss) {
         return H::combine(std::move(h), nss._ns);
+    }
+
+    friend auto logAttrs(const NamespaceString& nss) {
+        return "namespace"_attr = nss;
     }
 
 private:
