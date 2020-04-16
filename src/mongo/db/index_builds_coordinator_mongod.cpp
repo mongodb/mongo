@@ -202,12 +202,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
     invariant(!opCtx->lockState()->isRSTLExclusive(), buildUUID.toString());
 
-    // Copy over all necessary OperationContext state.
-
-    // Task in thread pool should retain the caller's deadline.
-    const auto deadline = opCtx->getDeadline();
-    const auto timeoutError = opCtx->getTimeoutError();
-
     const auto nss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
     const auto& oss = OperationShardingState::get(opCtx);
@@ -245,14 +239,12 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         buildUUID,
         dbName,
         nss,
-        deadline,
         indexBuildOptions,
         logicalOp,
         opDesc,
         replState,
         startPromise = std::move(startPromise),
         startTimestamp,
-        timeoutError,
         shardVersion,
         dbVersion
     ](auto status) mutable noexcept {
@@ -271,7 +263,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         }
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
-        opCtx->setDeadlineByDate(deadline, timeoutError);
 
         auto& oss = OperationShardingState::get(opCtx.get());
         oss.initializeClientRoutingVersions(nss, shardVersion, dbVersion);
