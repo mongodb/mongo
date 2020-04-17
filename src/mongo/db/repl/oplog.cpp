@@ -796,7 +796,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
       },
       {ErrorCodes::IndexAlreadyExists,
        ErrorCodes::IndexBuildAlreadyInProgress,
-       ErrorCodes::NamespaceNotFound}}},
+       ErrorCodes::NamespaceNotFound,
+       ErrorCodes::NoSuchKey}}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           if (OplogApplication::Mode::kApplyOpsCmd == mode) {

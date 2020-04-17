@@ -662,50 +662,42 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
                 << buildUUID,
             !opCtx->recoveryUnit()->getCommitTimestamp().isNull());
 
-    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    auto swReplState = indexBuildsCoord->_getIndexBuild(buildUUID);
-    if (swReplState == ErrorCodes::NoSuchKey) {
-        // If the index build was not found, we must restart the build. For some reason the index
-        // build has already been aborted on this node. This is possible in certain infrequent race
-        // conditions with stepdown, shutdown, and user interruption.
-        // Also, it can be because, when this node was previously in
-        // initial sync state and this index build was in progress on sync source. And, initial sync
-        // does not start the in progress index builds.
-        LOGV2(20653,
-              "Could not find an active index build with UUID {buildUUID} while processing a "
-              "commitIndexBuild oplog entry. Restarting the index build on "
-              "collection {nss} ({collUUID}) at optime {opCtx_recoveryUnit_getCommitTimestamp}",
-              "buildUUID"_attr = buildUUID,
-              "nss"_attr = nss,
-              "collUUID"_attr = collUUID,
-              "opCtx_recoveryUnit_getCommitTimestamp"_attr =
-                  opCtx->recoveryUnit()->getCommitTimestamp());
-
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-        indexBuildOptions.replSetAndNotPrimaryAtStart = true;
-
-        // This spawns a new thread and returns immediately.
-        auto fut = uassertStatusOK(indexBuildsCoord->startIndexBuild(
-            opCtx,
-            nss.db().toString(),
-            collUUID,
-            oplogEntry.indexSpecs,
-            buildUUID,
-            /* This oplog entry is only replicated for two-phase index builds */
-            IndexBuildProtocol::kTwoPhase,
-            indexBuildOptions));
-
-        // In certain optimized cases that return early, the future will already be set, and the
-        // index build will already have been torn-down. Any subsequent calls to look up the index
-        // build will fail immediately without any error information.
-        if (fut.isReady()) {
-            // Throws if there were errors building the index.
-            fut.get();
-            return;
-        }
-    }
-
-    auto replState = uassertStatusOK(indexBuildsCoord->_getIndexBuild(buildUUID));
+    // There is a possibility that we cannot find an active index build with the given build UUID.
+    // This can be the case when the index already exists or was dropped on the sync source before
+    // the collection was cloned during initial sync. The oplog code will ignore the NoSuchKey
+    // error code.
+    //
+    // Case 1: Index already exists:
+    // +-----------------------------------------+--------------------------------+
+    // |               Sync Target               |          Sync Source           |
+    // +-----------------------------------------+--------------------------------+
+    // |                                         | startIndexBuild 'x' at TS: 1.  |
+    // | Start oplog fetcher at TS: 2.           |                                |
+    // |                                         | commitIndexBuild 'x' at TS: 2. |
+    // | Begin cloning the collection.           |                                |
+    // | Index 'x' is listed as ready, build it. |                                |
+    // | Finish cloning the collection.          |                                |
+    // | Start the oplog replay phase.           |                                |
+    // | Apply commitIndexBuild 'x'.             |                                |
+    // | --- Index build not found ---           |                                |
+    // +-----------------------------------------+--------------------------------+
+    //
+    // Case 2: Sync source dropped the index:
+    // +--------------------------------+--------------------------------+
+    // |          Sync Target           |          Sync Source           |
+    // +--------------------------------+--------------------------------+
+    // |                                | startIndexBuild 'x' at TS: 1.  |
+    // | Start oplog fetcher at TS: 2.  |                                |
+    // |                                | commitIndexBuild 'x' at TS: 2. |
+    // |                                | dropIndex 'x' at TS: 3.        |
+    // | Begin cloning the collection.  |                                |
+    // | No user indexes to build.      |                                |
+    // | Finish cloning the collection. |                                |
+    // | Start the oplog replay phase.  |                                |
+    // | Apply commitIndexBuild 'x'.    |                                |
+    // | --- Index build not found ---  |                                |
+    // +--------------------------------+--------------------------------+
+    auto replState = uassertStatusOK(_getIndexBuild(buildUUID));
 
     // Retry until we are able to put the index build in the kPrepareCommit state. None of the
     // conditions for retrying are common or expected to be long-lived, so we believe this to be
