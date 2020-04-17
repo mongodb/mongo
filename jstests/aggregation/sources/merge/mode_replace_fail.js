@@ -1,7 +1,4 @@
 // Tests the behaviour of the $merge stage with whenMatched=replace and whenNotMatched=fail.
-//
-// Cannot implicitly shard accessed collections because a collection can be implictly created and
-// exists when none is expected.
 (function() {
 "use strict";
 
@@ -26,14 +23,34 @@ const pipeline = [mergeStage];
     assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
     let error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 1}, {_id: 3, a: 3}]});
+    // Since there is no way to guarantee the ordering of the writes performed by $merge, it
+    // follows that the contents of the target collection will depend on when the document which
+    // triggers the MergeStageNoMatchingDocument error executes. As such, we test that the
+    // target collection contains some combination of its original documents and expected
+    // updates. In particular, it should be the case that each document has exactly one of field
+    // 'a' or field 'b' and its value should equal that of '_id'.
+    let checkOutputDocument = function(elem) {
+        const hasA = elem.hasOwnProperty('a');
+        const hasB = elem.hasOwnProperty('b');
+        assert(hasA ^ hasB);
+        const value = hasA ? elem['a'] : elem['b'];
+        assert.eq(value, elem['_id'], elem);
+    };
+
+    let result = target.find().toArray();
+    assert.eq(result.length, 2, result);
+    for (const elem of result) {
+        checkOutputDocument(elem);
+    }
 
     // Multiple documents without a match.
     assert(target.drop());
     assert.commandWorked(target.insert([{_id: 1, b: 1}]));
     error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 1}]});
+    result = target.find().toArray();
+    assert.eq(result.length, 1, result);
+    checkOutputDocument(result[0]);
 })();
 
 // Test $merge when all documents in the source collection have a matching document in the
