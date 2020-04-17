@@ -36,8 +36,11 @@ assert.commandWorked(
 // Wait for the secondary to catch up by replicating a doc to both nodes.
 assert.writeOK(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w: "majority"}}));
 
-// Step up the secondary. Retry since the old primary may step down when we try to ask for its vote.
+// Step up the secondary. Retry since the old primary may step down when we try to ask for its
+// vote.
+let numStepUpCmds = 0;
 assert.soonNoExcept(function() {
+    numStepUpCmds++;
     return secondary.adminCommand({replSetStepUp: 1}).ok;
 });
 
@@ -49,8 +52,10 @@ const newSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverSt
 // Check that both the 'called' and 'successful' fields of stepUpCmd have been incremented in
 // serverStatus, and that they have not been incremented in any of the other election reason
 // counters.
-verifyServerStatusElectionReasonCounterChange(
-    initialSecondaryStatus.electionMetrics, newSecondaryStatus.electionMetrics, "stepUpCmd", 1);
+verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
+                                              newSecondaryStatus.electionMetrics,
+                                              "stepUpCmd",
+                                              numStepUpCmds);
 verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
                                               newSecondaryStatus.electionMetrics,
                                               "priorityTakeover",
