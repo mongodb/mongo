@@ -6609,12 +6609,8 @@ tasks:
   # don't want to publish packages.
   patchable: false
   stepback: false
-  # Same dependencies as "push" below
   depends_on:
-  - name: compile
-  - name: jsCore
-  - name: dbtest
-  - name: replica_sets_jscore_passthrough
+  - name: push
   commands:
     - func: "fetch artifacts"
     - func: "apply compile expansions"
@@ -6641,6 +6637,7 @@ tasks:
   tags: ["publish"]
   patchable: false
   depends_on:
+  - name: compile
   - name: jsCore
   - name: dbtest
   - name: replica_sets_jscore_passthrough
