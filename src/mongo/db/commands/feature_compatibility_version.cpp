@@ -165,48 +165,8 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
                 FeatureCompatibilityVersionParser::toString(newVersion));
     }
 
-    opCtx->recoveryUnit()->onCommit([opCtx, newVersion](boost::optional<Timestamp>) {
-        serverGlobalParams.featureCompatibility.setVersion(newVersion);
-        updateMinWireVersion();
-
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44) {
-            // Close all incoming connections from internal clients with binary versions lower than
-            // ours.
-            opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
-                transport::Session::kLatestVersionInternalClientKeepOpen |
-                transport::Session::kExternalClientKeepOpen);
-            // Close all outgoing connections to servers with binary versions lower than ours.
-            executor::EgressTagCloserManager::get(opCtx->getServiceContext())
-                .dropConnections(transport::Session::kKeepOpen);
-        }
-
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
-            if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
-                LOGV2(20460,
-                      "featureCompatibilityVersion - "
-                      "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
-                      "Blocking until fail point is disabled.");
-                hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
-            }
-            // Abort all open transactions when downgrading the featureCompatibilityVersion.
-            SessionKiller::Matcher matcherAllSessions(
-                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-            killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
-        }
-        const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
-        const bool isReplSet =
-            replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-        // We only want to increment the server TopologyVersion when the minWireVersion has changed.
-        // This can only happen in two scenarios:
-        // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
-        // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
-        const auto shouldIncrementTopologyVersion =
-            newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44 ||
-            newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46;
-        if (isReplSet && shouldIncrementTopologyVersion) {
-            replCoordinator->incrementTopologyVersion();
-        }
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, newVersion](boost::optional<Timestamp>) { _setVersion(opCtx, newVersion); });
 }
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
@@ -226,6 +186,69 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
+    }
+}
+
+void FeatureCompatibilityVersion::_setVersion(
+    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version newVersion) {
+    serverGlobalParams.featureCompatibility.setVersion(newVersion);
+    updateMinWireVersion();
+
+    if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44) {
+        // Close all incoming connections from internal clients with binary versions lower than
+        // ours.
+        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
+            transport::Session::kLatestVersionInternalClientKeepOpen |
+            transport::Session::kExternalClientKeepOpen);
+        // Close all outgoing connections to servers with binary versions lower than ours.
+        executor::EgressTagCloserManager::get(opCtx->getServiceContext())
+            .dropConnections(transport::Session::kKeepOpen);
+    }
+
+    if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+        if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
+            LOGV2(20460,
+                  "featureCompatibilityVersion - "
+                  "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
+                  "Blocking until fail point is disabled.");
+            hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
+        }
+        // Abort all open transactions when downgrading the featureCompatibilityVersion.
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
+    }
+    const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
+    const bool isReplSet =
+        replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    // We only want to increment the server TopologyVersion when the minWireVersion has changed.
+    // This can only happen in two scenarios:
+    // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
+    // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
+    const auto shouldIncrementTopologyVersion =
+        newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44 ||
+        newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46;
+    if (isReplSet && shouldIncrementTopologyVersion) {
+        replCoordinator->incrementTopologyVersion();
+    }
+}
+
+void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx) {
+    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
+    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
+        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+    if (swFcv.isOK()) {
+        const auto featureCompatibilityVersion = swFcv.getValue();
+        auto swVersion = FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion);
+        const auto memoryFcv = serverGlobalParams.featureCompatibility.getVersion();
+        if (swVersion.isOK() && (swVersion.getValue() != memoryFcv)) {
+            auto diskFcv = swVersion.getValue();
+            LOGV2(4675801,
+                  "Setting featureCompatibilityVersion as part of rollback",
+                  "newVersion"_attr = FeatureCompatibilityVersionParser::toString(diskFcv),
+                  "oldVersion"_attr = FeatureCompatibilityVersionParser::toString(memoryFcv));
+            _setVersion(opCtx, diskFcv);
+        }
     }
 }
 

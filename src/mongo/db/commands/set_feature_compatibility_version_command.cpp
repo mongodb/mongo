@@ -70,7 +70,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
+MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
 /**
  * Deletes the persisted default read/write concern document.
@@ -234,6 +236,7 @@ public:
                                      << requestedVersion)))));
             }
 
+            hangWhileUpgrading.pauseWhileSet(opCtx);
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion44) {
             uassert(ErrorCodes::IllegalOperation,
@@ -291,6 +294,7 @@ public:
                                      << requestedVersion)))));
             }
 
+            hangWhileDowngrading.pauseWhileSet(opCtx);
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         }
 
