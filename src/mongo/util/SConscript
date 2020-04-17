@@ -593,7 +593,6 @@ icuEnv.CppUnitTest(
         'clock_source_mock',
         'clock_sources',
         'diagnostic_info' if get_option('use-diagnostic-latches') == 'on' else [],
-        'latch_analyzer',
         'dns_query',
         'fail_point',
         'icu',
