@@ -37,6 +37,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/server_is_master_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
@@ -96,6 +97,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/transport/ismaster_metrics.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
@@ -1695,6 +1697,12 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     DbResponse dbresponse;
     if (op == dbMsg || (op == dbQuery && isCommand)) {
         dbresponse = receivedCommands(opCtx, m, behaviors);
+        // IsMaster should take kMaxAwaitTimeMs at most, log if it takes twice that.
+        if (auto command = currentOp.getCommand();
+            command && (command->getName() == "ismaster" || command->getName() == "isMaster")) {
+            slowMsOverride =
+                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTimeMs);
+        }
     } else if (op == dbQuery) {
         invariant(!isCommand);
         opCtx->markKillOnClientDisconnect();
