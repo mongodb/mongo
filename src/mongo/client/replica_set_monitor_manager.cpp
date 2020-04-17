@@ -100,7 +100,7 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
                     LOGV2_ERROR(4712101,
                                 "An error occurred publishing a ReplicaSetMonitor handshake event",
                                 "error"_attr = exception.toStatus(),
-                                "setName"_attr = monitor->getName(),
+                                "replicaSet"_attr = monitor->getName(),
                                 "handshakeStatus"_attr = isMasterReply.status);
                     return exception.toStatus();
                 }
@@ -235,8 +235,9 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
             monitor->drop();
         }
         _monitors.erase(it);
-        LOGV2(
-            20187, "Removed ReplicaSetMonitor for replica set {setName}", "setName"_attr = setName);
+        LOGV2(20187,
+              "Removed ReplicaSetMonitor for replica set {replicaSet}",
+              "replicaSet"_attr = setName);
     }
 }
 

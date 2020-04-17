@@ -342,8 +342,9 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         rpc::validateWireVersion(WireSpec::instance().outgoing, swProtocolSet.getValue().version);
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(20126,
-                      "remote host has incompatible wire version: {validateStatus}",
-                      "validateStatus"_attr = validateStatus);
+                      "Remote host has incompatible wire version: {error}",
+                      "Remote host has incompatible wire version",
+                      "error"_attr = validateStatus);
 
         return validateStatus;
     }
@@ -426,7 +427,11 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     _lastConnectivityCheck = Date_t::now();
     _session->setTimeout(_socketTimeout);
     _session->setTags(_tagMask);
-    LOGV2_DEBUG(20119, 1, "connected to server {}", ""_attr = toString());
+    LOGV2_DEBUG(20119,
+                1,
+                "Connected to host {connString}",
+                "Connected to host",
+                "connString"_attr = toString());
     return Status::OK();
 }
 
@@ -567,7 +572,7 @@ void DBClientConnection::_checkConnection() {
                     "Reconnect attempt to {connString} failed: {reason}",
                     "Reconnect attempt failed",
                     "connString"_attr = toString(),
-                    "reason"_attr = errmsg);
+                    "error"_attr = errmsg);
         if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
             uassertStatusOK(connectStatus);  // Will always throw
         } else {
@@ -593,7 +598,7 @@ void DBClientConnection::_checkConnection() {
                             "Reconnect: auth failed",
                             "db"_attr = kv.second[auth::getSaslCommandUserDBFieldName()],
                             "user"_attr = kv.second[auth::getSaslCommandUserFieldName()],
-                            "reason"_attr = ex.what());
+                            "error"_attr = ex.what());
             }
         }
     }
@@ -749,9 +754,10 @@ bool DBClientConnection::call(Message& toSend,
     auto sinkStatus = _session->sinkMessage(swm.getValue());
     if (!sinkStatus.isOK()) {
         LOGV2(20124,
-              "DBClientConnection failed to send message to {getServerAddress} - {sinkStatus}",
-              "getServerAddress"_attr = getServerAddress(),
-              "sinkStatus"_attr = redact(sinkStatus));
+              "DBClientConnection failed to send message to {connString}: {error}",
+              "DBClientConnection failed to send message",
+              "connString"_attr = getServerAddress(),
+              "error"_attr = redact(sinkStatus));
         return maybeThrow(sinkStatus);
     }
 
@@ -760,10 +766,10 @@ bool DBClientConnection::call(Message& toSend,
         response = std::move(swm.getValue());
     } else {
         LOGV2(20125,
-              "DBClientConnection failed to receive message from {getServerAddress} - "
-              "{swm_getStatus}",
-              "getServerAddress"_attr = getServerAddress(),
-              "swm_getStatus"_attr = redact(swm.getStatus()));
+              "DBClientConnection failed to receive message from {connString}: {error}",
+              "DBClientConnection failed to receive message",
+              "connString"_attr = getServerAddress(),
+              "error"_attr = redact(swm.getStatus()));
         return maybeThrow(swm.getStatus());
     }
 

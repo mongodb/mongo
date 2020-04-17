@@ -442,8 +442,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     const auto cbState = _networkInProgressQueue.back();
     LOGV2_DEBUG(22607,
                 3,
-                "Scheduling remote command request: {scheduledRequest}",
-                "scheduledRequest"_attr = redact(scheduledRequest.toString()));
+                "Scheduling remote command request: {request}",
+                "Scheduling remote command request",
+                "request"_attr = redact(scheduledRequest.toString()));
     lk.unlock();
 
     auto commandStatus = _net->startCommand(
@@ -458,12 +459,12 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
             if (_inShutdown_inlock()) {
                 return;
             }
-            LOGV2_DEBUG(
-                22608,
-                3,
-                "Received remote response: {response_isOK_response_response_status_toString}",
-                "response_isOK_response_response_status_toString"_attr =
-                    redact(response.isOK() ? response.toString() : response.status.toString()));
+            LOGV2_DEBUG(22608,
+                        3,
+                        "Received remote response: {response}",
+                        "Received remote response",
+                        "response"_attr = redact(response.isOK() ? response.toString()
+                                                                 : response.status.toString()));
             swap(cbState->callback, newCb);
             scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
         },
@@ -687,8 +688,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
     lk.unlock();
     LOGV2_DEBUG(4495133,
                 3,
-                "Scheduling exhaust remote command request: {scheduledRequest}",
-                "scheduledRequest"_attr = redact(scheduledRequest.toString()));
+                "Scheduling exhaust remote command request: {request}",
+                "Scheduling exhaust remote command request",
+                "request"_attr = redact(scheduledRequest.toString()));
 
     auto commandStatus = _net->startExhaustCommand(
         swCbHandle.getValue(),
@@ -696,12 +698,12 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
         [this, scheduledRequest, cbState, cb, baton](const ResponseOnAnyStatus& response) {
             using std::swap;
 
-            LOGV2_DEBUG(
-                4495134,
-                3,
-                "Received remote response: {response_isOK_response_response_status_toString}",
-                "response_isOK_response_response_status_toString"_attr =
-                    redact(response.isOK() ? response.toString() : response.status.toString()));
+            LOGV2_DEBUG(4495134,
+                        3,
+                        "Received remote response: {response}",
+                        "Received remote response",
+                        "response"_attr = redact(response.isOK() ? response.toString()
+                                                                 : response.status.toString()));
 
             // The cbState remains in the '_networkInProgressQueue' for the entirety of the
             // request's lifetime and is added to and removed from the '_poolInProgressQueue' each

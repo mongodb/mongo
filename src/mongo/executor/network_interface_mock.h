@@ -82,11 +82,6 @@ public:
     NetworkInterfaceMock();
     virtual ~NetworkInterfaceMock();
 
-    /**
-     * Logs the contents of the queues for diagnostics.
-     */
-    void logQueues();
-
     ////////////////////////////////////////////////////////////////////////////////
     //
     // NetworkInterface methods

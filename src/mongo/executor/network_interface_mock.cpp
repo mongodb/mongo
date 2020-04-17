@@ -64,28 +64,6 @@ NetworkInterfaceMock::~NetworkInterfaceMock() {
     invariant(_blackHoled.empty());
 }
 
-void NetworkInterfaceMock::logQueues() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    const std::vector<std::pair<std::string, const NetworkOperationList*>> queues{
-        {"unscheduled", &_unscheduled},
-        {"scheduled", &_scheduled},
-        {"processing", &_processing},
-        {"blackholes", &_blackHoled}};
-
-    for (auto&& queue : queues) {
-        if (queue.second->empty()) {
-            continue;
-        }
-
-        LOGV2(22588, "**** queue: {queue_first} ****", "queue_first"_attr = queue.first);
-        for (auto&& item : *queue.second) {
-            LOGV2(22589,
-                  "\t\t {item_getDiagnosticString}",
-                  "item_getDiagnosticString"_attr = item.getDiagnosticString());
-        }
-    }
-}
-
 std::string NetworkInterfaceMock::getDiagnosticString() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return str::stream() << "NetworkInterfaceMock -- waitingToRunMask:" << _waitingToRunMask
@@ -249,10 +227,10 @@ void NetworkInterfaceMock::shutdown() {
     _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
     lk.unlock();
     for (NetworkOperationIterator iter = todo.begin(); iter != todo.end(); ++iter) {
-        LOGV2_WARNING(
-            22590,
-            "Mock network interface shutting down with outstanding request: {iter_getRequest}",
-            "iter_getRequest"_attr = iter->getRequest());
+        LOGV2_WARNING(22590,
+                      "Mock network interface shutting down with outstanding request: {request}",
+                      "Mock network interface shutting down with outstanding request",
+                      "request"_attr = iter->getRequest());
         iter->setResponse(
             now, {ErrorCodes::ShutdownInProgress, "Shutting down mock network", Milliseconds(0)});
         iter->finishResponse();

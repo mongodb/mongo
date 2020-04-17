@@ -86,8 +86,9 @@ public:
         auto& entry = executorTestCaseRegistry()[name];
         if (entry) {
             LOGV2_FATAL(28713,
-                        "Multiple attempts to register ExecutorTest named {name}",
-                        "name"_attr = name);
+                        "Multiple attempts to register ExecutorTest named {executor}",
+                        "Multiple attempts to register ExecutorTest",
+                        "executor"_attr = name);
         }
         entry = std::move(makeTest);
     }
