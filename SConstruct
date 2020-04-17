@@ -2575,11 +2575,9 @@ def doConfigure(myenv):
         To specify a target minimum for Darwin platforms, please explicitly add the appropriate options
         to CCFLAGS and LINKFLAGS on the command line:
 
-        macOS: scons CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11" ..
-        iOS  : scons CCFLAGS="-miphoneos-version-min=10.3" LINKFLAGS="-miphoneos-version-min=10.3" ...
-        tvOS : scons CCFLAGS="-mtvos-version-min=10.3" LINKFLAGS="-tvos-version-min=10.3" ...
+        macOS: scons CCFLAGS="-mmacosx-version-min=10.13" LINKFLAGS="-mmacosx-version-min=10.13" ..
 
-        Note that MongoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
+        Note that MongoDB requires macOS 10.13 or later.
         """
         myenv.ConfError(textwrap.dedent(message))
 
