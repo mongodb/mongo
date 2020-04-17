@@ -191,8 +191,6 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         }
 
         if (statusWithOptionalResult.getValue()) {
-            // TODO (SERVER-37644): when joining is implemented, the returned Future will no longer
-            // always be set.
             invariant(statusWithOptionalResult.getValue()->isReady());
             // The requested index (specs) are already built or are being built. Return success
             // early (this is v4.0 behavior compatible).
