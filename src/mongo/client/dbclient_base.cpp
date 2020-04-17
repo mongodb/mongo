@@ -501,11 +501,12 @@ Status DBClientBase::authenticateInternalUser() {
         return status;
     }
 
-    if (serverGlobalParams.quiet.load()) {
+    if (!serverGlobalParams.quiet.load()) {
         LOGV2(20117,
-              "can't authenticate to {} as internal user, error: {status_reason}",
-              ""_attr = toString(),
-              "status_reason"_attr = status.reason());
+              "Can't authenticate to {connString} as internal user, error: {error}",
+              "Can't authenticate as internal user",
+              "connString"_attr = toString(),
+              "error"_attr = status);
     }
 
     return status;
@@ -999,6 +1000,7 @@ void DBClientBase::dropIndex(const string& ns,
         LOGV2_DEBUG(20118,
                     logSeverityV1toV2(_logLevel).toInt(),
                     "dropIndex failed: {info}",
+                    "dropIndex failed",
                     "info"_attr = info);
         uassert(10007, "dropIndex failed", 0);
     }

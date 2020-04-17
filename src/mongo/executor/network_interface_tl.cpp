@@ -350,7 +350,12 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                                                   << ", deadline was " << deadline.toString()
                                                   << ", op was " << redact(requestOnAny.toString());
 
-        LOGV2_DEBUG(22595, 2, "", "message"_attr = message);
+        LOGV2_DEBUG(22595,
+                    2,
+                    "Request timed out",
+                    "requestId"_attr = requestOnAny.id,
+                    "deadline"_attr = deadline,
+                    "request"_attr = requestOnAny);
         fulfillFinalPromise(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, message));
     });
 }
@@ -437,10 +442,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return kNetworkInterfaceShutdownInProgress;
     }
 
-    LOGV2_DEBUG(22596,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
-                "startCommand",
-                "request"_attr = redact(request.toString()));
+    LOGV2_DEBUG(
+        22596, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));
@@ -699,7 +702,7 @@ void NetworkInterfaceTL::RequestManager::killOperationsForPendingRequests() {
                     "Sending remote _killOperations request to cancel command",
                     "operationKey"_attr = cmdState.lock()->operationKey,
                     "target"_attr = requestState->request->target,
-                    "request_id"_attr = requestState->request->id);
+                    "requestId"_attr = requestState->request->id);
 
         auto status = requestState->interface()->_killOperation(requestState);
         if (!status.isOK()) {
@@ -768,9 +771,9 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
         LOGV2_DEBUG(4647200,
                     2,
-                    "Setup hedge request",
-                    "request_id"_attr = cmdStatePtr->requestOnAny.id,
-                    "request"_attr = redact(request.toString()),
+                    "Set maxTimeMS for request",
+                    "maxTime"_attr = Milliseconds(maxTimeMS),
+                    "requestId"_attr = cmdStatePtr->requestOnAny.id,
                     "target"_attr = cmdStatePtr->requestOnAny.target[idx]);
 
         if (cmdStatePtr->interface->_svcCtx) {
@@ -986,10 +989,8 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
-    LOGV2_DEBUG(23909,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
-                "startCommand",
-                "request"_attr = redact(request.toString()));
+    LOGV2_DEBUG(
+        23909, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));

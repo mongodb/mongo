@@ -209,13 +209,13 @@ void StreamableReplicaSetMonitor::drop() {
             lock, Status{ErrorCodes::ShutdownInProgress, "the ReplicaSetMonitor is shutting down"});
     }
 
-    LOGV2(4333209, "Closing Replica Set Monitor {setName}", "setName"_attr = getName());
+    LOGV2(4333209, "Closing Replica Set Monitor {replicaSet}", "replicaSet"_attr = getName());
     _queryProcessor->shutdown();
     _pingMonitor->shutdown();
     _isMasterMonitor->shutdown();
 
     ReplicaSetMonitorManager::get()->getNotifier().onDroppedSet(getName());
-    LOGV2(4333210, "Done closing Replica Set Monitor {setName}", "setName"_attr = getName());
+    LOGV2(4333210, "Done closing Replica Set Monitor {replicaSet}", "replicaSet"_attr = getName());
 }
 
 SemiFuture<HostAndPort> StreamableReplicaSetMonitor::getHostOrRefresh(
@@ -257,8 +257,8 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
     _isMasterMonitor->requestImmediateCheck();
     LOGV2_DEBUG(4333212,
                 kLowerLogLevel,
-                "RSM {setName} start async getHosts with {readPref}",
-                "setName"_attr = getName(),
+                "RSM {replicaSet} start async getHosts with {readPref}",
+                "replicaSet"_attr = getName(),
                 "readPref"_attr = readPrefToStringWithMinOpTime(criteria));
 
     // fail fast on timeout
@@ -310,16 +310,16 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
             query->promise.setError(errorStatus);
             query->done = true;
             LOGV2_INFO(4333208,
-                       "RSM {setName} host selection timeout: {status}",
-                       "setName"_attr = getName(),
+                       "RSM {replicaSet} host selection timeout: {status}",
+                       "replicaSet"_attr = getName(),
                        "error"_attr = errorStatus.toString());
         };
     auto swDeadlineHandle = _executor->scheduleWorkAt(query->deadline, deadlineCb);
 
     if (!swDeadlineHandle.isOK()) {
         LOGV2_INFO(4333207,
-                   "RSM {setName} error scheduling deadline handler: {status}",
-                   "setName"_attr = getName(),
+                   "RSM {replicaSet} error scheduling deadline handler: {status}",
+                   "replicaSet"_attr = getName(),
                    "error"_attr = swDeadlineHandle.getStatus());
         return SemiFuture<HostAndPortList>::makeReady(swDeadlineHandle.getStatus());
     }
@@ -579,8 +579,8 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     // Notify external components if there are membership changes in the topology.
     if (_hasMembershipChange(previousDescription, newDescription)) {
         LOGV2(4333213,
-              "RSM {setName} Topology Change: {topologyDescription}",
-              "setName"_attr = getName(),
+              "RSM {replicaSet} Topology Change: {topologyDescription}",
+              "replicaSet"_attr = getName(),
               "topologyDescription"_attr = newDescription->toString());
 
         auto maybePrimary = newDescription->getPrimary();
@@ -604,7 +604,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
                                 kLowerLogLevel,
                                 "Skip publishing unconfirmed replica set members since there are "
                                 "no primaries or secondaries in the new topology",
-                                "setName"_attr = getName());
+                                "replicaSet"_attr = getName());
                     return;
                 }
 
@@ -647,7 +647,7 @@ void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT d
                 kLowerLogLevel,
                 "ReplicaSetMonitor ping success",
                 "host"_attr = hostAndPort,
-                "setName"_attr = getName(),
+                "replicaSet"_attr = getName(),
                 "duration"_attr = durationMS);
     _topologyManager->onServerRTTUpdated(hostAndPort, durationMS);
 }
@@ -726,8 +726,8 @@ void StreamableReplicaSetMonitor::_processOutstanding(
                 const auto latency = _executor->now() - query->start;
                 LOGV2_DEBUG(433214,
                             kLowerLogLevel,
-                            "RSM {setName} finished async getHosts: {readPref} ({latency})",
-                            "setName"_attr = getName(),
+                            "RSM {replicaSet} finished async getHosts: {readPref} ({latency})",
+                            "replicaSet"_attr = getName(),
                             "readPref"_attr = readPrefToStringWithMinOpTime(query->criteria),
                             "latency"_attr = latency.toString());
                 shouldRemove = true;

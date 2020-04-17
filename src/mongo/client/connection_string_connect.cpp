@@ -61,12 +61,15 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
                 auto c = std::make_unique<DBClientConnection>(true, 0, newURI);
 
                 c->setSoTimeout(socketTimeout);
-                LOGV2_DEBUG(
-                    20109, 1, "creating new connection to:{server}", "server"_attr = server);
+                LOGV2_DEBUG(20109,
+                            1,
+                            "Creating new connection to: {hostAndPort}",
+                            "Creating new connection",
+                            "hostAndPort"_attr = server);
                 if (!c->connect(server, applicationName, errmsg)) {
                     continue;
                 }
-                LOGV2_DEBUG(20110, 1, "connected connection!");
+                LOGV2_DEBUG(20110, 1, "Connected connection!");
                 return std::move(c);
             }
             return nullptr;
@@ -98,10 +101,10 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
             auto replacementConn = _connectHook->connect(*this, errmsg, socketTimeout);
 
             LOGV2(20111,
-                  "replacing connection to {this} with "
-                  "{replacementConn_replacementConn_getServerAddress_empty}",
-                  "this"_attr = this->toString(),
-                  "replacementConn_replacementConn_getServerAddress_empty"_attr =
+                  "Replacing connection to {oldConnString} with {newConnString}",
+                  "Replacing connection string",
+                  "oldConnString"_attr = this->toString(),
+                  "newConnString"_attr =
                       (replacementConn ? replacementConn->getServerAddress() : "(empty)"));
 
             return replacementConn;

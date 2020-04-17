@@ -308,9 +308,10 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             } else {
                 LOGV2_DEBUG(22584,
                             2,
-                            "Failed to connect to {peer} - {status}",
-                            "peer"_attr = _peer,
-                            "status"_attr = redact(status));
+                            "Failed to connect to {hostAndPort} - {error}",
+                            "Failed to connect",
+                            "hostAndPort"_attr = _peer,
+                            "error"_attr = redact(status));
                 handler->promise.setError(status);
             }
         });

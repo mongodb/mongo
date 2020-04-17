@@ -151,8 +151,8 @@ Future<void> authenticateClient(const BSONObj& params,
         if (serverGlobalParams.transitionToAuth && !ErrorCodes::isNetworkError(status)) {
             // If auth failed in transitionToAuth, just pretend it succeeded.
             LOGV2(20108,
-                  "Failed to authenticate in transitionToAuth, falling back to no "
-                  "authentication.");
+                  "Failed to authenticate in transitionToAuth, "
+                  "falling back to no authentication");
 
             return Status::OK();
         }

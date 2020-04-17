@@ -57,8 +57,8 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
         if (!replicaSetMonitor) {
             LOGV2_DEBUG(4333215,
                         kLogLevel,
-                        "could not find rsm instance {setName} for query processing.",
-                        "setName"_attr = *setName);
+                        "could not find rsm instance {replicaSet} for query processing.",
+                        "replicaSet"_attr = *setName);
             return;
         }
         replicaSetMonitor->_processOutstanding(newDescription);

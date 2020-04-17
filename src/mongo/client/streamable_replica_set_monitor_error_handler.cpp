@@ -46,7 +46,7 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
 
         LOGV2(4712102,
               "Host failed in replica set",
-              "setName"_attr = _setName,
+              "replicaSet"_attr = _setName,
               "host"_attr = host,
               "error"_attr = status,
               "action"_attr = result);
