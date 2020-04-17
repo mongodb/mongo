@@ -108,9 +108,9 @@ private:
     std::map<ProcessId, HANDLE> _handles;
 
 public:
-    HANDLE getHandleForPid(ProcessId pid);
+    /** Will uassert with ErrorCodes::BadValue if the pid is unregistered. */
+    HANDLE getHandleForPid(ProcessId pid) const;
     void eraseHandleForPid(ProcessId pid);
-    std::size_t countHandleForPid(ProcessId pid);
     void insertHandleForPid(ProcessId pid, HANDLE handle);
 
 #endif

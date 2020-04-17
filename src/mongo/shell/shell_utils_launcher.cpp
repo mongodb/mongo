@@ -41,6 +41,7 @@
 #include <boost/iostreams/tee.hpp>
 #include <cctype>
 #include <fcntl.h>
+#include <fmt/format.h>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -61,12 +62,14 @@
 #endif
 
 #include "mongo/base/environment_buffer.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/net/hostandport.h"
@@ -109,6 +112,9 @@ inline int pipe(int fds[2]) {
 namespace shell_utils {
 
 namespace {
+
+using namespace fmt::literals;
+
 void safeClose(int fd) {
 #ifndef _WIN32
     struct ScopedSignalBlocker {
@@ -207,22 +213,19 @@ void ProgramRegistry::getRegisteredPids(vector<ProcessId>& pids) {
 }
 
 #ifdef _WIN32
-HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) {
+HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) const {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
 
-    return _handles[pid];
+    auto iter = _handles.find(pid);
+    uassert(
+        ErrorCodes::BadValue, "Unregistered pid {}"_format(pid.toNative()), iter != _handles.end());
+    return iter->second;
 }
 
 void ProgramRegistry::eraseHandleForPid(ProcessId pid) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
 
     _handles.erase(pid);
-}
-
-std::size_t ProgramRegistry::countHandleForPid(ProcessId pid) {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-
-    return _handles.count(pid);
 }
 
 void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
@@ -319,7 +322,9 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             ss << e.number();
             str = ss.str();
         } else {
-            verify(e.type() == mongo::String);
+            uassert(ErrorCodes::FailedToParse,
+                    "Program arguments must be strings",
+                    e.type() == mongo::String);
             str = e.valuestr();
         }
         if (isMongo) {
@@ -337,8 +342,9 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
 
     // Load explicitly set environment key value pairs into _envp.
     for (const BSONElement& e : env) {
-        // Environment variable values must be strings
-        verify(e.type() == mongo::String);
+        uassert(ErrorCodes::FailedToParse,
+                "Environment variable values must be strings",
+                e.type() == mongo::String);
 
         _envp.emplace(std::string(e.fieldName()), std::string(e.valuestr()));
     }
@@ -700,7 +706,6 @@ void ProgramRunner::launchProcess(int child_stdout) {
 // If block is true, this will throw if it cannot wait for the processes to exit.
 bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
 #ifdef _WIN32
-    verify(registry.countHandleForPid(pid));
     HANDLE h = registry.getHandleForPid(pid);
 
     // wait until the process object is signaled before getting its
@@ -856,7 +861,7 @@ BSONObj RunNonMongoProgram(const BSONObj& a, void* data) {
 }
 
 BSONObj ResetDbpath(const BSONObj& a, void* data) {
-    verify(a.nFields() == 1);
+    uassert(ErrorCodes::FailedToParse, "Expected 1 field", a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
     if (path.empty()) {
         LOGV2_WARNING(22824, "ResetDbpath(): nothing to do, path was empty");
@@ -879,7 +884,7 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
 }
 
 BSONObj PathExists(const BSONObj& a, void* data) {
-    verify(a.nFields() == 1);
+    uassert(ErrorCodes::FailedToParse, "Expected 1 field", a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
     if (path.empty()) {
         LOGV2_WARNING(22825, "PathExists(): path was empty");
@@ -922,7 +927,7 @@ void copyDir(const boost::filesystem::path& from, const boost::filesystem::path&
 
 // NOTE target dbpath will be cleared first
 BSONObj CopyDbpath(const BSONObj& a, void* data) {
-    verify(a.nFields() == 2);
+    uassert(ErrorCodes::FailedToParse, "Expected 2 fields", a.nFields() == 2);
     BSONObjIterator i(a);
     string from = i.next().str();
     string to = i.next().str();
@@ -941,7 +946,6 @@ BSONObj CopyDbpath(const BSONObj& a, void* data) {
 inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 #ifdef _WIN32
     if (sig == SIGKILL || port == 0) {
-        verify(registry.countHandleForPid(pid));
         TerminateProcess(registry.getHandleForPid(pid),
                          1);  // returns failure for "zombie" processes.
         return;
@@ -1010,7 +1014,8 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
         } else {
             const auto ewd = errnoWithDescription();
             LOGV2_INFO(22816, "Kill failed", "error"_attr = ewd);
-            verify(x == 0);
+            uasserted(ErrorCodes::UnknownError,
+                      "kill({}, {}) failed: {}"_format(pid.toNative(), sig, ewd));
         }
     }
 
@@ -1064,7 +1069,7 @@ int getSignal(const BSONObj& a) {
         BSONObjIterator i(a);
         i.next();
         BSONElement e = i.next();
-        verify(e.isNumber());
+        uassert(ErrorCodes::BadValue, "Expected a signal number", e.isNumber());
         ret = int(e.number());
     }
     return ret;
