@@ -412,6 +412,45 @@ func TestDeprecatedIndexOptions(t *testing.T) {
 	})
 }
 
+func TestLongIndexName(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+
+	Convey("With a test MongoRestore", t, func() {
+		args := []string{
+			NumParallelCollectionsOption, "1",
+			NumInsertionWorkersOption, "1",
+		}
+
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		session, err := restore.SessionProvider.GetSession()
+		So(err, ShouldBeNil)
+
+		coll := session.Database("longindextest").Collection("test_collection")
+		coll.Drop(nil)
+		defer func() {
+			coll.Drop(nil)
+		}()
+
+		if restore.serverVersion.LT(db.Version{4, 2, 0}) {
+			Convey("Creating index with a full name longer than 127 bytes should fail (<4.2)", func() {
+				restore.TargetDirectory = "testdata/longindextestdump"
+				result := restore.Restore()
+				So(result.Err, ShouldNotBeNil)
+				So(result.Err.Error(), ShouldContainSubstring, "namespace is too long (max size is 127 bytes)")
+			})
+		} else {
+			Convey("Creating index with a full name longer than 127 bytes should succeed (>=4.2)", func() {
+				restore.TargetDirectory = "testdata/longindextestdump"
+				result := restore.Restore()
+				So(result.Err, ShouldBeNil)
+			})
+		}
+
+	})
+}
+
 func TestRestoreUsersOrRoles(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
