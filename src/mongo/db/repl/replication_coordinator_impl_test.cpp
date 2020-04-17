@@ -3672,6 +3672,10 @@ TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfigInvalidHoriz
     ASSERT_FALSE(initialResponse->isSecondary());
     ASSERT_FALSE(initialResponse->isConfigSet());
 
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
+    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
+
     stdx::thread awaitIsMasterInitiate([&] {
         const auto topologyVersion = getTopoCoord().getTopologyVersion();
         ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
@@ -3679,6 +3683,9 @@ TEST_F(ReplCoordTest, AwaitableIsMasterOnNodeWithUninitializedConfigInvalidHoriz
                            AssertionException,
                            ErrorCodes::SplitHorizonChange);
     });
+
+    // Ensure that the isMaster request has started waiting before initiating.
+    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     // Call replSetInitiate with no horizon configured. This should return an error to the isMaster
     // request that is currently waiting on a horizonParam that doesn't exit in the config.
