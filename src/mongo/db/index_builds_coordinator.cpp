@@ -1401,7 +1401,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
 
     invariant(collection, str::stream() << collectionUUID);
-    invariant(0U == collection->numRecords(opCtx), str::stream() << collectionUUID);
+    invariant(collection->isEmpty(opCtx), str::stream() << collectionUUID);
     invariant(!specs.empty(), str::stream() << collectionUUID);
 
     auto nss = collection->ns();
