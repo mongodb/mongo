@@ -79,13 +79,6 @@ const numDocs = 10;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-let bulk = testDB[collName].initializeUnorderedBulkOp();
-for (let i = 0; i < numDocs; i++) {
-    bulk.insert({x: i});
-}
-assert.commandWorked(bulk.execute());
-assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
-
 jsTest.log(
     "Verify that maxTimeMS expiration of the additional request does not affect the command result");
 // The hedged read will have the maxTimeMS set to 10ms, hence need to sleep longer than that.
@@ -155,19 +148,30 @@ try {
     clearCommandDelay(sortedNodes[1]);
 }
 
+// Need causally consistent reads to verify the document count
+let session = testDB.getMongo().startSession({causalConsistency: true});
+const sessionDB = session.getDatabase(dbName);
+const sessionColl = sessionDB.getCollection(collName);
+
+let bulk = sessionColl.initializeUnorderedBulkOp();
+for (let i = 0; i < numDocs; i++) {
+    bulk.insert({x: i});
+}
+assert.commandWorked(bulk.execute());
+
 jsTest.log("Verify that the getMore on hedge request do not inherit maxTimeMS");
 try {
-    assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 100}));
+    assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 1000}));
 
     // force to open hedge read cursor on sortedNodes[1]
-    setCommandDelay(sortedNodes[0], "find", 100, ns);
+    setCommandDelay(sortedNodes[0], "find", 500, ns);
 
     // $where with sleep is used because blocking command via failCommand does not affect the opCtx
     // deadlines as it blocks and unblocks the command before it starts execution.
     const comment = "test_getmore_on_additional_request_" + ObjectId();
-    let findRes = assert.commandWorked(testDB.runCommand({
+    let findRes = assert.commandWorked(sessionDB.runCommand({
         find: collName,
-        filter: {$where: "sleep(200); return true;", x: {$gte: 0}},
+        filter: {$where: "sleep(2000); return true;", x: {$gte: 0}},
         $readPreference: {mode: "nearest"},
         batchSize: 0,
         comment: comment
@@ -178,7 +182,7 @@ try {
 
     // confirm that getMore does not time out.
     let getMoreRes =
-        assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: collName}));
+        assert.commandWorked(sessionDB.runCommand({getMore: cursorId, collection: collName}));
     assert.eq(getMoreRes.cursor.nextBatch.length, numDocs);
 } finally {
     clearCommandDelay(sortedNodes[0]);
