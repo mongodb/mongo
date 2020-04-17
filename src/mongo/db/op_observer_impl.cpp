@@ -1469,6 +1469,9 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
             shardRegistry->clearEntries();
         }
     }
+
+    // Make sure the in-memory FCV matches the on-disk FCV.
+    FeatureCompatibilityVersion::onReplicationRollback(opCtx);
 }
 
 }  // namespace mongo

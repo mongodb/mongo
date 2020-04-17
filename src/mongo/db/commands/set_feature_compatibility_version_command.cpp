@@ -70,6 +70,8 @@ MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingSessions);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingSessions);
+MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
 /**
  * Returns a set of the logical session ids of each entry in config.transactions that matches the
@@ -366,6 +368,12 @@ public:
                                      << requestedVersion)))));
             }
 
+            if (MONGO_FAIL_POINT(hangWhileUpgrading)) {
+                log() << "featureCompatibilityVersion - "
+                         "hangWhileUpgrading fail point enabled. "
+                         "Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangWhileUpgrading);
+            }
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion40) {
             uassert(ErrorCodes::IllegalOperation,
@@ -410,6 +418,12 @@ public:
                                      << requestedVersion)))));
             }
 
+            if (MONGO_FAIL_POINT(hangWhileDowngrading)) {
+                log() << "featureCompatibilityVersion - "
+                         "hangWhileDowngrading fail point enabled. "
+                         "Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangWhileDowngrading);
+            }
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         }
 
