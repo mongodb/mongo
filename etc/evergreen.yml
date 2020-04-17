@@ -5630,6 +5630,7 @@ tasks:
 - name: push
   patchable: false
   depends_on:
+  - name: compile
   - name: jsCore
   - name: dbtest
   - name: replica_sets_jscore_passthrough
