@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -52,6 +54,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -60,6 +63,9 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
+MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
+
 /**
  * Sets the minimum allowed version for the cluster. If it is 3.4, then the node should not use 3.6
  * features.
@@ -226,6 +232,11 @@ public:
                                      << requestedVersion)))));
             }
 
+            if (MONGO_FAIL_POINT(hangWhileUpgrading)) {
+                log() << "featureCompatibilityVersion - hangWhileUpgrading fail point enabled. "
+                         "Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangWhileUpgrading);
+            }
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion36) {
             uassert(ErrorCodes::IllegalOperation,
@@ -305,6 +316,11 @@ public:
                 Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
             }
 
+            if (MONGO_FAIL_POINT(hangWhileDowngrading)) {
+                log() << "featureCompatibilityVersion - hangWhileDowngrading fail point enabled. "
+                         "Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangWhileDowngrading);
+            }
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         }
 

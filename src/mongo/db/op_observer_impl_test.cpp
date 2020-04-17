@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/s/config_server_test_fixture.h"
@@ -59,6 +60,9 @@ public:
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();
+
+        // The rollback observer relies on the storage interface to query the FCV document.
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
         // Set up ReplicationCoordinator and create oplog.
         repl::ReplicationCoordinator::set(

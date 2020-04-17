@@ -161,36 +161,8 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }
 
-    opCtx->recoveryUnit()->onCommit([opCtx, newVersion](boost::optional<Timestamp>) {
-        serverGlobalParams.featureCompatibility.setVersion(newVersion);
-        updateMinWireVersion();
-
-        if (ShardingState::get(opCtx)->enabled() &&
-            (newVersion ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
-             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
-            Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
-        }
-
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
-            // Close all incoming connections from internal clients with binary versions lower than
-            // ours.
-            opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
-                transport::Session::kLatestVersionInternalClientKeepOpen |
-                transport::Session::kExternalClientKeepOpen);
-            // Close all outgoing connections to servers with binary versions lower than ours.
-            executor::EgressTagCloserManager::get(opCtx->getServiceContext())
-                .dropConnections(transport::Session::kKeepOpen);
-        }
-
-        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-            // Transactions are only allowed when the featureCompatibilityVersion is 4.0, so abort
-            // any open transactions when downgrading featureCompatibilityVersion.
-            SessionKiller::Matcher matcherAllSessions(
-                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-            killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
-        }
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, newVersion](boost::optional<Timestamp>) { _setVersion(opCtx, newVersion); });
 }
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
@@ -210,6 +182,56 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
+    }
+}
+
+void FeatureCompatibilityVersion::_setVersion(
+    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version newVersion) {
+    serverGlobalParams.featureCompatibility.setVersion(newVersion);
+    updateMinWireVersion();
+
+    if (ShardingState::get(opCtx)->enabled() &&
+        (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
+         newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
+        Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
+    }
+
+    if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+        // Close all incoming connections from internal clients with binary versions lower than
+        // ours.
+        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
+            transport::Session::kLatestVersionInternalClientKeepOpen |
+            transport::Session::kExternalClientKeepOpen);
+        // Close all outgoing connections to servers with binary versions lower than ours.
+        executor::EgressTagCloserManager::get(opCtx->getServiceContext())
+            .dropConnections(transport::Session::kKeepOpen);
+    }
+
+    if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        // Transactions are only allowed when the featureCompatibilityVersion is 4.0, so abort
+        // any open transactions when downgrading featureCompatibilityVersion.
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
+    }
+}
+
+void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx) {
+    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
+    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
+        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+    if (swFcv.isOK()) {
+        const auto featureCompatibilityVersion = swFcv.getValue();
+        auto swVersion = FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion);
+        const auto memoryFcv = serverGlobalParams.featureCompatibility.getVersion();
+        if (swVersion.isOK() && (swVersion.getValue() != memoryFcv)) {
+            auto diskFcv = swVersion.getValue();
+            log() << "Setting featureCompatibilityVersion from '"
+                  << FeatureCompatibilityVersionParser::toString(memoryFcv) << "' to '"
+                  << FeatureCompatibilityVersionParser::toString(diskFcv)
+                  << "' as part of rollback.";
+            _setVersion(opCtx, diskFcv);
+        }
     }
 }
 

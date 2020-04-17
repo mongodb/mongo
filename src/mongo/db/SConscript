@@ -134,6 +134,7 @@ env.CppUnitTest(
         'common',
         'op_observer_impl',
         'repl/replmocks',
+        'repl/storage_interface_impl',
         'service_context_d_test_fixture',
     ],
 )
