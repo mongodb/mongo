@@ -615,6 +615,24 @@ assert = (function() {
         }
     }
 
+    function _runHangAnalyzerIfWriteConcernTimedOut(res) {
+        const timeoutMsg = "waiting for replication timed out";
+        let isWriteConcernTimeout = false;
+        if (_isWriteResultType(res)) {
+            if (res.hasWriteConcernError() && res.getWriteConcernError().errmsg === timeoutMsg) {
+                isWriteConcernTimeout = true;
+            }
+        } else if ((res.hasOwnProperty("errmsg") && res.errmsg === timeoutMsg) ||
+                   (res.hasOwnProperty("writeConcernError") &&
+                    res.writeConcernError.errmsg === timeoutMsg)) {
+            isWriteConcernTimeout = true;
+        }
+        if (isWriteConcernTimeout) {
+            print("Running hang analyzer for writeConcern timeout " + tojson(res));
+            MongoRunner.runHangAnalyzer();
+        }
+    }
+
     function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernErrors}) {
         _validateAssertionMessage(msg);
         _validateCommandResponse(res, "commandWorked");
@@ -641,6 +659,7 @@ assert = (function() {
                     ignoreWriteErrors: ignoreWriteErrors,
                     ignoreWriteConcernErrors: ignoreWriteConcernErrors
                 })) {
+                _runHangAnalyzerIfWriteConcernTimedOut(res);
                 doassert(makeFailMsg(), res);
             }
         } else if (res.hasOwnProperty("acknowledged")) {
@@ -693,6 +712,7 @@ assert = (function() {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (_rawReplyOkAndNoWriteErrors(res)) {
+                _runHangAnalyzerIfWriteConcernTimedOut(res);
                 doassert(makeFailMsg(), res);
             }
 
@@ -707,6 +727,7 @@ assert = (function() {
                 }
 
                 if (!foundCode) {
+                    _runHangAnalyzerIfWriteConcernTimedOut(res);
                     doassert(makeFailCodeMsg(), res);
                 }
             }
@@ -782,6 +803,7 @@ assert = (function() {
         }
 
         if (errMsg) {
+            _runHangAnalyzerIfWriteConcernTimedOut(res);
             doassert(_buildAssertionMessage(msg, errMsg), res);
         }
 
@@ -843,6 +865,7 @@ assert = (function() {
         }
 
         if (errMsg) {
+            _runHangAnalyzerIfWriteConcernTimedOut(res);
             doassert(_buildAssertionMessage(msg, errMsg));
         }
 

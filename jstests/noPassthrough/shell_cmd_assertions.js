@@ -330,6 +330,54 @@ tests.push(function invalidResponsesAttemptToProvideInformationCommandFailed() {
     });
 });
 
+tests.push(function assertCallsHangAnalyzer() {
+    function runAssertTest(f, expectCall) {
+        const oldMongoRunner = MongoRunner;
+        let runs = 0;
+        try {
+            MongoRunner.runHangAnalyzer = function() {
+                ++runs;
+            };
+            f();
+            assert(false);
+        } catch (e) {
+            if (expectCall) {
+                assert.eq(runs, 1);
+            } else {
+                assert.eq(runs, 0);
+            }
+        } finally {
+            MongoRunner = oldMongoRunner;
+        }
+    }
+    const nonTimeOutWriteConcernError = {
+        n: 1,
+        ok: 1,
+        writeConcernError: {
+            code: ErrorCodes.WriteConcernFailed,
+            codeName: "WriteConcernFailed",
+            errmsg: "foo",
+        },
+    };
+
+    runAssertTest(() => assert.commandWorked(sampleWriteConcernError), true);
+    runAssertTest(() => assert.commandWorked(nonTimeOutWriteConcernError), false);
+
+    runAssertTest(() => assert.commandFailed(sampleWriteConcernError), false);
+
+    runAssertTest(
+        () => assert.commandFailedWithCode(sampleWriteConcernError, ErrorCodes.DuplicateKey), true);
+    runAssertTest(
+        () => assert.commandFailedWithCode(nonTimeOutWriteConcernError, ErrorCodes.DuplicateKey),
+        false);
+    runAssertTest(
+        () => assert.commandFailedWithCode(sampleWriteConcernError, ErrorCodes.WriteConcernFailed),
+        false);
+
+    runAssertTest(() => assert.commandWorkedIgnoringWriteConcernErrors(sampleWriteConcernError),
+                  false);
+});
+
 tests.forEach((test) => {
     jsTest.log(`Starting test '${test.name}'`);
     setup();
