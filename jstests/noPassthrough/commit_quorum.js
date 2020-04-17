@@ -49,14 +49,14 @@ assert.commandWorked(testDB.runCommand({create: collName}));
 
 // Use createIndex(es) to build indexes and check the commit quorum default.
 let res = assert.commandWorked(testDB[collName].createIndex({x: 1}));
-assert.eq("majority", res.commitQuorum);
+assert.eq("votingMembers", res.commitQuorum);
 
 res = assert.commandWorked(testDB[collName].createIndex({y: 1}, {}, 1));
 assert.eq(1, res.commitQuorum);
 
 // Use createIndex(es) to build indexes and check the commit quorum default.
 res = assert.commandWorked(testDB[collName].createIndexes([{i: 1}]));
-assert.eq("majority", res.commitQuorum);
+assert.eq("votingMembers", res.commitQuorum);
 
 res = assert.commandWorked(testDB[collName].createIndexes([{j: 1}], {}, 1));
 assert.eq(1, res.commitQuorum);

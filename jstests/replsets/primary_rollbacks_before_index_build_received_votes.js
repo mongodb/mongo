@@ -21,6 +21,14 @@ const collNss = primaryColl.getFullName();
 const secondary = rollbackTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
+if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
+      IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
+    jsTestLog(
+        'Skipping test because two phase index build and index build commit quorum are not supported.');
+    rst.stopSet();
+    return;
+}
+
 jsTestLog("Do a document write.");
 assert.commandWorked(
         primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
@@ -48,11 +56,11 @@ jsTestLog("Resume index builds.");
 IndexBuildTest.resumeIndexBuilds(secondary);
 IndexBuildTest.resumeIndexBuilds(primary);
 
+rollbackTest.transitionToSteadyStateOperations();
+
 let newPrimary = rollbackTest.getPrimary();
 let newPrimaryDB = newPrimary.getDB(dbName);
 IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB, collName, "i_1");
-
-rollbackTest.transitionToSteadyStateOperations();
 
 awaitBuild();
 
