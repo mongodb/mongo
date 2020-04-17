@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import shlex
 
 import pkg_resources
 import requests
@@ -165,7 +166,9 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
 
     def run_tests(self):
         """Run the suite and tests specified."""
-        self._resmoke_logger.info("verbatim resmoke.py invocation: %s", " ".join(sys.argv))
+        self._resmoke_logger.info(
+            "verbatim resmoke.py invocation: %s",
+            " ".join([shlex.quote(arg) for arg in shlex.split(" ".join(sys.argv))]))
 
         if config.EVERGREEN_TASK_ID:
             local_args = parser.to_local_args()
