@@ -99,6 +99,11 @@ public:
      */
     static void updateMinWireVersion();
 
+    /**
+     * Ensures the in-memory and on-disk FCV states are consistent after a rollback.
+     */
+    static void onReplicationRollback(OperationContext* opCtx);
+
 private:
     /**
      * Validate version. Uasserts if invalid.
@@ -110,6 +115,13 @@ private:
      */
     typedef std::function<void(BSONObjBuilder)> UpdateBuilder;
     static void _runUpdateCommand(OperationContext* opCtx, UpdateBuilder callback);
+
+    /**
+     * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
+     * servers and closing open transactions if necessary. Increments the server TopologyVersion.
+     */
+    static void _setVersion(OperationContext* opCtx,
+                            ServerGlobalParams::FeatureCompatibility::Version newVersion);
 };
 
 /**

@@ -73,8 +73,10 @@ MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingConfigMetadata);  // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingConfigMetadata);    // TODO SERVER-44034: Remove.
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(allowFCVDowngradeWithCompoundHashedShardKey);
+MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
 /**
  * Deletes the persisted default read/write concern document.
@@ -287,6 +289,7 @@ public:
                     opCtx, ShardingCatalogManager::ConfigUpgradeType::kUpgrade);
             }
 
+            hangWhileUpgrading.pauseWhileSet(opCtx);
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion42) {
             uassert(ErrorCodes::IllegalOperation,
@@ -434,6 +437,7 @@ public:
                     opCtx, ShardingCatalogManager::ConfigUpgradeType::kDowngrade);
             }
 
+            hangWhileDowngrading.pauseWhileSet(opCtx);
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
         }
 
