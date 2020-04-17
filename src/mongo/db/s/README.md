@@ -39,8 +39,10 @@ on each of these collections for efficient querying
 
 ## The shards list cache
 
-## Replica set monitoring and host targeting
+## Targeting a specific host within a shard
+When routing a query to a replica set, a cluster node must determine which member to target for a given read preference. A cluster node either has or creates a ReplicaSetMonitor for each remote shard to which it needs to route requests. Information from the ReplicaSetMonitor interface is used to route requests to a specific node within a shard.
 
+Further details on replica set monitoring and host targeting can be found [here](../../../mongo/client/README.md).
 ---
 
 # Migrations
