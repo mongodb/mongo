@@ -439,6 +439,18 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         # Wait for Mongos to retarget the primary for each shard and the config server.
         self._do_wait_for_mongos_retarget()
 
+        # Check that fixtures are still running
+        for rs_fixture in self._rs_fixtures:
+            if not rs_fixture.is_running():
+                raise errors.ServerFailure(
+                    "ReplicaSetFixture with pids {} expected to be running in"
+                    " ContinuousStepdown, but wasn't.".format(rs_fixture.pids()))
+        for mongos_fixture in self._mongos_fixtures:
+            if not mongos_fixture.is_running():
+                raise errors.ServerFailure("MongoSFixture with pids {} expected to be running in"
+                                           " ContinuousStepdown, but wasn't.".format(
+                                               mongos_fixture.pids()))
+
     def resume(self):
         """Resume the thread."""
         self.__lifecycle.mark_test_started()

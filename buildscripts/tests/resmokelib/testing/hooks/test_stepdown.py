@@ -1,13 +1,15 @@
 """Unit tests for buildscripts/resmokelib/testing/hooks/stepdown.py."""
 
+import logging
 import os
 import unittest
 
 import mock
 
+from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 
-# pylint: disable=missing-docstring
+# pylint: disable=missing-docstring,protected-access
 
 
 def _get_threading_lock(test_case, MockCondition):  # pylint: disable=invalid-name
@@ -17,6 +19,40 @@ def _get_threading_lock(test_case, MockCondition):  # pylint: disable=invalid-na
     test_case.assertEqual(1, len(MockCondition.call_args_list))
     lock = MockCondition.call_args[0][0]
     return lock
+
+
+class TestStepdownThread(unittest.TestCase):
+    @mock.patch("buildscripts.resmokelib.testing.fixtures.replicaset.ReplicaSetFixture")
+    @mock.patch("buildscripts.resmokelib.testing.fixtures.shardedcluster.ShardedClusterFixture")
+    def test_pause_throws_error(self, shardcluster_fixture, rs_fixture):
+        stepdown_thread = _stepdown._StepdownThread(
+            logger=logging.getLogger("hook_logger"),
+            mongos_fixtures=[shardcluster_fixture.mongos],
+            rs_fixtures=[rs_fixture],
+            stepdown_interval_secs=8,
+            terminate=False,
+            kill=False,
+            stepdown_lifecycle=_stepdown.FlagBasedStepdownLifecycle(),
+            wait_for_mongos_retarget=False,
+            stepdown_via_heartbeats=True,
+            background_reconfig=False,
+        )
+
+        # doesn't throw error when fixtures are running
+        stepdown_thread.pause()
+
+        # throws error when replica set fixture is not running
+        rs_fixture.is_running.return_value = False
+        try:
+            with self.assertRaises(errors.ServerFailure):
+                stepdown_thread.pause()
+        finally:
+            rs_fixture.is_running.return_value = True
+
+        # throws error when MongoS fixture is not running
+        shardcluster_fixture.mongos.is_running.return_value = False
+        with self.assertRaises(errors.ServerFailure):
+            stepdown_thread.pause()
 
 
 class TestFlagBasedStepdownLifecycle(unittest.TestCase):
