@@ -186,12 +186,16 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
     }
 
     std::shared_ptr<ReplicaSetMonitor> newMonitor;
+    LOGV2(4603701,
+          "Starting Replica Set Monitor",
+          "protocol"_attr = toString(gReplicaSetMonitorProtocol),
+          "uri"_attr = uri.toString());
     if (gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kScanning) {
-        LOGV2(4333204, "Starting Scanning ReplicaSetMonitor", "uri"_attr = uri.toString());
         newMonitor = std::make_shared<ScanningReplicaSetMonitor>(uri);
         newMonitor->init();
     } else {
-        LOGV2(4333205, "Starting Streamable ReplicaSetMonitor", "uri"_attr = uri.toString());
+        // Both ReplicaSetMonitorProtocol::kSdam and ReplicaSetMonitorProtocol::kStreamable use the
+        // StreamableReplicaSetMonitor.
         newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor(), _getConnectionManager());
     }
     _monitors[setName] = newMonitor;

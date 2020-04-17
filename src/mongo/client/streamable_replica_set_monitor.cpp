@@ -174,7 +174,7 @@ ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
 
 void StreamableReplicaSetMonitor::init() {
     stdx::lock_guard lock(_mutex);
-    LOGV2(4333206, "Starting Replica Set Monitor {uri}", "uri"_attr = _uri);
+    LOGV2_DEBUG(4333206, kLowerLogLevel, "Starting Replica Set Monitor {uri}", "uri"_attr = _uri);
 
     _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
     _topologyManager = std::make_unique<TopologyManager>(

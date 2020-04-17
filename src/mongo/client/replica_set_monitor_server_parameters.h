@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-enum class ReplicaSetMonitorProtocol { kScanning, kSdam };
+enum class ReplicaSetMonitorProtocol { kScanning, kSdam, kStreamable };
 extern ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol;
 std::string toString(ReplicaSetMonitorProtocol protocol);
 

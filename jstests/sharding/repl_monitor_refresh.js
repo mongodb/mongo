@@ -3,7 +3,6 @@ load("jstests/replsets/rslib.js");
 /**
  * Test for making sure that the replica seed list in the config server does not
  * become invalid when a replica set reconfig happens.
- * @tags: [multiversion_incompatible]
  */
 (function() {
 "use strict";
@@ -47,13 +46,6 @@ reconfig(replTest, confDoc);
 
 awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
 let rsConfig = st.rs0.getReplSetConfigFromNode();
-assert.soon(function() {
-    const res = st.rs0.getPrimary().adminCommand({replSetGetStatus: 1});
-    return ((res.members[0].configVersion === rsConfig.version) &&
-            (res.members[2].configVersion === rsConfig.version) &&
-            (res.members[0].configTerm === rsConfig.term) &&
-            (res.members[2].configTerm === rsConfig.term));
-});
 
 // Remove first node from set
 confDoc.members.shift();

@@ -40,6 +40,8 @@ ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol{ReplicaSetMonitorProtocol::
 std::string toString(ReplicaSetMonitorProtocol protocol) {
     if (protocol == ReplicaSetMonitorProtocol::kScanning) {
         return "scanning";
+    } else if (protocol == ReplicaSetMonitorProtocol::kStreamable) {
+        return "streamable";
     } else {
         return "sdam";
     }
@@ -54,6 +56,8 @@ void RSMProtocolServerParameter::append(OperationContext*,
 Status RSMProtocolServerParameter::setFromString(const std::string& protocolStr) {
     if (protocolStr == toString(ReplicaSetMonitorProtocol::kScanning)) {
         gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kScanning;
+    } else if (protocolStr == toString(ReplicaSetMonitorProtocol::kStreamable)) {
+        gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kStreamable;
     } else if (protocolStr == toString(ReplicaSetMonitorProtocol::kSdam)) {
         gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kSdam;
     } else {

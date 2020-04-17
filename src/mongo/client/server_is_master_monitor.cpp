@@ -30,6 +30,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -49,6 +50,15 @@ using executor::TaskExecutor;
 using executor::ThreadPoolTaskExecutor;
 
 const Milliseconds kZeroMs = Milliseconds{0};
+
+/**
+ * Given the TopologyVersion corresponding to a remote host, determines if exhaust is enabled.
+ */
+bool exhaustEnabled(boost::optional<TopologyVersion> topologyVersion) {
+    return (topologyVersion &&
+            gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kStreamable);
+}
+
 }  // namespace
 
 SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
@@ -190,10 +200,9 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
         return;
 
     StatusWith<executor::TaskExecutor::CallbackHandle> swCbHandle = [&]() {
-        if (_topologyVersion) {
+        if (exhaustEnabled(_topologyVersion)) {
             return _scheduleStreamableIsMaster();
         }
-
         return _scheduleSingleIsMaster();
     }();
 
@@ -313,7 +322,11 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleS
 
                 if (!result.response.isOK() || !result.response.moreToCome) {
                     self->_isMasterOutstanding = false;
-                    nextRefreshPeriod = self->_currentRefreshPeriod(lk, result.response.isOK());
+
+                    // Prevent immediate rescheduling when exhaust is not supported.
+                    auto scheduleImmediately =
+                        (exhaustEnabled(self->_topologyVersion)) ? result.response.isOK() : false;
+                    nextRefreshPeriod = self->_currentRefreshPeriod(lk, scheduleImmediately);
                     self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
                 }
             }
