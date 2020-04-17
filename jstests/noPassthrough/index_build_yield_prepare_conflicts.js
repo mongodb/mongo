@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   uses_transactions,
  *   uses_prepare_transaction,
  * ]
  */
