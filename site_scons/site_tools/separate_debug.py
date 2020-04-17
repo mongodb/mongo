@@ -15,7 +15,7 @@
 import SCons
 
 
-def _update_builder(env, builder, bitcode):
+def _update_builder(env, builder):
 
     old_scanner = builder.target_scanner
     old_path_function = old_scanner.path_function
@@ -23,15 +23,14 @@ def _update_builder(env, builder, bitcode):
     def new_scanner(node, env, path=()):
         results = old_scanner.function(node, env, path)
         origin = getattr(node.attributes, "debug_file_for", None)
-        if origin:
+        if origin is not None:
             origin_results = old_scanner(origin, env, path)
             for origin_result in origin_results:
-                origin_result_debug_file = getattr(
-                    origin_result.attributes, "separate_debug_file", None
+                origin_result_debug_files = getattr(
+                    origin_result.attributes, "separate_debug_files", None
                 )
-                if origin_result_debug_file:
-                    results.append(origin_result_debug_file)
-        # TODO: Do we need to do the same sort of drag along for bcsymbolmap files?
+                if origin_result_debug_files is not None:
+                    results.extend(origin_result_debug_files)
         return results
 
     builder.target_scanner = SCons.Scanner.Scanner(
@@ -50,34 +49,28 @@ def _update_builder(env, builder, bitcode):
     # setup from the etc/scons/xcode_*.vars files, which would be a
     # win as well.
     if env.TargetOSIs("darwin"):
-        if bitcode:
-            base_action.list.append(
+        base_action.list.extend(
+            [
                 SCons.Action.Action(
-                    "dsymutil -num-threads=1 $TARGET --symbol-map=${TARGET}.bcsymbolmap -o ${TARGET}.dSYM",
-                    "Generating debug info for $TARGET into ${TARGET}.dSYM",
-                )
-            )
-
-        else:
-            base_action.list.append(
+                    "$DSYMUTIL -num-threads 1 $TARGET -o ${TARGET}.dSYM",
+                    "$DSYMUTILCOMSTR"
+                ),
                 SCons.Action.Action(
-                    "dsymutil -num-threads=1 $TARGET -o ${TARGET}.dSYM",
-                    "Generating debug info for $TARGET into ${TARGET}.dSYM",
-                )
-            )
-        base_action.list.append(
-            SCons.Action.Action("strip -Sx ${TARGET}", "Stripping ${TARGET}")
+                    "$STRIP -Sx ${TARGET}",
+                    "$DEBUGSTRIPCOMSTR"
+                ),
+            ]
         )
     elif env.TargetOSIs("posix"):
         base_action.list.extend(
             [
                 SCons.Action.Action(
-                    "${OBJCOPY} --only-keep-debug $TARGET ${TARGET}.debug",
-                    "Generating debug info for $TARGET into ${TARGET}.debug",
+                    "$OBJCOPY --only-keep-debug $TARGET ${TARGET}.debug",
+                    "$OBJCOPY_ONLY_KEEP_DEBUG_COMSTR"
                 ),
                 SCons.Action.Action(
-                    "${OBJCOPY} --strip-debug --add-gnu-debuglink ${TARGET}.debug ${TARGET}",
-                    "Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}.debug",
+                    "$OBJCOPY --strip-debug --add-gnu-debuglink ${TARGET}.debug ${TARGET}",
+                    "$DEBUGSTRIPCOMSTR"
                 ),
             ]
         )
@@ -90,30 +83,52 @@ def _update_builder(env, builder, bitcode):
 
     def new_emitter(target, source, env):
 
-        bitcode_file = None
+        debug_files = []
         if env.TargetOSIs("darwin"):
-            debug_file = env.Entry(str(target[0]) + ".dSYM")
-            env.Precious(debug_file)
-            if bitcode:
-                bitcode_file = env.File(str(target[0]) + ".bcsymbolmap")
+
+            # There isn't a lot of great documentation about the structure of dSYM bundles.
+            # For general bundles, see:
+            #
+            # https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html
+            #
+            # But we expect to find two files in the bundle. An
+            # Info.plist file under Contents, and a file with the same
+            # name as the target under Contents/Resources/DWARF.
+
+            target0 = env.File(target[0])
+            dsym_dir_name = str(target[0]) + ".dSYM"
+            dsym_dir = env.Dir(dsym_dir_name, directory=target0.get_dir())
+
+            plist_file = env.File("Contents/Info.plist", directory=dsym_dir)
+            setattr(plist_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(plist_file.attributes, "aib_additional_directory", "{}/Contents".format(dsym_dir_name))
+
+            dwarf_dir = env.Dir("Contents/Resources/DWARF", directory=dsym_dir)
+
+            dwarf_file = env.File(target0.name, directory=dwarf_dir)
+            setattr(dwarf_file.attributes, "aib_effective_suffix", ".dSYM")
+            setattr(dwarf_file.attributes, "aib_additional_directory", "{}/Contents/Resources/DWARF".format(dsym_dir_name))
+
+            debug_files.extend([plist_file, dwarf_file])
+
         elif env.TargetOSIs("posix"):
             debug_file = env.File(str(target[0]) + ".debug")
+            debug_files.append(debug_file)
         elif env.TargetOSIs("windows"):
             debug_file = env.File(env.subst("${PDB}", target=target))
+            debug_files.append(debug_file)
         else:
             pass
 
-        setattr(debug_file.attributes, "debug_file_for", target[0])
-        setattr(target[0].attributes, "separate_debug_file", debug_file)
+        # Establish bidirectional linkages between the target and each debug file by setting
+        # attributes on th nodes. We use these in the scanner above to ensure that transitive
+        # dependencies among libraries are projected into transitive dependencies between
+        # debug files.
+        for debug_file in debug_files:
+            setattr(debug_file.attributes, "debug_file_for", target[0])
+        setattr(target[0].attributes, "separate_debug_files", debug_files)
 
-        target.append(debug_file)
-
-        if bitcode_file:
-            setattr(bitcode_file.attributes, "bcsymbolmap_file_for", target[0])
-            setattr(target[0].attributes, "bcsymbolmap_file", bitcode_file)
-            target.append(bitcode_file)
-
-        return (target, source)
+        return (target + debug_files, source)
 
     new_emitter = SCons.Builder.ListEmitter([base_emitter, new_emitter])
     builder.emitter = new_emitter
@@ -123,33 +138,41 @@ def generate(env):
     if not exists(env):
         return
 
-    # If we are generating bitcode, add the magic linker flags that
-    # hide the bitcode symbols, and override the name of the bitcode
-    # symbol map file so that it is determinstically known to SCons
-    # rather than being a UUID. We need this so that we can install it
-    # under a well known name. We leave it to the evergreen
-    # postprocessing to rename to the correct name. I'd like to do
-    # this better, but struggled for a long time and decided that
-    # later was a better time to address this. We should also consider
-    # moving all bitcode setup into a separate tool.
-    bitcode = False
-    if env.TargetOSIs("darwin") and any(
-        flag == "-fembed-bitcode" for flag in env["LINKFLAGS"]
-    ):
-        bitcode = True
-        env.AppendUnique(
-            LINKFLAGS=[
-                "-Wl,-bitcode_hide_symbols",
-                "-Wl,-bitcode_symbol_map,${TARGET}.bcsymbolmap",
-            ]
-        )
+    if env.TargetOSIs("darwin"):
 
-    # TODO: For now, not doing this for programs. Need to update
-    # auto_install_binaries to understand to install the debug symbol
-    # for target X to the same target location as X.
+        if env.get("DSYMUTIL", None) is None:
+            env["DSYMUTIL"] = env.WhereIs("dsymutil")
+
+        if env.get("STRIP", None) is None:
+            env["STRIP"] = env.WhereIs("strip")
+
+        if not env.Verbose():
+            env.Append(
+                DSYMUTILCOMSTR="Generating debug info for $TARGET into ${TARGET}.dSYM",
+                DEBUGSTRIPCOMSTR="Stripping debug info from ${TARGET}",
+            )
+
+    elif env.TargetOSIs("posix"):
+        if env.get("OBJCOPY", None) is None:
+            env["OBJCOPY"] = env.Whereis("objcopy")
+
+        if not env.Verbose():
+            env.Append(
+                OBJCOPY_ONLY_KEEP_DEBUG_COMSTR="Generating debug info for $TARGET into ${TARGET}.dSYM",
+                DEBUGSTRIPCOMSTR="Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}.debug",
+            )
+
     for builder in ["Program", "SharedLibrary", "LoadableModule"]:
-        _update_builder(env, env["BUILDERS"][builder], bitcode)
+        _update_builder(env, env["BUILDERS"][builder])
 
 
 def exists(env):
+    if env.TargetOSIs("darwin"):
+        if env.get("DSYMUTIL", None) is None and env.WhereIs("dsymutil") is None:
+            return False
+        if env.get("STRIP", None) is None and env.WhereIs("strip") is None:
+            return False
+    elif env.TargetOSIs("posix"):
+        if env.get("OBJCOPY", None) is None and env.WhereIs("objcopy") is None:
+            return False
     return True

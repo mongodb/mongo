@@ -361,13 +361,21 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
     installed_files = []
     for s in source:
         if not target:
-            auto_install_mapping = env[SUFFIX_MAP].get(s.get_suffix())
+
+            # AIB currently uses file suffixes to do mapping. However, sometimes we need
+            # to do the mapping based on a different suffix. This is used for things like
+            # dSYM files, where we really just want to describe where .dSYM bundles should
+            # be placed, but need to actually handle the substructure. Currently, this is
+            # only used by separate_debug.py.
+            #
+            # TODO: Find a way to do this without the tools needing to coordinate.
+            suffix = getattr(s.attributes, "aib_effective_suffix", s.get_suffix())
+            auto_install_mapping = env[SUFFIX_MAP].get(suffix)
+
             if not auto_install_mapping:
                 raise Exception(
                     "No target provided and no auto install mapping found for:", str(s)
                 )
-
-            target = auto_install_mapping.directory
 
         # We've already auto installed this file and it may have belonged to a
         # different role since it wouldn't get retagged above. So we just skip
@@ -379,11 +387,13 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
         if existing_installed_files:
             continue
 
-        # We must do an eearly subst here so that the _aib_debugdir
+        # We must do an early subst here so that the _aib_debugdir
         # generator has a chance to run while seeing 'source'.
-        #
-        # TODO: Find a way to not need this early subst.
         target = env.Dir(env.subst(target, source=s))
+        aib_additional_directory = getattr(s.attributes, "aib_additional_directory", None)
+        if aib_additional_directory is not None:
+            target = env.Dir(aib_additional_directory, directory=target)
+
         new_installed_files = env.Install(target=target, source=s)
         setattr(s.attributes, INSTALLED_FILES, new_installed_files)
 
@@ -435,7 +445,6 @@ def auto_install_emitter(target, source, env):
         if isinstance(t, str):
             t = env.File(t)
 
-        suffix = t.get_suffix()
         if env.get("AIB_IGNORE", False):
             continue
 
@@ -448,7 +457,10 @@ def auto_install_emitter(target, source, env):
         if "conftest" in str(t):
             continue
 
+        # Get the suffix, unless overridden
+        suffix = getattr(t.attributes, "aib_effective_suffix", t.get_suffix())
         auto_install_mapping = env[SUFFIX_MAP].get(suffix)
+
         if auto_install_mapping is not None:
             env.AutoInstall(
                 auto_install_mapping.directory,

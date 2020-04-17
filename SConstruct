@@ -744,6 +744,10 @@ env_vars.Add('DESTDIR',
     help='Where hygienic builds will install files',
     default='$BUILD_ROOT/install')
 
+env_vars.Add('DSYMUTIL',
+    help='Path to the dsymutil utility',
+)
+
 env_vars.Add('GITDIFFFLAGS',
     help='Sets flags for git diff',
     default='')
@@ -935,6 +939,10 @@ env_vars.Add('SHELL',
 env_vars.Add('SHLINKFLAGS',
     help='Sets flags for the linker when building shared libraries',
     converter=variable_shlex_converter)
+
+env_vars.Add('STRIP',
+    help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
+)
 
 env_vars.Add('TARGET_ARCH',
     help='Sets the architecture to build for',
@@ -3947,7 +3955,10 @@ if get_option('ninja') != 'disabled':
 if get_option('install-mode') == 'hygienic':
 
     if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
-        env.Tool('separate_debug')
+        separate_debug = Tool('separate_debug')
+        if not separate_debug.exists(env):
+            env.FatalError('Cannot honor --separate-debug because the separate_debug.py Tool reported as nonexistent')
+        separate_debug(env)
 
     env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"
 
