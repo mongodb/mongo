@@ -33,29 +33,19 @@
 
 #include "mongo/db/index_build_entry_helpers.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database_impl.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -296,63 +286,6 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     }
 }
 
-StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* opCtx,
-                                                              UUID collectionUUID) {
-    AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-    Collection* collection = autoCollection.getCollection();
-    if (!collection) {
-        str::stream ss;
-        ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
-        return Status(ErrorCodes::NamespaceNotFound, ss);
-    }
-
-    BSONObj collectionQuery = BSON("collectionUUID" << collectionUUID);
-    std::vector<IndexBuildEntry> indexBuildEntries;
-
-    auto qr = std::make_unique<QueryRequest>(collection->ns());
-    qr->setFilter(collectionQuery);
-
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
-                                     expCtx,
-                                     extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-
-    auto statusWithExecutor = getExecutor(
-        opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, QueryPlannerParams::DEFAULT);
-    if (!statusWithExecutor.isOK()) {
-        return statusWithExecutor.getStatus();
-    }
-
-    auto exec = std::move(statusWithExecutor.getValue());
-    PlanExecutor::ExecState state;
-    BSONObj obj;
-    RecordId loc;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
-        try {
-            IDLParserErrorContext ctx("IndexBuildsEntry Parser");
-            IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
-            indexBuildEntries.push_back(indexBuildEntry);
-        } catch (...) {
-            str::stream ss;
-            ss << "Invalid BSON found for RecordId " << loc << " in collection "
-               << collection->ns();
-            return Status(ErrorCodes::InvalidBSON, ss);
-        }
-    }
-
-    return indexBuildEntries;
-}
-
 StatusWith<CommitQuorumOptions> getCommitQuorum(OperationContext* opCtx, UUID indexBuildUUID) {
     StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
     if (!status.isOK()) {
@@ -363,9 +296,9 @@ StatusWith<CommitQuorumOptions> getCommitQuorum(OperationContext* opCtx, UUID in
     return indexBuildEntry.getCommitQuorum();
 }
 
-Status setCommitQuorum(OperationContext* opCtx,
-                       UUID indexBuildUUID,
-                       CommitQuorumOptions commitQuorumOptions) {
+Status setCommitQuorum_forTest(OperationContext* opCtx,
+                               UUID indexBuildUUID,
+                               CommitQuorumOptions commitQuorumOptions) {
     StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
     if (!status.isOK()) {
         return status.getStatus();
@@ -374,94 +307,6 @@ Status setCommitQuorum(OperationContext* opCtx,
     IndexBuildEntry indexBuildEntry = status.getValue();
     indexBuildEntry.setCommitQuorum(commitQuorumOptions);
     return upsert(opCtx, indexBuildEntry);
-}
-
-Status addCommitReadyMember(OperationContext* opCtx, UUID indexBuildUUID, HostAndPort hostAndPort) {
-    StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    IndexBuildEntry indexBuildEntry = status.getValue();
-
-    std::vector<HostAndPort> newCommitReadyMembers;
-    if (indexBuildEntry.getCommitReadyMembers()) {
-        newCommitReadyMembers = indexBuildEntry.getCommitReadyMembers().get();
-    }
-
-    if (std::find(newCommitReadyMembers.begin(), newCommitReadyMembers.end(), hostAndPort) ==
-        newCommitReadyMembers.end()) {
-        newCommitReadyMembers.push_back(hostAndPort);
-        indexBuildEntry.setCommitReadyMembers(newCommitReadyMembers);
-        return upsert(opCtx, indexBuildEntry);
-    }
-    return Status::OK();
-}
-
-Status removeCommitReadyMember(OperationContext* opCtx,
-                               UUID indexBuildUUID,
-                               HostAndPort hostAndPort) {
-    StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    IndexBuildEntry indexBuildEntry = status.getValue();
-
-    std::vector<HostAndPort> newCommitReadyMembers;
-    if (indexBuildEntry.getCommitReadyMembers()) {
-        newCommitReadyMembers = indexBuildEntry.getCommitReadyMembers().get();
-    }
-
-    if (std::find(newCommitReadyMembers.begin(), newCommitReadyMembers.end(), hostAndPort) !=
-        newCommitReadyMembers.end()) {
-        newCommitReadyMembers.erase(
-            std::remove(newCommitReadyMembers.begin(), newCommitReadyMembers.end(), hostAndPort));
-        indexBuildEntry.setCommitReadyMembers(newCommitReadyMembers);
-        return upsert(opCtx, indexBuildEntry);
-    }
-
-    return Status::OK();
-}
-
-StatusWith<std::vector<HostAndPort>> getCommitReadyMembers(OperationContext* opCtx,
-                                                           UUID indexBuildUUID) {
-    StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    IndexBuildEntry indexBuildEntry = status.getValue();
-    if (indexBuildEntry.getCommitReadyMembers()) {
-        return indexBuildEntry.getCommitReadyMembers().get();
-    }
-
-    return std::vector<HostAndPort>();
-}
-
-Status clearAllIndexBuildEntries(OperationContext* opCtx) {
-    return writeConflictRetry(opCtx,
-                              "truncateIndexBuildEntries",
-                              NamespaceString::kIndexBuildEntryNamespace.ns(),
-                              [&]() -> Status {
-                                  AutoGetCollection autoCollection(
-                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_X);
-                                  Collection* collection = autoCollection.getCollection();
-                                  if (!collection) {
-                                      str::stream ss;
-                                      ss << "Collection not found: "
-                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
-                                      return Status(ErrorCodes::NamespaceNotFound, ss);
-                                  }
-
-                                  WriteUnitOfWork wuow(opCtx);
-                                  Status status = collection->truncate(opCtx);
-                                  if (!status.isOK()) {
-                                      return status;
-                                  }
-                                  wuow.commit();
-                                  return Status::OK();
-                              });
 }
 
 }  // namespace indexbuildentryhelpers
