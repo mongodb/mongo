@@ -104,6 +104,9 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
  * for the given 'indexBuildUUID'.
  *
  * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
+ *
+ * TODO(SERVER-47635): use this to remove index build entries for the finished index builds from
+ * system.indexBuilds collection.
  */
 Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
 
@@ -120,16 +123,6 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
 StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
 
 /**
- * Returns a vector of matching IndexBuildEntries matching the documents with 'collectionUUID'
- * from disk.
- *
- * Can be used to get all the unfinished index builds on the collection if the indexBuildUUID is
- * unknown.
- */
-StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* opCtx,
-                                                              UUID collectionUUID);
-
-/**
  * Returns the 'commitQuorum' matching the document with 'indexBuildUUID' from disk if it
  * exists.
  *
@@ -144,48 +137,12 @@ StatusWith<CommitQuorumOptions> getCommitQuorum(OperationContext* opCtx, UUID in
  * whenever the commit quorum is changed.
  *
  * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
+ *
+ * Used for testing only.
  */
-Status setCommitQuorum(OperationContext* opCtx,
-                       UUID indexBuildUUID,
-                       CommitQuorumOptions commitQuorumOptions);
-
-/**
- * Adds 'hostAndPort' to the 'commitReadyMembers' field for the document with 'indexBuildUUID'.
- * If the 'hostAndPort' is already in the 'commitReadyMembers' field, nothing is done.
- *
- * When a replica set member is ready to commit the index build, we need to record this.
- *
- * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
- */
-Status addCommitReadyMember(OperationContext* opCtx, UUID indexBuildUUID, HostAndPort hostAndPort);
-
-/**
- * Removes 'hostAndPort' from the 'commitReadyMembers' field for the document with
- * 'indexBuildUUID' if it exists.
- *
- * If a replica set member is removed during a reconfig and it was a commit ready member, we need to
- * remove its entry from the 'commitReadyMembers' field.
- *
- * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
- */
-Status removeCommitReadyMember(OperationContext* opCtx,
+Status setCommitQuorum_forTest(OperationContext* opCtx,
                                UUID indexBuildUUID,
-                               HostAndPort hostAndPort);
-
-/**
- * Returns a vector of HostAndPorts of all the 'commitReadyMembers' for the document with
- * 'indexBuildUUID'.
- *
- * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
- */
-StatusWith<std::vector<HostAndPort>> getCommitReadyMembers(OperationContext* opCtx,
-                                                           UUID indexBuildUUID);
-
-/**
- * Truncates all the documents in the "config.system.indexBuilds" collection.
- * Can be used during recovery to remove unfinished index builds to restart them.
- */
-Status clearAllIndexBuildEntries(OperationContext* opCtx);
+                               CommitQuorumOptions commitQuorumOptions);
 
 }  // namespace indexbuildentryhelpers
 }  // namespace mongo

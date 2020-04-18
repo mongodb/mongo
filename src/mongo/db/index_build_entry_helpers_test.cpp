@@ -148,41 +148,6 @@ TEST_F(IndexBuildEntryHelpersTest, RemoveIndexBuildEntry) {
     ASSERT_OK(removeIndexBuildEntry(operationContext(), _secondEntry.getBuildUUID()));
 }
 
-TEST_F(IndexBuildEntryHelpersTest, GetIndexBuildEntries) {
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _firstEntry));
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _secondEntry));
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _thirdEntry));
-
-    // Fail to find a document with an incorrect index build UUID.
-    StatusWith<IndexBuildEntry> status = getIndexBuildEntry(operationContext(), UUID::gen());
-    ASSERT_EQUALS(status.getStatus(), ErrorCodes::NoMatchingDocument);
-
-    // Find a document with the correct index build UUID.
-    IndexBuildEntry fetchedEntry =
-        unittest::assertGet(getIndexBuildEntry(operationContext(), _firstEntry.getBuildUUID()));
-
-    checkIfEqual(_firstEntry, fetchedEntry);
-
-    // Search for index build entries by collection UUID.
-    {
-        std::vector<IndexBuildEntry> entries = unittest::assertGet(
-            getIndexBuildEntries(operationContext(), _secondEntry.getCollectionUUID()));
-        ASSERT_EQ(2U, entries.size());
-    }
-
-    {
-        std::vector<IndexBuildEntry> entries = unittest::assertGet(
-            getIndexBuildEntries(operationContext(), _thirdEntry.getCollectionUUID()));
-        ASSERT_EQ(1U, entries.size());
-    }
-
-    {
-        std::vector<IndexBuildEntry> entries =
-            unittest::assertGet(getIndexBuildEntries(operationContext(), UUID::gen()));
-        ASSERT_EQ(0U, entries.size());
-    }
-}
-
 TEST_F(IndexBuildEntryHelpersTest, CommitQuorum) {
     ASSERT_OK(addIndexBuildEntry(operationContext(), _firstEntry));
 
@@ -191,7 +156,8 @@ TEST_F(IndexBuildEntryHelpersTest, CommitQuorum) {
             getCommitQuorum(operationContext(), UUID::gen());
         ASSERT_EQUALS(statusWith.getStatus(), ErrorCodes::NoMatchingDocument);
 
-        Status status = setCommitQuorum(operationContext(), UUID::gen(), CommitQuorumOptions(1));
+        Status status =
+            setCommitQuorum_forTest(operationContext(), UUID::gen(), CommitQuorumOptions(1));
         ASSERT_EQUALS(status.code(), ErrorCodes::NoMatchingDocument);
     }
 
@@ -201,91 +167,12 @@ TEST_F(IndexBuildEntryHelpersTest, CommitQuorum) {
         ASSERT_BSONOBJ_EQ(opts.toBSON(), _firstEntry.getCommitQuorum().toBSON());
 
         CommitQuorumOptions newCommitQuorum(0);
-        ASSERT_OK(setCommitQuorum(operationContext(), _firstEntry.getBuildUUID(), newCommitQuorum));
+        ASSERT_OK(setCommitQuorum_forTest(
+            operationContext(), _firstEntry.getBuildUUID(), newCommitQuorum));
 
         opts = unittest::assertGet(getCommitQuorum(operationContext(), _firstEntry.getBuildUUID()));
         ASSERT_BSONOBJ_EQ(opts.toBSON(), newCommitQuorum.toBSON());
     }
-}
-
-TEST_F(IndexBuildEntryHelpersTest, CommitReadyMembers) {
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _firstEntry));
-
-    HostAndPort first("localhost:27017");
-    HostAndPort second("localhost:27018");
-
-    {
-        StatusWith<std::vector<HostAndPort>> statusWith =
-            getCommitReadyMembers(operationContext(), UUID::gen());
-        ASSERT_EQUALS(statusWith.getStatus(), ErrorCodes::NoMatchingDocument);
-
-        Status status = addCommitReadyMember(operationContext(), UUID::gen(), first);
-        ASSERT_EQUALS(status.code(), ErrorCodes::NoMatchingDocument);
-
-        status = removeCommitReadyMember(operationContext(), UUID::gen(), first);
-        ASSERT_EQUALS(status.code(), ErrorCodes::NoMatchingDocument);
-    }
-
-    {
-        std::vector<HostAndPort> entries = unittest::assertGet(
-            getCommitReadyMembers(operationContext(), _firstEntry.getBuildUUID()));
-        ASSERT_EQ(entries.size(), 0U);
-
-        ASSERT_OK(addCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), first));
-        ASSERT_OK(addCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), second));
-
-        entries = unittest::assertGet(
-            getCommitReadyMembers(operationContext(), _firstEntry.getBuildUUID()));
-        ASSERT_EQ(entries.size(), 2U);
-        ASSERT_EQ(entries.at(0), first);
-        ASSERT_EQ(entries.at(1), second);
-
-        ASSERT_OK(removeCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), first));
-        entries = unittest::assertGet(
-            getCommitReadyMembers(operationContext(), _firstEntry.getBuildUUID()));
-        ASSERT_EQ(entries.size(), 1U);
-        ASSERT_EQ(entries.at(0), second);
-
-        ASSERT_OK(removeCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), second));
-    }
-
-    {
-        // Adding the same HostAndPort pair twice should only register it once.
-        ASSERT_OK(addCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), first));
-        ASSERT_OK(addCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), first));
-
-        std::vector<HostAndPort> entries = unittest::assertGet(
-            getCommitReadyMembers(operationContext(), _firstEntry.getBuildUUID()));
-        ASSERT_EQ(entries.size(), 1U);
-
-        // Removing HostAndPort pair not in array should have no affect.
-        ASSERT_OK(removeCommitReadyMember(operationContext(), _firstEntry.getBuildUUID(), second));
-        entries = unittest::assertGet(
-            getCommitReadyMembers(operationContext(), _firstEntry.getBuildUUID()));
-        ASSERT_EQ(entries.size(), 1U);
-    }
-}
-
-TEST_F(IndexBuildEntryHelpersTest, ClearAllIndexBuildEntries) {
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _firstEntry));
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _secondEntry));
-    ASSERT_OK(addIndexBuildEntry(operationContext(), _thirdEntry));
-
-    unittest::assertGet(getIndexBuildEntry(operationContext(), _firstEntry.getBuildUUID()));
-    unittest::assertGet(getIndexBuildEntry(operationContext(), _secondEntry.getBuildUUID()));
-    unittest::assertGet(getIndexBuildEntry(operationContext(), _thirdEntry.getBuildUUID()));
-
-    ASSERT_OK(clearAllIndexBuildEntries(operationContext()));
-
-    StatusWith<IndexBuildEntry> status =
-        getIndexBuildEntry(operationContext(), _firstEntry.getBuildUUID());
-    ASSERT_EQUALS(status.getStatus(), ErrorCodes::NoMatchingDocument);
-
-    status = getIndexBuildEntry(operationContext(), _secondEntry.getBuildUUID());
-    ASSERT_EQUALS(status.getStatus(), ErrorCodes::NoMatchingDocument);
-
-    status = getIndexBuildEntry(operationContext(), _thirdEntry.getBuildUUID());
-    ASSERT_EQUALS(status.getStatus(), ErrorCodes::NoMatchingDocument);
 }
 
 }  // namespace
