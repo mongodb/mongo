@@ -140,16 +140,15 @@ func (restore *MongoRestore) RestoreIntents() Result {
 		}
 
 		var totalResult Result
-		var totalErr error
 		// wait until all goroutines are done or one of them errors out
 		for i := 0; i < restore.OutputOptions.NumParallelCollections; i++ {
 			result := <-resultChan
 			totalResult.combineWith(result)
-			if totalErr == nil && totalResult.Err != nil {
-				totalErr = totalResult.Err
+			if totalResult.Err != nil {
+				return totalResult
 			}
 		}
-		return totalResult.withErr(totalErr)
+		return totalResult
 	}
 
 	var totalResult Result

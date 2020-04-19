@@ -31,6 +31,7 @@ func init() {
 var (
 	testArchive          = "testdata/test.bar.archive"
 	testArchiveWithOplog = "testdata/dump-w-oplog.archive"
+	testBadFormatArchive = "testdata/bad-format.archive"
 )
 
 func TestMongorestoreShortArchive(t *testing.T) {
@@ -102,5 +103,29 @@ func TestMongorestoreArchiveWithOplog(t *testing.T) {
 		So(result.Err, ShouldBeNil)
 		So(result.Failures, ShouldEqual, 0)
 		So(result.Successes, ShouldNotEqual, 0)
+	})
+}
+
+func TestMongorestoreBadFormatArchive(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	_, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		args := []string{
+			ArchiveOption + "=" + testBadFormatArchive,
+			DropOption,
+		}
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		result := restore.Restore()
+		Convey("A mongorestore on an archive with a bad format should error out instead of hang", func() {
+			So(result.Err, ShouldNotBeNil)
+			So(result.Failures, ShouldEqual, 0)
+			So(result.Successes, ShouldEqual, 0)
+		})
 	})
 }
