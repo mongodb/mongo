@@ -11939,9 +11939,11 @@ buildvariants:
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: |- # Set the taskExecutorPoolSize for all tests
-        --mongosSetParameters="replicaSetMonitorProtocol: scanning" \
-        --mongodSetParameters="replicaSetMonitorProtocol: scanning"
+    test_flags: >-
+      --mongosSetParameters="{replicaSetMonitorProtocol: scanning}"
+      --mongodSetParameters="{replicaSetMonitorProtocol: scanning}"
+      --excludeWithAnyTags=requires_streamable_rsm
+
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

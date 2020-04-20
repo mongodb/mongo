@@ -5,7 +5,7 @@
  * RSM receives the isMaster replies because of a topology change rather than maxAwaitTimeMS being
  * hit. A replica set node should send a response to the mongos as soon as it processes a topology
  * change, so "immediately"/"quickly" can vary - we specify 5 seconds in this test ('timeoutMS').
- * @tags: [multiversion_incompatible]
+ * @tags: [multiversion_incompatible, requires_streamable_rsm]
  */
 
 // Checking UUID consistency and orphans involves talking to a shard node, which in this test is
