@@ -1,5 +1,5 @@
 /**
- * Verify that readConcern: snapshot is not permitted outside transactions.
+ * Verify that readConcern: snapshot is not permitted for writes outside transactions.
  *
  * @tags: [uses_transactions]
  */
@@ -56,14 +56,6 @@ function tryCommands({testDB, message}) {
         remove: true,
         readConcern: {level: "snapshot"},
     };
-    assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
-
-    jsTestLog("Verify that finds cannot use readConcern snapshot " + message);
-    cmd = {find: collName, readConcern: {level: "snapshot"}};
-    assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
-
-    jsTestLog("Verify that aggregate cannot use readConcern snapshot " + message);
-    cmd = {aggregate: collName, pipeline: [], cursor: {}, readConcern: {level: "snapshot"}};
     assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
 }
 tryCommands({testDB: sessionDb, message: "in session."});

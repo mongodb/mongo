@@ -300,6 +300,18 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         }
     }
 
+    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+            return {ErrorCodes::NotAReplicaSet,
+                    "node needs to be a replica set member to use readConcern: snapshot"};
+        }
+        if (!opCtx->inMultiDocumentTransaction() && !serverGlobalParams.enableMajorityReadConcern) {
+            return {ErrorCodes::ReadConcernMajorityNotEnabled,
+                    "read concern level snapshot is not supported when "
+                    "enableMajorityReadConcern=false"};
+        }
+    }
+
     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
     auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
 
@@ -346,13 +358,6 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
-        }
-    }
-
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-            return {ErrorCodes::NotAReplicaSet,
-                    "node needs to be a replica set member to use readConcern: snapshot"};
         }
     }
 

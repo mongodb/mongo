@@ -99,12 +99,6 @@ session.startTransaction({
 assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-// 'atClusterTime' cannot be used outside of a session.
-assert.commandFailedWithCode(
-    testDB.runCommand(
-        {find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}),
-    ErrorCodes.InvalidOptions);
-
 // 'atClusterTime' cannot be used with 'afterClusterTime'.
 session.startTransaction(
     {readConcern: {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime}});

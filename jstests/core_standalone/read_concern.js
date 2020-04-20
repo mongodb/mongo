@@ -34,7 +34,7 @@ if (isWiredTiger(db) || (isEphemeral(db) && !isEphemeralForTest(db))) {
 
 // Snapshot readConcern fail.
 assert.commandFailedWithCode(t.runCommand({find: "read_concern", readConcern: {level: "snapshot"}}),
-                             [ErrorCodes.InvalidOptions, ErrorCodes.NotImplemented],
+                             [ErrorCodes.NotAReplicaSet, ErrorCodes.NotImplemented],
                              "expected snapshot readConcern to fail on standalone mongod");
 
 // Standalones don't support any operations with clusterTime.

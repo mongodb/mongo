@@ -1127,11 +1127,6 @@ void execCommandDatabase(OperationContext* opCtx,
             }
         }
 
-        uassert(ErrorCodes::InvalidOptions,
-                "read concern level snapshot is only valid in a transaction",
-                opCtx->inMultiDocumentTransaction() ||
-                    readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern);
-
         if (startTransaction) {
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
