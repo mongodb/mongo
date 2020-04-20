@@ -3045,6 +3045,91 @@ const char* ExpressionIndexOfArray::getOpName() const {
     return "$indexOfArray";
 }
 
+/* ----------------------- ExpressionIndexOfBase ------------------ */
+
+template <typename SubClass>
+Value ExpressionIndexOfBase<SubClass>::evaluate(const Document& root, Variables* variables) const {
+    const auto& children = Expression::getChildren();
+    Value stringArg = children[0]->evaluate(root, variables);
+
+    if (stringArg.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    const auto opName = static_cast<const SubClass*>(this)->getOpName();
+
+    uassert(40091,
+            str::stream() << opName
+                          << " requires a string as the first argument, found: "
+                          << typeName(stringArg.getType()),
+            stringArg.getType() == String);
+    const std::string& input = stringArg.getString();
+
+    Value tokenArg = children[1]->evaluate(root, variables);
+    uassert(40092,
+            str::stream() << opName
+                          << " requires a string as the second argument, found: "
+                          << typeName(tokenArg.getType()),
+            tokenArg.getType() == String);
+    const std::string& token = tokenArg.getString();
+
+    size_t startIndex = 0;
+    if (children.size() > 2) {
+        Value startIndexArg = children[2]->evaluate(root, variables);
+        uassertIfNotIntegralAndNonNegative(startIndexArg, opName, "starting index");
+        startIndex = static_cast<size_t>(startIndexArg.coerceToInt());
+    }
+
+    // Boyer-Moore can't handle tokens of length 0.
+    if(token.size() == 0){
+        return Value(static_cast<int>(startIndex));
+    }
+
+    return static_cast<const SubClass*>(this)->finishEvaluate(
+        root, variables, input, startIndex, token);
+}
+
+template <typename SubClass>
+boost::intrusive_ptr<Expression> ExpressionIndexOfBase<SubClass>::optimize(){
+    const auto& children = Expression::getChildren();
+    const auto opName = static_cast<const SubClass*>(this)->getOpName();
+
+    // Make sure the arguments are valid here, so that we can fail early.
+    ExpressionConstant* stringAsConst = dynamic_cast<ExpressionConstant*>(children[0].get());
+    if (stringAsConst != nullptr) {
+        Value stringArg = stringAsConst->getValue();
+        if(stringArg.nullish()){
+            return this;
+        }
+        uassert(40091,
+                str::stream() << opName
+                              << " requires a string as the first argument, found: "
+                              << typeName(stringArg.getType()),
+                stringArg.getType() == String);
+    }
+
+    ExpressionConstant* tokenAsConst = dynamic_cast<ExpressionConstant*>(children[1].get());
+    if (tokenAsConst != nullptr) {
+        // The token is constant, and we create the Boyer Moore search object.
+        Value tokenArg = tokenAsConst->getValue();
+        if(tokenArg.nullish()){
+            return this;
+        }
+        uassert(40092,
+                str::stream() << opName
+                              << " requires a string as the second argument, found: "
+                              << typeName(tokenArg.getType()),
+                tokenArg.getType() == String);
+        // We have to copy the token, since the Boyer Moore object stores the memory
+        // address of the token, and Value.getString() returns a copy.
+        _token = tokenArg.getString();
+        _search = new boost::algorithm::boyer_moore<std::string::const_iterator>(
+                _token.begin(), _token.end());
+    }
+
+    return this;
+}
+
 /* ----------------------- ExpressionIndexOfBytes ------------------ */
 
 namespace {
@@ -3058,33 +3143,11 @@ bool stringHasTokenAtIndex(size_t index, const std::string& input, const std::st
 
 }  // namespace
 
-Value ExpressionIndexOfBytes::evaluate(const Document& root, Variables* variables) const {
-    Value stringArg = _children[0]->evaluate(root, variables);
-
-    if (stringArg.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(40091,
-            str::stream() << "$indexOfBytes requires a string as the first argument, found: "
-                          << typeName(stringArg.getType()),
-            stringArg.getType() == String);
-    const std::string& input = stringArg.getString();
-
-    Value tokenArg = _children[1]->evaluate(root, variables);
-    uassert(40092,
-            str::stream() << "$indexOfBytes requires a string as the second argument, found: "
-                          << typeName(tokenArg.getType()),
-            tokenArg.getType() == String);
-    const std::string& token = tokenArg.getString();
-
-    size_t startIndex = 0;
-    if (_children.size() > 2) {
-        Value startIndexArg = _children[2]->evaluate(root, variables);
-        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-        startIndex = static_cast<size_t>(startIndexArg.coerceToInt());
-    }
-
+Value ExpressionIndexOfBytes::finishEvaluate(const Document& root,
+                                             Variables* variables,
+                                             const std::string& input,
+                                             const size_t startIndex,
+                                             const std::string& token) const {
     size_t endIndex = input.size();
     if (_children.size() > 3) {
         Value endIndexArg = _children[3]->evaluate(root, variables);
@@ -3097,12 +3160,32 @@ Value ExpressionIndexOfBytes::evaluate(const Document& root, Variables* variable
         return Value(-1);
     }
 
-    size_t position = input.substr(0, endIndex).find(token, startIndex);
-    if (position == std::string::npos) {
-        return Value(-1);
+    if (token.size() == 1) {
+        // Use one character search.
+        char tokenChar = token[0];
+        size_t position = input.substr(0, endIndex).find(tokenChar, startIndex);
+        if (position == std::string::npos) {
+            return Value(-1);
+        }
+        return Value(static_cast<int>(position));
+    } else if (_search == nullptr) {
+        // Token is not a constant, so use regular find function.
+        size_t position = input.substr(0, endIndex).find(token, startIndex);
+        if (position == std::string::npos) {
+            return Value(-1);
+        }
+        return Value(static_cast<int>(position));
+    } else {
+        // Use Boyer Moore.
+        const std::string toSearch = input.substr(0, endIndex);
+        auto position_pair = (*_search)(toSearch.begin() + startIndex, toSearch.end());
+        if (position_pair == std::make_pair(toSearch.end(), toSearch.end())) {
+            return Value(-1);
+        }
+        return Value(static_cast<int>(std::distance(toSearch.begin(), position_pair.first)));
     }
 
-    return Value(static_cast<int>(position));
+    invariant(0);
 }
 
 REGISTER_EXPRESSION(indexOfBytes, ExpressionIndexOfBytes::parse);
@@ -3112,41 +3195,43 @@ const char* ExpressionIndexOfBytes::getOpName() const {
 
 /* ----------------------- ExpressionIndexOfCP --------------------- */
 
-Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) const {
-    Value stringArg = _children[0]->evaluate(root, variables);
-
-    if (stringArg.nullish()) {
-        return Value(BSONNULL);
+size_t byteIndexToCodePointIndex(const std::string& input, const size_t byteIndex){
+    size_t codePointIx = 0;
+    for (size_t byteIx = 0; byteIx < input.size(); ++codePointIx) {
+        if(byteIx == byteIndex){
+            return codePointIx;
+        }
+        uassert(40095,
+                "$indexOfCP found bad UTF-8 in the input",
+                !str::isUTF8ContinuationByte(input[byteIx]));
+        byteIx += getCodePointLength(input[byteIx]);
     }
+    MONGO_UNREACHABLE;
+}
 
-    uassert(40093,
-            str::stream() << "$indexOfCP requires a string as the first argument, found: "
-                          << typeName(stringArg.getType()),
-            stringArg.getType() == String);
-    const std::string& input = stringArg.getString();
-
-    Value tokenArg = _children[1]->evaluate(root, variables);
-    uassert(40094,
-            str::stream() << "$indexOfCP requires a string as the second argument, found: "
-                          << typeName(tokenArg.getType()),
-            tokenArg.getType() == String);
-    const std::string& token = tokenArg.getString();
-
-    size_t startCodePointIndex = 0;
-    if (_children.size() > 2) {
-        Value startIndexArg = _children[2]->evaluate(root, variables);
-        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-        startCodePointIndex = static_cast<size_t>(startIndexArg.coerceToInt());
+Value ExpressionIndexOfCP::finishEvaluate(const Document& root,
+                                          Variables* variables,
+                                          const std::string& input,
+                                          const size_t startCodePointIndex,
+                                          const std::string& token) const {
+    size_t endCodePointIndex = std::numeric_limits<size_t>::max();
+    if (_children.size() > 3) {
+        Value endIndexArg = _children[3]->evaluate(root, variables);
+        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
+        endCodePointIndex = endIndexArg.coerceToInt();
     }
 
     // Compute the length (in code points) of the input, and convert 'startCodePointIndex' to a byte
-    // index.
+    // index, as well as 'endCodePointIndex'
     size_t codePointLength = 0;
     size_t startByteIndex = 0;
+    size_t endByteIndex = input.size();
     for (size_t byteIx = 0; byteIx < input.size(); ++codePointLength) {
-        if (codePointLength == startCodePointIndex) {
-            // We have determined the byte at which our search will start.
+        if(codePointLength == startCodePointIndex){
             startByteIndex = byteIx;
+        }
+        if(codePointLength == endCodePointIndex){
+            endByteIndex = byteIx;
         }
 
         uassert(40095,
@@ -3154,15 +3239,9 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
                 !str::isUTF8ContinuationByte(input[byteIx]));
         byteIx += getCodePointLength(input[byteIx]);
     }
-
-    size_t endCodePointIndex = codePointLength;
-    if (_children.size() > 3) {
-        Value endIndexArg = _children[3]->evaluate(root, variables);
-        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
-
-        // Don't let 'endCodePointIndex' exceed the number of code points in the string.
-        endCodePointIndex =
-            std::min(codePointLength, static_cast<size_t>(endIndexArg.coerceToInt()));
+    endCodePointIndex = std::min(endCodePointIndex, codePointLength);
+    if(startCodePointIndex == codePointLength){
+        startByteIndex = input.size();
     }
 
     if (startByteIndex == 0 && input.empty() && token.empty()) {
@@ -3171,19 +3250,36 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
         return Value(0);
     }
 
-    // We must keep track of which byte, and which code point, we are examining, being careful not
-    // to overflow either the length of the string or the ending code point.
-
-    size_t currentCodePointIndex = startCodePointIndex;
-    for (size_t byteIx = startByteIndex; currentCodePointIndex < endCodePointIndex;
-         ++currentCodePointIndex) {
-        if (stringHasTokenAtIndex(byteIx, input, token)) {
-            return Value(static_cast<int>(currentCodePointIndex));
+    if (_search == nullptr) {
+        // Token is not a constant, so just do a regular search.
+        size_t currentCodePointIndex = startCodePointIndex;
+        for (size_t byteIx = startByteIndex; currentCodePointIndex < endCodePointIndex;
+             ++currentCodePointIndex) {
+            if (stringHasTokenAtIndex(byteIx, input, token)) {
+                return Value(static_cast<int>(currentCodePointIndex));
+            }
+            byteIx += getCodePointLength(input[byteIx]);
         }
-        byteIx += getCodePointLength(input[byteIx]);
+        return Value(-1);
+    } else {
+        // UTF8 is a self-synchronizing code. This means that you cannot accidentally
+        // read a codepoint by starting in the middle of a code word. If you join two
+        // code words, it is guaranteed that there is no third valid code word formed
+        // somewhere in the middle of the bytes.
+        // Boyer-Moore is unaware that we are passing in UTF8 characters, but this
+        // doesn't matter because as long as the needle is valid UTF8, it will always
+        // return the starting index of a valid code word.
+        std::string toSearch = input.substr(0, endByteIndex);
+        auto position_pair = (*_search)(toSearch.begin() + startByteIndex, toSearch.end());
+        if (position_pair == std::make_pair(toSearch.end(), toSearch.end())) {
+            return Value(-1);
+        }
+        size_t byteResult = std::distance(toSearch.begin(), position_pair.first);
+        size_t codePointResult = byteIndexToCodePointIndex(input, byteResult);
+        return Value(static_cast<int>(codePointResult));
     }
 
-    return Value(-1);
+    invariant(0);
 }
 
 REGISTER_EXPRESSION(indexOfCP, ExpressionIndexOfCP::parse);
