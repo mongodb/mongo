@@ -7641,7 +7641,6 @@ tasks:
   - func: "run idl tests"
 
 - name: tla_plus
-  batchtime: 10080 # 1 week in minutes
   commands:
   - func: "do non-compile setup"
   - command: shell.exec
@@ -8908,9 +8907,10 @@ buildvariants:
   display_name: TLA+
   run_on:
   - ubuntu1804-build
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    timeout_secs: 345600 # 4 days in seconds
+    timeout_secs: 345600 # 4 days
   tasks:
   - name: tla_plus
 
