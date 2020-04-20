@@ -10,22 +10,20 @@ const runTest = function(conn, failPointConn) {
     assert.commandWorked(db.runCommand({createUser: "testuser", pwd: "pwd", roles: []}));
     db.grantRolesToUser("testuser", [{role: "readWrite", db: "test"}]);
 
-    const queryFn = function() {
-        assert.eq(db.getSiblingDB("admin").auth("testuser", "pwd"), 1);
-        let testDB = db.getSiblingDB("test");
-        testDB.test.insert({});
-        assert.eq(testDB.test.find({}).comment("curop_auth_info.js query").itcount(), 1);
-    };
+    assert.commandWorked(db.getSiblingDB("test").test.insert({}));
 
     jsTestLog("blocking finds and starting parallel shell to create op");
     assert.commandWorked(failPointConn.getDB("admin").runCommand(
         {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
-    let finderWait = startParallelShell(queryFn, conn.port);
-    let myOp;
+    let finderWait = startParallelShell(function() {
+        assert.eq(db.getSiblingDB("admin").auth("testuser", "pwd"), 1);
+        let testDB = db.getSiblingDB("test");
+        assert.eq(testDB.test.find({}).comment("curop_auth_info.js query").itcount(), 1);
+    }, conn.port);
 
+    let myOp;
     assert.soon(function() {
-        const curOpResults = db.runCommand({currentOp: 1});
-        assert.commandWorked(curOpResults);
+        const curOpResults = assert.commandWorked(db.runCommand({currentOp: 1}));
         print(tojson(curOpResults));
         const myOps = curOpResults["inprog"].filter((op) => {
             return (op["command"]["comment"] == "curop_auth_info.js query");
@@ -63,15 +61,7 @@ const m = MongoRunner.runMongod();
 runTest(m, m);
 MongoRunner.stopMongod(m);
 
-const st = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    config: 1,
-    keyFile: 'jstests/libs/key1',
-    other: {
-        shardAsReplicaSet: false,
-    }
-});
-runTest(st.s0, st.d0);
+const st = new ShardingTest({shards: 1, mongos: 1, config: 1, keyFile: 'jstests/libs/key1'});
+runTest(st.s0, st.shard0);
 st.stop();
 })();

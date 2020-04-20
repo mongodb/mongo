@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/auto_retry_transaction_in_sharding.js");
 load("jstests/libs/create_index_txn_helpers.js");
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
@@ -27,11 +28,12 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing duplicate sequential createIndexes, both succeed");
-
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     jsTest.log("Committing transaction 1");
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
@@ -50,7 +52,9 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
     assert.eq(secondSessionColl.find({}).itcount(), 1);
@@ -73,8 +77,14 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
 
-    createIndexAndCRUDInTxn(sessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(
+            sessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
+
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
     assert.eq(secondSessionColl.find({}).itcount(), 1);
@@ -98,12 +108,15 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     jsTest.log(
         "Testing duplicate createIndexes in parallel, both attempt to commit, second to commit fails");
-
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -120,7 +133,9 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     jsTest.log("Testing createIndexes inside txn and createCollection on conflicting collection " +
                "in parallel.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     assert.commandWorked(secondSessionDB.createCollection(collName));
     assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
@@ -132,12 +147,15 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     assert.commandWorked(sessionDB.dropDatabase());
     jsTest.log("Testing duplicate createIndexes which implicitly create a database in parallel" +
                ", both attempt to commit, second to commit fails");
-
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     jsTest.log("Committing transaction 2");
     secondSession.commitTransaction();
@@ -153,11 +171,15 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     jsTest.log("Testing distinct createIndexes in parallel, both successfully commit.");
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-    createIndexAndCRUDInTxn(
-        secondSessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        createIndexAndCRUDInTxn(
+            secondSessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
 
     session.commitTransaction();
     secondSession.commitTransaction();

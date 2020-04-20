@@ -19,7 +19,7 @@ const shard0Name = st.shard0.shardName;
 const shard1Name = st.shard1.shardName;
 
 const kDatabaseName = 'TestDB';
-st.enableSharding(kDatabaseName);
+st.enableSharding(kDatabaseName, st.shard1.shardName);
 
 // Creates and shard collName with 2 chunks, one per shard. Only the router referenced by st.s0
 // knows that collName is sharded, and all the shards are restarted so they don't have the
@@ -61,21 +61,18 @@ const staleMongoS = st.s1;
     insertBulkOp.insert({Key: 1});
     insertBulkOp.execute();
 
-    // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
-    assert.neq(4, freshMongoS.getDB(kDatabaseName).TestInsertColl.find().itcount());
-    assert.neq(4, staleMongoS.getDB(kDatabaseName).TestInsertColl.find().itcount());
+    assert.eq(4, freshMongoS.getDB(kDatabaseName).TestInsertColl.find().itcount());
+    assert.eq(4, staleMongoS.getDB(kDatabaseName).TestInsertColl.find().itcount());
 }
 {
     jsTest.log('Testing: Multi-update with sharded collection unknown on a stale mongos');
     setupCollectionForTest('TestUpdateColl');
 
-    var updateBulkOp = staleMongoS.getDB(kDatabaseName).TestUpdateColl.initializeUnorderedBulkOp();
-    updateBulkOp.find({}).update({$inc: {inc: 1}});
-    updateBulkOp.execute();
+    assert.commandWorked(staleMongoS.getDB(kDatabaseName)
+                             .TestUpdateColl.update({}, {$inc: {inc: 1}}, {multi: true}));
 
     var s0Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: -1});
-    // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
-    assert.neq(1, s0Doc.inc);
+    assert.eq(1, s0Doc.inc);
     var s1Doc = freshMongoS.getDB(kDatabaseName).TestUpdateColl.findOne({Key: 0});
     assert.eq(1, s1Doc.inc);
 }
@@ -83,12 +80,10 @@ const staleMongoS = st.s1;
     jsTest.log('Testing: Multi-remove with sharded collection unknown on a stale mongos');
     setupCollectionForTest('TestRemoveColl');
 
-    var removeBulkOp = staleMongoS.getDB(kDatabaseName).TestRemoveColl.initializeUnorderedBulkOp();
-    removeBulkOp.find({}).remove({});
-    removeBulkOp.execute();
+    assert.commandWorked(
+        staleMongoS.getDB(kDatabaseName).TestRemoveColl.remove({}, {justOne: false}));
 
-    // TODO (SERVER-32198): After SERVER-32198 is fixed and backported change neq to eq
-    assert.neq(0, freshMongoS.getDB(kDatabaseName).TestRemoveColl.find().itcount());
+    assert.eq(0, freshMongoS.getDB(kDatabaseName).TestRemoveColl.find().itcount());
 }
 {
     jsTest.log('Testing: Find with sharded collection unknown on a stale mongos');

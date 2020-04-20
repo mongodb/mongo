@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/auto_retry_transaction_in_sharding.js");
 load("jstests/libs/create_index_txn_helpers.js");
 
 let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
@@ -23,18 +24,18 @@ let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     secondSessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing createIndexes in a transaction");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, function() {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);
     sessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing multiple createIndexess in a transaction");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
-    session.commitTransaction();
+    withTxnAndAutoRetryOnMongos(session, function() {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+        createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);
@@ -45,16 +46,20 @@ let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
 
     jsTest.log("Testing createIndexes in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-    assert.commandWorked(session.abortTransaction_forTesting());
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
+    session.abortTransaction();
 
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
 
     jsTest.log("Testing multiple createIndexes in a transaction that aborts");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-    createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+        createIndexAndCRUDInTxn(sessionDB, secondCollName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     session.abortTransaction();
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(sessionColl.getIndexes().length, 0);
@@ -66,7 +71,9 @@ let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     jsTest.log(
         "Testing createIndexes with conflicting index specs in a transaction that aborts (SHOULD FAIL)");
     session.startTransaction({writeConcern: {w: "majority"}});
-    createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
     assert.commandFailedWithCode(
         sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
         ErrorCodes.IndexKeySpecsConflict);
