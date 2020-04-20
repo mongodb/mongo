@@ -1147,13 +1147,19 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     {
         // If the config doesn't have a term, don't change it.
         auto needBumpConfigTerm = _rsConfig.getConfigTerm() != OpTime::kUninitializedTerm;
+        auto currConfigVersionAndTerm = _rsConfig.getConfigVersionAndTerm();
         lk.unlock();
 
         if (needBumpConfigTerm) {
             // We re-write the term but keep version the same. This conceptually a no-op
             // in the config consensus group, analogous to writing a new oplog entry
             // in Raft log state machine on step up.
-            auto getNewConfig = [&](const ReplSetConfig& oldConfig, long long primaryTerm) {
+            auto getNewConfig = [&](const ReplSetConfig& oldConfig,
+                                    long long primaryTerm) -> StatusWith<ReplSetConfig> {
+                if (oldConfig.getConfigVersionAndTerm() != currConfigVersionAndTerm) {
+                    return {ErrorCodes::ConfigurationInProgress,
+                            "reconfig on step up was preempted by another reconfig"};
+                }
                 auto config = oldConfig;
                 config.setConfigTerm(primaryTerm);
                 return config;
