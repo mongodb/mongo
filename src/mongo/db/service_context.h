@@ -321,6 +321,23 @@ public:
                                     ConstructorAction constructor,
                                     DestructorAction destructor = {});
 
+        /**
+         * This constructor registers a constructor and optional destructor with the given
+         * "name", a list of names of prerequisites, "prereqs", and a list of names of dependents,
+         * "dependents".
+         *
+         * The named constructor will run after all of its prereqs successfully complete,
+         * and the corresponding destructor, if provided, will run before any of its
+         * prerequisites execute. The dependents will run after this constructor and
+         * the corresponding destructor, if provided, will run after any of its
+         * dependents execute.
+         */
+        ConstructorActionRegisterer(std::string name,
+                                    std::vector<std::string> prereqs,
+                                    std::vector<std::string> dependents,
+                                    ConstructorAction constructor,
+                                    DestructorAction destructor = {});
+
     private:
         using ConstructorActionListIterator = std::list<ConstructorDestructorActions>::iterator;
         ConstructorActionListIterator _iter;

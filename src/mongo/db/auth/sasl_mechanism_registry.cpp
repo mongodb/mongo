@@ -33,11 +33,13 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
 
@@ -146,6 +148,26 @@ bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechNam
     return sequenceContains(_enabledMechanisms, mechName);
 }
 
+void appendMechs(const std::vector<std::unique_ptr<ServerFactoryBase>>& mechs,
+                 std::vector<std::string>* pNames) {
+    std::transform(mechs.cbegin(),
+                   mechs.cend(),
+                   std::back_inserter(*pNames),
+                   [](const std::unique_ptr<mongo::ServerFactoryBase>& factory) {
+                       return factory->mechanismName().toString();
+                   });
+}
+
+std::vector<std::string> SASLServerMechanismRegistry::getMechanismNames() const {
+    std::vector<std::string> names;
+    names.reserve(_externalMechs.size() + _internalMechs.size());
+
+    appendMechs(_externalMechs, &names);
+    appendMechs(_internalMechs, &names);
+
+    return names;
+}
+
 namespace {
 ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
     "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {
@@ -153,6 +175,29 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializ
                                          std::make_unique<SASLServerMechanismRegistry>(
                                              service, saslGlobalParams.authenticationMechanisms));
     }};
+
+ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
+    "ValidateSASLServerMechanismRegistry", [](ServiceContext* service) {
+        auto supportedMechanisms = SASLServerMechanismRegistry::get(service).getMechanismNames();
+
+        // Manually include MONGODB-X509 since there is no factory for it since it not a SASL
+        // mechanism
+        supportedMechanisms.push_back(auth::kMechanismMongoX509.toString());
+
+        // Error if the user tries to use a SASL mechanism that does not exist
+        for (const auto& mech : saslGlobalParams.authenticationMechanisms) {
+            auto it = std::find(supportedMechanisms.cbegin(), supportedMechanisms.cend(), mech);
+            if (it == supportedMechanisms.end()) {
+                LOGV2_ERROR(47429001,
+                            "SASL Mechanism '{mechanism}' is not supported",
+                            "mechanism"_attr = mech);
+
+                // Quick Exit since we are in the middle of setting up ServiceContext
+                quickExit(EXIT_BADOPTIONS);
+            }
+        }
+    }};
+
 }  // namespace
 
 }  // namespace mongo

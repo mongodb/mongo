@@ -416,6 +416,15 @@ ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
     std::string name,
     std::vector<std::string> prereqs,
     ConstructorAction constructor,
+    DestructorAction destructor)
+    : ConstructorActionRegisterer(
+          std::move(name), prereqs, {}, std::move(constructor), std::move(destructor)) {}
+
+ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
+    std::string name,
+    std::vector<std::string> prereqs,
+    std::vector<std::string> dependents,
+    ConstructorAction constructor,
     DestructorAction destructor) {
     if (!destructor)
         destructor = [](ServiceContext*) {};
@@ -431,7 +440,8 @@ ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
                             registeredConstructorActions().erase(_iter);
                             return Status::OK();
                         },
-                        std::move(prereqs));
+                        std::move(prereqs),
+                        std::move(dependents));
 }
 
 ServiceContext::UniqueServiceContext ServiceContext::make() {
