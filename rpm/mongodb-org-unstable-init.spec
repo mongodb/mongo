@@ -260,6 +260,8 @@ fi
 %{_bindir}/mongos
 %{_mandir}/man1/mongos.1*
 
+%files tools
+
 %files database-tools-extra
 %defattr(-,root,root,-)
 
