@@ -429,6 +429,12 @@ void CollectionShardingRuntime::appendInfoForServerStatus(BSONArrayBuilder* buil
     }
 }
 
+void CollectionShardingRuntime::clearReceivingChunks() {
+    stdx::lock_guard lk(_metadataManagerLock);
+    invariant(_metadataType == MetadataType::kSharded);
+    _metadataManager->clearReceivingChunks();
+}
+
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
     : _nss(std::move(ns)), _opCtx(opCtx) {
     AutoGetCollection autoColl(_opCtx,

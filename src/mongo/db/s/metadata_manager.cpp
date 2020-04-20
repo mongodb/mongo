@@ -558,4 +558,9 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
         });
     return cleanupComplete;
 }
+
+void MetadataManager::clearReceivingChunks() {
+    stdx::lock_guard<Latch> lg(_managerLock);
+    _receivingChunks.clear();
+}
 }  // namespace mongo

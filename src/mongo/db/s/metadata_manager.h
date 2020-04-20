@@ -114,6 +114,11 @@ public:
     }
 
     /**
+     * Clears the items in the _receivingChunks list.
+     */
+    void clearReceivingChunks();
+
+    /**
      * Appends information on all the chunk ranges in rangesToClean to builder.
      */
     void append(BSONObjBuilder* builder) const;
