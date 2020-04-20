@@ -25,7 +25,7 @@ if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
       IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
     jsTestLog(
         'Skipping test because two phase index build and index build commit quorum are not supported.');
-    rst.stopSet();
+    rollbackTest.stop();
     return;
 }
 
