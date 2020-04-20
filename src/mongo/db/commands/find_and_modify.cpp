@@ -181,9 +181,7 @@ void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
                           << nsString.ns(),
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString));
 
-    // Check for shard version match
-    auto css = CollectionShardingState::get(opCtx, nsString);
-    css->checkShardVersionOrThrow_DEPRECATED(opCtx);
+    CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -273,8 +271,7 @@ public:
                     str::stream() << "database " << dbName << " does not exist",
                     autoColl.getDb());
 
-            auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow_DEPRECATED(opCtx);
+            CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
 
             Collection* const collection = autoColl.getCollection();
 
@@ -300,8 +297,7 @@ public:
                     str::stream() << "database " << dbName << " does not exist",
                     autoColl.getDb());
 
-            auto css = CollectionShardingState::get(opCtx, nsString);
-            css->checkShardVersionOrThrow_DEPRECATED(opCtx);
+            CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
 
             Collection* const collection = autoColl.getCollection();
             const auto exec =

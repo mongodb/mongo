@@ -86,6 +86,19 @@ const staleMongoS = st.s1;
     assert.eq(0, freshMongoS.getDB(kDatabaseName).TestRemoveColl.find().itcount());
 }
 {
+    jsTest.log('Testing: Find-and-modify with sharded collection unknown on a stale mongos');
+    setupCollectionForTest('TestFindAndModifyColl');
+
+    assert.eq(null, staleMongoS.getDB(kDatabaseName).TestFindAndModifyColl.findAndModify({
+        query: {Key: -2},
+        update: {Key: -2},
+        upsert: true
+    }));
+
+    assert.eq({Key: -2},
+              freshMongoS.getDB(kDatabaseName).TestFindAndModifyColl.findOne({Key: -2}, {_id: 0}));
+}
+{
     jsTest.log('Testing: Find with sharded collection unknown on a stale mongos');
     setupCollectionForTest('TestFindColl');
 
