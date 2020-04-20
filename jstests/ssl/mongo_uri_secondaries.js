@@ -61,16 +61,14 @@ const subShellCommandFormatter = function(replSet) {
     return command;
 };
 
-const subShellArgs = [
-    "env",
-    "SSL_CERT_FILE=jstests/libs/trusted-ca.pem",
-    'mongo',
-    '--nodb',
-    '--eval',
-    subShellCommandFormatter(rst)
-];
+function runWithEnv(args, env) {
+    const pid = _startMongoProgram({args: args, env: env});
+    return waitProgram(pid);
+}
 
-const retVal = _runMongoProgram(...subShellArgs);
+const subShellArgs = ['mongo', '--nodb', '--eval', subShellCommandFormatter(rst)];
+
+const retVal = runWithEnv(subShellArgs, {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"});
 assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
 
 rst.stopSet();
