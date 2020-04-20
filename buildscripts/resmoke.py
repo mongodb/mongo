@@ -4,11 +4,11 @@
 import os
 import os.path
 import random
+import shlex
 import subprocess
 import sys
 import tarfile
 import time
-import shlex
 
 import pkg_resources
 import requests
