@@ -539,9 +539,6 @@ var authCommandsLib = {
           skipSharded: true,
           setup: function(db) {
               assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
-              // SERVER-47441 `movePrimary` is a mongos only command.
-              db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
-              db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
@@ -4956,9 +4953,6 @@ var authCommandsLib = {
           command: {renameCollection: firstDbName + ".x", to: secondDbName + ".y"},
           setup: function(db) {
               assert.writeOK(db.getSisterDB(firstDbName).x.save({}));
-              // SERVER-47441 `movePrimary` is a mongos only command.
-              db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
-              db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
           },
           teardown: function(db) {
               db.getSisterDB(firstDbName).x.drop();
