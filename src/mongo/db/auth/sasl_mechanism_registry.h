@@ -357,6 +357,8 @@ public:
         return true;
     }
 
+    std::vector<std::string> getMechanismNames() const;
+
 private:
     using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
 
@@ -390,6 +392,7 @@ public:
     GlobalSASLMechanismRegisterer() {
         registerer.emplace(std::string(typeid(Factory).name()),
                            std::vector<std::string>{"CreateSASLServerMechanismRegistry"},
+                           std::vector<std::string>{"ValidateSASLServerMechanismRegistry"},
                            [](ServiceContext* service) {
                                SASLServerMechanismRegistry::get(service).registerFactory<Factory>();
                            });
