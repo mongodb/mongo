@@ -2,11 +2,7 @@
 // identify documents by checking that there is a supporting unique, non-partial,
 // collator-compatible index in the index catalog. This is meant to test sharding-related
 // configurations that are not covered by the aggregation passthrough suites.
-//
-// Requires blacklist from multiversion suites because a v4.2 node doesn't have the required logic
-// to refresh its DatabaseShardingState on receiving a StaleDbVersion. A v4.2 node will retry a
-// $merge indefinitely until the test fails.
-// @tags: [requires_fcv_44]
+
 (function() {
 "use strict";
 

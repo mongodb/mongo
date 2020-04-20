@@ -46,7 +46,10 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
     auto chunkVersion = ChunkVersion::parseFromCommand(request.body);
     if (chunkVersion != ErrorCodes::NoSuchKey) {
         batchRequest.setShardVersion(uassertStatusOK(std::move(chunkVersion)));
-        if (chunkVersion == ChunkVersion::UNSHARDED()) {
+
+        if (chunkVersion == ChunkVersion::UNSHARDED() &&
+            (serverGlobalParams.featureCompatibility.getVersion() ==
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44)) {
             auto dbVersion = DatabaseVersion::parse(IDLParserErrorContext("BatchedCommandRequest"),
                                                     request.body);
             batchRequest.setDbVersion(std::move(dbVersion));

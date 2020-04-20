@@ -534,8 +534,13 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     auto dbVersion = targetedBatch.getEndpoint().databaseVersion;
     invariant((shardVersion == ChunkVersion::UNSHARDED() && dbVersion) ||
               (shardVersion != ChunkVersion::UNSHARDED() && !dbVersion));
-    if (dbVersion)
-        request.setDbVersion(dbVersion.get());
+
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        if (dbVersion) {
+            request.setDbVersion(dbVersion.get());
+        }
+    }
 
     if (_clientRequest.hasWriteConcern()) {
         if (_clientRequest.isVerboseWC()) {
