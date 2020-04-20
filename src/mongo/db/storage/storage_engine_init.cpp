@@ -177,9 +177,10 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
 }
 
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
-    invariant(service->getStorageEngine());
+    auto storageEngine = service->getStorageEngine();
+    invariant(storageEngine);
     StorageControl::stopStorageControls(service);
-    service->getStorageEngine()->cleanShutdown();
+    storageEngine->cleanShutdown();
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {
         lockFile->clearPidAndUnlock();

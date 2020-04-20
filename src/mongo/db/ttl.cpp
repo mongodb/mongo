@@ -57,9 +57,16 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/exit.h"
 
 namespace mongo {
+
+class TTLMonitor;
+
+namespace {
+
+const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
+
+}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 
@@ -72,15 +79,29 @@ ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocume
 
 class TTLMonitor : public BackgroundJob {
 public:
-    TTLMonitor(ServiceContext* serviceContext) : _serviceContext(serviceContext) {}
-    virtual ~TTLMonitor() {}
+    explicit TTLMonitor() : BackgroundJob(false /* selfDelete */) {}
 
-    virtual std::string name() const {
+    static TTLMonitor* get(ServiceContext* serviceCtx) {
+        return getTTLMonitor(serviceCtx).get();
+    }
+
+    static void set(ServiceContext* serviceCtx, std::unique_ptr<TTLMonitor> monitor) {
+        auto& ttlMonitor = getTTLMonitor(serviceCtx);
+        if (ttlMonitor) {
+            invariant(!ttlMonitor->running(),
+                      "Tried to reset the TTLMonitor without shutting down the original instance.");
+        }
+
+        invariant(monitor);
+        ttlMonitor = std::move(monitor);
+    }
+
+    std::string name() const {
         return "TTLMonitor";
     }
 
-    virtual void run() {
-        ThreadClient tc(name(), _serviceContext);
+    void run() {
+        ThreadClient tc(name(), getGlobalServiceContext());
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
         {
@@ -88,10 +109,19 @@ public:
             tc.get()->setSystemOperationKillable(lk);
         }
 
-        while (!globalInShutdownDeprecated()) {
+        while (true) {
             {
+                // Wait until either ttlMonitorSleepSecs passes or a shutdown is requested.
+                auto deadline = Date_t::now() + Seconds(ttlMonitorSleepSecs.load());
+                stdx::unique_lock<Latch> lk(_stateMutex);
+
                 MONGO_IDLE_THREAD_BLOCK;
-                sleepsecs(ttlMonitorSleepSecs.load());
+                _shuttingDownCV.wait_until(
+                    lk, deadline.toSystemTimePoint(), [&] { return _shuttingDown; });
+
+                if (_shuttingDown) {
+                    return;
+                }
             }
 
             LOGV2_DEBUG(22528, 3, "thread awake");
@@ -121,7 +151,24 @@ public:
         }
     }
 
+    /**
+     * Signals the thread to quit and then waits until it does.
+     */
+    void shutdown() {
+        LOGV2(36841000, "Shutting down TTL collection monitor thread");
+        {
+            stdx::lock_guard<Latch> lk(_stateMutex);
+            _shuttingDown = true;
+            _shuttingDownCV.notify_one();
+        }
+        wait();
+        LOGV2(36841001, "Finished shutting down TTL collection monitor thread");
+    }
+
 private:
+    /**
+     * Gets all TTL indexes from every collection and performs doTTLForIndex().
+     */
     void doTTLPass() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
@@ -207,7 +254,7 @@ private:
     }
 
     /**
-     * Remove documents from the collection using the specified TTL index after a sufficient amount
+     * Removes documents from the collection using the specified TTL index after a sufficient amount
      * of time has passed according to its expiry specification.
      */
     void doTTLForIndex(OperationContext* opCtx, NamespaceString collectionNSS, BSONObj idx) {
@@ -340,19 +387,29 @@ private:
         LOGV2_DEBUG(22536, 1, "deleted: {numDeleted}", "numDeleted"_attr = numDeleted);
     }
 
-    ServiceContext* _serviceContext;
+    // Protects the state below.
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");
+
+    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
+    // _shuttingDown is set and stop accordingly.
+    mutable stdx::condition_variable _shuttingDownCV;
+
+    bool _shuttingDown = false;
 };
 
-namespace {
-// The global TTLMonitor object is intentionally leaked.  Even though it is only used in one
-// function, we declare it here to indicate to the leak sanitizer that the leak of this object
-// should not be reported.
-TTLMonitor* ttlMonitor = nullptr;
-}  // namespace
-
-void startTTLBackgroundJob(ServiceContext* serviceContext) {
-    ttlMonitor = new TTLMonitor(serviceContext);
+void startTTLMonitor(ServiceContext* serviceContext) {
+    std::unique_ptr<TTLMonitor> ttlMonitor = std::make_unique<TTLMonitor>();
     ttlMonitor->go();
+    TTLMonitor::set(serviceContext, std::move(ttlMonitor));
+}
+
+void shutdownTTLMonitor(ServiceContext* serviceContext) {
+    TTLMonitor* ttlMonitor = TTLMonitor::get(serviceContext);
+    // We allow the TTLMonitor not to be set in case shutdown occurs before the thread has been
+    // initialized.
+    if (ttlMonitor) {
+        ttlMonitor->shutdown();
+    }
 }
 
 }  // namespace mongo

@@ -686,7 +686,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             LOGV2(20553,
                   "**          For more info see http://dochub.mongodb.org/core/ttlcollections");
         } else {
-            startTTLBackgroundJob(serviceContext);
+            startTTLMonitor(serviceContext);
         }
 
         if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsMaster) {
@@ -1240,6 +1240,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     stopMongoDFTDC();
 
     HealthLog::get(serviceContext).shutdown();
+    shutdownTTLMonitor(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
     //

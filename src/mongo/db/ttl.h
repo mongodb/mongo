@@ -33,6 +33,15 @@ namespace mongo {
 
 class ServiceContext;
 
-void startTTLBackgroundJob(ServiceContext* serviceContext);
+/**
+ * Instantiates the TTLMonitor to periodically remove documents from TTL collections. Safe to call
+ * again after shutdownTTLMonitor() has been called.
+ */
+void startTTLMonitor(ServiceContext* serviceContext);
+
+/**
+ * Shuts down the TTLMonitor if it is running. Safe to call multiple times.
+ */
+void shutdownTTLMonitor(ServiceContext* serviceContext);
 
 }  // namespace mongo
