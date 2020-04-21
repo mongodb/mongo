@@ -33,7 +33,6 @@
 #include <cstdlib>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -71,7 +70,8 @@ void BsonTemplateEvaluator::addOperator(const std::string& name, const OperatorF
 
 BsonTemplateEvaluator::OperatorFn BsonTemplateEvaluator::operatorEvaluator(
     const std::string& op) const {
-    return mapFindWithDefault(_operatorFunctions, op, OperatorFn());
+    auto iter = _operatorFunctions.find(op);
+    return iter == _operatorFunctions.end() ? nullptr : iter->second;
 }
 
 /* This is the top level method for using this library. It takes a BSON Object as input,

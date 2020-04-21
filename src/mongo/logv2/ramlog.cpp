@@ -33,7 +33,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo::logv2 {
@@ -159,13 +158,10 @@ RamLog* RamLog::get(const std::string& name) {
         _named = new RM();
     }
 
-    RamLog* result = mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
-    if (!result) {
-        result = new RamLog(name);
-        (*_named)[name] = result;
-    }
-
-    return result;
+    auto [iter, isNew] = _named->try_emplace(name);
+    if (isNew)
+        iter->second = new RamLog(name);
+    return iter->second;
 }
 
 RamLog* RamLog::getIfExists(const std::string& name) {
@@ -173,7 +169,8 @@ RamLog* RamLog::getIfExists(const std::string& name) {
         return NULL;
     }
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
-    return mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
+    auto iter = _named->find(name);
+    return iter == _named->end() ? nullptr : iter->second;
 }
 
 void RamLog::getNames(std::vector<string>& names) {

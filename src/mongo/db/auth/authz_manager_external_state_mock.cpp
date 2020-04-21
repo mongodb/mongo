@@ -46,7 +46,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -274,7 +273,10 @@ Status AuthzManagerExternalStateMock::remove(OperationContext* opCtx,
 
 std::vector<BSONObj> AuthzManagerExternalStateMock::getCollectionContents(
     const NamespaceString& collectionName) {
-    return mapFindWithDefault(_documents, collectionName, std::vector<BSONObj>());
+    auto iter = _documents.find(collectionName);
+    if (iter != _documents.end())
+        return iter->second;
+    return {};
 }
 
 Status AuthzManagerExternalStateMock::_findOneIter(OperationContext* opCtx,

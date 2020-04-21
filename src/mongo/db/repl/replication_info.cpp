@@ -65,7 +65,6 @@
 #include "mongo/transport/ismaster_metrics.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/map_util.h"
 
 namespace mongo {
 
@@ -501,11 +500,9 @@ public:
 
         result.append("readOnly", storageGlobalParams.readOnly);
 
-        const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
-                                                  "automationServiceDescriptor",
-                                                  static_cast<ServerParameter*>(nullptr));
-        if (parameter)
-            parameter->append(opCtx, result, "automationServiceDescriptor");
+        const auto& params = ServerParameterSet::getGlobal()->getMap();
+        if (auto iter = params.find("automationServiceDescriptor"); iter != params.end())
+            iter->second->append(opCtx, result, "automationServiceDescriptor");
 
         if (opCtx->getClient()->session()) {
             MessageCompressorManager::forSession(opCtx->getClient()->session())

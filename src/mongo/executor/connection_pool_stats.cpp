@@ -32,7 +32,6 @@
 #include "mongo/executor/connection_pool_stats.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/map_util.h"
 
 namespace mongo {
 namespace executor {

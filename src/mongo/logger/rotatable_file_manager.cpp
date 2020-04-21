@@ -32,7 +32,6 @@
 #include "mongo/logger/rotatable_file_manager.h"
 
 #include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/util/map_util.h"
 
 namespace mongo {
 namespace logger {
@@ -61,7 +60,8 @@ StatusWithRotatableFileWriter RotatableFileManager::openFile(const std::string& 
 }
 
 RotatableFileWriter* RotatableFileManager::getFile(const std::string& name) {
-    return mapFindWithDefault(_writers, name, static_cast<RotatableFileWriter*>(nullptr));
+    auto iter = _writers.find(name);
+    return iter == _writers.end() ? nullptr : iter->second;
 }
 
 RotatableFileManager::FileNameStatusPairVector RotatableFileManager::rotateAll(

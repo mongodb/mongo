@@ -35,7 +35,6 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/invariant.h"
-#include "mongo/util/map_util.h"
 
 #include <sstream>
 
@@ -166,7 +165,8 @@ vector<string> MockReplicaSet::getSecondaries() const {
 }
 
 MockRemoteDBServer* MockReplicaSet::getNode(const string& hostAndPort) {
-    return mapFindWithDefault(_nodeMap, hostAndPort, static_cast<MockRemoteDBServer*>(nullptr));
+    auto iter = _nodeMap.find(hostAndPort);
+    return iter == _nodeMap.end() ? nullptr : iter->second;
 }
 
 repl::ReplSetConfig MockReplicaSet::getReplConfig() const {

@@ -39,7 +39,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -123,22 +122,16 @@ void recordEndAndRemove(BgInfoMap& bgiMap, StringData key) {
 }
 
 void awaitNoBgOps(stdx::unique_lock<Latch>& lk, BgInfoMap* bgiMap, StringData key) {
-    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(*bgiMap, key, std::shared_ptr<BgInfo>());
-    if (!bgInfo)
-        return;
-    bgInfo->awaitNoBgOps(lk);
+    if (auto iter = bgiMap->find(key); iter != bgiMap->end())
+        iter->second->awaitNoBgOps(lk);
 }
 
 }  // namespace
 
 void BackgroundOperation::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, StringData ns) {
     stdx::unique_lock<Latch> lk(m);
-    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(nsInProg, ns, std::shared_ptr<BgInfo>());
-    if (!bgInfo) {
-        // There are no index builds in progress on the collection, so no need to wait.
-        return;
-    }
-    bgInfo->waitForAnOpRemoval(lk, opCtx);
+    if (auto iter = nsInProg.find(ns); iter != nsInProg.end())
+        iter->second->waitForAnOpRemoval(lk, opCtx);
 }
 
 bool BackgroundOperation::inProgForDb(StringData db) {
@@ -148,10 +141,8 @@ bool BackgroundOperation::inProgForDb(StringData db) {
 
 int BackgroundOperation::numInProgForDb(StringData db) {
     stdx::lock_guard<Latch> lk(m);
-    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(dbsInProg, db, std::shared_ptr<BgInfo>());
-    if (!bgInfo)
-        return 0;
-    return bgInfo->getOpsInProgCount();
+    auto iter = dbsInProg.find(db);
+    return iter == dbsInProg.end() ? 0 : iter->second->getOpsInProgCount();
 }
 
 bool BackgroundOperation::inProgForNs(StringData ns) {

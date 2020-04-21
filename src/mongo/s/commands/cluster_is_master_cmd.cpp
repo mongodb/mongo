@@ -44,7 +44,6 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/transport/message_compressor_manager.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
 
@@ -170,11 +169,12 @@ public:
         result.append("maxWireVersion", WireSpec::instance().incomingExternalClient.maxWireVersion);
         result.append("minWireVersion", WireSpec::instance().incomingExternalClient.minWireVersion);
 
-        const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
-                                                  "automationServiceDescriptor",
-                                                  static_cast<ServerParameter*>(nullptr));
-        if (parameter)
-            parameter->append(opCtx, result, "automationServiceDescriptor");
+        {
+            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
+            auto iter = serverParams.find("automationServiceDescriptor");
+            if (iter != serverParams.end())
+                iter->second->append(opCtx, result, "automationServiceDescriptor");
+        }
 
         MessageCompressorManager::forSession(opCtx->getClient()->session())
             .serverNegotiate(cmdObj, &result);
