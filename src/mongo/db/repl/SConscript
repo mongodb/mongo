@@ -10,6 +10,7 @@ env.Library(
         env.Idlc('repl_server_parameters.idl')[0]
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ]
 )
@@ -925,6 +926,7 @@ env.Library(
         'initial_syncer',
         'data_replicator_external_state_initial_sync',
         'repl_coordinator_interface',
+        'repl_server_parameters',
         'repl_settings',
         'replica_set_messages',
         'replication_process',

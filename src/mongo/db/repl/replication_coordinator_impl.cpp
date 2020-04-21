@@ -42,6 +42,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -3539,11 +3541,33 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
 
     HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
     // Always allow chaining while in catchup and drain mode.
-    auto chainingPreference = _getMemberState_inlock().primary()
+    auto memberState = _getMemberState_inlock();
+    auto chainingPreference = memberState.primary()
         ? TopologyCoordinator::ChainingPreference::kAllowChaining
         : TopologyCoordinator::ChainingPreference::kUseConfiguration;
-    HostAndPort newSyncSource =
-        _topCoord->chooseNewSyncSource(_replExecutor->now(), lastOpTimeFetched, chainingPreference);
+    ReadPreference readPreference = ReadPreference::Nearest;
+    // Handle special case of initial sync source read preference.
+    // This sync source will be cleared when we go to secondary mode, because we will perform
+    // a postMemberState action of kOnFollowerModeStateChange which calls chooseNewSyncSource().
+    if (memberState.startup2() && _selfIndex != -1) {
+        if (!initialSyncSourceReadPreference.empty()) {
+            try {
+                readPreference =
+                    ReadPreference_parse(IDLParserErrorContext("initialSyncSourceReadPreference"),
+                                         initialSyncSourceReadPreference);
+            } catch (const DBException& e) {
+                fassertFailedWithStatus(3873100, e.toStatus());
+            }
+            // If read preference is explictly set, it takes precedence over chaining: false.
+            chainingPreference = TopologyCoordinator::ChainingPreference::kAllowChaining;
+        }
+    }
+    HostAndPort newSyncSource = _topCoord->chooseNewSyncSource(
+        _replExecutor->now(), lastOpTimeFetched, chainingPreference, readPreference);
+    auto primary = _topCoord->getCurrentPrimaryMember();
+    // If read preference is SecondaryOnly, we should never choose the primary.
+    invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
+              primary->getHostAndPort() != newSyncSource);
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.

@@ -32,6 +32,7 @@
 #include <iosfwd>
 #include <string>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -186,10 +187,15 @@ public:
 
     /**
      * Chooses and sets a new sync source, based on our current knowledge of the world.
+     * If chaining is disabled in the configuration and chainingPreference is kUseConfiguration,
+     * only the primary will be selected (regardless of read preference).  Otherwise,
+     * the readPreference is respected.  Chaining disabled with SecondaryOnly read preference is
+     * not allowed.
      */
     HostAndPort chooseNewSyncSource(Date_t now,
                                     const OpTime& lastOpTimeFetched,
-                                    ChainingPreference chainingPreference);
+                                    ChainingPreference chainingPreference,
+                                    ReadPreference readPreference);
 
     /**
      * Suppresses selecting "host" as sync source until "until".
@@ -709,6 +715,11 @@ public:
     bool checkIfCommitQuorumIsSatisfied(const CommitQuorumOptions& commitQuorum,
                                         const std::vector<HostAndPort>& commitReadyMembers) const;
 
+    /**
+     * Returns nullptr if there is no primary, or the MemberConfig* for the current primary.
+     */
+    const MemberConfig* getCurrentPrimaryMember() const;
+
     ////////////////////////////////////////////////////////////
     //
     // Test support methods
@@ -791,6 +802,25 @@ private:
     // Returns the number of heartbeat pings which have occurred.
     int _getTotalPings();
 
+    // Does preliminary checks involved in choosing sync source
+    // * Do we have a valid configuration?
+    // * Do we have a forced sync source?
+    // * Have we gotten enough pings?
+    // Returns a HostAndPort if one is decided (may be empty), boost:none if we need to move to the
+    // next step.
+    boost::optional<HostAndPort> _chooseSyncSourceInitialStep(Date_t now);
+
+    // Returns the primary node if it is a valid sync source, otherwise returns an empty
+    // HostAndPort.
+    HostAndPort _choosePrimaryAsSyncSource(Date_t now, const OpTime& lastOpTimeFetched);
+
+    // Chooses a sync source among available nodes.  ReadPreference may be any value but
+    // PrimaryOnly, but PrimaryPreferred is treated the same as "Nearest" (it is assumed
+    // the caller will handle PrimaryPreferred by trying _choosePrimaryAsSyncSource() first)
+    HostAndPort _chooseNearbySyncSource(Date_t now,
+                                        const OpTime& lastOpTimeFetched,
+                                        ReadPreference readPreference);
+
     // Returns the current "ping" value for the given member by their address
     Milliseconds _getPing(const HostAndPort& host);
 
@@ -841,9 +871,6 @@ private:
      * nullptr if memberId is not found in the configuration.
      */
     MemberData* _findMemberDataByMemberId(const int memberId);
-
-    // Returns NULL if there is no primary, or the MemberConfig* for the current primary
-    const MemberConfig* _currentPrimaryMember() const;
 
     /**
      * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
@@ -974,6 +1001,9 @@ private:
     typedef std::map<HostAndPort, PingStats> PingMap;
     // Ping stats for each member by HostAndPort;
     PingMap _pings;
+    // For the purpose of deciding on a sync source, we count only pings for nodes which are in our
+    // current config.
+    int pingsInConfig = 0;
 
     // V1 last vote info for elections
     LastVote _lastVote{OpTime::kInitialTerm, -1};

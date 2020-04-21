@@ -48,6 +48,7 @@ env.Library(
     ],
     source=[
         'read_preference.cpp',
+        env.Idlc('read_preference.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
