@@ -32,7 +32,8 @@
 namespace mongo {
 namespace feature_compatibility_version_documentation {
 constexpr StringData kCompatibilityLink =
-    "http://dochub.mongodb.org/core/4.0-feature-compatibility"_sd;
-constexpr StringData kUpgradeLink = "http://dochub.mongodb.org/core/4.0-upgrade-fcv"_sd;
+    "https://docs.mongodb.com/master/release-notes/4.4-compatibility/#feature-compatibility"_sd;
+constexpr StringData kUpgradeLink =
+    "https://docs.mongodb.com/master/release-notes/4.4/#upgrade-procedures"_sd;
 }  // namespace feature_compatibility_version_documentation
 }  // namespace mongo
