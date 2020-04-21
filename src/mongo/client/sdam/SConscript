@@ -31,16 +31,41 @@ env.Library(
 sdam_json_test = env.Program(
     target='sdam_json_test',
     source=[
-        'sdam_json_test_runner.cpp',
-        env.Idlc('sdam_json_test_runner_cli_options.idl')[0]],
+        'sdam_json_test_runner.cpp'],
     AIB_COMPONENT="sdam-json-test",
     LIBDEPS=[
         'sdam',
         'sdam_test',
+        'json_test',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser'],
+        '$BUILD_DIR/mongo/client/connection_string'],
 )[0]
+
+server_selection_json_test = env.Program(
+    target='server_selection_json_test',
+    source=[
+        'server_selection_json_test_runner.cpp'],
+    AIB_COMPONENT="server-selection-json-test",
+    LIBDEPS=[
+        'sdam',
+        'sdam_test',
+        'json_test',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/client/connection_string'],
+)[0]
+
+env.Library(
+    target='json_test',
+    source=[
+        'json_test_arg_parser.cpp',
+        env.Idlc('json_test_runner_cli_options.idl')[0],
+    ],
+    LIBDEPS=[
+        'sdam',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+)
 
 env.Library(
     target='sdam_test',

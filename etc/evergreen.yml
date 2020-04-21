@@ -3829,7 +3829,8 @@ tasks:
           - "library_dependency_graph.json"
           - "patch_files.txt"
           - "pytests/**"
-          - "src/mongo/client/sdam/json_tests/**"
+          - "src/mongo/client/sdam/json_tests/sdam_tests/**"
+          - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
           - "src/mongo/db/modules/enterprise/docs/**"
           - "src/mongo/db/modules/enterprise/jstests/**"
           - "src/mongo/db/modules/subscription/jstests/**"
@@ -4000,6 +4001,18 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=sdam_json_test
+
+- name: server_selection_json_test
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: install-server-selection-json-test
+        task_compile_flags: >-
+          --detect-odr-violations
+        compiling_for_test: true
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=server_selection_json_test
 
 ## dbtest ##
 - name: dbtest
@@ -8565,6 +8578,10 @@ task_groups:
   tasks:
   - server_discovery_and_monitoring_json_test
 - <<: *compile_task_group_template
+  name: server_selection_json_test_TG
+  tasks:
+  - server_selection_json_test
+- <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
   - dbtest
@@ -8751,6 +8768,7 @@ buildvariants:
   - name: sharding_gen
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
@@ -9540,6 +9558,7 @@ buildvariants:
   - name: sharding_gen
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
@@ -9576,6 +9595,7 @@ buildvariants:
   - name: buildscripts_test
   - name: noPassthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
   - name: dbtest_TG
     distros:
       - windows-64-vs2019-large
@@ -9637,6 +9657,7 @@ buildvariants:
     - name: replica_sets_ese_gen
     - name: sasl
     - name: server_discovery_and_monitoring_json_test_TG
+    - name: server_selection_json_test_TG
     - name: .sharding .txns
     - name: sharding_auth_gen
     - name: sharding_auth_audit_gen
@@ -10082,6 +10103,7 @@ buildvariants:
     distros:
         - rhel62-small
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - name: enterprise-rhel-62-64-bit-large-txns-format
   display_name: "Enterprise RHEL 6.2 (large transactions format)"
@@ -11269,6 +11291,7 @@ buildvariants:
     - ubuntu1604-build
   - name: buildscripts_test
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
@@ -12090,6 +12113,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - name: ubuntu1804-asan
   display_name: ~ ASAN Ubuntu 18.04
@@ -12177,6 +12201,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
@@ -12200,6 +12225,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
   - name: jsCore
   - name: jsCore_txns
 

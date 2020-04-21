@@ -54,6 +54,7 @@ enum class TopologyType {
 };
 const std::vector<TopologyType> allTopologyTypes();
 std::string toString(const TopologyType topologyType);
+StatusWith<TopologyType> parseTopologyType(StringData strTopologyType);
 std::ostream& operator<<(std::ostream& os, const TopologyType topologyType);
 
 enum class ServerType {

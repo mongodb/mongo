@@ -40,7 +40,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/sdam/sdam_json_test_runner_cli_options_gen.h"
+#include "mongo/client/sdam/json_test_arg_parser.h"
 #include "mongo/client/sdam/topology_manager.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
@@ -52,17 +52,18 @@
 
 /**
  * This program runs the Server Discover and Monitoring JSON test files located in
- * the src/monogo/client/sdam/json_tests sub-directory.
+ * the src/monogo/client/sdam/json_tests/sdam_tests sub-directory.
  *
  * The process return code conforms to the UNIX idiom of 0 to indicate success and non-zero to
  * indicate failure. In the case of test failure, the process will return the number of test cases
  * that failed.
  *
  * Example invocation to run all tests:
- *  sdam_json_test --source-dir src/monogo/client/sdam/json_tests
+ *  sdam_json_test --source-dir src/monogo/client/sdam/json_tests/sdam_tests
  *
  * Example invocation to run a single test:
- *  sdam_json_test --source-dir src/monogo/client/sdam/json_tests --filter normalize_uri_case
+ *  sdam_json_test --source-dir src/monogo/client/sdam/json_tests/sdam_tests --filter
+ * normalize_uri_case
  */
 
 namespace fs = boost::filesystem;
@@ -77,105 +78,6 @@ std::string emphasize(const std::string text) {
     output << border << " " << text << " " << border << std::endl;
     return output.str();
 }
-
-class ArgParser {
-public:
-    ArgParser(int argc, char* argv[]) {
-        moe::OptionsParser parser;
-        moe::Environment environment;
-        moe::OptionSection options;
-
-        Status ret = addCliOptions(&options);
-        if (!ret.isOK()) {
-            std::cerr << "Unexpected error adding cli options: " << ret.toString() << std::endl;
-            MONGO_UNREACHABLE;
-        }
-
-        ret = parser.run(options, toStringVector(argc, argv), {}, &environment);
-        if (argc <= 1 || !ret.isOK() || environment.count("help")) {
-            if (!ret.isOK()) {
-                std::cerr << "An error occurred: " << ret.toString() << std::endl;
-            }
-            printHelpAndExit(argv[0], options.helpString());
-        }
-
-        const auto exitIfError = [](Status status) {
-            if (!status.isOK()) {
-                std::cerr << "An error occurred: " << status.toString() << std::endl;
-                std::exit(kArgParseExitCode);
-            }
-        };
-
-        if (environment.count(kSourceDirOption)) {
-            ret = environment.get(kSourceDirOption, &_sourceDirectory);
-            exitIfError(ret);
-        }
-
-        if (environment.count(moe::Key(kFilterOption))) {
-            ret = environment.get(moe::Key(kFilterOption), &_testFilters);
-            exitIfError(ret);
-        }
-
-        if (environment.count(moe::Key(kVerbose))) {
-            std::string value;
-            ret = environment.get(moe::Key(kVerbose), &value);
-            if (!ret.isOK())
-                exitIfError(ret);
-            _verbose = value.size() + 1;
-        }
-    }
-
-    void LogParams() const {
-        LOGV2(20199, "Verbosity: {verbose}", "verbose"_attr = _verbose);
-        LOGV2(20200,
-              "Source Directory: {sourceDirectory}",
-              "sourceDirectory"_attr = _sourceDirectory);
-        if (_testFilters.size()) {
-            LOGV2(20201,
-                  "Filters: {boost_join_testFilters}",
-                  "boost_join_testFilters"_attr = boost::join(_testFilters, ", "));
-        }
-    }
-
-    const std::string& SourceDirectory() const {
-        return _sourceDirectory;
-    }
-
-    const std::vector<std::string>& TestFilters() const {
-        return _testFilters;
-    }
-
-    int Verbose() const {
-        return _verbose;
-    }
-
-private:
-    constexpr static auto kSourceDirOption = "source-dir";
-    constexpr static auto kSourceDirDefault = ".";
-
-    constexpr static auto kFilterOption = "filter";
-
-    constexpr static int kHelpExitCode = 0;
-    constexpr static int kArgParseExitCode = 1024;
-
-    constexpr static auto kVerbose = "verbose";
-
-    std::string _sourceDirectory = kSourceDirDefault;
-    std::vector<std::string> _testFilters;
-    int _verbose = 0;
-
-    void printHelpAndExit(char* programName, const std::string desc) {
-        std::cout << programName << ":" << std::endl << desc << std::endl;
-        std::exit(kHelpExitCode);
-    }
-
-    std::vector<std::string> toStringVector(int n, char** array) {
-        std::vector<std::string> result;
-        for (int i = 0; i < n; ++i)
-            result.push_back(array[i]);
-        return result;
-    }
-};
 
 /**
  * This class is responsible for parsing and executing a single 'phase' of the json test
@@ -609,7 +511,7 @@ private:
             } else {
                 // We can technically choose either kUnknown or kSharded and be compliant,
                 // but it seems that some of the json tests assume kUnknown as the initial state.
-                // see: json_tests/sharded/normalize_uri_case.json
+                // see: json_tests/sdam_tests/sharded/normalize_uri_case.json
                 _initialType = TopologyType::kUnknown;
             }
         } else {

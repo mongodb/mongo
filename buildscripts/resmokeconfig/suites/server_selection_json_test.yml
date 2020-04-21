@@ -1,0 +1,7 @@
+test_kind: server_selection_json_test
+
+selector:
+  roots:
+  - src/mongo/client/sdam/json_tests/server_selection_tests/**/*.json
+
+executor: {}
